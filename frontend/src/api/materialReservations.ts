@@ -3,37 +3,38 @@ import {
   CreateMaterialReservationRequest, 
   UpdateMaterialReservationRequest, 
   MaterialReservation, 
-  MaterialAvailabilityResponse 
+  MaterialAvailabilityResponse,
+  ApiResponse
 } from './types';
 
 export const materialReservationApi = {
   // Создать резервирование
   createReservation: async (data: CreateMaterialReservationRequest): Promise<MaterialReservation> => {
-    const response = await api.post('/material-reservations', data);
+    const response = await api.post<ApiResponse<MaterialReservation>>('/material-reservations', data);
     return response.data.data;
   },
 
   // Получить все резервирования
   getAllReservations: async (): Promise<MaterialReservation[]> => {
-    const response = await api.get('/material-reservations');
+    const response = await api.get<ApiResponse<MaterialReservation[]>>('/material-reservations');
     return response.data.data;
   },
 
   // Получить резервирования по материалу
   getReservationsByMaterial: async (materialId: number): Promise<MaterialReservation[]> => {
-    const response = await api.get(`/material-reservations/material/${materialId}`);
+    const response = await api.get<ApiResponse<MaterialReservation[]>>(`/material-reservations/material/${materialId}`);
     return response.data.data;
   },
 
   // Получить доступное количество материала
   getAvailableQuantity: async (materialId: number): Promise<MaterialAvailabilityResponse> => {
-    const response = await api.get(`/material-reservations/available/${materialId}`);
+    const response = await api.get<ApiResponse<MaterialAvailabilityResponse>>(`/material-reservations/available/${materialId}`);
     return response.data.data;
   },
 
   // Обновить резервирование
   updateReservation: async (id: number, data: UpdateMaterialReservationRequest): Promise<MaterialReservation> => {
-    const response = await api.put(`/material-reservations/${id}`, data);
+    const response = await api.put<ApiResponse<MaterialReservation>>(`/material-reservations/${id}`, data);
     return response.data.data;
   },
 
@@ -49,7 +50,7 @@ export const materialReservationApi = {
 
   // Очистить истекшие резервирования
   cleanupExpiredReservations: async (): Promise<{ expired_count: number }> => {
-    const response = await api.post('/material-reservations/cleanup/expired');
+    const response = await api.post<ApiResponse<{ expired_count: number }>>('/material-reservations/cleanup/expired');
     return response.data.data;
   }
 };

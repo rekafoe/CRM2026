@@ -43,8 +43,9 @@ export const BulkRulesCreator: React.FC<BulkRulesCreatorProps> = ({
   const loadMaterials = async () => {
     try {
       setLoading(true)
-      const materialsData = await getMaterials()
-      setMaterials(materialsData)
+      const materialsResponse = await getMaterials()
+      // backend может возвращать расширенные поля — приводим к локальному типу
+      setMaterials((materialsResponse as any).data || [])
     } catch (error) {
       console.error('Ошибка загрузки материалов:', error)
     } finally {

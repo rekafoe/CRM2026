@@ -167,35 +167,9 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
 
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
-        console.warn('API requests failed, using mock data for demonstration');
-
-        // Mock data for demonstration when API is not available
-        if (serviceRes.status === 'rejected') {
-          setServicePrices([
-            { id: 1, name: 'Цифровая цветная печать', price_per_unit: 2.5, unit: 'per_sheet', is_active: true },
-            { id: 2, name: 'Резка на гильотине', price_per_unit: 0.15, unit: 'per_cut', is_active: true },
-            { id: 3, name: 'Ламинация матовая', price_per_unit: 0.8, unit: 'per_sheet', is_active: true }
-          ]);
-        }
-
-        if (markupRes.status === 'rejected') {
-          setMarkupSettings([
-            { id: 1, setting_name: 'base_markup', setting_value: 2.2, description: 'Базовая наценка на все продукты', is_active: true },
-            { id: 2, setting_name: 'equipment_cost_per_sheet', setting_value: 0.05, description: 'Стоимость оборудования за лист', is_active: true },
-            { id: 3, setting_name: 'minimum_order_value', setting_value: 5.0, description: 'Минимальная стоимость заказа', is_active: true }
-          ]);
-        }
-
-        if (discountRes.status === 'rejected') {
-          setQuantityDiscounts([
-            { id: 1, min_quantity: 1, max_quantity: 9, discount_percent: 0, description: 'Без скидки', is_active: true },
-            { id: 2, min_quantity: 10, max_quantity: 24, discount_percent: 3, description: 'Скидка 3% от 10 листов', is_active: true },
-            { id: 3, min_quantity: 25, max_quantity: 49, discount_percent: 5, description: 'Скидка 5% от 25 листов', is_active: true },
-            { id: 4, min_quantity: 50, max_quantity: null, discount_percent: 10, description: 'Скидка 10% от 50 листов', is_active: true }
-          ]);
-        }
-
-        setError('⚠️ Демонстрационные данные загружены. API сервер не доступен.');
+        // По правилам проекта не используем хардкод/моки: просто показываем ошибку.
+        console.warn('API requests failed:', failed);
+        setError('Не удалось загрузить часть данных ценообразования. Проверьте доступность API.');
       }
     } catch (error) {
       setError('Ошибка загрузки данных ценообразования');

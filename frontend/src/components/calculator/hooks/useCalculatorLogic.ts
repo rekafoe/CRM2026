@@ -39,12 +39,15 @@ export const useCalculatorLogic = () => {
       // ⚠️ DEPRECATED: Этот код НЕ должен использоваться!
       // В новом калькуляторе (ImprovedPrintingCalculatorModal) используется useCalculatorPricingActions
       
+      const priceTotal = Number((response as any)?.finalPrice ?? (response as any)?.price_total ?? 0);
+      const pricePerItem = Number((response as any)?.pricePerUnit ?? (specs.quantity ? priceTotal / specs.quantity : 0));
+
       const result: CalculationResult = {
-        productName: response.data.productName || specs.productType,
+        productName: (response as any)?.productName || specs.productType,
         specifications: specs,
-        pricePerItem: response.data.pricePerItem || response.data.unitPrice || 0,
-        totalCost: response.data.totalPrice || response.data.totalCost || 0,
-        materials: (response.data.materials || []).map((m: any) => ({
+        pricePerItem,
+        totalCost: priceTotal,
+        materials: (Array.isArray((response as any)?.materials) ? (response as any).materials : []).map((m: any) => ({
           material: typeof m.material === 'string' ? m.material : m.material?.name || 'Неизвестно',
           quantity: m.quantity || 0,
           unit: m.unit || 'шт',
@@ -52,9 +55,16 @@ export const useCalculatorLogic = () => {
           // ❌ НЕПРАВИЛЬНО: считаем total на фронте! Должно быть m.total от бэкенда!
           total: m.total || ((m.cost || m.price || m.unitPrice || 0) * (m.quantity || 0))
         })),
-        services: response.data.services || [],
-        productionTime: response.data.productionTime || response.data.estimatedTime || '1 день',
-        deliveryDate: response.data.deliveryDate || new Date().toISOString()
+        services: (Array.isArray((response as any)?.operations) ? (response as any).operations : []).map((op: any) => ({
+          service: op?.name || op?.service || 'Операция',
+          price: op?.unit_price || op?.price || 0,
+          total: op?.subtotal || op?.total || 0,
+          operationId: op?.id,
+          quantity: op?.qty,
+          unit: op?.unit,
+        })),
+        productionTime: (response as any)?.estimatedTime || '1 день',
+        deliveryDate: new Date().toISOString()
       };
 
       logger.info('✅ Расчет завершен', { 

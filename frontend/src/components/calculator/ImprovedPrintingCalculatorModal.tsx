@@ -188,7 +188,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const prevPrintTechRef = useRef<string>('');
   const prevPrintColorRef = useRef<'bw' | 'color' | null>(null);
   const isFirstRenderRef = useRef(true);
-  const calculationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const calculationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   useEffect(() => {
     // Пропускаем первый рендер

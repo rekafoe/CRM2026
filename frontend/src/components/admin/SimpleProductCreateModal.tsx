@@ -143,8 +143,8 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
           />
         </FormField>
 
-        <div style={{ display: 'flex', gap: 12 }}>
-          <FormField label="Иконка (эмодзи)" style={{ flex: 1 }}>
+        <div className="flex gap-3">
+          <FormField label="Иконка (эмодзи)" className="flex-1">
             <input
               className="form-input"
               value={icon}
@@ -153,7 +153,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
               placeholder="📦"
             />
           </FormField>
-          <FormField label="Тип калькулятора" style={{ flex: 1 }}>
+          <FormField label="Тип калькулятора" className="flex-1">
             <select
               className="form-select"
               value={calculatorType}
@@ -190,7 +190,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
           </select>
         </FormField>
 
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
+        <div className="flex gap-3 justify-end mt-2">
           <Button variant="secondary" onClick={handleClose} disabled={submitting}>
             Отмена
           </Button>

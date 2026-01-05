@@ -8,6 +8,7 @@ interface AnimatedTransitionProps {
   duration?: number
   delay?: number
   className?: string
+  onExited?: () => void
 }
 
 export const AnimatedTransition: React.FC<AnimatedTransitionProps> = ({
@@ -16,7 +17,8 @@ export const AnimatedTransition: React.FC<AnimatedTransitionProps> = ({
   animation = 'fade',
   duration = 300,
   delay = 0,
-  className = ''
+  className = '',
+  onExited
 }) => {
   const [isVisible, setIsVisible] = useState(show)
   const [shouldRender, setShouldRender] = useState(show)
@@ -32,6 +34,7 @@ export const AnimatedTransition: React.FC<AnimatedTransitionProps> = ({
       setIsVisible(false)
       const timer = setTimeout(() => {
         setShouldRender(false)
+        onExited?.()
       }, duration)
       return () => clearTimeout(timer)
     }

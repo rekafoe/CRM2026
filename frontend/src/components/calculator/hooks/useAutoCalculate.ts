@@ -49,7 +49,7 @@ export function useAutoCalculate({
   isCustomFormat
 }: UseAutoCalculateParams) {
   const isFirstRender = useRef(true);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const specsRef = useRef(specs);
   const lastSpecsKeyRef = useRef<string>('');
   const isCalculatingRef = useRef(false);

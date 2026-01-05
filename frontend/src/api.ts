@@ -468,6 +468,21 @@ export const calcUniversalPrice = (payload: {
   params: { productType: payload.productType, ...payload.specifications }
 });
 
+// Universal Calculator rules (материальные правила)
+export type UniversalCalculatorRulePayload = {
+  id?: number;
+  product_type: string;
+  product_name: string;
+  material_id: number;
+  qty_per_item: number;
+  calculation_type: 'per_item' | 'per_sheet' | 'per_sqm' | 'fixed';
+  is_required: boolean;
+  notes?: string;
+};
+
+export const createOrUpdateRule = (rule: UniversalCalculatorRulePayload) =>
+  api.post('/universal-calculator/rules', rule);
+
 
 // Категории материалов
 export const getMaterialCategories = () => api.get<any[]>('/material-categories');

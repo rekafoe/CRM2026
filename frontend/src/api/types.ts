@@ -148,3 +148,17 @@ export interface MaterialFilters {
   page?: number;
   limit?: number;
 }
+
+// Реэкспорт базовых сущностей из shared (единый источник правды для типов)
+export type {
+  Material,
+  Order,
+  User,
+  Category,
+  Supplier,
+  ProductSpecs,
+  CalculationResult,
+  OrderItem,
+  OrderFile,
+  MaterialReservation as SharedMaterialReservation,
+} from '../../../shared/types/entities';

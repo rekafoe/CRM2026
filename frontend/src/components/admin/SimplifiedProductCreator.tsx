@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Button, FormField, Alert } from '../common';
 import { ProductCategory } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
+import { getErrorMessage } from '../../utils/errorUtils';
 import './ProductManagement.css';
 
 interface SimplifiedProductCreatorProps {
@@ -84,7 +85,7 @@ const PRODUCT_TEMPLATES = {
       { name: 'quantity', type: 'number', label: 'Количество', min_value: 1, max_value: 100000, is_required: true, sort_order: 1 },
     ],
   },
-};
+} as const;
 
 type TemplateKey = keyof typeof PRODUCT_TEMPLATES;
 
@@ -103,7 +104,10 @@ export const SimplifiedProductCreator: React.FC<SimplifiedProductCreatorProps> =
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const createProductWithSetup = useProductDirectoryStore((state) => state.createProductWithSetup);
+  type ProductDirectoryStoreState = ReturnType<typeof useProductDirectoryStore.getState>;
+  const createProductWithSetup = useProductDirectoryStore(
+    (state: ProductDirectoryStoreState) => state.createProductWithSetup
+  );
 
   const handleTemplateSelect = (templateKey: TemplateKey) => {
     setSelectedTemplate(templateKey);
@@ -139,11 +143,13 @@ export const SimplifiedProductCreator: React.FC<SimplifiedProductCreatorProps> =
         operations: [], // операции будут добавлены автоматически через autoOperationType
         autoOperationType: template.autoOperationType,
         materials: [],
-        parameters: template.parameters.map((param, index) => ({
-          ...param,
-          options: Array.isArray(param.options) ? JSON.stringify(param.options) : param.options,
-          sort_order: param.sort_order ?? index,
-        })),
+        parameters: template.parameters.map((param, index) => {
+          const base: any = { ...param, sort_order: (param as any).sort_order ?? index };
+          if ('options' in param) {
+            base.options = JSON.stringify((param as any).options ?? []);
+          }
+          return base;
+        }),
         template: {
           trim_size: {},
           print_run: { enabled: false },
@@ -182,18 +188,18 @@ export const SimplifiedProductCreator: React.FC<SimplifiedProductCreatorProps> =
       isOpen={visible}
       onClose={handleClose}
       title="Создать продукт"
-      size="large"
+      size="lg"
     >
       <div className="simplified-product-creator">
         {error && (
-          <Alert type="error" style={{ marginBottom: '20px' }}>
+          <Alert type="error" className="mb-5">
             {error}
           </Alert>
         )}
 
         {step === 1 && (
           <div className="template-selection">
-            <h3 style={{ marginBottom: '16px' }}>Выберите тип продукта</h3>
+            <h3 className="mb-4">Выберите тип продукта</h3>
             <div className="template-grid">
               {(Object.keys(PRODUCT_TEMPLATES) as TemplateKey[]).map((key) => {
                 const template = PRODUCT_TEMPLATES[key];
@@ -219,48 +225,48 @@ export const SimplifiedProductCreator: React.FC<SimplifiedProductCreatorProps> =
               variant="secondary"
               size="sm"
               onClick={() => setStep(1)}
-              style={{ marginBottom: '16px' }}
+              className="mb-4"
             >
               ← Назад к шаблонам
             </Button>
 
-            <div className="selected-template-info" style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '32px', marginBottom: '8px' }}>
+            <div className="selected-template-info mb-5">
+              <div className="text-2xl mb-2">
                 {PRODUCT_TEMPLATES[selectedTemplate].icon}
               </div>
               <h3>{PRODUCT_TEMPLATES[selectedTemplate].name}</h3>
-              <p style={{ color: '#666', fontSize: '14px' }}>
+              <p className="text-sm text-muted">
                 {PRODUCT_TEMPLATES[selectedTemplate].description}
               </p>
             </div>
 
-            <FormField
-              label="Категория"
-              type="select"
-              value={selectedCategory?.toString() || ''}
-              onChange={(e) => setSelectedCategory(Number(e.target.value))}
-              required
-            >
-              <option value="">Выберите категорию</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.icon} {cat.name}
-                </option>
-              ))}
+            <FormField label="Категория" required>
+              <select
+                className="form-select"
+                value={selectedCategory?.toString() || ''}
+                onChange={(e) => setSelectedCategory(Number(e.target.value))}
+              >
+                <option value="">Выберите категорию</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.icon} {cat.name}
+                  </option>
+                ))}
+              </select>
             </FormField>
 
-            <FormField
-              label="Название продукта"
-              type="text"
-              value={customName}
-              onChange={(e) => setCustomName(e.target.value)}
-              placeholder={`Например: ${PRODUCT_TEMPLATES[selectedTemplate].name} A4`}
-              required
-            />
+            <FormField label="Название продукта" required>
+              <input
+                className="form-input"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder={`Например: ${PRODUCT_TEMPLATES[selectedTemplate].name} A4`}
+              />
+            </FormField>
 
-            <Alert type="info" style={{ marginTop: '20px' }}>
+            <Alert type="info" className="mt-5">
               <strong>Что будет создано:</strong>
-              <ul style={{ marginTop: '8px', marginLeft: '20px' }}>
+              <ul className="mt-2 ml-5 list-disc">
                 <li>Продукт с базовыми настройками</li>
                 <li>
                   Параметры: {PRODUCT_TEMPLATES[selectedTemplate].parameters.length} полей
@@ -272,7 +278,7 @@ export const SimplifiedProductCreator: React.FC<SimplifiedProductCreatorProps> =
           </div>
         )}
 
-        <div className="modal-actions" style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+        <div className="modal-actions mt-6 flex gap-3 justify-end">
           <Button variant="secondary" onClick={handleClose} disabled={submitting}>
             Отмена
           </Button>
@@ -287,60 +293,6 @@ export const SimplifiedProductCreator: React.FC<SimplifiedProductCreatorProps> =
           )}
         </div>
       </div>
-
-      <style>{`
-        .template-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 16px;
-        }
-
-        .template-card {
-          background: white;
-          border: 2px solid #e0e0e0;
-          border-radius: 8px;
-          padding: 20px;
-          cursor: pointer;
-          transition: all 0.2s;
-          text-align: center;
-        }
-
-        .template-card:hover {
-          border-color: #4CAF50;
-          box-shadow: 0 4px 12px rgba(76, 175, 80, 0.15);
-          transform: translateY(-2px);
-        }
-
-        .template-icon {
-          font-size: 48px;
-          margin-bottom: 12px;
-        }
-
-        .template-name {
-          font-weight: 600;
-          font-size: 16px;
-          margin-bottom: 8px;
-          color: #333;
-        }
-
-        .template-description {
-          font-size: 13px;
-          color: #666;
-          line-height: 1.4;
-        }
-
-        .selected-template-info {
-          background: #f5f5f5;
-          padding: 20px;
-          border-radius: 8px;
-          text-align: center;
-        }
-
-        .selected-template-info h3 {
-          margin: 8px 0;
-          color: #333;
-        }
-      `}</style>
     </Modal>
   );
 };

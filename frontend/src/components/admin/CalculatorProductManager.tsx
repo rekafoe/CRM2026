@@ -240,7 +240,7 @@ const CalculatorProductManager: React.FC = () => {
         customerType: testCalculation.customerType as 'regular' | 'vip'
       });
       
-      setCalcResult(result.data || result);
+      setCalcResult(result);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Ошибка расчета цены');
       console.error('Calculation error:', err);
@@ -301,6 +301,8 @@ const CalculatorProductManager: React.FC = () => {
       calcResult={calcResult}
     />
   );
+
+  const renderAnalyticsTab = () => <AnalyticsTab />;
 
 
   return (

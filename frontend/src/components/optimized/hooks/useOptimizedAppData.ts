@@ -37,7 +37,7 @@ export const useOptimizedAppData = (
   }>({ currentUser: null, contextUserId: null, contextDate: null });
   
   const loadingRef = useRef(false);
-  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Загрузка начальных данных
   useEffect(() => {

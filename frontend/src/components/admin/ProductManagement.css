@@ -198,6 +198,61 @@
   min-width: 180px;
 }
 
+/* =================================
+   SimplifiedProductCreator (без инлайн-стилей)
+   ================================= */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.template-card {
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.template-card:hover {
+  border-color: #4CAF50;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.15);
+  transform: translateY(-2px);
+}
+
+.template-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.template-name {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.template-description {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.selected-template-info {
+  background: #f5f5f5;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.selected-template-info h3 {
+  margin: 8px 0;
+  color: #333;
+}
+
 .product-controls__select:hover {
   border-color: #cbd5e0;
 }

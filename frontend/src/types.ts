@@ -3,6 +3,9 @@ export type LaminationType = 'none' | 'matte' | 'glossy';
 export type PaymentMethod = 'online' | 'offline' | 'telegram';
 export type OrderStatus = 'new' | 'in_production' | 'ready_to_ship' | 'shipped' | 'completed';
 
+// Реэкспорт типов калькулятора из shared, чтобы импорты вида "../../types" работали консистентно
+export type { ProductSpecs, CalculationResult } from '../../shared/types/entities';
+
 export interface ItemParams {
   description: string;
   paperDensity?: number;
