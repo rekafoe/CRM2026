@@ -3,16 +3,14 @@ import { hashPassword } from '../utils'
 import { randomBytes } from 'crypto'
 
 async function ensureOrderStatuses(db: any): Promise<void> {
-  const row = await db.get('SELECT COUNT(1) as c FROM order_statuses') as { c?: number } | undefined
-  const count = Number(row?.c || 0)
-  if (count > 0) return
-
   const statuses = [
     { name: 'Новый', color: '#9e9e9e', sort_order: 1 },
     { name: 'В производстве', color: '#1976d2', sort_order: 2 },
     { name: 'Готов к отправке', color: '#ffa000', sort_order: 3 },
     { name: 'Отправлен', color: '#7b1fa2', sort_order: 4 },
-    { name: 'Завершён', color: '#2e7d32', sort_order: 5 }
+    { name: 'Завершён', color: '#2e7d32', sort_order: 5 },
+    { name: 'Отменен', color: '#dc3545', sort_order: 6 },
+    { name: 'Возврат', color: '#ffc107', sort_order: 7 }
   ]
 
   for (const s of statuses) {
@@ -23,7 +21,10 @@ async function ensureOrderStatuses(db: any): Promise<void> {
       s.sort_order
     )
   }
-  console.log('✅ Order statuses seeded (bootstrap)')
+
+  const row = await db.get('SELECT COUNT(1) as c FROM order_statuses') as { c?: number } | undefined
+  const count = Number(row?.c || 0)
+  console.log(`✅ Order statuses ensured (bootstrap): ${count}`)
 }
 
 async function runMigrations(): Promise<void> {
