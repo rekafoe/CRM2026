@@ -240,7 +240,12 @@ export class OrderService {
       
       if (orderInOrders) {
         // Обновляем обычный заказ
-        await db.run('UPDATE orders SET status = ?, updatedAt = datetime("now") WHERE id = ?', [status, id])
+        try {
+          await db.run('UPDATE orders SET status = ?, updatedAt = datetime(\"now\") WHERE id = ?', [status, id])
+        } catch {
+          // На некоторых схемах есть только updated_at
+          await db.run('UPDATE orders SET status = ?, updated_at = datetime(\"now\") WHERE id = ?', [status, id])
+        }
 
         // Если статус "принят в работу" (id = 2), подтверждаем резервы по заказу
         if (Number(status) === 2) {
