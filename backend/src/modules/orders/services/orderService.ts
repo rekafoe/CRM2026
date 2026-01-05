@@ -221,7 +221,13 @@ export class OrderService {
     const db = await getDb()
     
     // Сначала проверяем, есть ли заказ в таблице photo_orders (Telegram заказы)
-    const telegramOrder = await db.get('SELECT id FROM photo_orders WHERE id = ?', [id])
+    let telegramOrder: any = null
+    try {
+      telegramOrder = await db.get('SELECT id FROM photo_orders WHERE id = ?', [id])
+    } catch {
+      // photo_orders может отсутствовать на некоторых инстансах/БД — считаем, что телеграм-заказа нет
+      telegramOrder = null
+    }
     
     if (telegramOrder) {
       await db.run('UPDATE photo_orders SET status = ?, updated_at = datetime("now") WHERE id = ?', [status, id])
