@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vite --port 5173",
-    "build": "node ./node_modules/vite/bin/vite.js build",
+    "build": "node ./node_modules/typescript/bin/tsc --noEmit && node ./node_modules/vite/bin/vite.js build",
     "preview": "vite preview --port 5173",
     "build:widget": "vite --config vite.widget.config.ts build"
   },
