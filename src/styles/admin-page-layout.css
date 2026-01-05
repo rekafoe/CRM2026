@@ -1,0 +1,109 @@
+/* Базовые стили для админ страниц */
+.admin-page,
+.admin-page-layout {
+  min-height: 100vh;
+  background: #f8f9fa;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100%;
+}
+
+.admin-page-header {
+  background: white;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.admin-page-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-page-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.back-btn {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.back-btn:hover {
+  background: #5a6268;
+}
+
+.admin-page-content {
+  padding: 0;
+  max-width: 100% !important;
+  margin: 0 !important;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  min-height: calc(100vh - 100px);
+  width: 100%;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .admin-page-header {
+    padding: 10px 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .admin-page-header h1 {
+    font-size: 18px;
+  }
+  
+  .admin-page-content {
+    padding: 0;
+    margin: 0;
+  }
+}
+
+/* Специальные стили для разных типов страниц */
+.admin-page-layout.reports-page {
+  background: #f8f9fa;
+}
+
+.admin-page-layout.materials-page {
+  background: #f8f9fa;
+}
+
+.admin-page-layout.warehouse-page {
+  background: #f8f9fa;
+}
+
+.admin-page-layout.pricing-page {
+  background: #f8f9fa;
+}
+
+.admin-page-layout.settings-page {
+  background: #f8f9fa;
+}
+
+.admin-page-layout.calculator-page {
+  background: #f8f9fa;
+}

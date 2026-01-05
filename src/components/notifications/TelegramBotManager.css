@@ -1,0 +1,362 @@
+.telegram-bot-manager {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-primary);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.telegram-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.telegram-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.telegram-tabs {
+  display: flex;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.telegram-tabs button {
+  flex: 1;
+  padding: 15px 20px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 3px solid transparent;
+}
+
+.telegram-tabs button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.telegram-tabs button.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  background: var(--bg-primary);
+}
+
+.telegram-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* Конфигурация */
+.telegram-config h3,
+.telegram-test h3,
+.telegram-users h3 {
+  margin: 0 0 20px 0;
+  color: var(--text-primary);
+  font-size: 1.3rem;
+}
+
+.config-section,
+.test-section,
+.users-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.config-item,
+.test-item,
+.message-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.config-item label,
+.test-item label,
+.message-item label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.config-help {
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  margin-top: 5px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  border-left: 3px solid var(--primary-color);
+}
+
+.config-item input,
+.test-item textarea,
+.message-item textarea,
+.message-item select {
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.config-item input:focus,
+.test-item textarea:focus,
+.message-item textarea:focus,
+.message-item select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.config-item input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.config-actions,
+.test-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* Кнопки */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btn-secondary {
+  background: var(--secondary-color);
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--secondary-hover);
+}
+
+/* Предупреждения */
+.warning {
+  padding: 15px;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 6px;
+  color: #856404;
+  margin-top: 15px;
+}
+
+/* Пользователи */
+.users-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.stat-label {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.stat-value {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.message-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.role-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.role-selector label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-direction: row !important;
+}
+
+.send-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.users-list h4 {
+  margin: 20px 0 15px 0;
+  color: var(--text-primary);
+}
+
+.users-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
+}
+
+.user-card {
+  padding: 15px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.user-card:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.user-info {
+  margin-bottom: 10px;
+}
+
+.user-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 5px;
+}
+
+.user-role {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.user-email {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.user-telegram {
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.telegram-connected {
+  color: #28a745;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.telegram-disconnected {
+  color: #dc3545;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Загрузка */
+.loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .telegram-bot-manager {
+    width: 95%;
+    max-height: 95vh;
+  }
+  
+  .telegram-tabs {
+    flex-direction: column;
+  }
+  
+  .telegram-tabs button {
+    border-bottom: none;
+    border-right: 3px solid transparent;
+  }
+  
+  .telegram-tabs button.active {
+    border-right-color: var(--primary-color);
+    border-bottom-color: transparent;
+  }
+  
+  .users-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .users-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .send-buttons {
+    flex-direction: column;
+  }
+  
+  .role-selector {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

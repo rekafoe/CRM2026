@@ -1,0 +1,434 @@
+/* Pricing Manager Styles */
+.pricing-manager-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.pricing-manager-modal {
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  width: 100%;
+  max-width: 1000px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pricing-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent-primary);
+  color: white;
+}
+
+.pricing-manager-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: white;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.close-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.pricing-manager-tabs {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tab-button {
+  flex: 1;
+  padding: 16px 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-button:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.tab-button.active {
+  color: #667eea;
+  border-bottom-color: #667eea;
+  background: white;
+}
+
+.pricing-manager-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #6b7280;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error {
+  text-align: center;
+  padding: 40px;
+  color: #dc2626;
+}
+
+.error button {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Base Prices Tab */
+.pricing-manager-modal .base-prices-tab h3 {
+  margin: 0 0 24px 0;
+  color: #374151;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.pricing-manager-modal .price-group {
+  margin-bottom: 32px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.pricing-manager-modal .price-group h4 {
+  margin: 0 0 16px 0;
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.pricing-manager-modal .price-table {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.pricing-manager-modal .price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 0;
+}
+
+.pricing-manager-modal .variant-name {
+  font-weight: 500;
+  color: #374151;
+  flex: 1;
+}
+
+.pricing-manager-modal .price-values {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pricing-manager-modal .price {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pricing-manager-modal .price.urgent {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pricing-manager-modal .price.online {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.pricing-manager-modal .price.promo {
+  background: #dcfce7;
+  color: #166534;
+}
+
+/* Multipliers Tab */
+.pricing-manager-modal .multipliers-tab h3 {
+  margin: 0 0 24px 0;
+  color: #374151;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.pricing-manager-modal .multipliers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.pricing-manager-modal .multiplier-card {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  transition: all 0.2s;
+  position: relative;
+  z-index: 1;
+}
+
+.pricing-manager-modal .multiplier-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.pricing-manager-modal .multiplier-card.urgent {
+  border-color: #f59e0b;
+  background: var(--bg-warning);
+}
+
+.pricing-manager-modal .multiplier-card.online {
+  border-color: #3b82f6;
+  background: var(--bg-info);
+}
+
+.pricing-manager-modal .multiplier-card.promo {
+  border-color: #10b981;
+  background: var(--bg-success);
+}
+
+.pricing-manager-modal .multiplier-card h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pricing-manager-modal .multiplier-value {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.pricing-manager-modal .multiplier-card.urgent .multiplier-value {
+  color: #92400e;
+}
+
+.pricing-manager-modal .multiplier-card.online .multiplier-value {
+  color: #1e40af;
+}
+
+.pricing-manager-modal .multiplier-card.promo .multiplier-value {
+  color: #166534;
+}
+
+.pricing-manager-modal .multiplier-card p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* Discounts Tab */
+.pricing-manager-modal .discounts-tab h3 {
+  margin: 0 0 20px 0;
+  color: #374151;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.pricing-manager-modal .discount-section {
+  margin-bottom: 32px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.pricing-manager-modal .discount-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.pricing-manager-modal .discount-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 0;
+}
+
+.pricing-manager-modal .discount-condition {
+  font-weight: 500;
+  color: #374151;
+  flex: 1;
+}
+
+.pricing-manager-modal .discount-value {
+  background: #10b981;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  margin-left: 12px;
+}
+
+/* Footer */
+.pricing-manager-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #e5e7eb;
+  background: #f8f9fa;
+}
+
+.btn-primary, .btn-secondary {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background: #667eea;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #5a67d8;
+}
+
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #4b5563;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pricing-manager-modal {
+    margin: 10px;
+    max-height: 95vh;
+  }
+  
+  .pricing-manager-tabs {
+    flex-direction: column;
+  }
+  
+  .tab-button {
+    text-align: left;
+  }
+  
+  .pricing-manager-modal .price-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .pricing-manager-modal .price-values {
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+  }
+  
+  .pricing-manager-modal .multipliers-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .pricing-manager-modal .discount-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .pricing-manager-modal .discount-value {
+    margin-left: 0;
+    margin-top: 4px;
+  }
+}
+

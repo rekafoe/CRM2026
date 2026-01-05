@@ -1,0 +1,357 @@
+/* UserManagement.css - Стили для управления пользователями */
+
+/* Основной контейнер */
+.user-management {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Заголовок */
+.user-management-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 16px;
+}
+
+.user-management-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-management-back-btn {
+  padding: 8px 16px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.user-management-title {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.user-management-description {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.user-management-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-management-create-btn {
+  padding: 8px 16px;
+  background-color: var(--accent-primary);
+  color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* Статистика пользователей */
+.user-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.user-stat-card {
+  padding: 16px;
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.user-stat-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.user-stat-value.admin {
+  color: var(--error);
+}
+
+.user-stat-value.manager {
+  color: var(--accent-primary);
+}
+
+.user-stat-value.user {
+  color: var(--accent-light);
+}
+
+.user-stat-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Список пользователей */
+.users-list {
+  background-color: var(--bg-primary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.users-list-header {
+  background-color: var(--bg-secondary);
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: bold;
+}
+
+.users-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.users-loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.users-scroll-container {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.user-item {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.user-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.user-info {
+  flex: 1;
+}
+
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.user-name {
+  font-weight: bold;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.user-role-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.user-role-badge.admin {
+  background-color: var(--error);
+  color: var(--bg-primary);
+}
+
+.user-role-badge.manager {
+  background-color: var(--accent-primary);
+  color: var(--bg-primary);
+}
+
+.user-role-badge.user {
+  background-color: var(--accent-light);
+  color: var(--bg-primary);
+}
+
+.user-api-badge {
+  padding: 4px 8px;
+  background-color: var(--accent-light);
+  color: var(--bg-primary);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.user-details {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.user-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.user-edit-btn {
+  padding: 6px 12px;
+  background-color: var(--accent-light);
+  color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.user-token-btn {
+  padding: 6px 12px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.user-delete-btn {
+  padding: 6px 12px;
+  background-color: var(--error);
+  color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: 'pointer';
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Модальные окна */
+.user-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+}
+
+.user-modal {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  width: 400px;
+  max-width: 90%;
+}
+
+.user-modal-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.user-modal-title {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.user-modal-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px;
+}
+
+.user-modal-body {
+  padding: 20px;
+}
+
+.user-modal-description {
+  margin: '0 0 16px 0';
+  color: var(--text-secondary);
+}
+
+.user-modal-text {
+  margin: '0 0 20px 0';
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Формы */
+.user-form {
+  padding: 20px;
+}
+
+.user-form-group {
+  margin-bottom: 16px;
+}
+
+.user-form-label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.user-form-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.user-form-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.user-form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.user-btn-secondary {
+  padding: 8px 16px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.user-btn-primary {
+  padding: 8px 16px;
+  background-color: var(--accent-primary);
+  color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}

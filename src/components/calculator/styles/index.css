@@ -1,0 +1,146 @@
+/* ========================================
+   ГЛАВНЫЙ ФАЙЛ СТИЛЕЙ КАЛЬКУЛЯТОРА
+   ======================================== */
+
+/* Импортируем все стили калькулятора */
+@import './calculator-base.css';
+@import './calculator-product-selection.css';
+@import './calculator-forms.css';
+@import './calculator-results.css';
+@import './calculator-presets.css';
+@import './calculator-sidebar.css';
+@import './calculator-compact.css';
+
+/* Дополнительные утилиты для калькулятора */
+.calculator-hidden {
+  display: none !important;
+}
+
+.calculator-visible {
+  display: block !important;
+}
+
+.calculator-fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.calculator-fade-out {
+  animation: fadeOut 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* Скрытие скроллбаров для WebKit */
+.calculator-content::-webkit-scrollbar,
+.calculator-body::-webkit-scrollbar,
+.product-selection-grid::-webkit-scrollbar,
+.presets-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.calculator-content::-webkit-scrollbar-track,
+.calculator-body::-webkit-scrollbar-track,
+.product-selection-grid::-webkit-scrollbar-track,
+.presets-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.calculator-content::-webkit-scrollbar-thumb,
+.calculator-body::-webkit-scrollbar-thumb,
+.product-selection-grid::-webkit-scrollbar-thumb,
+.presets-body::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.calculator-content::-webkit-scrollbar-thumb:hover,
+.calculator-body::-webkit-scrollbar-thumb:hover,
+.product-selection-grid::-webkit-scrollbar-thumb:hover,
+.presets-body::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Улучшенные переходы */
+.calculator-section,
+.product-selection-card,
+.preset-card,
+.material-option,
+.format-option,
+.side-option {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Фокус для доступности */
+.calculator-btn:focus,
+.calculator-input:focus,
+.calculator-select:focus,
+.parameter-input:focus,
+.parameter-select:focus {
+  outline: 2px solid #007bff;
+  outline-offset: 2px;
+}
+
+/* Улучшенные тени */
+.calculator-content {
+  box-shadow: 
+    0 10px 30px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.calculator-section:hover {
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(0, 123, 255, 0.1);
+}
+
+/* Анимации загрузки */
+.calculator-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.calculator-loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}

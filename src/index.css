@@ -1,0 +1,60 @@
+:root { --c:#0f172a; --b:#f6f7f8; --br:#e5e7eb; --p:#1976d2; --d:#c00; }
+*{ box-sizing:border-box; }
+html,body,#root{ height:100%; margin:0; font-family: system-ui, -apple-system, Arial, sans-serif; color:var(--c); background:var(--b); }
+.app{ display:flex; height:100%; }
+.sidebar{ width:280px; background:#fff; border-right:1px solid var(--br); display:flex; flex-direction:column; padding:16px; gap:8px }
+.sidebar h2{ font-size:1.1rem; margin:6px 0 }
+.add-order-btn{ padding:10px; border:1px solid var(--p); background:var(--p); color:#fff; border-radius:6px; cursor:pointer }
+.btn-danger{ padding:10px; border:1px solid var(--d); background:#fff; color:var(--d); border-radius:6px; cursor:pointer }
+.order-list{ list-style:none; padding:0; margin:0; overflow:auto }
+.order-item{ padding:8px 10px; margin-bottom:8px; border:1px solid var(--br); border-radius:6px; background:#fff; cursor:pointer }
+.order-item.active{ border-color:var(--p); outline:2px solid rgba(25,118,210,.15) }
+.detail{ flex:1; padding:20px; display:flex; flex-direction:column; gap:16px }
+.detail-header{ display:flex; align-items:center; justify-content:space-between }
+.detail-actions button{ padding:8px 10px; border:1px solid var(--p); background:var(--p); color:#fff; border-radius:6px; cursor:pointer }
+.detail-body{ flex:1; overflow:auto }
+.detail-body .item{ padding:10px 0; border-bottom:1px solid var(--br) }
+.progress-bar{ width:100%; margin:10px 0 }
+.progress-bar__fill{ display:block }
+.order-total{ margin:10px 0; padding:12px; border:1px solid var(--br); border-radius:6px; background:#fff }
+.order-total__line{ display:flex; justify-content:space-between; margin-bottom:8px }
+.order-total__sum{ display:flex; justify-content:space-between; font-weight:600 }
+
+/* Стили для предоплаты */
+.order-total__line.prepayment {
+  background: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+  border-left: 4px solid #1976d2;
+}
+
+.order-total__line.debt {
+  background: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 4px 0;
+  font-weight: 600;
+}
+
+.order-total__line .paid {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.order-total__line .pending {
+  color: #ffc107;
+  font-weight: 600;
+}
+
+.order-total__line .debt-amount {
+  color: #dc3545;
+  font-weight: 700;
+}
+
+.order-total__line .paid-amount {
+  color: #28a745;
+  font-weight: 700;
+}
+input,select,button{ border:1px solid var(--br); padding:8px 10px; border-radius:6px }
+button{ cursor:pointer }

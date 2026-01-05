@@ -1,0 +1,207 @@
+/* Functional top bar */
+.app-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 16px;
+  background: #1976d2; /* синяя панель */
+  border-bottom: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.app-icon-btn {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  text-decoration: none;
+  font-size: 18px;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+}
+.app-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.app-icon-btn:active {
+  transform: translateY(1px);
+}
+
+/* Стили для кнопки тестирования состояния */
+.state-test-btn {
+  position: relative;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  text-decoration: none;
+  font-size: 18px;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+  cursor: pointer;
+}
+
+.state-test-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.state-test-btn:active {
+  transform: translateY(1px);
+}
+
+.state-test-btn.active {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.state-test-notification {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #dc3545;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+/* Topbar info section */
+.topbar-info {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: #fff;
+}
+.chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  font-size: 13px;
+}
+.chip--clickable {
+  cursor: pointer;
+}
+.chip--clickable:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.topbar-picker {
+  position: fixed;
+  top: 56px;
+  right: 16px;
+  z-index: 120;
+  background: #fff;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+  padding: 12px;
+  min-width: 280px;
+}
+.topbar-picker .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.topbar-picker .note {
+  font-size: 12px;
+  color: #6b7280;
+}
+/* Order list items and status visuals */
+.order-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+}
+.order-item__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.order-item__id {
+  font-size: 12px;
+  color: #666;
+}
+.order-item__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.status-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--status-color, #1976d2);
+  color: var(--status-color, #1976d2);
+  background: #fff;
+}
+.status-bar {
+  flex: 1;
+  height: 6px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.status-bar__fill {
+  height: 100%;
+  background: var(--status-color, #1976d2);
+}
+
+/* push content below the fixed top bar */
+.app {
+  padding-top: 56px;
+}
+
+/* Sidebar mini toolbar under top bar */
+.sidebar-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0 8px 0;
+}
+.icon-btn {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #333;
+  font-size: 18px;
+}
+.icon-btn:hover {
+  background: #f5f5f5;
+}
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

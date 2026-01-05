@@ -1,0 +1,382 @@
+/* Анимации и переходы для улучшения UX */
+
+/* Базовые анимации */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleOut {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes bounce {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40%, 43% {
+    transform: translateY(-10px);
+  }
+  70% {
+    transform: translateY(-5px);
+  }
+  90% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Классы анимаций */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-fade-out {
+  animation: fadeOut 0.3s ease-in;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-slide-out {
+  animation: slideOut 0.3s ease-in;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.animate-scale-out {
+  animation: scaleOut 0.2s ease-in;
+}
+
+.animate-pulse {
+  animation: pulse 2s infinite;
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Переходы для интерактивных элементов */
+.transition-all {
+  transition: all 0.3s ease;
+}
+
+.transition-colors {
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.transition-transform {
+  transition: transform 0.3s ease;
+}
+
+.transition-opacity {
+  transition: opacity 0.3s ease;
+}
+
+/* Hover эффекты */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.hover-scale {
+  transition: transform 0.2s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+.hover-glow {
+  transition: box-shadow 0.3s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 20px var(--accent-primary);
+}
+
+/* Анимации для кнопок */
+.btn-animated {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn-animated::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-animated:hover::before {
+  left: 100%;
+}
+
+.btn-animated:active {
+  transform: scale(0.98);
+}
+
+/* Анимации для модальных окон */
+.modal-enter {
+  animation: scaleIn 0.3s ease-out;
+}
+
+.modal-exit {
+  animation: scaleOut 0.3s ease-in;
+}
+
+.modal-backdrop-enter {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.modal-backdrop-exit {
+  animation: fadeOut 0.3s ease-in;
+}
+
+/* Анимации для списков */
+.list-item-enter {
+  animation: slideIn 0.3s ease-out;
+}
+
+.list-item-exit {
+  animation: slideOut 0.3s ease-in;
+}
+
+/* Анимации для уведомлений */
+.toast-enter {
+  animation: slideIn 0.3s ease-out;
+}
+
+.toast-exit {
+  animation: slideOut 0.3s ease-in;
+}
+
+/* Анимации для загрузки */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+.loading-dots::after {
+  content: '';
+  animation: pulse 1.5s infinite;
+}
+
+/* Анимации для форм */
+.form-field-focus {
+  transition: all 0.3s ease;
+}
+
+.form-field-focus:focus {
+  transform: scale(1.02);
+  box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.1);
+}
+
+/* Анимации для карточек */
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px var(--shadow);
+}
+
+/* Анимации для навигации */
+.nav-item {
+  position: relative;
+  transition: color 0.3s ease;
+}
+
+.nav-item::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: var(--accent-primary);
+  transition: width 0.3s ease;
+}
+
+.nav-item:hover::after,
+.nav-item.active::after {
+  width: 100%;
+}
+
+/* Анимации для таблиц */
+.table-row {
+  transition: background-color 0.2s ease;
+}
+
+.table-row:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Анимации для прогресс-баров */
+.progress-bar {
+  transition: width 0.5s ease;
+}
+
+/* Анимации для калькулятора */
+.calculator-result {
+  animation: scaleIn 0.5s ease-out;
+}
+
+.calculator-field {
+  transition: all 0.3s ease;
+}
+
+.calculator-field:focus {
+  transform: scale(1.02);
+  box-shadow: 0 0 0 2px var(--accent-primary);
+}
+
+/* Анимации для темной темы */
+.theme-transition {
+  transition: all 0.3s ease;
+}
+
+/* Анимации для скелетонов */
+.skeleton {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Анимации для ошибок */
+.error-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Анимации для успеха */
+.success-bounce {
+  animation: bounce 0.6s ease-in-out;
+}
+
+/* Responsive анимации */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Анимации для мобильных устройств */
+@media (max-width: 768px) {
+  .hover-lift:hover {
+    transform: none;
+  }
+  
+  .hover-scale:hover {
+    transform: none;
+  }
+  
+  .card-hover:hover {
+    transform: none;
+  }
+}

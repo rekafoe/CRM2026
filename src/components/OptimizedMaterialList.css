@@ -1,0 +1,13 @@
+/* OptimizedMaterialList extracted styles */
+.oml-category-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  color: #fff;
+  background-color: var(--bg-tertiary);
+}
+.oml-category-tag[data-bg] {
+  background-color: attr(data-bg color);
+}

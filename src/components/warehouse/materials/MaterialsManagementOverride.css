@@ -1,0 +1,777 @@
+/* CRITICAL OVERRIDE STYLES - MAXIMUM SPECIFICITY */
+/* Эти стили должны перезатирать все остальные */
+
+/* Material Cards - MAXIMUM SPECIFICITY OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-card,
+.warehouse-dashboard .materials-management .material-card,
+.materials-management-container .materials-management .material-card,
+.materials-management .material-card,
+div.material-card,
+.material-card {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important;
+  padding: 16px !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 1px 3px var(--shadow) !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  min-height: 450px !important;
+  overflow: hidden !important;
+  position: relative !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Material Cards Hover - MAXIMUM SPECIFICITY OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-card:hover,
+.warehouse-dashboard .materials-management .material-card:hover,
+.materials-management-container .materials-management .material-card:hover,
+.materials-management .material-card:hover,
+div.material-card:hover,
+.material-card:hover {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 4px 8px var(--shadow) !important;
+  transform: none !important;
+}
+
+/* Material Cards Selected - MAXIMUM SPECIFICITY OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-card.selected,
+.warehouse-dashboard .materials-management .material-card.selected,
+.materials-management-container .materials-management .material-card.selected,
+.materials-management .material-card.selected,
+div.material-card.selected,
+.material-card.selected {
+  border-color: var(--accent-primary) !important;
+  background-color: var(--info-light) !important;
+}
+
+/* Material Actions - COMPACT ICON BUTTONS */
+.material-actions {
+  display: flex !important;
+  gap: 4px !important;
+  margin-top: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-end !important;
+  padding: 0 !important;
+}
+
+/* Material Action Buttons - ICON ONLY */
+.material-actions .warehouse-button {
+  padding: 6px !important;
+  font-size: 12px !important;
+  min-height: 32px !important;
+  min-width: 32px !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 6px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  text-align: center !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+
+
+/* Grid Layout - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .materials-list.grid,
+.warehouse-dashboard .materials-management .materials-list.grid,
+.materials-management-container .materials-management .materials-list.grid,
+.materials-management .materials-list.grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+  gap: 12px !important;
+  padding: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  grid-auto-rows: min-content !important;
+  align-items: start !important;
+}
+
+/* Material Details - FLEX LAYOUT */
+.warehouse-dashboard .materials-management-container .materials-management .material-details,
+.warehouse-dashboard .materials-management .material-details,
+.materials-management-container .materials-management .material-details,
+.materials-management .material-details {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin-bottom: 10px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 0 4px !important;
+}
+
+/* Detail Item - FLEX LAYOUT */
+.warehouse-dashboard .materials-management-container .materials-management .detail-item,
+.warehouse-dashboard .materials-management .detail-item,
+.materials-management-container .materials-management .detail-item,
+.materials-management .detail-item {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Material Description - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-description,
+.warehouse-dashboard .materials-management .material-description,
+.materials-management-container .materials-management .material-description,
+.materials-management .material-description {
+  background: var(--bg-tertiary) !important;
+  border-radius: 4px !important;
+  padding: 6px !important;
+  margin-bottom: 8px !important;
+  font-size: 12px !important;
+  color: var(--text-secondary) !important;
+  line-height: 1.3 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Material Card Body - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-card-body,
+.warehouse-dashboard .materials-management .material-card-body,
+.materials-management-container .materials-management .material-card-body,
+.materials-management .material-card-body {
+  margin-bottom: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Warehouse Header - CRITICAL OVERRIDE */
+.warehouse-dashboard .warehouse-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 12px 16px !important;
+  background: white !important;
+  border-bottom: 1px solid #e0e0e0 !important;
+  flex-shrink: 0 !important;
+  z-index: 10 !important;
+  position: relative !important;
+  min-height: 60px !important;
+  box-sizing: border-box !important;
+}
+
+/* Warehouse Header - CRITICAL OVERRIDE */
+.warehouse-dashboard .warehouse-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 12px 16px !important;
+  background: white !important;
+  border-bottom: 1px solid #e0e0e0 !important;
+  flex-shrink: 0 !important;
+  z-index: 10 !important;
+  position: relative !important;
+  min-height: 60px !important;
+  box-sizing: border-box !important;
+}
+
+/* Header Actions - CRITICAL OVERRIDE */
+.warehouse-dashboard .header-actions {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+  z-index: 100 !important;
+  position: relative !important;
+  margin-right: 50px !important;
+}
+
+.warehouse-dashboard .action-btn {
+  padding: 4px 8px !important;
+  border: none !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  min-height: 24px !important;
+}
+
+.warehouse-dashboard .action-btn.secondary {
+  background: #f8f9fa !important;
+  color: #6c757d !important;
+  border: 1px solid #dee2e6 !important;
+}
+
+.warehouse-dashboard .action-btn.secondary:hover {
+  background: #e9ecef !important;
+  color: #495057 !important;
+}
+
+/* Special styles for Filters button */
+.warehouse-dashboard .header-actions .action-btn.secondary {
+  position: relative !important;
+  z-index: 101 !important;
+  margin-right: 5px !important;
+}
+
+/* Compact Stats - CRITICAL OVERRIDE */
+.warehouse-dashboard .compact-stats {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+  margin: 0 12px !important;
+  height: auto !important;
+}
+
+.warehouse-dashboard .compact-stat,
+.warehouse-dashboard .compact-stats .compact-stat {
+  display: flex !important;
+  align-items: center !important;
+  align-self: center !important;
+  gap: 3px !important;
+  padding: 4px 8px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+  min-width: 40px !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  min-height: 28px !important;
+  height: 32px !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  vertical-align: middle !important;
+}
+
+.warehouse-dashboard .compact-stat.success {
+  background: var(--success-light, #d4edda) !important;
+  color: var(--success, #155724) !important;
+  border: 1px solid var(--border-success, #c3e6cb) !important;
+}
+
+.warehouse-dashboard .compact-stat.warning {
+  background: var(--warning-light, #fff3cd) !important;
+  color: var(--warning, #856404) !important;
+  border: 1px solid var(--border-warning, #ffeaa7) !important;
+  position: relative !important;
+  top: 0 !important;
+  transform: translateY(0) !important;
+}
+
+.warehouse-dashboard .compact-stat.danger {
+  background: var(--error-light, #f8d7da) !important;
+  color: var(--error, #721c24) !important;
+  border: 1px solid var(--border-error, #f5c6cb) !important;
+}
+
+.warehouse-dashboard .compact-stat.info {
+  background: var(--info-light, #d1ecf1) !important;
+  color: var(--info, #0c5460) !important;
+  border: 1px solid var(--border-info, #bee5eb) !important;
+}
+
+.warehouse-dashboard .compact-icon {
+  font-size: 12px !important;
+}
+
+.warehouse-dashboard .compact-value {
+  font-weight: 700 !important;
+  font-size: 11px !important;
+}
+
+/* Close Button - CRITICAL OVERRIDE */
+.warehouse-dashboard .close-btn {
+  position: fixed !important;
+  top: 15px !important;
+  right: 15px !important;
+  width: 30px !important;
+  height: 30px !important;
+  border: none !important;
+  background: #dc3545 !important;
+  color: white !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 14px !important;
+  transition: all 0.2s ease !important;
+  z-index: 10000 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.warehouse-dashboard .close-btn:hover {
+  background: #c82333 !important;
+  transform: scale(1.1) !important;
+}
+
+/* Warehouse Button - CRITICAL OVERRIDE */
+.warehouse-dashboard .warehouse-button {
+  min-height: 32px !important;
+  border-radius: 4px !important;
+  font-weight: 500 !important;
+  box-sizing: border-box !important;
+}
+
+.warehouse-dashboard .warehouse-button.btn-sm {
+  min-height: 28px !important;
+  padding: 4px 8px !important;
+  font-size: 12px !important;
+}
+
+.warehouse-dashboard .warehouse-button.btn-md {
+  min-height: 32px !important;
+  padding: 6px 12px !important;
+  font-size: 13px !important;
+}
+
+.warehouse-dashboard .warehouse-button.btn-lg {
+  min-height: 36px !important;
+  padding: 8px 16px !important;
+  font-size: 14px !important;
+}
+
+/* Materials Toolbar - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .materials-toolbar,
+.warehouse-dashboard .materials-management .materials-toolbar,
+.materials-management-container .materials-management .materials-toolbar,
+.materials-management .materials-toolbar {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important;
+  padding: 12px !important;
+  margin-bottom: 12px !important;
+  box-shadow: 0 1px 3px var(--shadow) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+.warehouse-dashboard .materials-management-container .materials-management .materials-toolbar .warehouse-button,
+.warehouse-dashboard .materials-management .materials-toolbar .warehouse-button,
+.materials-management-container .materials-management .materials-toolbar .warehouse-button,
+.materials-management .materials-toolbar .warehouse-button {
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  min-height: 32px !important;
+  border-radius: 4px !important;
+  font-weight: 500 !important;
+}
+
+/* Поиск материалов: фиксируем ширину и выравнивание */
+.materials-management .materials-toolbar .flex-grow {
+  flex: 1 1 260px !important;
+  min-width: 240px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.materials-management .materials-toolbar input[type="text"] {
+  height: 36px !important;
+  min-height: 36px !important;
+  padding-left: 12px !important;
+  padding-right: 36px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+.materials-management .materials-toolbar .relative {
+  width: 100% !important;
+  max-width: 300px !important;
+  position: relative !important;
+  display: block !important;
+}
+
+.materials-management .materials-toolbar .relative span {
+  position: absolute !important;
+  right: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  height: 16px !important;
+  width: 16px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+  color: var(--text-secondary, #6b7280) !important;
+}
+
+/* Detail Item - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .detail-item,
+.warehouse-dashboard .materials-management .detail-item,
+.materials-management-container .materials-management .detail-item,
+.materials-management .detail-item {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.warehouse-dashboard .materials-management-container .materials-management .detail-label,
+.warehouse-dashboard .materials-management .detail-label,
+.materials-management-container .materials-management .detail-label,
+.materials-management .detail-label {
+  color: var(--text-secondary) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.warehouse-dashboard .materials-management-container .materials-management .detail-value,
+.warehouse-dashboard .materials-management .detail-value,
+.materials-management-container .materials-management .detail-value,
+.materials-management .detail-value {
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 60% !important;
+  text-align: right !important;
+  flex-shrink: 0 !important;
+}
+
+/* Detail Label - FLEX LAYOUT */
+.warehouse-dashboard .materials-management-container .materials-management .detail-label,
+.warehouse-dashboard .materials-management .detail-label,
+.materials-management-container .materials-management .detail-label,
+.materials-management .detail-label {
+  color: var(--text-secondary) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  flex-shrink: 0 !important;
+  margin-right: 8px !important;
+}
+
+/* Material Price - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-price,
+.warehouse-dashboard .materials-management .material-price,
+.materials-management-container .materials-management .material-price,
+.materials-management .material-price {
+  background: var(--bg-tertiary) !important;
+  border-radius: 4px !important;
+  padding: 8px !important;
+  text-align: center !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.warehouse-dashboard .materials-management-container .materials-management .price-main,
+.warehouse-dashboard .materials-management .price-main,
+.materials-management-container .materials-management .price-main,
+.materials-management .price-main {
+  color: var(--text-primary) !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+}
+
+.warehouse-dashboard .materials-management-container .materials-management .price-label,
+.warehouse-dashboard .materials-management .price-label,
+.materials-management-container .materials-management .price-label,
+.materials-management .price-label {
+  color: var(--text-secondary) !important;
+  font-size: 12px !important;
+}
+
+/* Material Name - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-name,
+.warehouse-dashboard .materials-management .material-name,
+.materials-management-container .materials-management .material-name,
+.materials-management .material-name {
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+  margin-bottom: 4px !important;
+  font-size: 14px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Material Description - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-description,
+.warehouse-dashboard .materials-management .material-description,
+.materials-management-container .materials-management .material-description,
+.materials-management .material-description {
+  color: var(--text-secondary) !important;
+  font-size: 14px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Material Checkbox - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-checkbox,
+.warehouse-dashboard .materials-management .material-checkbox,
+.materials-management-container .materials-management .material-checkbox,
+.materials-management .material-checkbox {
+  width: 18px !important;
+  height: 18px !important;
+  accent-color: var(--accent-primary) !important;
+  flex-shrink: 0 !important;
+  margin-top: 0 !important;
+  vertical-align: middle !important;
+}
+
+/* Карточки: фиксируем чекбокс в левом верхнем углу с одинаковым отступом */
+.material-card {
+  position: relative !important;
+}
+
+.material-card .material-card-header {
+  padding-left: 30px !important;
+  align-items: center !important;
+}
+
+.material-card .material-checkbox {
+  position: absolute !important;
+  top: 12px !important;
+  left: 12px !important;
+  margin: 0 !important;
+}
+
+/* Строчные карточки: сохраняем компактный отступ справа */
+.material-row-card .material-checkbox {
+  margin-right: 6px !important;
+}
+
+/* Material Card Header - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-card-header,
+.warehouse-dashboard .materials-management .material-card-header,
+.materials-management-container .materials-management .material-card-header,
+.materials-management .material-card-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Material Card Footer - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-card-footer,
+.warehouse-dashboard .materials-management .material-card-footer,
+.materials-management-container .materials-management .material-card-footer,
+.materials-management .material-card-footer {
+  display: flex !important;
+  gap: 6px !important;
+  margin-top: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Material Card Body - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .material-card-body,
+.warehouse-dashboard .materials-management .material-card-body,
+.materials-management-container .materials-management .material-card-body,
+.materials-management .material-card-body {
+  margin-bottom: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Category Info - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .category-info,
+.warehouse-dashboard .materials-management .category-info,
+.materials-management-container .materials-management .category-info,
+.materials-management .category-info {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Close Button - CRITICAL OVERRIDE */
+.warehouse-dashboard .close-btn {
+  position: fixed !important;
+  top: 15px !important;
+  right: 15px !important;
+  width: 30px !important;
+  height: 30px !important;
+  border: none !important;
+  background: #dc3545 !important;
+  color: white !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 14px !important;
+  transition: all 0.2s ease !important;
+  z-index: 10000 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.warehouse-dashboard .close-btn:hover {
+  background: #c82333 !important;
+  transform: scale(1.1) !important;
+}
+
+/* Materials Toolbar - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .materials-toolbar,
+.warehouse-dashboard .materials-management .materials-toolbar,
+.materials-management-container .materials-management .materials-toolbar,
+.materials-management .materials-toolbar {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important;
+  padding: 12px !important;
+  margin-bottom: 12px !important;
+  box-shadow: 0 1px 3px var(--shadow) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.warehouse-dashboard .materials-management-container .materials-management .materials-toolbar .warehouse-button,
+.warehouse-dashboard .materials-management .materials-toolbar .warehouse-button,
+.materials-management-container .materials-management .materials-toolbar .warehouse-button,
+.materials-management .materials-toolbar .warehouse-button {
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  min-height: 32px !important;
+  border-radius: 4px !important;
+  font-weight: 500 !important;
+}
+
+/* Category Info - CRITICAL OVERRIDE */
+.warehouse-dashboard .materials-management-container .materials-management .category-info,
+.warehouse-dashboard .materials-management .category-info,
+.materials-management-container .materials-management .category-info,
+.materials-management .category-info {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Table View Improvements */
+.warehouse-dashboard .materials-management-container .materials-management .materials-list:not(.grid),
+.warehouse-dashboard .materials-management .materials-list:not(.grid),
+.materials-management-container .materials-management .materials-list:not(.grid),
+.materials-management .materials-list:not(.grid) {
+  background: white !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  overflow: hidden !important;
+}
+
+.warehouse-dashboard .materials-management-container .materials-management table,
+.warehouse-dashboard .materials-management table,
+.materials-management-container .materials-management table,
+.materials-management table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 13px !important;
+}
+
+.warehouse-dashboard .materials-management-container .materials-management th,
+.warehouse-dashboard .materials-management th,
+.materials-management-container .materials-management th,
+.materials-management th {
+  background: #f8f9fa !important;
+  padding: 12px 8px !important;
+  text-align: left !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  color: #495057 !important;
+  border-bottom: 2px solid #dee2e6 !important;
+}
+
+.warehouse-dashboard .materials-management-container .materials-management td,
+.warehouse-dashboard .materials-management td,
+.materials-management-container .materials-management td,
+.materials-management td {
+  padding: 10px 8px !important;
+  border-bottom: 1px solid #f1f3f4 !important;
+  vertical-align: middle !important;
+}
+
+.warehouse-dashboard .materials-management-container .materials-management tr:hover,
+.warehouse-dashboard .materials-management tr:hover,
+.materials-management-container .materials-management tr:hover,
+.materials-management tr:hover {
+  background: #f8f9fa !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .warehouse-dashboard .materials-management-container .materials-management .materials-list.grid,
+  .warehouse-dashboard .materials-management .materials-list.grid,
+  .materials-management-container .materials-management .materials-list.grid,
+  .materials-management .materials-list.grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    padding: 10px !important;
+  }
+  
+  .warehouse-dashboard .materials-management-container .materials-management .material-details,
+  .warehouse-dashboard .materials-management .material-details,
+  .materials-management-container .materials-management .material-details,
+  .materials-management .material-details {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+  }
+  
+  .warehouse-dashboard .materials-management-container .materials-management .material-actions,
+  .warehouse-dashboard .materials-management .material-actions,
+  .materials-management-container .materials-management .material-actions,
+  .materials-management .material-actions {
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+  
+  .warehouse-dashboard .materials-management-container .materials-management .material-actions .warehouse-button,
+  .warehouse-dashboard .materials-management .material-actions .warehouse-button,
+  .materials-management-container .materials-management .material-actions .warehouse-button,
+  .materials-management .material-actions .warehouse-button {
+    width: 100% !important;
+    max-width: 100% !important;
+    justify-content: center !important;
+    padding: 3px 4px !important;
+    font-size: 10px !important;
+    margin-bottom: 2px !important;
+    min-height: 26px !important;
+  }
+}
+
+/* Icon Only Button Class */
+.material-actions .warehouse-button.icon-only {
+  padding: 6px !important;
+  font-size: 14px !important;
+  min-height: 32px !important;
+  min-width: 32px !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+.material-actions .warehouse-button.icon-only:hover {
+  transform: scale(1.05) !important;
+  transition: transform 0.2s ease !important;
+}

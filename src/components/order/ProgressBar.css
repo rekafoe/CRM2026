@@ -1,0 +1,11 @@
+/* ProgressBar extracted styles */
+.progress-bar-container { width: 100%; }
+.pb-bar { background-color: #e0e0e0; position: relative; margin-bottom: 8px; overflow: hidden; }
+.pb-fill { transition: width 0.3s ease; }
+.pb-steps { display: flex; justify-content: space-between; position: relative; }
+.pb-step { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
+.pb-step.is-clickable { cursor: pointer; }
+.pb-circle { width: 24px; height: 24px; border-radius: 50%; color: #666; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; margin-bottom: 4px; transition: all 0.3s ease; border: 2px solid transparent; background-color: #e0e0e0; }
+.pb-circle.is-on { color: #fff; }
+.pb-label { font-size: 10px; text-align: center; color: #666; max-width: 60px; line-height: 1.2; }
+.pb-label.is-active { font-weight: bold; }

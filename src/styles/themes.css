@@ -1,0 +1,279 @@
+/* CSS переменные для темной и светлой темы - MONOCHROME DESIGN */
+:root {
+  /* Светлая тема (по умолчанию) - монохромная палитра */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --bg-hover: #f1f3f4;
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-disabled: #adb5bd;
+  --text-muted: #868e96;
+  --border-color: #dee2e6;
+  --border-light: #f8f9fa;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --shadow-light: rgba(0, 0, 0, 0.05);
+
+  /* Монохромные акценты */
+  --accent-primary: #495057;
+  --accent-secondary: #6c757d;
+  --accent-light: #adb5bd;
+  --accent-dark: #343a40;
+
+  /* Монохромные состояния */
+  --success: #6c757d;
+  --warning: #868e96;
+  --error: #495057;
+  --info: #6c757d;
+
+  /* Расширенные цвета для состояний - монохромные */
+  --success-light: #f8f9fa;
+  --success-border: #dee2e6;
+  --warning-light: #f8f9fa;
+  --warning-border: #dee2e6;
+  --error-light: #f8f9fa;
+  --error-border: #dee2e6;
+  --info-light: #f8f9fa;
+  --info-border: #dee2e6;
+
+  /* Цвета для текста */
+  --text-light: #6c757d;
+  --text-lighter: #adb5bd;
+
+  /* Цвета для фонов */
+  --bg-warning: #f8f9fa;
+  --bg-success: #f8f9fa;
+  --bg-error: #f8f9fa;
+  --bg-info: #f8f9fa;
+
+  /* Цвета для границ */
+  --border-warning: #dee2e6;
+  --border-success: #dee2e6;
+  --border-error: #dee2e6;
+  --border-info: #dee2e6;
+
+  /* Цвета для изменений цен - монохромные */
+  --price-increase: #495057;
+  --price-decrease: #6c757d;
+  --price-neutral: #adb5bd;
+}
+
+[data-theme="dark"] {
+  /* Темная тема - монохромная палитра */
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: #2a2a2a;
+  --bg-hover: #1a1a1a;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --text-disabled: #666666;
+  --text-muted: #888888;
+  --border-color: #333333;
+  --border-light: #1e1e1e;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-light: rgba(0, 0, 0, 0.2);
+
+  /* Монохромные акценты (темная тема) */
+  --accent-primary: #b0b0b0;
+  --accent-secondary: #888888;
+  --accent-light: #666666;
+  --accent-dark: #cccccc;
+
+  /* Монохромные состояния (темная тема) */
+  --success: #b0b0b0;
+  --warning: #888888;
+  --error: #b0b0b0;
+  --info: #b0b0b0;
+
+  /* Расширенные цвета для состояний (темная тема) - монохромные */
+  --success-light: #1e1e1e;
+  --success-border: #333333;
+  --warning-light: #1e1e1e;
+  --warning-border: #333333;
+  --error-light: #1e1e1e;
+  --error-border: #333333;
+  --info-light: #1e1e1e;
+  --info-border: #333333;
+
+  /* Цвета для текста (темная тема) */
+  --text-light: #b0b0b0;
+  --text-lighter: #888888;
+
+  /* Цвета для фонов (темная тема) */
+  --bg-warning: #1e1e1e;
+  --bg-success: #1e1e1e;
+  --bg-error: #1e1e1e;
+  --bg-info: #1e1e1e;
+
+  /* Цвета для границ (темная тема) */
+  --border-warning: #333333;
+  --border-success: #333333;
+  --border-error: #333333;
+  --border-info: #333333;
+
+  /* Цвета для изменений цен (темная тема) - монохромные */
+  --price-increase: #b0b0b0;
+  --price-decrease: #888888;
+  --price-neutral: #666666;
+}
+
+/* Базовые стили с использованием CSS переменных */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 4px var(--shadow);
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.btn-primary {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-secondary);
+  border-color: var(--accent-secondary);
+}
+
+.text-primary {
+  color: var(--text-primary) !important;
+}
+
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.bg-primary {
+  background-color: var(--bg-primary) !important;
+}
+
+.bg-secondary {
+  background-color: var(--bg-secondary) !important;
+}
+
+.border {
+  border-color: var(--border-color) !important;
+}
+
+/* Стили для форм */
+.form-control {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.form-control:focus {
+  background-color: var(--bg-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
+}
+
+/* Стили для таблиц */
+.table {
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: var(--bg-secondary);
+}
+
+.table-hover tbody tr:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Стили для модальных окон */
+.modal-content {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+.modal-header {
+  border-bottom-color: var(--border-color);
+}
+
+.modal-footer {
+  border-top-color: var(--border-color);
+}
+
+/* Стили для навигации */
+.navbar {
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.nav-link {
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+  color: var(--accent-primary);
+}
+
+/* Стили для уведомлений */
+.toast {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+/* Стили для калькулятора */
+.calculator-panel {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.calculator-result {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 15px;
+}
+
+/* Анимации */
+.theme-transition {
+  transition: all 0.3s ease;
+}
+
+/* Стили для переключателя темы */
+.theme-toggle {
+  background: none;
+  border: 2px solid var(--border-color);
+  border-radius: 50px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent-primary);
+  background-color: var(--bg-tertiary);
+}
+
+.theme-toggle-icon {
+  font-size: 18px;
+  transition: transform 0.3s ease;
+}
+
+[data-theme="dark"] .theme-toggle-icon {
+  transform: rotate(180deg);
+}

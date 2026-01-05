@@ -1,0 +1,398 @@
+/* ========================================
+   СТИЛИ ДЛЯ ФОРМ КАЛЬКУЛЯТОРА
+   ======================================== */
+
+/* Сетка типов продуктов */
+.product-types-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.product-type-card {
+  background: white;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.product-type-card:hover {
+  border-color: #007bff;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 123, 255, 0.1);
+}
+
+.product-type-card.selected {
+  border-color: #007bff;
+  background: rgba(0, 123, 255, 0.1);
+}
+
+.product-type-card .product-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  display: block;
+  filter: grayscale(0.3);
+  transition: all 0.3s ease;
+}
+
+.product-type-card:hover .product-icon,
+.product-type-card.selected .product-icon {
+  filter: grayscale(0);
+  transform: scale(1.1);
+}
+
+.product-type-card .product-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #495057;
+  margin: 0;
+}
+
+/* Сетка параметров */
+.parameters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.parameter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.parameter-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  margin: 0;
+}
+
+.parameter-input,
+.parameter-select {
+  padding: 12px 16px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.parameter-input:focus,
+.parameter-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.parameter-input:invalid {
+  border-color: #dc3545;
+}
+
+/* Выбор формата */
+.format-selection {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.format-option {
+  background: white;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.format-option:hover {
+  border-color: #007bff;
+  transform: translateY(-1px);
+}
+
+.format-option.selected {
+  border-color: #007bff;
+  background: rgba(0, 123, 255, 0.1);
+}
+
+.format-option .format-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  margin: 0 0 4px 0;
+}
+
+.format-option .format-size {
+  font-size: 12px;
+  color: #6c757d;
+  margin: 0;
+}
+
+/* Кастомный формат */
+.custom-format {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.custom-format-input {
+  padding: 12px 16px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.custom-format-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.custom-format-input:invalid {
+  border-color: #dc3545;
+}
+
+/* Управление количеством */
+.quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.quantity-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.quantity-btn:hover {
+  background: #0056b3;
+  transform: scale(1.05);
+}
+
+.quantity-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.quantity-input {
+  padding: 12px 16px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  width: 100px;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.quantity-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+/* Выбор сторон */
+.sides-selection {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.side-option {
+  background: white;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.side-option:hover {
+  border-color: #007bff;
+  transform: translateY(-1px);
+}
+
+.side-option.selected {
+  border-color: #007bff;
+  background: rgba(0, 123, 255, 0.1);
+}
+
+.side-option .side-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.side-option .side-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  margin: 0;
+}
+
+/* Сетка материалов */
+.materials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.material-option {
+  background: white;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.material-option:hover {
+  border-color: #007bff;
+  transform: translateY(-1px);
+}
+
+.material-option.selected {
+  border-color: #007bff;
+  background: rgba(0, 123, 255, 0.1);
+}
+
+.material-option .material-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  margin: 0 0 4px 0;
+}
+
+.material-option .material-price {
+  font-size: 12px;
+  color: #6c757d;
+  margin: 0;
+}
+
+/* Расширенные настройки */
+.advanced-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.advanced-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.advanced-setting-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  margin: 0;
+}
+
+.advanced-setting-input,
+.advanced-setting-select {
+  padding: 12px 16px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.advanced-setting-input:focus,
+.advanced-setting-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+/* Ошибки валидации */
+.validation-error {
+  color: #dc3545;
+  font-size: 12px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.validation-error::before {
+  content: '⚠';
+  font-size: 14px;
+}
+
+.validation-success {
+  color: #28a745;
+  font-size: 12px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.validation-success::before {
+  content: '✓';
+  font-size: 14px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .product-types-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .parameters-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .format-selection {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .custom-format {
+    grid-template-columns: 1fr;
+  }
+  
+  .sides-selection {
+    grid-template-columns: 1fr;
+  }
+  
+  .materials-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .advanced-settings {
+    grid-template-columns: 1fr;
+  }
+}

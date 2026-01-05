@@ -1,0 +1,319 @@
+/* Стили для виджета счетчиков */
+.counters-widget {
+  position: relative;
+  display: inline-block;
+}
+
+.counters-widget.loading {
+  opacity: 0.7;
+}
+
+.counters-header {
+  display: flex;
+  align-items: center;
+}
+
+.counters-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.counters-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.counters-toggle:active {
+  transform: translateY(0);
+}
+
+.counters-icon {
+  font-size: 14px;
+}
+
+.counters-summary {
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.counters-details {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  padding: 16px;
+  min-width: 320px;
+  max-width: 400px;
+  margin-top: 8px;
+}
+
+.counters-error {
+  background: #ffebee;
+  color: #c62828;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  border-left: 3px solid #c62828;
+}
+
+.counters-section {
+  margin-bottom: 16px;
+}
+
+.counters-section:last-child {
+  margin-bottom: 0;
+}
+
+.counters-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.printers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.printer-counter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.printer-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.printer-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #333;
+}
+
+.printer-code {
+  font-size: 10px;
+  color: #666;
+  font-family: monospace;
+}
+
+.printer-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.current-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  font-family: monospace;
+}
+
+.difference {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.difference.positive {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.difference.negative {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.counter-input {
+  width: 80px;
+  padding: 4px 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 11px;
+  text-align: center;
+}
+
+.counter-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.cash-data {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cash-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.cash-row:last-child {
+  border-bottom: none;
+}
+
+.cash-label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.cash-input-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cash-input {
+  width: 100px;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: right;
+}
+
+.cash-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.currency {
+  font-size: 10px;
+  color: #666;
+  font-weight: 500;
+}
+
+.cash-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  font-family: monospace;
+}
+
+.cash-difference {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.cash-difference.success {
+  color: #2e7d32;
+}
+
+.cash-difference.warning {
+  color: #f57c00;
+}
+
+.cash-difference.error {
+  color: #c62828;
+}
+
+.counters-summary-section {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.summary-row:last-child {
+  margin-bottom: 0;
+}
+
+.summary-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  font-family: monospace;
+}
+
+.summary-status {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.summary-status.success {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.summary-status.warning {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.summary-status.error {
+  background: #ffebee;
+  color: #c62828;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .counters-details {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90vw;
+    max-width: 350px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  
+  .counters-toggle {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  
+  .counters-summary {
+    font-size: 10px;
+  }
+}

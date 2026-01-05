@@ -1,0 +1,18 @@
+/* PrepaymentModal extracted styles */
+.pp-overlay { position: fixed; inset: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.pp-modal { background-color: #fff; padding: 24px; border-radius: 8px; min-width: 400px; max-width: 500px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+.pp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.pp-title { margin: 0; color: #1976d2; }
+.pp-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #666; }
+.pp-field { margin-bottom: 16px; }
+.pp-label { display: block; margin-bottom: 8px; font-weight: bold; }
+.pp-input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; }
+.pp-radio-group { display: flex; gap: 16px; }
+.pp-radio { display: flex; align-items: center; cursor: pointer; gap: 8px; }
+.pp-hint-offline { margin-top: 8px; padding: 8px 12px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px; color: #856404; }
+.pp-actions { display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid #eee; }
+.pp-btn { padding: 10px 20px; border-radius: 4px; font-size: 14px; cursor: pointer; }
+.pp-btn-primary { background-color: #1976d2; color: #fff; border: none; }
+.pp-btn-primary.is-loading { background-color: #ccc; cursor: not-allowed; }
+.pp-btn-secondary { background-color: #fff; border: 1px solid #ddd; }
+.pp-info { margin-top: 16px; padding: 12px; background-color: #f5f5f5; border-radius: 4px; font-size: 12px; color: #666; }

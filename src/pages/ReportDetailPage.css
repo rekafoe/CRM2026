@@ -1,0 +1,33 @@
+/* ReportDetailPage extracted styles */
+.rdp { padding: 20px; max-width: 1200px; margin: 0 auto; }
+.rdp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 2px solid #e0e0e0; padding-bottom: 16px; }
+.rdp-title { margin: 0; color: #333; }
+.rdp-subtitle { margin: 8px 0 0 0; color: #666; }
+.rdp-btn { padding: 8px 16px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; }
+.rdp-btn-primary { background-color: #1976d2; color: #fff; border: none; }
+.rdp-btn-warn { background-color: #ff9800; color: #fff; border: none; }
+.rdp-btn-success { background-color: #4caf50; color: #fff; border: none; }
+.rdp-btn-danger { background-color: #f44336; color: #fff; border: none; }
+.rdp-btn-small { padding: 6px 12px; font-size: 12px; }
+.rdp-loading { display: flex; justify-content: center; align-items: center; height: 200px; font-size: 18px; color: #666; }
+.rdp-empty { padding: 20px; text-align: center; }
+.rdp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.rdp-stat { padding: 16px; background-color: color-mix(in srgb, var(--stat-color, #e0e0e0) 12%, #fff); border-radius: 8px; border: 2px solid var(--stat-color, #e0e0e0); text-align: center; }
+.rdp-stat-count { font-size: 20px; font-weight: bold; margin-bottom: 8px; }
+.rdp-stat-name { font-size: 14px; color: #666; margin-bottom: 4px; }
+.rdp-stat-revenue { font-size: 12px; color: #888; }
+.rdp-orders { background-color: #fff; border-radius: 8px; border: 1px solid #e0e0e0; overflow: hidden; }
+.rdp-orders-header { background-color: #f5f5f5; padding: 16px; border-bottom: 1px solid #e0e0e0; font-weight: bold; }
+.rdp-orders-empty { padding: 40px; text-align: center; color: #666; }
+.rdp-orders-list { max-height: 600px; overflow-y: auto; }
+.rdp-order { padding: 16px; border-bottom: 1px solid #f0f0f0; background-color: #fff; }
+.rdp-order.is-editing { background-color: #f8f9fa; }
+.rdp-order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.rdp-order-title { display: flex; align-items: center; gap: 12px; }
+.rdp-order-title h3 { margin: 0; font-size: 16px; }
+.rdp-badge { padding: 4px 8px; color: #fff; border-radius: 4px; font-size: 12px; font-weight: bold; }
+.rdp-order-actions { display: flex; gap: 8px; }
+.rdp-order-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px; font-size: 14px; color: #666; }
+.rdp-progress { margin-bottom: 12px; }
+.rdp-items { margin-top: 12px; }
+.rdp-items h4 { margin: 0 0 8px 0; font-size: 14px; color: #333; }
