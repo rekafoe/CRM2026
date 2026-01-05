@@ -1,0 +1,350 @@
+/* ========================================
+   БАЗОВЫЕ СТИЛИ ДЛЯ СПИСКОВ ЗАКАЗОВ
+   ======================================== */
+
+/* Основной список заказов */
+.order-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow: auto;
+}
+
+/* Элемент заказа */
+.order-item {
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.order-item:hover {
+  background: #f8f9fa;
+  border-color: #d1d5db;
+}
+
+.order-item.active {
+  border-color: #1976d2;
+  outline: 2px solid rgba(25, 118, 210, 0.15);
+  background: #f0f7ff;
+}
+
+/* Виртуализированный список заказов */
+.virtualized-order-list {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  overflow: hidden;
+}
+
+.virtualized-container {
+  position: relative;
+}
+
+.virtualized-order-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.virtualized-order-item:hover {
+  background-color: #f8f9fa;
+}
+
+.virtualized-order-item.selected {
+  background-color: #e3f2fd;
+  border-left: 4px solid #2196f3;
+}
+
+.virtualized-order-item:last-child {
+  border-bottom: none;
+}
+
+/* Контент элемента заказа */
+.order-item-content {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.order-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.order-customer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.order-number {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.order-customer-name {
+  color: #666;
+  font-size: 13px;
+}
+
+.order-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #666;
+}
+
+.order-date {
+  color: #666;
+  font-size: 12px;
+}
+
+.order-amount {
+  font-weight: 600;
+  color: #1976d2;
+  font-size: 14px;
+}
+
+/* Оптимизированный список заказов */
+.optimized-order-list {
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.optimized-order-list.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.optimized-order-list.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #dc3545;
+  font-size: 14px;
+}
+
+/* Скелетон для списка заказов */
+.order-list-skeleton {
+  padding: 0;
+}
+
+.skeleton-order-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Статусы заказов */
+.order-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.order-status.new {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.order-status.in-progress {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.order-status.completed {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+.order-status.cancelled {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.order-status.pending {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+/* Приоритеты заказов */
+.order-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.order-priority.high {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.order-priority.medium {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.order-priority.low {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+
+/* Дополнительная информация о заказе */
+.order-items {
+  font-size: 14px;
+  color: #666;
+  text-align: center;
+}
+
+.order-items-count {
+  font-weight: 500;
+  color: #333;
+}
+
+.order-items-label {
+  color: #666;
+  font-size: 12px;
+}
+
+/* Фильтры и поиск */
+.order-list-filters {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8f9fa;
+}
+
+.order-list-search {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.order-list-search:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+/* Заголовок списка */
+.order-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8f9fa;
+}
+
+.order-list-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.order-list-count {
+  font-size: 12px;
+  color: #666;
+  background: #e5e7eb;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+/* Пустое состояние */
+.order-list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #666;
+  text-align: center;
+}
+
+.order-list-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.order-list-empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.order-list-empty-description {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .order-item {
+    padding: 12px;
+  }
+  
+  .virtualized-order-item {
+    padding: 16px;
+  }
+  
+  .order-item-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .order-main-info {
+    width: 100%;
+  }
+  
+  .order-customer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .order-meta {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .order-list-filters {
+    padding: 8px 12px;
+  }
+  
+  .order-list-header {
+    padding: 8px 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* Темная тема отключена - используем только светлую тему */

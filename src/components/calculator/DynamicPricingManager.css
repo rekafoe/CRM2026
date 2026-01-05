@@ -1,0 +1,228 @@
+.dynamic-pricing-modal {
+  width: 95vw !important;
+  max-width: 1400px !important;
+  height: 90vh !important;
+}
+
+.dynamic-pricing-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 85vh;
+  min-height: 600px;
+}
+
+.pricing-tabs {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  overflow-x: auto;
+}
+
+.pricing-tabs button {
+  background: none;
+  border: none;
+  padding: 16px 24px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.pricing-tabs button:hover {
+  background: #e9ecef;
+  color: #333;
+}
+
+.pricing-tabs button.active {
+  color: #667eea;
+  border-bottom-color: #667eea;
+  background: white;
+}
+
+.pricing-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  max-height: calc(85vh - 60px);
+  min-height: 500px;
+}
+
+.pricing-section h3 {
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.pricing-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.pricing-table th {
+  background: #f8f9fa;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  border-bottom: 2px solid #e0e0e0;
+  white-space: nowrap;
+}
+
+.pricing-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+  color: #555;
+}
+
+.pricing-table tr:hover {
+  background: #f8f9fa;
+}
+
+.pricing-table input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background: white;
+}
+
+.pricing-table input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status.active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status.inactive {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-btn, .save-btn, .cancel-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.edit-btn {
+  background: #667eea;
+  color: white;
+}
+
+.edit-btn:hover {
+  background: #5a6fd8;
+}
+
+.save-btn {
+  background: #28a745;
+  color: white;
+}
+
+.save-btn:hover {
+  background: #218838;
+}
+
+.cancel-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.cancel-btn:hover {
+  background: #5a6268;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  font-size: 16px;
+  color: #666;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .pricing-content {
+    padding: 16px;
+    max-height: calc(90vh - 60px);
+  }
+  
+  .pricing-tabs {
+    flex-wrap: wrap;
+  }
+  
+  .pricing-tabs button {
+    padding: 12px 16px;
+    min-width: 100px;
+    font-size: 13px;
+  }
+  
+  .pricing-table th,
+  .pricing-table td {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  
+  .edit-actions {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .edit-btn, .save-btn, .cancel-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pricing-content {
+    padding: 12px;
+    max-height: calc(95vh - 60px);
+  }
+  
+  .pricing-table {
+    font-size: 12px;
+  }
+  
+  .pricing-table th,
+  .pricing-table td {
+    padding: 6px 8px;
+  }
+}
+

@@ -1,0 +1,512 @@
+/**
+ * Современные стили для управления операциями
+ * Использует систему дизайна проекта: карточки, градиенты, анимации
+ */
+
+/* =================================
+   Основной контейнер
+   ================================= */
+.services-management {
+  padding: 2rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  min-height: 100vh;
+}
+
+/* Заголовок страницы */
+.services-header {
+  margin-bottom: 2rem;
+}
+
+.services-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.services-header__icon {
+  font-size: 3rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.services-header__title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary, #1a202c);
+  margin: 0;
+}
+
+.services-header__subtitle {
+  color: var(--text-secondary, #718096);
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* =================================
+   Статистические карточки
+   ================================= */
+.services-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  border: 1px solid #e2e8f0;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.stat-card__label {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #718096);
+  font-weight: 500;
+}
+
+.stat-card__icon {
+  font-size: 1.5rem;
+  opacity: 0.7;
+}
+
+.stat-card__value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary, #1a202c);
+  margin-bottom: 0.25rem;
+}
+
+.stat-card__trend {
+  font-size: 0.75rem;
+  color: var(--success, #38a169);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.stat-card__trend--negative {
+  color: var(--danger, #e53e3e);
+}
+
+/* =================================
+   Панель управления и фильтры
+   ================================= */
+.services-controls {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 2rem;
+}
+
+.services-controls__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.services-controls__filters {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.services-controls__search {
+  position: relative;
+  flex: 1;
+  min-width: 250px;
+  max-width: 400px;
+}
+
+.services-controls__search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary, #a0aec0);
+  pointer-events: none;
+}
+
+.services-controls__search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.services-controls__search-input:focus {
+  outline: none;
+  border-color: var(--primary, #3182ce);
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+}
+
+.services-controls__filter-select {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 150px;
+}
+
+.services-controls__filter-select:hover {
+  border-color: #cbd5e0;
+}
+
+.services-controls__filter-select:focus {
+  outline: none;
+  border-color: var(--primary, #3182ce);
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+}
+
+/* Быстрые фильтры (чипсы) */
+.services-quick-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.quick-filter-chip {
+  padding: 0.5rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: white;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.quick-filter-chip:hover {
+  background: #f7fafc;
+  border-color: #cbd5e0;
+}
+
+.quick-filter-chip--active {
+  background: var(--primary, #3182ce);
+  color: white;
+  border-color: var(--primary, #3182ce);
+}
+
+.quick-filter-chip--active:hover {
+  background: #2c5282;
+  border-color: #2c5282;
+}
+
+/* =================================
+   Таблица услуг (улучшенная)
+   ================================= */
+.services-table-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.services-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.services-table__head {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.services-table__head th {
+  padding: 1rem 1.5rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: white;
+}
+
+.services-table__head th:last-child {
+  text-align: right;
+}
+
+.services-table__body tr {
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.services-table__body tr:last-child {
+  border-bottom: none;
+}
+
+.services-table__body tr:hover {
+  background: linear-gradient(90deg, #f7fafc 0%, #edf2f7 100%);
+}
+
+.services-table__body td {
+  padding: 1rem 1.5rem;
+  font-size: 0.875rem;
+}
+
+.services-table__service-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.services-table__service-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.services-table__service-name {
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.services-table__type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: #edf2f7;
+  color: #4a5568;
+}
+
+.services-table__price {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--primary, #3182ce);
+}
+
+.services-table__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.services-table__action-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.services-table__action-btn--edit {
+  background: #bee3f8;
+  color: #2c5282;
+}
+
+.services-table__action-btn--edit:hover {
+  background: #90cdf4;
+}
+
+.services-table__action-btn--toggle {
+  background: #feebc8;
+  color: #9c4221;
+}
+
+.services-table__action-btn--toggle:hover {
+  background: #fbd38d;
+}
+
+.services-table__action-btn--ranges {
+  background: #e2e8f0;
+  color: #2d3748;
+}
+
+.services-table__action-btn--ranges:hover {
+  background: #cbd5e0;
+}
+
+.services-table__action-btn--delete {
+  background: #fed7d7;
+  color: #742a2a;
+}
+
+.services-table__action-btn--delete:hover {
+  background: #fc8181;
+}
+
+/* =================================
+   Пустое состояние
+   ================================= */
+.services-empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: white;
+  border-radius: 12px;
+  border: 2px dashed #cbd5e0;
+}
+
+.services-empty__icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.services-empty__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+  margin-bottom: 0.5rem;
+}
+
+.services-empty__message {
+  color: var(--text-secondary, #718096);
+  margin-bottom: 1.5rem;
+}
+
+/* =================================
+   Футер таблицы
+   ================================= */
+.services-table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #718096);
+}
+
+.services-table-footer strong {
+  color: var(--text-primary, #1a202c);
+  font-weight: 600;
+}
+
+/* =================================
+   Анимации
+   ================================= */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.services-table__body tr {
+  animation: slideInUp 0.3s ease forwards;
+}
+
+.services-table__body tr:nth-child(1) { animation-delay: 0.05s; }
+.services-table__body tr:nth-child(2) { animation-delay: 0.1s; }
+.services-table__body tr:nth-child(3) { animation-delay: 0.15s; }
+.services-table__body tr:nth-child(4) { animation-delay: 0.2s; }
+.services-table__body tr:nth-child(5) { animation-delay: 0.25s; }
+
+/* =================================
+   Адаптивность
+   ================================= */
+@media (max-width: 768px) {
+  .services-management {
+    padding: 1rem;
+  }
+
+  .services-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .services-controls__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .services-controls__filters {
+    flex-direction: column;
+  }
+
+  .services-controls__search {
+    max-width: none;
+  }
+
+  .services-table__actions {
+    flex-direction: column;
+  }
+
+  .services-table__body td {
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* =================================
+   Темная тема (опционально)
+   ================================= */
+@media (prefers-color-scheme: dark) {
+  .services-management {
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+  }
+
+  .stat-card,
+  .services-controls,
+  .services-table-container {
+    background: #2d3748;
+    border-color: #4a5568;
+  }
+
+  .services-header__title,
+  .stat-card__value {
+    color: #f7fafc;
+  }
+
+  .services-header__subtitle,
+  .stat-card__label {
+    color: #cbd5e0;
+  }
+
+  .services-controls__search-input,
+  .services-controls__filter-select {
+    background: #1a202c;
+    border-color: #4a5568;
+    color: #f7fafc;
+  }
+
+  .quick-filter-chip {
+    background: #1a202c;
+    border-color: #4a5568;
+    color: #f7fafc;
+  }
+
+  .services-table__body tr:hover {
+    background: linear-gradient(90deg, #2d3748 0%, #1a202c 100%);
+  }
+}
+

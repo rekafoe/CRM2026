@@ -1,0 +1,321 @@
+/* ========================================
+   БАЗОВЫЕ СТИЛИ ДЛЯ ПРЕДОПЛАТЫ
+   ======================================== */
+
+/* Информация о предоплате */
+.prepayment-info {
+  font-size: 12px;
+  color: #1976d2;
+  font-weight: 500;
+}
+
+/* Строки в итогах заказа */
+.order-total__line.prepayment {
+  background: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+  border-left: 4px solid #1976d2;
+}
+
+.order-total__line.debt {
+  background: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 4px 0;
+  font-weight: 600;
+}
+
+/* Статусы платежей */
+.order-total__line .paid {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.order-total__line .pending {
+  color: #ffc107;
+  font-weight: 600;
+}
+
+.order-total__line .cancelled {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+/* Суммы платежей */
+.order-total__line .debt-amount {
+  color: #dc3545;
+  font-weight: 700;
+}
+
+.order-total__line .paid-amount {
+  color: #28a745;
+  font-weight: 700;
+}
+
+.order-total__line .prepayment-amount {
+  color: #1976d2;
+  font-weight: 700;
+}
+
+/* Карточка предоплаты */
+.prepayment-card {
+  background: #f8f9fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.prepayment-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.prepayment-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.prepayment-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.prepayment-status.paid {
+  background: #d4edda;
+  color: #155724;
+}
+
+.prepayment-status.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.prepayment-status.cancelled {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.prepayment-status.not-set {
+  background: #e2e3e5;
+  color: #6c757d;
+}
+
+/* Детали предоплаты */
+.prepayment-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prepayment-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.prepayment-detail-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.prepayment-detail-value {
+  color: #333;
+  font-weight: 600;
+}
+
+/* Кнопки предоплаты */
+.prepayment-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.prepayment-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.prepayment-btn--primary {
+  background: #1976d2;
+  color: white;
+}
+
+.prepayment-btn--primary:hover {
+  background: #1565c0;
+}
+
+.prepayment-btn--success {
+  background: #28a745;
+  color: white;
+}
+
+.prepayment-btn--success:hover {
+  background: #218838;
+}
+
+.prepayment-btn--warning {
+  background: #ffc107;
+  color: #212529;
+}
+
+.prepayment-btn--warning:hover {
+  background: #e0a800;
+}
+
+.prepayment-btn--danger {
+  background: #dc3545;
+  color: white;
+}
+
+.prepayment-btn--danger:hover {
+  background: #c82333;
+}
+
+/* Индикатор предоплаты */
+.prepayment-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.prepayment-indicator.has-prepayment {
+  background: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #bbdefb;
+}
+
+.prepayment-indicator.no-prepayment {
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #ddd;
+}
+
+.prepayment-indicator.partial {
+  background: #fff3e0;
+  color: #f57c00;
+  border: 1px solid #ffcc02;
+}
+
+.prepayment-indicator.full {
+  background: #e8f5e8;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+/* Прогресс-бар предоплаты */
+.prepayment-progress {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.prepayment-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #1976d2 0%, #42a5f5 100%);
+  transition: width 0.3s ease;
+}
+
+.prepayment-progress-bar.paid {
+  background: linear-gradient(90deg, #28a745 0%, #4caf50 100%);
+}
+
+.prepayment-progress-bar.partial {
+  background: linear-gradient(90deg, #ffc107 0%, #ffeb3b 100%);
+}
+
+/* Список предоплат */
+.prepayment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.prepayment-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #f8f9fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.prepayment-list-item-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prepayment-list-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.prepayment-list-item-date {
+  font-size: 12px;
+  color: #666;
+}
+
+.prepayment-list-item-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1976d2;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .prepayment-card {
+    padding: 12px;
+  }
+  
+  .prepayment-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .prepayment-actions {
+    flex-direction: column;
+  }
+  
+  .prepayment-btn {
+    width: 100%;
+  }
+  
+  .prepayment-detail-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .prepayment-list-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* Темная тема отключена - используем только светлую тему */

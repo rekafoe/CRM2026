@@ -1,0 +1,506 @@
+/* Orders Management Component Styles */
+
+.orders-management {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Header */
+.orders-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.orders-title h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.orders-count {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.orders-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* Statistics */
+.orders-stats {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 20px;
+  animation: slideDown 0.3s ease-out;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 16px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent-color);
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Filters */
+.orders-filters {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 20px;
+  animation: slideDown 0.3s ease-out;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filters-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+/* Bulk Actions */
+.bulk-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: var(--accent-color);
+  color: white;
+  animation: slideDown 0.3s ease-out;
+}
+
+.bulk-info {
+  font-weight: 600;
+}
+
+.bulk-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.bulk-buttons select {
+  background: white;
+  color: var(--text-primary);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+/* Orders List */
+.orders-list {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-primary);
+}
+
+.orders-list-header {
+  display: grid;
+  grid-template-columns: 40px 1fr 120px 200px 100px 120px 100px;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.order-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 120px 200px 100px 120px 100px;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-items: center;
+}
+
+.order-row:hover {
+  background: var(--bg-hover);
+}
+
+.order-row.selected {
+  background: var(--accent-light);
+  border-color: var(--accent-color);
+}
+
+.order-row.active {
+  background: var(--accent-light);
+  border-left: 4px solid var(--accent-color);
+}
+
+.order-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.order-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.order-number {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-number strong {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.order-id {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.order-status {
+  display: flex;
+  align-items: center;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  text-align: center;
+  min-width: 80px;
+}
+
+.order-customer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.customer-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.customer-phone {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.order-date {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.order-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: right;
+}
+
+.amount-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.prepayment-info {
+  font-size: 12px;
+  color: var(--accent-color);
+  font-weight: 500;
+}
+
+.order-items {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  color: var(--text-primary);
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Animations */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .orders-list-header,
+  .order-row {
+    grid-template-columns: 40px 1fr 100px 150px 80px 100px 80px;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .orders-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .orders-actions {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .filters-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .orders-list-header {
+    display: none;
+  }
+  
+  .order-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+  
+  .order-row > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .order-checkbox {
+    order: -1;
+    align-self: flex-start;
+  }
+  
+  .order-number {
+    order: 1;
+  }
+  
+  .order-status {
+    order: 2;
+  }
+  
+  .order-customer {
+    order: 3;
+  }
+  
+  .order-date {
+    order: 4;
+  }
+  
+  .order-amount {
+    order: 5;
+  }
+  
+  .order-items {
+    order: 6;
+  }
+  
+  .bulk-actions {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+  
+  .bulk-buttons {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .orders-management {
+    padding: 0;
+  }
+  
+  .orders-header,
+  .orders-stats,
+  .orders-filters,
+  .bulk-actions,
+  .pagination {
+    padding: 16px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .stat-item {
+    padding: 12px;
+  }
+  
+  .stat-value {
+    font-size: 20px;
+  }
+  
+  .filters-actions {
+    flex-direction: column;
+  }
+  
+  .export-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .export-buttons button {
+    width: 100%;
+  }
+}
+
+/* Dark theme adjustments */
+@media (prefers-color-scheme: dark) {
+  .bulk-actions {
+    background: var(--accent-color);
+  }
+  
+  .bulk-buttons select {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .order-row {
+    border: 2px solid var(--border-color);
+  }
+  
+  .order-row.selected {
+    border-color: var(--accent-color);
+    border-width: 3px;
+  }
+  
+  .status-badge {
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .order-row,
+  .orders-stats,
+  .orders-filters,
+  .bulk-actions {
+    transition: none;
+    animation: none;
+  }
+}

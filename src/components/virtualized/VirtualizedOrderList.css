@@ -1,0 +1,5 @@
+.virtualized-order-list {}
+.virtualized-container { overflow-y: auto; position: relative; }
+.virtualized-outer { position: relative; }
+.virtualized-abs { position: absolute; left: 0; right: 0; }
+

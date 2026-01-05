@@ -1,0 +1,277 @@
+/* ========================================
+   КОМПАКТНЫЕ СТИЛИ ДЛЯ КАЛЬКУЛЯТОРА
+   ======================================== */
+
+/* Компактные сетки */
+.params-grid.compact,
+.materials-grid.compact,
+.advanced-grid.compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+/* Компактные группы параметров */
+.param-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.param-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Компактные элементы управления */
+.param-group .form-control,
+.param-group select,
+.param-group input {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  transition: all 0.2s ease;
+  min-height: 36px;
+}
+
+.param-group .form-control:focus,
+.param-group select:focus,
+.param-group input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+/* Компактные кнопки количества */
+.quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.quantity-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.quantity-btn:hover {
+  background: #f8f9fa;
+  border-color: #007bff;
+  color: #007bff;
+}
+
+.quantity-input {
+  width: 80px;
+  height: 32px;
+  text-align: center;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.quantity-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.quantity-hint {
+  font-size: 11px;
+  color: #999;
+  margin-top: 2px;
+  line-height: 1.2;
+}
+
+/* Компактные кастомные форматы */
+.custom-format-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.custom-format-inputs input {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-format-inputs span {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+/* Компактные опции материалов */
+.material-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.material-option {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  text-align: center;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.material-option:hover {
+  border-color: #007bff;
+  background: #f8f9fa;
+}
+
+.material-option.selected {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+/* Компактные опции сторон */
+.side-options {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.side-option {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  text-align: center;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.side-option:hover {
+  border-color: #007bff;
+  background: #f8f9fa;
+}
+
+.side-option.selected {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+/* Компактные опции формата */
+.format-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.format-option {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  text-align: center;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.format-option:hover {
+  border-color: #007bff;
+  background: #f8f9fa;
+}
+
+.format-option.selected {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+/* Компактная информация о продукте */
+.selected-product-info {
+  margin-top: 8px;
+}
+
+.selected-product-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+}
+
+.product-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.product-details {
+  flex: 1;
+}
+
+.product-type {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+}
+
+/* Адаптивность для компактного режима */
+@media (max-width: 1200px) {
+  .params-grid.compact,
+  .materials-grid.compact,
+  .advanced-grid.compact {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .params-grid.compact,
+  .materials-grid.compact,
+  .advanced-grid.compact {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .material-options,
+  .format-options {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .side-options {
+    flex-direction: column;
+  }
+}

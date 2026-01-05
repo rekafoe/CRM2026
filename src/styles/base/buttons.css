@@ -1,0 +1,209 @@
+/* ========================================
+   БАЗОВЫЕ СТИЛИ КНОПОК
+   ======================================== */
+
+/* Базовый стиль кнопки */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Основная кнопка */
+.btn-primary {
+  background: #1976d2;
+  color: white;
+  border-color: #1976d2;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #1565c0;
+  border-color: #1565c0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(25, 118, 210, 0.3);
+}
+
+/* Вторичная кнопка */
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+  border-color: #6c757d;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #5a6268;
+  border-color: #5a6268;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+}
+
+/* Успешная кнопка */
+.btn-success {
+  background: #28a745;
+  color: white;
+  border-color: #28a745;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #218838;
+  border-color: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+/* Опасная кнопка */
+.btn-danger {
+  background: #dc3545;
+  color: white;
+  border-color: #dc3545;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #c82333;
+  border-color: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+/* Предупреждающая кнопка */
+.btn-warning {
+  background: #ffc107;
+  color: #212529;
+  border-color: #ffc107;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #e0a800;
+  border-color: #e0a800;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(255, 193, 7, 0.3);
+}
+
+/* Ошибка кнопка */
+.btn-error {
+  background: #dc3545;
+  color: white;
+  border-color: #dc3545;
+}
+
+.btn-error:hover:not(:disabled) {
+  background: #c82333;
+  border-color: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+/* Размеры кнопок */
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn-lg {
+  padding: 12px 24px;
+  font-size: 16px;
+}
+
+/* Кнопка-иконка */
+.btn-icon {
+  padding: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+/* Прозрачная кнопка */
+.btn-outline {
+  background: transparent;
+  border: 1px solid currentColor;
+}
+
+.btn-outline.btn-primary {
+  color: #1976d2;
+  border-color: #1976d2;
+}
+
+.btn-outline.btn-primary:hover:not(:disabled) {
+  background: #1976d2;
+  color: white;
+}
+
+.btn-outline.btn-secondary {
+  color: #6c757d;
+  border-color: #6c757d;
+}
+
+.btn-outline.btn-secondary:hover:not(:disabled) {
+  background: #6c757d;
+  color: white;
+}
+
+/* Кнопка-ссылка */
+.btn-link {
+  background: none;
+  border: none;
+  color: #1976d2;
+  text-decoration: underline;
+  padding: 4px 8px;
+}
+
+.btn-link:hover:not(:disabled) {
+  color: #1565c0;
+  text-decoration: none;
+}
+
+/* Группа кнопок */
+.btn-group {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.btn-group .btn {
+  border-radius: 0;
+}
+
+.btn-group .btn:first-child {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.btn-group .btn:last-child {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  
+  .btn-sm {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  
+  .btn-lg {
+    padding: 10px 20px;
+    font-size: 15px;
+  }
+}

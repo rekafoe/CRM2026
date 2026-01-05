@@ -1,0 +1,12 @@
+:root{
+  --pc-primary:#1976d2;--pc-border:#e0e0e0;--pc-text:#333;--pc-bg:#fff
+}
+.pcw{font-family:Arial,sans-serif;color:var(--pc-text);border:1px solid var(--pc-border);border-radius:8px;padding:12px;background:var(--pc-bg);max-width:720px}
+.pcw h3{margin:0 0 8px 0}
+.pcw .row{display:flex;gap:8px;align-items:center;margin:6px 0}
+.pcw select,.pcw input{border:1px solid var(--pc-border);padding:6px 8px;border-radius:4px}
+.pcw .btn{padding:8px 10px;border:1px solid var(--pc-primary);background:var(--pc-primary);color:#fff;border-radius:4px;cursor:pointer}
+.pcw .btn.alt{background:#fff;color:var(--pc-primary)}
+.pcw .danger{border-color:#c00;background:#c00}
+.pcw .muted{color:#777;font-size:.9em}
+.pcw .summary{border-top:1px solid var(--pc-border);margin-top:8px;padding-top:8px}

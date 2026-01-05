@@ -1,0 +1,8 @@
+# Ignore legacy JS sources; use TS/TSX
+src/**/*.js
+
+# Ignore source maps
+*.map
+
+.env
+

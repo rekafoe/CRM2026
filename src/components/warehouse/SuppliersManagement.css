@@ -1,0 +1,701 @@
+/* ===== СТИЛИ ДЛЯ УПРАВЛЕНИЯ ПОСТАВЩИКАМИ ===== */
+
+.suppliers-management {
+  padding: 8px;
+  background: var(--bg-primary);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Заголовок */
+.suppliers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.suppliers-header h2 {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-btn.primary {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.action-btn.primary:hover {
+  background: var(--accent-primary-dark);
+  transform: translateY(-1px);
+}
+
+/* Статистика */
+.suppliers-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.stat-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.stat-card.success {
+  border-left: 4px solid var(--success-color);
+}
+
+.stat-card.warning {
+  border-left: 4px solid var(--warning-color);
+}
+
+.stat-icon {
+  font-size: 14px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+/* Элементы управления */
+.suppliers-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 150px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 13px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary-light);
+}
+
+.filter-select {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* Стили для поиска */
+.search-section {
+  flex: 1;
+  min-width: 150px;
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  right: 10px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  font-size: 12px;
+}
+
+/* Стили для фильтров */
+.filter-section {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-group label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.filter-group select {
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 13px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.reset-filters-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.reset-filters-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--primary-color);
+}
+
+/* Список поставщиков */
+/* Табличный режим */
+.suppliers-table-wrapper {
+  flex: 1;
+  overflow: auto;
+}
+
+.suppliers-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.suppliers-table th,
+.suppliers-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  text-align: center;
+  font-size: 13px;
+}
+
+.suppliers-table th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.suppliers-table th:last-child,
+.suppliers-table td:last-child {
+  border-right: none;
+}
+
+.suppliers-table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+.row-inactive {
+  opacity: 0.7;
+}
+
+.supplier-actions.inline {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.supplier-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+  max-width: 350px;
+  width: 100%;
+}
+
+.supplier-card:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 2px 8px var(--shadow);
+  transform: translateY(-1px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.card-content h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+}
+
+.supplier-status {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.supplier-status.active {
+  background: var(--success-light);
+  color: var(--success-color);
+}
+
+.supplier-status.inactive {
+  background: var(--warning-light);
+  color: var(--warning-color);
+}
+
+.supplier-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.contact-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
+.contact-value {
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.contact-value a {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.contact-value a:hover {
+  text-decoration: underline;
+}
+
+.supplier-actions {
+  display: flex;
+  gap: 3px;
+  justify-content: flex-end;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-color);
+}
+
+.supplier-actions .action-btn {
+  padding: 3px 5px;
+  font-size: 11px;
+  min-width: auto;
+  border-radius: 3px;
+}
+
+.supplier-actions .action-btn.small {
+  padding: 3px 5px;
+  font-size: 11px;
+  min-width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.supplier-actions .action-btn.small:first-child {
+  background: var(--info-color);
+  color: white;
+}
+
+.supplier-actions .action-btn.small:first-child:hover {
+  background: var(--info-dark);
+}
+
+.supplier-actions .action-btn.small:nth-child(2) {
+  background: var(--success-color);
+  color: white;
+}
+
+.supplier-actions .action-btn.small:nth-child(2):hover {
+  background: var(--success-dark);
+}
+
+.action-btn.edit {
+  background: var(--info-color);
+  color: white;
+}
+
+.action-btn.edit:hover {
+  background: var(--info-dark);
+}
+
+.action-btn.delete {
+  background: var(--danger-color);
+  color: white;
+}
+
+.action-btn.delete:hover {
+  background: var(--danger-dark);
+}
+
+/* Пустое состояние */
+.suppliers-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  background: var(--bg-secondary);
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  margin-top: 20px;
+}
+
+.empty-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-content h3 {
+  color: var(--text-primary);
+  font-size: 18px;
+  margin: 0 0 8px 0;
+}
+
+.empty-content p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0 0 20px 0;
+}
+
+/* Форма поставщика */
+.supplier-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.form-group input,
+.form-group textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary-light);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.checkbox-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.checkbox-group label {
+  margin: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Состояния загрузки и ошибок */
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  text-align: center;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 40px 20px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top: 4px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0;
+}
+
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.7;
+}
+
+.error-state h3 {
+  color: var(--text-primary);
+  font-size: 18px;
+  margin: 0 0 8px 0;
+}
+
+.error-state p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0 0 20px 0;
+  max-width: 400px;
+}
+
+/* Дополнительные стили для карточек поставщиков */
+.supplier-notes {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-color);
+}
+
+.supplier-notes strong {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 3px;
+}
+
+.supplier-notes p {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.supplier-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-color);
+}
+
+.meta-item {
+  font-size: 9px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Адаптивность */
+@media (max-width: 1400px) {
+  .suppliers-list {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .suppliers-list {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .suppliers-list {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .suppliers-management {
+    padding: 6px;
+  }
+  
+  .suppliers-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+  
+  .suppliers-stats {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  
+  .suppliers-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  
+  .search-input {
+    min-width: auto;
+  }
+  
+  .filter-section {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  
+  .filter-group {
+    justify-content: space-between;
+  }
+  
+  .suppliers-list {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  
+  .supplier-card {
+    max-width: none;
+  }
+  
+  .supplier-meta {
+    flex-direction: column;
+    gap: 3px;
+  }
+  
+  .supplier-actions {
+    justify-content: center;
+  }
+}

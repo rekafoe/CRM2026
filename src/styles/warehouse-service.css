@@ -1,0 +1,265 @@
+/* Warehouse Service Styles */
+.warehouse-service {
+  position: relative;
+  display: inline-block;
+}
+
+.warehouse-service-toggle-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.warehouse-service-toggle-btn:hover {
+  background: var(--accent-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.warehouse-service-toggle-btn.active {
+  background: var(--accent-secondary);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.warehouse-notification-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: var(--error);
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(255, 107, 107, 0.4);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.warehouse-service-dropdown {
+  position: fixed;
+  top: 60px;
+  right: 10px;
+  width: 420px;
+  max-height: calc(100vh - 80px);
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.warehouse-service-header {
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent-primary);
+  color: white;
+  padding: 20px;
+  text-align: center;
+}
+
+.warehouse-service-header h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.warehouse-stats {
+  display: flex;
+  justify-content: space-around;
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-icon {
+  font-size: 20px;
+}
+
+.stat-value {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.stat-label {
+  font-size: 11px;
+  opacity: 0.9;
+  text-align: center;
+}
+
+.warehouse-sections {
+  padding: 16px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+.warehouse-section-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px;
+  margin-bottom: 8px;
+  border: 2px solid #f0f0f0;
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+}
+
+.warehouse-section-btn:hover {
+  border-color: var(--section-color, #667eea);
+  background: var(--bg-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.warehouse-section-btn.active {
+  border-color: var(--section-color, #667eea);
+  background: var(--bg-tertiary);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.section-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent-primary);
+  border-radius: 10px;
+  color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.section-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.section-description {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.section-arrow {
+  font-size: 18px;
+  color: #ccc;
+  transition: all 0.3s ease;
+}
+
+.warehouse-section-btn:hover .section-arrow {
+  color: var(--section-color, #667eea);
+  transform: translateX(4px);
+}
+
+.warehouse-service-footer {
+  padding: 16px;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.warehouse-close-btn {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  color: #666;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.warehouse-close-btn:hover {
+  background: #f5f5f5;
+  border-color: #bbb;
+  color: #333;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .warehouse-service-dropdown {
+    right: 5px;
+    left: 5px;
+    width: auto;
+    max-width: calc(100vw - 10px);
+  }
+  
+  .warehouse-stats {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .stat-item {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+
+/* Scrollbar Styling */
+.warehouse-sections::-webkit-scrollbar {
+  width: 6px;
+}
+
+.warehouse-sections::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.warehouse-sections::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.warehouse-sections::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
