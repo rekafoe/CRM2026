@@ -2,12 +2,15 @@
 
 import React from 'react';
 import { MaterialsAnalyticsData } from '../types';
+import type { ABCSummary } from '../types';
 
 interface MaterialsAnalyticsProps {
   data: MaterialsAnalyticsData;
 }
 
 export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) => {
+  const abcClasses = ['A', 'B', 'C'] as const satisfies ReadonlyArray<keyof ABCSummary>;
+
   return (
     <>
       {/* ABC-анализ материалов */}
@@ -45,7 +48,7 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
 
         {/* Топ материалов по классам */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-          {['A', 'B', 'C'].map(className => (
+          {abcClasses.map((className) => (
             <div key={className} style={{
               padding: '16px',
               backgroundColor: 'var(--bg-secondary)',

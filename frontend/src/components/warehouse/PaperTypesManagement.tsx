@@ -108,13 +108,13 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
                     <strong>Связанные материалы:</strong>
                     <div className="materials-grid">
                       {paperType.materials
-                        .reduce((acc, material) => {
-                          if (!acc.find(m => m.id === material.id)) {
+                        .reduce((acc: typeof paperType.materials, material) => {
+                          if (!acc.find((m) => m.id === material.id)) {
                             acc.push(material);
                           }
                           return acc;
-                        }, [] as any[])
-                        .map((material, index) => (
+                        }, [] as NonNullable<typeof paperType.materials>)
+                        .map((material, index: number) => (
                         <div key={`${paperType.id}-card-${material.id}-${index}`} className="material-item">
                           <span className="material-name">{material.name}</span>
                           {material.density && (
@@ -146,13 +146,13 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
                 {paperType.materials && paperType.materials.length > 0 ? (
                   <div className="material-list">
                     {paperType.materials
-                      .reduce((acc, material) => {
-                        if (!acc.find(m => m.id === material.id)) {
+                      .reduce((acc: typeof paperType.materials, material) => {
+                        if (!acc.find((m) => m.id === material.id)) {
                           acc.push(material);
                         }
                         return acc;
-                      }, [] as any[])
-                      .map((material, index) => (
+                      }, [] as NonNullable<typeof paperType.materials>)
+                      .map((material, index: number) => (
                       <div key={`${paperType.id}-${material.id}-${index}`} className="material-item">
                         <div className="material-info">
                           <span className="material-name">{material.name}</span>

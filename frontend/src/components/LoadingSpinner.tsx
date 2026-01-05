@@ -185,6 +185,7 @@ interface SkeletonProps {
   borderRadius?: string | number;
   animation?: 'pulse' | 'wave';
   lines?: number;
+  style?: React.CSSProperties;
 }
 
 export const Skeleton: React.FC<SkeletonProps> = ({
@@ -193,6 +194,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
   borderRadius = '4px',
   animation = 'pulse',
   lines = 1,
+  style,
 }) => {
   const skeletonStyle: React.CSSProperties = {
     width,
@@ -200,6 +202,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
     borderRadius,
     backgroundColor: '#f0f0f0',
     animation: animation === 'pulse' ? 'pulse 1.5s ease-in-out infinite' : 'wave 1.5s ease-in-out infinite',
+    ...style,
   };
 
   if (lines === 1) {

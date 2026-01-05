@@ -190,7 +190,7 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
                     <span className="current-value">
                       {printer.value !== null ? printer.value.toLocaleString() : '—'}
                     </span>
-                    {printer.difference !== null && (
+                    {printer.difference != null && (
                       <span className={`difference ${printer.difference >= 0 ? 'positive' : 'negative'}`}>
                         {printer.difference >= 0 ? '+' : ''}{printer.difference}
                       </span>

@@ -81,7 +81,7 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
     setError(null);
     
     try {
-      const response = await api.get(`${ENDPOINTS.SUPPLIERS.GET(supplier.id)}/analytics`);
+      const response = await api.get<SupplierAnalytics>(`${ENDPOINTS.SUPPLIERS.GET(supplier.id)}/analytics`);
       setAnalytics(response.data);
     } catch (error: any) {
       console.error('Ошибка загрузки аналитики:', error);
@@ -95,7 +95,7 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
     if (!supplier) return;
     
     try {
-      const response = await api.get(`${ENDPOINTS.SUPPLIERS.GET(supplier.id)}/delivery-history`);
+      const response = await api.get<DeliveryHistoryItem[]>(`${ENDPOINTS.SUPPLIERS.GET(supplier.id)}/delivery-history`);
       setDeliveryHistory(response.data);
     } catch (error: any) {
       console.error('Ошибка загрузки истории поставок:', error);

@@ -2,12 +2,20 @@
 
 import React from 'react';
 import { TimeAnalyticsData } from '../types';
+import type { TimeOfDayTrends } from '../types';
 
 interface TimeAnalyticsProps {
   data: TimeAnalyticsData;
 }
 
 export const TimeAnalytics: React.FC<TimeAnalyticsProps> = ({ data }) => {
+  const periods = [
+    { key: 'morning', label: '🌅 Утро (6:00-12:00)', color: 'var(--accent-light)' },
+    { key: 'afternoon', label: '☀️ День (12:00-18:00)', color: 'var(--accent-primary)' },
+    { key: 'evening', label: '🌆 Вечер (18:00-24:00)', color: '#6c757d' },
+    { key: 'night', label: '🌙 Ночь (0:00-6:00)', color: '#343a40' }
+  ] as const satisfies ReadonlyArray<{ key: keyof TimeOfDayTrends; label: string; color: string }>;
+
   return (
     <>
       {/* Почасовое распределение */}
@@ -102,12 +110,7 @@ export const TimeAnalytics: React.FC<TimeAnalyticsProps> = ({ data }) => {
           🌅 Активность по времени суток
         </h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
-          {[
-            { key: 'morning', label: '🌅 Утро (6:00-12:00)', color: 'var(--accent-light)' },
-            { key: 'afternoon', label: '☀️ День (12:00-18:00)', color: 'var(--accent-primary)' },
-            { key: 'evening', label: '🌆 Вечер (18:00-24:00)', color: '#6c757d' },
-            { key: 'night', label: '🌙 Ночь (0:00-6:00)', color: '#343a40' }
-          ].map(period => (
+          {periods.map((period) => (
             <div key={period.key} style={{
               padding: '16px',
               backgroundColor: 'var(--bg-secondary)',

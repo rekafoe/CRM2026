@@ -212,7 +212,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({
             <button className="close-btn" onClick={onClose}>×</button>
           </div>
           <div className="modal-content">
-            <LoadingSpinner message="Загрузка истории..." />
+            <LoadingSpinner text="Загрузка истории..." />
           </div>
         </div>
       </div>

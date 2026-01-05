@@ -5,7 +5,7 @@ interface WarehouseButtonProps {
   variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning';
   size?: 'sm' | 'md' | 'lg';
   icon?: React.ReactNode;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   loading?: boolean;
@@ -25,6 +25,7 @@ export const WarehouseButton: React.FC<WarehouseButtonProps> = ({
   const buttonVariant = variant === 'success' ? 'primary' : 
                        variant === 'warning' ? 'secondary' : 
                        variant === 'danger' ? 'secondary' : variant;
+  const hasText = children !== undefined && children !== null && children !== false;
 
   return (
     <Button
@@ -35,7 +36,7 @@ export const WarehouseButton: React.FC<WarehouseButtonProps> = ({
       disabled={disabled || loading}
       className={`warehouse-button warehouse-button--${variant} ${className}`.trim()}
     >
-      {loading ? 'Загрузка...' : children}
+      {loading ? (hasText ? 'Загрузка...' : null) : children}
     </Button>
   );
 };

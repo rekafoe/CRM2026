@@ -42,7 +42,7 @@ export const SupplierMaterialsModal: React.FC<SupplierMaterialsModalProps> = ({
     setError(null);
     
     try {
-      const response = await api.get(`/suppliers/${supplier.id}/materials`);
+      const response = await api.get<Material[]>(`/suppliers/${supplier.id}/materials`);
       setMaterials(response.data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Ошибка загрузки материалов');

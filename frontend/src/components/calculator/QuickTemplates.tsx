@@ -1,7 +1,9 @@
-import React, { useState, useCallback } from 'react';
-import { ProductSpecs } from '../../types';
+import React, { useEffect, useState, useCallback } from 'react';
+import type { ProductSpecs } from './types/calculator.types';
 import { useLogger } from '../../utils/logger';
 import { useToastNotifications } from '../Toast';
+import { Alert } from '../common';
+import { api } from '../../api';
 import './QuickTemplates.css';
 
 interface QuickTemplate {
@@ -28,257 +30,35 @@ export const QuickTemplates: React.FC<QuickTemplatesProps> = ({
   
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [templates, setTemplates] = useState<QuickTemplate[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Предустановленные шаблоны
-  const templates: QuickTemplate[] = [
-    // Популярные заказы
-    {
-      id: 'flyers_a6_1000',
-      name: 'Листовки A6, 1000 шт',
-      description: 'Стандартные листовки для рекламы',
-      icon: '📄',
-      category: 'popular',
-      popularity: 95,
-      specs: {
-        productType: 'flyers',
-        format: 'A6',
-        quantity: 1000,
-        sides: 2,
-        paperType: 'semi-matte',
-        paperDensity: 130,
-        lamination: 'none',
-        priceType: 'standard',
-        customerType: 'regular'
-      }
-    },
-    {
-      id: 'business_cards_500',
-      name: 'Визитки, 500 шт',
-      description: 'Стандартные визитки с ламинацией',
-      icon: '💳',
-      category: 'popular',
-      popularity: 90,
-      specs: {
-        productType: 'business_cards',
-        format: 'стандартные',
-        quantity: 500,
-        sides: 2,
-        paperType: 'semi-matte',
-        paperDensity: 300,
-        lamination: 'matte',
-        priceType: 'standard',
-        customerType: 'regular'
-      }
-    },
-    {
-      id: 'booklets_a4_8pages',
-      name: 'Буклет A4, 8 стр',
-      description: 'Рекламный буклет с фальцовкой',
-      icon: '📖',
-      category: 'popular',
-      popularity: 85,
-      specs: {
-        productType: 'booklets',
-        format: 'A4',
-        quantity: 1000,
-        sides: 2,
-        paperType: 'semi-matte',
-        paperDensity: 150,
-        lamination: 'matte',
-        priceType: 'standard',
-        customerType: 'regular',
-        pages: 8,
-        folding: true
-      }
-    },
-    {
-      id: 'posters_a3_100',
-      name: 'Постер A3, 100 шт',
-      description: 'Рекламные постеры',
-      icon: '🖼️',
-      category: 'popular',
-      popularity: 80,
-      specs: {
-        productType: 'posters',
-        format: 'A3',
-        quantity: 100,
-        sides: 1,
-        paperType: 'semi-matte',
-        paperDensity: 200,
-        lamination: 'none',
-        priceType: 'standard',
-        customerType: 'regular',
-        cutting: true
-      }
-    },
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+    setErrorMessage(null);
 
-    // Срочные заказы
-    {
-      id: 'urgent_flyers',
-      name: 'Срочные листовки',
-      description: 'Листовки с ускоренным производством',
-      icon: '⚡',
-      category: 'urgent',
-      popularity: 75,
-      specs: {
-        productType: 'flyers',
-        format: 'A6',
-        quantity: 500,
-        sides: 1,
-        paperType: 'semi-matte',
-        paperDensity: 130,
-        lamination: 'none',
-        priceType: 'urgent',
-        customerType: 'regular'
-      }
-    },
-    {
-      id: 'express_business_cards',
-      name: 'Экспресс визитки',
-      description: 'Визитки за 1 день',
-      icon: '🚀',
-      category: 'urgent',
-      popularity: 70,
-      specs: {
-        productType: 'business_cards',
-        format: 'стандартные',
-        quantity: 100,
-        sides: 2,
-        paperType: 'semi-matte',
-        paperDensity: 300,
-        lamination: 'none',
-        priceType: 'express',
-        customerType: 'regular'
-      }
-    },
+    api.get<QuickTemplate[]>('/quick-templates')
+      .then((res) => {
+        if (!mounted) return;
+        setTemplates(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch((err) => {
+        if (!mounted) return;
+        logger.error('Ошибка загрузки быстрых шаблонов', err);
+        setErrorMessage('Не удалось загрузить быстрые шаблоны');
+        setTemplates([]);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setIsLoading(false);
+      });
 
-    // VIP заказы
-    {
-      id: 'vip_brochures',
-      name: 'VIP брошюры',
-      description: 'Премиум брошюры для VIP клиентов',
-      icon: '👑',
-      category: 'vip',
-      popularity: 65,
-      specs: {
-        productType: 'brochures',
-        format: 'A4',
-        quantity: 500,
-        sides: 2,
-        paperType: 'coated',
-        paperDensity: 200,
-        lamination: 'glossy',
-        priceType: 'standard',
-        customerType: 'vip',
-        pages: 16,
-        folding: true
-      }
-    },
-    {
-      id: 'premium_calendars',
-      name: 'Премиум календари',
-      description: 'Настенные календари высокого качества',
-      icon: '📅',
-      category: 'vip',
-      popularity: 60,
-      specs: {
-        productType: 'calendars',
-        format: 'A3',
-        quantity: 100,
-        sides: 2,
-        paperType: 'coated',
-        paperDensity: 250,
-        lamination: 'glossy',
-        priceType: 'standard',
-        customerType: 'vip',
-        cutting: true
-      }
-    },
-
-    // Промо акции
-    {
-      id: 'promo_stickers',
-      name: 'Промо наклейки',
-      description: 'Наклейки по акционной цене',
-      icon: '🏷️',
-      category: 'promo',
-      popularity: 85,
-      specs: {
-        productType: 'stickers',
-        format: '58x40',
-        quantity: 2000,
-        sides: 1,
-        paperType: 'self-adhesive',
-        paperDensity: 130,
-        lamination: 'none',
-        priceType: 'promo',
-        customerType: 'regular',
-        cutting: true
-      }
-    },
-    {
-      id: 'discount_flyers',
-      name: 'Акционные листовки',
-      description: 'Листовки со скидкой',
-      icon: '💰',
-      category: 'promo',
-      popularity: 80,
-      specs: {
-        productType: 'flyers',
-        format: 'A5',
-        quantity: 2000,
-        sides: 2,
-        paperType: 'semi-matte',
-        paperDensity: 130,
-        lamination: 'none',
-        priceType: 'promo',
-        customerType: 'regular'
-      }
-    },
-
-    // Специализированные
-    {
-      id: 'magnetic_cards',
-      name: 'Магнитные визитки',
-      description: 'Визитки с магнитной основой',
-      icon: '🧲',
-      category: 'specialty',
-      popularity: 70,
-      specs: {
-        productType: 'magnetic_cards',
-        format: '90x50',
-        quantity: 200,
-        sides: 2,
-        paperType: 'magnetic',
-        paperDensity: 300,
-        lamination: 'matte',
-        priceType: 'standard',
-        customerType: 'regular',
-        magnetic: true,
-        cutting: true
-      }
-    },
-    {
-      id: 'wedding_invitations',
-      name: 'Свадебные приглашения',
-      description: 'Элегантные приглашения на свадьбу',
-      icon: '💒',
-      category: 'specialty',
-      popularity: 75,
-      specs: {
-        productType: 'wedding_invitations',
-        format: 'A6',
-        quantity: 100,
-        sides: 2,
-        paperType: 'coated',
-        paperDensity: 250,
-        lamination: 'matte',
-        priceType: 'standard',
-        customerType: 'regular',
-        folding: true
-      }
-    }
-  ];
+    return () => {
+      mounted = false;
+    };
+  }, [logger]);
 
   // Категории шаблонов
   const categories = [
@@ -328,6 +108,12 @@ export const QuickTemplates: React.FC<QuickTemplatesProps> = ({
         <button className="close-btn" onClick={onClose}>×</button>
       </div>
 
+      {errorMessage && (
+        <Alert type="error" className="mb-4" onClose={() => setErrorMessage(null)}>
+          {errorMessage}
+        </Alert>
+      )}
+
       {/* Панель управления */}
       <div className="templates-controls">
         <div className="search-container">
@@ -359,7 +145,9 @@ export const QuickTemplates: React.FC<QuickTemplatesProps> = ({
 
       {/* Список шаблонов */}
       <div className="templates-container">
-        {filteredTemplates.length === 0 ? (
+        {isLoading ? (
+          <div className="users-loading">Загрузка шаблонов...</div>
+        ) : filteredTemplates.length === 0 ? (
           <div className="no-templates">
             <div className="no-templates-icon">🔍</div>
             <h3>Шаблоны не найдены</h3>

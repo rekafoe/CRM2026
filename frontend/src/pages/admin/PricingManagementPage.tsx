@@ -11,7 +11,7 @@ const PricingManagementPage: React.FC<PricingManagementPageProps> = ({ onBack })
     <AdminPageLayout
       title="Управление ценами"
       icon="💰"
-      onBack={onBack}
+      onBack={onBack ?? (() => window.history.back())}
       className="pricing-management-page"
     >
       <PricingManagement />

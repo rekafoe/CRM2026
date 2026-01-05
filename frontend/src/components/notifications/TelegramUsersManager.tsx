@@ -27,7 +27,7 @@ interface CreateTelegramUserRequest {
   last_name?: string;
   role?: string;
   notifications_enabled?: boolean;
-  notification_preferences?: {
+  notification_preferences: {
     low_stock: boolean;
     new_orders: boolean;
     system_alerts: boolean;
@@ -58,7 +58,7 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
     }
   });
 
-  const { addNotification } = useUIStore();
+  const { showToast } = useUIStore();
 
   // Загрузка пользователей
   const loadUsers = async () => {
@@ -82,7 +82,7 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
       setUsers(data.data || []);
     } catch (err: any) {
       setError(err.message);
-      addNotification(`Ошибка загрузки пользователей: ${err.message}`, 'error');
+      showToast(`Ошибка загрузки пользователей: ${err.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,7 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
   // Создание пользователя
   const createUser = async () => {
     if (!newUser.chat_id.trim()) {
-      addNotification('Введите Chat ID', 'warning');
+      showToast('Введите Chat ID', 'warning');
       return;
     }
 
@@ -111,7 +111,7 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
         throw new Error(errorData.message || 'Ошибка создания пользователя');
       }
 
-      addNotification('Пользователь Telegram создан успешно', 'success');
+      showToast('Пользователь Telegram создан успешно', 'success');
       setShowAddModal(false);
       setNewUser({
         chat_id: '',
@@ -128,7 +128,7 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
       });
       loadUsers();
     } catch (err: any) {
-      addNotification(`Ошибка создания пользователя: ${err.message}`, 'error');
+      showToast(`Ошибка создания пользователя: ${err.message}`, 'error');
     }
   };
 
@@ -158,11 +158,11 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
         throw new Error(errorData.message || 'Ошибка обновления пользователя');
       }
 
-      addNotification('Пользователь обновлен успешно', 'success');
+      showToast('Пользователь обновлен успешно', 'success');
       setEditingUser(null);
       loadUsers();
     } catch (err: any) {
-      addNotification(`Ошибка обновления пользователя: ${err.message}`, 'error');
+      showToast(`Ошибка обновления пользователя: ${err.message}`, 'error');
     }
   };
 
@@ -187,10 +187,10 @@ export const TelegramUsersManager: React.FC<TelegramUsersManagerProps> = ({ onCl
         throw new Error(errorData.message || 'Ошибка удаления пользователя');
       }
 
-      addNotification('Пользователь удален успешно', 'success');
+      showToast('Пользователь удален успешно', 'success');
       loadUsers();
     } catch (err: any) {
-      addNotification(`Ошибка удаления пользователя: ${err.message}`, 'error');
+      showToast(`Ошибка удаления пользователя: ${err.message}`, 'error');
     }
   };
 

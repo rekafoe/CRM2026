@@ -345,13 +345,23 @@ export const getTimePeakHoursAnalytics = (params?: { period?: string }) =>
 export const duplicateOrder = (orderId: number) => 
   api.post<Order>(`/orders/${orderId}/duplicate`);
 
-export const getDailyReportByDate = (date: string) =>
-  api.get<DailyReport>(`/daily-reports/${date}`);
-export const updateDailyReport = (date: string, data: {
-  orders_count?: number;
-  total_revenue?: number;
-}) =>
-  api.patch<DailyReport>(`/daily-reports/${date}`, data);
+export const getDailyReportByDate = (date: string, userId?: number) =>
+  api.get<DailyReport>(`/daily-reports/${date}`, {
+    params: userId ? { user_id: userId } : undefined
+  });
+export const updateDailyReport = (
+  date: string,
+  data: {
+    orders_count?: number;
+    total_revenue?: number;
+    cash_actual?: number;
+    user_id?: number;
+  },
+  userId?: number
+) =>
+  api.patch<DailyReport>(`/daily-reports/${date}`, data, {
+    params: userId ? { user_id: userId } : undefined
+  });
 
 export const getPresets = () => api.get<PresetCategory[]>('/presets');
 export const getUsers = () => api.get<UserRef[]>('/users');

@@ -11,7 +11,7 @@ interface NotificationsManagerProps {
 
 export const NotificationsManager: React.FC<NotificationsManagerProps> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'alerts' | 'telegram' | 'orders' | 'settings'>('alerts');
-  const { addNotification } = useUIStore();
+  const { showToast } = useUIStore();
 
   const renderContent = () => {
     switch (activeTab) {
@@ -71,7 +71,7 @@ export const NotificationsManager: React.FC<NotificationsManagerProps> = ({ onCl
 
 // Компонент настроек уведомлений
 const NotificationsSettings: React.FC = () => {
-  const { addNotification } = useUIStore();
+  const { showToast } = useUIStore();
   const [settings, setSettings] = useState({
     stockMonitoring: {
       enabled: true,
@@ -95,7 +95,7 @@ const NotificationsSettings: React.FC = () => {
 
   const handleSaveSettings = () => {
     // Здесь будет логика сохранения настроек
-    addNotification('Настройки сохранены', 'success');
+    showToast('Настройки сохранены', 'success');
   };
 
   return (

@@ -17,7 +17,7 @@ interface OrderFormData {
   customerPhone: string;
   customerEmail: string;
   prepaymentAmount: string;
-  paymentMethod: 'online' | 'offline';
+  paymentMethod: 'online' | 'offline' | 'telegram';
   status: number;
 }
 
@@ -288,12 +288,13 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
                   <select
                     id="paymentMethod"
                     value={formData.paymentMethod}
-                    onChange={(e) => handleInputChange('paymentMethod', e.target.value as 'online' | 'offline')}
+                    onChange={(e) => handleInputChange('paymentMethod', e.target.value as OrderFormData['paymentMethod'])}
                     className="form-control"
                     disabled={loading}
                   >
                     <option value="online">🌐 Онлайн</option>
                     <option value="offline">🏪 Оффлайн</option>
+                    <option value="telegram">💬 Telegram</option>
                   </select>
                 </div>
               </div>

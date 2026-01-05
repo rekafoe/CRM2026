@@ -16,7 +16,7 @@ export interface PaperType {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  materials?: any[];
+  materials?: Material[];
   prices?: { [density: number]: number };
 }
 
@@ -78,7 +78,7 @@ export const usePaperTypesManagement = (onRefresh?: () => void) => {
       console.log('📋 Setting paper types:', newPaperTypes.length, 'items');
       
       // Дедупликация по id - оставляем только первое вхождение каждого id
-      const uniquePaperTypes = newPaperTypes.reduce((acc, paperType) => {
+      const uniquePaperTypes = newPaperTypes.reduce((acc: PaperType[], paperType: PaperType) => {
         if (!acc.find(pt => pt.id === paperType.id)) {
           acc.push(paperType);
         }

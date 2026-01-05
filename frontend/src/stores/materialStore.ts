@@ -54,7 +54,13 @@ export const useMaterialStore = create<MaterialState>()(
       getMaterialById: (id) => get().materials.find(material => material.id === id),
       
       getMaterialsByCategory: (category) => 
-        get().materials.filter(material => material.category === category),
+        get().materials.filter((material: any) => {
+          const name =
+            material.category_name ??
+            material.category?.name ??
+            material.category;
+          return name === category;
+        }),
       
       getLowStockMaterials: (threshold) => 
         get().materials.filter(material => 

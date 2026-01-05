@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Supplier } from '../../types/shared';
 import { useUIStore } from '../../stores/uiStore';
-import { useSuppliers, useCreateSupplier, useUpdateSupplier, useDeleteSupplier } from '../../api/hooks/useSuppliers';
+import { useSuppliers, useCreateSupplier, useUpdateSupplier, useDeleteSupplier, CreateSupplierRequest } from '../../api/hooks/useSuppliers';
 import { SupplierModal } from './SupplierModal';
 import { SupplierMaterialsModal } from './SupplierMaterialsModal';
 import { SupplierAnalyticsModal } from './SupplierAnalyticsModal';
@@ -44,15 +44,18 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
       setLoadingFilters(true);
       
       // Загружаем категории
-      const categoriesResponse = await api.get('/material-categories');
-      setCategories(categoriesResponse.data || []);
+      const categoriesResponse = await api.get<Array<{ id: number; name: string }>>('/material-categories');
+      setCategories(Array.isArray(categoriesResponse.data) ? categoriesResponse.data : []);
       
       // Извлекаем уникальные регионы из адресов поставщиков
+      const isNonEmptyString = (v: unknown): v is string =>
+        typeof v === 'string' && v.trim().length > 0;
+
       const uniqueRegions = [...new Set(
         suppliers
           .map(s => s.address)
-          .filter(addr => addr && addr.trim())
-          .map(addr => {
+          .filter(isNonEmptyString)
+          .map((addr) => {
             // Извлекаем город из адреса (первое слово до запятой)
             const city = addr.split(',')[0]?.trim();
             return city || addr;
@@ -90,7 +93,7 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
     if (searchQuery) {
       filtered = filtered.filter(s => 
         s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.contact.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (s.contact_person || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.email?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
@@ -180,7 +183,22 @@ export const SuppliersManagement: React.FC<SuppliersManagementProps> = ({
         showToast('Поставщик обновлен', 'success');
       } else {
         // Добавление нового поставщика
-        await createSupplierMutation.mutateAsync(supplierData);
+        if (!supplierData.name || !supplierData.name.trim()) {
+          showToast('Укажите название поставщика', 'error');
+          return;
+        }
+
+        const payload: CreateSupplierRequest = {
+          name: supplierData.name,
+          contact_person: (supplierData as any).contact_person,
+          email: supplierData.email,
+          phone: supplierData.phone,
+          address: supplierData.address,
+          notes: supplierData.notes,
+          is_active: supplierData.is_active ?? true,
+        };
+
+        await createSupplierMutation.mutateAsync(payload);
         showToast('Поставщик добавлен', 'success');
       }
       setShowAddModal(false);

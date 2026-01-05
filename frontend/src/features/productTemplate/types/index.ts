@@ -15,6 +15,9 @@ export interface ProductOperation {
   price_multiplier?: number;
   sequence?: number;
   sort_order?: number;
+  // Условия/связки с параметрами (используются в UI настройки операций)
+  conditions?: Record<string, any> | null;
+  linked_parameter_name?: string | null;
 }
 
 export interface AvailableOperation {
@@ -27,7 +30,7 @@ export interface AvailableOperation {
 }
 
 export interface OperationError {
-  type: 'add' | 'remove' | 'load';
+  type: 'add' | 'remove' | 'load' | 'update';
   message: string;
 }
 

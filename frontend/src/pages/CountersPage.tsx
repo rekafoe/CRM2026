@@ -407,8 +407,8 @@ export const CountersPage: React.FC = () => {
                   
                   <div className="value-row">
                     <span className="value-label">Разница:</span>
-                    <span className={`value-difference ${printer.difference !== null ? (printer.difference >= 0 ? 'positive' : 'negative') : 'neutral'}`}>
-                      {printer.difference !== null ? (printer.difference >= 0 ? '+' : '') + printer.difference : '—'}
+                    <span className={`value-difference ${printer.difference != null ? (printer.difference >= 0 ? 'positive' : 'negative') : 'neutral'}`}>
+                      {printer.difference != null ? (printer.difference >= 0 ? '+' : '') + printer.difference : '—'}
                     </span>
                   </div>
                 </div>

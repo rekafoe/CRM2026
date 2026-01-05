@@ -65,7 +65,7 @@ const AdminPanelHome: React.FC = () => {
 
   const lowStockCount = materials?.filter((m: any) => m.quantity < 10).length || 0;
   const totalOrders = orders?.length || 0;
-  const totalRevenue = orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
+  const totalRevenue = orders?.reduce((sum, order: any) => sum + (order.totalAmount ?? order.total_amount ?? 0), 0) || 0;
 
   const handleNavigate = (page: string) => {
     navigate(`/adminpanel/${page}`);

@@ -8,7 +8,7 @@ interface UnifiedOrder {
   customerName?: string;
   customerContact?: string;
   totalAmount: number;
-  createdAt: string;
+  created_at: string;
   assignedTo?: number;
   assignedToName?: string;
   notes?: string;

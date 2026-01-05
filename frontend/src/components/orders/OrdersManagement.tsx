@@ -327,11 +327,11 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
   );
 
   if (loading && orders.length === 0) {
-    return <LoadingSpinner message="Загрузка заказов..." />;
+    return <LoadingSpinner text="Загрузка заказов..." />;
   }
 
   if (error) {
-    return <ErrorDisplay message={error} onRetry={() => loadOrders()} />;
+    return <ErrorDisplay error={error} onRetry={() => loadOrders()} />;
   }
 
   return (

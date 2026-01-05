@@ -99,7 +99,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
       title="Создать продукт"
       size="md"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="flex flex-column gap-4">
         {error && (
           <Alert type="error" onClose={() => setError(null)}>
             {error}
@@ -140,7 +140,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
           />
         </FormField>
 
-        <div className="flex gap-3">
+        <div className="form-row">
           <FormField label="Иконка (эмодзи)" className="flex-1">
             <input
               className="form-input"
@@ -179,7 +179,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
         {/* Подсказки по типам продуктов */}
         {productType === 'sheet_single' && (
           <Alert type="info">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-column gap-1">
               <strong>📄 Листовое изделие</strong>
               <span className="text-sm">Один лист бумаги с печатью. Примеры: визитки, листовки, флаеры, наклейки.</span>
             </div>
@@ -188,7 +188,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
 
         {productType === 'multi_page' && (
           <Alert type="info">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-column gap-1">
               <strong>📚 Многостраничное изделие</strong>
               <span className="text-sm">Изделие из нескольких страниц с переплетом. Примеры: буклеты, брошюры, каталоги, журналы.</span>
             </div>
@@ -197,14 +197,14 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
 
         {productType === 'universal' && (
           <Alert type="info">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-column gap-1">
               <strong>🔧 Универсальное изделие</strong>
               <span className="text-sm">Гибкая настройка для нестандартных продуктов.</span>
             </div>
           </Alert>
         )}
 
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
+        <div className="flex gap-3 justify-end mt-2">
           <Button variant="secondary" onClick={handleClose} disabled={submitting}>
             Отмена
           </Button>

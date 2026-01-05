@@ -32,6 +32,7 @@ export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransact
     quantity: '',
     reason: '',
     notes: '',
+    orderId: '',
     supplier_id: '',
     delivery_number: '',
     invoice_number: '',
@@ -59,6 +60,7 @@ export const EnhancedMaterialTransactionModal: React.FC<EnhancedMaterialTransact
                 transactionType === 'out' ? 'Списание материалов' :
                 transactionType === 'adjustment' ? 'Корректировка остатков' : 'Перемещение материалов',
         notes: '',
+        orderId: '',
         supplier_id: material?.supplier_id?.toString() || '',
         delivery_number: '',
         invoice_number: '',

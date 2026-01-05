@@ -57,8 +57,8 @@ export interface Item {
   sheetsNeeded?: number;
   piecesPerSheet?: number;
   formatInfo?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Order {
@@ -187,10 +187,10 @@ export interface Printer {
 
 // API Response types
 export interface ApiResponse<T = any> {
-  data: T;
+  data: T | null;
   message?: string;
   success: boolean;
-  error?: string;
+  error?: string | ApiError;
 }
 
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {
@@ -237,7 +237,9 @@ export interface User {
   permissions: Permission[];
   isActive: boolean;
   lastLogin?: string;
-  createdAt: string;
+  created_at: string;
+  // Back-compat (старое поле)
+  createdAt?: string;
 }
 
 // App-level configuration constants

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Item } from '../types';
+import type { Item } from '../../types';
 
 interface ParameterSummaryItem {
   label: string;

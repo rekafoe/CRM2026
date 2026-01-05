@@ -65,7 +65,7 @@ export async function getProductDetails(productId: number): Promise<ProductWithD
 
   try {
     const response = await api.get(`/products/${productId}`);
-    const product = extractData<ProductWithDetails>(response, null);
+    const product = extractData<ProductWithDetails | null>(response, null);
     
     if (product) {
       productDetailsCache.set(cacheKey, product);

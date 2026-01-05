@@ -10,7 +10,7 @@ interface LowStockAlert {
   currentQuantity: number
   minQuantity: number
   alertLevel: 'warning' | 'critical' | 'out_of_stock'
-  createdAt: string
+  created_at: string
   isResolved: boolean
   resolvedAt?: string
   resolvedBy?: number
@@ -27,7 +27,7 @@ interface AlertStats {
 }
 
 export const LowStockAlerts: React.FC = () => {
-  const logger = useLogger()
+  const logger = useLogger('LowStockAlerts')
   const [filter, setFilter] = useState<'all' | 'active' | 'resolved'>('active')
   
   // API хуки
@@ -222,7 +222,7 @@ export const LowStockAlerts: React.FC = () => {
                   <span className="alert-level-text">{getAlertLevelText(alert.alertLevel)}</span>
                 </div>
                 <div className="alert-date">
-                  {new Date(alert.createdAt).toLocaleString('ru-RU')}
+                  {new Date((alert as any).created_at ?? (alert as any).createdAt).toLocaleString('ru-RU')}
                 </div>
               </div>
               

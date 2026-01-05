@@ -21,7 +21,14 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   onClose,
   onSave
 }) => {
-  const [formData, setFormData] = useState<Partial<Material> & { finish?: string }>({
+  type MaterialFormData = Partial<Material> & {
+    finish?: string;
+    // поля, которые есть в форме, но могут отсутствовать в shared Material типе
+    density?: number;
+    paper_type_id?: number;
+  };
+
+  const [formData, setFormData] = useState<MaterialFormData>({
     name: '',
     description: '',
     category_id: undefined, // Изменяем на undefined, чтобы пользователь выбрал категорию

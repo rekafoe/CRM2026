@@ -65,7 +65,7 @@ export class AIService {
   static addTrainingData(data: TrainingData): void {
     this.trainingData.push(data);
     this.modelMetrics.trainingDataSize = this.trainingData.length;
-    logger.info('Добавлены данные для обучения ИИ', { data });
+    logger.info('AIService', 'Добавлены данные для обучения ИИ', { data });
   }
 
   // Предсказание цены на основе параметров
@@ -124,7 +124,7 @@ export class AIService {
         recommendations
       };
     } catch (error) {
-      logger.error('Ошибка предсказания цены ИИ', error);
+      logger.error('AIService', 'Ошибка предсказания цены ИИ', error);
       return {
         predictedPrice: 0,
         confidence: 0,
@@ -174,7 +174,7 @@ export class AIService {
       // Сортируем по ожидаемой прибыли
       return recommendations.sort((a, b) => b.expectedProfit - a.expectedProfit);
     } catch (error) {
-      logger.error('Ошибка генерации рекомендаций ИИ', error);
+      logger.error('AIService', 'Ошибка генерации рекомендаций ИИ', error);
       return [];
     }
   }
@@ -183,7 +183,7 @@ export class AIService {
   static retrainModel(): AIModelMetrics {
     try {
       if (this.trainingData.length < 10) {
-        logger.warn('Недостаточно данных для переобучения модели', { 
+        logger.warn('AIService', 'Недостаточно данных для переобучения модели', { 
           dataSize: this.trainingData.length 
         });
         return this.modelMetrics;
@@ -198,10 +198,10 @@ export class AIService {
         trainingDataSize: this.trainingData.length
       };
       
-      logger.info('Модель ИИ переобучена', { metrics: this.modelMetrics });
+      logger.info('AIService', 'Модель ИИ переобучена', { metrics: this.modelMetrics });
       return this.modelMetrics;
     } catch (error) {
-      logger.error('Ошибка переобучения модели ИИ', error);
+      logger.error('AIService', 'Ошибка переобучения модели ИИ', error);
       return this.modelMetrics;
     }
   }
@@ -220,7 +220,7 @@ export class AIService {
   static importTrainingData(data: TrainingData[]): void {
     this.trainingData = [...data];
     this.modelMetrics.trainingDataSize = this.trainingData.length;
-    logger.info('Импортированы данные для обучения ИИ', { count: data.length });
+    logger.info('AIService', 'Импортированы данные для обучения ИИ', { count: data.length });
   }
 
   // Приватные методы
@@ -441,7 +441,7 @@ export class AIService {
       
       // Если рассчитанная цена меньше минимальной, применяем минимальную стоимость
       if (price < minimumCost) {
-        logger.info('Применена минимальная стоимость заказа', {
+        logger.info('AIService', 'Применена минимальная стоимость заказа', {
           originalPrice: price,
           minimumCost,
           quantity,

@@ -10,8 +10,8 @@ interface UserOrderPage {
   totalOrders: number;
   completedOrders: number;
   totalRevenue: number;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface UserOrderPageOrder {
@@ -102,7 +102,8 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
         setPage(response.data.data.page);
         setOrders(response.data.data.orders);
         // Сохраняем время последнего обновления страницы
-        setLastUpdate(response.data.data.page.updatedAt);
+        const p = response.data.data.page as any;
+        setLastUpdate(p.updated_at ?? p.updatedAt ?? null);
       } else {
         setError('Ошибка при загрузке страницы заказов');
       }

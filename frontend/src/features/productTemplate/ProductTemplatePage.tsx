@@ -214,7 +214,7 @@ const ProductTemplatePage: React.FC = () => {
             variant="secondary" 
             size="sm"
             onClick={() => navigate('/adminpanel/products')}
-            style={{ marginRight: '16px' }}
+            className="mr-4"
           >
             ← Назад
           </Button>

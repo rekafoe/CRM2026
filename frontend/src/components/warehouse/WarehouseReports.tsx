@@ -628,7 +628,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
                   <td>{item.recommended_order_quantity.toFixed(0)}</td>
                   <td>{new Date(item.recommended_order_date).toLocaleDateString()}</td>
                   <td style={{ fontSize: '12px' }}>
-                    {item.predicted_consumption.slice(0, 3).map(p => 
+                    {item.predicted_consumption.slice(0, 3).map((p: { month: string; quantity: number; confidence: number }) => 
                       `${p.month}: ${p.quantity} (${(p.confidence * 100).toFixed(0)}%)`
                     ).join(', ')}
                   </td>

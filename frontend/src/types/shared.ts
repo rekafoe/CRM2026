@@ -1,6 +1,7 @@
 // frontend/src/types/shared.ts
 // Импортируем shared типы
 export * from '../../../shared/types';
+import type { OrderItem, User } from '../../../shared/types';
 
 // Дополнительные типы, специфичные для frontend
 export interface APP_CONFIG {

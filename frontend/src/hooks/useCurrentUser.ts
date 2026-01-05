@@ -14,8 +14,8 @@ export const useCurrentUser = (): User | null => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const userData = await getCurrentUser();
-        setUser(userData);
+        const res = await getCurrentUser();
+        setUser(res.data);
       } catch (error) {
         console.error('Error fetching current user:', error);
         setUser(null);

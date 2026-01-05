@@ -1,4 +1,4 @@
-import { Item } from '../types';
+import type { Item } from '../../types';
 
 // Определяем, что описание сгенерировано автоматически калькулятором
 export const isAutoDescription = (desc: string | undefined | null): boolean => {
@@ -66,7 +66,9 @@ export const generateItemDescription = (item: Item): string => {
   }
 
   if (Array.isArray(item.params.parameterSummary) && item.params.parameterSummary.length > 0) {
-    return item.params.parameterSummary.map((param) => `${param.label}: ${param.value}`).join(', ');
+    return item.params.parameterSummary
+      .map((param: { label: string; value: string }) => `${param.label}: ${param.value}`)
+      .join(', ');
   }
 
   // ПРИОРИТЕТ 3: Если есть спецификации, генерируем описание

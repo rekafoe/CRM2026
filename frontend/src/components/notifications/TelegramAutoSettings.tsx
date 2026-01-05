@@ -27,7 +27,7 @@ export const TelegramAutoSettings: React.FC<TelegramAutoSettingsProps> = ({ onCl
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const { addNotification } = useUIStore();
+  const { showToast } = useUIStore();
 
   // Загрузка настроек
   const loadSettings = async () => {
@@ -47,9 +47,9 @@ export const TelegramAutoSettings: React.FC<TelegramAutoSettingsProps> = ({ onCl
     setSaving(true);
     try {
       await api.put(ENDPOINTS.NOTIFICATIONS.TELEGRAM_SETTINGS, settings);
-      addNotification('Настройки сохранены успешно', 'success');
+      showToast('Настройки сохранены успешно', 'success');
     } catch (error: any) {
-      addNotification(`Ошибка сохранения: ${error.message}`, 'error');
+      showToast(`Ошибка сохранения: ${error.message}`, 'error');
     } finally {
       setSaving(false);
     }

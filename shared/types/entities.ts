@@ -233,7 +233,10 @@ export interface Category {
 export interface Supplier {
   id: number;
   name: string;
-  contact: string;
+  // Фактическое поле в БД/бэкенде
+  contact_person?: string;
+  // Back-compat для старого фронта (постепенно убрать)
+  contact?: string;
   email?: string;
   phone?: string;
   address?: string;

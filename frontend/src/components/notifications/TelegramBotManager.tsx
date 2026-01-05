@@ -24,7 +24,7 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
   const [userMessage, setUserMessage] = useState('');
   const [selectedRole, setSelectedRole] = useState<'admin' | 'manager' | 'user'>('admin');
   
-  const { addNotification } = useUIStore();
+  const { showToast } = useUIStore();
   
   // API хуки
   const { data: telegramConfig, isLoading: configLoading } = useTelegramConfig();
@@ -52,48 +52,48 @@ export const TelegramBotManager: React.FC<TelegramBotManagerProps> = ({ onClose 
   const handleSaveConfig = async () => {
     try {
       await configureTelegram.mutateAsync(config);
-      addNotification('Конфигурация Telegram сохранена', 'success');
+      showToast('Конфигурация Telegram сохранена', 'success');
     } catch (error: any) {
-      addNotification(`Ошибка сохранения: ${error.message}`, 'error');
+      showToast(`Ошибка сохранения: ${error.message}`, 'error');
     }
   };
 
   const handleTestMessage = async () => {
     try {
       await testTelegram.mutateAsync(testMessage);
-      addNotification('Тестовое сообщение отправлено', 'success');
+      showToast('Тестовое сообщение отправлено', 'success');
     } catch (error: any) {
-      addNotification(`Ошибка отправки: ${error.message}`, 'error');
+      showToast(`Ошибка отправки: ${error.message}`, 'error');
     }
   };
 
   const handleSendToAll = async () => {
     if (!userMessage.trim()) {
-      addNotification('Введите сообщение', 'warning');
+      showToast('Введите сообщение', 'warning');
       return;
     }
 
     try {
       await sendToAllUsers.mutateAsync(userMessage);
-      addNotification('Сообщение отправлено всем пользователям', 'success');
+      showToast('Сообщение отправлено всем пользователям', 'success');
       setUserMessage('');
     } catch (error: any) {
-      addNotification(`Ошибка отправки: ${error.message}`, 'error');
+      showToast(`Ошибка отправки: ${error.message}`, 'error');
     }
   };
 
   const handleSendToRole = async () => {
     if (!userMessage.trim()) {
-      addNotification('Введите сообщение', 'warning');
+      showToast('Введите сообщение', 'warning');
       return;
     }
 
     try {
       await sendToRole.mutateAsync({ role: selectedRole, message: userMessage });
-      addNotification(`Сообщение отправлено роли ${selectedRole}`, 'success');
+      showToast(`Сообщение отправлено роли ${selectedRole}`, 'success');
       setUserMessage('');
     } catch (error: any) {
-      addNotification(`Ошибка отправки: ${error.message}`, 'error');
+      showToast(`Ошибка отправки: ${error.message}`, 'error');
     }
   };
 

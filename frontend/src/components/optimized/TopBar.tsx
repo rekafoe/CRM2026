@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Logo } from '../Logo';
+import { Logo } from '../Logo.tsx';
 import './TopBar.css';
 
 interface TopBarProps {

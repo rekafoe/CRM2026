@@ -52,7 +52,7 @@ export const MaterialsList: React.FC<MaterialsListProps> = ({
 
     // Фильтруем только обычные материалы, исключая типы бумаги
     let filtered = uniqueMaterials.filter(material => 
-      !material.paper_type_id || material.category_name !== 'Типы бумаги'
+      !material.paper_type_id || (material as any).category_name !== 'Типы бумаги'
     );
 
     // Поиск

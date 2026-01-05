@@ -36,7 +36,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [filterCancelled, setFilterCancelled] = useState<'all' | 'cancelled' | 'not_cancelled'>('all');
   const [filterAssigned, setFilterAssigned] = useState<'all' | 'assigned' | 'not_assigned'>('not_assigned');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'createdAt' | 'number' | 'totalAmount'>('createdAt');
+  const [sortBy, setSortBy] = useState<'created_at' | 'number' | 'totalAmount'>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const loadOrders = useCallback(async () => {
@@ -103,7 +103,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       let valA: any;
       let valB: any;
 
-      if (sortBy === 'createdAt') {
+      if (sortBy === 'created_at') {
         valA = new Date(a.created_at).getTime();
         valB = new Date(b.created_at).getTime();
       } else if (sortBy === 'number') {
@@ -199,7 +199,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             <option value="not_assigned">Неназначенные</option>
           </select>
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
-            <option value="createdAt">По дате</option>
+            <option value="created_at">По дате</option>
             <option value="number">По номеру</option>
             <option value="totalAmount">По сумме</option>
           </select>

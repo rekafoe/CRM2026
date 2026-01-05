@@ -15,8 +15,8 @@ interface CalculatorSectionsProps {
   validationErrors: Record<string, string>;
   isCustomFormat: boolean;
   customFormat: { width: string; height: string };
-  setIsCustomFormat: (value: boolean) => void;
-  setCustomFormat: (value: { width: string; height: string }) => void;
+  setIsCustomFormat: React.Dispatch<React.SetStateAction<boolean>>;
+  setCustomFormat: React.Dispatch<React.SetStateAction<{ width: string; height: string }>>;
   updateSpecs: (updates: Partial<ProductSpecs>) => void;
   backendProductSchema: any;
   warehousePaperTypes: Array<{ name: string; display_name: string }>;
@@ -123,7 +123,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
             sides={specs.sides}
             onPrintTechnologyChange={setPrintTechnology}
             onPrintColorModeChange={setPrintColorMode}
-            onSidesChange={(value) => updateSpecs({ sides: value })}
+            onSidesChange={(value) => updateSpecs({ sides: value as 1 | 2 })}
             selectedProduct={selectedProduct}
             backendProductSchema={backendProductSchema}
           />
@@ -161,7 +161,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
             <QuantityDiscountsSection
               quantity={specs.quantity}
               basePrice={result.pricePerItem}
-              onDiscountChange={setAppliedDiscount}
+              onDiscountChange={(discount) => setAppliedDiscount(discount?.discount_percent ?? 0)}
             />
           </div>
         </div>

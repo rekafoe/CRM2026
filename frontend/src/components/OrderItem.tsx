@@ -207,7 +207,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
         sides: Math.max(1, numberInputToNumber(sides, 1)),
         sheets: Math.max(0, numberInputToNumber(sheets, 0)),
         waste: Math.max(0, numberInputToNumber(waste, 0)),
-        printerId: printerId === '' ? null : Number(printerId),
+        printerId: printerId === '' ? undefined : Number(printerId),
         params: {
           ...item.params,
           description: customDescription

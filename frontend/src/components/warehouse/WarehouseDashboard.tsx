@@ -141,7 +141,14 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = ({ onClose 
   }, [selectedMaterials, showToast]);
 
   // Вкладки складского сервиса
-  const tabs = [
+  const tabs: Array<{
+    id: WarehouseTab;
+    title: string;
+    icon: string;
+    description: string;
+    color: string;
+    count?: number;
+  }> = [
     {
       id: 'materials' as WarehouseTab,
       title: 'Материалы',
@@ -312,7 +319,7 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = ({ onClose 
               >
                 <span className="tab-icon">{tab.icon}</span>
                 <span className="tab-title">{tab.title}</span>
-                {tab.count > 0 && (
+                {(tab.count ?? 0) > 0 && (
                   <span className="tab-count">{tab.count}</span>
                 )}
               </button>

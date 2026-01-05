@@ -41,7 +41,7 @@ class RequestCache {
     // Очищаем старые записи если достигли лимита
     if (this.cache.size >= this.maxSize) {
       const oldestKey = this.cache.keys().next().value;
-      this.cache.delete(oldestKey);
+      if (oldestKey) this.cache.delete(oldestKey);
     }
 
     this.cache.set(key, {
@@ -195,10 +195,11 @@ export class EnhancedApiClient {
       }
 
       // Преобразуем ошибку в стандартный формат
+      const responseData = axiosError.response?.data as any;
       const apiError: ApiError = {
-        message: axiosError.response?.data?.message || axiosError.message || 'Произошла ошибка',
+        message: responseData?.message || axiosError.message || 'Произошла ошибка',
         code: axiosError.response?.status?.toString() || 'UNKNOWN',
-        details: axiosError.response?.data?.details,
+        details: responseData?.details,
         timestamp: new Date().toISOString(),
       };
 

@@ -10,7 +10,7 @@ export interface StockAlert {
   currentQuantity: number;
   minQuantity: number;
   alertLevel: 'warning' | 'critical' | 'out_of_stock';
-  createdAt: string;
+  created_at: string;
   isResolved: boolean;
   resolvedAt?: string;
   resolvedBy?: number;
@@ -27,7 +27,7 @@ export interface AutoOrder {
   supplierContact?: string;
   totalAmount: number;
   status: 'pending' | 'approved' | 'sent' | 'delivered' | 'cancelled';
-  createdAt: string;
+  created_at: string;
   materials: AutoOrderMaterial[];
   notes?: string;
 }

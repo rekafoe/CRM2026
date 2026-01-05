@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, getAllUsers, createUser, updateUser, deleteUser, resetUserToken } from '../../api';
+import { getErrorMessage } from '../../utils/errorUtils';
+import { Alert } from '../../components/common';
 import './UserManagement.css';
 
 interface UserManagementProps {
@@ -14,6 +16,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showTokenModal, setShowTokenModal] = useState<User | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -22,11 +25,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const loadUsers = async () => {
     setIsLoading(true);
     try {
+      setErrorMessage(null);
       const response = await getAllUsers();
       setUsers(response.data);
     } catch (error) {
-      console.error('Error loading users:', error);
-      alert('Ошибка при загрузке пользователей');
+      setErrorMessage(getErrorMessage(error, 'Ошибка при загрузке пользователей'));
     } finally {
       setIsLoading(false);
     }
@@ -34,25 +37,25 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
 
   const handleCreateUser = async (userData: { name: string; email: string; password: string; role: string }) => {
     try {
+      setErrorMessage(null);
       await createUser(userData);
       setShowCreateModal(false);
       await loadUsers();
       alert('Пользователь успешно создан');
-    } catch (error: any) {
-      console.error('Error creating user:', error);
-      alert(error.response?.data?.message || 'Ошибка при создании пользователя');
+    } catch (error: unknown) {
+      setErrorMessage(getErrorMessage(error, 'Ошибка при создании пользователя'));
     }
   };
 
   const handleUpdateUser = async (userId: number, userData: { name: string; email: string; role: string }) => {
     try {
+      setErrorMessage(null);
       await updateUser(userId, userData);
       setEditingUser(null);
       await loadUsers();
       alert('Пользователь успешно обновлен');
-    } catch (error: any) {
-      console.error('Error updating user:', error);
-      alert(error.response?.data?.message || 'Ошибка при обновлении пользователя');
+    } catch (error: unknown) {
+      setErrorMessage(getErrorMessage(error, 'Ошибка при обновлении пользователя'));
     }
   };
 
@@ -60,23 +63,24 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) return;
 
     try {
+      setErrorMessage(null);
       await deleteUser(userId);
       await loadUsers();
       alert('Пользователь успешно удален');
-    } catch (error: any) {
-      console.error('Error deleting user:', error);
-      alert(error.response?.data?.message || 'Ошибка при удалении пользователя');
+    } catch (error: unknown) {
+      // Бэкенд возвращает 400, если у пользователя есть активные заказы — показываем это в интерфейсе
+      setErrorMessage(getErrorMessage(error, 'Ошибка при удалении пользователя'));
     }
   };
 
   const handleResetToken = async (user: User) => {
     try {
+      setErrorMessage(null);
       const response = await resetUserToken(user.id);
       alert(`Новый API токен для ${user.name}: ${response.data.api_token}`);
       setShowTokenModal(null);
-    } catch (error) {
-      console.error('Error resetting token:', error);
-      alert('Ошибка при сбросе токена');
+    } catch (error: unknown) {
+      setErrorMessage(getErrorMessage(error, 'Ошибка при сбросе токена'));
     }
   };
 
@@ -129,6 +133,12 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
           </button>
         </div>
       </div>
+
+      {errorMessage && (
+        <Alert type="error" className="mb-4" onClose={() => setErrorMessage(null)}>
+          {errorMessage}
+        </Alert>
+      )}
 
       {/* Статистика */}
       <div className="user-stats">

@@ -45,7 +45,6 @@ export const QueryProvider: React.FC<QueryProviderProps> = ({ children }) => {
       {import.meta.env.DEV && (
         <ReactQueryDevtools 
           initialIsOpen={false}
-          position="bottom-right"
         />
       )}
     </QueryClientProvider>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { checkMaterialAvailability, calculateMaterialCost } from '../../../services/calculatorMaterialService';
+import type { CalculationResult } from '../types/calculator.types';
 
 interface MaterialsSectionProps {
   specs: {
@@ -26,23 +27,17 @@ interface MaterialsSectionProps {
   getDefaultPaperDensity: (paperType: string) => number;
   updateSpecs: (updates: Partial<any>, instant?: boolean) => void; // 🆕 Добавили instant
   schema?: { 
-    fields?: Array<{ name: string }>; 
+    fields?: Array<{
+      name: string;
+      label?: string;
+      required?: boolean;
+      placeholder?: string;
+      enum?: any[];
+    }>; 
     constraints?: { allowed_paper_types?: string[] | null } 
   } | null;
-  // 🆕 Реальные данные из результата расчета бэкенда
-  result?: {
-    materials?: Array<{
-      materialId: number;
-      materialName: string;
-      quantity: number;
-      unitPrice: number;
-      totalCost: number;
-    }>;
-    layout?: {
-      sheetsNeeded?: number;
-      itemsPerSheet?: number;
-    };
-  } | null;
+  // Результат расчета
+  result?: CalculationResult | null;
 }
 
 export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
@@ -103,8 +98,8 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       if (result?.materials && result.materials.length > 0 && result.layout?.sheetsNeeded) {
         const material = result.materials[0]; // Берем первый материал
         const sheetsNeeded = result.layout.sheetsNeeded;
-        const pricePerSheet = material.unitPrice ?? material.price ?? 0;
-        const materialCost = material.totalCost ?? material.total ?? 0;
+        const pricePerSheet = (material.unitPrice ?? material.price ?? 0) as number;
+        const materialCost = (material.total ?? 0) as number;
         
         // Проверяем, что все значения валидны
         if (typeof materialCost === 'number' && typeof pricePerSheet === 'number' && typeof sheetsNeeded === 'number') {

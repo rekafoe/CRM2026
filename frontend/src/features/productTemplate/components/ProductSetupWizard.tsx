@@ -158,7 +158,7 @@ export const ProductSetupWizard: React.FC<ProductSetupWizardProps> = ({
         </div>
 
         {setupState.canActivate && (
-          <Alert type="success" style={{ marginTop: '16px' }}>
+          <Alert type="success" className="mt-4">
             🎉 Все шаги завершены! Продукт готов к использованию.
           </Alert>
         )}

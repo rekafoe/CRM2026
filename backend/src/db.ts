@@ -11,6 +11,15 @@ function resolveDatabasePath(): string {
   // Если DB_FILE задан — используем его всегда (даже если файла ещё нет: он создастся при первом старте)
   if (raw) {
     const resolved = path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw)
+    // Гарантируем, что директория для файла существует (частая проблема на Railway при DB_FILE=/data/...)
+    try {
+      const dir = path.dirname(resolved)
+      if (dir && dir !== '.' && !fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+    } catch (e) {
+      console.log('⚠️ Не удалось создать директорию для DB_FILE:', resolved, e)
+    }
     console.log('✅ Используется БД из DB_FILE:', resolved)
     return resolved
   }

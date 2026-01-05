@@ -34,7 +34,8 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
       setIsRequired(operation.is_required ?? true);
       
       // Проверяем, есть ли conditions или linked_parameter_name
-      const hasConditions = operation.conditions && Object.keys(operation.conditions).length > 0;
+      const conditionsObj = operation.conditions ?? {};
+      const hasConditions = Object.keys(conditionsObj).length > 0;
       const hasLinkedParam = operation.linked_parameter_name;
       
       if (hasLinkedParam) {
@@ -42,14 +43,14 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
         setLinkedParameter(hasLinkedParam);
         // Пытаемся извлечь значение из conditions
         if (hasConditions) {
-          const firstKey = Object.keys(operation.conditions)[0];
-          setParameterValue(operation.conditions[firstKey]);
+          const firstKey = Object.keys(conditionsObj)[0];
+          setParameterValue(conditionsObj[firstKey]);
         }
       } else if (hasConditions) {
         setConditionMode('parameter');
-        const firstKey = Object.keys(operation.conditions)[0];
+        const firstKey = Object.keys(conditionsObj)[0];
         setLinkedParameter(firstKey);
-        setParameterValue(operation.conditions[firstKey]);
+        setParameterValue(conditionsObj[firstKey]);
       } else {
         setConditionMode('always');
       }

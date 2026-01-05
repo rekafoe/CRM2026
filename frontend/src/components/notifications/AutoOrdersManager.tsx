@@ -17,7 +17,7 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
   const [activeTab, setActiveTab] = useState<'orders' | 'create'>('orders');
   const [statusFilter, setStatusFilter] = useState<string>('');
   
-  const { addNotification } = useUIStore();
+  const { showToast } = useUIStore();
   
   // API хуки
   const { data: orders = [], isLoading } = useAutoOrders(statusFilter);
@@ -28,18 +28,18 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
   const handleApproveOrder = async (orderId: number) => {
     try {
       await approveAutoOrder.mutateAsync(orderId);
-      addNotification('Заказ подтвержден', 'success');
+      showToast('Заказ подтвержден', 'success');
     } catch (error: any) {
-      addNotification(`Ошибка подтверждения: ${error.message}`, 'error');
+      showToast(`Ошибка подтверждения: ${error.message}`, 'error');
     }
   };
 
   const handleSendOrder = async (orderId: number) => {
     try {
       await sendAutoOrder.mutateAsync(orderId);
-      addNotification('Заказ отправлен поставщику', 'success');
+      showToast('Заказ отправлен поставщику', 'success');
     } catch (error: any) {
-      addNotification(`Ошибка отправки: ${error.message}`, 'error');
+      showToast(`Ошибка отправки: ${error.message}`, 'error');
     }
   };
 
@@ -98,7 +98,7 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
                     <div className="order-id">Заказ #{order.id}</div>
                     <div className="order-supplier">{order.supplierName}</div>
                     <div className="order-date">
-                      {new Date(order.created_at).toLocaleString('ru-RU')}
+                      {new Date((order as any).created_at ?? (order as any).createdAt).toLocaleString('ru-RU')}
                     </div>
                   </div>
                   <div className="order-status">
@@ -189,7 +189,7 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
             className="btn btn-primary"
             onClick={() => {
               // Здесь можно добавить логику для ручного создания заказа
-              addNotification('Функция создания заказа в разработке', 'info');
+              showToast('Функция создания заказа в разработке', 'info');
             }}
           >
             🔧 Создать заказ вручную

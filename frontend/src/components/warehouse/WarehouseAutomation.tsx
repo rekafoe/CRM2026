@@ -90,7 +90,7 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
       setRules(mockRules);
     } catch (error) {
       console.error('Ошибка загрузки данных автоматизации:', error);
-      addNotification('Ошибка загрузки данных автоматизации', 'error');
+      addNotification({ message: 'Ошибка загрузки данных автоматизации', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -105,10 +105,10 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
         rule.id === ruleId ? { ...rule, is_active: !rule.is_active } : rule
       ));
       
-      addNotification('Правило автоматизации обновлено', 'success');
+      addNotification({ message: 'Правило автоматизации обновлено', type: 'success' });
     } catch (error) {
       console.error('Ошибка обновления правила:', error);
-      addNotification('Ошибка обновления правила', 'error');
+      addNotification({ message: 'Ошибка обновления правила', type: 'error' });
     }
   };
 
@@ -118,10 +118,10 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
       // await fetch(`/api/warehouse/automation/rules/${ruleId}`, { method: 'DELETE' });
       
       setRules(prev => prev.filter(rule => rule.id !== ruleId));
-      addNotification('Правило автоматизации удалено', 'success');
+      addNotification({ message: 'Правило автоматизации удалено', type: 'success' });
     } catch (error) {
       console.error('Ошибка удаления правила:', error);
-      addNotification('Ошибка удаления правила', 'error');
+      addNotification({ message: 'Ошибка удаления правила', type: 'error' });
     }
   };
 
@@ -134,10 +134,10 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
       // });
       
       setSettings(prev => ({ ...prev, ...newSettings }));
-      addNotification('Настройки автоматизации обновлены', 'success');
+      addNotification({ message: 'Настройки автоматизации обновлены', type: 'success' });
     } catch (error) {
       console.error('Ошибка обновления настроек:', error);
-      addNotification('Ошибка обновления настроек', 'error');
+      addNotification({ message: 'Ошибка обновления настроек', type: 'error' });
     }
   };
 

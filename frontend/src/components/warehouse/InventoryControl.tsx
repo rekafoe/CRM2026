@@ -499,7 +499,7 @@ export const InventoryControl: React.FC<InventoryControlProps> = ({
                             const mat = materials.find(m => m.id === Number(mid));
                             const suggestedThreshold = ((mat as any)?.min_quantity ?? (mat as any)?.min_stock_level ?? 10) as number;
                             const suggestedOrder = Math.max( (suggestedThreshold || 10) * 2, 10 );
-                            const suggestedSupplierId = (mat as any)?.supplier_id || (mat as any)?.supplier?.id || prev.supplier_id || '';
+                            const suggestedSupplierId = (mat as any)?.supplier_id || (mat as any)?.supplier?.id || ruleForm.supplier_id || '';
                             setRuleForm(prev => ({
                               ...prev,
                               material_id: Number(mid),

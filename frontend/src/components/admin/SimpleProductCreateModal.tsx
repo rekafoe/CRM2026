@@ -102,7 +102,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
       title="Создать продукт"
       size="md"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="flex flex-column gap-4">
         {error && (
           <Alert type="error" onClose={() => setError(null)}>
             {error}
@@ -143,7 +143,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
           />
         </FormField>
 
-        <div className="flex gap-3">
+        <div className="form-row">
           <FormField label="Иконка (эмодзи)" className="flex-1">
             <input
               className="form-input"

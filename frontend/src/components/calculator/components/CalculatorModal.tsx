@@ -30,7 +30,12 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({
   // Хуки для управления состоянием
   const calculatorState = useCalculatorState(initialProductType);
   const calculatorData = useCalculatorData();
-  const calculatorValidation = useCalculatorValidation();
+  const calculatorValidation = useCalculatorValidation({
+    specs: calculatorState.specs as any,
+    backendProductSchema: null,
+    isCustomFormat: calculatorState.isCustomFormat,
+    customFormat: calculatorState.customFormat,
+  });
   const calculatorLogic = useCalculatorLogic();
 
   // Инициализация при открытии модального окна

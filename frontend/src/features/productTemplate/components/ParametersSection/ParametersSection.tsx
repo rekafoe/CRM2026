@@ -4,6 +4,7 @@ import { Modal } from '../../../../components/common/Modal'
 import { apiClient } from '../../../../api/client'
 import { MultiPagePresetHelper } from '../../../../components/admin/ProductCreationWizard/components/MultiPagePresetHelper'
 import { getParameterPresetsForProductType } from '../../config/productParameterPresets'
+import type { ProductParameter, ProductParameterPreset } from '../../../../services/products/types'
 
 const REQUIRED_PARAMETER_KEYS = [
   'tip',
@@ -37,19 +38,21 @@ interface Parameter {
   id?: number;
   name: string;
   label?: string;
-  type: string;
+  type: 'select' | 'checkbox' | 'number' | 'text' | 'range' | string;
   options?: any;
+  default_value?: string | number;
   is_required?: boolean;
   sort_order?: number;
+  linked_operation_id?: number;
 }
 
 interface ParametersSectionProps {
   parameters: Parameter[];
-  presets?: ParameterPreset[];
+  presets?: ProductParameterPreset[];
   presetsLoading?: boolean;
-  onAddParam: (param: Omit<Parameter, 'id'>) => Promise<void> | void;
-  onDeleteParam: (param: Parameter) => Promise<void> | void;
-  onUpdateParam?: (param: Parameter) => Promise<void> | void;
+  onAddParam: (param: Partial<ProductParameter>) => Promise<void> | void;
+  onDeleteParam: (param: { id: number; name?: string; label?: string }) => Promise<void> | void;
+  onUpdateParam?: (param: Partial<ProductParameter> & { id: number }) => Promise<void> | void;
   productType?: string; // Тип продукта для адаптации UI
 }
 
@@ -120,7 +123,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
               : 'select',
         options:
           preset.field_type === 'select' && Array.isArray(preset.options)
-            ? preset.options.join('; ')
+            ? preset.options
             : undefined,
         is_required: preset.is_required ?? true,
         sort_order: (normalized.length || 0) + 1,
@@ -136,7 +139,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
         type: preset.type,
         options:
           preset.type === 'select' && Array.isArray(preset.options)
-            ? preset.options.join('; ')
+            ? preset.options
             : undefined,
         is_required: preset.is_required,
         sort_order: preset.sort_order || (normalized.length || 0) + 1,
@@ -146,15 +149,20 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
 
   const handleAddCustom = async () => {
     if (!customParam.label?.trim()) return
+    const parsedOptions =
+      customParam.type === 'select'
+        ? String(customParam.options || '')
+            .split(';')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined
+
     await onAddParam({
       ...customParam,
       name: customParam.name.trim() || customParam.label.trim().toLowerCase().replace(/\s+/g, '_'),
       label: customParam.label.trim(),
       type: customParam.type,
-      options:
-        customParam.type === 'select'
-          ? customParam.options
-          : undefined,
+      options: parsedOptions,
       linked_operation_id: selectedOperationId || undefined,
     } as any)
     setCustomParam({
@@ -193,10 +201,18 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
 
   const handleSaveEdit = async () => {
     if (!editingParam || !onUpdateParam) return
+    const parsedOptions =
+      editingParam.type === 'select'
+        ? String(editingParam.options || '')
+            .split(';')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined
     await onUpdateParam({
       ...editingParam,
+      id: editingParam.id as number,
       label: editingParam.label?.trim() || editingParam.name.trim(),
-      options: editingParam.type === 'select' ? editingParam.options : undefined,
+      options: parsedOptions,
       linked_operation_id: selectedOperationId || undefined,
     } as any)
     setEditingParam(null)
@@ -228,7 +244,8 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
     }
     
     try {
-      await onDeleteParam(param)
+      if (!param.id) return
+      await onDeleteParam({ id: param.id, name: param.name, label: param.label })
     } catch (error) {
       console.error('Failed to delete parameter', error)
       alert('Ошибка удаления параметра')
@@ -249,8 +266,8 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
               console.log('Applying multi-page preset:', preset);
               // TODO: Реализовать применение пресета
             }}
-            currentPages={parameters.find(p => p.name === 'pages')?.default_value as number}
-            currentBinding={parameters.find(p => p.name === 'binding')?.default_value as string}
+            currentPages={Number(parameters.find(p => p.name === 'pages')?.default_value ?? 0)}
+            currentBinding={String(parameters.find(p => p.name === 'binding')?.default_value ?? '')}
           />
         </div>
       )}
@@ -272,7 +289,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
           <div className="flex flex-wrap gap-2">
             {missingPreset.map((preset) => (
               <button
-                key={preset.key || preset.preset_key}
+                key={preset.key}
                 type="button"
                 className="btn-secondary text-sm"
                 onClick={() => void handleAddPreset(preset)}

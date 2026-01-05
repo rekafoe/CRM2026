@@ -27,7 +27,6 @@ export const Logo: React.FC<LogoProps> = ({
              style={{ 
                WebkitTextStroke: '1px #374151',
                WebkitTextFillColor: 'transparent',
-               textStroke: '1px #374151',
                color: 'transparent'
              }}>
           CORE

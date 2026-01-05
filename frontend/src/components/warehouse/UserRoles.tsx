@@ -7,8 +7,8 @@ interface Role {
   description: string
   permissions: string[]
   isActive: boolean
-  createdAt: string
-  updatedAt: string
+  created_at: string
+  updated_at: string
 }
 
 interface User {
@@ -17,7 +17,7 @@ interface User {
   email: string
   role: string
   isActive: boolean
-  createdAt: string
+  created_at: string
   lastLogin: string
 }
 
