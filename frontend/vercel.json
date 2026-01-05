@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/api/health",
-      "destination": "https://caboose.proxy.rlwy.net/health"
+      "destination": "https://caboose.proxy.rlwy.net:57337/health"
     },
     {
       "source": "/api/(.*)",
-      "destination": "https://caboose.proxy.rlwy.net/api/$1"
+      "destination": "https://caboose.proxy.rlwy.net:57337/api/$1"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
