@@ -1,5 +1,37 @@
 import { Database } from 'sqlite';
-import { MaterialReservation, MaterialReservationHistory } from '../../../shared/types/entities';
+
+// Локальные типы (НЕ импортируем из /shared, т.к. shared не попадает в Docker build context Railway)
+export interface MaterialReservation {
+  id: number;
+  material_id: number;
+  order_id?: number;
+  quantity_reserved: number;
+  reserved_at?: string;
+  expires_at?: string;
+  status: 'active' | 'fulfilled' | 'cancelled' | 'expired';
+  reserved_by?: number;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  material?: {
+    id: number;
+    name?: string;
+    unit?: string;
+  };
+  user?: {
+    id: number;
+    name?: string;
+  };
+}
+
+export interface MaterialReservationHistory {
+  id?: number;
+  reservation_id: number;
+  action: string;
+  changed_by?: number;
+  reason?: string;
+  created_at?: string;
+}
 
 export class MaterialReservationService {
   private db: Database;

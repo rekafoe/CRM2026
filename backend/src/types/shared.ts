@@ -1,6 +1,6 @@
 // backend/src/types/shared.ts
-// Импортируем shared типы
-export * from '../../../shared/types';
+// Важно: backend деплоится отдельно (Dockerfile, Railway), поэтому НЕ импортируем типы из корня /shared.
+// Если нужны общие типы — дублируем только необходимые интерфейсы локально или переносим их в backend/src.
 
 // Дополнительные типы, специфичные для backend
 export interface DatabaseConfig {

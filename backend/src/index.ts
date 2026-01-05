@@ -30,7 +30,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 })
 
 // Start server
-const port = process.env.PORT || 3001
+const port = config.port
 console.log(`🔄 Starting server on port ${port}...`)
 
 app.listen(port, '0.0.0.0', () => {
