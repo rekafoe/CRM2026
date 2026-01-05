@@ -3,15 +3,32 @@ import { hashPassword } from '../utils'
 import { randomBytes } from 'crypto'
 
 async function ensureOrderStatuses(db: any): Promise<void> {
+  // Канонические статусы, которые рисует фронт (ProgressBar / dropdown)
   const statuses = [
-    { name: 'Новый', color: '#9e9e9e', sort_order: 1 },
-    { name: 'В производстве', color: '#1976d2', sort_order: 2 },
-    { name: 'Готов к отправке', color: '#ffa000', sort_order: 3 },
-    { name: 'Отправлен', color: '#7b1fa2', sort_order: 4 },
-    { name: 'Завершён', color: '#2e7d32', sort_order: 5 },
-    { name: 'Отменен', color: '#dc3545', sort_order: 6 },
-    { name: 'Возврат', color: '#ffc107', sort_order: 7 }
+    { name: 'Ожидает', color: '#9e9e9e', sort_order: 1 },
+    { name: 'Оформлен', color: '#1976d2', sort_order: 2 },
+    { name: 'Принят в работу', color: '#5c6bc0', sort_order: 3 },
+    { name: 'Выполнен', color: '#2e7d32', sort_order: 4 },
+    { name: 'Передан в ПВЗ', color: '#ffa000', sort_order: 5 },
+    { name: 'Получен в ПВЗ', color: '#7b1fa2', sort_order: 6 },
+    { name: 'Завершён', color: '#1b5e20', sort_order: 7 }
   ]
+
+  // Миграция старых названий в новые (чтобы не плодить дубли на уже “засеянной” БД)
+  const renameMap: Array<{ from: string; to: string }> = [
+    { from: 'Новый', to: 'Ожидает' },
+    { from: 'В производстве', to: 'Принят в работу' },
+    { from: 'Готов к отправке', to: 'Выполнен' },
+    { from: 'Отправлен', to: 'Передан в ПВЗ' },
+  ]
+
+  for (const m of renameMap) {
+    try {
+      const existsTo = await db.get('SELECT id FROM order_statuses WHERE name = ?', m.to)
+      if (existsTo) continue
+      await db.run('UPDATE order_statuses SET name = ? WHERE name = ?', m.to, m.from)
+    } catch {}
+  }
 
   for (const s of statuses) {
     await db.run(
@@ -19,6 +36,13 @@ async function ensureOrderStatuses(db: any): Promise<void> {
       s.name,
       s.color,
       s.sort_order
+    )
+    // Обновляем color/sort_order для существующих строк (если уже были)
+    await db.run(
+      'UPDATE order_statuses SET color = ?, sort_order = ? WHERE name = ?',
+      s.color,
+      s.sort_order,
+      s.name
     )
   }
 

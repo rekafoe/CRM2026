@@ -9,6 +9,18 @@ import { itemRowSelect, mapItemRowToItem } from '../../../models/mappers/itemMap
 import { mapPhotoOrderToOrder, mapPhotoOrderToVirtualItem } from '../../../models/mappers/telegramPhotoOrderMapper'
 
 export class OrderService {
+  private static async getStatusIdByName(db: any, name: string): Promise<number | null> {
+    try {
+      const row = (await db.get(
+        'SELECT id FROM order_statuses WHERE name = ? LIMIT 1',
+        [name]
+      )) as { id?: number } | undefined
+      return row?.id != null ? Number(row.id) : null
+    } catch {
+      return null
+    }
+  }
+
   // DB row types (internal)
   // use shared mapper
   static async getAllOrders(userId: number) {
@@ -43,8 +55,17 @@ export class OrderService {
     // Use the first status by sort_order, fallback to 1.
     let defaultStatusId = 1
     try {
+      // Предпочитаем "Ожидает" (каноничный первый статус). Для обратной совместимости пробуем и старое "Новый".
+      const waitingId = await this.getStatusIdByName(db, 'Ожидает')
+      const legacyNewId = await this.getStatusIdByName(db, 'Новый')
+      if (waitingId != null) {
+        defaultStatusId = waitingId
+      } else if (legacyNewId != null) {
+        defaultStatusId = legacyNewId
+      } else {
       const statusRow = await db.get<{ id: number }>('SELECT id FROM order_statuses ORDER BY sort_order ASC, id ASC LIMIT 1')
       if (statusRow?.id) defaultStatusId = Number(statusRow.id)
+      }
     } catch {}
 
     const insertRes = await db.run(
@@ -247,8 +268,9 @@ export class OrderService {
           await db.run('UPDATE orders SET status = ?, updated_at = datetime(\"now\") WHERE id = ?', [status, id])
         }
 
-        // Если статус "принят в работу" (id = 2), подтверждаем резервы по заказу
-        if (Number(status) === 2) {
+        // Если статус "Принят в работу", подтверждаем резервы по заказу
+        const inWorkId = await this.getStatusIdByName(db, 'Принят в работу')
+        if (inWorkId != null && Number(status) === Number(inWorkId)) {
           const reservations = await UnifiedWarehouseService.getReservationsByOrder(id)
           const reservationIds = reservations
             .filter(r => r.status === 'reserved')
