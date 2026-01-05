@@ -7,11 +7,17 @@ import { PhotoOrderRow } from '../models/mappers/telegramPhotoOrderMapper'
 export const OrderRepository = {
   async getItemsByOrderId(orderId: number): Promise<Item[]> {
     const db = await getDb()
-    const rows = await db.all<ItemRow>(
-      `SELECT ${itemRowSelect} FROM items WHERE orderId = ?`,
-      orderId
-    )
-    return Array.isArray(rows) ? rows.map(mapItemRowToItem) : []
+    try {
+      const rows = await db.all<ItemRow>(
+        `SELECT ${itemRowSelect} FROM items WHERE orderId = ?`,
+        orderId
+      )
+      return Array.isArray(rows) ? rows.map(mapItemRowToItem) : []
+    } catch (e: any) {
+      // On fresh/partial DB some tables may be missing; don't break /api/orders
+      console.warn('[OrderRepository] getItemsByOrderId failed:', e?.message || e)
+      return []
+    }
   },
 
   async listUserOrders(userId: number): Promise<Order[]> {
@@ -36,88 +42,98 @@ export const OrderRepository = {
 
   async listAssignedOrdersForUser(userId: number): Promise<any[]> {
     const db = await getDb()
-    const assignedOrders = await db.all(
-      `SELECT 
-        uopo.order_id as id,
-        uopo.order_type,
-        uopo.status as assignment_status,
-        uopo.assigned_at,
-        uopo.notes as assignment_notes,
-        CASE 
-          WHEN uopo.order_type = 'website' THEN 
-            CASE 
-              WHEN o.source = 'website' THEN 'site-ord-' || o.id
-              ELSE o.number
-            END
-          WHEN uopo.order_type = 'telegram' THEN 'tg-ord-' || po.id
-          ELSE 'ord-' || uopo.order_id
-        END as number,
-        CASE 
-          WHEN uopo.order_type = 'website' THEN o.status
-          WHEN uopo.order_type = 'telegram' THEN po.status
-          ELSE 'pending'
-        END as status,
-        CASE 
-          WHEN uopo.order_type = 'website' THEN o.created_at
-          WHEN uopo.order_type = 'telegram' THEN uopo.assigned_at
-          ELSE uopo.assigned_at
-        END as created_at,
-        CASE 
-          WHEN uopo.order_type = 'website' THEN o.customerName
-          WHEN uopo.order_type = 'telegram' THEN po.first_name
-          ELSE 'Клиент'
-        END as customerName,
-        CASE 
-          WHEN uopo.order_type = 'website' THEN o.customerPhone
-          WHEN uopo.order_type = 'telegram' THEN po.chat_id
-          ELSE ''
-        END as customerPhone,
-        CASE 
-          WHEN uopo.order_type = 'website' THEN o.customerEmail
-          ELSE ''
-        END as customerEmail,
-        CASE 
-          WHEN uopo.order_type = 'website' THEN o.prepaymentAmount
-          WHEN uopo.order_type = 'telegram' THEN po.total_price / 100.0
-          ELSE 0
-        END as prepaymentAmount,
-        CASE 
-          WHEN uopo.order_type = 'website' THEN o.prepaymentStatus
-          ELSE 'paid'
-        END as prepaymentStatus,
-        CASE 
-          WHEN uopo.order_type = 'website' THEN o.paymentUrl
-          ELSE ''
-        END as paymentUrl,
-        CASE 
-          WHEN uopo.order_type = 'website' THEN o.paymentId
-          ELSE ''
-        END as paymentId,
-        CASE 
-          WHEN uopo.order_type = 'website' THEN o.paymentMethod
-          ELSE 'telegram'
-        END as paymentMethod,
-        uopo.page_id as userId
-      FROM user_order_page_orders uopo
-      LEFT JOIN orders o ON uopo.order_type = 'website' AND uopo.order_id = o.id
-      LEFT JOIN photo_orders po ON uopo.order_type = 'telegram' AND uopo.order_id = po.id
-      WHERE uopo.page_id IN (
-        SELECT id FROM user_order_pages WHERE user_id = ?
+    try {
+      const assignedOrders = await db.all(
+        `SELECT 
+          uopo.order_id as id,
+          uopo.order_type,
+          uopo.status as assignment_status,
+          uopo.assigned_at,
+          uopo.notes as assignment_notes,
+          CASE 
+            WHEN uopo.order_type = 'website' THEN 
+              CASE 
+                WHEN o.source = 'website' THEN 'site-ord-' || o.id
+                ELSE o.number
+              END
+            WHEN uopo.order_type = 'telegram' THEN 'tg-ord-' || po.id
+            ELSE 'ord-' || uopo.order_id
+          END as number,
+          CASE 
+            WHEN uopo.order_type = 'website' THEN o.status
+            WHEN uopo.order_type = 'telegram' THEN po.status
+            ELSE 'pending'
+          END as status,
+          CASE 
+            WHEN uopo.order_type = 'website' THEN o.created_at
+            WHEN uopo.order_type = 'telegram' THEN uopo.assigned_at
+            ELSE uopo.assigned_at
+          END as created_at,
+          CASE 
+            WHEN uopo.order_type = 'website' THEN o.customerName
+            WHEN uopo.order_type = 'telegram' THEN po.first_name
+            ELSE 'Клиент'
+          END as customerName,
+          CASE 
+            WHEN uopo.order_type = 'website' THEN o.customerPhone
+            WHEN uopo.order_type = 'telegram' THEN po.chat_id
+            ELSE ''
+          END as customerPhone,
+          CASE 
+            WHEN uopo.order_type = 'website' THEN o.customerEmail
+            ELSE ''
+          END as customerEmail,
+          CASE 
+            WHEN uopo.order_type = 'website' THEN o.prepaymentAmount
+            WHEN uopo.order_type = 'telegram' THEN po.total_price / 100.0
+            ELSE 0
+          END as prepaymentAmount,
+          CASE 
+            WHEN uopo.order_type = 'website' THEN o.prepaymentStatus
+            ELSE 'paid'
+          END as prepaymentStatus,
+          CASE 
+            WHEN uopo.order_type = 'website' THEN o.paymentUrl
+            ELSE ''
+          END as paymentUrl,
+          CASE 
+            WHEN uopo.order_type = 'website' THEN o.paymentId
+            ELSE ''
+          END as paymentId,
+          CASE 
+            WHEN uopo.order_type = 'website' THEN o.paymentMethod
+            ELSE 'telegram'
+          END as paymentMethod,
+          uopo.page_id as userId
+        FROM user_order_page_orders uopo
+        LEFT JOIN orders o ON uopo.order_type = 'website' AND uopo.order_id = o.id
+        LEFT JOIN photo_orders po ON uopo.order_type = 'telegram' AND uopo.order_id = po.id
+        WHERE uopo.page_id IN (
+          SELECT id FROM user_order_pages WHERE user_id = ?
+        )
+        ORDER BY uopo.assigned_at DESC`,
+        [userId]
       )
-      ORDER BY uopo.assigned_at DESC`,
-      [userId]
-    )
-    return assignedOrders
+      return assignedOrders
+    } catch (e: any) {
+      console.warn('[OrderRepository] listAssignedOrdersForUser failed:', e?.message || e)
+      return []
+    }
   },
 
   async getPhotoOrderById(id: number): Promise<PhotoOrderRow | undefined> {
     const db = await getDb()
-    const row = await db.get<PhotoOrderRow>(
-      `SELECT id, status, created_at, first_name, chat_id, total_price, selected_size, processing_options, quantity
-       FROM photo_orders WHERE id = ?`,
-      [id]
-    )
-    return row || undefined
+    try {
+      const row = await db.get<PhotoOrderRow>(
+        `SELECT id, status, created_at, first_name, chat_id, total_price, selected_size, processing_options, quantity
+         FROM photo_orders WHERE id = ?`,
+        [id]
+      )
+      return row || undefined
+    } catch (e: any) {
+      console.warn('[OrderRepository] getPhotoOrderById failed:', e?.message || e)
+      return undefined
+    }
   },
 
   async searchOrders(
