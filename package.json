@@ -1,27 +1,47 @@
 {
-  "name": "crm-frontend",
+  "name": "crm-system",
   "version": "1.0.0",
+  "description": "CRM system for print shop with order management, price calculator, and materials tracking",
+  "main": "index.js",
   "scripts": {
-    "dev": "vite --port 5173",
-    "build": "node ./node_modules/typescript/bin/tsc --noEmit && vite build",
-    "preview": "vite preview --port 5173",
-    "build:widget": "vite --config vite.widget.config.ts build"
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "start": "cd backend && npm start",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "setup": "npm run install:all && npm run setup:git",
+    "setup:git": "setup-git.bat"
   },
-  "dependencies": {
-    "@tanstack/react-query": "^5.89.0",
-    "@tanstack/react-query-devtools": "^5.89.0",
-    "axios": "^1.12.2",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.30.1",
-    "zustand": "^5.0.8"
-  },
+  "keywords": [
+    "crm",
+    "print-shop",
+    "order-management",
+    "price-calculator",
+    "materials-tracking",
+    "react",
+    "nodejs",
+    "typescript"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
   "devDependencies": {
-    "@types/react": "^18.2.14",
-    "@types/react-dom": "^18.2.7",
-    "@vitejs/plugin-react": "^4.0.1",
-    "concurrently": "^9.2.1",
-    "typescript": "^5.1.6",
-    "vite": "^4.4.9"
+    "concurrently": "^8.2.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/username/crm-system.git"
+  },
+  "bugs": {
+    "url": "https://github.com/username/crm-system/issues"
+  },
+  "homepage": "https://github.com/username/crm-system#readme",
+  "dependencies": {
+    "sqlite3": "^5.1.7"
   }
 }
