@@ -26,6 +26,10 @@ function resolveDatabasePath(): string {
 
   // По умолчанию храним БД в рабочей директории процесса (в dev это backend/, в Docker/Railway — WORKDIR)
   const defaultPath = path.resolve(process.cwd(), 'data.db')
+  if ((process.env.NODE_ENV || '').toLowerCase() === 'production') {
+    console.log('⚠️ DB_FILE не задан. В production на Railway без Volume SQLite файл может теряться при рестартах/деплоях.')
+    console.log('   Рекомендуется подключить Railway Volume и выставить DB_FILE=/data/data.db')
+  }
   console.log('✅ Используется БД:', defaultPath)
   return defaultPath
 }

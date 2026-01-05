@@ -46,4 +46,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /usr/src/app/dist ./dist
-CMD ["sh", "-c", "npm run migrate && npm run start"]
+CMD ["sh", "-c", "if [ \"${RUN_MIGRATIONS_ON_START:-1}\" = \"1\" ]; then npm run migrate; fi; npm run start"]

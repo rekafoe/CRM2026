@@ -37,13 +37,19 @@ async function ensureOrderStatuses(db: any): Promise<void> {
       s.color,
       s.sort_order
     )
-    // Обновляем color/sort_order для существующих строк (если уже были)
-    await db.run(
-      'UPDATE order_statuses SET color = ?, sort_order = ? WHERE name = ?',
-      s.color,
-      s.sort_order,
-      s.name
-    )
+
+    // Обновляем только если реально отличаются (чтобы не писать в БД на каждом рестарте)
+    const existing = await db.get('SELECT color, sort_order FROM order_statuses WHERE name = ?', s.name) as { color?: string; sort_order?: number } | undefined
+    const sameColor = (existing?.color ?? null) === (s.color ?? null)
+    const sameSort = Number(existing?.sort_order ?? -1) === Number(s.sort_order)
+    if (!sameColor || !sameSort) {
+      await db.run(
+        'UPDATE order_statuses SET color = ?, sort_order = ? WHERE name = ?',
+        s.color,
+        s.sort_order,
+        s.name
+      )
+    }
   }
 
   const row = await db.get('SELECT COUNT(1) as c FROM order_statuses') as { c?: number } | undefined
