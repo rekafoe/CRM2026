@@ -1,0 +1,11 @@
+{
+  "migrationFolder": "migrations",
+  "direction": "up",
+  "databaseUrl": {
+    "user": "<db_user>",
+    "password": "<db_password>",
+    "host": "localhost",
+    "database": "<db_name>",
+    "port": 5432
+  }
+}

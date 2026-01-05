@@ -219,7 +219,7 @@ await fetch('/api/cost-calculation/calculate', ...)
 1. `frontend/PRICING_FIXES.md` - первые исправления
 2. `frontend/PRICING_AUDIT_COMPLETE.md` - полный отчет по калькулятору
 3. `frontend/PRICING_FINAL_AUDIT.md` - финальный отчет (глубокая проверка)
-4. `frontend/PRICING_COMPLETE_SCAN.md` - **ЭТОТ ДОКУМЕНТ** (полное сканирование)
+4. `docs/_archive/PRICING_COMPLETE_SCAN.md` - **ЭТОТ ДОКУМЕНТ** (полное сканирование)
 
 **Все проблемы задокументированы и исправлены!** ✅
 
