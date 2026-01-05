@@ -45,9 +45,12 @@ export function setAuthToken(token?: string) {
   if (token) {
     try { if (APP_CONFIG?.storage?.token) localStorage.setItem(APP_CONFIG.storage.token, token); } catch {}
     localStorage.setItem('crmToken', token);
+    // backward-compat for older clients
+    localStorage.setItem('api_token', token);
   } else {
     try { if (APP_CONFIG?.storage?.token) localStorage.removeItem(APP_CONFIG.storage.token); } catch {}
     localStorage.removeItem('crmToken');
+    localStorage.removeItem('api_token');
   }
 }
 

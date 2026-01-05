@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { APP_CONFIG } from '../types'
 
 const API_BASE_URL = '/api'
 
@@ -13,7 +14,10 @@ const optimizedApi = axios.create({
 
 // Интерцептор для добавления токена авторизации
 optimizedApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem('api_token')
+  const token =
+    localStorage.getItem('crmToken') ||
+    (APP_CONFIG?.storage?.token ? localStorage.getItem(APP_CONFIG.storage.token) : null) ||
+    localStorage.getItem('api_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -27,6 +31,8 @@ optimizedApi.interceptors.response.use(
     if (error.response?.status === 401) {
       // Перенаправляем на страницу входа при ошибке авторизации
       localStorage.removeItem('api_token')
+      localStorage.removeItem('crmToken')
+      if (APP_CONFIG?.storage?.token) localStorage.removeItem(APP_CONFIG.storage.token)
       window.location.href = '/login'
     }
     return Promise.reject(error)
