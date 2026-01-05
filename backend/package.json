@@ -4,10 +4,10 @@
   "scripts": {
     "dev": "ts-node-dev --transpile-only src/index_old.ts",
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
-    "start": "node dist/backend/src/index_old.js",
+    "start": "node dist/index_old.js",
     "test": "jest --runInBand",
     "seed:demo": "ts-node src/scripts/seedDemoData.ts",
-    "migrate": "node dist/backend/src/scripts/migrate.js",
+    "migrate": "node dist/scripts/migrate.js",
     "migrate:dev": "ts-node src/scripts/migrate.ts"
   },
   "dependencies": {
