@@ -38,10 +38,19 @@ export class OrderService {
   static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm') {
     const createdAt = date ? `${date}T12:00:00.000Z` : getCurrentTimestamp()
     const db = await getDb()
+
+    // Default status should reference existing order_statuses.id (FK)
+    // Use the first status by sort_order, fallback to 1.
+    let defaultStatusId = 1
+    try {
+      const statusRow = await db.get<{ id: number }>('SELECT id FROM order_statuses ORDER BY sort_order ASC, id ASC LIMIT 1')
+      if (statusRow?.id) defaultStatusId = Number(statusRow.id)
+    } catch {}
+
     const insertRes = await db.run(
       'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
-        0, // 0 - ожидает (по умолчанию)
+        defaultStatusId, // FK -> order_statuses.id (обычно "Новый")
         createdAt,
         customerName || null,
         customerPhone || null,
