@@ -1,0 +1,11 @@
+node_modules
+dist
+*.db
+*.sqlite
+*.sqlite3
+uploads
+.env
+.env.*
+npm-debug.log*
+*.log
+

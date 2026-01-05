@@ -1,0 +1,595 @@
+import { Request, Response } from 'express'
+import { asyncHandler } from '../../../middleware'
+import { UnifiedPricingService } from '../services/unifiedPricingService'
+import { ServiceManagementService } from '../services/serviceManagementService'
+import { PricingServiceDTO, ServiceVolumeTierDTO } from '../dtos/service.dto'
+import { getDb } from '../../../db'
+import { getTemplateConfig, applyPriceRulesBySheets, getPrintSheetSizeFromConfig } from '../../productTemplate/configPricing'
+import { CompatibilityService } from '../../../services/compatibilityService'
+import { logger } from '../../../utils/logger'
+import { PrintPriceService } from '../services/printPriceService'
+
+const toServiceResponse = (service: PricingServiceDTO) => ({
+  id: service.id,
+  name: service.name,
+  type: service.type,
+  service_type: service.type,
+  unit: service.unit,
+  rate: service.rate,
+  price_per_unit: service.rate,
+  currency: service.currency ?? 'BYN',
+  isActive: service.isActive,
+  is_active: service.isActive,
+})
+
+const toTierResponse = (tier: ServiceVolumeTierDTO) => ({
+  id: tier.id,
+  serviceId: tier.serviceId,
+  service_id: tier.serviceId,
+  minQuantity: tier.minQuantity,
+  min_quantity: tier.minQuantity,
+  rate: tier.rate,
+  price_per_unit: tier.rate,
+  isActive: tier.isActive,
+  is_active: tier.isActive,
+})
+
+export class PricingController {
+  // Рассчитать цену продукта
+  static calculateProductPrice = asyncHandler(async (req: Request, res: Response) => {
+    const {
+      productId,
+      quantity,
+      qty: qtyParam,
+      specifications = {},
+      configuration = {},
+    } = req.body
+
+    if (!productId) {
+      res.status(400).json({
+        success: false,
+        message: 'productId обязателен для расчёта в новой системе',
+      })
+      return
+    }
+
+    const finalQuantity = quantity ?? qtyParam
+    const qty = Number(finalQuantity)
+
+    if (!Number.isFinite(qty) || qty <= 0) {
+      res.status(400).json({
+        success: false,
+        message: 'quantity должен быть положительным числом',
+      })
+      return
+    }
+
+    try {
+      // Поддерживаем оба формата: configuration (новый) и specifications (старый)
+      const config = Object.keys(configuration).length > 0 ? configuration : specifications;
+      
+      const result = await UnifiedPricingService.calculatePrice(
+        Number(productId),
+        config,
+        qty,
+      )
+
+      res.json({ success: true, data: result })
+    } catch (error) {
+      logger.error('Error in calculateProductPrice', { productId, qty, error })
+      res.status(500).json({
+        success: false,
+        message: 'Ошибка расчета цены',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
+  })
+
+  // --- Services CRUD (service_prices) ---
+  static listServices = asyncHandler(async (req: Request, res: Response) => {
+    const services = await ServiceManagementService.listServices()
+    res.json(services.map(toServiceResponse))
+  })
+
+  static createService = asyncHandler(async (req: Request, res: Response) => {
+    const { name, service_type, type, unit, rate, currency, is_active, isActive } = req.body
+    const service = await ServiceManagementService.createService({
+      name,
+      type: (service_type ?? type) || 'generic',
+      unit,
+      rate: Number(rate ?? 0),
+      currency,
+      isActive: is_active !== undefined ? !!is_active : isActive,
+    })
+    res.status(201).json(toServiceResponse(service))
+  })
+
+  static updateService = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const { name, service_type, type, unit, rate, is_active, isActive } = req.body
+    const updated = await ServiceManagementService.updateService(Number(id), {
+      name,
+      type: service_type ?? type,
+      unit,
+      rate: rate !== undefined ? Number(rate) : undefined,
+      isActive: is_active !== undefined ? !!is_active : isActive,
+    })
+
+    if (!updated) {
+      res.status(404).json({ success: false })
+      return
+    }
+
+    res.json(toServiceResponse(updated))
+  })
+
+  static deleteService = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    await ServiceManagementService.deleteService(Number(id))
+    res.json({ success: true })
+  })
+
+  // --- Service volume price tiers ---
+  static listServiceVolumePrices = asyncHandler(async (req: Request, res: Response) => {
+    const { serviceId } = req.params
+    const tiers = await ServiceManagementService.listServiceTiers(Number(serviceId))
+    res.json(tiers.map(toTierResponse))
+  })
+
+  // --- Print prices (per print technology) ---
+  static listPrintPrices = asyncHandler(async (_req: Request, res: Response) => {
+    const prices = await PrintPriceService.list()
+    res.json(prices)
+  })
+
+  static createPrintPrice = asyncHandler(async (req: Request, res: Response) => {
+    const {
+      technology_code,
+      counter_unit,
+      price_bw_single,
+      price_bw_duplex,
+      price_color_single,
+      price_color_duplex,
+      price_bw_per_meter,
+      price_color_per_meter,
+      is_active,
+    } = req.body
+
+    if (!technology_code) {
+      res.status(400).json({ message: 'technology_code обязателен' })
+      return
+    }
+
+    const payload = {
+      technology_code,
+      counter_unit: counter_unit || 'sheets',
+      price_bw_single: price_bw_single ?? null,
+      price_bw_duplex: price_bw_duplex ?? null,
+      price_color_single: price_color_single ?? null,
+      price_color_duplex: price_color_duplex ?? null,
+      price_bw_per_meter: price_bw_per_meter ?? null,
+      price_color_per_meter: price_color_per_meter ?? null,
+      is_active: is_active !== undefined ? Number(is_active) : 1,
+    }
+
+    const created = await PrintPriceService.create(payload as any)
+    res.status(201).json(created)
+  })
+
+  static updatePrintPrice = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const updated = await PrintPriceService.update(Number(id), req.body)
+    if (!updated) {
+      res.status(404).json({ message: 'print price not found' })
+      return
+    }
+    res.json(updated)
+  })
+
+  static deletePrintPrice = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    await PrintPriceService.delete(Number(id))
+    res.status(204).end()
+  })
+
+  static createServiceVolumePrice = asyncHandler(async (req: Request, res: Response) => {
+    const { serviceId } = req.params
+    const { min_quantity, minQuantity, price_per_unit, rate, is_active, isActive } = req.body
+    const tier = await ServiceManagementService.createServiceTier(Number(serviceId), {
+      minQuantity: Number(min_quantity ?? minQuantity ?? 0),
+      rate: Number(price_per_unit ?? rate ?? 0),
+      isActive: is_active !== undefined ? !!is_active : isActive,
+    })
+    res.status(201).json(toTierResponse(tier))
+  })
+
+  static updateServiceVolumePrice = asyncHandler(async (req: Request, res: Response) => {
+    const { tierId } = req.params
+    const { min_quantity, minQuantity, price_per_unit, rate, is_active, isActive } = req.body
+    const updated = await ServiceManagementService.updateServiceTier(Number(tierId), {
+      minQuantity: min_quantity ?? minQuantity,
+      rate: rate ?? price_per_unit,
+      isActive: is_active !== undefined ? !!is_active : isActive,
+    })
+
+    if (!updated) {
+      res.status(404).json({ success: false })
+      return
+    }
+
+    res.json(toTierResponse(updated))
+  })
+
+  static deleteServiceVolumePrice = asyncHandler(async (req: Request, res: Response) => {
+    const { tierId } = req.params
+    await ServiceManagementService.deleteServiceTier(Number(tierId))
+    res.json({ success: true })
+  })
+
+  // --- Operation norms (operation_norms) ---
+  private static async ensureOperationNormsTable() {
+    const db = await getDb()
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS operation_norms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_type TEXT NOT NULL,
+        operation TEXT NOT NULL,
+        service_id INTEGER NOT NULL,
+        formula TEXT NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        updated_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (service_id) REFERENCES post_processing_services(id) ON DELETE CASCADE,
+        UNIQUE(product_type, service_id)
+      )
+    `)
+
+    try {
+      const operations = await db.all<Array<{ id: number; name: string }>>(
+        `SELECT id, name FROM post_processing_services WHERE is_active = 1`
+      )
+
+      if (!operations.length) {
+        logger.warn('Нет активных операций в post_processing_services — пропускаю предзаполнение operation_norms')
+        return
+      }
+
+      const normalized = operations.map((op) => ({ ...op, lower: op.name.toLowerCase() }))
+
+      const findOperationId = (candidates: string[]): number | undefined => {
+        for (const candidate of candidates) {
+          const exact = normalized.find((op) => op.lower === candidate.toLowerCase())
+          if (exact) return exact.id
+        }
+        for (const candidate of candidates) {
+          const fuzzy = normalized.find((op) => op.lower.includes(candidate.toLowerCase()))
+          if (fuzzy) return fuzzy.id
+        }
+        return undefined
+      }
+
+      const presets: Array<{
+        productType: string
+        operationLabel: string
+        candidates: string[]
+        formula: string
+      }> = [
+        // Листовые продукты (универсальные)
+        {
+          productType: 'sheet_single',
+          operationLabel: 'Печать',
+          candidates: ['Цифровая цветная печать (SRA3)', 'Печать', 'Цифровая печать'],
+          formula: 'ceil(quantity / max(itemsPerSheet, 1))'
+        },
+        {
+          productType: 'sheet_single',
+          operationLabel: 'Резка',
+          candidates: ['Резка на гильотине', 'Резка', 'Вырубка'],
+          formula: 'ceil(quantity / max(itemsPerSheet, 1))'
+        },
+        {
+          productType: 'sheet_item',
+          operationLabel: 'Печать',
+          candidates: ['Цифровая цветная печать (SRA3)', 'Печать', 'Цифровая печать'],
+          formula: 'ceil(quantity / max(itemsPerSheet, 1))'
+        },
+        {
+          productType: 'sheet_item',
+          operationLabel: 'Резка',
+          candidates: ['Резка на гильотине', 'Резка', 'Вырубка'],
+          formula: 'ceil(quantity / max(itemsPerSheet, 1))'
+        },
+        // Флаеры
+        {
+          productType: 'flyers',
+          operationLabel: 'Печать',
+          candidates: ['Цифровая цветная печать (SRA3)', 'Цифровая печать SRA3', 'Цифровая печать'],
+          formula: 'ceil(quantity / max(itemsPerSheet, 1))'
+        },
+        {
+          productType: 'flyers',
+          operationLabel: 'Резка',
+          candidates: ['Резка на гильотине', 'Резка листов'],
+          formula: 'ceil(quantity / 200)'
+        },
+        {
+          productType: 'flyers',
+          operationLabel: 'Ламинация',
+          candidates: ['Ламинация матовая', 'Ламинация глянцевая'],
+          formula: 'quantity'
+        },
+        // Визитки
+        {
+          productType: 'business_cards',
+          operationLabel: 'Печать',
+          candidates: ['Цифровая цветная печать (SRA3)', 'Цифровая печать визиток'],
+          formula: 'ceil(quantity / 10)'
+        },
+        {
+          productType: 'business_cards',
+          operationLabel: 'Резка',
+          candidates: ['Резка на гильотине', 'Высечка визиток'],
+          formula: 'ceil(quantity / 10)'
+        },
+        {
+          productType: 'business_cards',
+          operationLabel: 'Скругление углов',
+          candidates: ['Скругление углов', 'Углорез'],
+          formula: 'quantity * 4'
+        },
+        {
+          productType: 'business_cards',
+          operationLabel: 'Ламинация',
+          candidates: ['Ламинация матовая', 'Ламинация глянцевая'],
+          formula: 'ceil(quantity / 10)'
+        },
+        // Буклеты
+        {
+          productType: 'booklets',
+          operationLabel: 'Печать',
+          candidates: ['Цифровая цветная печать (SRA3)', 'Цифровая печать буклетов'],
+          formula: 'ceil(quantity / 2)'
+        },
+        {
+          productType: 'booklets',
+          operationLabel: 'Резка',
+          candidates: ['Резка на гильотине'],
+          formula: 'ceil(quantity / 2)'
+        },
+        {
+          productType: 'booklets',
+          operationLabel: 'Биговка',
+          candidates: ['Биговка', 'Фальцовка (1 сгиб)'],
+          formula: 'ceil(quantity / 2)'
+        },
+        {
+          productType: 'booklets',
+          operationLabel: 'Скоба',
+          candidates: ['Сшивка', 'Скрепление на скобу'],
+          formula: 'quantity'
+        }
+      ]
+
+      for (const preset of presets) {
+        const operationId = findOperationId(preset.candidates)
+        if (!operationId) continue
+
+        await db.run(
+          `INSERT OR IGNORE INTO operation_norms (product_type, operation, service_id, formula, is_active)
+           VALUES (?, ?, ?, ?, 1)`,
+          preset.productType,
+          preset.operationLabel,
+          operationId,
+          preset.formula
+        )
+      }
+    } catch (error) {
+      logger.error('Error creating default operations', error)
+    }
+  }
+
+  static listOperationNorms = asyncHandler(async (req: Request, res: Response) => {
+    await PricingController.ensureOperationNormsTable()
+    const db = await getDb()
+    const rows = await db.all(`SELECT * FROM operation_norms ORDER BY product_type, operation`)
+    res.json(rows.map((r: any) => ({ ...r, is_active: !!r.is_active })))
+  })
+
+  static createOperationNorm = asyncHandler(async (req: Request, res: Response) => {
+    await PricingController.ensureOperationNormsTable()
+    const { product_type, operation, service_id, formula, is_active } = req.body
+    const db = await getDb()
+    const result = await db.run(`INSERT INTO operation_norms (product_type, operation, service_id, formula, is_active) VALUES (?, ?, ?, ?, ?)`,
+      product_type, operation, service_id, formula, is_active ? 1 : 0)
+    const row = await db.get(`SELECT * FROM operation_norms WHERE id = ?`, result.lastID)
+    res.status(201).json({ ...row, is_active: !!row.is_active })
+  })
+
+  static updateOperationNorm = asyncHandler(async (req: Request, res: Response) => {
+    await PricingController.ensureOperationNormsTable()
+    const { id } = req.params
+    const { product_type, operation, service_id, formula, is_active } = req.body
+    const db = await getDb()
+    const current = await db.get(`SELECT * FROM operation_norms WHERE id = ?`, id)
+    if (!current) { res.status(404).json({ success: false }); return }
+    await db.run(`UPDATE operation_norms SET product_type = ?, operation = ?, service_id = ?, formula = ?, is_active = ? WHERE id = ?`,
+      product_type ?? current.product_type,
+      operation ?? current.operation,
+      service_id ?? current.service_id,
+      formula ?? current.formula,
+      is_active !== undefined ? (is_active ? 1 : 0) : current.is_active,
+      id)
+    const row = await db.get(`SELECT * FROM operation_norms WHERE id = ?`, id)
+    res.json({ ...row, is_active: !!row.is_active })
+  })
+
+  static deleteOperationNorm = asyncHandler(async (req: Request, res: Response) => {
+    await PricingController.ensureOperationNormsTable()
+    const { id } = req.params
+    const db = await getDb()
+    await db.run(`DELETE FROM operation_norms WHERE id = ?`, id)
+    res.json({ success: true })
+  })
+
+  // --- Product Types (replacement for enhanced-calculator) ---
+  static getProductTypes = asyncHandler(async (req: Request, res: Response) => {
+    await PricingController.ensureOperationNormsTable()
+    const db = await getDb()
+    
+    // Получаем типы продуктов из operation_norms
+    const productTypes = await db.all(`
+      SELECT DISTINCT product_type as key, 
+             CASE 
+               WHEN product_type = 'flyers' THEN 'Листовки'
+               WHEN product_type = 'business_cards' THEN 'Визитки'
+               WHEN product_type = 'booklets' THEN 'Буклеты'
+               WHEN product_type = 'posters' THEN 'Постеры'
+               ELSE UPPER(SUBSTR(product_type, 1, 1)) || LOWER(SUBSTR(product_type, 2))
+             END as name,
+             'active' as status,
+             datetime('now') as created_at
+      FROM operation_norms 
+      WHERE is_active = 1
+      ORDER BY product_type
+    `)
+    
+    res.json(productTypes)
+  })
+
+  static getProductSchema = asyncHandler(async (req: Request, res: Response) => {
+    await PricingController.ensureOperationNormsTable()
+    const { key } = req.params
+    const db = await getDb()
+    
+    // Получаем схему продукта на основе operation_norms
+    const operations = await db.all(`
+      SELECT 
+        op.operation,
+        op.service_id,
+        pps.name as service_name,
+        pps.unit,
+        pps.price as price_per_unit,
+        pps.operation_type,
+        pps.price_unit,
+        op.formula
+      FROM operation_norms op
+      JOIN post_processing_services pps ON op.service_id = pps.id
+      WHERE op.product_type = ? AND op.is_active = 1
+      ORDER BY op.operation
+    `, [key])
+    
+    // Создаем схему на основе операций
+    const schema = {
+      key,
+      name: key === 'flyers' ? 'Листовки' : 
+            key === 'business_cards' ? 'Визитки' : 
+            key === 'booklets' ? 'Буклеты' : key,
+      parameters: {
+        format: { type: 'select', options: ['A6', 'A5', 'A4', 'A3', 'SRA3'], required: true },
+        quantity: { type: 'number', min: 1, required: true },
+        sides: { type: 'select', options: [1, 2], default: 1 },
+        paperType: { type: 'select', options: ['semi-matte', 'coated', 'matte'], default: 'semi-matte' },
+        paperDensity: { type: 'select', options: [120, 150, 200, 300], default: 120 },
+        lamination: { type: 'select', options: ['none', 'matte', 'glossy'], default: 'none' }
+      },
+      operations: operations.map(op => ({
+        operation: op.operation,
+        service_id: op.service_id,
+        service: op.service_name,
+        type: op.operation_type ?? 'general',
+        unit: op.unit,
+        rate: op.price_per_unit,
+        price_unit: op.price_unit ?? 'per_item',
+        formula: op.formula
+      }))
+    }
+    
+    res.json(schema)
+  })
+
+  static createProductType = asyncHandler(async (req: Request, res: Response) => {
+    const { key, name, operations } = req.body
+    const db = await getDb()
+    
+    // Создаем базовую операцию для типа продукта, если операций нет
+    if (!operations || operations.length === 0) {
+      // Находим первую доступную услугу (обычно печать)
+      const defaultService = await db.get(
+        `SELECT id FROM post_processing_services WHERE is_active = 1 ORDER BY id LIMIT 1`
+      )
+      
+      if (defaultService) {
+        await db.run(`
+          INSERT INTO operation_norms (product_type, operation, service_id, formula, is_active)
+          VALUES (?, ?, ?, ?, 1)
+        `, [key, 'Базовая операция', defaultService.id, 'quantity'])
+      }
+    } else {
+      // Создаем операции для нового типа продукта
+      for (const operation of operations) {
+        await db.run(`
+          INSERT INTO operation_norms (product_type, operation, service_id, formula, is_active)
+          VALUES (?, ?, ?, ?, 1)
+        `, [key, operation.operation, operation.service_id, operation.formula])
+      }
+    }
+    
+    res.status(201).json({ success: true, key })
+  })
+
+  static updateProductSchema = asyncHandler(async (req: Request, res: Response) => {
+    const { key } = req.params
+    const { operations } = req.body
+    const db = await getDb()
+    
+    logger.debug('updateProductSchema request', { key, operations })
+    
+    // Удаляем старые операции
+    await db.run(`DELETE FROM operation_norms WHERE product_type = ?`, [key])
+    
+    // Добавляем новые операции
+    for (const operation of operations || []) {
+      let serviceId = operation.service_id
+      
+      // Если service_id не передан, пытаемся найти по названию услуги
+      if (!serviceId && operation.service) {
+        const service = await db.get(
+          `SELECT id FROM post_processing_services WHERE name = ? AND is_active = 1 LIMIT 1`,
+          operation.service
+        )
+        serviceId = service?.id
+      }
+      
+      // Если все еще нет service_id, используем дефолтный (печать)
+      if (!serviceId) {
+        const defaultService = await db.get(
+          `SELECT id FROM post_processing_services WHERE name LIKE '%печать%' AND is_active = 1 LIMIT 1`
+        )
+        serviceId = defaultService?.id || 4 // fallback ID
+      }
+      
+      logger.debug('Adding operation', { 
+        product_type: key, 
+        operation: operation.operation, 
+        service_id: serviceId, 
+        formula: operation.formula 
+      })
+      
+      await db.run(`
+        INSERT INTO operation_norms (product_type, operation, service_id, formula, is_active)
+        VALUES (?, ?, ?, ?, 1)
+      `, [key, operation.operation, serviceId, operation.formula || 'quantity'])
+    }
+    
+    res.json({ success: true })
+  })
+
+  static deleteProductType = asyncHandler(async (req: Request, res: Response) => {
+    const { key } = req.params
+    const db = await getDb()
+    
+    // Деактивируем операции вместо удаления
+    await db.run(`UPDATE operation_norms SET is_active = 0 WHERE product_type = ?`, [key])
+    
+    res.json({ success: true })
+  })
+}

@@ -1,0 +1,35 @@
+{
+  "products": [],
+  "schemas": {
+    "booklets": {
+      "key": "booklets",
+      "type": "Буклеты",
+      "fields": [
+        {
+          "name": "format",
+          "type": "select",
+          "label": "Формат",
+          "enum": [
+            "A4",
+            "A5"
+          ],
+          "required": true
+        },
+        {
+          "name": "pages",
+          "type": "select",
+          "label": "Страницы",
+          "enum": [
+            4,
+            8,
+            12,
+            16,
+            20,
+            24
+          ],
+          "required": true
+        }
+      ]
+    }
+  }
+}
