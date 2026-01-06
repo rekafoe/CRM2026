@@ -78,6 +78,63 @@ const DiscountsTabComponent: React.FC<DiscountsTabProps> = ({
         )}
       </div>
 
+      {/* Карточка создания новой записи показывается всегда, если нажали "Добавить" */}
+      {editingItem?.id === -1 && (
+        <div className="data-card">
+          <div className="card-header">
+            <div className="card-title">
+              <h4>Новая скидка</h4>
+              <StatusBadge status={'active'} />
+            </div>
+            <div className="card-actions">
+              <Button variant="success" size="sm" onClick={onSave} loading={loading}>
+                Сохранить
+              </Button>
+              <Button variant="secondary" size="sm" onClick={onCancel}>
+                Отмена
+              </Button>
+            </div>
+          </div>
+
+          <div className="card-content">
+            <div className="field-group">
+              <FormField label="Диапазон листов SRA3">
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={getEditingValue('min_quantity')}
+                    onChange={handleMinChange}
+                    className="form-control"
+                  />
+                  <input
+                    type="number"
+                    step="1"
+                    placeholder="∞"
+                    value={getEditingValue('max_quantity')}
+                    onChange={handleMaxChange}
+                    className="form-control"
+                  />
+                </div>
+              </FormField>
+
+              <FormField label="Процент скидки">
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="100"
+                  value={getEditingValue('discount_percent')}
+                  onChange={handleDiscountChange}
+                  className="form-control"
+                />
+              </FormField>
+            </div>
+          </div>
+        </div>
+      )}
+
       {filteredItems.length === 0 ? (
         <EmptyState
           icon="🎯"
