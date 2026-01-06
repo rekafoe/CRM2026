@@ -282,6 +282,19 @@ router.get('/:productId/schema', async (req, res) => {
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
+
+    // 🖨️ Настройки печати продукта (products.print_settings)
+    // Хранятся как JSON:
+    // { allowedTechnologies: string[], allowedColorModes: ('bw'|'color')[], allowedSides: (1|2)[] }
+    let productPrintSettings: any = null;
+    try {
+      const raw = (product as any)?.print_settings;
+      if (raw) {
+        productPrintSettings = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      }
+    } catch {
+      productPrintSettings = null;
+    }
     
     // Получаем template config (constraints и config_data) для полной информации о шаблоне
     let allowedPaperTypes: string[] | null = null;
@@ -592,7 +605,17 @@ router.get('/:productId/schema', async (req, res) => {
       },
       constraints: {
         allowed_paper_types: allowedPaperTypes || null, // Разрешенные типы бумаги
-        print_sheet: templateConstraints?.print_sheet || null // Печатный лист из constraints
+        print_sheet: templateConstraints?.print_sheet || null, // Печатный лист из constraints
+        // 🖨️ Ограничения печати из products.print_settings (используются в ImprovedPrinting для фильтрации)
+        allowed_print_technologies: Array.isArray(productPrintSettings?.allowedTechnologies)
+          ? productPrintSettings.allowedTechnologies
+          : null,
+        allowed_color_modes: Array.isArray(productPrintSettings?.allowedColorModes)
+          ? productPrintSettings.allowedColorModes
+          : null,
+        allowed_sides: Array.isArray(productPrintSettings?.allowedSides)
+          ? productPrintSettings.allowedSides
+          : null,
       }
     };
     
