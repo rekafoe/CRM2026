@@ -195,6 +195,20 @@ async function ensureMarkupDefaults(db: any): Promise<void> {
     );
   `)
 
+  // Если таблица уже существовала (старая схема) — нужные колонки могли отсутствовать.
+  // Пример: markup_settings без description => SQLITE_ERROR: no column named description
+  try {
+    const cols = await db.all<{ name: string }[]>(`PRAGMA table_info(markup_settings)`)
+    const has = (name: string) => Array.isArray(cols) && cols.some(c => c?.name === name)
+
+    if (!has('description')) await db.exec(`ALTER TABLE markup_settings ADD COLUMN description TEXT`)
+    if (!has('is_active')) await db.exec(`ALTER TABLE markup_settings ADD COLUMN is_active INTEGER DEFAULT 1`)
+    if (!has('created_at')) await db.exec(`ALTER TABLE markup_settings ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP`)
+    if (!has('updated_at')) await db.exec(`ALTER TABLE markup_settings ADD COLUMN updated_at TEXT DEFAULT CURRENT_TIMESTAMP`)
+  } catch {
+    // no-op
+  }
+
   const seeds: Array<{ name: string; value: number; description: string }> = [
     { name: 'base_markup', value: 2.2, description: 'Базовый множитель наценки (умножается на себестоимость)' },
     { name: 'rush_multiplier', value: 1.5, description: 'Множитель срочности' },
