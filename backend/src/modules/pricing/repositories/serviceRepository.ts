@@ -11,6 +11,39 @@ import {
 
 const DEFAULT_CURRENCY = 'BYN';
 
+// post_processing_services.operation_type имеет CHECK constraint на фиксированный список значений.
+// Фронт/админка иногда присылает агрегированные типы (например "postprint"), которые в БД запрещены.
+// Поэтому нормализуем тип перед записью.
+const ALLOWED_OPERATION_TYPES = new Set<string>([
+  'print',
+  'cut',
+  'fold',
+  'score',
+  'laminate',
+  'bind',
+  'perforate',
+  'emboss',
+  'foil',
+  'varnish',
+  'package',
+  'design',
+  'delivery',
+  'other',
+]);
+
+function normalizeOperationType(raw: unknown): string {
+  const v = typeof raw === 'string' ? raw.trim() : '';
+  if (!v) return 'other';
+
+  // Совместимость с фронтом/старой моделью
+  const mapped =
+    v === 'postprint' || v === 'generic'
+      ? 'other'
+      : v;
+
+  return ALLOWED_OPERATION_TYPES.has(mapped) ? mapped : 'other';
+}
+
 type RawServiceRow = {
   id: number;
   service_name: string;
@@ -131,11 +164,19 @@ export class PricingServiceRepository {
   static async createService(payload: CreatePricingServiceDTO): Promise<PricingServiceDTO> {
     const db = await this.getConnection();
     // ИЗМЕНЕНО: Создаем в post_processing_services
+    const operationType = normalizeOperationType(payload.type);
+    if (typeof payload.type === 'string' && payload.type.trim() && !ALLOWED_OPERATION_TYPES.has(payload.type.trim()) && payload.type.trim() !== 'postprint' && payload.type.trim() !== 'generic') {
+      const err: any = new Error(
+        `Недопустимый operation_type: "${payload.type}". Разрешено: ${Array.from(ALLOWED_OPERATION_TYPES).join(', ')}`
+      );
+      err.status = 400;
+      throw err;
+    }
     const result = await db.run(
       `INSERT INTO post_processing_services (name, operation_type, unit, price, is_active) 
        VALUES (?, ?, ?, ?, ?)`,
       payload.name,
-      payload.type ?? 'generic',
+      operationType,
       payload.unit,
       Number(payload.rate ?? 0),
       payload.isActive === undefined || payload.isActive ? 1 : 0,
@@ -165,12 +206,24 @@ export class PricingServiceRepository {
       return null;
     }
 
+    const operationType = payload.type !== undefined
+      ? normalizeOperationType(payload.type)
+      : (current.operation_type ?? 'other');
+
+    if (typeof payload.type === 'string' && payload.type.trim() && !ALLOWED_OPERATION_TYPES.has(payload.type.trim()) && payload.type.trim() !== 'postprint' && payload.type.trim() !== 'generic') {
+      const err: any = new Error(
+        `Недопустимый operation_type: "${payload.type}". Разрешено: ${Array.from(ALLOWED_OPERATION_TYPES).join(', ')}`
+      );
+      err.status = 400;
+      throw err;
+    }
+
     await db.run(
       `UPDATE post_processing_services 
        SET name = ?, operation_type = ?, unit = ?, price = ?, is_active = ? 
        WHERE id = ?`,
       payload.name ?? current.name,
-      payload.type ?? current.operation_type ?? 'generic',
+      operationType,
       payload.unit ?? current.unit,
       payload.rate !== undefined ? payload.rate : current.price,
       payload.isActive !== undefined ? (payload.isActive ? 1 : 0) : current.is_active,
