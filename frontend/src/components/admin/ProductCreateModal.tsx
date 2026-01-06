@@ -30,7 +30,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
   const [categoryId, setCategoryId] = useState<number | null>(
     categories.length > 0 ? categories[0].id : null
   );
-  const [calculatorType, setCalculatorType] = useState<'product' | 'operation'>('product');
+  const [calculatorType, setCalculatorType] = useState<'product' | 'operation' | 'simplified'>('product');
   const [productType, setProductType] = useState<'sheet_single' | 'multi_page' | 'universal'>('sheet_single');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +86,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
     setDescription('');
     setIcon('📦');
     setCategoryId(categories.length > 0 ? categories[0].id : null);
-    setCalculatorType('product');
+      setCalculatorType('product');
     setProductType('sheet_single');
     setError(null);
     onClose();
@@ -153,10 +153,11 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
             <select
               className="form-select"
               value={calculatorType}
-              onChange={(e) => setCalculatorType(e.target.value as 'product' | 'operation')}
+            onChange={(e) => setCalculatorType(e.target.value as 'product' | 'operation' | 'simplified')}
             >
               <option value="product">Продуктовый</option>
               <option value="operation">Операционный</option>
+            <option value="simplified">Упрощённый</option>
             </select>
           </FormField>
         </div>

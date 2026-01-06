@@ -53,7 +53,7 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
             onChange={(e) => onFormChange('product_type', e.target.value)}
           />
         </FormField>
-        <FormField label="Тип калькулятора" help="product / operation">
+        <FormField label="Тип калькулятора" help="product / operation / simplified">
           <select
             className="form-select"
             value={form.calculator_type || ''}
@@ -62,6 +62,7 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
             <option value="">—</option>
             <option value="product">product</option>
             <option value="operation">operation</option>
+            <option value="simplified">simplified</option>
           </select>
         </FormField>
         <FormField label="Категория" help="ID категории (только чтение)">

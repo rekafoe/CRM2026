@@ -5,7 +5,7 @@ export async function up(db: Database): Promise<void> {
   // calculator_type: 'product' | 'operation'
   await db.exec(`
     ALTER TABLE products ADD COLUMN calculator_type TEXT
-      CHECK (calculator_type IN ('product','operation'))
+      CHECK (calculator_type IN ('product','operation','simplified'))
       DEFAULT 'product'
   `).catch(() => {/* column may already exist */});
 

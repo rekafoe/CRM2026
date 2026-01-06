@@ -67,8 +67,8 @@ const ProductEditPage: React.FC = () => {
     if (!productId || !form.name) return;
     try {
       setSaving(true);
-      const { name, description, icon } = form;
-      await updateProduct(productId, { name, description, icon } as any);
+      const { name, description, icon, calculator_type, product_type } = form;
+      await updateProduct(productId, { name, description, icon, calculator_type, product_type } as any);
       alert('Сохранено');
     } catch (error) {
       console.error(error);
@@ -76,7 +76,7 @@ const ProductEditPage: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [productId, form.name, form.description, form.icon]);
+  }, [productId, form.name, form.description, form.icon, form.calculator_type, form.product_type]);
 
   const handleFormChange = useCallback((field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));

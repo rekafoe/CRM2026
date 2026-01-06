@@ -13,14 +13,14 @@ interface NewProductModalProps {
 
 const NewProductModal: React.FC<NewProductModalProps> = ({ onClose, onCreated }) => {
   const [name, setName] = useState('')
-  const [calculatorType, setCalculatorType] = useState<'product' | 'operation'>('product')
+  const [calculatorType, setCalculatorType] = useState<'product' | 'operation' | 'simplified'>('product')
   const [productType, setProductType] = useState<ProductType>('sheet_single')
   const [description, setDescription] = useState('')
   const [iconFile, setIconFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
 
   const productTypeOptions = useMemo(() => (
-    calculatorType === 'product'
+    calculatorType === 'product' || calculatorType === 'simplified'
       ? [
           { value: 'sheet_single', label: 'Листовое изделие' },
           { value: 'multi_page', label: 'Многостраничное' },
@@ -34,7 +34,7 @@ const NewProductModal: React.FC<NewProductModalProps> = ({ onClose, onCreated })
 
   useEffect(() => {
     // сбрасываем тип при переключении калькулятора
-    setProductType(calculatorType === 'product' ? 'sheet_single' : 'sheet_item' as ProductType)
+    setProductType((calculatorType === 'product' || calculatorType === 'simplified') ? 'sheet_single' : 'sheet_item' as ProductType)
   }, [calculatorType])
 
   useEffect(() => {
@@ -100,12 +100,13 @@ const NewProductModal: React.FC<NewProductModalProps> = ({ onClose, onCreated })
                 className="np-select" 
                 value={calculatorType} 
                 onChange={(e) => {
-                  const value = e.target.value as 'product' | 'operation'
+                  const value = e.target.value as 'product' | 'operation' | 'simplified'
                   setCalculatorType(value)
                 }}
               >
                 <option value="product">Продуктовый калькулятор</option>
                 <option value="operation">Операционный калькулятор</option>
+                <option value="simplified">Упрощённый калькулятор</option>
               </select>
             </div>
 

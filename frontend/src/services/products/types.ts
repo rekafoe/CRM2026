@@ -19,7 +19,7 @@ export interface Product {
   name: string;
   description?: string;
   icon?: string;
-  calculator_type?: 'product' | 'operation';
+  calculator_type?: 'product' | 'operation' | 'simplified';
   product_type?: 'sheet_single' | 'multi_page' | 'universal' | 'sheet_item' | 'multi_page_item';
   is_active: boolean;
   created_at: string;
