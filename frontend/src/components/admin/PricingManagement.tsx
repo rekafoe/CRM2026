@@ -147,6 +147,21 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
         return;
       }
 
+      type Settled<T> = PromiseSettledResult<T>;
+      const isFulfilledUnknown = (r: PromiseSettledResult<unknown>): r is PromiseFulfilledResult<unknown> =>
+        r.status === 'fulfilled';
+      const isRejectedUnknown = (r: PromiseSettledResult<unknown>): r is PromiseRejectedResult =>
+        r.status === 'rejected';
+
+      const keys = [
+        'print-prices',
+        'service-prices',
+        'markup-settings',
+        'quantity-discounts',
+        'printing-technologies',
+        'printers',
+      ] as const;
+
       const results = await Promise.allSettled([
         api.get<PrintPrice[]>('/pricing/print-prices'),
         api.get<ServicePrice[]>('/pricing/service-prices'),
@@ -156,7 +171,14 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
         api.get<PrinterRow[]>('/printers'),
       ]);
 
-      const [printRes, serviceRes, markupRes, discountRes, techRes, printersRes] = results;
+      const [printRes, serviceRes, markupRes, discountRes, techRes, printersRes] = results as [
+        Settled<Awaited<ReturnType<typeof api.get<PrintPrice[]>>>>,
+        Settled<Awaited<ReturnType<typeof api.get<ServicePrice[]>>>>,
+        Settled<Awaited<ReturnType<typeof api.get<MarkupSetting[]>>>>,
+        Settled<Awaited<ReturnType<typeof api.get<QuantityDiscount[]>>>>,
+        Settled<Awaited<ReturnType<typeof api.get<PrintTechnology[]>>>>,
+        Settled<Awaited<ReturnType<typeof api.get<PrinterRow[]>>>>
+      ];
 
       if (printRes.status === 'fulfilled') setPrintPrices(printRes.value.data || []);
       if (serviceRes.status === 'fulfilled') setServicePrices(serviceRes.value.data || []);
@@ -165,11 +187,21 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
       if (techRes.status === 'fulfilled') setPrintTechnologies(Array.isArray(techRes.value.data) ? techRes.value.data : []);
       if (printersRes.status === 'fulfilled') setPrinters(Array.isArray(printersRes.value.data) ? printersRes.value.data : []);
 
-      const failed = results.filter((r) => r.status === 'rejected');
-      if (failed.length > 0) {
-        // По правилам проекта не используем хардкод/моки: просто показываем ошибку.
-        console.warn('API requests failed:', failed);
-        setError('Не удалось загрузить часть данных ценообразования. Проверьте доступность API.');
+      const failedDetails: string[] = [];
+      (results as PromiseSettledResult<unknown>[]).forEach((r, idx) => {
+        if (isRejectedUnknown(r)) {
+          const anyErr: any = r.reason;
+          const status = anyErr?.response?.status;
+          const msg = anyErr?.response?.data?.message || anyErr?.message || 'Ошибка запроса';
+          failedDetails.push(`${keys[idx]}: ${status ? `${status} ` : ''}${msg}`);
+        }
+        // если вдруг нужно — для fulfilled можно в будущем прокидывать диагностику
+        if (isFulfilledUnknown(r)) {
+          // noop
+        }
+      });
+      if (failedDetails.length > 0) {
+        setError(`Не удалось загрузить часть данных: ${failedDetails.join(' | ')}`);
       }
     } catch (error) {
       setError('Ошибка загрузки данных ценообразования');
@@ -178,6 +210,21 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
       setLoading(false);
     }
   }, [mode, setPrintPrices, setServicePrices, setMarkupSettings, setQuantityDiscounts]);
+
+  const ensureMarkupDefaults = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await api.post<MarkupSetting[]>('/pricing/markup-settings/ensure-defaults', {});
+      setMarkupSettings(res.data || []);
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const msg = error?.response?.data?.message || error?.message || 'Ошибка';
+      setError(`Не удалось создать дефолтные наценки: ${status ? `${status} ` : ''}${msg}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [setMarkupSettings]);
 
   useEffect(() => {
     loadPricingData();
@@ -461,11 +508,13 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
                 markupSettings={markupSettings}
                 loading={loading}
                 searchTerm={debouncedSearchTerm}
+                error={error}
                 editingItem={editingItem}
                 editingValues={editingValues}
                 onEdit={handleEdit}
                 onSave={handleSave}
                 onCancel={handleCancel}
+                onEnsureDefaults={ensureMarkupDefaults}
                 getEditingValue={getEditingValue}
                 updateEditingValue={updateEditingValue}
               />

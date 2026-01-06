@@ -219,6 +219,26 @@ async function ensureMarkupDefaults(db: any): Promise<void> {
   }
 }
 
+// POST /api/pricing/markup-settings/ensure-defaults — принудительно создать/активировать дефолтные наценки
+router.post('/markup-settings/ensure-defaults', asyncHandler(async (_req, res) => {
+  const db = await getDb()
+  await ensureMarkupDefaults(db)
+  const markupSettings = await db.all<any>(`
+    SELECT
+      ms.id,
+      ms.setting_name,
+      ms.setting_value,
+      ms.description,
+      ms.is_active,
+      ms.created_at,
+      ms.updated_at
+    FROM markup_settings ms
+    WHERE ms.is_active = 1
+    ORDER BY ms.setting_name
+  `)
+  res.json(markupSettings)
+}))
+
 // GET /api/pricing/markup-settings - настройки наценки
 router.get('/markup-settings', asyncHandler(async (req, res) => {
   try {

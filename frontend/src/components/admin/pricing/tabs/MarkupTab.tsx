@@ -6,11 +6,13 @@ interface MarkupTabProps {
   markupSettings: MarkupSetting[];
   loading: boolean;
   searchTerm: string;
+  error?: string | null;
   editingItem: EditingItem | null;
   editingValues: EditingValues;
   onEdit: (item: MarkupSetting, type: PricingItemType) => void;
   onSave: () => Promise<void>;
   onCancel: () => void;
+  onEnsureDefaults?: () => Promise<void>;
   getEditingValue: (key: string) => string | number;
   updateEditingValue: (key: string, value: string | number) => void;
 }
@@ -32,11 +34,13 @@ const MarkupTabComponent: React.FC<MarkupTabProps> = ({
   markupSettings,
   loading,
   searchTerm,
+  error,
   editingItem,
   editingValues,
   onEdit,
   onSave,
   onCancel,
+  onEnsureDefaults,
   getEditingValue,
   updateEditingValue,
 }) => {
@@ -64,7 +68,11 @@ const MarkupTabComponent: React.FC<MarkupTabProps> = ({
         <EmptyState
           icon="📈"
           title="Нет настроек наценок"
-          description="Добавьте настройки наценок для различных условий"
+          description={
+            error
+              ? `Ошибка загрузки: ${error}`
+              : 'API вернул 0 активных настроек. Нажмите "Создать дефолты", чтобы заполнить базовые значения.'
+          }
         />
       ) : (
         <div className="data-grid">
@@ -104,10 +112,9 @@ const MarkupTabComponent: React.FC<MarkupTabProps> = ({
                       />
                     ) : (
                       <span className="field-value">
-                        {item.setting_name.includes('multiplier') ?
-                          `${item.setting_value} (${((item.setting_value - 1) * 100).toFixed(0)}%)` :
-                          `${item.setting_value}%`
-                        }
+                        {(item.setting_name.includes('multiplier') || item.setting_name.includes('markup')) ?
+                          `×${item.setting_value} (${((item.setting_value - 1) * 100).toFixed(0)}%)` :
+                          `${item.setting_value}%`}
                       </span>
                     )}
                   </FormField>
@@ -119,6 +126,14 @@ const MarkupTabComponent: React.FC<MarkupTabProps> = ({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {filteredItems.length === 0 && !loading && onEnsureDefaults && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="primary" onClick={onEnsureDefaults} loading={loading}>
+            Создать дефолты
+          </Button>
         </div>
       )}
     </div>
