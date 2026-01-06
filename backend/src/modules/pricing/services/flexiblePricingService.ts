@@ -276,6 +276,48 @@ export class FlexiblePricingService {
       let totalOperationsCost = 0;
       let totalSetupCost = 0;
 
+      // ✅ Печать как "скрытая" операция:
+      // Если в продукте настроены разрешенные технологии/цвет/стороны (в UI вкладка "Печать"),
+      // то печать должна участвовать в расчёте даже без явного post_processing_service "Печать".
+      const hasPrintParams = !!configuration.print_technology && !!configuration.print_color_mode;
+      const hasPrintOperation = operations.some((op) => {
+        const nameLower = (op?.name || '').toString().toLowerCase();
+        return op?.operation_type === 'print' || nameLower.includes('печать') || nameLower.includes('print');
+      });
+      if (hasPrintParams && !hasPrintOperation) {
+        const virtualPrintOperation = {
+          id: -1,
+          name: 'Печать',
+          operation_type: 'print',
+          price_unit: 'per_sheet',
+          unit: 'per_sheet',
+          price: 0,
+          setup_cost: 0,
+          min_quantity: 1,
+        };
+        logger.info('🖨️ Добавляем виртуальную операцию печати (из настроек печати продукта)', {
+          productId,
+          print_technology: configuration.print_technology,
+          print_color_mode: configuration.print_color_mode,
+          sides: configuration.sides,
+          sheetsNeeded,
+        });
+
+        const printCost = await this.calculateOperationCost(
+          virtualPrintOperation,
+          configuration,
+          quantity,
+          sheetsNeeded,
+          productSize,
+          layout,
+          numberOfStacks,
+          markupSettings,
+        );
+        operationCosts.push(printCost);
+        totalOperationsCost += printCost.totalCost;
+        totalSetupCost += printCost.setupCost;
+      }
+
       logger.info('🔧 Начинаем расчет операций', {
         operationsCount: operations.length,
         operations: operations.map(op => ({
