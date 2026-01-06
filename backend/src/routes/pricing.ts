@@ -1,10 +1,36 @@
 import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
+import { ServiceManagementService } from '../modules/pricing/services/serviceManagementService'
 
 console.log('Loading pricing routes...')
 
 const router = Router()
+
+const toServiceResponse = (service: any) => ({
+  id: service.id,
+  name: service.name,
+  type: service.type,
+  service_type: service.type,
+  unit: service.unit,
+  rate: service.rate,
+  price_per_unit: service.rate,
+  currency: service.currency ?? 'BYN',
+  isActive: service.isActive,
+  is_active: service.isActive,
+})
+
+const toTierResponse = (tier: any) => ({
+  id: tier.id,
+  serviceId: tier.serviceId,
+  service_id: tier.serviceId,
+  minQuantity: tier.minQuantity,
+  min_quantity: tier.minQuantity,
+  rate: tier.rate,
+  price_per_unit: tier.rate,
+  isActive: tier.isActive,
+  is_active: tier.isActive,
+})
 
 // Test route without authentication
 router.get('/test', (req: any, res: any) => {
@@ -148,33 +174,10 @@ router.get('/service-prices', asyncHandler(async (req, res) => {
   }
 }))
 
-// Alias: GET /api/pricing/services - список услуг (backward compatibility)
-router.get('/services', asyncHandler(async (req, res) => {
-  try {
-    const db = await getDb()
-    const servicePrices = await db.all<any>(`
-      SELECT
-        s.id,
-        s.name,
-        s.description,
-        s.price as price_per_unit,
-        s.unit,
-        s.operation_type,
-        s.price_unit,
-        s.setup_cost,
-        s.min_quantity,
-        s.is_active,
-        s.created_at,
-        s.updated_at
-      FROM post_processing_services s
-      WHERE s.is_active = 1
-      ORDER BY s.name
-    `)
-    res.json(servicePrices)
-  } catch (error) {
-    console.log('Service prices table not found, returning empty array')
-    res.json([])
-  }
+// Services API (новая система + совместимость с фронтом)
+router.get('/services', asyncHandler(async (_req, res) => {
+  const services = await ServiceManagementService.listServices()
+  res.json(services.map(toServiceResponse))
 }))
 
 // GET /api/pricing/markup-settings - настройки наценки
@@ -344,48 +347,83 @@ router.post('/service-prices', asyncHandler(async (req, res) => {
   }
 }))
 
-// Alias: POST /api/pricing/services - создать услугу (backward compatibility)
 router.post('/services', asyncHandler(async (req, res) => {
-  const { name, description, price_per_unit, unit, operation_type, price_unit, setup_cost, min_quantity } = req.body
+  const { name, service_type, type, unit, rate, currency, is_active, isActive } = req.body
+  const created = await ServiceManagementService.createService({
+    name,
+    type: (service_type ?? type) || 'generic',
+    unit,
+    rate: Number(rate ?? 0),
+    currency,
+    isActive: is_active !== undefined ? !!is_active : isActive,
+  })
+  res.status(201).json(toServiceResponse(created))
+}))
 
-  try {
-    const db = await getDb()
-    const result = await db.run(`
-      INSERT INTO post_processing_services (name, description, price, unit, operation_type, price_unit, setup_cost, min_quantity, is_active, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
-    `, [name, description || '', price_per_unit, unit || 'per_item', operation_type || 'general', price_unit || 'per_item', setup_cost || 0, min_quantity || 1])
+router.put('/services/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { name, service_type, type, unit, rate, is_active, isActive } = req.body
+  const updated = await ServiceManagementService.updateService(Number(id), {
+    name,
+    type: service_type ?? type,
+    unit,
+    rate: rate !== undefined ? Number(rate) : undefined,
+    isActive: is_active !== undefined ? !!is_active : isActive,
+  })
 
-    res.json({
-      id: result.lastID,
-      name,
-      description: description || '',
-      price_per_unit,
-      unit: unit || 'per_item',
-      operation_type: operation_type || 'general',
-      price_unit: price_unit || 'per_item',
-      setup_cost: setup_cost || 0,
-      min_quantity: min_quantity || 1,
-      is_active: 1,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
-  } catch (error) {
-    console.log('Service prices table not found, returning mock data')
-    res.json({
-      id: Date.now(),
-      name: name || 'Новая услуга',
-      description: description || '',
-      price_per_unit: price_per_unit || 0,
-      unit: unit || 'per_item',
-      operation_type: operation_type || 'general',
-      price_unit: price_unit || 'per_item',
-      setup_cost: setup_cost || 0,
-      min_quantity: min_quantity || 1,
-      is_active: 1,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
+  if (!updated) {
+    res.status(404).json({ success: false })
+    return
   }
+
+  res.json(toServiceResponse(updated))
+}))
+
+router.delete('/services/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  await ServiceManagementService.deleteService(Number(id))
+  res.json({ success: true })
+}))
+
+// --- Service volume tiers ---
+router.get('/services/:serviceId/tiers', asyncHandler(async (req, res) => {
+  const { serviceId } = req.params
+  const tiers = await ServiceManagementService.listServiceTiers(Number(serviceId))
+  res.json(tiers.map(toTierResponse))
+}))
+
+router.post('/services/:serviceId/tiers', asyncHandler(async (req, res) => {
+  const { serviceId } = req.params
+  const { min_quantity, minQuantity, price_per_unit, rate, is_active, isActive } = req.body
+  const tier = await ServiceManagementService.createServiceTier(Number(serviceId), {
+    minQuantity: Number(min_quantity ?? minQuantity ?? 0),
+    rate: Number(price_per_unit ?? rate ?? 0),
+    isActive: is_active !== undefined ? !!is_active : isActive,
+  })
+  res.status(201).json(toTierResponse(tier))
+}))
+
+router.put('/services/:serviceId/tiers/:tierId', asyncHandler(async (req, res) => {
+  const { tierId } = req.params
+  const { min_quantity, minQuantity, price_per_unit, rate, is_active, isActive } = req.body
+  const updated = await ServiceManagementService.updateServiceTier(Number(tierId), {
+    minQuantity: min_quantity ?? minQuantity,
+    rate: rate ?? price_per_unit,
+    isActive: is_active !== undefined ? !!is_active : isActive,
+  })
+
+  if (!updated) {
+    res.status(404).json({ success: false })
+    return
+  }
+
+  res.json(toTierResponse(updated))
+}))
+
+router.delete('/services/:serviceId/tiers/:tierId', asyncHandler(async (req, res) => {
+  const { tierId } = req.params
+  await ServiceManagementService.deleteServiceTier(Number(tierId))
+  res.json({ success: true })
 }))
 
 // POST /api/pricing/markup-settings - создать настройку наценки
