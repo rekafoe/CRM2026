@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { asyncHandler } from '../middleware'
+import { asyncHandler, AuthenticatedRequest } from '../middleware'
 import { getDb } from '../config/database'
 import { hashPassword } from '../utils'
 
@@ -98,6 +98,24 @@ router.delete('/:id', asyncHandler(async (req, res) => {
 router.post('/:id/reset-token', asyncHandler(async (req, res) => {
   const { id } = req.params
   const db = await getDb()
+
+  const actor = (req as AuthenticatedRequest).user
+  if (!actor) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const targetId = Number(id)
+  if (!Number.isFinite(targetId) || targetId <= 0) {
+    res.status(400).json({ message: 'Некорректный id пользователя' })
+    return
+  }
+
+  // Только админ или сам пользователь
+  if (actor.role !== 'admin' && actor.id !== targetId) {
+    res.status(403).json({ message: 'Недостаточно прав для сброса токена другого пользователя' })
+    return
+  }
 
   // Генерируем новый токен
   const newToken = require('crypto').randomBytes(32).toString('hex')

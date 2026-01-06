@@ -1,7 +1,7 @@
 // Компонент управления пользователями
 
 import React, { useState, useEffect } from 'react';
-import { User, getAllUsers, createUser, updateUser, deleteUser, resetUserToken } from '../../api';
+import { User, getAllUsers, createUser, updateUser, deleteUser, resetUserToken, getCurrentUser, setAuthToken } from '../../api';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { Alert } from '../../components/common';
 import './UserManagement.css';
@@ -17,10 +17,22 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showTokenModal, setShowTokenModal] = useState<User | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   useEffect(() => {
     loadUsers();
+    void loadCurrentUser();
   }, []);
+
+  const loadCurrentUser = async () => {
+    try {
+      const res = await getCurrentUser();
+      setCurrentUserId(res.data?.id ?? null);
+    } catch {
+      // если токена нет/просрочен — просто не будем пытаться авто-обновлять токен при reset-token
+      setCurrentUserId(null);
+    }
+  };
 
   const loadUsers = async () => {
     setIsLoading(true);
@@ -77,6 +89,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     try {
       setErrorMessage(null);
       const response = await resetUserToken(user.id);
+      // Если сбрасываем токен текущему пользователю — не ломаем сессию: обновляем token в storage
+      if (currentUserId && currentUserId === user.id) {
+        setAuthToken(response.data.api_token);
+      }
       alert(`Новый API токен для ${user.name}: ${response.data.api_token}`);
       setShowTokenModal(null);
     } catch (error: unknown) {

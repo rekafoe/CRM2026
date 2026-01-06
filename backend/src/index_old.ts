@@ -5,7 +5,7 @@ import path from 'path'
 import { initDB } from './config/database'
 import { config } from './config/app'
 import { uploadsDir } from './config/upload'
-import { authMiddleware, errorHandler } from './middleware'
+import { authMiddleware, errorHandler, asyncHandler } from './middleware'
 import { performanceMiddleware, performanceLoggingMiddleware } from './middleware/performance'
 import { compressionMiddleware } from './middleware/compression'
 import { cachePresets } from './middleware/httpCache'
@@ -15,6 +15,7 @@ import { StockMonitoringService } from './services/stockMonitoringService'
 import { AutoOrderService } from './services/autoOrderService'
 import { UserNotificationService } from './services/userNotificationService'
 import { logger } from './utils/logger'
+import { AuthController } from './controllers'
 
 // Load environment variables
 dotenv.config()
@@ -41,6 +42,9 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({ status: 'OK', service: 'crm-backend', timestamp: new Date().toISOString() })
 })
+
+// Backward compatibility: некоторые клиенты шлют POST /login вместо /api/auth/login
+app.post('/login', asyncHandler(AuthController.login))
 
 // Authentication middleware
 app.use(authMiddleware)

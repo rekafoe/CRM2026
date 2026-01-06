@@ -23,6 +23,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     // auth endpoints
     /^\/api\/auth\/login$/,
     /^\/api\/auth\/me$/,
+    // backward compat
+    /^\/login$/,
     // temporary for testing calculator
     /^\/api\/universal-calculator/,
     /^\/api\/materials\/test-calculator$/,
