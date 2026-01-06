@@ -12,6 +12,9 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   console.log(`🔍 Auth middleware: ${req.method} ${req.path}`);
   
   const openPaths = [
+    // infra / health
+    /^\/$/,
+    /^\/health$/,
     // public widget needs these
     /^\/api\/presets/,
     /^\/api\/orders\/[0-9]+\/items$/,

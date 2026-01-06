@@ -37,6 +37,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() })
 })
 
+// Root endpoint (before auth middleware) — нужен для Railway/внешних проверок и чтобы GET / не возвращал 401
+app.get('/', (req, res) => {
+  res.json({ status: 'OK', service: 'crm-backend', timestamp: new Date().toISOString() })
+})
+
 // Authentication middleware
 app.use(authMiddleware)
 
