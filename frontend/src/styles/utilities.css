@@ -260,14 +260,21 @@
 
 .btn-primary {
   /* Fallback важен: если themes.css/переменные не подгрузились, кнопка не должна стать "белая на белом" */
-  background-color: var(--accent-primary, #1976d2);
-  border-color: var(--accent-primary, #1976d2);
-  color: white;
+  background-color: var(--accent-primary, #1976d2) !important;
+  border-color: var(--accent-primary, #1976d2) !important;
+  color: #fff !important;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: var(--accent-secondary, #1565c0);
-  border-color: var(--accent-secondary, #1565c0);
+  background-color: var(--accent-secondary, #1565c0) !important;
+  border-color: var(--accent-secondary, #1565c0) !important;
+}
+
+.btn-primary:disabled {
+  /* В disabled состоянии кнопка всё равно должна быть читаемой */
+  background-color: var(--accent-light, #6c757d) !important;
+  border-color: var(--accent-light, #6c757d) !important;
+  color: #fff !important;
 }
 
 .btn-secondary {
