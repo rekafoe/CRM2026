@@ -60,12 +60,32 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   console.log(`🔍 Is open path: ${isOpenPath}`);
   
   if (isOpenPath) {
+    // Open path = анонимный доступ разрешён, но если токен передан — попробуем определить пользователя
+    // (нужно для админских действий на "частично открытых" эндпоинтах вроде /api/suppliers).
+    const auth = req.headers['authorization'] || ''
+    const token = typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice(7) : undefined
+
+    if (token) {
+      try {
+        const db = await getDb()
+        const user = await db.get<{ id: number; role: string }>(
+          'SELECT id, role FROM users WHERE api_token = ?',
+          token
+        )
+        if (user) {
+          ;(req as AuthenticatedRequest).user = user
+        }
+      } catch {
+        // игнорируем: для open-path не обязаны валидировать токен
+      }
+    }
+
     console.log(`✅ Allowing access to ${req.path}`);
     return next();
   }
   
   const auth = req.headers['authorization'] || ''
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : undefined
+  const token = typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice(7) : undefined
   
   if (!token) { 
     res.status(401).json({ message: 'Unauthorized' })
