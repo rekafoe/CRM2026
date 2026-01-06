@@ -49,6 +49,7 @@ type RawServiceRow = {
   service_name: string;
   service_type?: string;
   unit: string;
+  price_unit?: string;
   price_per_unit: number;
   is_active: number;
 };
@@ -106,11 +107,18 @@ export class PricingServiceRepository {
   }
 
   private static mapService(row: RawServiceRow): PricingServiceDTO {
+    const priceUnit = row.price_unit ?? 'per_item';
     return {
       id: row.id,
       name: row.service_name,
       type: row.service_type ?? 'generic',
-      unit: row.unit,
+      // Для обратной совместимости с фронтом: если цена "за рез/за лист/фикс" — показываем это в unit,
+      // потому что в UI поле unit сейчас совмещает unit и price_unit.
+      unit:
+        priceUnit && priceUnit !== 'per_item'
+          ? priceUnit
+          : row.unit,
+      priceUnit,
       rate: Number(row.price_per_unit ?? 0),
       currency: DEFAULT_CURRENCY,
       isActive: !!row.is_active,
@@ -136,6 +144,7 @@ export class PricingServiceRepository {
         name as service_name, 
         operation_type as service_type, 
         unit, 
+        price_unit,
         price as price_per_unit, 
         is_active 
       FROM post_processing_services 
@@ -153,6 +162,7 @@ export class PricingServiceRepository {
         name as service_name, 
         operation_type as service_type, 
         unit, 
+        price_unit,
         price as price_per_unit, 
         is_active 
       FROM post_processing_services 
@@ -172,12 +182,20 @@ export class PricingServiceRepository {
       err.status = 400;
       throw err;
     }
+    // Совместимость с UI: если payload.unit содержит per_cut/per_sheet/... — это на самом деле price_unit
+    const rawUnit = (payload.unit ?? '').toString();
+    const rawPriceUnit = (payload.priceUnit ?? '').toString();
+    const isPriceUnitFromUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(rawUnit);
+    const resolvedPriceUnit = rawPriceUnit || (isPriceUnitFromUnit ? rawUnit : 'per_item');
+    const resolvedUnit = isPriceUnitFromUnit ? 'шт' : rawUnit;
+
     const result = await db.run(
-      `INSERT INTO post_processing_services (name, operation_type, unit, price, is_active) 
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO post_processing_services (name, operation_type, unit, price_unit, price, is_active) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
       payload.name,
       operationType,
-      payload.unit,
+      resolvedUnit,
+      resolvedPriceUnit,
       Number(payload.rate ?? 0),
       payload.isActive === undefined || payload.isActive ? 1 : 0,
     );
@@ -187,6 +205,7 @@ export class PricingServiceRepository {
         name as service_name, 
         operation_type as service_type, 
         unit, 
+        price_unit,
         price as price_per_unit, 
         is_active 
       FROM post_processing_services 
@@ -218,13 +237,22 @@ export class PricingServiceRepository {
       throw err;
     }
 
+    const rawUnit = payload.unit !== undefined ? String(payload.unit) : '';
+    const rawPriceUnit = payload.priceUnit !== undefined ? String(payload.priceUnit) : '';
+    const isPriceUnitFromUnit = rawUnit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(rawUnit) : false;
+    const resolvedPriceUnit = rawPriceUnit || (isPriceUnitFromUnit ? rawUnit : (current.price_unit ?? 'per_item'));
+    const resolvedUnit = isPriceUnitFromUnit
+      ? (current.unit ?? 'шт')
+      : (payload.unit ?? current.unit);
+
     await db.run(
       `UPDATE post_processing_services 
-       SET name = ?, operation_type = ?, unit = ?, price = ?, is_active = ? 
+       SET name = ?, operation_type = ?, unit = ?, price_unit = ?, price = ?, is_active = ? 
        WHERE id = ?`,
       payload.name ?? current.name,
       operationType,
-      payload.unit ?? current.unit,
+      resolvedUnit,
+      resolvedPriceUnit,
       payload.rate !== undefined ? payload.rate : current.price,
       payload.isActive !== undefined ? (payload.isActive ? 1 : 0) : current.is_active,
       id,
@@ -236,6 +264,7 @@ export class PricingServiceRepository {
         name as service_name, 
         operation_type as service_type, 
         unit, 
+        price_unit,
         price as price_per_unit, 
         is_active 
       FROM post_processing_services 

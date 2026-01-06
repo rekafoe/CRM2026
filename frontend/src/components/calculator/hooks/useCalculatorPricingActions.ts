@@ -133,7 +133,13 @@ export function useCalculatorPricingActions({
           }
         } else if (specs.format) {
           // Парсим format строку в trim_size
-          const parsed = parseFormatToTrimSize(specs.format);
+          // Для визиток формат в UI может быть A4/A5 (как формат листа), но trim_size должен быть размером изделия.
+          // Поэтому для business_cards парсим только если формат выглядит как "90×50"/"90x50" или custom.
+          const looksLikeNumericSize = /(\d+)\s*[×x]\s*(\d+)/.test(specs.format);
+          const parsed =
+            resolvedType === 'business_cards' && !looksLikeNumericSize
+              ? null
+              : parseFormatToTrimSize(specs.format);
           if (parsed) {
             trimSize = parsed;
             logger.info('📐 Парсим format в trim_size', { format: specs.format, trimSize: parsed });

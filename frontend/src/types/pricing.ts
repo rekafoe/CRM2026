@@ -5,6 +5,7 @@ export interface PricingService {
   name: string;
   type: PricingServiceType;
   unit: string;
+  priceUnit?: string;
   rate: number;
   isActive: boolean;
 }
@@ -27,6 +28,7 @@ export interface CreatePricingServicePayload {
   name: string;
   type: PricingServiceType;
   unit: string;
+  priceUnit?: string;
   rate: number;
   isActive?: boolean;
 }

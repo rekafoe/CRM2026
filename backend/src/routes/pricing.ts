@@ -13,6 +13,7 @@ const toServiceResponse = (service: any) => ({
   type: service.type,
   service_type: service.type,
   unit: service.unit,
+  price_unit: service.priceUnit,
   rate: service.rate,
   price_per_unit: service.rate,
   currency: service.currency ?? 'BYN',
@@ -348,11 +349,12 @@ router.post('/service-prices', asyncHandler(async (req, res) => {
 }))
 
 router.post('/services', asyncHandler(async (req, res) => {
-  const { name, service_type, type, unit, rate, currency, is_active, isActive } = req.body
+  const { name, service_type, type, unit, price_unit, priceUnit, rate, currency, is_active, isActive } = req.body
   const created = await ServiceManagementService.createService({
     name,
     type: (service_type ?? type) || 'generic',
     unit,
+    priceUnit: price_unit ?? priceUnit,
     rate: Number(rate ?? 0),
     currency,
     isActive: is_active !== undefined ? !!is_active : isActive,
@@ -362,11 +364,12 @@ router.post('/services', asyncHandler(async (req, res) => {
 
 router.put('/services/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { name, service_type, type, unit, rate, is_active, isActive } = req.body
+  const { name, service_type, type, unit, price_unit, priceUnit, rate, is_active, isActive } = req.body
   const updated = await ServiceManagementService.updateService(Number(id), {
     name,
     type: service_type ?? type,
     unit,
+    priceUnit: price_unit ?? priceUnit,
     rate: rate !== undefined ? Number(rate) : undefined,
     isActive: is_active !== undefined ? !!is_active : isActive,
   })

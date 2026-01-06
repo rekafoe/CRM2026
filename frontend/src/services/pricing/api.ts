@@ -33,6 +33,7 @@ const mapService = (svc: any): PricingService => ({
   name: svc.service_name ?? svc.name ?? '',
   type: svc.service_type ?? svc.type ?? 'generic',
   unit: svc.unit ?? '',
+  priceUnit: svc.price_unit ?? svc.priceUnit,
   rate: Number(svc.price_per_unit ?? svc.rate ?? 0),
   isActive: svc.is_active !== undefined ? !!svc.is_active : true,
 });
@@ -53,10 +54,16 @@ export async function getPricingServices(): Promise<PricingService[]> {
 }
 
 export async function createPricingService(payload: CreatePricingServicePayload): Promise<PricingService> {
+  // Совместимость с существующей формой: поле unit в UI иногда содержит per_cut/per_sheet (это price_unit)
+  const isPriceUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(payload.unit);
+  const resolvedUnit = isPriceUnit ? 'item' : payload.unit;
+  const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
+
   const response = await api.post('/pricing/services', {
     name: payload.name,
     service_type: payload.type,
-    unit: payload.unit,
+    unit: resolvedUnit,
+    price_unit: resolvedPriceUnit,
     rate: payload.rate,
     is_active: payload.isActive ?? true,
   });
@@ -65,10 +72,15 @@ export async function createPricingService(payload: CreatePricingServicePayload)
 }
 
 export async function updatePricingService(id: number, payload: UpdatePricingServicePayload): Promise<PricingService> {
+  const isPriceUnit = payload.unit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(payload.unit) : false;
+  const resolvedUnit = payload.unit ? (isPriceUnit ? 'item' : payload.unit) : undefined;
+  const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
+
   const response = await api.put(`/pricing/services/${id}`, {
     name: payload.name,
     service_type: payload.type,
-    unit: payload.unit,
+    unit: resolvedUnit,
+    price_unit: resolvedPriceUnit,
     rate: payload.rate,
     is_active: payload.isActive,
   });

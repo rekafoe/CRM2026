@@ -34,7 +34,7 @@ const emptyServiceForm: ServiceFormState = {
 const serviceToFormState = (service: PricingService): ServiceFormState => ({
   name: service.name,
   type: service.type,
-  unit: service.unit,
+  unit: service.priceUnit ?? service.unit,
   rate: service.rate.toString(),
   isActive: service.isActive,
 });

@@ -176,16 +176,21 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
 
   const availableFormats = useMemo(() => {
     const schemaFormats = backendProductSchema?.fields?.find((f: any) => f.name === 'format')?.enum;
+    if (productType === 'business_cards') {
+      // Для визиток формат = размер изделия, а не A4/A5
+      return ['90×50', '85×55', '90×45', 'custom'];
+    }
     if (Array.isArray(schemaFormats) && schemaFormats.length) return schemaFormats as string[];
     if (currentConfig?.formats?.length) return currentConfig.formats as string[];
     return ['A4'];
-  }, [backendProductSchema, currentConfig]);
+  }, [backendProductSchema, currentConfig, productType]);
 
   const getDefaultFormat = useCallback((): string => {
+    if (productType === 'business_cards') return '90×50';
     const enumFormats = backendProductSchema?.fields?.find((f: any) => f.name === 'format')?.enum;
     if (Array.isArray(enumFormats) && enumFormats.length) return enumFormats[0];
     return 'A4';
-  }, [backendProductSchema]);
+  }, [backendProductSchema, productType]);
 
   return {
     backendProductTypes,

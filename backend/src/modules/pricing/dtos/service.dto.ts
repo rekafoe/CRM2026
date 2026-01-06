@@ -3,6 +3,7 @@ export interface PricingServiceDTO {
   name: string;
   type: string;
   unit: string;
+  priceUnit?: string;
   rate: number;
   currency?: string;
   isActive: boolean;
@@ -12,6 +13,7 @@ export interface CreatePricingServiceDTO {
   name: string;
   type?: string;
   unit: string;
+  priceUnit?: string;
   rate: number;
   currency?: string;
   isActive?: boolean;
@@ -21,6 +23,7 @@ export interface UpdatePricingServiceDTO {
   name?: string;
   type?: string;
   unit?: string;
+  priceUnit?: string;
   rate?: number;
   currency?: string;
   isActive?: boolean;
