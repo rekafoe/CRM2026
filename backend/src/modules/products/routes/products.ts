@@ -601,7 +601,8 @@ router.get('/:productId/schema', async (req, res) => {
         print_run: templateConfigData?.print_run || null, // Ограничения тиража (enabled, min, max)
         finishing: templateConfigData?.finishing || null, // Отделка
         packaging: templateConfigData?.packaging || null, // Упаковка
-        price_rules: templateConfigData?.price_rules || null // Правила ценообразования
+        price_rules: templateConfigData?.price_rules || null, // Правила ценообразования
+        simplified: templateConfigData?.simplified || null, // 🆕 Упрощённый калькулятор (конфиг по размерам)
       },
       constraints: {
         allowed_paper_types: allowedPaperTypes || null, // Разрешенные типы бумаги

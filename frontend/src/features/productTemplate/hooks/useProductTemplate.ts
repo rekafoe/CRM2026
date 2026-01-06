@@ -2,6 +2,29 @@ import { useReducer } from 'react'
 
 export type PriceRule = { min_qty: number; max_qty?: number; unit_price?: number; discount_percent?: number }
 
+export type SimplifiedQtyTier = { min_qty: number; max_qty?: number; price: number }
+export type SimplifiedPrintKey = { technology_code: string; color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex' | 'duplex_bw_back' }
+export type SimplifiedPrintPrice = SimplifiedPrintKey & { tiers: SimplifiedQtyTier[] }
+export type SimplifiedMaterialPrice = { material_id: number; tiers: SimplifiedQtyTier[] }
+export type SimplifiedFinishingPrice = {
+  service_id: number;
+  price_unit: 'per_cut' | 'per_item';
+  units_per_item: number; // сколько "резов/бигов/фальцев" на изделие
+  tiers: SimplifiedQtyTier[];
+}
+export type SimplifiedSizeConfig = {
+  id: string;
+  label: string;
+  width_mm: number;
+  height_mm: number;
+  default_print?: Partial<SimplifiedPrintKey>;
+  print_prices: SimplifiedPrintPrice[];
+  allowed_material_ids: number[];
+  material_prices: SimplifiedMaterialPrice[];
+  finishing: SimplifiedFinishingPrice[];
+}
+export type SimplifiedConfig = { sizes: SimplifiedSizeConfig[] }
+
 export interface TemplateState {
   meta: { name: string; description: string; icon: string }
   trim_size: { width: string; height: string }
@@ -23,6 +46,7 @@ export interface TemplateState {
   packaging: Array<{ name: string }>
   print_run: { enabled: boolean; min: number | ''; max: number | '' }
   price_rules: PriceRule[]
+  simplified: SimplifiedConfig
   test: { qty: number; params: Record<string, any>; paramsJson: string }
 }
 
@@ -36,6 +60,7 @@ type Action =
   | { type: 'setMaterialsConstraints'; patch: Partial<TemplateState['constraints']['materials']> }
   | { type: 'setOverrides'; patch: Partial<TemplateState['constraints']['overrides']> }
   | { type: 'setRules'; value: PriceRule[] }
+  | { type: 'setSimplified'; value: SimplifiedConfig }
   | { type: 'addRule'; rule: PriceRule }
   | { type: 'updateRule'; index: number; patch: Partial<PriceRule> }
   | { type: 'removeRule'; index: number }
@@ -63,6 +88,8 @@ function reducer(state: TemplateState, action: Action): TemplateState {
       return { ...state, print_run: { ...state.print_run, ...action.patch } }
     case 'setRules':
       return { ...state, price_rules: action.value }
+    case 'setSimplified':
+      return { ...state, simplified: action.value }
     case 'addRule':
       return { ...state, price_rules: [...state.price_rules, action.rule] }
     case 'updateRule':
@@ -93,6 +120,7 @@ export function useProductTemplateInitial(): TemplateState {
     packaging: [],
     print_run: { enabled: false, min: '', max: '' },
     price_rules: [],
+    simplified: { sizes: [] },
     test: { qty: 100, params: {}, paramsJson: '{}' }
   }
 }

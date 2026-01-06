@@ -21,6 +21,7 @@ import useProductTemplatePage from './hooks/useProductTemplatePage';
 import { useProductOperations } from './hooks/useProductOperations';
 import { PrintTab, ProductPrintSettings } from '../../pages/admin/product-edit/PrintTab';
 import { updateProduct } from '../../services/products';
+import { SimplifiedTemplateSection } from './components/SimplifiedTemplateSection';
 
 
 const ProductTemplatePage: React.FC = () => {
@@ -258,121 +259,138 @@ const ProductTemplatePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Локальные вкладки для разделения основных настроек, материалов и тиража */}
-      <div className="product-tabs">
-        <button
-          type="button"
-          className={`product-tab ${activeTab === 'main' ? 'product-tab--active' : ''}`}
-          onClick={() => setActiveTab('main')}
-        >
-          Основные настройки
-        </button>
-        <button
-          type="button"
-          className={`product-tab ${activeTab === 'run' ? 'product-tab--active' : ''}`}
-          onClick={() => setActiveTab('run')}
-        >
-          Тираж
-        </button>
-        <button
-          type="button"
-          className={`product-tab ${activeTab === 'operations' ? 'product-tab--active' : ''}`}
-          onClick={() => setActiveTab('operations')}
-        >
-          Операции и цена
-        </button>
-        <button
-          type="button"
-          className={`product-tab ${activeTab === 'materials' ? 'product-tab--active' : ''}`}
-          onClick={() => setActiveTab('materials')}
-        >
-          Материалы
-        </button>
-        <button
-          type="button"
-          className={`product-tab ${activeTab === 'print' ? 'product-tab--active' : ''}`}
-          onClick={() => setActiveTab('print')}
-        >
-          Печать
-        </button>
-      </div>
+      {product?.calculator_type === 'simplified' ? (
+        <div className="product-template__body product-template__body--simplified">
+          <section className="product-template__main">
+            {loading && <Alert type="info">Загружаем данные шаблона…</Alert>}
+            {!loading && (
+              <SimplifiedTemplateSection
+                value={state.simplified}
+                onChange={(next) => dispatch({ type: 'setSimplified', value: next })}
+                onSave={() => void persistTemplateConfig('Шаблон упрощённого калькулятора сохранён')}
+                saving={saving}
+                allMaterials={allMaterials as any}
+              />
+            )}
+          </section>
+        </div>
+      ) : (
+      <>
+        {/* Локальные вкладки для разделения основных настроек, материалов и тиража */}
+        <div className="product-tabs">
+          <button
+            type="button"
+            className={`product-tab ${activeTab === 'main' ? 'product-tab--active' : ''}`}
+            onClick={() => setActiveTab('main')}
+          >
+            Основные настройки
+          </button>
+          <button
+            type="button"
+            className={`product-tab ${activeTab === 'run' ? 'product-tab--active' : ''}`}
+            onClick={() => setActiveTab('run')}
+          >
+            Тираж
+          </button>
+          <button
+            type="button"
+            className={`product-tab ${activeTab === 'operations' ? 'product-tab--active' : ''}`}
+            onClick={() => setActiveTab('operations')}
+          >
+            Операции и цена
+          </button>
+          <button
+            type="button"
+            className={`product-tab ${activeTab === 'materials' ? 'product-tab--active' : ''}`}
+            onClick={() => setActiveTab('materials')}
+          >
+            Материалы
+          </button>
+          <button
+            type="button"
+            className={`product-tab ${activeTab === 'print' ? 'product-tab--active' : ''}`}
+            onClick={() => setActiveTab('print')}
+          >
+            Печать
+          </button>
+        </div>
 
-      {notFound && (
-        <Alert type="error">Продукт не найден или недоступен.</Alert>
-      )}
+        {notFound && (
+          <Alert type="error">Продукт не найден или недоступен.</Alert>
+        )}
 
-      <div className="product-template__body">
-        <aside className="product-template__sidebar">
-          <div className="template-summary-card">
-            <div className="template-summary-card__icon">{state.meta.icon || product?.icon || '📦'}</div>
-            <div className="template-summary-card__name">{state.meta.name || product?.name || 'Без названия'}</div>
-            <ul className="template-summary-card__list">
-              {summaryStats.map((item) => (
-                <li key={item.label}>
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                </li>
-              ))}
-            </ul>
-            <div className="template-summary-card__meta">
-              Создан: {product?.created_at ? new Date(product.created_at).toLocaleDateString() : '—'}
-            </div>
+        <div className="product-template__body">
+          <aside className="product-template__sidebar">
+            <div className="template-summary-card">
+              <div className="template-summary-card__icon">{state.meta.icon || product?.icon || '📦'}</div>
+              <div className="template-summary-card__name">{state.meta.name || product?.name || 'Без названия'}</div>
+              <ul className="template-summary-card__list">
+                {summaryStats.map((item) => (
+                  <li key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </li>
+                ))}
+              </ul>
+              <div className="template-summary-card__meta">
+                Создан: {product?.created_at ? new Date(product.created_at).toLocaleDateString() : '—'}
               </div>
+                </div>
 
-          {productId && (
-            <ProductSetupStatus 
-              productId={productId}
-              onStatusChange={() => {
-                // Можно добавить обновление данных продукта при изменении статуса
-                console.log('Setup status changed');
-              }}
-            />
-          )}
+            {productId && (
+              <ProductSetupStatus 
+                productId={productId}
+                onStatusChange={() => {
+                  // Можно добавить обновление данных продукта при изменении статуса
+                  console.log('Setup status changed');
+                }}
+              />
+            )}
 
-        </aside>
+          </aside>
 
-        <section className="product-template__main">
-          {loading && <Alert type="info">Загружаем данные шаблона…</Alert>}
-          {!loading && (
-            <>
-              {loadingLists && <Alert type="info">Обновляем связанные списки…</Alert>}
-              {/* Основные секции */}
-              {activeTab === 'main' && (
-                <div className="template-sections-list">
-                  {/* Секция: Формат в сложенном виде */}
-                  <div className="template-section template-section--trim" id="section-format">
-                    <div className="template-section__header">
-                      <h3 className="template-section__title">Формат в сложенном виде</h3>
-                    </div>
-                    <div className="template-section__content">
-                      <TrimSizeSection
-                        trimWidth={trimWidth}
-                        trimHeight={trimHeight}
-                        saving={saving}
-                        existingFormats={(() => {
-                          // Извлекаем список форматов из параметра "format"
-                          const formatParam = parameters.find(p => p.name === 'format');
-                          if (formatParam && formatParam.options) {
-                            if (Array.isArray(formatParam.options)) {
-                              return formatParam.options;
+          <section className="product-template__main">
+            {loading && <Alert type="info">Загружаем данные шаблона…</Alert>}
+            {!loading && (
+              <>
+                {loadingLists && <Alert type="info">Обновляем связанные списки…</Alert>}
+                {/* Основные секции */}
+                {activeTab === 'main' && (
+                  <div className="template-sections-list">
+                    {/* Секция: Формат в сложенном виде */}
+                    <div className="template-section template-section--trim" id="section-format">
+                      <div className="template-section__header">
+                        <h3 className="template-section__title">Формат в сложенном виде</h3>
+                      </div>
+                      <div className="template-section__content">
+                        <TrimSizeSection
+                          trimWidth={trimWidth}
+                          trimHeight={trimHeight}
+                          saving={saving}
+                          existingFormats={(() => {
+                            // Извлекаем список форматов из параметра "format"
+                            const formatParam = parameters.find(p => p.name === 'format');
+                            if (formatParam && formatParam.options) {
+                              if (Array.isArray(formatParam.options)) {
+                                return formatParam.options;
+                              }
+                              // Если options - строка, пытаемся распарсить
+                              try {
+                                const parsed = typeof formatParam.options === 'string' 
+                                  ? JSON.parse(formatParam.options) 
+                                  : formatParam.options;
+                                return Array.isArray(parsed) ? parsed : [];
+                              } catch {
+                                return [];
+                              }
                             }
-                            // Если options - строка, пытаемся распарсить
-                            try {
-                              const parsed = typeof formatParam.options === 'string' 
-                                ? JSON.parse(formatParam.options) 
-                                : formatParam.options;
-                              return Array.isArray(parsed) ? parsed : [];
-                            } catch {
-                              return [];
-                            }
-                          }
-                          return [];
-                        })()}
-                        onChange={(field, value) => dispatch({ type: 'setTrim', field, value })}
-                        onSave={() => void persistTrimSizeWithFormat('Формат сохранён и добавлен в параметры калькулятора')}
-                      />
+                            return [];
+                          })()}
+                          onChange={(field, value) => dispatch({ type: 'setTrim', field, value })}
+                          onSave={() => void persistTrimSizeWithFormat('Формат сохранён и добавлен в параметры калькулятора')}
+                        />
+                      </div>
                     </div>
-                  </div>
 
                   {/* Секция: Параметры продукта */}
                   <div className="template-section template-section--parameters" id="section-parameters">
@@ -536,6 +554,8 @@ const ProductTemplatePage: React.FC = () => {
           )}
         </section>
       </div>
+      </>
+      )}
 
       <Modal
         isOpen={showMetaModal}

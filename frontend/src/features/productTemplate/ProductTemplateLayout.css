@@ -141,6 +141,10 @@
   align-items: flex-start;
 }
 
+.product-template__body--simplified {
+  grid-template-columns: 1fr;
+}
+
 .product-template__sidebar {
   display: grid;
   gap: 12px;

@@ -1,0 +1,236 @@
+.simplified-template {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.simplified-template__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.simplified-template__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.simplified-template__grid {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+}
+
+.simplified-template__sizes {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  background: var(--bg-secondary, #fff);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.simplified-template__sizes-title {
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  padding: 6px 8px;
+}
+
+.simplified-size {
+  text-align: left;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg-primary, #fff);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.simplified-size:hover {
+  background: var(--bg-hover, #f9fafb);
+}
+
+.simplified-size--active {
+  border-color: var(--accent-primary, #1976d2);
+  background: rgba(25, 118, 210, 0.08);
+}
+
+.simplified-size__label {
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.simplified-size__meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.simplified-template__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.simplified-card {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  background: var(--bg-secondary, #fff);
+}
+
+.simplified-card__header {
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.simplified-card__content {
+  padding: 12px 14px;
+}
+
+.simplified-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.simplified-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.simplified-row {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--bg-primary, #fff);
+}
+
+.simplified-row__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.simplified-row__title {
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.simplified-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.simplified-row__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.simplified-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.simplified-tier {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.simplified-tier__range {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.simplified-tier__dash {
+  color: var(--text-secondary, #6b7280);
+}
+
+.simplified-tier__price {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.simplified-materials {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.simplified-materials__group-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.simplified-materials__items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.simplified-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  background: var(--bg-primary, #fff);
+  cursor: pointer;
+}
+
+.simplified-checkbox--checked {
+  border-color: var(--accent-primary, #1976d2);
+  background: rgba(25, 118, 210, 0.06);
+}
+
+.simplified-add-size {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.simplified-add-size__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+@media (max-width: 1100px) {
+  .simplified-template__grid {
+    grid-template-columns: 1fr;
+  }
+  .simplified-form-grid,
+  .simplified-row__grid {
+    grid-template-columns: 1fr;
+  }
+  .simplified-tier {
+    grid-template-columns: 1fr;
+  }
+  .simplified-materials__items {
+    grid-template-columns: 1fr;
+  }
+}
+
+

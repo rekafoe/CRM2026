@@ -223,6 +223,11 @@ export default function useProductTemplatePage(productId: number | undefined): U
             })
           }
 
+          // 🆕 Упрощённый калькулятор (конфиг по размерам)
+          if (cfgData.simplified && typeof cfgData.simplified === 'object') {
+            dispatch({ type: 'setSimplified', value: cfgData.simplified as any })
+          }
+
           if (constraints.print_sheet) {
             const sheet = constraints.print_sheet
             if (typeof sheet === 'string') {
@@ -308,8 +313,9 @@ export default function useProductTemplatePage(productId: number | undefined): U
       min: state.print_run.min || undefined,
       max: state.print_run.max || undefined
     },
-    price_rules: state.price_rules
-  }), [state.trim_size.width, state.trim_size.height, state.finishing, state.packaging, state.print_run.enabled, state.print_run.min, state.print_run.max, state.price_rules])
+    price_rules: state.price_rules,
+    simplified: state.simplified
+  }), [state.trim_size.width, state.trim_size.height, state.finishing, state.packaging, state.print_run.enabled, state.print_run.min, state.print_run.max, state.price_rules, state.simplified])
 
   const buildConstraints = useCallback(() => ({
     print_sheet: state.print_sheet.preset
