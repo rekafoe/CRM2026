@@ -378,8 +378,12 @@ export class FlexiblePricingService {
       const markup = await this.getBaseMarkup();
       const priceWithMarkup = subtotal * markup;
 
-      // 8. Применяем скидку за тираж
-      const discountPercent = await this.getQuantityDiscount(sheetsNeeded, quantity, productType);
+      // 8. Применяем скидку за тираж / объём печати
+      const isSra3 =
+        !!layout?.recommendedSheetSize &&
+        ((layout.recommendedSheetSize.width === 320 && layout.recommendedSheetSize.height === 450) ||
+          (layout.recommendedSheetSize.width === 450 && layout.recommendedSheetSize.height === 320));
+      const discountPercent = await this.getQuantityDiscount(sheetsNeeded, quantity, productType, isSra3 ? 'SRA3' : undefined);
       const discountAmount = priceWithMarkup * (discountPercent / 100);
       let finalPrice = priceWithMarkup - discountAmount;
       let pricePerUnit = finalPrice / quantity;
@@ -1351,12 +1355,26 @@ export class FlexiblePricingService {
   /**
    * Получает скидку за тираж из БД
    */
-  private static async getQuantityDiscount(sheetsCount: number, itemsCount: number, productType?: string): Promise<number> {
+  private static async getQuantityDiscount(
+    sheetsCount: number,
+    itemsCount: number,
+    productType?: string,
+    sheetFormat?: 'SRA3'
+  ): Promise<number> {
     const db = await getDb();
 
-    // Для листовых продуктов скидки не применяются, цена определяется листами печати
+    // Для листовых продуктов скидки применяем как "скидки за объём печати" по количеству листов (например SRA3)
     if (this.isSheetBasedProduct(productType)) {
-      return 0;
+      if (sheetFormat !== 'SRA3') return 0;
+      const discount = await db.get(`
+        SELECT discount_percent FROM quantity_discounts
+        WHERE min_quantity <= ?
+          AND (max_quantity IS NULL OR max_quantity >= ?)
+          AND is_active = 1
+        ORDER BY min_quantity DESC
+        LIMIT 1
+      `, [sheetsCount, sheetsCount]);
+      return discount?.discount_percent || 0;
     }
 
     // Для многостраничных и других продуктов скидки применяются по количеству изделий/экземпляров

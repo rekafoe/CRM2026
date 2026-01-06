@@ -303,6 +303,24 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
     });
   }, []);
 
+  const handleAddQuantityDiscount = useCallback(() => {
+    setEditingItem({
+      id: -1,
+      min_quantity: 1,
+      max_quantity: null,
+      discount_percent: 0,
+      description: 'Скидка за объём печати (листы SRA3)',
+      is_active: 1,
+      type: 'quantity-discounts',
+    } as any);
+    setEditingValues({
+      min_quantity: 1,
+      max_quantity: '',
+      discount_percent: 0,
+      is_active: 1,
+    });
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!editingItem) return;
 
@@ -318,7 +336,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
       const { type, id } = editingItem;
       const endpoint = getUpdateEndpoint(type);
       
-      if (type === 'print-prices' && id === -1) {
+      if ((type === 'print-prices' || type === 'quantity-discounts' || type === 'markup-settings') && id === -1) {
         await api.post(endpoint, editingValues);
       } else {
       await api.put(`${endpoint}/${id}`, editingValues);
@@ -529,6 +547,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
                 onEdit={handleEdit}
                 onSave={handleSave}
                 onCancel={handleCancel}
+                onAddNew={handleAddQuantityDiscount}
                 getEditingValue={getEditingValue}
                 updateEditingValue={updateEditingValue}
               />

@@ -11,6 +11,7 @@ interface DiscountsTabProps {
   onEdit: (item: QuantityDiscount, type: PricingItemType) => void;
   onSave: () => Promise<void>;
   onCancel: () => void;
+  onAddNew?: () => void;
   getEditingValue: (key: string) => string | number;
   updateEditingValue: (key: string, value: string | number) => void;
 }
@@ -37,6 +38,7 @@ const DiscountsTabComponent: React.FC<DiscountsTabProps> = ({
   onEdit,
   onSave,
   onCancel,
+  onAddNew,
   getEditingValue,
   updateEditingValue,
 }) => {
@@ -53,11 +55,27 @@ const DiscountsTabComponent: React.FC<DiscountsTabProps> = ({
     updateEditingValue('discount_percent', parseFloat(e.target.value) || 0);
   }, [updateEditingValue]);
 
+  const handleMinChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    updateEditingValue('min_quantity', parseInt(e.target.value || '0', 10) || 0);
+  }, [updateEditingValue]);
+
+  const handleMaxChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    updateEditingValue('max_quantity', raw === '' ? '' : (parseInt(raw, 10) || ''));
+  }, [updateEditingValue]);
+
   return (
     <div className="pricing-section">
       <div className="section-header">
         <h3>Скидки за объем печати</h3>
         <p>Управление скидками в зависимости от количества</p>
+        {onAddNew && (
+          <div className="mt-2">
+            <Button variant="primary" size="sm" onClick={onAddNew}>
+              ➕ Добавить скидку
+            </Button>
+          </div>
+        )}
       </div>
 
       {filteredItems.length === 0 ? (
@@ -93,6 +111,34 @@ const DiscountsTabComponent: React.FC<DiscountsTabProps> = ({
               
               <div className="card-content">
                 <div className="field-group">
+                  <FormField label="Диапазон листов SRA3">
+                    {editingItem?.id === item.id ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={getEditingValue('min_quantity')}
+                          onChange={handleMinChange}
+                          className="form-control"
+                        />
+                        <input
+                          type="number"
+                          min=""
+                          step="1"
+                          placeholder="∞"
+                          value={getEditingValue('max_quantity')}
+                          onChange={handleMaxChange}
+                          className="form-control"
+                        />
+                      </div>
+                    ) : (
+                      <span className="field-value">
+                        {item.min_quantity} – {item.max_quantity || '∞'} листов
+                      </span>
+                    )}
+                  </FormField>
+
                   <FormField label="Процент скидки">
                     {editingItem?.id === item.id ? (
                       <input
