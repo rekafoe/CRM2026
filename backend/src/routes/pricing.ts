@@ -198,7 +198,7 @@ async function ensureMarkupDefaults(db: any): Promise<void> {
   // Если таблица уже существовала (старая схема) — нужные колонки могли отсутствовать.
   // Пример: markup_settings без description => SQLITE_ERROR: no column named description
   try {
-    const cols = await db.all<{ name: string }[]>(`PRAGMA table_info(markup_settings)`)
+    const cols = await db.all(`PRAGMA table_info(markup_settings)`) as Array<{ name?: string }>
     const has = (name: string) => Array.isArray(cols) && cols.some(c => c?.name === name)
 
     if (!has('description')) await db.exec(`ALTER TABLE markup_settings ADD COLUMN description TEXT`)
