@@ -115,7 +115,6 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
             value={categoryId ?? ''}
             onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">Без категории</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -197,7 +196,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
           <Button
             variant="primary"
             onClick={handleSubmit}
-            disabled={submitting || !name.trim()}
+            disabled={submitting || !name.trim() || categories.length === 0}
           >
             {submitting ? 'Создание...' : 'Создать продукт'}
           </Button>

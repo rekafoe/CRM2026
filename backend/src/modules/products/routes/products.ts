@@ -1132,10 +1132,52 @@ router.post('/', async (req, res) => {
     const { category_id, name, description, icon, calculator_type, product_type } = req.body;
     const db = await getDb();
 
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      res.status(400).json({ error: 'Поле name обязательно' });
+      return;
+    }
+
+    // category_id обязателен (NOT NULL + FK). Если категорий нет — создаём системную дефолтную.
+    let resolvedCategoryId: number | null = typeof category_id === 'number' ? category_id : null;
+
+    if (resolvedCategoryId !== null) {
+      const exists = await db.get(`SELECT id FROM product_categories WHERE id = ?`, [resolvedCategoryId]);
+      if (!exists) {
+        res.status(400).json({ error: 'Категория не найдена' });
+        return;
+      }
+    } else {
+      const first = await db.get<{ id: number }>(`SELECT id FROM product_categories ORDER BY sort_order, id LIMIT 1`);
+      if (first?.id) {
+        resolvedCategoryId = first.id;
+      } else {
+        const insert = await db.run(
+          `
+          INSERT INTO product_categories (name, icon, description, sort_order, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, 0, 1, datetime('now'), datetime('now'))
+        `,
+          ['Без категории', '📦', 'Системная категория по умолчанию']
+        );
+        resolvedCategoryId = insert.lastID ?? null;
+      }
+    }
+
+    if (resolvedCategoryId === null) {
+      res.status(500).json({ error: 'Не удалось определить категорию продукта' });
+      return;
+    }
+
     const result = await db.run(`
       INSERT INTO products (category_id, name, description, icon, calculator_type, product_type)
       VALUES (?, ?, ?, ?, ?, ?)
-    `, [category_id, name, description, icon, calculator_type || 'product', product_type || 'sheet_single']);
+    `, [
+      resolvedCategoryId,
+      name.trim(),
+      description ?? null,
+      icon ?? null,
+      calculator_type || 'product',
+      product_type || 'sheet_single',
+    ]);
 
     // Автоматически создаем операции на основе типа продукта
     if (product_type) {
@@ -1145,8 +1187,8 @@ router.post('/', async (req, res) => {
 
     res.json({
       id: result.lastID,
-      category_id,
-      name,
+      category_id: resolvedCategoryId,
+      name: name.trim(),
       description,
       icon,
       calculator_type: calculator_type || 'product',
