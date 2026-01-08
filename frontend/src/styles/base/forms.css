@@ -250,9 +250,9 @@
 }
 
 .form-select--compact {
-  width: 120px !important;
-  min-width: 100px !important;
-  max-width: 140px !important;
+  width: 140px !important;
+  min-width: 120px !important;
+  max-width: 180px !important;
 }
 
 /* Адаптивность */

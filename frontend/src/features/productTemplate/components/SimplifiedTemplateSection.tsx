@@ -373,7 +373,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                     const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, technology_code: e.target.value } : r))
                                     updateSize(selected.id, { print_prices: next })
                                   }}
-                                  style={{ maxWidth: '140px' }}
                                 >
                                   {printTechs.map(t => (
                                     <option key={t.code} value={t.code}>{t.name}</option>
@@ -388,7 +387,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                     const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, color_mode: (e.target.value as any) } : r))
                                     updateSize(selected.id, { print_prices: next })
                                   }}
-                                  style={{ maxWidth: '120px' }}
                                 >
                                   <option value="color">полноцвет</option>
                                   <option value="bw">ч/б</option>
@@ -402,7 +400,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                     const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, sides_mode: (e.target.value as any) } : r))
                                     updateSize(selected.id, { print_prices: next })
                                   }}
-                                  style={{ maxWidth: '130px' }}
                                 >
                                   <option value="single">односторонняя</option>
                                   <option value="duplex">двухсторонняя</option>
