@@ -103,8 +103,14 @@
 
 .simplified-form-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, max-content);
   gap: 10px;
+  justify-content: start;
+}
+
+.simplified-form-grid > * {
+  width: auto;
+  min-width: 0;
 }
 
 .simplified-list {
@@ -142,9 +148,15 @@
 
 .simplified-row__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, max-content);
   gap: 6px;
   margin-bottom: 8px;
+  justify-content: start;
+}
+
+.simplified-row__grid > * {
+  width: auto;
+  min-width: 0;
 }
 
 .simplified-tiers {
@@ -434,7 +446,7 @@
   .simplified-form-grid,
   .simplified-row__grid {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 6px;
   }
   .simplified-tier {
     grid-template-columns: 1fr;
