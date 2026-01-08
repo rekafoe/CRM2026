@@ -34,21 +34,21 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
       <div className="product-form-grid">
         <FormField label="Название" required help="Отображается в каталоге и калькуляторе">
           <input
-            className="form-input"
+            className="form-input form-input--full"
             value={form.name}
             onChange={(e) => onFormChange('name', e.target.value)}
           />
         </FormField>
         <FormField label="Иконка" help="Эмодзи или короткий символ">
           <input
-            className="form-input"
+            className="form-input form-input--full"
             value={form.icon || ''}
             onChange={(e) => onFormChange('icon', e.target.value)}
           />
         </FormField>
         <FormField label="Тип продукции" help="Влияет на процессы и расчёты">
           <input
-            className="form-input"
+            className="form-input form-input--full"
             value={form.product_type || ''}
             onChange={(e) => onFormChange('product_type', e.target.value)}
           />

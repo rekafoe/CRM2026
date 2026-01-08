@@ -108,7 +108,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
 
         <FormField label="Категория">
           <select
-            className="form-select"
+            className="form-select form-select--full"
             value={categoryId ?? ''}
             onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : null)}
           >
@@ -151,7 +151,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
           </FormField>
           <FormField label="Тип калькулятора" className="flex-1">
             <select
-              className="form-select"
+              className="form-select form-select--full"
               value={calculatorType}
             onChange={(e) => setCalculatorType(e.target.value as 'product' | 'operation' | 'simplified')}
             >
@@ -164,7 +164,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
 
         <FormField label="Тип продукта">
           <select
-            className="form-select"
+            className="form-select form-select--full"
             value={productType}
             onChange={(e) => setProductType(e.target.value as 'sheet_single' | 'multi_page' | 'universal')}
           >
