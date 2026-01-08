@@ -68,10 +68,10 @@ export interface SimplifiedPricingResult {
 interface SimplifiedQtyTier {
   min_qty: number;
   max_qty?: number;
-  // Массив цен для каждого тиража: [1x, 5x, 10x, 50x, 100x, 500x, 1000x, 1000-∞x]
-  tier_prices?: number[];
-  // Обратная совместимость - если tier_prices нет, используем price
+  unit_price: number; // цена за 1 ед. для этого диапазона
+  // Обратная совместимость - если unit_price нет, но есть price или tier_prices
   price?: number;
+  tier_prices?: number[];
 }
 
 interface SimplifiedSizeConfig {
@@ -191,8 +191,8 @@ export class SimplifiedPricingService {
       if (printPriceConfig) {
         const tier = this.findTierForQuantity(printPriceConfig.tiers, quantity);
         if (tier) {
-          // Определяем цену для конкретного тиража из tier_prices
-          const priceForTier = this.getPriceForQuantityTier(tier, quantity);
+          // Используем unit_price из диапазона
+          const priceForTier = this.getPriceForQuantityTier(tier);
           printPrice = priceForTier * quantity;
           printDetails = {
             tier: { ...tier, price: priceForTier },
@@ -212,7 +212,7 @@ export class SimplifiedPricingService {
       if (materialPriceConfig) {
         const tier = this.findTierForQuantity(materialPriceConfig.tiers, quantity);
         if (tier) {
-          const priceForTier = this.getPriceForQuantityTier(tier, quantity);
+          const priceForTier = this.getPriceForQuantityTier(tier);
           materialPrice = priceForTier * quantity;
           materialDetails = {
             tier: { ...tier, price: priceForTier },
@@ -245,7 +245,7 @@ export class SimplifiedPricingService {
           if (tier) {
             const unitsPerItem = finConfig.units_per_item ?? finishingPriceConfig.units_per_item ?? 1;
             const totalUnits = quantity * unitsPerItem;
-            const priceForTier = this.getPriceForQuantityTier(tier, quantity);
+            const priceForTier = this.getPriceForQuantityTier(tier);
             
             let servicePrice = 0;
             if (finishingPriceConfig.price_unit === 'per_cut' || finConfig.price_unit === 'per_cut') {
@@ -365,42 +365,26 @@ export class SimplifiedPricingService {
   }
   
   /**
-   * Определяет цену для конкретного тиража (1, 5, 10, 50, 100, 500, 1000, 1000+)
-   * на основе tier_prices массива или старого поля price
+   * Определяет цену за единицу из диапазона
+   * Использует unit_price, если доступен, иначе использует price или tier_prices для обратной совместимости
    */
-  private static getPriceForQuantityTier(
-    tier: SimplifiedQtyTier,
-    quantity: number
-  ): number {
-    // Если есть tier_prices, используем его
-    if (tier.tier_prices && tier.tier_prices.length > 0) {
-      // Определяем индекс тиража: 1->0, 5->1, 10->2, 50->3, 100->4, 500->5, 1000->6, 1000+->7
-      let tierIndex = 7; // По умолчанию 1000-∞
-      
-      if (quantity >= 1000) {
-        tierIndex = 7; // 1000-∞
-      } else if (quantity >= 500) {
-        tierIndex = 6; // 1000x
-      } else if (quantity >= 100) {
-        tierIndex = 5; // 500x
-      } else if (quantity >= 50) {
-        tierIndex = 4; // 100x
-      } else if (quantity >= 10) {
-        tierIndex = 3; // 50x
-      } else if (quantity >= 5) {
-        tierIndex = 2; // 10x
-      } else if (quantity >= 1) {
-        tierIndex = 1; // 5x
-      } else {
-        tierIndex = 0; // 1x
-      }
-      
-      // Используем цену для выбранного тиража, или первую доступную
-      return tier.tier_prices[tierIndex] ?? tier.tier_prices[0] ?? 0;
+  private static getPriceForQuantityTier(tier: SimplifiedQtyTier): number {
+    // Приоритет: unit_price > price > tier_prices (для обратной совместимости)
+    if (tier.unit_price !== undefined && tier.unit_price !== null) {
+      return tier.unit_price;
     }
     
-    // Обратная совместимость: используем price если tier_prices нет
-    return tier.price ?? 0;
+    // Обратная совместимость: используем price если unit_price нет
+    if (tier.price !== undefined && tier.price !== null) {
+      return tier.price;
+    }
+    
+    // Обратная совместимость: используем первую цену из tier_prices, если доступна
+    if (tier.tier_prices && tier.tier_prices.length > 0) {
+      return tier.tier_prices[0] ?? 0;
+    }
+    
+    return 0;
   }
 }
 
