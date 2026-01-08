@@ -612,25 +612,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                       <Alert type="info" className="mt-3">Нет материалов для выбранного типа бумаги.</Alert>
                     )}
 
-                    <div className="mt-3">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          const firstId = selected.allowed_material_ids[0]
-                          if (!firstId) return
-                          updateSize(selected.id, {
-                            material_prices: [
-                              ...selected.material_prices,
-                              { material_id: firstId, tiers: [{ min_qty: 1, max_qty: undefined, unit_price: 0 }] },
-                            ],
-                          })
-                        }}
-                        disabled={selected.allowed_material_ids.length === 0}
-                      >
-                        ➕ Цена материала
-                      </Button>
-                    </div>
 
                     {selected.material_prices.length > 0 && (
                       <div className="simplified-list mt-3">
@@ -639,6 +620,112 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                             <div className="simplified-row__head">
                               <div className="simplified-row__title">{materialName(mp.material_id)}</div>
                               <div className="simplified-row__actions">
+                                <div className="simplified-row__add-range-wrapper">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => {
+                                      setTierModal({
+                                        type: 'material',
+                                        materialIdx: idx,
+                                        tierIdx: undefined,
+                                        isOpen: true,
+                                        minQty: '1',
+                                        maxQty: '',
+                                      })
+                                    }}
+                                  >
+                                    ➕ Диапазон
+                                  </Button>
+                                  {tierModal.isOpen && tierModal.type === 'material' && tierModal.materialIdx === idx && (
+                                    <div
+                                      ref={tierModalRef}
+                                      className="simplified-tier-modal"
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="simplified-tier-modal__content">
+                                        <div className="simplified-tier-modal__header">
+                                          <strong>{tierModal.tierIdx !== undefined ? 'Редактировать диапазон' : 'Добавить диапазон'}</strong>
+                                          <button
+                                            type="button"
+                                            className="simplified-tier-modal__close"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                            }}
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                        <div className="simplified-tier-modal__body">
+                                          <FormField label="От">
+                                            <input
+                                              className="form-input form-input--compact"
+                                              type="number"
+                                              min="1"
+                                              step="1"
+                                              value={tierModal.minQty}
+                                              onChange={(e) => setTierModal({ ...tierModal, minQty: e.target.value })}
+                                              onMouseDown={(e) => e.stopPropagation()}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onFocus={(e) => e.stopPropagation()}
+                                            />
+                                          </FormField>
+                                          <FormField label="До (оставьте пустым для ∞)">
+                                            <input
+                                              className="form-input form-input--compact"
+                                              type="number"
+                                              min="1"
+                                              step="1"
+                                              placeholder="∞"
+                                              value={tierModal.maxQty}
+                                              onChange={(e) => setTierModal({ ...tierModal, maxQty: e.target.value })}
+                                              onMouseDown={(e) => e.stopPropagation()}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onFocus={(e) => e.stopPropagation()}
+                                            />
+                                          </FormField>
+                                          <div className="simplified-tier-modal__actions">
+                                            <Button
+                                              variant="secondary"
+                                              size="sm"
+                                              onClick={() => setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })}
+                                            >
+                                              Отмена
+                                            </Button>
+                                            <Button
+                                              variant="primary"
+                                              size="sm"
+                                              onClick={() => {
+                                                const minQty = Number(tierModal.minQty) || 1
+                                                const maxQty = tierModal.maxQty === '' ? undefined : (Number(tierModal.maxQty) || undefined)
+                                                const next = selected.material_prices.map((r, i) => {
+                                                  if (i !== idx) return r
+                                                  if (tierModal.tierIdx !== undefined) {
+                                                    return {
+                                                      ...r,
+                                                      tiers: r.tiers.map((tt, j) =>
+                                                        j === tierModal.tierIdx
+                                                          ? { ...tt, min_qty: minQty, max_qty: maxQty }
+                                                          : tt
+                                                      )
+                                                    }
+                                                  } else {
+                                                    return { ...r, tiers: [...r.tiers, { min_qty: minQty, max_qty: maxQty, unit_price: 0 }] }
+                                                  }
+                                                })
+                                                updateSize(selected.id, { material_prices: next })
+                                                setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                              }}
+                                            >
+                                              {tierModal.tierIdx !== undefined ? 'Сохранить' : 'Добавить'}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                                 <Button
                                   variant="error"
                                   size="sm"
@@ -708,117 +795,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                           </th>
                                         )
                                       })}
-                                      <th>
-                                        <div className="simplified-row__add-range-wrapper">
-                                          <Button
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => {
-                                              setTierModal({
-                                                type: 'material',
-                                                materialIdx: idx,
-                                                tierIdx: undefined,
-                                                isOpen: true,
-                                                minQty: '1',
-                                                maxQty: '',
-                                              })
-                                            }}
-                                          >
-                                            ➕ Диапазон
-                                          </Button>
-                                          {tierModal.isOpen && tierModal.type === 'material' && tierModal.materialIdx === idx && (
-                                            <div
-                                              ref={tierModalRef}
-                                              className="simplified-tier-modal"
-                                              onMouseDown={(e) => e.stopPropagation()}
-                                              onClick={(e) => e.stopPropagation()}
-                                            >
-                                              <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
-                                                <div className="simplified-tier-modal__header">
-                                                  <strong>{tierModal.tierIdx !== undefined ? 'Редактировать диапазон' : 'Добавить диапазон'}</strong>
-                                                  <button
-                                                    type="button"
-                                                    className="simplified-tier-modal__close"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation()
-                                                      setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
-                                                    }}
-                                                  >
-                                                    ✕
-                                                  </button>
-                                                </div>
-                                                <div className="simplified-tier-modal__body">
-                                                  <FormField label="От">
-                                                    <input
-                                                      className="form-input form-input--compact"
-                                                      type="number"
-                                                      min="1"
-                                                      step="1"
-                                                      value={tierModal.minQty}
-                                                      onChange={(e) => setTierModal({ ...tierModal, minQty: e.target.value })}
-                                                      onMouseDown={(e) => e.stopPropagation()}
-                                                      onClick={(e) => e.stopPropagation()}
-                                                      onFocus={(e) => e.stopPropagation()}
-                                                    />
-                                                  </FormField>
-                                                  <FormField label="До (оставьте пустым для ∞)">
-                                                    <input
-                                                      className="form-input form-input--compact"
-                                                      type="number"
-                                                      min="1"
-                                                      step="1"
-                                                      placeholder="∞"
-                                                      value={tierModal.maxQty}
-                                                      onChange={(e) => setTierModal({ ...tierModal, maxQty: e.target.value })}
-                                                      onMouseDown={(e) => e.stopPropagation()}
-                                                      onClick={(e) => e.stopPropagation()}
-                                                      onFocus={(e) => e.stopPropagation()}
-                                                    />
-                                                  </FormField>
-                                                  <div className="simplified-tier-modal__actions" onClick={(e) => e.stopPropagation()}>
-                                                    <Button
-                                                      variant="secondary"
-                                                      size="sm"
-                                                      onClick={() => {
-                                                        setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
-                                                      }}
-                                                    >
-                                                      Отмена
-                                                    </Button>
-                                                    <Button
-                                                      variant="primary"
-                                                      size="sm"
-                                                      onClick={() => {
-                                                        const minQty = Number(tierModal.minQty) || 1
-                                                        const maxQty = tierModal.maxQty === '' ? undefined : (Number(tierModal.maxQty) || undefined)
-                                                        const next = selected.material_prices.map((r, i) => {
-                                                          if (i !== idx) return r
-                                                          if (tierModal.tierIdx !== undefined) {
-                                                            return { 
-                                                              ...r, 
-                                                              tiers: r.tiers.map((tt, j) => 
-                                                                j === tierModal.tierIdx 
-                                                                  ? { ...tt, min_qty: minQty, max_qty: maxQty }
-                                                                  : tt
-                                                              )
-                                                            }
-                                                          } else {
-                                                            return { ...r, tiers: [...r.tiers, { min_qty: minQty, max_qty: maxQty, unit_price: 0 }] }
-                                                          }
-                                                        })
-                                                        updateSize(selected.id, { material_prices: next })
-                                                        setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
-                                                      }}
-                                                    >
-                                                      {tierModal.tierIdx !== undefined ? 'Сохранить' : 'Добавить'}
-                                                    </Button>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </th>
+                                      <th></th>
                                     </tr>
                                   </thead>
                                   <tbody>
