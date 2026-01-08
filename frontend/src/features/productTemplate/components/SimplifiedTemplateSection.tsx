@@ -50,6 +50,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
     minQty: '1',
     maxQty: '',
   })
+  const [isMobile, setIsMobile] = useState(false)
 
   const selected = useMemo(
     () => value.sizes.find(s => s.id === selectedSizeId) || null,
@@ -101,17 +102,17 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
   const tierModalRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!tierModal.isOpen) return
-    
+
     const handleClickOutside = (e: MouseEvent) => {
       if (!tierModalRef.current) return
-      
+
       const target = e.target as HTMLElement
-      
+
       // Проверяем, что клик был действительно вне модалки
       if (tierModalRef.current.contains(target)) {
         return // Клик внутри модалки - не закрываем
       }
-      
+
       // Проверяем, что клик не на кнопке открытия модалки
       const button = target.closest('button')
       if (button) {
@@ -120,21 +121,33 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
           return // Клик на кнопке открытия - не закрываем
         }
       }
-      
+
       // Закрываем модалку только если клик действительно вне её
       setTierModal((prev) => ({ ...prev, isOpen: false, tierIdx: undefined }))
     }
-    
+
     // Используем небольшую задержку, чтобы событие от кнопки открытия не закрывало модалку
     const timeoutId = setTimeout(() => {
       document.addEventListener('click', handleClickOutside, true)
     }, 100)
-    
+
     return () => {
       clearTimeout(timeoutId)
       document.removeEventListener('click', handleClickOutside, true)
     }
   }, [tierModal.isOpen])
+
+  // Отслеживание размера экрана для мобильной адаптации
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const openAddSize = useCallback(() => {
     setShowAddSize(true)
@@ -374,7 +387,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
 
                             {row.tiers.length > 0 && (
                               <div className="simplified-tiers-table">
-                                <table className="simplified-table simplified-table--compact">
+                                <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
                                   <thead>
                                     <tr>
                                       <th>Цена за 1 ед.</th>
@@ -752,7 +765,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                             </FormField>
                             {mp.tiers.length > 0 && (
                               <div className="simplified-tiers-table">
-                                <table className="simplified-table simplified-table--compact">
+                                <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
                                   <thead>
                                     <tr>
                                       <th>Цена за 1 ед.</th>
@@ -925,7 +938,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                             </div>
                             {f.tiers.length > 0 && (
                               <div className="simplified-tiers-table">
-                                <table className="simplified-table simplified-table--compact">
+                                <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
                                   <thead>
                                     <tr>
                                       <th>Цена за 1 ед.</th>
