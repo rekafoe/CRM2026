@@ -112,12 +112,12 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
         return // Клик внутри модалки - не закрываем
       }
       
-      // Проверяем, что клик не на кнопке открытия модалки или редактирования диапазона
+      // Проверяем, что клик не на кнопке открытия модалки
       const button = target.closest('button')
       if (button) {
         const buttonText = button.textContent || ''
-        if (buttonText.includes('Диапазон') || buttonText.includes('✎') || button.classList.contains('simplified-table__edit-range')) {
-          return // Клик на кнопке открытия/редактирования - не закрываем
+        if (buttonText.includes('Диапазон')) {
+          return // Клик на кнопке открытия - не закрываем
         }
       }
       
@@ -383,23 +383,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                         return (
                                           <th key={ti} className="simplified-table__range-cell">
                                             {rangeLabel}
-                                            <button
-                                              type="button"
-                                              className="simplified-table__edit-range"
-                                              onClick={() => {
-                                                setTierModal({
-                                                  type: 'print',
-                                                  printIdx: idx,
-                                                  tierIdx: ti,
-                                                  isOpen: true,
-                                                  minQty: String(t.min_qty),
-                                                  maxQty: t.max_qty == null ? '' : String(t.max_qty),
-                                                })
-                                              }}
-                                              title="Редактировать диапазон"
-                                            >
-                                              ✎
-                                            </button>
                                             <Button
                                               variant="error"
                                               size="sm"
@@ -797,23 +780,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                         return (
                                           <th key={ti} className="simplified-table__range-cell">
                                             {rangeLabel}
-                                            <button
-                                              type="button"
-                                              className="simplified-table__edit-range"
-                                              onClick={() => {
-                                                setTierModal({
-                                                  type: 'material',
-                                                  materialIdx: idx,
-                                                  tierIdx: ti,
-                                                  isOpen: true,
-                                                  minQty: String(t.min_qty),
-                                                  maxQty: t.max_qty == null ? '' : String(t.max_qty),
-                                                })
-                                              }}
-                                              title="Редактировать диапазон"
-                                            >
-                                              ✎
-                                            </button>
                                             <Button
                                               variant="error"
                                               size="sm"
@@ -1079,23 +1045,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                         return (
                                           <th key={ti} className="simplified-table__range-cell">
                                             {rangeLabel}
-                                            <button
-                                              type="button"
-                                              className="simplified-table__edit-range"
-                                              onClick={() => {
-                                                setTierModal({
-                                                  type: 'finishing',
-                                                  finishingIdx: idx,
-                                                  tierIdx: ti,
-                                                  isOpen: true,
-                                                  minQty: String(t.min_qty),
-                                                  maxQty: t.max_qty == null ? '' : String(t.max_qty),
-                                                })
-                                              }}
-                                              title="Редактировать диапазон"
-                                            >
-                                              ✎
-                                            </button>
                                             <Button
                                               variant="error"
                                               size="sm"
