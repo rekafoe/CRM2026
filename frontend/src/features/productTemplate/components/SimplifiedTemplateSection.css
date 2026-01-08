@@ -1,7 +1,7 @@
 .simplified-template {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .simplified-template__header {
@@ -19,18 +19,18 @@
 
 .simplified-template__grid {
   display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 16px;
+  grid-template-columns: 220px 1fr;
+  gap: 12px;
 }
 
 .simplified-template__sizes {
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--bg-secondary, #fff);
-  padding: 10px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   max-height: 70vh;
   overflow: auto;
 }
@@ -44,8 +44,8 @@
 .simplified-size {
   text-align: left;
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 8px 10px;
   background: var(--bg-primary, #fff);
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
@@ -74,7 +74,7 @@
 .simplified-template__editor {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .simplified-card {
@@ -174,7 +174,7 @@
 .simplified-materials {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .simplified-materials__group-title {
@@ -216,7 +216,7 @@
 .simplified-add-size {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .simplified-add-size__actions {
@@ -293,7 +293,8 @@
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 280px;
+  min-width: 240px;
+  max-width: 280px;
   pointer-events: auto;
   overflow: visible;
 }
@@ -350,9 +351,9 @@
 }
 
 .form-input--compact-table {
-  width: 100px;
-  min-width: 80px;
-  max-width: 120px;
+  width: 80px;
+  min-width: 70px;
+  max-width: 100px;
   padding: 4px 6px;
   font-size: 12px;
   text-align: center;
@@ -373,9 +374,10 @@
   color: var(--text-secondary, #6b7280);
   text-align: center;
   background: var(--bg-hover, #f9fafb);
-  padding: 4px 6px;
+  padding: 4px 4px;
   position: relative;
-  min-width: 80px;
+  min-width: 70px;
+  max-width: 100px;
 }
 
 .simplified-table__edit-range {
@@ -438,9 +440,9 @@
   .form-input--compact-table {
     font-size: 11px;
     padding: 2px 4px;
-    width: 90px;
-    min-width: 70px;
-    max-width: 110px;
+    width: 75px;
+    min-width: 65px;
+    max-width: 90px;
   }
 }
 
