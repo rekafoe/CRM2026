@@ -375,7 +375,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                 type="number"
                 min={2}
                 step={2}
-                className="form-input"
+                className="form-input form-input--compact"
                 value={pagesPerProduct}
                 onChange={(event) => setPagesPerProduct(Math.max(1, Number(event.target.value) || 0))}
               />
@@ -385,7 +385,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
               <input
                 type="number"
                 min={1}
-                className="form-input"
+                className="form-input form-input--compact"
                 value={multiPageQty}
                 onChange={(event) => setMultiPageQty(Math.max(1, Number(event.target.value) || 1))}
               />
@@ -568,7 +568,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                 type="number"
                 min={0.01}
                 step={0.01}
-                className="form-input"
+                className="form-input form-input--compact"
                 value={newQtyPerSheet}
                 onChange={(event) => setNewQtyPerSheet(Number(event.target.value))}
                 title={productType === 'multi_page' 
@@ -631,7 +631,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                     placeholder="Поиск материалов..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="form-input"
+                    className="form-input form-input--compact"
                     style={{ flex: 1 }}
                   />
                   <button
@@ -705,7 +705,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                                   onChange={(e) =>
                                     setBulkQty((prev) => ({ ...prev, [materialId]: Number(e.target.value) }))
                                   }
-                                  className="form-input"
+                                  className="form-input form-input--compact"
                                   style={{ width: 100, textAlign: 'center' }}
                                   placeholder="шт/лист"
                                   title={productType === 'multi_page' 

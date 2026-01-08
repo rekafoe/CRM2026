@@ -366,7 +366,7 @@ export const Step4Template: React.FC<Step4TemplateProps> = ({
         </FormField>
         <FormField label="Печатный лист, ширина (мм)" className="flex-1">
           <input
-            className="form-input"
+            className="form-input form-input--compact"
             value={form.template.print_sheet_width}
             onChange={(e) => onUpdateTemplate({ print_sheet_width: e.target.value })}
             placeholder="320"
@@ -374,7 +374,7 @@ export const Step4Template: React.FC<Step4TemplateProps> = ({
         </FormField>
         <FormField label="Печатный лист, высота (мм)" className="flex-1">
           <input
-            className="form-input"
+            className="form-input form-input--compact"
             value={form.template.print_sheet_height}
             onChange={(e) => onUpdateTemplate({ print_sheet_height: e.target.value })}
             placeholder="450"
@@ -395,7 +395,7 @@ export const Step4Template: React.FC<Step4TemplateProps> = ({
           <div className="flex flex-wrap gap-4">
             <FormField label="Минимальный тираж" className="flex-1">
               <input
-                className="form-input"
+                className="form-input form-input--compact"
                 value={form.template.print_run_min}
                 onChange={(e) => onUpdateTemplate({ print_run_min: e.target.value })}
                 placeholder="100"
@@ -403,7 +403,7 @@ export const Step4Template: React.FC<Step4TemplateProps> = ({
             </FormField>
             <FormField label="Максимальный тираж" className="flex-1">
               <input
-                className="form-input"
+                className="form-input form-input--compact"
                 value={form.template.print_run_max}
                 onChange={(e) => onUpdateTemplate({ print_run_max: e.target.value })}
                 placeholder="10000"

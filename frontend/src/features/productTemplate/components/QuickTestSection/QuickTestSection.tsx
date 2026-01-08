@@ -99,7 +99,7 @@ const QuickTestSection: React.FC<QuickTestSectionProps> = ({ parameters, qty, pa
                         </span>
                       </label>
                     ) : (par.type === 'number' || par.type === 'range') ? (
-                      <input className="form-input" type="number" value={val ?? ''} onChange={(e)=>{ const v=e.target.value===''?'':Number(e.target.value); const next={...params,[key as string]:v}; onChangeParams(next) }} />
+                      <input className="form-input form-input--compact" type="number" value={val ?? ''} onChange={(e)=>{ const v=e.target.value===''?'':Number(e.target.value); const next={...params,[key as string]:v}; onChangeParams(next) }} />
                     ) : (
                       <input className="form-input" value={val ?? ''} onChange={(e)=>{ const v=e.target.value; const next={...params,[key as string]:v}; onChangeParams(next) }} />
                     )}
@@ -111,7 +111,7 @@ const QuickTestSection: React.FC<QuickTestSectionProps> = ({ parameters, qty, pa
         )}
         <div className="parameter-item">
           <div className="parameter-info"><h5>Тираж</h5></div>
-          <input className="form-input" type="number" value={qty} onChange={(e)=>onChangeQty(parseInt(e.target.value)||0)} />
+          <input className="form-input form-input--compact" type="number" value={qty} onChange={(e)=>onChangeQty(parseInt(e.target.value)||0)} />
         </div>
         <div className="parameter-item">
           <div className="parameter-info"><h5>Параметры (JSON)</h5></div>

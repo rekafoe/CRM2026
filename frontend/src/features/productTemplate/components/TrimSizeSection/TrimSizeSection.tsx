@@ -144,7 +144,7 @@ const TrimSizeSection: React.FC<TrimSizeSectionProps> = ({
           <FormField label="Ширина (мм)" required>
             <input
               type="number"
-              className="form-input"
+              className="form-input form-input--compact"
               placeholder="210"
               value={localWidth}
               onChange={(e) => handleWidthChange(e.target.value)}
@@ -155,7 +155,7 @@ const TrimSizeSection: React.FC<TrimSizeSectionProps> = ({
           <FormField label="Высота (мм)" required>
             <input
               type="number"
-              className="form-input"
+              className="form-input form-input--compact"
               placeholder="148"
               value={localHeight}
               onChange={(e) => handleHeightChange(e.target.value)}
