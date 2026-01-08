@@ -352,7 +352,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                               className="simplified-tier-modal__close"
                               onClick={(e: React.MouseEvent) => {
                                 e.stopPropagation()
-                                setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                setTierModal({ type: 'print', isOpen: false, minQty: '1', maxQty: '' })
                               }}
                               title="Закрыть"
                             >
@@ -393,7 +393,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                 size="sm"
                                 onClick={(e) => {
                                   e?.stopPropagation()
-                                  setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                  setTierModal({ type: 'print', isOpen: false, minQty: '1', maxQty: '' })
                                 }}
                               >
                                 Отмена
@@ -412,7 +412,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                     return r
                                   })
                                   updateSize(selected.id, { print_prices: next })
-                                  setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                  setTierModal({ type: 'print', isOpen: false, minQty: '1', maxQty: '' })
                                 }}
                               >
                                 Добавить
@@ -660,7 +660,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                             className="simplified-tier-modal__close"
                                             onClick={(e) => {
                                               e.stopPropagation()
-                                              setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                              setTierModal({ type: 'print', isOpen: false, minQty: '1', maxQty: '' })
                                             }}
                                           >
                                             ✕
@@ -724,7 +724,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                   }
                                                 })
                                                 updateSize(selected.id, { material_prices: next })
-                                                setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                                setTierModal({ type: 'print', isOpen: false, minQty: '1', maxQty: '' })
                                               }}
                                             >
                                               {tierModal.tierIdx !== undefined ? 'Сохранить' : 'Добавить'}
@@ -898,6 +898,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                       className="simplified-tier-modal"
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => e.stopPropagation()}
+                      style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 2000 }}
                     >
                       <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
                         <div className="simplified-tier-modal__header">
@@ -947,7 +948,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                               variant="secondary"
                               size="sm"
                               onClick={() => {
-                                setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                setTierModal({ type: 'print', isOpen: false, minQty: '1', maxQty: '' })
                               }}
                             >
                               Отмена
@@ -966,7 +967,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                   return r
                                 })
                                 updateSize(selected.id, { finishing: next })
-                                setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                setTierModal({ type: 'print', isOpen: false, minQty: '1', maxQty: '' })
                               }}
                             >
                               Добавить

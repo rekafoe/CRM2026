@@ -309,14 +309,15 @@
 }
 
 .simplified-tier-modal {
-  position: absolute;
-  top: calc(100% + 2px);
-  right: 0;
-  z-index: 1001;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2000;
   background: var(--bg-primary, #fff);
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   min-width: 220px;
   max-width: 260px;
   pointer-events: auto;
