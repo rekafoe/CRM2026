@@ -229,7 +229,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
           <p className="text-muted text-sm">Настройка цен по размерам: печать (за изделие), материалы (за изделие) и отделка (за рез/биг/фальц).</p>
         </div>
         <div className="simplified-template__header-actions">
-          <Button variant="secondary" onClick={openAddSize}>➕ Размер</Button>
+          <Button variant="secondary" onClick={openAddSize}>Добавить размер</Button>
           <Button variant="primary" onClick={onSave} disabled={saving}>Сохранить</Button>
         </div>
       </div>
@@ -314,12 +314,12 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                       }}
                       disabled={loadingLists}
                     >
-                      ➕ Цена печати
+                      Добавить цену печати
                     </Button>
                   </div>
                   <div className="simplified-card__content">
                     {selected.print_prices.length === 0 ? (
-                      <div className="text-muted">Нет цен. Нажмите “➕ Цена печати”.</div>
+                      <div className="text-muted">Нет цен печати. Добавьте первую цену.</div>
                     ) : (
                       <div className="simplified-list">
                         {selected.print_prices.map((row, idx) => (
@@ -407,7 +407,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                 updateSize(selected.id, { print_prices: next })
                                               }}
                                             >
-                                              ✕
+                                              Удалить
                                             </Button>
                                           </th>
                                         )
@@ -428,7 +428,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                               })
                                             }}
                                           >
-                                            ➕ Диапазон
+                                            Добавить диапазон
                                           </Button>
                                           {tierModal.isOpen && tierModal.type === 'print' && tierModal.printIdx === idx && (
                                             <div
@@ -447,8 +447,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                       e.stopPropagation()
                                                       setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
                                                     }}
+                                                    title="Закрыть"
                                                   >
-                                                    ✕
+                                                    ×
                                                   </button>
                                                 </div>
                                                 <div className="simplified-tier-modal__body">
@@ -791,7 +792,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                   })
                                                 }}
                                               >
-                                                ✏️
+                                                Изменить
                                               </Button>
                                               <Button
                                                 variant="error"
@@ -874,12 +875,12 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                       }}
                       disabled={loadingLists}
                     >
-                      ➕ Услуга
+                      Добавить услугу
                     </Button>
                   </div>
                   <div className="simplified-card__content">
                     {selected.finishing.length === 0 ? (
-                      <div className="text-muted">Нет услуг. Нажмите “➕ Услуга”.</div>
+                      <div className="text-muted">Нет услуг. Добавьте первую услугу.</div>
                     ) : (
                       <div className="simplified-list">
                         {selected.finishing.map((f, idx) => (
@@ -960,7 +961,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                 updateSize(selected.id, { finishing: next })
                                               }}
                                             >
-                                              ✕
+                                              Удалить
                                             </Button>
                                           </th>
                                         )
@@ -981,7 +982,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                               })
                                             }}
                                           >
-                                            ➕ Диапазон
+                                            Добавить диапазон
                                           </Button>
                                           {tierModal.isOpen && tierModal.type === 'finishing' && tierModal.finishingIdx === idx && (
                                             <div
@@ -1000,8 +1001,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                       e.stopPropagation()
                                                       setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
                                                     }}
+                                                    title="Закрыть"
                                                   >
-                                                    ✕
+                                                    ×
                                                   </button>
                                                 </div>
                                                 <div className="simplified-tier-modal__body">

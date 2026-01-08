@@ -25,12 +25,12 @@
 
 .simplified-template__sizes {
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
-  background: var(--bg-secondary, #fff);
+  border-radius: 6px;
+  background: var(--bg-primary, #fff);
   padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   max-height: 70vh;
   overflow: auto;
 }
@@ -44,20 +44,22 @@
 .simplified-size {
   text-align: left;
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: 4px;
+  padding: 6px 8px;
   background: var(--bg-primary, #fff);
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .simplified-size:hover {
   background: var(--bg-hover, #f9fafb);
+  border-color: var(--accent-primary, #1976d2);
 }
 
 .simplified-size--active {
   border-color: var(--accent-primary, #1976d2);
-  background: rgba(25, 118, 210, 0.08);
+  background: rgba(25, 118, 210, 0.03);
+  box-shadow: 0 1px 2px rgba(25, 118, 210, 0.1);
 }
 
 .simplified-size__label {
@@ -79,21 +81,24 @@
 
 .simplified-card {
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 10px;
-  background: var(--bg-secondary, #fff);
+  border-radius: 6px;
+  background: var(--bg-primary, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .simplified-card__header {
-  padding: 10px 12px;
+  padding: 8px 10px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   border-bottom: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-hover, #fafafa);
+  border-radius: 4px 4px 0 0;
 }
 
 .simplified-card__content {
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
 .simplified-form-grid {
@@ -110,9 +115,10 @@
 
 .simplified-row {
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 4px;
+  padding: 6px;
   background: var(--bg-primary, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .simplified-row__head {
@@ -193,24 +199,30 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px;
+  padding: 4px 6px;
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--bg-primary, #fff);
   cursor: pointer;
   flex: 1 0 auto;
-  min-width: 140px;
-  max-width: 180px;
-  font-size: 13px;
-  line-height: 1.3;
+  min-width: 130px;
+  max-width: 170px;
+  font-size: 12px;
+  line-height: 1.4;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: all 0.15s ease;
+}
+
+.simplified-checkbox:hover {
+  border-color: var(--accent-primary, #1976d2);
+  background: rgba(25, 118, 210, 0.02);
 }
 
 .simplified-checkbox--checked {
   border-color: var(--accent-primary, #1976d2);
-  background: rgba(25, 118, 210, 0.06);
+  background: rgba(25, 118, 210, 0.04);
 }
 
 .simplified-add-size {
@@ -238,8 +250,8 @@
 }
 
 .simplified-table thead {
-  background: var(--bg-hover, #f9fafb);
-  border-bottom: 2px solid var(--border-color, #e5e7eb);
+  background: var(--bg-hover, #fafafa);
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
 }
 
 .simplified-table th {
@@ -257,7 +269,7 @@
 }
 
 .simplified-table tbody tr:hover {
-  background: var(--bg-hover, #f9fafb);
+  background: rgba(0, 0, 0, 0.01);
 }
 
 .simplified-table tbody tr:last-child td {
@@ -286,15 +298,15 @@
 
 .simplified-tier-modal {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 2px);
   right: 0;
   z-index: 1001;
-  background: var(--bg-secondary, #fff);
+  background: var(--bg-primary, #fff);
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 240px;
-  max-width: 280px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-width: 220px;
+  max-width: 260px;
   pointer-events: auto;
   overflow: visible;
 }
@@ -314,21 +326,23 @@
 .simplified-tier-modal__close {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: 14px;
   cursor: pointer;
   color: var(--text-secondary, #6b7280);
-  padding: 0;
-  width: 24px;
-  height: 24px;
+  padding: 2px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: background-color 0.15s;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  line-height: 1;
 }
 
 .simplified-tier-modal__close:hover {
   background: var(--bg-hover, #f9fafb);
+  color: var(--text-primary, #374151);
 }
 
 .simplified-tier-modal__body {
@@ -370,11 +384,11 @@
 }
 
 .simplified-table__range-cell {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-secondary, #6b7280);
   text-align: center;
-  background: var(--bg-hover, #f9fafb);
-  padding: 4px 4px;
+  background: transparent;
+  padding: 4px 2px;
   position: relative;
   min-width: 70px;
   max-width: 100px;
@@ -400,12 +414,13 @@
 
 .simplified-table__range-cell .btn {
   position: absolute;
-  top: 1px;
-  right: 1px;
-  padding: 1px 3px;
-  font-size: 10px;
-  min-width: 18px;
-  height: 18px;
+  top: 0px;
+  right: 0px;
+  padding: 0px 2px;
+  font-size: 9px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 2px;
 }
 
 .simplified-table__price-label {
