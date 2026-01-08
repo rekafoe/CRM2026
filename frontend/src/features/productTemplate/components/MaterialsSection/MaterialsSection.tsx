@@ -393,7 +393,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
             <div>
               <label className="form-label">Печать</label>
               <select
-                className="form-select"
+                className="form-select form-select--compact"
                 value={printSides}
                 onChange={(event) => setPrintSides(event.target.value === '1' ? 1 : 2)}
               >
@@ -527,7 +527,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
               ))}
             </datalist>
               <select
-                className="form-select"
+                className="form-select form-select--compact"
                 value={selectedMaterialId ?? ''}
                 onChange={(event) => {
                   const value = Number(event.target.value)
@@ -583,7 +583,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
             <div>
               <label className="form-label">Обязательный</label>
               <select
-                className="form-select"
+                className="form-select form-select--compact"
                 value={isRequired ? '1' : '0'}
                 onChange={(event) => setIsRequired(event.target.value === '1')}
               >
@@ -731,7 +731,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                                 onChange={(e) =>
                                   setBulkRequired((prev) => ({ ...prev, [materialId]: e.target.value === '1' }))
                                 }
-                                className="form-select"
+                                className="form-select form-select--compact"
                                 style={{ width: 80 }}
                               >
                                 <option value="1">Обязат.</option>

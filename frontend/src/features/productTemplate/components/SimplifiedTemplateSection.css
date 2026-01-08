@@ -197,6 +197,8 @@
   border-radius: 8px;
   background: var(--bg-primary, #fff);
   cursor: pointer;
+  width: fit-content;
+  max-width: 200px;
 }
 
 .simplified-checkbox--checked {

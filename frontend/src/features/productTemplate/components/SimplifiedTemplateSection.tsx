@@ -344,7 +344,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                             <div className="simplified-row__grid">
                               <FormField label="Технология">
                                 <select
-                                  className="form-select"
+                                  className="form-select form-select--compact"
                                   value={row.technology_code}
                                   onChange={(e) => {
                                     const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, technology_code: e.target.value } : r))
@@ -358,7 +358,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                               </FormField>
                               <FormField label="Цветность">
                                 <select
-                                  className="form-select"
+                                  className="form-select form-select--compact"
                                   value={row.color_mode}
                                   onChange={(e) => {
                                     const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, color_mode: (e.target.value as any) } : r))
@@ -371,7 +371,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                               </FormField>
                               <FormField label="Стороны">
                                 <select
-                                  className="form-select"
+                                  className="form-select form-select--compact"
                                   value={row.sides_mode}
                                   onChange={(e) => {
                                     const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, sides_mode: (e.target.value as any) } : r))
@@ -572,7 +572,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                   <div className="simplified-card__content">
                     <FormField label="Тип бумаги">
                       <select
-                        className="form-select"
+                        className="form-select form-select--compact"
                         value={selectedPaperTypeId || ''}
                         onChange={(e) => setSelectedPaperTypeId(e.target.value || null)}
                         disabled={loadingLists || paperTypes.length === 0}
@@ -750,7 +750,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                             </div>
                             <FormField label="Материал">
                               <select
-                                className="form-select"
+                                className="form-select form-select--compact"
                                 value={String(mp.material_id)}
                                 onChange={(e) => {
                                   const v = Number(e.target.value)
@@ -897,7 +897,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                             <div className="simplified-row__grid">
                               <FormField label="Услуга">
                                 <select
-                                  className="form-select"
+                                  className="form-select form-select--compact"
                                   value={String(f.service_id)}
                                   onChange={(e) => {
                                     const v = Number(e.target.value)
@@ -912,7 +912,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                               </FormField>
                               <FormField label="Единица">
                                 <select
-                                  className="form-select"
+                                  className="form-select form-select--compact"
                                   value={f.price_unit}
                                   onChange={(e) => {
                                     const v = e.target.value as any

@@ -31,7 +31,7 @@ const QuickTestSection: React.FC<QuickTestSectionProps> = ({ parameters, qty, pa
                   <div key={key} className="parameter-item">
                     <div className="parameter-info"><h5>{par.label || par.name}</h5></div>
                     {par.type === 'select' && Array.isArray(par.options) ? (
-                      <select className="form-select" value={val ?? ''} onChange={(e)=>{ const v=e.target.value; const next={...params,[key as string]:v}; onChangeParams(next) }}>
+                      <select className="form-select form-select--compact" value={val ?? ''} onChange={(e)=>{ const v=e.target.value; const next={...params,[key as string]:v}; onChangeParams(next) }}>
                         {(() => {
                           // 🆕 Для material_id группируем по типам бумаги
                           const isMaterialId = key === 'material_id';
