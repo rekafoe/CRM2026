@@ -234,7 +234,7 @@
 }
 
 .simplified-table th {
-  padding: 10px 12px;
+  padding: 8px 6px;
   text-align: left;
   font-weight: 600;
   color: var(--text-primary, #111827);
@@ -243,7 +243,7 @@
 }
 
 .simplified-table td {
-  padding: 8px 12px;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--border-color, #e5e7eb);
 }
 
@@ -341,7 +341,9 @@
 }
 
 .form-input--compact-table {
-  width: 70px;
+  width: 100px;
+  min-width: 80px;
+  max-width: 120px;
   padding: 4px 6px;
   font-size: 12px;
   text-align: center;
@@ -353,7 +355,7 @@
 
 .simplified-table--compact th,
 .simplified-table--compact td {
-  padding: 6px 8px;
+  padding: 4px 6px;
   white-space: nowrap;
 }
 
@@ -362,8 +364,9 @@
   color: var(--text-secondary, #6b7280);
   text-align: center;
   background: var(--bg-hover, #f9fafb);
-  padding: 6px 8px;
+  padding: 4px 6px;
   position: relative;
+  min-width: 80px;
 }
 
 .simplified-table__edit-range {
@@ -386,12 +389,12 @@
 
 .simplified-table__range-cell .btn {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  padding: 1px 4px;
-  font-size: 11px;
-  min-width: 20px;
-  height: 20px;
+  top: 1px;
+  right: 1px;
+  padding: 1px 3px;
+  font-size: 10px;
+  min-width: 18px;
+  height: 18px;
 }
 
 .simplified-table__price-label {
@@ -424,11 +427,14 @@
   }
   .simplified-table--compact th,
   .simplified-table--compact td {
-    padding: 4px 6px;
+    padding: 3px 5px;
   }
   .form-input--compact-table {
     font-size: 11px;
-    padding: 3px 5px;
+    padding: 2px 4px;
+    width: 90px;
+    min-width: 70px;
+    max-width: 110px;
   }
 }
 
