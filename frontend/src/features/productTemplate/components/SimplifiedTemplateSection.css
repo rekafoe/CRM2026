@@ -272,19 +272,21 @@
 
 .simplified-row__add-range-wrapper {
   position: relative;
+  display: inline-block;
 }
 
 .simplified-tier-modal {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 4px);
   right: 0;
-  margin-top: 4px;
-  z-index: 1000;
+  z-index: 1001;
   background: var(--bg-secondary, #fff);
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 280px;
+  pointer-events: auto;
+  overflow: visible;
 }
 
 .simplified-tier-modal__content {

@@ -101,13 +101,34 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
   const tierModalRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (tierModal.isOpen && tierModalRef.current && !tierModalRef.current.contains(e.target as Node)) {
-        setTierModal({ ...tierModal, isOpen: false })
+      if (!tierModal.isOpen || !tierModalRef.current) return
+      
+      const target = e.target as HTMLElement
+      // Проверяем, что клик был действительно вне модалки
+      if (tierModalRef.current.contains(target)) {
+        return // Клик внутри модалки - не закрываем
       }
+      
+      // Проверяем, что клик не на кнопке открытия модалки
+      const button = target.closest('button')
+      if (button && button.textContent?.includes('Диапазон')) {
+        return // Клик на кнопке открытия - не закрываем
+      }
+      
+      // Закрываем модалку только если клик действительно вне её
+      setTierModal((prev) => ({ ...prev, isOpen: false, tierIdx: undefined }))
     }
+    
     if (tierModal.isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+      // Используем небольшую задержку, чтобы событие от кнопки открытия не закрывало модалку
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside, true)
+      }, 100)
+      
+      return () => {
+        clearTimeout(timeoutId)
+        document.removeEventListener('mousedown', handleClickOutside, true)
+      }
     }
   }, [tierModal.isOpen])
 
@@ -495,6 +516,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                             <div
                                               ref={tierModalRef}
                                               className="simplified-tier-modal"
+                                              onMouseDown={(e) => e.stopPropagation()}
                                             >
                                               <div className="simplified-tier-modal__content">
                                                 <div className="simplified-tier-modal__header">
@@ -502,7 +524,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                   <button
                                                     type="button"
                                                     className="simplified-tier-modal__close"
-                                                    onClick={() => setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                                    }}
                                                   >
                                                     ✕
                                                   </button>
@@ -516,6 +541,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                       step="1"
                                                       value={tierModal.minQty}
                                                       onChange={(e) => setTierModal({ ...tierModal, minQty: e.target.value })}
+                                                      onMouseDown={(e) => e.stopPropagation()}
+                                                      onClick={(e) => e.stopPropagation()}
+                                                      onFocus={(e) => e.stopPropagation()}
                                                     />
                                                   </FormField>
                                                   <FormField label="До (оставьте пустым для ∞)">
@@ -527,6 +555,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                       placeholder="∞"
                                                       value={tierModal.maxQty}
                                                       onChange={(e) => setTierModal({ ...tierModal, maxQty: e.target.value })}
+                                                      onMouseDown={(e) => e.stopPropagation()}
+                                                      onClick={(e) => e.stopPropagation()}
+                                                      onFocus={(e) => e.stopPropagation()}
                                                     />
                                                   </FormField>
                                                   <div className="simplified-tier-modal__actions">
@@ -721,6 +752,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                     <div
                                       ref={tierModalRef}
                                       className="simplified-tier-modal"
+                                      onMouseDown={(e) => e.stopPropagation()}
                                     >
                                       <div className="simplified-tier-modal__content">
                                         <div className="simplified-tier-modal__header">
@@ -728,7 +760,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                           <button
                                             type="button"
                                             className="simplified-tier-modal__close"
-                                            onClick={() => setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })}
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                            }}
                                           >
                                             ✕
                                           </button>
@@ -742,6 +777,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                               step="1"
                                               value={tierModal.minQty}
                                               onChange={(e) => setTierModal({ ...tierModal, minQty: e.target.value })}
+                                              onMouseDown={(e) => e.stopPropagation()}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onFocus={(e) => e.stopPropagation()}
                                             />
                                           </FormField>
                                           <FormField label="До (оставьте пустым для ∞)">
@@ -753,6 +791,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                               placeholder="∞"
                                               value={tierModal.maxQty}
                                               onChange={(e) => setTierModal({ ...tierModal, maxQty: e.target.value })}
+                                              onMouseDown={(e) => e.stopPropagation()}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onFocus={(e) => e.stopPropagation()}
                                             />
                                           </FormField>
                                           <div className="simplified-tier-modal__actions">
@@ -886,6 +927,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                             <div
                                               ref={tierModalRef}
                                               className="simplified-tier-modal"
+                                              onMouseDown={(e) => e.stopPropagation()}
                                             >
                                               <div className="simplified-tier-modal__content">
                                                 <div className="simplified-tier-modal__header">
@@ -893,7 +935,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                   <button
                                                     type="button"
                                                     className="simplified-tier-modal__close"
-                                                    onClick={() => setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                                    }}
                                                   >
                                                     ✕
                                                   </button>
@@ -907,6 +952,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                       step="1"
                                                       value={tierModal.minQty}
                                                       onChange={(e) => setTierModal({ ...tierModal, minQty: e.target.value })}
+                                                      onMouseDown={(e) => e.stopPropagation()}
+                                                      onClick={(e) => e.stopPropagation()}
+                                                      onFocus={(e) => e.stopPropagation()}
                                                     />
                                                   </FormField>
                                                   <FormField label="До (оставьте пустым для ∞)">
@@ -918,6 +966,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                       placeholder="∞"
                                                       value={tierModal.maxQty}
                                                       onChange={(e) => setTierModal({ ...tierModal, maxQty: e.target.value })}
+                                                      onMouseDown={(e) => e.stopPropagation()}
+                                                      onClick={(e) => e.stopPropagation()}
+                                                      onFocus={(e) => e.stopPropagation()}
                                                     />
                                                   </FormField>
                                                   <div className="simplified-tier-modal__actions">
@@ -1155,6 +1206,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                             <div
                                               ref={tierModalRef}
                                               className="simplified-tier-modal"
+                                              onMouseDown={(e) => e.stopPropagation()}
                                             >
                                               <div className="simplified-tier-modal__content">
                                                 <div className="simplified-tier-modal__header">
@@ -1162,7 +1214,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                   <button
                                                     type="button"
                                                     className="simplified-tier-modal__close"
-                                                    onClick={() => setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                                    }}
                                                   >
                                                     ✕
                                                   </button>
@@ -1176,6 +1231,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                       step="1"
                                                       value={tierModal.minQty}
                                                       onChange={(e) => setTierModal({ ...tierModal, minQty: e.target.value })}
+                                                      onMouseDown={(e) => e.stopPropagation()}
+                                                      onClick={(e) => e.stopPropagation()}
+                                                      onFocus={(e) => e.stopPropagation()}
                                                     />
                                                   </FormField>
                                                   <FormField label="До (оставьте пустым для ∞)">
@@ -1187,6 +1245,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                       placeholder="∞"
                                                       value={tierModal.maxQty}
                                                       onChange={(e) => setTierModal({ ...tierModal, maxQty: e.target.value })}
+                                                      onMouseDown={(e) => e.stopPropagation()}
+                                                      onClick={(e) => e.stopPropagation()}
+                                                      onFocus={(e) => e.stopPropagation()}
                                                     />
                                                   </FormField>
                                                   <div className="simplified-tier-modal__actions">
