@@ -278,14 +278,14 @@
 }
 
 .btn-secondary {
-  background-color: #6c757d !important;
-  border-color: #6c757d !important;
-  color: white !important;
+  background-color: #94a3b8 !important;
+  border-color: #94a3b8 !important;
+  color: #1e293b !important;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: #5a6268 !important;
-  border-color: #5a6268 !important;
+  background-color: #cbd5e1 !important;
+  border-color: #cbd5e1 !important;
 }
 
 .btn-success {

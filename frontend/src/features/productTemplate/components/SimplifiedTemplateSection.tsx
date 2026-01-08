@@ -276,14 +276,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                     </FormField>
                     <FormField label="Ширина, мм">
                       <input
-                        className="form-input"
+                        className="form-input form-input--compact"
                         value={String(selected.width_mm)}
                         onChange={(e) => updateSize(selected.id, { width_mm: Number(e.target.value) || 0 })}
                       />
                     </FormField>
                     <FormField label="Высота, мм">
                       <input
-                        className="form-input"
+                        className="form-input form-input--compact"
                         value={String(selected.height_mm)}
                         onChange={(e) => updateSize(selected.id, { height_mm: Number(e.target.value) || 0 })}
                       />
@@ -297,25 +297,48 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                       <strong>Печать (цена за изделие)</strong>
                       <div className="text-muted text-sm">Для каждого набора (технология/цветность/стороны) задайте диапазоны тиража и цену за 1 изделие.</div>
                     </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        const firstTech = printTechs[0]?.code || ''
-                        if (!firstTech) return
-                        // По умолчанию создаём диапазон "от 1 до ∞"
-                        const nextRow = {
-                          technology_code: firstTech,
-                          color_mode: 'color' as const,
-                          sides_mode: 'single' as const,
-                          tiers: [{ min_qty: 1, max_qty: undefined, unit_price: 0 }],
-                        }
-                        updateSize(selected.id, { print_prices: [...selected.print_prices, nextRow] })
-                      }}
-                      disabled={loadingLists}
-                    >
-                      Добавить цену печати
-                    </Button>
+                    <div className="flex gap-2">
+                      {selected.print_prices.length > 0 && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            // Добавляем диапазон к первой цене печати
+                            const firstPrice = selected.print_prices[0]
+                            if (firstPrice) {
+                              const next = selected.print_prices.map((r, i) => {
+                                if (i === 0) {
+                                  return { ...r, tiers: [...r.tiers, { min_qty: (r.tiers[r.tiers.length - 1]?.max_qty || r.tiers[r.tiers.length - 1]?.min_qty || 0) + 1, max_qty: undefined, unit_price: 0 }] }
+                                }
+                                return r
+                              })
+                              updateSize(selected.id, { print_prices: next })
+                            }
+                          }}
+                        >
+                          Добавить диапазон
+                        </Button>
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          const firstTech = printTechs[0]?.code || ''
+                          if (!firstTech) return
+                          // По умолчанию создаём диапазон "от 1 до ∞"
+                          const nextRow = {
+                            technology_code: firstTech,
+                            color_mode: 'color' as const,
+                            sides_mode: 'single' as const,
+                            tiers: [{ min_qty: 1, max_qty: undefined, unit_price: 0 }],
+                          }
+                          updateSize(selected.id, { print_prices: [...selected.print_prices, nextRow] })
+                        }}
+                        disabled={loadingLists}
+                      >
+                        Добавить цену печати
+                      </Button>
+                    </div>
                   </div>
                   <div className="simplified-card__content">
                     {selected.print_prices.length === 0 ? (
@@ -350,6 +373,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                     const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, technology_code: e.target.value } : r))
                                     updateSize(selected.id, { print_prices: next })
                                   }}
+                                  style={{ maxWidth: '140px' }}
                                 >
                                   {printTechs.map(t => (
                                     <option key={t.code} value={t.code}>{t.name}</option>
@@ -364,6 +388,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                     const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, color_mode: (e.target.value as any) } : r))
                                     updateSize(selected.id, { print_prices: next })
                                   }}
+                                  style={{ maxWidth: '120px' }}
                                 >
                                   <option value="color">полноцвет</option>
                                   <option value="bw">ч/б</option>
@@ -377,6 +402,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                     const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, sides_mode: (e.target.value as any) } : r))
                                     updateSize(selected.id, { print_prices: next })
                                   }}
+                                  style={{ maxWidth: '130px' }}
                                 >
                                   <option value="single">односторонняя</option>
                                   <option value="duplex">двухсторонняя</option>
@@ -1127,10 +1153,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
           </FormField>
           <div className="simplified-form-grid">
             <FormField label="Ширина, мм" required>
-              <input className="form-input" value={newSize.width_mm} onChange={(e) => setNewSize({ ...newSize, width_mm: e.target.value })} placeholder="210" />
+              <input className="form-input form-input--compact" value={newSize.width_mm} onChange={(e) => setNewSize({ ...newSize, width_mm: e.target.value })} placeholder="210" />
             </FormField>
             <FormField label="Высота, мм" required>
-              <input className="form-input" value={newSize.height_mm} onChange={(e) => setNewSize({ ...newSize, height_mm: e.target.value })} placeholder="297" />
+              <input className="form-input form-input--compact" value={newSize.height_mm} onChange={(e) => setNewSize({ ...newSize, height_mm: e.target.value })} placeholder="297" />
             </FormField>
           </div>
           <div className="simplified-add-size__actions">
