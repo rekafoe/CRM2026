@@ -341,7 +341,7 @@
 }
 
 .form-input--compact-table {
-  width: 40px;
+  width: 40px !important;
   padding: 4px 6px;
   font-size: 12px;
   text-align: center;
