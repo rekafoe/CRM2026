@@ -1,14 +1,14 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState, useEffect } from 'react'
 import { Button, FormField, Alert, Modal } from '../../../components/common'
 import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
-import { getPaperTypesFromWarehouse } from '../../../services/calculatorMaterialService'
+import { getPaperTypesFromWarehouse, type PaperTypeForCalculator } from '../../../services/calculatorMaterialService'
 import { getPrintTechnologies } from '../../../api'
 import { api } from '../../../api'
 import type { SimplifiedConfig, SimplifiedSizeConfig } from '../hooks/useProductTemplate'
 import './SimplifiedTemplateSection.css'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean }
-type PaperTypeRow = Awaited<ReturnType<typeof getPaperTypesFromWarehouse>>[number]
+type PaperTypeRow = PaperTypeForCalculator
 type ServiceRow = { id: number; name: string; operationType?: string; operation_type?: string; priceUnit?: string; price_unit?: string }
 
 interface Props {
@@ -31,6 +31,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
   const [loadingLists, setLoadingLists] = useState(false)
   const [showAddSize, setShowAddSize] = useState(false)
   const [newSize, setNewSize] = useState<{ label: string; width_mm: string; height_mm: string }>({ label: '', width_mm: '', height_mm: '' })
+  const [selectedPaperTypeId, setSelectedPaperTypeId] = useState<string | null>(null)
 
   const selected = useMemo(
     () => value.sizes.find(s => s.id === selectedSizeId) || null,
@@ -62,8 +63,19 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
       setPrintTechs((techResp || []).filter((t: any) => t && t.code))
       const allowedOps = new Set(['cut', 'score', 'fold', 'laminate'])
       setServices((svcResp || []).filter((s: any) => allowedOps.has(String(s.operation_type ?? s.operationType ?? '').toLowerCase())))
+      // Автоматически выбираем первый тип бумаги, если он есть
+      if (pt && pt.length > 0 && !selectedPaperTypeId) {
+        setSelectedPaperTypeId(pt[0].id)
+      }
     } finally {
       setLoadingLists(false)
+    }
+  }, [selectedPaperTypeId])
+
+  // Загружаем списки при монтировании компонента
+  useEffect(() => {
+    if (paperTypes.length === 0 && printTechs.length === 0 && services.length === 0 && !loadingLists) {
+      void loadLists()
     }
   }, [])
 
@@ -102,19 +114,42 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
   const svcName = useCallback((id: number) => services.find(s => Number(s.id) === Number(id))?.name || `#${id}`, [services])
   const materialName = useCallback((id: number) => allMaterials.find(m => Number(m.id) === Number(id))?.name || `#${id}`, [allMaterials])
 
-  const groupedMaterials = useMemo(() => {
-    const byPaperType = new Map<string, CalculatorMaterial[]>()
-    for (const m of allMaterials || []) {
-      const key = String((m as any).paper_type_name || (m as any).paper_type || (m as any).category_name || 'Другое')
-      const list = byPaperType.get(key) || []
-      list.push(m)
-      byPaperType.set(key, list)
+  // Материалы выбранного типа бумаги
+  const materialsForSelectedPaperType = useMemo(() => {
+    if (!selectedPaperTypeId || !paperTypes.length) return []
+    const paperType = paperTypes.find(pt => pt.id === selectedPaperTypeId)
+    if (!paperType) return []
+    
+    // Получаем все material_id из плотностей этого типа бумаги
+    const materialIds = new Set(
+      paperType.densities?.map(d => d.material_id).filter(id => id && id > 0) || []
+    )
+    
+    // Если есть материалы в allMaterials, используем их
+    if (allMaterials && allMaterials.length > 0) {
+      return allMaterials.filter(m => materialIds.has(Number(m.id)))
+        .sort((a, b) => {
+          // Сортируем по плотности, если она есть
+          const aDensity = paperType.densities?.find(d => d.material_id === Number(a.id))?.value || 0
+          const bDensity = paperType.densities?.find(d => d.material_id === Number(b.id))?.value || 0
+          return aDensity - bDensity || String(a.name).localeCompare(String(b.name))
+        })
     }
-    return Array.from(byPaperType.entries()).map(([k, items]) => ({
-      key: k,
-      items: items.sort((a, b) => String(a.name).localeCompare(String(b.name))),
-    }))
-  }, [allMaterials])
+    
+    // Если материалов нет в allMaterials, создаём на основе плотностей из типа бумаги
+    return paperType.densities
+      ?.filter(d => d.material_id && d.material_id > 0)
+      .map(d => ({
+        id: d.material_id,
+        name: `${paperType.display_name || paperType.name} ${d.value} г/м²`,
+        price: d.price || 0,
+        unit: 'лист',
+        quantity: d.available_quantity || 0,
+        is_active: d.is_available ? 1 : 0,
+        category_name: paperType.display_name || paperType.name,
+      } as any as CalculatorMaterial))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name))) || []
+  }, [selectedPaperTypeId, paperTypes, allMaterials])
 
   return (
     <div className="simplified-template">
@@ -289,68 +324,89 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                               </FormField>
                             </div>
 
-                            <div className="simplified-tiers">
-                              {row.tiers.map((t, ti) => (
-                                <div key={ti} className="simplified-tier">
-                                  <div className="simplified-tier__range">
-                                    <input
-                                      className="form-input"
-                                      value={String(t.min_qty)}
-                                      onChange={(e) => {
-                                        const v = Number(e.target.value) || 0
-                                        const next = selected.print_prices.map((r, i) => {
-                                          if (i !== idx) return r
-                                          return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, min_qty: v } : tt)) }
-                                        })
-                                        updateSize(selected.id, { print_prices: next })
-                                      }}
-                                    />
-                                    <span className="simplified-tier__dash">—</span>
-                                    <input
-                                      className="form-input"
-                                      placeholder="∞"
-                                      value={t.max_qty == null ? '' : String(t.max_qty)}
-                                      onChange={(e) => {
-                                        const raw = e.target.value
-                                        const v = raw === '' ? undefined : (Number(raw) || undefined)
-                                        const next = selected.print_prices.map((r, i) => {
-                                          if (i !== idx) return r
-                                          return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, max_qty: v } : tt)) }
-                                        })
-                                        updateSize(selected.id, { print_prices: next })
-                                      }}
-                                    />
-                                  </div>
-                                  <div className="simplified-tier__price">
-                                    <input
-                                      className="form-input"
-                                      value={String(t.price)}
-                                      onChange={(e) => {
-                                        const v = Number(e.target.value) || 0
-                                        const next = selected.print_prices.map((r, i) => {
-                                          if (i !== idx) return r
-                                          return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, price: v } : tt)) }
-                                        })
-                                        updateSize(selected.id, { print_prices: next })
-                                      }}
-                                    />
-                                    <span className="text-muted text-sm">за 1 изделие</span>
-                                  </div>
-                                  <Button
-                                    variant="error"
-                                    size="sm"
-                                    onClick={() => {
-                                      const next = selected.print_prices.map((r, i) => {
-                                        if (i !== idx) return r
-                                        return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
-                                      })
-                                      updateSize(selected.id, { print_prices: next })
-                                    }}
-                                  >
-                                    ✕
-                                  </Button>
-                                </div>
-                              ))}
+                            <div className="simplified-tiers-table">
+                              <table className="simplified-table">
+                                <thead>
+                                  <tr>
+                                    <th>От</th>
+                                    <th>До</th>
+                                    <th>Цена за 1 изделие</th>
+                                    <th></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {row.tiers.map((t, ti) => (
+                                    <tr key={ti}>
+                                      <td>
+                                        <input
+                                          className="form-input form-input--table"
+                                          type="number"
+                                          min="1"
+                                          value={String(t.min_qty)}
+                                          onChange={(e) => {
+                                            const v = Number(e.target.value) || 0
+                                            const next = selected.print_prices.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, min_qty: v } : tt)) }
+                                            })
+                                            updateSize(selected.id, { print_prices: next })
+                                          }}
+                                        />
+                                      </td>
+                                      <td>
+                                        <input
+                                          className="form-input form-input--table"
+                                          type="number"
+                                          min="1"
+                                          placeholder="∞"
+                                          value={t.max_qty == null ? '' : String(t.max_qty)}
+                                          onChange={(e) => {
+                                            const raw = e.target.value
+                                            const v = raw === '' ? undefined : (Number(raw) || undefined)
+                                            const next = selected.print_prices.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, max_qty: v } : tt)) }
+                                            })
+                                            updateSize(selected.id, { print_prices: next })
+                                          }}
+                                        />
+                                      </td>
+                                      <td>
+                                        <input
+                                          className="form-input form-input--table"
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={String(t.price)}
+                                          onChange={(e) => {
+                                            const v = Number(e.target.value) || 0
+                                            const next = selected.print_prices.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, price: v } : tt)) }
+                                            })
+                                            updateSize(selected.id, { print_prices: next })
+                                          }}
+                                        />
+                                      </td>
+                                      <td>
+                                        <Button
+                                          variant="error"
+                                          size="sm"
+                                          onClick={() => {
+                                            const next = selected.print_prices.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
+                                            })
+                                            updateSize(selected.id, { print_prices: next })
+                                          }}
+                                        >
+                                          ✕
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
                           </div>
                         ))}
@@ -363,37 +419,64 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                   <div className="simplified-card__header">
                     <div>
                       <strong>Материалы (разрешённые)</strong>
-                      <div className="text-muted text-sm">Выберите конкретные материалы. Для каждого можно задать цену “за изделие” по диапазонам.</div>
+                      <div className="text-muted text-sm">Выберите тип бумаги, затем конкретные материалы с чекбоксами. Для каждого можно задать цену "за изделие" по диапазонам.</div>
                     </div>
                   </div>
                   <div className="simplified-card__content">
-                    <div className="simplified-materials">
-                      {groupedMaterials.map(group => (
-                        <div key={group.key} className="simplified-materials__group">
-                          <div className="simplified-materials__group-title">{group.key}</div>
-                          <div className="simplified-materials__items">
-                            {group.items.map(m => {
-                              const checked = selected.allowed_material_ids.includes(Number(m.id))
-                              return (
-                                <label key={m.id} className={`simplified-checkbox ${checked ? 'simplified-checkbox--checked' : ''}`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    onChange={() => {
-                                      const nextAllowed = checked
-                                        ? selected.allowed_material_ids.filter(id => id !== Number(m.id))
-                                        : [...selected.allowed_material_ids, Number(m.id)]
-                                      updateSize(selected.id, { allowed_material_ids: nextAllowed })
-                                    }}
-                                  />
-                                  <span>{m.name}</span>
-                                </label>
-                              )
-                            })}
-                          </div>
+                    <FormField label="Тип бумаги">
+                      <select
+                        className="form-select"
+                        value={selectedPaperTypeId || ''}
+                        onChange={(e) => setSelectedPaperTypeId(e.target.value || null)}
+                        disabled={loadingLists || paperTypes.length === 0}
+                      >
+                        {paperTypes.length === 0 ? (
+                          <option value="">Загрузка...</option>
+                        ) : (
+                          <>
+                            <option value="">-- Выберите тип бумаги --</option>
+                            {paperTypes.map(pt => (
+                              <option key={pt.id} value={pt.id}>{pt.display_name || pt.name}</option>
+                            ))}
+                          </>
+                        )}
+                      </select>
+                    </FormField>
+
+                    {selectedPaperTypeId && materialsForSelectedPaperType.length > 0 && (
+                      <div className="simplified-materials mt-3">
+                        <div className="simplified-materials__group-title mb-2">Материалы ({materialsForSelectedPaperType.length})</div>
+                        <div className="simplified-materials__items">
+                          {materialsForSelectedPaperType.map(m => {
+                            const checked = selected.allowed_material_ids.includes(Number(m.id))
+                            const densityInfo = paperTypes.find(pt => pt.id === selectedPaperTypeId)
+                              ?.densities?.find(d => d.material_id === Number(m.id))
+                            return (
+                              <label key={m.id} className={`simplified-checkbox ${checked ? 'simplified-checkbox--checked' : ''}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    const nextAllowed = checked
+                                      ? selected.allowed_material_ids.filter(id => id !== Number(m.id))
+                                      : [...selected.allowed_material_ids, Number(m.id)]
+                                    updateSize(selected.id, { allowed_material_ids: nextAllowed })
+                                  }}
+                                />
+                                <span>
+                                  {m.name}
+                                  {densityInfo && <span className="text-muted text-sm"> ({densityInfo.value} г/м²)</span>}
+                                </span>
+                              </label>
+                            )
+                          })}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    )}
+
+                    {selectedPaperTypeId && materialsForSelectedPaperType.length === 0 && !loadingLists && (
+                      <Alert type="info" className="mt-3">Нет материалов для выбранного типа бумаги.</Alert>
+                    )}
 
                     <div className="mt-3">
                       <Button
@@ -456,49 +539,89 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                 ))}
                               </select>
                             </FormField>
-                            <div className="simplified-tiers">
-                              {mp.tiers.map((t, ti) => (
-                                <div key={ti} className="simplified-tier">
-                                  <div className="simplified-tier__range">
-                                    <input className="form-input" value={String(t.min_qty)} onChange={(e) => {
-                                      const v = Number(e.target.value) || 0
-                                      const next = selected.material_prices.map((r, i) => {
-                                        if (i !== idx) return r
-                                        return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, min_qty: v } : tt)) }
-                                      })
-                                      updateSize(selected.id, { material_prices: next })
-                                    }} />
-                                    <span className="simplified-tier__dash">—</span>
-                                    <input className="form-input" placeholder="∞" value={t.max_qty == null ? '' : String(t.max_qty)} onChange={(e) => {
-                                      const raw = e.target.value
-                                      const v = raw === '' ? undefined : (Number(raw) || undefined)
-                                      const next = selected.material_prices.map((r, i) => {
-                                        if (i !== idx) return r
-                                        return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, max_qty: v } : tt)) }
-                                      })
-                                      updateSize(selected.id, { material_prices: next })
-                                    }} />
-                                  </div>
-                                  <div className="simplified-tier__price">
-                                    <input className="form-input" value={String(t.price)} onChange={(e) => {
-                                      const v = Number(e.target.value) || 0
-                                      const next = selected.material_prices.map((r, i) => {
-                                        if (i !== idx) return r
-                                        return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, price: v } : tt)) }
-                                      })
-                                      updateSize(selected.id, { material_prices: next })
-                                    }} />
-                                    <span className="text-muted text-sm">за 1 изделие</span>
-                                  </div>
-                                  <Button variant="error" size="sm" onClick={() => {
-                                    const next = selected.material_prices.map((r, i) => {
-                                      if (i !== idx) return r
-                                      return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
-                                    })
-                                    updateSize(selected.id, { material_prices: next })
-                                  }}>✕</Button>
-                                </div>
-                              ))}
+                            <div className="simplified-tiers-table">
+                              <table className="simplified-table">
+                                <thead>
+                                  <tr>
+                                    <th>От</th>
+                                    <th>До</th>
+                                    <th>Цена за 1 изделие</th>
+                                    <th></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {mp.tiers.map((t, ti) => (
+                                    <tr key={ti}>
+                                      <td>
+                                        <input
+                                          className="form-input form-input--table"
+                                          type="number"
+                                          min="1"
+                                          value={String(t.min_qty)}
+                                          onChange={(e) => {
+                                            const v = Number(e.target.value) || 0
+                                            const next = selected.material_prices.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, min_qty: v } : tt)) }
+                                            })
+                                            updateSize(selected.id, { material_prices: next })
+                                          }}
+                                        />
+                                      </td>
+                                      <td>
+                                        <input
+                                          className="form-input form-input--table"
+                                          type="number"
+                                          min="1"
+                                          placeholder="∞"
+                                          value={t.max_qty == null ? '' : String(t.max_qty)}
+                                          onChange={(e) => {
+                                            const raw = e.target.value
+                                            const v = raw === '' ? undefined : (Number(raw) || undefined)
+                                            const next = selected.material_prices.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, max_qty: v } : tt)) }
+                                            })
+                                            updateSize(selected.id, { material_prices: next })
+                                          }}
+                                        />
+                                      </td>
+                                      <td>
+                                        <input
+                                          className="form-input form-input--table"
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={String(t.price)}
+                                          onChange={(e) => {
+                                            const v = Number(e.target.value) || 0
+                                            const next = selected.material_prices.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, price: v } : tt)) }
+                                            })
+                                            updateSize(selected.id, { material_prices: next })
+                                          }}
+                                        />
+                                      </td>
+                                      <td>
+                                        <Button
+                                          variant="error"
+                                          size="sm"
+                                          onClick={() => {
+                                            const next = selected.material_prices.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
+                                            })
+                                            updateSize(selected.id, { material_prices: next })
+                                          }}
+                                        >
+                                          ✕
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
                           </div>
                         ))}
@@ -518,7 +641,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                       size="sm"
                       onClick={() => {
                         const first = services[0]
-                        if (!first) return
+                        if (!first || loadingLists) return
                         updateSize(selected.id, {
                           finishing: [
                             ...selected.finishing,
@@ -526,7 +649,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                           ],
                         })
                       }}
-                      disabled={loadingLists}
+                      disabled={loadingLists || services.length === 0}
                     >
                       ➕ Услуга
                     </Button>
@@ -602,49 +725,89 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                 />
                               </FormField>
                             </div>
-                            <div className="simplified-tiers">
-                              {f.tiers.map((t, ti) => (
-                                <div key={ti} className="simplified-tier">
-                                  <div className="simplified-tier__range">
-                                    <input className="form-input" value={String(t.min_qty)} onChange={(e) => {
-                                      const v = Number(e.target.value) || 0
-                                      const next = selected.finishing.map((r, i) => {
-                                        if (i !== idx) return r
-                                        return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, min_qty: v } : tt)) }
-                                      })
-                                      updateSize(selected.id, { finishing: next })
-                                    }} />
-                                    <span className="simplified-tier__dash">—</span>
-                                    <input className="form-input" placeholder="∞" value={t.max_qty == null ? '' : String(t.max_qty)} onChange={(e) => {
-                                      const raw = e.target.value
-                                      const v = raw === '' ? undefined : (Number(raw) || undefined)
-                                      const next = selected.finishing.map((r, i) => {
-                                        if (i !== idx) return r
-                                        return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, max_qty: v } : tt)) }
-                                      })
-                                      updateSize(selected.id, { finishing: next })
-                                    }} />
-                                  </div>
-                                  <div className="simplified-tier__price">
-                                    <input className="form-input" value={String(t.price)} onChange={(e) => {
-                                      const v = Number(e.target.value) || 0
-                                      const next = selected.finishing.map((r, i) => {
-                                        if (i !== idx) return r
-                                        return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, price: v } : tt)) }
-                                      })
-                                      updateSize(selected.id, { finishing: next })
-                                    }} />
-                                    <span className="text-muted text-sm">{f.price_unit === 'per_cut' ? 'за 1 рез/биг/фальц' : 'за 1 изделие'}</span>
-                                  </div>
-                                  <Button variant="error" size="sm" onClick={() => {
-                                    const next = selected.finishing.map((r, i) => {
-                                      if (i !== idx) return r
-                                      return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
-                                    })
-                                    updateSize(selected.id, { finishing: next })
-                                  }}>✕</Button>
-                                </div>
-                              ))}
+                            <div className="simplified-tiers-table">
+                              <table className="simplified-table">
+                                <thead>
+                                  <tr>
+                                    <th>От</th>
+                                    <th>До</th>
+                                    <th>Цена {f.price_unit === 'per_cut' ? 'за 1 рез/биг/фальц' : 'за 1 изделие'}</th>
+                                    <th></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {f.tiers.map((t, ti) => (
+                                    <tr key={ti}>
+                                      <td>
+                                        <input
+                                          className="form-input form-input--table"
+                                          type="number"
+                                          min="1"
+                                          value={String(t.min_qty)}
+                                          onChange={(e) => {
+                                            const v = Number(e.target.value) || 0
+                                            const next = selected.finishing.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, min_qty: v } : tt)) }
+                                            })
+                                            updateSize(selected.id, { finishing: next })
+                                          }}
+                                        />
+                                      </td>
+                                      <td>
+                                        <input
+                                          className="form-input form-input--table"
+                                          type="number"
+                                          min="1"
+                                          placeholder="∞"
+                                          value={t.max_qty == null ? '' : String(t.max_qty)}
+                                          onChange={(e) => {
+                                            const raw = e.target.value
+                                            const v = raw === '' ? undefined : (Number(raw) || undefined)
+                                            const next = selected.finishing.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, max_qty: v } : tt)) }
+                                            })
+                                            updateSize(selected.id, { finishing: next })
+                                          }}
+                                        />
+                                      </td>
+                                      <td>
+                                        <input
+                                          className="form-input form-input--table"
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={String(t.price)}
+                                          onChange={(e) => {
+                                            const v = Number(e.target.value) || 0
+                                            const next = selected.finishing.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, price: v } : tt)) }
+                                            })
+                                            updateSize(selected.id, { finishing: next })
+                                          }}
+                                        />
+                                      </td>
+                                      <td>
+                                        <Button
+                                          variant="error"
+                                          size="sm"
+                                          onClick={() => {
+                                            const next = selected.finishing.map((r, i) => {
+                                              if (i !== idx) return r
+                                              return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
+                                            })
+                                            updateSize(selected.id, { finishing: next })
+                                          }}
+                                        >
+                                          ✕
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
                           </div>
                         ))}
