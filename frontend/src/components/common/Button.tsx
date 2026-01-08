@@ -7,7 +7,7 @@ interface ButtonProps {
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
   loading?: boolean;
-  onClick?: () => void;
+  onClick?: (e?: React.MouseEvent) => void;
   type?: 'button' | 'submit' | 'reset';
   className?: string;
   icon?: React.ReactNode;
@@ -50,9 +50,9 @@ export const Button: React.FC<ButtonProps> = ({
   const sizeClasses = getSizeClasses(size);
   const disabledClasses = disabled || loading ? 'opacity-50 cursor-not-allowed' : '';
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
     if (!disabled && !loading && onClick) {
-      onClick();
+      onClick(e);
     }
   };
 
