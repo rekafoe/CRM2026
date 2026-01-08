@@ -570,13 +570,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                     </div>
                   </div>
                   <div className="simplified-card__content">
-                    <FormField label="Тип бумаги">
-                      <select
-                        className="form-select form-select--compact"
-                        value={selectedPaperTypeId || ''}
-                        onChange={(e) => setSelectedPaperTypeId(e.target.value || null)}
-                        disabled={loadingLists || paperTypes.length === 0}
-                      >
+                    <div style={{ maxWidth: '200px' }}>
+                      <FormField label="Тип бумаги">
+                        <select
+                          className="form-select form-select--compact"
+                          value={selectedPaperTypeId || ''}
+                          onChange={(e) => setSelectedPaperTypeId(e.target.value || null)}
+                          disabled={loadingLists || paperTypes.length === 0}
+                        >
                         {paperTypes.length === 0 ? (
                           <option value="">Загрузка...</option>
                         ) : (
@@ -589,6 +590,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                         )}
                       </select>
                     </FormField>
+                    </div>
 
                     {selectedPaperTypeId && materialsForSelectedPaperType.length > 0 && (
                       <div className="simplified-materials mt-3">

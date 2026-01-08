@@ -199,10 +199,13 @@
   background: var(--bg-primary, #fff);
   cursor: pointer;
   flex: 1 0 auto;
-  min-width: 120px;
-  max-width: 160px;
+  min-width: 140px;
+  max-width: 180px;
   font-size: 13px;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .simplified-checkbox--checked {
@@ -440,96 +443,4 @@
     max-width: 110px;
   }
 }
-
-/* Мобильная адаптация для таблиц диапазонов */
-@media (max-width: 768px) {
-  .simplified-tiers-table {
-    display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .simplified-table--mobile-stack {
-    display: block;
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0 8px;
-  }
-
-  .simplified-table--mobile-stack thead {
-    display: none; /* Скрываем заголовки на мобильных */
-  }
-
-  .simplified-table--mobile-stack tbody {
-    display: block;
-  }
-
-  .simplified-table--mobile-stack tr {
-    display: block;
-    background: var(--bg-primary, #fff);
-    border: 1px solid var(--border-color, #e5e7eb);
-    border-radius: 8px;
-    margin-bottom: 8px;
-    padding: 12px;
-  }
-
-  .simplified-table--mobile-stack tr:last-child {
-    margin-bottom: 0;
-  }
-
-  .simplified-table--mobile-stack td {
-    display: block;
-    padding: 8px 0;
-    border: none;
-    text-align: left;
-  }
-
-  .simplified-table--mobile-stack .simplified-table__price-label {
-    font-weight: 600;
-    color: var(--text-primary, #111827);
-    margin-bottom: 4px;
-  }
-
-  .simplified-table--mobile-stack .form-input--compact-table {
-    width: 100%;
-    margin-top: 4px;
-  }
-
-  /* Специальные стили для мобильных диапазонов */
-  .simplified-mobile-range {
-    background: var(--bg-hover, #f9fafb);
-    border: 1px solid var(--border-color, #e5e7eb);
-    border-radius: 6px;
-    padding: 8px 10px;
-    margin-bottom: 8px;
-  }
-
-  .simplified-mobile-range__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--text-secondary, #6b7280);
-  }
-
-  .simplified-mobile-range__actions {
-    display: flex;
-    gap: 4px;
-  }
-
-  .simplified-mobile-range__price {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .simplified-mobile-range__price-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-primary, #111827);
-  }
-}
-
-
 
