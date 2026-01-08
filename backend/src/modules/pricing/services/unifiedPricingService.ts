@@ -10,6 +10,7 @@
 
 import { getDb } from '../../../db';
 import { FlexiblePricingService } from './flexiblePricingService';
+import { SimplifiedPricingService } from './simplifiedPricingService';
 import type { ProductSize } from './layoutCalculationService';
 import { logger } from '../../../utils/logger';
 
@@ -61,7 +62,7 @@ export interface UnifiedPricingResult {
   
   // Метаданные
   calculatedAt: string;
-  calculationMethod: 'flexible_operations' | 'fallback_legacy';
+  calculationMethod: 'flexible_operations' | 'fallback_legacy' | 'simplified';
 }
 
 export class UnifiedPricingService {
@@ -77,6 +78,24 @@ export class UnifiedPricingService {
     logger.info('💰 UnifiedPricingService: начало расчета', { productId, quantity });
     
     try {
+      // 1. Проверяем calculator_type продукта
+      const db = await getDb();
+      const product = await db.get<{ calculator_type?: string | null }>(
+        `SELECT calculator_type FROM products WHERE id = ?`,
+        [productId]
+      );
+      
+      if (!product) {
+        throw new Error('Product not found');
+      }
+      
+      // 2. Если simplified - используем SimplifiedPricingService
+      if (product.calculator_type === 'simplified') {
+        logger.info('✨ Используется SimplifiedPricingService (упрощённый калькулятор)', { productId });
+        return await this.calculateViaSimplifiedSystem(productId, configuration, quantity);
+      }
+      
+      // 3. Иначе - используем FlexiblePricingService (стандартный калькулятор)
       // Проверяем и при необходимости создаём операции для продукта
       const hasOperations = await this.ensureProductHasOperations(productId);
 
@@ -302,6 +321,75 @@ export class UnifiedPricingService {
       return false;
     }
     return true;
+  }
+  
+  /**
+   * Расчет через упрощённую систему (прямые цены из config_data.simplified)
+   */
+  private static async calculateViaSimplifiedSystem(
+    productId: number,
+    configuration: any,
+    quantity: number
+  ): Promise<UnifiedPricingResult> {
+    const result = await SimplifiedPricingService.calculatePrice(
+      productId,
+      configuration,
+      quantity
+    );
+    
+    // Преобразуем SimplifiedPricingResult в UnifiedPricingResult
+    return {
+      productId: result.productId,
+      productName: result.productName,
+      quantity: result.quantity,
+      productSize: result.selectedSize ? {
+        width: result.selectedSize.width_mm,
+        height: result.selectedSize.height_mm,
+      } : { width: 0, height: 0 },
+      layout: {},
+      materials: result.selectedMaterial ? [{
+        materialId: result.selectedMaterial.material_id,
+        materialName: result.selectedMaterial.material_name,
+        quantity: result.quantity,
+        unitPrice: result.materialDetails?.tier.price || 0,
+        totalCost: result.materialPrice,
+      }] : [],
+      operations: [
+        ...(result.printDetails ? [{
+          operationId: 0,
+          operationName: 'Печать',
+          operationType: 'print',
+          priceUnit: 'per_item' as const,
+          unitPrice: result.printDetails.tier.price,
+          quantity: result.quantity,
+          setupCost: 0,
+          totalCost: result.printPrice,
+          appliedRules: undefined,
+        }] : []),
+        ...(result.finishingDetails?.map(f => ({
+          operationId: f.service_id,
+          operationName: f.service_name,
+          operationType: 'other' as const,
+          priceUnit: result.selectedFinishing?.find(sf => sf.service_id === f.service_id)?.price_unit || 'per_item' as const,
+          unitPrice: f.tier.price,
+          quantity: f.units_needed,
+          setupCost: 0,
+          totalCost: f.priceForQuantity,
+          appliedRules: undefined,
+        })) || []),
+      ],
+      materialCost: result.materialPrice,
+      operationsCost: result.printPrice + result.finishingPrice,
+      setupCosts: 0,
+      subtotal: result.subtotal,
+      markup: 0, // В упрощённом калькуляторе наценки уже учтены
+      discountPercent: 0,
+      discountAmount: 0,
+      finalPrice: result.finalPrice,
+      pricePerUnit: result.pricePerUnit,
+      calculatedAt: result.calculatedAt,
+      calculationMethod: 'simplified',
+    };
   }
   
   /**

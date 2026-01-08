@@ -5,6 +5,7 @@ export { UnifiedPricingService } from './services/unifiedPricingService';
 
 // Services (для внутреннего использования)
 export { FlexiblePricingService } from './services/flexiblePricingService';
+export { SimplifiedPricingService } from './services/simplifiedPricingService';
 export { CostCalculationService } from './services/costCalculationService';
 export { LayoutCalculationService } from './services/layoutCalculationService';
 export { MarkupSettingsService } from './services/markupSettingsService';
