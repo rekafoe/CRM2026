@@ -100,35 +100,39 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
   // Закрытие модалки при клике вне её
   const tierModalRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (!tierModal.isOpen) return
+    
     const handleClickOutside = (e: MouseEvent) => {
-      if (!tierModal.isOpen || !tierModalRef.current) return
+      if (!tierModalRef.current) return
       
       const target = e.target as HTMLElement
+      
       // Проверяем, что клик был действительно вне модалки
       if (tierModalRef.current.contains(target)) {
         return // Клик внутри модалки - не закрываем
       }
       
-      // Проверяем, что клик не на кнопке открытия модалки
+      // Проверяем, что клик не на кнопке открытия модалки или редактирования диапазона
       const button = target.closest('button')
-      if (button && button.textContent?.includes('Диапазон')) {
-        return // Клик на кнопке открытия - не закрываем
+      if (button) {
+        const buttonText = button.textContent || ''
+        if (buttonText.includes('Диапазон') || buttonText.includes('✎') || button.classList.contains('simplified-table__edit-range')) {
+          return // Клик на кнопке открытия/редактирования - не закрываем
+        }
       }
       
       // Закрываем модалку только если клик действительно вне её
       setTierModal((prev) => ({ ...prev, isOpen: false, tierIdx: undefined }))
     }
     
-    if (tierModal.isOpen) {
-      // Используем небольшую задержку, чтобы событие от кнопки открытия не закрывало модалку
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('mousedown', handleClickOutside, true)
-      }, 100)
-      
-      return () => {
-        clearTimeout(timeoutId)
-        document.removeEventListener('mousedown', handleClickOutside, true)
-      }
+    // Используем небольшую задержку, чтобы событие от кнопки открытия не закрывало модалку
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside, true)
+    }, 100)
+    
+    return () => {
+      clearTimeout(timeoutId)
+      document.removeEventListener('click', handleClickOutside, true)
     }
   }, [tierModal.isOpen])
 
@@ -312,88 +316,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                 {techName(row.technology_code)} • {row.color_mode === 'color' ? 'полноцвет' : 'ч/б'} • {row.sides_mode === 'single' ? '1 сторона' : row.sides_mode === 'duplex' ? '2 стороны' : '2 стороны (ч/б оборот)'}
                               </div>
                               <div className="simplified-row__actions">
-                                <div className="simplified-row__add-range-wrapper">
-                                  {tierModal.isOpen && tierModal.type === 'print' && tierModal.printIdx === idx && (
-                                    <div
-                                      ref={tierModalRef}
-                                      className="simplified-tier-modal"
-                                    >
-                                      <div className="simplified-tier-modal__content">
-                                        <div className="simplified-tier-modal__header">
-                                          <strong>{tierModal.tierIdx !== undefined ? 'Редактировать диапазон' : 'Добавить диапазон'}</strong>
-                                          <button
-                                            type="button"
-                                            className="simplified-tier-modal__close"
-                                            onClick={() => setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })}
-                                          >
-                                            ✕
-                                          </button>
-                                        </div>
-                                        <div className="simplified-tier-modal__body">
-                                          <FormField label="От">
-                                            <input
-                                              className="form-input form-input--compact"
-                                              type="number"
-                                              min="1"
-                                              step="1"
-                                              value={tierModal.minQty}
-                                              onChange={(e) => setTierModal({ ...tierModal, minQty: e.target.value })}
-                                            />
-                                          </FormField>
-                                          <FormField label="До (оставьте пустым для ∞)">
-                                            <input
-                                              className="form-input form-input--compact"
-                                              type="number"
-                                              min="1"
-                                              step="1"
-                                              placeholder="∞"
-                                              value={tierModal.maxQty}
-                                              onChange={(e) => setTierModal({ ...tierModal, maxQty: e.target.value })}
-                                            />
-                                          </FormField>
-                                          <div className="simplified-tier-modal__actions">
-                                            <Button
-                                              variant="secondary"
-                                              size="sm"
-                                              onClick={() => setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })}
-                                            >
-                                              Отмена
-                                            </Button>
-                                            <Button
-                                              variant="primary"
-                                              size="sm"
-                                              onClick={() => {
-                                                const minQty = Number(tierModal.minQty) || 1
-                                                const maxQty = tierModal.maxQty === '' ? undefined : (Number(tierModal.maxQty) || undefined)
-                                                const next = selected.print_prices.map((r, i) => {
-                                                  if (i !== idx) return r
-                                                  if (tierModal.tierIdx !== undefined) {
-                                                    // Редактирование существующего диапазона
-                                                    return { 
-                                                      ...r, 
-                                                      tiers: r.tiers.map((tt, j) => 
-                                                        j === tierModal.tierIdx 
-                                                          ? { ...tt, min_qty: minQty, max_qty: maxQty }
-                                                          : tt
-                                                      )
-                                                    }
-                                                  } else {
-                                                    // Добавление нового диапазона
-                                                    return { ...r, tiers: [...r.tiers, { min_qty: minQty, max_qty: maxQty, unit_price: 0 }] }
-                                                  }
-                                                })
-                                                updateSize(selected.id, { print_prices: next })
-                                                setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
-                                              }}
-                                            >
-                                              {tierModal.tierIdx !== undefined ? 'Сохранить' : 'Добавить'}
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
                                 <Button
                                   variant="error"
                                   size="sm"
@@ -517,8 +439,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                               ref={tierModalRef}
                                               className="simplified-tier-modal"
                                               onMouseDown={(e) => e.stopPropagation()}
+                                              onClick={(e) => e.stopPropagation()}
                                             >
-                                              <div className="simplified-tier-modal__content">
+                                              <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
                                                 <div className="simplified-tier-modal__header">
                                                   <strong>{tierModal.tierIdx !== undefined ? 'Редактировать диапазон' : 'Добавить диапазон'}</strong>
                                                   <button
@@ -560,11 +483,13 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                       onFocus={(e) => e.stopPropagation()}
                                                     />
                                                   </FormField>
-                                                  <div className="simplified-tier-modal__actions">
+                                                  <div className="simplified-tier-modal__actions" onClick={(e) => e.stopPropagation()}>
                                                     <Button
                                                       variant="secondary"
                                                       size="sm"
-                                                      onClick={() => setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })}
+                                                      onClick={() => {
+                                                        setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                                      }}
                                                     >
                                                       Отмена
                                                     </Button>
@@ -928,8 +853,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                               ref={tierModalRef}
                                               className="simplified-tier-modal"
                                               onMouseDown={(e) => e.stopPropagation()}
+                                              onClick={(e) => e.stopPropagation()}
                                             >
-                                              <div className="simplified-tier-modal__content">
+                                              <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
                                                 <div className="simplified-tier-modal__header">
                                                   <strong>{tierModal.tierIdx !== undefined ? 'Редактировать диапазон' : 'Добавить диапазон'}</strong>
                                                   <button
@@ -971,11 +897,13 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                       onFocus={(e) => e.stopPropagation()}
                                                     />
                                                   </FormField>
-                                                  <div className="simplified-tier-modal__actions">
+                                                  <div className="simplified-tier-modal__actions" onClick={(e) => e.stopPropagation()}>
                                                     <Button
                                                       variant="secondary"
                                                       size="sm"
-                                                      onClick={() => setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })}
+                                                      onClick={() => {
+                                                        setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                                      }}
                                                     >
                                                       Отмена
                                                     </Button>
@@ -1207,8 +1135,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                               ref={tierModalRef}
                                               className="simplified-tier-modal"
                                               onMouseDown={(e) => e.stopPropagation()}
+                                              onClick={(e) => e.stopPropagation()}
                                             >
-                                              <div className="simplified-tier-modal__content">
+                                              <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
                                                 <div className="simplified-tier-modal__header">
                                                   <strong>{tierModal.tierIdx !== undefined ? 'Редактировать диапазон' : 'Добавить диапазон'}</strong>
                                                   <button
@@ -1250,11 +1179,13 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                                       onFocus={(e) => e.stopPropagation()}
                                                     />
                                                   </FormField>
-                                                  <div className="simplified-tier-modal__actions">
+                                                  <div className="simplified-tier-modal__actions" onClick={(e) => e.stopPropagation()}>
                                                     <Button
                                                       variant="secondary"
                                                       size="sm"
-                                                      onClick={() => setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })}
+                                                      onClick={() => {
+                                                        setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
+                                                      }}
                                                     >
                                                       Отмена
                                                     </Button>
