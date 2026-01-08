@@ -2,7 +2,13 @@ import { useReducer } from 'react'
 
 export type PriceRule = { min_qty: number; max_qty?: number; unit_price?: number; discount_percent?: number }
 
-export type SimplifiedQtyTier = { min_qty: number; max_qty?: number; price: number }
+// Цены для каждого фиксированного тиража (1, 5, 10, 50, 100, 500, 1000, infinity)
+export type SimplifiedQtyTier = { 
+  min_qty: number; 
+  max_qty?: number; 
+  // Массив цен для каждого тиража: [1x, 5x, 10x, 50x, 100x, 500x, 1000x, 1000-∞x]
+  tier_prices: number[];
+}
 export type SimplifiedPrintKey = { technology_code: string; color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex' | 'duplex_bw_back' }
 export type SimplifiedPrintPrice = SimplifiedPrintKey & { tiers: SimplifiedQtyTier[] }
 export type SimplifiedMaterialPrice = { material_id: number; tiers: SimplifiedQtyTier[] }
