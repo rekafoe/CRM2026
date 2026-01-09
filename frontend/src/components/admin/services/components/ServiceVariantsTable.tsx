@@ -731,7 +731,9 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         await handleDeleteVariant(variant.id);
                                       }
                                     }}
+                                    title="Удалить тип"
                                   >
+                                    <span style={{ fontSize: '14px' }}>×</span>
                                   </button>
                                 </div>
                               </div>
@@ -879,7 +881,9 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         type="button"
                                         className="el-button el-button--danger el-button--small"
                                         onClick={() => handleDeleteVariant(variant.id)}
+                                        title="Удалить вариант"
                                       >
+                                        <span style={{ fontSize: '14px' }}>×</span>
                                       </button>
                                     </div>
                                   </div>
