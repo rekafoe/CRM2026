@@ -206,16 +206,23 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
       const [pt, techResp, svcResp] = await Promise.all([
         getPaperTypesFromWarehouse(),
         getPrintTechnologies().then(r => (Array.isArray(r.data) ? r.data : [])),
-        api.get('/pricing/services').then(r => (Array.isArray(r.data) ? r.data : [])),
+        api.get('/pricing/services').then(r => (Array.isArray(r.data) ? r.data : [])).catch(err => {
+          console.error('Ошибка загрузки услуг отделки:', err)
+          return []
+        }),
       ])
       setPaperTypes(pt || [])
       setPrintTechs((techResp || []).filter((t: any) => t && t.code))
       const allowedOps = new Set(['cut', 'score', 'fold', 'laminate'])
-      setServices((svcResp || []).filter((s: any) => allowedOps.has(String(s.operation_type ?? s.operationType ?? '').toLowerCase())))
+      const filteredServices = (svcResp || []).filter((s: any) => allowedOps.has(String(s.operation_type ?? s.operationType ?? '').toLowerCase()))
+      setServices(filteredServices)
+      console.log('Загружены услуги отделки:', filteredServices.length, filteredServices)
       // Автоматически выбираем первый тип бумаги, если он есть
       if (pt && pt.length > 0 && !selectedPaperTypeId) {
         setSelectedPaperTypeId(pt[0].id)
       }
+    } catch (error) {
+      console.error('Ошибка загрузки списков:', error)
     } finally {
       setLoadingLists(false)
     }
@@ -223,10 +230,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
 
   // Загружаем списки при монтировании компонента
   useEffect(() => {
-    if (paperTypes.length === 0 && printTechs.length === 0 && services.length === 0 && !loadingLists) {
+    if (!loadingLists && (paperTypes.length === 0 || printTechs.length === 0 || services.length === 0)) {
       void loadLists()
     }
-  }, [])
+  }, []) // Загружаем только один раз при монтировании
 
   // Закрытие модалки при клике вне её
   const tierModalRef = useRef<HTMLDivElement>(null)
@@ -1243,8 +1250,20 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                     </div>
                   </div>
                   <div className="simplified-card__content">
-                    {services.length === 0 ? (
+                    {loadingLists ? (
                       <div className="text-muted">Загрузка услуг отделки...</div>
+                    ) : services.length === 0 ? (
+                      <div className="text-muted">
+                        <div>Услуги отделки не найдены. Проверьте настройки услуг в системе.</div>
+                        <button
+                          type="button"
+                          className="el-button el-button--text el-button--mini"
+                          onClick={() => void loadLists()}
+                          style={{ marginTop: '8px' }}
+                        >
+                          Попробовать снова
+                        </button>
+                      </div>
                     ) : (() => {
                       const commonRanges = getSizeRanges(selected)
                       
