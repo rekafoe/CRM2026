@@ -5,6 +5,7 @@ import { getPaperTypesFromWarehouse, type PaperTypeForCalculator } from '../../.
 import { getPrintTechnologies } from '../../../api'
 import { api } from '../../../api'
 import type { SimplifiedConfig, SimplifiedSizeConfig } from '../hooks/useProductTemplate'
+import { ServicePricingTable, type ServiceItem, type ServicePricing } from './ServicePricingTable'
 import './SimplifiedTemplateSection.css'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean }
@@ -1267,156 +1268,35 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                     ) : (() => {
                       const commonRanges = getSizeRanges(selected)
                       
+                      // Преобразуем services в формат ServiceItem
+                      const serviceItems: ServiceItem[] = services.map(s => ({
+                        id: Number(s.id),
+                        name: s.name
+                      }))
+                      
+                      // Преобразуем finishing в формат ServicePricing
+                      const servicePricings: ServicePricing[] = selected.finishing.map(f => ({
+                        service_id: f.service_id,
+                        price_unit: f.price_unit,
+                        units_per_item: f.units_per_item,
+                        tiers: f.tiers
+                      }))
+                      
                       return (
-                        <div className="simplified-tiers-table">
-                          <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
-                            <thead>
-                              <tr>
-                                <th>Параметры отделки (цена за рез/биг/фальц или за изделие)</th>
-                                {commonRanges.map((t, ti) => {
-                                  const rangeLabel = t.max_qty == null ? `${t.min_qty} - ∞` : String(t.min_qty)
-                                  return (
-                                    <th key={ti} className="simplified-table__range-cell">
-                                      <div className="cell">
-                                        <span
-                                          style={{ cursor: 'pointer' }}
-                          onClick={() => {
-                            setTierModal({
-                                              type: 'edit',
-                                              tierIndex: ti,
-                              isOpen: true,
-                                              boundary: String(t.min_qty),
-                                              anchorElement: undefined
-                            })
+                        <ServicePricingTable
+                          services={serviceItems}
+                          servicePricings={servicePricings}
+                          commonRanges={commonRanges}
+                          onUpdate={(newPricings) => {
+                            updateSize(selected.id, { finishing: newPricings })
                           }}
-                        >
-                                          {rangeLabel}
-                                        </span>
-                                        <span>
-                                          <button
-                                            type="button"
-                                            className="el-button remove-range el-button--text el-button--mini"
-                                            style={{ color: 'red', marginRight: '-15px' }}
-                        onClick={() => {
-                                              const newRanges = removeRange(commonRanges, ti)
-                                              updateSizeRanges(selected.id, newRanges)
-                                            }}
-                                          >
-                                            ×
-                                          </button>
-                                        </span>
-                    </div>
-                                    </th>
-                                  )
-                                })}
-                                <th>
-                                  <div className="cell">
-                                    <div className="simplified-row__add-range-wrapper">
-                          <button
-                            type="button"
-                                        className="el-button el-button--info el-button--mini is-plain"
-                                        style={{ width: '100%', marginLeft: '0px' }}
-                            onClick={(e) => {
-                                          const button = e.currentTarget as HTMLElement
-                                          setTierModal({
-                                            type: 'add',
-                                            isOpen: true,
-                                            boundary: '',
-                                            anchorElement: button
-                                          })
-                                        }}
-                                      >
-                                        + Диапазон
-                          </button>
-                        </div>
-                                  </div>
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {services.map(service => {
-                                const finishing = selected.finishing.find(f => f.service_id === Number(service.id))
-                                const actualIdx = selected.finishing.findIndex(f => f.service_id === Number(service.id))
-                                
-                                // Если услуги нет в finishing, используем дефолтные значения
-                                const defaultFinishing = {
-                                  service_id: Number(service.id),
-                                  price_unit: 'per_cut' as const,
-                                  units_per_item: 1,
-                                  tiers: commonRanges.map(r => ({ ...r, unit_price: 0 }))
-                                }
-                                const activeFinishing = finishing || defaultFinishing
-                                
-                                return (
-                                  <tr key={service.id}>
-                                    <td>
-                                      <div className="el-select el-select--small" style={{ width: '100%' }}>
-                                        <div className="el-input el-input--small el-input--suffix">
-                            <input
-                                            type="text"
-                                            readOnly
-                                            className="el-input__inner"
-                                            value={service.name}
-                                            style={{ cursor: 'default' }}
-                                          />
-                                          <span className="el-input__suffix">
-                                            <span className="el-input__suffix-inner">
-                                              <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                            </span>
-                                          </span>
-                          </div>
-                        </div>
-                                    </td>
-                                    {commonRanges.map((t, ti) => {
-                                      const priceTier = activeFinishing.tiers.find(rt => rt.min_qty === t.min_qty) || t
-                                      return (
-                                        <td key={ti}>
-                                <input
-                                            className="form-input form-input--compact-table"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={String(priceTier.unit_price || 0)}
-                                  onChange={(e) => {
-                                    const v = Number(e.target.value) || 0
-                                    if (actualIdx === -1) {
-                                      // Создаем новую запись для услуги
-                                      const newFinishing = {
-                                        service_id: Number(service.id),
-                                        price_unit: 'per_cut' as const,
-                                        units_per_item: 1,
-                                        tiers: commonRanges.map((rt, rti) => {
-                                          if (rti === ti) return { ...rt, unit_price: v }
-                                          return { ...rt, unit_price: 0 }
-                                        })
-                                      }
-                                      updateSize(selected.id, {
-                                        finishing: [...selected.finishing, newFinishing]
-                                      })
-                                    } else {
-                                      const next = selected.finishing.map((r, i) => {
-                                        if (i !== actualIdx) return r
-                                        const updatedTiers = commonRanges.map((rt, rti) => {
-                                          if (rti === ti) return { ...rt, unit_price: v }
-                                          const existingTier = r.tiers.find(t => t.min_qty === rt.min_qty)
-                                          return existingTier || rt
-                                        })
-                                        return { ...r, tiers: updatedTiers }
-                                      })
-                                      updateSize(selected.id, { finishing: next })
-                                    }
-                                              }}
-                                          />
-                                        </td>
-                                      )
-                                    })}
-                                      <td></td>
-                                    </tr>
-                                )
-                              })}
-                                  </tbody>
-                                </table>
-                              </div>
+                          onRangesUpdate={(newRanges) => {
+                            updateSizeRanges(selected.id, newRanges)
+                          }}
+                          rangesEditable={true}
+                          isMobile={isMobile}
+                          title="Параметры отделки (цена за рез/биг/фальц или за изделие)"
+                        />
                       )
                     })()}
                   </div>
