@@ -93,7 +93,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-semibold">Варианты услуги: {serviceName}</h3>
-        <Button variant="primary" size="sm" onClick={handleCreateVariant}>
+        <Button variant="primary" size="sm" onClick={() => {
+          console.log('Main create button clicked');
+          handleCreateVariant();
+        }}>
           + Добавить тип
         </Button>
       </div>
@@ -122,7 +125,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                           <button
                             type="button"
                             className="el-button el-button--success el-button--small"
-                            onClick={handleCreateVariant}
+                            onClick={() => {
+                            console.log('Header create button clicked');
+                            handleCreateVariant();
+                          }}
                             title="Добавить строку (тип)"
                           >
                             <span style={{ fontSize: '14px' }}>↓</span>
@@ -233,14 +239,18 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                 <button
                                   type="button"
                                   className="el-button el-button--success el-button--small is-plain"
-                                  onClick={async () => {
-                                    try {
-                                      const newVariant = await operations.createVariant(typeName, { type: '', density: '' });
-                                      editing.startEditingParams(newVariant.id, { type: '', density: '' });
-                                    } catch (err) {
-                                      console.error('Ошибка создания дочерней строки:', err);
-                                      // Ошибка уже обработана в хуке и отображена через setError
-                                    }
+                                  onClick={() => {
+                                    console.log('Child button clicked');
+                                    const handler = async () => {
+                                      try {
+                                        const newVariant = await operations.createVariant(typeName, { type: '', density: '' });
+                                        editing.startEditingParams(newVariant.id, { type: '', density: '' });
+                                      } catch (err) {
+                                        console.error('Ошибка создания дочерней строки:', err);
+                                        // Ошибка уже обработана в хуке и отображена через setError
+                                      }
+                                    };
+                                    handler();
                                   }}
                                   title="Добавить дочернюю строку"
                                 >
@@ -358,14 +368,18 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         <button
                                           type="button"
                                           className="el-button el-button--success el-button--small"
-                                          onClick={async () => {
-                                            try {
-                                              const newVariant = await operations.createVariant(typeName, { type: '', density: '' });
-                                              editing.startEditingParams(newVariant.id, { type: '', density: '' });
-                                            } catch (err) {
-                                              console.error('Ошибка создания строки на том же уровне (уровень 1):', err);
-                                              // Ошибка уже обработана в хуке и отображена через setError
-                                            }
+                                          onClick={() => {
+                                            console.log('Level 1 button clicked');
+                                            const handler = async () => {
+                                              try {
+                                                const newVariant = await operations.createVariant(typeName, { type: '', density: '' });
+                                                editing.startEditingParams(newVariant.id, { type: '', density: '' });
+                                              } catch (err) {
+                                                console.error('Ошибка создания строки на том же уровне (уровень 1):', err);
+                                                // Ошибка уже обработана в хуке и отображена через setError
+                                              }
+                                            };
+                                            handler();
                                           }}
                                           title="Добавить строку на том же уровне"
                                         >
@@ -374,18 +388,22 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         <button
                                           type="button"
                                           className="el-button el-button--success el-button--small is-plain"
-                                          onClick={async () => {
-                                            try {
-                                              const newVariant = await operations.createVariant(typeName, {
-                                                ...variant.parameters,
-                                                parentVariantId: variant.id,
-                                                subType: '',
-                                              });
-                                              editing.startEditingParams(newVariant.id, { ...variant.parameters, parentVariantId: variant.id, subType: '' });
-                                            } catch (err) {
-                                              console.error('Ошибка создания дочерней строки (уровень 2):', err);
-                                              // Ошибка уже обработана в хуке и отображена через setError
-                                            }
+                                          onClick={() => {
+                                            console.log('Level 2 button clicked');
+                                            const handler = async () => {
+                                              try {
+                                                const newVariant = await operations.createVariant(typeName, {
+                                                  ...variant.parameters,
+                                                  parentVariantId: variant.id,
+                                                  subType: '',
+                                                });
+                                                editing.startEditingParams(newVariant.id, { ...variant.parameters, parentVariantId: variant.id, subType: '' });
+                                              } catch (err) {
+                                                console.error('Ошибка создания дочерней строки (уровень 2):', err);
+                                                // Ошибка уже обработана в хуке и отображена через setError
+                                              }
+                                            };
+                                            handler();
                                           }}
                                           title="Добавить дочернюю строку (уровень 2)"
                                         >
