@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { FormField } from '../../../common/components/FormField'
-import { Button } from '../../../common/components/Button'
-import { getServiceVolumeTiers, type ServiceVolumeTier } from '../../../services/pricing/api'
+import { FormField, Button } from '../../../components/common'
+import { getServiceVolumeTiers } from '../../../services/pricing/api'
+import type { ServiceVolumeTier } from '../../../types/pricing'
 
 // Типы для работы с диапазонами
 export type Tier = { min_qty: number; max_qty?: number; unit_price: number }
@@ -639,7 +639,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={(e) => {
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                   e.stopPropagation()
                   setTierModal({ type: 'add', isOpen: false, boundary: '' })
                 }}
@@ -649,7 +649,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
               <Button
                 variant="primary"
                 size="sm"
-                onClick={(e) => {
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                   e.stopPropagation()
                   if (tierModal.type === 'add') {
                     handleAddRange()

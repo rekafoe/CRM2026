@@ -72,6 +72,7 @@ const initialState: ServicesManagementState = {
     unit: 'item',
     rate: '',
     isActive: true,
+    hasVariants: false,
   },
   editingService: null,
   editingServiceForm: null,

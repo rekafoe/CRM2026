@@ -237,8 +237,11 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
   const handleUpdateVariantName = async (variantId: number, newName: string) => {
     try {
+      const variant = variants.find((v) => v.id === variantId);
+      if (!variant) return;
       const updated = await updateServiceVariant(serviceId, variantId, {
         variantName: newName,
+        parameters: variant.parameters,
       });
       setVariants(variants.map((v) => (v.id === variantId ? { ...v, ...updated } : v)));
       setEditingVariantName(null);
@@ -263,7 +266,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
   const handleUpdateVariantParams = async (variantId: number, params: Record<string, any>) => {
     try {
+      const variant = variants.find((v) => v.id === variantId);
+      if (!variant) return;
       const updated = await updateServiceVariant(serviceId, variantId, {
+        variantName: variant.variantName,
         parameters: params,
       });
       setVariants(variants.map((v) => (v.id === variantId ? { ...v, ...updated } : v)));
@@ -442,7 +448,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
     // Сохраняем на сервере
     if (tier.id > 0) {
       try {
-        await updateServiceVariantTier(serviceId, variant.id, tier.id, { rate: newPrice });
+        await updateServiceVariantTier(serviceId, variant.id, tier.id, {
+          minQuantity: tier.minQuantity,
+          rate: newPrice,
+        });
       } catch (err) {
         console.error('Ошибка обновления цены:', err);
       }
