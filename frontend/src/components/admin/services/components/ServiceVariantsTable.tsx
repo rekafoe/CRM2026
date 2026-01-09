@@ -515,6 +515,20 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                         </div>
                       </div>
                     </th>
+                    <th>
+                      <div className="cell">
+                        <div className="active-panel">
+                          <button
+                            type="button"
+                            className="el-button el-button--success el-button--small"
+                            onClick={handleCreateVariant}
+                            title="Добавить строку (тип)"
+                          >
+                            <i className="el-icon-bottom"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </th>
                     {commonRanges.map((range, idx) => {
                       const rangeLabel = range.max_qty == null ? `${range.min_qty} - ∞` : String(range.min_qty);
                       return (
@@ -648,6 +662,45 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                             <div className="active-panel">
                               <button
                                 type="button"
+                                className="el-button el-button--success el-button--small"
+                                onClick={async () => {
+                                  // Создаем новую строку (тип) после текущей
+                                  try {
+                                    const newVariant = await createServiceVariant(serviceId, {
+                                      variantName: 'Новый тип',
+                                      parameters: {},
+                                      sortOrder: variantIndex + 1,
+                                      isActive: true,
+                                    });
+                                    const newVariantWithTiers: VariantWithTiers = {
+                                      ...newVariant,
+                                      tiers: defaultTiers().map((t) => ({
+                                        id: 0,
+                                        serviceId,
+                                        variantId: newVariant.id,
+                                        minQuantity: t.min_qty,
+                                        rate: t.unit_price,
+                                        isActive: true,
+                                      })),
+                                    };
+                                    // Вставляем новый вариант после текущего
+                                    const newVariants = [...variants];
+                                    newVariants.splice(variantIndex + 1, 0, newVariantWithTiers);
+                                    setVariants(newVariants);
+                                    // Сразу начинаем редактирование названия
+                                    setEditingVariantName(newVariant.id);
+                                    setEditingVariantNameValue(newVariant.variantName);
+                                  } catch (err) {
+                                    console.error('Ошибка создания строки:', err);
+                                    setError('Не удалось создать строку');
+                                  }
+                                }}
+                                title="Добавить строку (тип)"
+                              >
+                                <i className="el-icon-bottom"></i>
+                              </button>
+                              <button
+                                type="button"
                                 className="el-button el-button--danger el-button--small"
                                 onClick={() => handleDeleteVariant(variant.id)}
                               >
@@ -757,7 +810,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                             <div className="active-panel">
                               <button
                                 type="button"
-                                className="el-button el-button--info el-button--mini is-plain"
+                                className="el-button el-button--success el-button--small is-plain"
                                 onClick={async () => {
                                   // Создаем новый вариант для этого типа
                                   try {
@@ -790,9 +843,9 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                     setError('Не удалось создать подвариант');
                                   }
                                 }}
-                                title="Добавить подвариант"
+                                title="Добавить подстроку"
                               >
-                                <i className="el-icon-plus"></i>
+                                <i className="el-icon-bottom-right"></i>
                               </button>
                               <button
                                 type="button"

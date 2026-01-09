@@ -233,6 +233,30 @@
   color: #fff;
 }
 
+.el-button--success {
+  color: #fff;
+  background-color: #67c23a;
+  border-color: #67c23a;
+}
+
+.el-button--success:hover {
+  background: #85ce61;
+  border-color: #85ce61;
+  color: #fff;
+}
+
+.el-button--success.is-plain {
+  color: #67c23a;
+  background: #f0f9ff;
+  border-color: #b3e19d;
+}
+
+.el-button--success.is-plain:hover {
+  background: #67c23a;
+  border-color: #67c23a;
+  color: #fff;
+}
+
 .el-button--text {
   border-color: transparent;
   color: #409eff;
