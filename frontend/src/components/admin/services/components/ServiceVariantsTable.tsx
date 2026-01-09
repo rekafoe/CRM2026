@@ -537,7 +537,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                             onClick={handleCreateVariant}
                             title="Добавить строку (тип)"
                           >
-                            <i className="el-icon-bottom"></i>
+                            <span style={{ fontSize: '14px' }}>↓</span>
                           </button>
                         </div>
                       </div>
@@ -720,7 +720,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                     }}
                                     title="Добавить строку (тип)"
                                   >
-                                    <i className="el-icon-bottom"></i>
+                                    <span style={{ fontSize: '14px' }}>↓</span>
                                   </button>
                                   <button
                                     type="button"
@@ -873,7 +873,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         }}
                                         title="Добавить подстроку"
                                       >
-                                        <i className="el-icon-bottom-right"></i>
+                                        <span style={{ fontSize: '14px' }}>↘</span>
                                       </button>
                                       <button
                                         type="button"
