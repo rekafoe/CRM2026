@@ -564,7 +564,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                     </div>
                   </div>
                   <div className="simplified-card__content">
-                    <div style={{ maxWidth: '200px' }}>
+                    <div style={{ maxWidth: '200px', width: 'fit-content' }}>
                       <FormField label="Тип бумаги">
                         <select
                           className="form-select form-select--compact"
