@@ -415,11 +415,57 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
           preservedPrices.set(t.minQuantity, t.rate);
         });
         
-        // Используем цены из normalizedTiers, переопределяя для существующих min_qty
+        // Создаем карту для определения цены исходного диапазона для каждого min_qty
+        // Когда мы разбиваем диапазон или редактируем границу, новые поддиапазоны должны наследовать цену исходного
+        const originalRangePrices = new Map<number, number>();
+        variant.tiers.forEach((originalTier) => {
+          const originalMin = originalTier.minQuantity;
+          // Находим следующий tier, чтобы определить верхнюю границу
+          const nextTier = variant.tiers.find(t => t.minQuantity > originalMin);
+          const originalMax = nextTier ? nextTier.minQuantity : Infinity;
+          
+          // Для каждого нового tier, проверяем, попадает ли он в диапазон исходного
+          normalizedTiers.forEach((newTier) => {
+            if (newTier.min_qty >= originalMin && newTier.min_qty < originalMax) {
+              // Если для этого min_qty еще не установлена цена из исходного диапазона
+              if (!originalRangePrices.has(newTier.min_qty)) {
+                originalRangePrices.set(newTier.min_qty, originalTier.rate);
+              }
+            }
+          });
+        });
+        
+        // Для случая редактирования границы: если мы изменили min_qty существующего tier,
+        // нужно сохранить его исходную цену
+        if (tierModal.type === 'edit' && tierModal.tierIndex !== undefined) {
+          const rangeToEdit = currentCommonRanges[tierModal.tierIndex];
+          if (rangeToEdit) {
+            const originalTier = variant.tiers.find(t => t.minQuantity === rangeToEdit.min_qty);
+            if (originalTier) {
+              // Находим новый tier с измененным min_qty
+              const newTierWithEditedBoundary = normalizedTiers.find(t => 
+                t.min_qty === boundary && !preservedPrices.has(t.min_qty)
+              );
+              if (newTierWithEditedBoundary && !originalRangePrices.has(newTierWithEditedBoundary.min_qty)) {
+                originalRangePrices.set(newTierWithEditedBoundary.min_qty, originalTier.rate);
+              }
+            }
+          }
+        }
+        
+        // Применяем цены: сначала из preservedPrices (если min_qty уже существовал),
+        // затем из originalRangePrices (если это новый min_qty из разбитого диапазона),
+        // иначе из normalizedTiers (уже установлена в addRangeBoundary)
         const newTiersWithPrices = normalizedTiers.map((t) => {
+          // Если min_qty уже существовал, используем сохраненную цену
           if (preservedPrices.has(t.min_qty)) {
             return { ...t, unit_price: preservedPrices.get(t.min_qty)! };
           }
+          // Если это новый min_qty из разбитого диапазона, используем цену исходного диапазона
+          if (originalRangePrices.has(t.min_qty)) {
+            return { ...t, unit_price: originalRangePrices.get(t.min_qty)! };
+          }
+          // Иначе используем цену, установленную в addRangeBoundary (которая уже правильная)
           return t;
         });
 
@@ -436,14 +482,15 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         };
       });
 
-      // Обновляем локальное состояние
-      setVariants(updatedVariants);
-
-      // Параллельно загружаем все существующие tiers для всех вариантов
-      const existingTiersPromises = updatedVariants.map((variant) =>
+      // Параллельно загружаем все существующие tiers для всех вариантов ДО обновления локального состояния
+      // Это нужно для правильного сравнения с новыми данными
+      const existingTiersPromises = currentVariants.map((variant) =>
         getServiceVariantTiers(serviceId, variant.id)
       );
       const allExistingTiers = await Promise.all(existingTiersPromises);
+      
+      // Обновляем локальное состояние после загрузки существующих tiers
+      setVariants(updatedVariants);
       
       // Подготавливаем все операции для батчинга
       const operations: Array<() => Promise<any>> = [];
