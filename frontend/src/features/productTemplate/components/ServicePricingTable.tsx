@@ -639,8 +639,8 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                  e.stopPropagation()
+                onClick={(e?: React.MouseEvent<Element>) => {
+                  e?.stopPropagation()
                   setTierModal({ type: 'add', isOpen: false, boundary: '' })
                 }}
               >
@@ -649,8 +649,8 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
               <Button
                 variant="primary"
                 size="sm"
-                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                  e.stopPropagation()
+                onClick={(e?: React.MouseEvent<Element>) => {
+                  e?.stopPropagation()
                   if (tierModal.type === 'add') {
                     handleAddRange()
                   } else {
