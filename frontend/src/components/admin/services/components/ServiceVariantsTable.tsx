@@ -16,6 +16,7 @@ import {
   updateServiceVariantTier,
   deleteServiceVariantTier,
 } from '../../../../services/pricing';
+import '../../../../features/productTemplate/components/SimplifiedTemplateSection.css';
 import './ServiceVariantsTable.css';
 
 interface ServiceVariantsTableProps {
@@ -495,13 +496,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse">
+          <table className="simplified-table">
             <thead>
               <tr>
-                <th className="border px-2 py-1 text-left">Тип / Вариант</th>
-                <th className="border px-2 py-1 text-left">Параметры</th>
+                <th>Тип / Вариант</th>
+                <th>Параметры</th>
                 {commonRanges.map((range, idx) => (
-                  <th key={idx} className="border px-2 py-1 text-center relative">
+                  <th key={idx} className="text-center relative">
                     <div className="flex items-center justify-center gap-1">
                       <span>
                         {range.min_qty}
@@ -528,7 +529,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                     </div>
                   </th>
                 ))}
-                <th className="border px-2 py-1 text-center">
+                <th className="text-center">
                   <button
                     ref={addRangeButtonRef}
                     className="text-xs text-blue-600 hover:text-blue-800"
@@ -538,15 +539,15 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                     + Диапазон
                   </button>
                 </th>
-                <th className="border px-2 py-1 text-center">Действия</th>
+                <th className="text-center">Действия</th>
               </tr>
             </thead>
             <tbody>
               {variants.map((variant, variantIndex) => (
                 <React.Fragment key={variant.id}>
                   {/* Родительская строка - тип */}
-                  <tr className="service-variants-table__parent-row">
-                    <td className="border px-2 py-1 service-variants-table__parent-cell">
+                  <tr className="simplified-table__parent-row">
+                    <td className="simplified-table__parent-cell">
                       {editingVariantName === variant.id ? (
                         <input
                           className="w-full px-1 py-0.5 border rounded"
@@ -583,7 +584,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                         </div>
                       )}
                     </td>
-                    <td className="border px-2 py-1" colSpan={commonRanges.length + 2}>
+                    <td colSpan={commonRanges.length + 2}>
                       {editingVariantParams === variant.id ? (
                         <div className="flex items-center gap-2">
                           <input
@@ -640,7 +641,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                         </div>
                       )}
                     </td>
-                    <td className="border px-2 py-1 text-center">
+                    <td className="text-center">
                       <Button
                         size="sm"
                         variant="error"
@@ -651,25 +652,25 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                     </td>
                   </tr>
                   {/* Дочерняя строка - варианты с ценами */}
-                  <tr className="service-variants-table__child-row">
-                    <td className="border px-2 py-1 service-variants-table__child-cell">
+                  <tr className="simplified-table__child-row">
+                    <td className="simplified-table__child-cell">
                       <span className="text-sm text-gray-600">
                         {variant.parameters.type && variant.parameters.density
                           ? `${variant.parameters.type} ${variant.parameters.density}`
                           : 'Вариант'}
                       </span>
                     </td>
-                    <td className="border px-2 py-1"></td>
+                    <td></td>
                     {commonRanges.map((range, rangeIdx) => {
                       const tier = variant.tiers.find(
                         (t) => t.minQuantity === range.min_qty
                       );
                       return (
-                        <td key={rangeIdx} className="border px-2 py-1">
+                        <td key={rangeIdx}>
                           <input
                             type="number"
                             step="0.01"
-                            className="w-full px-1 py-0.5 border rounded text-sm"
+                            className="w-full"
                             value={tier?.rate || 0}
                             onChange={(e) =>
                               handlePriceChange(variantIndex, range.min_qty, Number(e.target.value))
@@ -679,8 +680,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                         </td>
                       );
                     })}
-                    <td className="border px-2 py-1"></td>
-                    <td className="border px-2 py-1"></td>
+                    <td></td>
+                    <td></td>
                   </tr>
                 </React.Fragment>
               ))}

@@ -2,39 +2,20 @@
   margin-top: 1rem;
 }
 
-.service-variants-table__parent-row {
-  background-color: #f9fafb;
-}
-
-.service-variants-table__parent-cell {
-  font-weight: 600;
-  padding-left: 1rem;
-}
-
-.service-variants-table__child-row {
-  background-color: #ffffff;
-}
-
-.service-variants-table__child-cell {
-  padding-left: 2rem;
-  font-size: 0.875rem;
-  color: #6b7280;
-}
-
-.service-variants-table table {
-  border-collapse: collapse;
-}
-
-.service-variants-table th,
-.service-variants-table td {
-  border: 1px solid #e5e7eb;
-}
-
-.service-variants-table input[type="number"] {
+/* Дополнительные стили для таблицы вариантов услуг */
+.service-variants-table .simplified-table input[type="number"] {
   text-align: center;
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 4px;
+  font-size: 12px;
 }
 
-.service-variants-table input[type="text"] {
-  font-size: 0.875rem;
+.service-variants-table .simplified-table input[type="text"] {
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 4px;
 }
 
