@@ -630,15 +630,16 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   // Функция для определения уровня вложенности варианта
   const getVariantLevel = useCallback((variant: VariantWithTiers): number => {
     const params = variant.parameters || {};
-    // Уровень 0: родительский тип (нет параметров type/density)
-    if (!params.type && !params.density) {
-      return 0;
-    }
     // Уровень 2: есть parentVariantId (внучатый вариант)
-    if (params.parentVariantId) {
+    if (params.parentVariantId !== undefined && params.parentVariantId !== null) {
       return 2;
     }
-    // Уровень 1: есть type или density, но нет parentVariantId (дочерний вариант)
+    // Уровень 0: родительский тип (нет ключей type/density в параметрах или объект пустой)
+    const hasTypeOrDensity = 'type' in params || 'density' in params;
+    if (!hasTypeOrDensity || (Object.keys(params).length === 0)) {
+      return 0;
+    }
+    // Уровень 1: есть type или density (даже пустые), но нет parentVariantId (дочерний вариант)
     return 1;
   }, []);
 
@@ -918,7 +919,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                             isActive: true,
                                           })),
                                         };
-                                        setVariants([...variants, newVariantWithTiers]);
+                                        setVariants((prev) => [...prev, newVariantWithTiers]);
                                         setEditingVariantName(newVariant.id);
                                         setEditingVariantNameValue(newVariant.variantName);
                                       } catch (err) {
@@ -953,7 +954,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                             isActive: true,
                                           })),
                                         };
-                                        setVariants([...variants, newVariantWithTiers]);
+                                        setVariants((prev) => [...prev, newVariantWithTiers]);
                                         setEditingVariantParams(newVariant.id);
                                         setEditingVariantParamsValue({ type: '', density: '' });
                                       } catch (err) {
@@ -1100,10 +1101,12 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                             onClick={async () => {
                                               // Создаем новую строку на том же уровне (вариант уровня 1)
                                               try {
+                                                // Получаем актуальное количество вариантов
+                                                const currentVariantsCount = variants.length;
                                                 const newVariant = await createServiceVariant(serviceId, {
                                                   variantName: typeName,
                                                   parameters: { type: '', density: '' },
-                                                  sortOrder: variants.length,
+                                                  sortOrder: currentVariantsCount,
                                                   isActive: true,
                                                 });
                                                 const newVariantWithTiers: VariantWithTiers = {
@@ -1117,8 +1120,12 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                     isActive: true,
                                                   })),
                                                 };
-                                                setVariants([...variants, newVariantWithTiers]);
-                                                setEditingVariantParams(newVariant.id);
+                                                const newVariantId = newVariant.id;
+                                                setVariants((prev) => [...prev, newVariantWithTiers]);
+                                                // Перезагружаем варианты для обновления группировки
+                                                await loadVariants();
+                                                // Восстанавливаем состояние редактирования после перезагрузки
+                                                setEditingVariantParams(newVariantId);
                                                 setEditingVariantParamsValue({ type: '', density: '' });
                                               } catch (err) {
                                                 console.error('Ошибка создания строки:', err);
@@ -1156,7 +1163,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                     isActive: true,
                                                   })),
                                                 };
-                                                setVariants([...variants, newVariantWithTiers]);
+                                                setVariants((prev) => [...prev, newVariantWithTiers]);
                                                 setEditingVariantParams(newVariant.id);
                                                 setEditingVariantParamsValue({ ...variant.parameters, parentVariantId: variant.id, subType: '' });
                                               } catch (err) {
@@ -1301,7 +1308,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                         isActive: true,
                                                       })),
                                                     };
-                                                    setVariants([...variants, newVariantWithTiers]);
+                                                    setVariants((prev) => [...prev, newVariantWithTiers]);
                                                     setEditingVariantParams(newVariant.id);
                                                     setEditingVariantParamsValue({ ...level2Variant.parameters, subType: '' });
                                                   } catch (err) {
