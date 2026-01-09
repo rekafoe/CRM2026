@@ -689,7 +689,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                     type="button"
                                     className="el-button el-button--success el-button--small"
                                     onClick={async () => {
-                                      // Создаем новую строку (тип) после текущей
+                                      // Создаем новую строку (тип) на том же уровне
                                       try {
                                         const newVariant = await createServiceVariant(serviceId, {
                                           variantName: 'Новый тип',
@@ -708,9 +708,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                             isActive: true,
                                           })),
                                         };
-                                        // Добавляем новый вариант в конец списка
                                         setVariants([...variants, newVariantWithTiers]);
-                                        // Сразу начинаем редактирование названия
                                         setEditingVariantName(newVariant.id);
                                         setEditingVariantNameValue(newVariant.variantName);
                                       } catch (err) {
@@ -718,20 +716,58 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         setError('Не удалось создать строку');
                                       }
                                     }}
-                                    title="Добавить строку (тип)"
+                                    title="Добавить строку на том же уровне"
                                   >
                                     <span style={{ fontSize: '14px' }}>↓</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="el-button el-button--success el-button--small is-plain"
+                                    onClick={async () => {
+                                      // Создаем дочернюю строку (вариант) для этого типа
+                                      try {
+                                        const newVariant = await createServiceVariant(serviceId, {
+                                          variantName: typeName, // Тот же тип
+                                          parameters: { type: '', density: '' },
+                                          sortOrder: variants.length,
+                                          isActive: true,
+                                        });
+                                        const newVariantWithTiers: VariantWithTiers = {
+                                          ...newVariant,
+                                          tiers: defaultTiers().map((t) => ({
+                                            id: 0,
+                                            serviceId,
+                                            variantId: newVariant.id,
+                                            minQuantity: t.min_qty,
+                                            rate: t.unit_price,
+                                            isActive: true,
+                                          })),
+                                        };
+                                        setVariants([...variants, newVariantWithTiers]);
+                                        setEditingVariantParams(newVariant.id);
+                                        setEditingVariantParamsValue({ type: '', density: '' });
+                                      } catch (err) {
+                                        console.error('Ошибка создания дочерней строки:', err);
+                                        setError('Не удалось создать дочернюю строку');
+                                      }
+                                    }}
+                                    title="Добавить дочернюю строку"
+                                  >
+                                    <span style={{ fontSize: '14px' }}>↘</span>
                                   </button>
                                   <button
                                     type="button"
                                     className="el-button el-button--danger el-button--small"
                                     onClick={async () => {
                                       // Удаляем все варианты этого типа
+                                      if (!confirm(`Удалить тип "${typeName}" и все его варианты?`)) {
+                                        return;
+                                      }
                                       for (const variant of typeVariants) {
                                         await handleDeleteVariant(variant.id);
                                       }
                                     }}
-                                    title="Удалить тип"
+                                    title="Удалить строку"
                                   >
                                     <span style={{ fontSize: '14px' }}>×</span>
                                   </button>
@@ -842,13 +878,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                     <div className="active-panel">
                                       <button
                                         type="button"
-                                        className="el-button el-button--success el-button--small is-plain"
+                                        className="el-button el-button--success el-button--small"
                                         onClick={async () => {
-                                          // Создаем новый вариант (подстроку) для этого типа
+                                          // Создаем новую строку на том же уровне (вариант того же типа)
                                           try {
                                             const newVariant = await createServiceVariant(serviceId, {
                                               variantName: typeName, // Тот же тип
-                                              parameters: { type: '', density: '' }, // Новые параметры
+                                              parameters: { type: '', density: '' },
                                               sortOrder: variants.length,
                                               isActive: true,
                                             });
@@ -863,25 +899,68 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                 isActive: true,
                                               })),
                                             };
-                                            // Добавляем новый вариант в конец списка
                                             setVariants([...variants, newVariantWithTiers]);
-                                            // Сразу начинаем редактирование параметров
                                             setEditingVariantParams(newVariant.id);
                                             setEditingVariantParamsValue({ type: '', density: '' });
                                           } catch (err) {
-                                            console.error('Ошибка создания подварианта:', err);
-                                            setError('Не удалось создать подвариант');
+                                            console.error('Ошибка создания строки:', err);
+                                            setError('Не удалось создать строку');
                                           }
                                         }}
-                                        title="Добавить подстроку"
+                                        title="Добавить строку на том же уровне"
+                                      >
+                                        <span style={{ fontSize: '14px' }}>↓</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="el-button el-button--success el-button--small is-plain"
+                                        onClick={async () => {
+                                          // Создаем новый тип (родительскую строку) - текущая строка становится родительской
+                                          try {
+                                            // Сначала создаем новый тип с параметрами текущего варианта
+                                            const newTypeName = variant.parameters.type && variant.parameters.density
+                                              ? `${variant.parameters.type} ${variant.parameters.density}`
+                                              : variant.parameters.type || variant.parameters.density || 'Новый тип';
+                                            
+                                            const newVariant = await createServiceVariant(serviceId, {
+                                              variantName: newTypeName,
+                                              parameters: {},
+                                              sortOrder: variants.length,
+                                              isActive: true,
+                                            });
+                                            const newVariantWithTiers: VariantWithTiers = {
+                                              ...newVariant,
+                                              tiers: defaultTiers().map((t) => ({
+                                                id: 0,
+                                                serviceId,
+                                                variantId: newVariant.id,
+                                                minQuantity: t.min_qty,
+                                                rate: t.unit_price,
+                                                isActive: true,
+                                              })),
+                                            };
+                                            setVariants([...variants, newVariantWithTiers]);
+                                            setEditingVariantName(newVariant.id);
+                                            setEditingVariantNameValue(newVariant.variantName);
+                                          } catch (err) {
+                                            console.error('Ошибка создания нового типа:', err);
+                                            setError('Не удалось создать новый тип');
+                                          }
+                                        }}
+                                        title="Создать новый уровень вложенности (строка становится родительской)"
                                       >
                                         <span style={{ fontSize: '14px' }}>↘</span>
                                       </button>
                                       <button
                                         type="button"
                                         className="el-button el-button--danger el-button--small"
-                                        onClick={() => handleDeleteVariant(variant.id)}
-                                        title="Удалить вариант"
+                                        onClick={() => {
+                                          if (!confirm('Удалить этот вариант?')) {
+                                            return;
+                                          }
+                                          handleDeleteVariant(variant.id);
+                                        }}
+                                        title="Удалить строку"
                                       >
                                         <span style={{ fontSize: '14px' }}>×</span>
                                       </button>
