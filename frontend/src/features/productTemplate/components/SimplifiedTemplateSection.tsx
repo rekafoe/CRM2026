@@ -498,244 +498,487 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                       <div className="text-muted">Выберите технологию печати, чтобы увидеть доступные вариации.</div>
                     ) : (() => {
                       const commonRanges = getSizeRanges(selected)
+                      const colorRows = selected.print_prices.filter(p => p.color_mode === 'color')
+                      const bwRows = selected.print_prices.filter(p => p.color_mode === 'bw')
                       
                       return (
-                        <div className="simplified-print-variations">
-                          {/* Полноцветные вариации */}
-                          <div className="simplified-print-group">
-                            <div className="simplified-print-group__title">Общий класс полноцвет</div>
-                            <div className="simplified-print-group__items">
-                              {selected.print_prices
-                                .filter(p => p.color_mode === 'color')
-                                .map((row) => {
-                                  const actualIdx = selected.print_prices.findIndex(p =>
-                                    p.technology_code === row.technology_code &&
-                                    p.color_mode === row.color_mode &&
-                                    p.sides_mode === row.sides_mode
-                                  )
+                        <div className="simplified-tiers-table">
+                          <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
+                            <thead>
+                              <tr>
+                                <th>Параметры печати (цена за изделие указанного формата и цветности)</th>
+                                {commonRanges.map((t, ti) => {
+                                  const rangeLabel = t.max_qty == null ? `${t.min_qty} - ∞` : String(t.min_qty)
                                   return (
-                                    <div key={`${row.color_mode}_${row.sides_mode}`} className="simplified-row">
-                                      <div className="simplified-row__head">
-                                        <div className="simplified-row__title">
-                                          {row.sides_mode === 'single' ? 'односторонняя' : 'двухсторонняя'}
-                                        </div>
+                                    <th key={ti} className="simplified-table__range-cell">
+                                      <div className="cell">
+                                        <span
+                                          style={{ cursor: 'pointer' }}
+                                          onClick={() => {
+                                            setTierModal({
+                                              type: 'edit',
+                                              tierIndex: ti,
+                                              isOpen: true,
+                                              boundary: String(t.min_qty),
+                                              anchorElement: undefined
+                                            })
+                                          }}
+                                        >
+                                          {rangeLabel}
+                                        </span>
+                                        <span>
+                                          <button
+                                            type="button"
+                                            className="el-button remove-range el-button--text el-button--mini"
+                                            style={{ color: 'red', marginRight: '-15px' }}
+                                            onClick={() => {
+                                              const newRanges = removeRange(commonRanges, ti)
+                                              updateSizeRanges(selected.id, newRanges)
+                                            }}
+                                          >
+                                            ×
+                                          </button>
+                                        </span>
                                       </div>
-
-                                      <div className="simplified-tiers-table">
-                                        <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
-                                          <thead>
-                                            <tr>
-                                              <th>Параметры печати (цена за изделие указанного формата и цветности)</th>
-                                              {commonRanges.map((t, ti) => {
-                                                const rangeLabel = t.max_qty == null ? `${t.min_qty} - ∞` : String(t.min_qty)
-                                                return (
-                                                  <th key={ti} className="simplified-table__range-cell">
-                                                    <div className="cell">
-                                                      <span
-                                                        style={{ cursor: 'pointer' }}
-                                                        onClick={() => {
-                                                          setTierModal({
-                                                            type: 'edit',
-                                                            tierIndex: ti,
-                                                            isOpen: true,
-                                                            boundary: String(t.min_qty),
-                                                            anchorElement: undefined
-                                                          })
-                                                        }}
-                                                      >
-                                                        {rangeLabel}
-                                                      </span>
-                                                      <span>
-                                                        <button
-                                                          type="button"
-                                                          className="el-button remove-range el-button--text el-button--mini"
-                                                          style={{ color: 'red', marginRight: '-15px' }}
-                                                          onClick={() => {
-                                                            const newRanges = removeRange(commonRanges, ti)
-                                                            updateSizeRanges(selected.id, newRanges)
-                                                          }}
-                                                        >
-                                                          ×
-                                                        </button>
-                                                      </span>
-                                                    </div>
-                                                  </th>
-                                                )
-                                              })}
-                                              <th>
-                                                <div className="cell">
-                                                  <div className="simplified-row__add-range-wrapper">
-                                                    <button
-                                                      ref={addRangeButtonRef}
-                                                      type="button"
-                                                      className="el-button el-button--info el-button--mini is-plain"
-                                                      style={{ width: '100%', marginLeft: '0px' }}
-                                                      onClick={(e) => {
-                                                        const button = e.currentTarget as HTMLElement
-                                                        setTierModal({
-                                                          type: 'add',
-                                                          isOpen: true,
-                                                          boundary: '',
-                                                          anchorElement: button
-                                                        })
-                                                      }}
-                                                    >
-                                                      + Диапазон
-                                                    </button>
-                                                  </div>
-                                                </div>
-                                              </th>
-                                            </tr>
-                                          </thead>
-                                          <tbody>
-                                            <tr>
-                                              <td className="simplified-table__price-label">
-                                                {row.sides_mode === 'single' ? 'односторонняя' : 'двухсторонняя'}
-                                              </td>
-                                              {commonRanges.map((t, ti) => {
-                                                const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
-                                                return (
-                                                  <td key={ti}>
-                                                    <input
-                                                      className="form-input form-input--compact-table"
-                                                      type="number"
-                                                      min="0"
-                                                      step="0.01"
-                                                      value={String(priceTier.unit_price || 0)}
-                                                      onChange={(e) => {
-                                                        const v = Number(e.target.value) || 0
-                                                        const next = selected.print_prices.map((r, i) => {
-                                                          if (i !== actualIdx) return r
-                                                          const updatedTiers = commonRanges.map((rt, rti) => {
-                                                            if (rti === ti) return { ...rt, unit_price: v }
-                                                            const existingTier = r.tiers.find(t => t.min_qty === rt.min_qty)
-                                                            return existingTier || rt
-                                                          })
-                                                          return { ...r, tiers: updatedTiers }
-                                                        })
-                                                        updateSize(selected.id, { print_prices: next })
-                                                      }}
-                                                    />
-                                                  </td>
-                                                )
-                                              })}
-                                              <td></td>
-                                            </tr>
-                                          </tbody>
-                                        </table>
-                                      </div>
-                                    </div>
+                                    </th>
                                   )
                                 })}
-                            </div>
-                          </div>
-
-                          {/* Ч/б вариации */}
-                          <div className="simplified-print-group">
-                            <div className="simplified-print-group__title">Чёрно-белая печать</div>
-                            <div className="simplified-print-group__items">
-                              {selected.print_prices
-                                .filter(p => p.color_mode === 'bw')
-                                .map((row) => {
-                                  const actualIdx = selected.print_prices.findIndex(p =>
-                                    p.technology_code === row.technology_code &&
-                                    p.color_mode === row.color_mode &&
-                                    p.sides_mode === row.sides_mode
-                                  )
-                                  return (
-                                    <div key={`${row.color_mode}_${row.sides_mode}`} className="simplified-row">
-                                      <div className="simplified-row__head">
-                                        <div className="simplified-row__title">
-                                          {row.sides_mode === 'single' ? 'односторонняя' : 'двухсторонняя'}
+                                <th>
+                                  <div className="cell">Ед.изм.</div>
+                                </th>
+                                <th>
+                                  <div className="cell">Вес за ед</div>
+                                </th>
+                                <th>
+                                  <div className="cell">
+                                    <div className="simplified-row__add-range-wrapper">
+                                      <button
+                                        ref={addRangeButtonRef}
+                                        type="button"
+                                        className="el-button el-button--info el-button--mini is-plain"
+                                        style={{ width: '100%', marginLeft: '0px' }}
+                                        onClick={(e) => {
+                                          const button = e.currentTarget as HTMLElement
+                                          setTierModal({
+                                            type: 'add',
+                                            isOpen: true,
+                                            boundary: '',
+                                            anchorElement: button
+                                          })
+                                        }}
+                                      >
+                                        + Диапазон
+                                      </button>
+                                    </div>
+                                  </div>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {/* Полноцветная - родительская строка */}
+                              {colorRows.length > 0 && (
+                                <>
+                                  <tr className="simplified-table__parent-row">
+                                    <td className="simplified-table__parent-cell">
+                                      <div className="el-select el-select--small" style={{ width: '100%' }}>
+                                        <div className="el-input el-input--small el-input--suffix">
+                                          <input
+                                            type="text"
+                                            readOnly
+                                            className="el-input__inner"
+                                            value="полноцветная"
+                                            style={{ cursor: 'default', backgroundColor: '#f5f7fa' }}
+                                          />
+                                          <span className="el-input__suffix">
+                                            <span className="el-input__suffix-inner">
+                                              <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                            </span>
+                                          </span>
                                         </div>
                                       </div>
+                                    </td>
+                                    {commonRanges.map(() => (
+                                      <td key={Math.random()} style={{ backgroundColor: '#f5f7fa' }}></td>
+                                    ))}
+                                    <td style={{ backgroundColor: '#f5f7fa' }}></td>
+                                    <td style={{ backgroundColor: '#f5f7fa' }}></td>
+                                    <td style={{ backgroundColor: '#f5f7fa' }}></td>
+                                  </tr>
+                                  
+                                  {/* Односторонняя полноцветная */}
+                                  {colorRows.find(r => r.sides_mode === 'single') && (() => {
+                                    const row = colorRows.find(r => r.sides_mode === 'single')!
+                                    const actualIdx = selected.print_prices.findIndex(p =>
+                                      p.technology_code === row.technology_code &&
+                                      p.color_mode === row.color_mode &&
+                                      p.sides_mode === row.sides_mode
+                                    )
+                                    return (
+                                      <tr className="simplified-table__child-row">
+                                        <td className="simplified-table__child-cell">
+                                          <div className="el-select el-select--small" style={{ width: '100%' }}>
+                                            <div className="el-input el-input--small el-input--suffix">
+                                              <input
+                                                type="text"
+                                                readOnly
+                                                className="el-input__inner"
+                                                value="односторонняя"
+                                                style={{ cursor: 'default' }}
+                                              />
+                                              <span className="el-input__suffix">
+                                                <span className="el-input__suffix-inner">
+                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        {commonRanges.map((t, ti) => {
+                                          const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
+                                          return (
+                                            <td key={ti}>
+                                              <input
+                                                className="form-input form-input--compact-table"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={String(priceTier.unit_price || 0)}
+                                                onChange={(e) => {
+                                                  const v = Number(e.target.value) || 0
+                                                  const next = selected.print_prices.map((r, i) => {
+                                                    if (i !== actualIdx) return r
+                                                    const updatedTiers = commonRanges.map((rt, rti) => {
+                                                      if (rti === ti) return { ...rt, unit_price: v }
+                                                      const existingTier = r.tiers.find(t => t.min_qty === rt.min_qty)
+                                                      return existingTier || rt
+                                                    })
+                                                    return { ...r, tiers: updatedTiers }
+                                                  })
+                                                  updateSize(selected.id, { print_prices: next })
+                                                }}
+                                              />
+                                            </td>
+                                          )
+                                        })}
+                                        <td>
+                                          <div className="el-select el-select--small">
+                                            <div className="el-input el-input--small el-input--suffix">
+                                              <input
+                                                type="text"
+                                                readOnly
+                                                className="el-input__inner"
+                                                value="BLR"
+                                                style={{ cursor: 'default' }}
+                                              />
+                                              <span className="el-input__suffix">
+                                                <span className="el-input__suffix-inner">
+                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td>
+                                          <input
+                                            className="form-input form-input--compact-table"
+                                            type="text"
+                                            placeholder=""
+                                          />
+                                        </td>
+                                        <td></td>
+                                      </tr>
+                                    )
+                                  })()}
+                                  
+                                  {/* Двухсторонняя полноцветная */}
+                                  {colorRows.find(r => r.sides_mode === 'duplex') && (() => {
+                                    const row = colorRows.find(r => r.sides_mode === 'duplex')!
+                                    const actualIdx = selected.print_prices.findIndex(p =>
+                                      p.technology_code === row.technology_code &&
+                                      p.color_mode === row.color_mode &&
+                                      p.sides_mode === row.sides_mode
+                                    )
+                                    return (
+                                      <tr className="simplified-table__child-row">
+                                        <td className="simplified-table__child-cell">
+                                          <div className="el-select el-select--small" style={{ width: '100%' }}>
+                                            <div className="el-input el-input--small el-input--suffix">
+                                              <input
+                                                type="text"
+                                                readOnly
+                                                className="el-input__inner"
+                                                value="двухсторонняя"
+                                                style={{ cursor: 'default' }}
+                                              />
+                                              <span className="el-input__suffix">
+                                                <span className="el-input__suffix-inner">
+                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        {commonRanges.map((t, ti) => {
+                                          const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
+                                          return (
+                                            <td key={ti}>
+                                              <input
+                                                className="form-input form-input--compact-table"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={String(priceTier.unit_price || 0)}
+                                                onChange={(e) => {
+                                                  const v = Number(e.target.value) || 0
+                                                  const next = selected.print_prices.map((r, i) => {
+                                                    if (i !== actualIdx) return r
+                                                    const updatedTiers = commonRanges.map((rt, rti) => {
+                                                      if (rti === ti) return { ...rt, unit_price: v }
+                                                      const existingTier = r.tiers.find(t => t.min_qty === rt.min_qty)
+                                                      return existingTier || rt
+                                                    })
+                                                    return { ...r, tiers: updatedTiers }
+                                                  })
+                                                  updateSize(selected.id, { print_prices: next })
+                                                }}
+                                              />
+                                            </td>
+                                          )
+                                        })}
+                                        <td>
+                                          <div className="el-select el-select--small">
+                                            <div className="el-input el-input--small el-input--suffix">
+                                              <input
+                                                type="text"
+                                                readOnly
+                                                className="el-input__inner"
+                                                value="BLR"
+                                                style={{ cursor: 'default' }}
+                                              />
+                                              <span className="el-input__suffix">
+                                                <span className="el-input__suffix-inner">
+                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td>
+                                          <input
+                                            className="form-input form-input--compact-table"
+                                            type="text"
+                                            placeholder=""
+                                          />
+                                        </td>
+                                        <td></td>
+                                      </tr>
+                                    )
+                                  })()}
+                                </>
+                              )}
 
-                                      <div className="simplified-tiers-table">
-                                        <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
-                                          <thead>
-                                            <tr>
-                                              <th>Параметры печати (цена за изделие указанного формата и цветности)</th>
-                                              {commonRanges.map((t, ti) => {
-                                                const rangeLabel = t.max_qty == null ? `${t.min_qty} - ∞` : String(t.min_qty)
-                                                return (
-                                                  <th key={ti} className="simplified-table__range-cell">
-                                                    <div className="cell">
-                                                      <span
-                                                        style={{ cursor: 'pointer' }}
-                                                        onClick={() => {
-                                                          setTierModal({
-                                                            type: 'edit',
-                                                            tierIndex: ti,
-                                                            isOpen: true,
-                                                            boundary: String(t.min_qty),
-                                                            anchorElement: undefined
-                                                          })
-                                                        }}
-                                                      >
-                                                        {rangeLabel}
-                                                      </span>
-                                                      <span>
-                                                        <button
-                                                          type="button"
-                                                          className="el-button remove-range el-button--text el-button--mini"
-                                                          style={{ color: 'red', marginRight: '-15px' }}
-                                                          onClick={() => {
-                                                            const newRanges = removeRange(commonRanges, ti)
-                                                            updateSizeRanges(selected.id, newRanges)
-                                                          }}
-                                                        >
-                                                          ×
-                                                        </button>
-                                                      </span>
-                                                    </div>
-                                                  </th>
-                                                )
-                                              })}
-                                              <th></th>
-                                            </tr>
-                                          </thead>
-                                          <tbody>
-                                            <tr>
-                                              <td className="simplified-table__price-label">
-                                                {row.sides_mode === 'single' ? 'односторонняя' : 'двухсторонняя'}
-                                              </td>
-                                              {commonRanges.map((t, ti) => {
-                                                const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
-                                                return (
-                                                  <td key={ti}>
-                                                    <input
-                                                      className="form-input form-input--compact-table"
-                                                      type="number"
-                                                      min="0"
-                                                      step="0.01"
-                                                      value={String(priceTier.unit_price || 0)}
-                                                      onChange={(e) => {
-                                                        const v = Number(e.target.value) || 0
-                                                        const next = selected.print_prices.map((r, i) => {
-                                                          if (i !== actualIdx) return r
-                                                          const updatedTiers = commonRanges.map((rt, rti) => {
-                                                            if (rti === ti) return { ...rt, unit_price: v }
-                                                            const existingTier = r.tiers.find(t => t.min_qty === rt.min_qty)
-                                                            return existingTier || rt
-                                                          })
-                                                          return { ...r, tiers: updatedTiers }
-                                                        })
-                                                        updateSize(selected.id, { print_prices: next })
-                                                      }}
-                                                    />
-                                                  </td>
-                                                )
-                                              })}
-                                              <td></td>
-                                            </tr>
-                                          </tbody>
-                                        </table>
+                              {/* Черно-белая - родительская строка */}
+                              {bwRows.length > 0 && (
+                                <>
+                                  <tr className="simplified-table__parent-row">
+                                    <td className="simplified-table__parent-cell">
+                                      <div className="el-select el-select--small" style={{ width: '100%' }}>
+                                        <div className="el-input el-input--small el-input--suffix">
+                                          <input
+                                            type="text"
+                                            readOnly
+                                            className="el-input__inner"
+                                            value="черно-белая"
+                                            style={{ cursor: 'default', backgroundColor: '#f5f7fa' }}
+                                          />
+                                          <span className="el-input__suffix">
+                                            <span className="el-input__suffix-inner">
+                                              <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                            </span>
+                                          </span>
+                                        </div>
                                       </div>
-                                    </div>
-                                  )
-                                })}
-                            </div>
-                          </div>
+                                    </td>
+                                    {commonRanges.map(() => (
+                                      <td key={Math.random()} style={{ backgroundColor: '#f5f7fa' }}></td>
+                                    ))}
+                                    <td style={{ backgroundColor: '#f5f7fa' }}></td>
+                                    <td style={{ backgroundColor: '#f5f7fa' }}></td>
+                                  </tr>
+                                  
+                                  {/* Односторонняя ч/б */}
+                                  {bwRows.find(r => r.sides_mode === 'single') && (() => {
+                                    const row = bwRows.find(r => r.sides_mode === 'single')!
+                                    const actualIdx = selected.print_prices.findIndex(p =>
+                                      p.technology_code === row.technology_code &&
+                                      p.color_mode === row.color_mode &&
+                                      p.sides_mode === row.sides_mode
+                                    )
+                                    return (
+                                      <tr className="simplified-table__child-row">
+                                        <td className="simplified-table__child-cell">
+                                          <div className="el-select el-select--small" style={{ width: '100%' }}>
+                                            <div className="el-input el-input--small el-input--suffix">
+                                              <input
+                                                type="text"
+                                                readOnly
+                                                className="el-input__inner"
+                                                value="односторонняя"
+                                                style={{ cursor: 'default' }}
+                                              />
+                                              <span className="el-input__suffix">
+                                                <span className="el-input__suffix-inner">
+                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        {commonRanges.map((t, ti) => {
+                                          const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
+                                          return (
+                                            <td key={ti}>
+                                              <input
+                                                className="form-input form-input--compact-table"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={String(priceTier.unit_price || 0)}
+                                                onChange={(e) => {
+                                                  const v = Number(e.target.value) || 0
+                                                  const next = selected.print_prices.map((r, i) => {
+                                                    if (i !== actualIdx) return r
+                                                    const updatedTiers = commonRanges.map((rt, rti) => {
+                                                      if (rti === ti) return { ...rt, unit_price: v }
+                                                      const existingTier = r.tiers.find(t => t.min_qty === rt.min_qty)
+                                                      return existingTier || rt
+                                                    })
+                                                    return { ...r, tiers: updatedTiers }
+                                                  })
+                                                  updateSize(selected.id, { print_prices: next })
+                                                }}
+                                              />
+                                            </td>
+                                          )
+                                        })}
+                                        <td>
+                                          <div className="el-select el-select--small">
+                                            <div className="el-input el-input--small el-input--suffix">
+                                              <input
+                                                type="text"
+                                                readOnly
+                                                className="el-input__inner"
+                                                value="BLR"
+                                                style={{ cursor: 'default' }}
+                                              />
+                                              <span className="el-input__suffix">
+                                                <span className="el-input__suffix-inner">
+                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td>
+                                          <input
+                                            className="form-input form-input--compact-table"
+                                            type="text"
+                                            placeholder=""
+                                          />
+                                        </td>
+                                        <td></td>
+                                      </tr>
+                                    )
+                                  })()}
+                                  
+                                  {/* Двухсторонняя ч/б */}
+                                  {bwRows.find(r => r.sides_mode === 'duplex') && (() => {
+                                    const row = bwRows.find(r => r.sides_mode === 'duplex')!
+                                    const actualIdx = selected.print_prices.findIndex(p =>
+                                      p.technology_code === row.technology_code &&
+                                      p.color_mode === row.color_mode &&
+                                      p.sides_mode === row.sides_mode
+                                    )
+                                    return (
+                                      <tr className="simplified-table__child-row">
+                                        <td className="simplified-table__child-cell">
+                                          <div className="el-select el-select--small" style={{ width: '100%' }}>
+                                            <div className="el-input el-input--small el-input--suffix">
+                                              <input
+                                                type="text"
+                                                readOnly
+                                                className="el-input__inner"
+                                                value="двухсторонняя"
+                                                style={{ cursor: 'default' }}
+                                              />
+                                              <span className="el-input__suffix">
+                                                <span className="el-input__suffix-inner">
+                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        {commonRanges.map((t, ti) => {
+                                          const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
+                                          return (
+                                            <td key={ti}>
+                                              <input
+                                                className="form-input form-input--compact-table"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={String(priceTier.unit_price || 0)}
+                                                onChange={(e) => {
+                                                  const v = Number(e.target.value) || 0
+                                                  const next = selected.print_prices.map((r, i) => {
+                                                    if (i !== actualIdx) return r
+                                                    const updatedTiers = commonRanges.map((rt, rti) => {
+                                                      if (rti === ti) return { ...rt, unit_price: v }
+                                                      const existingTier = r.tiers.find(t => t.min_qty === rt.min_qty)
+                                                      return existingTier || rt
+                                                    })
+                                                    return { ...r, tiers: updatedTiers }
+                                                  })
+                                                  updateSize(selected.id, { print_prices: next })
+                                                }}
+                                              />
+                                            </td>
+                                          )
+                                        })}
+                                        <td>
+                                          <div className="el-select el-select--small">
+                                            <div className="el-input el-input--small el-input--suffix">
+                                              <input
+                                                type="text"
+                                                readOnly
+                                                className="el-input__inner"
+                                                value="BLR"
+                                                style={{ cursor: 'default' }}
+                                              />
+                                              <span className="el-input__suffix">
+                                                <span className="el-input__suffix-inner">
+                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td>
+                                          <input
+                                            className="form-input form-input--compact-table"
+                                            type="text"
+                                            placeholder=""
+                                          />
+                                        </td>
+                                        <td></td>
+                                      </tr>
+                                    )
+                                  })()}
+                                </>
+                              )}
+                            </tbody>
+                          </table>
                         </div>
                       )
                     })()}

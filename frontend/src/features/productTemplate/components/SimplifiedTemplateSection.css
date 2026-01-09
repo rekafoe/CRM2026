@@ -372,6 +372,88 @@
   min-width: 200px;
 }
 
+/* Иерархия строк в таблице */
+.simplified-table__parent-row {
+  background-color: #f5f7fa;
+}
+
+.simplified-table__parent-row td {
+  background-color: #f5f7fa !important;
+  font-weight: 500;
+}
+
+.simplified-table__parent-cell {
+  padding-left: 10px !important;
+}
+
+.simplified-table__child-row {
+  background-color: #fff;
+}
+
+.simplified-table__child-cell {
+  padding-left: 32px !important;
+  position: relative;
+}
+
+.simplified-table__child-cell::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 60%;
+  background-color: #dcdfe6;
+}
+
+/* Компактные селекторы */
+.simplified-table .el-select--small {
+  font-size: 12px;
+}
+
+.simplified-table .el-input--small {
+  font-size: 12px;
+}
+
+.simplified-table .el-input--small .el-input__inner {
+  height: 32px;
+  line-height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.simplified-table .el-input__suffix {
+  right: 5px;
+}
+
+.simplified-table .el-input__suffix-inner {
+  font-size: 12px;
+}
+
+.simplified-table .el-select__caret {
+  font-size: 12px;
+}
+
+/* Иконки Element UI */
+.simplified-table .el-icon-arrow-up::before {
+  content: '▲';
+  font-size: 10px;
+  color: #909399;
+}
+
+.simplified-table .el-input__suffix {
+  pointer-events: none;
+}
+
+.simplified-table .el-input__inner[readonly] {
+  cursor: default;
+  background-color: #fff;
+}
+
+.simplified-table .el-input__inner[readonly][style*="background-color: #f5f7fa"] {
+  background-color: #f5f7fa !important;
+}
+
 .simplified-table td {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border-color, #e5e7eb);
