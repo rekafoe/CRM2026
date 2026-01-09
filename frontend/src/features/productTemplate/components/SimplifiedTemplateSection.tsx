@@ -1319,7 +1319,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                 const finishing = selected.finishing.find(f => f.service_id === Number(service.id))
                                 const actualIdx = selected.finishing.findIndex(f => f.service_id === Number(service.id))
                                 
-                                if (!finishing) return null
+                                // Если услуги нет в finishing, используем дефолтные значения
+                                const defaultFinishing = {
+                                  service_id: Number(service.id),
+                                  price_unit: 'per_cut' as const,
+                                  units_per_item: 1,
+                                  tiers: commonRanges.map(r => ({ ...r, unit_price: 0 }))
+                                }
+                                const activeFinishing = finishing || defaultFinishing
                                 
                                 return (
                                   <tr key={service.id}>
@@ -1342,7 +1349,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                         </div>
                                     </td>
                                     {commonRanges.map((t, ti) => {
-                                      const priceTier = finishing.tiers.find(rt => rt.min_qty === t.min_qty) || t
+                                      const priceTier = activeFinishing.tiers.find(rt => rt.min_qty === t.min_qty) || t
                                       return (
                                         <td key={ti}>
                                 <input
@@ -1353,16 +1360,32 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                             value={String(priceTier.unit_price || 0)}
                                   onChange={(e) => {
                                     const v = Number(e.target.value) || 0
-                                                const next = selected.finishing.map((r, i) => {
-                                                if (i !== actualIdx) return r
-                                                const updatedTiers = commonRanges.map((rt, rti) => {
-                                                  if (rti === ti) return { ...rt, unit_price: v }
-                                                  const existingTier = r.tiers.find(t => t.min_qty === rt.min_qty)
-                                                  return existingTier || rt
-                                                })
-                                                return { ...r, tiers: updatedTiers }
-                                                })
-                                                updateSize(selected.id, { finishing: next })
+                                    if (actualIdx === -1) {
+                                      // Создаем новую запись для услуги
+                                      const newFinishing = {
+                                        service_id: Number(service.id),
+                                        price_unit: 'per_cut' as const,
+                                        units_per_item: 1,
+                                        tiers: commonRanges.map((rt, rti) => {
+                                          if (rti === ti) return { ...rt, unit_price: v }
+                                          return { ...rt, unit_price: 0 }
+                                        })
+                                      }
+                                      updateSize(selected.id, {
+                                        finishing: [...selected.finishing, newFinishing]
+                                      })
+                                    } else {
+                                      const next = selected.finishing.map((r, i) => {
+                                        if (i !== actualIdx) return r
+                                        const updatedTiers = commonRanges.map((rt, rti) => {
+                                          if (rti === ti) return { ...rt, unit_price: v }
+                                          const existingTier = r.tiers.find(t => t.min_qty === rt.min_qty)
+                                          return existingTier || rt
+                                        })
+                                        return { ...r, tiers: updatedTiers }
+                                      })
+                                      updateSize(selected.id, { finishing: next })
+                                    }
                                               }}
                                           />
                                         </td>
