@@ -524,7 +524,6 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                             onClick={handleCreateVariant}
                             title="Добавить строку (тип)"
                           >
-                            <i className="el-icon-bottom"></i>
                           </button>
                         </div>
                       </div>
@@ -691,14 +690,12 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                 }}
                                 title="Добавить строку (тип)"
                               >
-                                <i className="el-icon-bottom"></i>
                               </button>
                               <button
                                 type="button"
                                 className="el-button el-button--danger el-button--small"
                                 onClick={() => handleDeleteVariant(variant.id)}
                               >
-                                <i className="el-icon-delete"></i>
                               </button>
                             </div>
                           </div>
@@ -839,14 +836,12 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                 }}
                                 title="Добавить подстроку"
                               >
-                                <i className="el-icon-bottom-right"></i>
                               </button>
                               <button
                                 type="button"
                                 className="el-button el-button--danger el-button--small"
                                 onClick={() => handleDeleteVariant(variant.id)}
                               >
-                                <i className="el-icon-delete"></i>
                               </button>
                             </div>
                           </div>
