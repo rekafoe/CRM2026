@@ -315,20 +315,31 @@ export class PricingServiceRepository {
 
   static async listServiceTiers(serviceId: number, variantId?: number): Promise<ServiceVolumeTierDTO[]> {
     const db = await this.getConnection();
+    await this.ensureSchema(db);
+    
     let query = `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active FROM service_volume_prices WHERE service_id = ?`;
     const params: any[] = [serviceId];
     
-    if (variantId !== undefined) {
-      query += ` AND (variant_id = ? OR variant_id IS NULL)`;
+    if (variantId !== undefined && variantId !== null) {
+      // Для варианта возвращаем только его tiers
+      query += ` AND variant_id = ?`;
       params.push(variantId);
     } else {
+      // Для услуги без варианта возвращаем только общие tiers
       query += ` AND variant_id IS NULL`;
     }
     
     query += ` ORDER BY min_quantity`;
     
-    const rows = await db.all<RawTierRow[]>(query, ...params);
-    return rows.map(this.mapTier);
+    try {
+      const rows = await db.all<RawTierRow[]>(query, ...params);
+      return rows.map(this.mapTier);
+    } catch (error: any) {
+      console.error('Error in listServiceTiers:', error);
+      console.error('Query:', query);
+      console.error('Params:', params);
+      throw error;
+    }
   }
 
   static async createServiceTier(serviceId: number, payload: CreateServiceVolumeTierDTO): Promise<ServiceVolumeTierDTO> {

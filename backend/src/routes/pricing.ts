@@ -781,20 +781,62 @@ router.delete('/services/:serviceId/variants/:variantId', asyncHandler(async (re
 // Tiers для вариантов
 router.get('/services/:serviceId/variants/:variantId/tiers', asyncHandler(async (req, res) => {
   const { serviceId, variantId } = req.params
-  const tiers = await ServiceManagementService.listServiceTiers(Number(serviceId), Number(variantId))
+  const serviceIdNum = Number(serviceId)
+  const variantIdNum = Number(variantId)
+  
+  if (isNaN(serviceIdNum) || isNaN(variantIdNum)) {
+    res.status(400).json({ error: 'Invalid serviceId or variantId' })
+    return
+  }
+  
+  const tiers = await ServiceManagementService.listServiceTiers(serviceIdNum, variantIdNum)
   res.json(tiers.map(toTierResponse))
 }))
 
 router.post('/services/:serviceId/variants/:variantId/tiers', asyncHandler(async (req, res) => {
   const { serviceId, variantId } = req.params
   const { min_quantity, minQuantity, price_per_unit, rate, is_active, isActive } = req.body
-  const tier = await ServiceManagementService.createServiceTier(Number(serviceId), {
+  
+  const serviceIdNum = Number(serviceId)
+  const variantIdNum = Number(variantId)
+  
+  if (isNaN(serviceIdNum) || isNaN(variantIdNum)) {
+    res.status(400).json({ error: 'Invalid serviceId or variantId' })
+    return
+  }
+  
+  const tier = await ServiceManagementService.createServiceTier(serviceIdNum, {
     minQuantity: Number(min_quantity ?? minQuantity ?? 0),
     rate: Number(price_per_unit ?? rate ?? 0),
     isActive: is_active !== undefined ? !!is_active : isActive,
-    variantId: Number(variantId),
+    variantId: variantIdNum,
   })
   res.status(201).json(toTierResponse(tier))
+}))
+
+// PUT и DELETE для tiers вариантов
+router.put('/services/:serviceId/variants/:variantId/tiers/:tierId', asyncHandler(async (req, res) => {
+  const { tierId } = req.params
+  const { min_quantity, minQuantity, price_per_unit, rate, is_active, isActive } = req.body
+  
+  const updated = await ServiceManagementService.updateServiceTier(Number(tierId), {
+    minQuantity: min_quantity ?? minQuantity,
+    rate: rate ?? price_per_unit,
+    isActive: is_active !== undefined ? !!is_active : isActive,
+  })
+
+  if (!updated) {
+    res.status(404).json({ error: 'Tier not found' })
+    return
+  }
+
+  res.json(toTierResponse(updated))
+}))
+
+router.delete('/services/:serviceId/variants/:variantId/tiers/:tierId', asyncHandler(async (req, res) => {
+  const { tierId } = req.params
+  await ServiceManagementService.deleteServiceTier(Number(tierId))
+  res.json({ success: true })
 }))
 
 // POST /api/pricing/markup-settings - создать настройку наценки
