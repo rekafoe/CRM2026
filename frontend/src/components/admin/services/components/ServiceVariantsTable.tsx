@@ -34,6 +34,9 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   const tierModal = useTierModal();
   const operations = useVariantOperations(serviceId, variants, setVariants, setError, reload, invalidateCache);
 
+  console.log('operations object:', operations);
+  console.log('createVariant function:', operations.createVariant);
+
   // Вычисляем общие диапазоны
   const commonRanges = useMemo(() => calculateCommonRanges(variants), [variants]);
   const commonRangesAsPriceRanges: PriceRange[] = useMemo(() => {
@@ -388,22 +391,18 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         <button
                                           type="button"
                                           className="el-button el-button--success el-button--small is-plain"
-                                          onClick={() => {
-                                            console.log('Level 2 button clicked');
-                                            const handler = async () => {
-                                              try {
-                                                const newVariant = await operations.createVariant(typeName, {
-                                                  ...variant.parameters,
-                                                  parentVariantId: variant.id,
-                                                  subType: '',
-                                                });
-                                                editing.startEditingParams(newVariant.id, { ...variant.parameters, parentVariantId: variant.id, subType: '' });
-                                              } catch (err) {
-                                                console.error('Ошибка создания дочерней строки (уровень 2):', err);
-                                                // Ошибка уже обработана в хуке и отображена через setError
-                                              }
-                                            };
-                                            handler();
+                                          onClick={async () => {
+                                            try {
+                                              const newVariant = await operations.createVariant(typeName, {
+                                                ...variant.parameters,
+                                                parentVariantId: variant.id,
+                                                subType: '',
+                                              });
+                                              editing.startEditingParams(newVariant.id, { ...variant.parameters, parentVariantId: variant.id, subType: '' });
+                                            } catch (err) {
+                                              console.error('Ошибка создания дочерней строки (уровень 2):', err);
+                                              // Ошибка уже обработана в хуке и отображена через setError
+                                            }
                                           }}
                                           title="Добавить дочернюю строку (уровень 2)"
                                         >
@@ -498,17 +497,21 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                           <button
                                             type="button"
                                             className="el-button el-button--success el-button--small"
-                                            onClick={async () => {
-                                              try {
-                                                const newVariant = await operations.createVariant(typeName, {
-                                                  ...level2Variant.parameters,
-                                                  subType: '',
-                                                });
-                                                editing.startEditingParams(newVariant.id, { ...level2Variant.parameters, subType: '' });
-                                              } catch (err) {
-                                                console.error('Ошибка создания строки на том же уровне (уровень 2):', err);
-                                                // Ошибка уже обработана в хуке и отображена через setError
-                                              }
+                                            onClick={() => {
+                                              console.log('Level 2 sibling button clicked');
+                                              const handler = async () => {
+                                                try {
+                                                  const newVariant = await operations.createVariant(typeName, {
+                                                    ...level2Variant.parameters,
+                                                    subType: '',
+                                                  });
+                                                  editing.startEditingParams(newVariant.id, { ...level2Variant.parameters, subType: '' });
+                                                } catch (err) {
+                                                  console.error('Ошибка создания строки на том же уровне (уровень 2):', err);
+                                                  // Ошибка уже обработана в хуке и отображена через setError
+                                                }
+                                              };
+                                              handler();
                                             }}
                                             title="Добавить строку на том же уровне"
                                           >
