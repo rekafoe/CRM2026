@@ -245,18 +245,17 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                 <button
                                   type="button"
                                   className="el-button el-button--success el-button--small is-plain"
-                                  onClick={() => {
-                                    console.log('Child button clicked');
-                                    const handler = async () => {
-                                      try {
-                                        const newVariant = await operations.createVariant(typeName, { type: '', density: '' });
-                                        editing.startEditingParams(newVariant.id, { type: '', density: '' });
-                                      } catch (err) {
-                                        console.error('Ошибка создания дочерней строки:', err);
-                                        // Ошибка уже обработана в хуке и отображена через setError
-                                      }
-                                    };
-                                    handler();
+                                  onClick={async () => {
+                                    console.log('Child button clicked - about to call createVariant');
+                                    try {
+                                      console.log('Calling operations.createVariant with:', typeName, { type: '', density: '' });
+                                      const newVariant = await operations.createVariant(typeName, { type: '', density: '' });
+                                      console.log('createVariant returned:', newVariant);
+                                      editing.startEditingParams(newVariant.id, { type: '', density: '' });
+                                    } catch (err) {
+                                      console.error('Ошибка создания дочерней строки:', err);
+                                      // Ошибка уже обработана в хуке и отображена через setError
+                                    }
                                   }}
                                   title="Добавить дочернюю строку"
                                 >
