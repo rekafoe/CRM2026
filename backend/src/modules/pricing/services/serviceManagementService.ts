@@ -28,8 +28,8 @@ export class ServiceManagementService {
     return PricingServiceRepository.deleteService(id);
   }
 
-  static listServiceTiers(serviceId: number): Promise<ServiceVolumeTierDTO[]> {
-    return PricingServiceRepository.listServiceTiers(serviceId);
+  static listServiceTiers(serviceId: number, variantId?: number): Promise<ServiceVolumeTierDTO[]> {
+    return PricingServiceRepository.listServiceTiers(serviceId, variantId);
   }
 
   static createServiceTier(serviceId: number, payload: CreateServiceVolumeTierDTO): Promise<ServiceVolumeTierDTO> {
