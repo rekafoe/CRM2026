@@ -81,18 +81,17 @@ export function useVariantOperations(
       // Инвалидируем кэш
       invalidateCacheRef.current?.();
 
-      // Перезагружаем tiers для нового варианта через небольшую задержку
+      // Обновляем tiers для нового варианта через небольшую задержку
       setTimeout(async () => {
         try {
-          // Обновляем только tiers для нового варианта, не перезагружая все варианты
-          const allTiers = await getAllVariantTiers(serviceId);
-          cacheRef.current.set(serviceId, allTiers);
+          // Получаем tiers только для нового варианта
+          const newVariantTiers = await getServiceVariantTiers(serviceId, newVariant.id);
 
           // Обновляем локальный вариант с актуальными tiers
           setVariants((prev) =>
             prev.map((v) =>
               v.id === newVariant.id
-                ? { ...v, tiers: allTiers[newVariant.id] || v.tiers }
+                ? { ...v, tiers: newVariantTiers }
                 : v
             )
           );
