@@ -251,6 +251,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
   const handleUpdateVariantName = useCallback(async (variantId: number, newName: string) => {
     try {
+      // Находим вариант и обновляем локально
       setVariants((prev) => {
         const variant = prev.find((v) => v.id === variantId);
         if (!variant) return prev;
@@ -259,18 +260,19 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         // Обновляем все варианты с тем же названием типа
         return prev.map((v) => {
           if (v.variantName === oldName) {
-            // Обновляем локально, API вызов будет сделан отдельно
             return { ...v, variantName: newName };
           }
           return v;
         });
       });
       
-      // Обновляем на сервере
-      const variant = variants.find((v) => v.id === variantId);
+      // Обновляем на сервере параллельно
+      const currentVariants = variants;
+      const variant = currentVariants.find((v) => v.id === variantId);
       if (!variant) return;
+      
       const oldName = variant.variantName;
-      const variantsToUpdate = variants.filter((v) => v.variantName === oldName);
+      const variantsToUpdate = currentVariants.filter((v) => v.variantName === oldName);
       const updatePromises = variantsToUpdate.map((v) =>
         updateServiceVariant(serviceId, v.id, {
           variantName: newName,
@@ -370,6 +372,21 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       // Сохраняем текущее состояние вариантов с ценами перед изменением диапазонов
       const currentVariants = [...variants];
       
+      // Вычисляем commonRanges один раз для всех вариантов (если нужно для редактирования)
+      let currentCommonRanges: Tier[] = [];
+      if (tierModal.type === 'edit' && tierModal.tierIndex !== undefined) {
+        const allMinQtys = new Set<number>();
+        currentVariants.forEach((v) => {
+          v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
+        });
+        const sortedMinQtys = Array.from(allMinQtys).sort((a, b) => a - b);
+        currentCommonRanges = sortedMinQtys.map((minQty, idx) => ({
+          min_qty: minQty,
+          max_qty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
+          unit_price: 0,
+        }));
+      }
+      
       // Обновляем диапазоны для всех вариантов локально
       const updatedVariants = currentVariants.map((variant) => {
         const currentTiers: Tier[] = variant.tiers.map((t) => ({
@@ -383,18 +400,6 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
           newTiers = addRangeBoundary(currentTiers, boundary);
         } else {
           if (tierModal.tierIndex === undefined) return variant;
-          // Вычисляем commonRanges для поиска редактируемого диапазона
-          const allMinQtys = new Set<number>();
-          currentVariants.forEach((v) => {
-            v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
-          });
-          const sortedMinQtys = Array.from(allMinQtys).sort((a, b) => a - b);
-          const currentCommonRanges: Tier[] = sortedMinQtys.map((minQty, idx) => ({
-            min_qty: minQty,
-            max_qty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
-            unit_price: 0,
-          }));
-          
           const rangeToEdit = currentCommonRanges[tierModal.tierIndex];
           if (!rangeToEdit) return variant;
           const tierIndex = currentTiers.findIndex((t) => t.min_qty === rangeToEdit.min_qty);
@@ -405,20 +410,16 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         const normalizedTiers = normalizeTiers(newTiers);
         
         // Сохраняем существующие цены для диапазонов
-        // Создаем карту: min_qty -> rate для быстрого поиска
         const preservedPrices = new Map<number, number>();
         variant.tiers.forEach((t) => {
           preservedPrices.set(t.minQuantity, t.rate);
         });
         
-        // Используем цены из normalizedTiers (которые уже установлены addRangeBoundary),
-        // но переопределяем их для существующих min_qty из сохраненных цен
+        // Используем цены из normalizedTiers, переопределяя для существующих min_qty
         const newTiersWithPrices = normalizedTiers.map((t) => {
-          // Если min_qty уже существовал, используем сохраненную цену
           if (preservedPrices.has(t.min_qty)) {
             return { ...t, unit_price: preservedPrices.get(t.min_qty)! };
           }
-          // Иначе используем цену, установленную addRangeBoundary (которая уже правильная)
           return t;
         });
 
@@ -438,41 +439,61 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       // Обновляем локальное состояние
       setVariants(updatedVariants);
 
-      // Сохраняем изменения на сервере
-      for (const variant of updatedVariants) {
-        // Получаем текущие tiers с сервера для сравнения
-        const existingTiers = await getServiceVariantTiers(serviceId, variant.id);
+      // Параллельно загружаем все существующие tiers для всех вариантов
+      const existingTiersPromises = updatedVariants.map((variant) =>
+        getServiceVariantTiers(serviceId, variant.id)
+      );
+      const allExistingTiers = await Promise.all(existingTiersPromises);
+      
+      // Подготавливаем все операции для батчинга
+      const operations: Array<() => Promise<any>> = [];
+      
+      updatedVariants.forEach((variant, variantIndex) => {
+        const existingTiers = allExistingTiers[variantIndex];
         const existingTiersMap = new Map(existingTiers.map(t => [t.minQuantity, t]));
+        const newTiersMinQtys = new Set(variant.tiers.map(t => t.minQuantity));
         
-        // Создаем или обновляем tiers
-        for (const newTier of variant.tiers) {
+        // Операции создания и обновления
+        variant.tiers.forEach((newTier) => {
           const existingTier = existingTiersMap.get(newTier.minQuantity);
           if (existingTier) {
             // Обновляем существующий tier, если цена изменилась
             if (existingTier.rate !== newTier.rate) {
-              await updateServiceVariantTier(serviceId, variant.id, existingTier.id, {
-                minQuantity: newTier.minQuantity,
-                rate: newTier.rate,
-                isActive: true,
-              });
+              operations.push(() =>
+                updateServiceVariantTier(serviceId, variant.id, existingTier.id, {
+                  minQuantity: newTier.minQuantity,
+                  rate: newTier.rate,
+                  isActive: true,
+                })
+              );
             }
           } else {
             // Создаем новый tier
-            await createServiceVariantTier(serviceId, variant.id, {
-              minQuantity: newTier.minQuantity,
-              rate: newTier.rate,
-              isActive: true,
-            });
+            operations.push(() =>
+              createServiceVariantTier(serviceId, variant.id, {
+                minQuantity: newTier.minQuantity,
+                rate: newTier.rate,
+                isActive: true,
+              })
+            );
           }
-        }
+        });
         
-        // Удаляем tiers, которые больше не нужны
-        const newTiersMinQtys = new Set(variant.tiers.map(t => t.minQuantity));
-        for (const existingTier of existingTiers) {
+        // Операции удаления
+        existingTiers.forEach((existingTier) => {
           if (!newTiersMinQtys.has(existingTier.minQuantity)) {
-            await deleteServiceVariantTier(serviceId, existingTier.id);
+            operations.push(() =>
+              deleteServiceVariantTier(serviceId, existingTier.id)
+            );
           }
-        }
+        });
+      });
+
+      // Выполняем все операции параллельно (с ограничением на количество одновременных запросов)
+      const BATCH_SIZE = 10; // Ограничиваем количество одновременных запросов
+      for (let i = 0; i < operations.length; i += BATCH_SIZE) {
+        const batch = operations.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(op => op()));
       }
 
       // Перезагружаем данные после сохранения
@@ -1048,6 +1069,9 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                               const level2Variants = typeGroup.level2.get(variant.id) || [];
                               const hasChildren = level2Variants.length > 0;
                               
+                              // Создаем Map для быстрого поиска tiers по minQuantity
+                              const tiersMap = new Map(variant.tiers.map(t => [t.minQuantity, t]));
+                              
                               return (
                                 <React.Fragment key={variant.id}>
                                   <tr className="el-table__row el-table__row--level-1">
@@ -1126,9 +1150,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                       </div>
                                     </td>
                                     {commonRanges.map((range, rangeIdx) => {
-                                      const tier = variant.tiers.find(
-                                        (t) => t.minQuantity === range.min_qty
-                                      );
+                                      // Используем Map для быстрого поиска вместо find
+                                      const tier = tiersMap.get(range.min_qty);
                                       return (
                                         <td key={`${variant.id}-${range.min_qty}`}>
                                           <div className="cell">
@@ -1255,6 +1278,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                   {/* Внучатые строки - варианты уровня 2 */}
                                   {level2Variants.map((level2Variant) => {
                                     const level2VariantIndex = variantsIndexMap.get(level2Variant.id) ?? -1;
+                                    // Создаем Map для быстрого поиска tiers по minQuantity
+                                    const level2TiersMap = new Map(level2Variant.tiers.map(t => [t.minQuantity, t]));
                                     return (
                                       <tr key={level2Variant.id} className="el-table__row el-table__row--level-2">
                                         <td>
@@ -1313,9 +1338,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                           </div>
                                         </td>
                                         {commonRanges.map((range, rangeIdx) => {
-                                          const tier = level2Variant.tiers.find(
-                                            (t) => t.minQuantity === range.min_qty
-                                          );
+                                          // Используем Map для быстрого поиска вместо find
+                                          const tier = level2TiersMap.get(range.min_qty);
                                           return (
                                             <td key={`${level2Variant.id}-${range.min_qty}`}>
                                               <div className="cell">
