@@ -207,6 +207,35 @@
   align-items: stretch;
 }
 
+.simplified-materials__list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.simplified-material-item {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background: var(--bg-primary, #fff);
+  padding: 12px;
+}
+
+.simplified-material-item__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.simplified-material-item__title {
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.simplified-material-item__pricing {
+  margin-top: 8px;
+}
+
 .simplified-checkbox {
   display: flex;
   align-items: center;
@@ -250,6 +279,69 @@
   margin-top: 8px;
 }
 
+.simplified-print-variations {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.simplified-print-group {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background: var(--bg-primary, #fff);
+  padding: 12px;
+}
+
+.simplified-print-group__title {
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.simplified-print-group__items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.simplified-finishing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.simplified-finishing-item {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background: var(--bg-primary, #fff);
+  padding: 12px;
+}
+
+.simplified-finishing-item__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.simplified-finishing-item__title {
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.simplified-finishing-item__controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.simplified-finishing-item__pricing {
+  margin-top: 8px;
+}
+
 .simplified-tiers-table {
   margin-top: 10px;
   overflow-x: auto;
@@ -273,6 +365,11 @@
   color: var(--text-primary, #111827);
   font-size: 13px;
   white-space: nowrap;
+}
+
+.simplified-table th:first-child {
+  width: 200px;
+  min-width: 200px;
 }
 
 .simplified-table td {

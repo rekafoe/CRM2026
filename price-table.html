@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Таблица цен печати</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui@2.15.14/lib/theme-chalk/index.css">
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .price-table {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        /* Эмуляция базовых стилей Element UI */
+        .el-switch {
+            display: inline-block;
+            position: relative;
+            font-size: 14px;
+            line-height: 20px;
+            height: 20px;
+            vertical-align: middle;
+        }
+
+        .el-switch__core {
+            display: inline-block;
+            position: relative;
+            width: 40px;
+            height: 20px;
+            border: 1px solid #dcdfe6;
+            outline: none;
+            border-radius: 10px;
+            box-sizing: border-box;
+            background: #dcdfe6;
+            cursor: pointer;
+            transition: border-color .3s, background-color .3s;
+            vertical-align: middle;
+        }
+
+        .el-switch__core.is-active {
+            border-color: #367fa9;
+            background-color: #367fa9;
+        }
+
+        .el-switch__label {
+            display: inline-block;
+            font-size: 14px;
+            color: #303133;
+            vertical-align: middle;
+            margin: 0 5px;
+        }
+
+        .el-switch__label--left {
+            margin-right: 10px;
+        }
+
+        .el-switch__label--right {
+            margin-left: 10px;
+        }
+
+        .el-switch__label.is-active {
+            color: #367fa9;
+        }
+
+        .el-table {
+            position: relative;
+            overflow: hidden;
+            box-sizing: border-box;
+            flex: 1;
+            width: 100%;
+            max-width: 100%;
+            background-color: #fff;
+            font-size: 14px;
+            color: #606266;
+        }
+
+        .el-table--border {
+            border-right: 1px solid #ebeef5;
+            border-bottom: 1px solid #ebeef5;
+        }
+
+        .el-table--fit {
+            border-right: 0;
+            border-bottom: 0;
+        }
+
+        .el-table__header-wrapper {
+            overflow: hidden;
+        }
+
+        .el-table__header {
+            margin-bottom: 0;
+        }
+
+        .el-table__body-wrapper {
+            overflow: auto;
+            position: relative;
+        }
+
+        .el-table__body {
+            margin-top: 0;
+        }
+
+        .el-table thead {
+            color: #909399;
+            font-weight: 500;
+        }
+
+        .el-table thead th {
+            background-color: #fafafa;
+            border-bottom: 1px solid #ebeef5;
+        }
+
+        .el-table th {
+            padding: 12px 0;
+            min-width: 0;
+            box-sizing: border-box;
+            text-overflow: ellipsis;
+            vertical-align: middle;
+            position: relative;
+            text-align: left;
+        }
+
+        .el-table th.is-center {
+            text-align: center;
+        }
+
+        .el-table th .cell {
+            display: inline-block;
+            box-sizing: border-box;
+            position: relative;
+            vertical-align: middle;
+            padding-left: 10px;
+            padding-right: 10px;
+            width: 100%;
+        }
+
+        .el-table td {
+            padding: 12px 0;
+            min-width: 0;
+            box-sizing: border-box;
+            text-overflow: ellipsis;
+            vertical-align: middle;
+            position: relative;
+            text-align: left;
+            border-bottom: 1px solid #ebeef5;
+        }
+
+        .el-table td .cell {
+            box-sizing: border-box;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: normal;
+            word-break: break-all;
+            line-height: 23px;
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        .el-table--enable-row-hover .el-table__body tr:hover > td {
+            background-color: #f5f7fa;
+        }
+
+        .el-table__expand-icon {
+            cursor: pointer;
+            color: #666;
+            transition: transform 0.2s ease-in-out;
+            font-size: 12px;
+        }
+
+        .el-table__expand-icon--expanded {
+            transform: rotate(90deg);
+        }
+
+        .el-table__indent {
+            display: inline-block;
+            width: 16px;
+        }
+
+        .el-table__placeholder {
+            display: inline-block;
+            width: 20px;
+        }
+
+        .el-input {
+            position: relative;
+            font-size: 14px;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .el-input--small .el-input__inner {
+            font-size: 12px;
+            height: 32px;
+            line-height: 32px;
+        }
+
+        .el-input__inner {
+            -webkit-appearance: none;
+            background-color: #fff;
+            background-image: none;
+            border-radius: 4px;
+            border: 1px solid #dcdfe6;
+            box-sizing: border-box;
+            color: #606266;
+            display: inline-block;
+            font-size: inherit;
+            height: 40px;
+            line-height: 40px;
+            outline: none;
+            padding: 0 15px;
+            transition: border-color .2s cubic-bezier(.645,.045,.355,1);
+            width: 100%;
+        }
+
+        .el-input__inner:focus {
+            outline: none;
+            border-color: #409eff;
+        }
+
+        .el-select {
+            display: inline-block;
+            position: relative;
+        }
+
+        .el-select--small {
+            font-size: 12px;
+        }
+
+        .el-select .el-input {
+            width: 100%;
+        }
+
+        .el-button {
+            display: inline-block;
+            line-height: 1;
+            white-space: nowrap;
+            cursor: pointer;
+            background: #fff;
+            border: 1px solid #dcdfe6;
+            color: #606266;
+            -webkit-appearance: none;
+            text-align: center;
+            box-sizing: border-box;
+            outline: none;
+            margin: 0;
+            transition: .1s;
+            font-weight: 500;
+            padding: 12px 20px;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+
+        .el-button--small {
+            padding: 9px 15px;
+            font-size: 12px;
+            border-radius: 3px;
+        }
+
+        .el-button--mini {
+            padding: 7px 15px;
+            font-size: 12px;
+            border-radius: 3px;
+        }
+
+        .el-button--text {
+            border-color: transparent;
+            color: #606266;
+            background: transparent;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .el-button--primary {
+            color: #fff;
+            background-color: #409eff;
+            border-color: #409eff;
+        }
+
+        .el-button--success {
+            color: #fff;
+            background-color: #67c23a;
+            border-color: #67c23a;
+        }
+
+        .el-button--warning {
+            color: #fff;
+            background-color: #e6a23c;
+            border-color: #e6a23c;
+        }
+
+        .el-button--danger {
+            color: #fff;
+            background-color: #f56c6c;
+            border-color: #f56c6c;
+        }
+
+        .el-button--info {
+            color: #fff;
+            background-color: #909399;
+            border-color: #909399;
+        }
+
+        .el-button--plain {
+            color: #409eff;
+            background: #ecf5ff;
+            border-color: #b3d8ff;
+        }
+
+        .el-button--primary.is-plain {
+            color: #409eff;
+            background: #ecf5ff;
+            border-color: #b3d8ff;
+        }
+
+        .el-button--success.is-plain {
+            color: #67c23a;
+            background: #f0f9ff;
+            border-color: #c2e7b0;
+        }
+
+        .el-popover {
+            position: absolute;
+            background: #fff;
+            min-width: 150px;
+            border: 1px solid #ebeef5;
+            padding: 12px;
+            z-index: 2000;
+            color: #606266;
+            line-height: 1.4;
+            text-align: justify;
+            font-size: 14px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,.1);
+            word-break: break-all;
+        }
+
+        .el-popover__title {
+            color: #303133;
+            font-size: 16px;
+            line-height: 1;
+            margin-bottom: 12px;
+        }
+
+        .el-popper {
+            position: absolute;
+            z-index: 2000;
+        }
+
+        /* Скрываем скрытые элементы */
+        .hidden-columns,
+        .el-popover[style*="display: none"],
+        .el-select-dropdown[style*="display: none"],
+        .el-table__column-resize-proxy {
+            display: none !important;
+        }
+
+        /* Активная панель */
+        .active-panel {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .active-panel-with-popover {
+            margin-bottom: 10px;
+        }
+
+        /* Плавающие элементы */
+        .price-table span[style*="float: right"] {
+            float: right;
+            padding: 0px 20px;
+            border: 1px solid #ebeef5;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+
+        /* Таблица в поповерах */
+        .el-popover table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .el-popover table td {
+            padding: 5px;
+            border: none;
+            font-weight: bold;
+        }
+
+        .el-popover table td:first-child {
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+    <div class="price-table" cols="24,48,72,96,1000">
+        <span style="float: right; padding: 0px 20px; border: 1px solid rgb(235, 238, 245);">
+            <div role="tooltip" id="el-popover-2251" aria-hidden="true" class="el-popover el-popper" tabindex="0" style="width: 400px; display: none;">
+                <div class="el-popover__title">Подсказка</div>
+                <div style="word-break: break-word;">
+                    Если выбран <strong>динамический</strong> способ расчета, то цена плавно перетекает от одного диапазона к
+                    другому в зависимости от выбранного количества. <br>
+                    В <strong>статическом</strong> режиме цена остается постоянной в пределах всего диапазона.
+                </div>
+            </div>
+            <span class="el-popover__reference-wrapper">
+                <div style="el-popover__reference" aria-describedby="el-popover-2251" tabindex="0">
+                    <span>Рассчитывать цену</span>
+                    <div role="switch" class="el-switch">
+                        <input type="checkbox" name="" true-value="true" class="el-switch__input">
+                        <span class="el-switch__label el-switch__label--left is-active"><!----><span>статически</span></span>
+                        <span class="el-switch__core" style="width: 40px; border-color: rgb(54, 127, 169); background-color: rgb(54, 127, 169);"></span>
+                        <span class="el-switch__label el-switch__label--right"><!----><span aria-hidden="true">динамически</span></span>
+                    </div>
+                </div>
+            </span>
+        </span>
+
+        <span style="float: right; padding: 0px 20px; border: 1px solid rgb(235, 238, 245);">
+            <div role="tooltip" id="el-popover-9965" aria-hidden="true" class="el-popover el-popper" style="width: 400px; display: none;">
+                <div class="el-popover__title">Подсказка</div>
+                <div style="word-break: break-word;">
+                    Если выбрано добавлять цену <strong>по тиражу</strong>, то цена добавляется на каждую единицу тиража, а если
+                    выбрано <strong>один раз</strong>, то цена добавляется к стоимости заказа только один раз.
+                </div>
+            </div>
+            <span class="el-popover__reference-wrapper"></span>
+        </span>
+
+        <div class="el-table el-table--fit el-table--border el-table--scrollable-x el-table--enable-row-hover el-table--enable-row-transition el-table--small" style="width: 100%; margin: 15px 0px;">
+            <div class="hidden-columns">
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+
+            <div class="el-table__header-wrapper">
+                <table cellspacing="0" cellpadding="0" border="0" class="el-table__header" style="width: 853px;">
+                    <colgroup>
+                        <col name="el-table_3_column_16" width="80">
+                        <col name="el-table_3_column_17" width="85">
+                        <col name="el-table_3_column_18" width="85">
+                        <col name="el-table_3_column_19" width="85">
+                        <col name="el-table_3_column_20" width="85">
+                        <col name="el-table_3_column_21" width="85">
+                        <col name="el-table_3_column_22" width="80">
+                        <col name="el-table_3_column_23" width="80">
+                        <col name="el-table_3_column_24" width="188">
+                        <col name="gutter" width="0">
+                    </colgroup>
+                    <thead class="has-gutter">
+                        <tr>
+                            <th colspan="1" rowspan="1" class="el-table_3_column_16     is-leaf">
+                                <div class="cell">
+                                    Параметры печати (цена за изделие указанного формата и цветности)
+                                </div>
+                            </th>
+                            <th colspan="1" rowspan="1" class="el-table_3_column_17  is-center   is-leaf">
+                                <div class="cell">
+                                    24
+                                    <span>
+                                        <button type="button" class="el-button remove-range el-button--text el-button--mini" style="color: red; margin-right: -15px;">
+                                            <i class="el-icon-close"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </th>
+                            <th colspan="1" rowspan="1" class="el-table_3_column_18  is-center   is-leaf">
+                                <div class="cell">
+                                    48
+                                    <span>
+                                        <button type="button" class="el-button remove-range el-button--text el-button--mini" style="color: red; margin-right: -15px;">
+                                            <i class="el-icon-close"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </th>
+                            <th colspan="1" rowspan="1" class="el-table_3_column_19  is-center   is-leaf">
+                                <div class="cell">
+                                    72
+                                    <span>
+                                        <button type="button" class="el-button remove-range el-button--text el-button--mini" style="color: red; margin-right: -15px;">
+                                            <i class="el-icon-close"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </th>
+                            <th colspan="1" rowspan="1" class="el-table_3_column_20  is-center   is-leaf">
+                                <div class="cell">
+                                    96
+                                    <span>
+                                        <button type="button" class="el-button remove-range el-button--text el-button--mini" style="color: red; margin-right: -15px;">
+                                            <i class="el-icon-close"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </th>
+                            <th colspan="1" rowspan="1" class="el-table_3_column_21  is-center   is-leaf">
+                                <div class="cell">
+                                    1000 - ∞
+                                    <span>
+                                        <button type="button" class="el-button remove-range el-button--text el-button--mini" style="color: red; margin-right: -15px;">
+                                            <i class="el-icon-close"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </th>
+                            <th colspan="1" rowspan="1" class="el-table_3_column_22  is-center   is-leaf">
+                                <div class="cell">Ед.изм.</div>
+                            </th>
+                            <th colspan="1" rowspan="1" class="el-table_3_column_23  is-center   is-leaf">
+                                <div class="cell">Вес за ед</div>
+                            </th>
+                            <th colspan="1" rowspan="1" class="el-table_3_column_24     is-leaf">
+                                <div class="cell">
+                                    <div class="active-panel active-panel-with-popover">
+                                        <span>
+                                            <button type="button" class="el-button el-button--info el-button--mini is-plain" style="width: 100%; margin-left: 0px;">
+                                                <i class="el-icon-plus"></i>
+                                                <span>Диапазон</span>
+                                            </button>
+                                        </span>
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="gutter" style="width: 0px; display: none;"></th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+
+            <div class="el-table__body-wrapper is-scrolling-left">
+                <table cellspacing="0" cellpadding="0" border="0" class="el-table__body" style="width: 853px;">
+                    <colgroup>
+                        <col name="el-table_3_column_16" width="80">
+                        <col name="el-table_3_column_17" width="85">
+                        <col name="el-table_3_column_18" width="85">
+                        <col name="el-table_3_column_19" width="85">
+                        <col name="el-table_3_column_20" width="85">
+                        <col name="el-table_3_column_21" width="85">
+                        <col name="el-table_3_column_22" width="80">
+                        <col name="el-table_3_column_23" width="80">
+                        <col name="el-table_3_column_24" width="188">
+                    </colgroup>
+                    <tbody>
+                        <!-- Цифровая печать -->
+                        <tr class="el-table__row expanded el-table__row--level-0">
+                            <td rowspan="1" colspan="1" class="el-table_3_column_16  ">
+                                <div class="cell">
+                                    <div class="el-table__expand-icon el-table__expand-icon--expanded">
+                                        <i class="el-icon-arrow-right"></i>
+                                    </div>
+                                    <div style="width: calc(100% - 28px); margin-left: 5px; display: inline-block;">
+                                        <div>
+                                            <div class="el-select el-select--small" style="width: 100%;">
+                                                <div class="el-input el-input--small el-input--suffix">
+                                                    <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="Цифровая печать">
+                                                    <span class="el-input__suffix">
+                                                        <span class="el-input__suffix-inner">
+                                                            <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_17  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_18  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_19  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_20  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_21  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_22  ">
+                                <div class="cell">
+                                    <div class="el-select el-select--small">
+                                        <div class="el-input el-input--small is-disabled el-input--suffix">
+                                            <input type="text" disabled="disabled" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="BLR">
+                                            <span class="el-input__suffix">
+                                                <span class="el-input__suffix-inner">
+                                                    <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_23  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_24  ">
+                                <div class="cell">
+                                    <div class="active-panel">
+                                        <button type="button" class="el-button el-button--info el-button--mini is-plain">
+                                            <i class="el-icon-chat-line-square"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small">
+                                            <i class="el-icon-bottom"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small is-plain">
+                                            <i class="el-icon-bottom-right"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--warning el-button--small">
+                                            <i class="el-icon-video-pause"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--danger el-button--small">
+                                            <i class="el-icon-delete"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Полноцветная печать -->
+                        <tr class="el-table__row el-table__row--level-1">
+                            <td rowspan="1" colspan="1" class="el-table_3_column_16  ">
+                                <div class="cell">
+                                    <span class="el-table__indent" style="padding-left: 16px;"></span>
+                                    <div class="el-table__expand-icon el-table__expand-icon--expanded">
+                                        <i class="el-icon-arrow-right"></i>
+                                    </div>
+                                    <div style="width: calc(100% - 44px); margin-left: 5px; display: inline-block;">
+                                        <div>
+                                            <div class="el-select el-select--small" style="width: 100%;">
+                                                <div class="el-input el-input--small el-input--suffix">
+                                                    <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="полноцветная">
+                                                    <span class="el-input__suffix">
+                                                        <span class="el-input__suffix-inner">
+                                                            <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_17  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_18  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_19  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_20  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_21  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_22  ">
+                                <div class="cell">
+                                    <div class="el-select el-select--small">
+                                        <div class="el-input el-input--small is-disabled el-input--suffix">
+                                            <input type="text" disabled="disabled" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="BLR">
+                                            <span class="el-input__suffix">
+                                                <span class="el-input__suffix-inner">
+                                                    <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_23  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_24  ">
+                                <div class="cell">
+                                    <div class="active-panel">
+                                        <button type="button" class="el-button el-button--info el-button--mini is-plain">
+                                            <i class="el-icon-chat-line-square"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small">
+                                            <i class="el-icon-bottom"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small is-plain">
+                                            <i class="el-icon-bottom-right"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--warning el-button--small">
+                                            <i class="el-icon-video-pause"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--danger el-button--small">
+                                            <i class="el-icon-delete"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Односторонняя полноцветная -->
+                        <tr class="el-table__row el-table__row--level-2">
+                            <td rowspan="1" colspan="1" class="el-table_3_column_16  ">
+                                <div class="cell">
+                                    <span class="el-table__indent" style="padding-left: 32px;"></span>
+                                    <span class="el-table__placeholder"></span>
+                                    <div style="width: calc(100% - 60px); margin-left: 8px; display: inline-block;">
+                                        <div>
+                                            <div class="el-select el-select--small" style="width: 100%;">
+                                                <div class="el-input el-input--small el-input--suffix">
+                                                    <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="односторонняя">
+                                                    <span class="el-input__suffix">
+                                                        <span class="el-input__suffix-inner">
+                                                            <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_17  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner" value="0.46">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_18  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner" value="0.35">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_19  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner" value="0.3">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_20  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner" value="0.2">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_21  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner" value="0.09">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_22  ">
+                                <div class="cell">
+                                    <div class="el-select el-select--small">
+                                        <div class="el-input el-input--small el-input--suffix">
+                                            <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="BLR">
+                                            <span class="el-input__suffix">
+                                                <span class="el-input__suffix-inner">
+                                                    <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_23  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_24  ">
+                                <div class="cell">
+                                    <div class="active-panel">
+                                        <button type="button" class="el-button el-button--info el-button--mini is-plain">
+                                            <i class="el-icon-chat-line-square"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small">
+                                            <i class="el-icon-bottom"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small is-plain">
+                                            <i class="el-icon-bottom-right"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--warning el-button--small">
+                                            <i class="el-icon-video-pause"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--danger el-button--small">
+                                            <i class="el-icon-delete"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Двухсторонняя полноцветная -->
+                        <tr class="el-table__row el-table__row--level-2">
+                            <td rowspan="1" colspan="1" class="el-table_3_column_16  ">
+                                <div class="cell">
+                                    <span class="el-table__indent" style="padding-left: 32px;"></span>
+                                    <span class="el-table__placeholder"></span>
+                                    <div style="width: calc(100% - 60px); margin-left: 8px; display: inline-block;">
+                                        <div>
+                                            <div class="el-select el-select--small" style="width: 100%;">
+                                                <div class="el-input el-input--small el-input--suffix">
+                                                    <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="двухсторонняя">
+                                                    <span class="el-input__suffix">
+                                                        <span class="el-input__suffix-inner">
+                                                            <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_17  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner" value="0.51">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_18  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner" value="0.41">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_19  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner" value="0.34">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_20  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner" value="0.25">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_21  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner" value="0.08">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_22  ">
+                                <div class="cell">
+                                    <div class="el-select el-select--small">
+                                        <div class="el-input el-input--small el-input--suffix">
+                                            <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="BLR">
+                                            <span class="el-input__suffix">
+                                                <span class="el-input__suffix-inner">
+                                                    <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_23  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_24  ">
+                                <div class="cell">
+                                    <div class="active-panel">
+                                        <button type="button" class="el-button el-button--info el-button--mini is-plain">
+                                            <i class="el-icon-chat-line-square"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small">
+                                            <i class="el-icon-bottom"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small is-plain">
+                                            <i class="el-icon-bottom-right"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--warning el-button--small">
+                                            <i class="el-icon-video-pause"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--danger el-button--small">
+                                            <i class="el-icon-delete"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- С черно-белым оборотом -->
+                        <tr class="el-table__row el-table__row--level-2">
+                            <td rowspan="1" colspan="1" class="el-table_3_column_16  ">
+                                <div class="cell">
+                                    <span class="el-table__indent" style="padding-left: 32px;"></span>
+                                    <span class="el-table__placeholder"></span>
+                                    <div style="width: calc(100% - 60px); margin-left: 8px; display: inline-block;">
+                                        <div>
+                                            <div class="el-select el-select--small" style="width: 100%;">
+                                                <div class="el-input el-input--small el-input--suffix">
+                                                    <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="с черно-белым оборотом">
+                                                    <span class="el-input__suffix">
+                                                        <span class="el-input__suffix-inner">
+                                                            <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_17  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_18  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_19  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_20  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_21  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_22  ">
+                                <div class="cell">
+                                    <div class="el-select el-select--small">
+                                        <div class="el-input el-input--small el-input--suffix">
+                                            <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="BLR">
+                                            <span class="el-input__suffix">
+                                                <span class="el-input__suffix-inner">
+                                                    <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_23  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_24  ">
+                                <div class="cell">
+                                    <div class="active-panel">
+                                        <button type="button" class="el-button el-button--info el-button--mini is-plain">
+                                            <i class="el-icon-chat-line-square"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small">
+                                            <i class="el-icon-bottom"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small is-plain">
+                                            <i class="el-icon-bottom-right"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--warning el-button--small">
+                                            <i class="el-icon-video-pause"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--danger el-button--small">
+                                            <i class="el-icon-delete"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Черно-белая печать -->
+                        <tr class="el-table__row el-table__row--level-1">
+                            <td rowspan="1" colspan="1" class="el-table_3_column_16  ">
+                                <div class="cell">
+                                    <span class="el-table__indent" style="padding-left: 16px;"></span>
+                                    <div class="el-table__expand-icon el-table__expand-icon--expanded">
+                                        <i class="el-icon-arrow-right"></i>
+                                    </div>
+                                    <div style="width: calc(100% - 44px); margin-left: 5px; display: inline-block;">
+                                        <div>
+                                            <div class="el-select el-select--small" style="width: 100%;">
+                                                <div class="el-input el-input--small el-input--suffix">
+                                                    <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="черно-белая">
+                                                    <span class="el-input__suffix">
+                                                        <span class="el-input__suffix-inner">
+                                                            <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_17  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_18  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_19  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_20  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_21  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_22  ">
+                                <div class="cell">
+                                    <div class="el-select el-select--small">
+                                        <div class="el-input el-input--small is-disabled el-input--suffix">
+                                            <input type="text" disabled="disabled" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="BLR">
+                                            <span class="el-input__suffix">
+                                                <span class="el-input__suffix-inner">
+                                                    <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_23  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small is-disabled">
+                                            <input type="text" disabled="disabled" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_24  ">
+                                <div class="cell">
+                                    <div class="active-panel">
+                                        <button type="button" class="el-button el-button--info el-button--mini is-plain">
+                                            <i class="el-icon-chat-line-square"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small">
+                                            <i class="el-icon-bottom"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small is-plain">
+                                            <i class="el-icon-bottom-right"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--warning el-button--small">
+                                            <i class="el-icon-video-pause"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--danger el-button--small">
+                                            <i class="el-icon-delete"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Односторонняя черно-белая -->
+                        <tr class="el-table__row el-table__row--level-2">
+                            <td rowspan="1" colspan="1" class="el-table_3_column_16  ">
+                                <div class="cell">
+                                    <span class="el-table__indent" style="padding-left: 32px;"></span>
+                                    <span class="el-table__placeholder"></span>
+                                    <div style="width: calc(100% - 60px); margin-left: 8px; display: inline-block;">
+                                        <div>
+                                            <div class="el-select el-select--small" style="width: 100%;">
+                                                <div class="el-input el-input--small el-input--suffix">
+                                                    <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="односторонняя">
+                                                    <span class="el-input__suffix">
+                                                        <span class="el-input__suffix-inner">
+                                                            <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_17  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_18  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_19  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_20  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_21  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_22  ">
+                                <div class="cell">
+                                    <div class="el-select el-select--small">
+                                        <div class="el-input el-input--small el-input--suffix">
+                                            <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="BLR">
+                                            <span class="el-input__suffix">
+                                                <span class="el-input__suffix-inner">
+                                                    <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_23  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_24  ">
+                                <div class="cell">
+                                    <div class="active-panel">
+                                        <button type="button" class="el-button el-button--info el-button--mini is-plain">
+                                            <i class="el-icon-chat-line-square"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small">
+                                            <i class="el-icon-bottom"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small is-plain">
+                                            <i class="el-icon-bottom-right"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--warning el-button--small">
+                                            <i class="el-icon-video-pause"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--danger el-button--small">
+                                            <i class="el-icon-delete"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Двухсторонняя черно-белая -->
+                        <tr class="el-table__row el-table__row--level-2">
+                            <td rowspan="1" colspan="1" class="el-table_3_column_16  ">
+                                <div class="cell">
+                                    <span class="el-table__indent" style="padding-left: 32px;"></span>
+                                    <span class="el-table__placeholder"></span>
+                                    <div style="width: calc(100% - 60px); margin-left: 8px; display: inline-block;">
+                                        <div>
+                                            <div class="el-select el-select--small" style="width: 100%;">
+                                                <div class="el-input el-input--small el-input--suffix">
+                                                    <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="двухсторонняя">
+                                                    <span class="el-input__suffix">
+                                                        <span class="el-input__suffix-inner">
+                                                            <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_17  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_18  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_19  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_20  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_21  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_22  ">
+                                <div class="cell">
+                                    <div class="el-select el-select--small">
+                                        <div class="el-input el-input--small el-input--suffix">
+                                            <input type="text" readonly="readonly" autocomplete="off" placeholder="Выбрать" class="el-input__inner" value="BLR">
+                                            <span class="el-input__suffix">
+                                                <span class="el-input__suffix-inner">
+                                                    <i class="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_23  ">
+                                <div class="cell">
+                                    <span>
+                                        <div class="el-input el-input--small">
+                                            <input type="text" autocomplete="off" class="el-input__inner">
+                                        </div>
+                                    </span>
+                                </div>
+                            </td>
+                            <td rowspan="1" colspan="1" class="el-table_3_column_24  ">
+                                <div class="cell">
+                                    <div class="active-panel">
+                                        <button type="button" class="el-button el-button--info el-button--mini is-plain">
+                                            <i class="el-icon-chat-line-square"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small">
+                                            <i class="el-icon-bottom"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--success el-button--small is-plain">
+                                            <i class="el-icon-bottom-right"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--warning el-button--small">
+                                            <i class="el-icon-video-pause"></i>
+                                        </button>
+                                        <button type="button" class="el-button el-button--danger el-button--small">
+                                            <i class="el-icon-delete"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Простой скрипт для базовой функциональности
+        document.addEventListener('DOMContentLoaded', function() {
+            // Обработка кликов по кнопкам удаления диапазонов
+            const removeButtons = document.querySelectorAll('.remove-range');
+            removeButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const columnText = this.closest('th').querySelector('.cell').textContent.trim().split(' ')[0];
+                    alert(`Вы действительно хотите удалить колонку ${columnText} и все цены, указанные в ней?`);
+                });
+            });
+
+            // Обработка переключателя статический/динамический
+            const switchInput = document.querySelector('.el-switch__input');
+            const switchCore = document.querySelector('.el-switch__core');
+            const switchLabels = document.querySelectorAll('.el-switch__label');
+
+            switchInput.addEventListener('change', function() {
+                if (this.checked) {
+                    switchCore.classList.add('is-active');
+                    switchLabels[0].classList.add('is-active');
+                    switchLabels[1].classList.remove('is-active');
+                } else {
+                    switchCore.classList.remove('is-active');
+                    switchLabels[0].classList.remove('is-active');
+                    switchLabels[1].classList.add('is-active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -21,8 +21,15 @@ interface Props {
 
 const uid = () => `sz_${Date.now()}_${Math.random().toString(16).slice(2)}`
 
-// По умолчанию: один диапазон от 1 до ∞ с нулевыми ценами для всех тиражей
-const defaultTiers = () => [{ min_qty: 1, max_qty: undefined, unit_price: 0 }]
+// По умолчанию: диапазоны как в существующей системе
+const defaultTiers = () => [
+  { min_qty: 1, max_qty: 24, unit_price: 0 },
+  { min_qty: 24, max_qty: 48, unit_price: 0 },
+  { min_qty: 48, max_qty: 72, unit_price: 0 },
+  { min_qty: 72, max_qty: 96, unit_price: 0 },
+  { min_qty: 96, max_qty: 1000, unit_price: 0 },
+  { min_qty: 1000, max_qty: undefined, unit_price: 0 }
+]
 
 type TierRangeModalState = {
   type: 'print' | 'material' | 'finishing'
@@ -295,46 +302,25 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                   <div className="simplified-card__header">
                     <div>
                       <strong>Печать (цена за изделие)</strong>
-                      <div className="text-muted text-sm">Для каждого набора (технология/цветность/стороны) задайте диапазоны тиража и цену за 1 изделие.</div>
+                      <div className="text-muted text-sm">Выберите технологию печати, и система автоматически покажет все доступные вариации с диапазонами цен.</div>
                     </div>
                     <div className="flex gap-2">
-                      {selected.print_prices.length > 0 && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            // Открываем модалку для добавления диапазона к первой цене печати
-                            setTierModal({
-                              type: 'print',
-                              printIdx: 0, // Первая цена печати
-                              tierIdx: undefined,
-                              isOpen: true,
-                              minQty: '1',
-                              maxQty: '',
-                            })
-                          }}
-                        >
-                          Добавить диапазон
-                        </Button>
-                      )}
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() => {
-                          const firstTech = printTechs[0]?.code || ''
-                          if (!firstTech) return
-                          // По умолчанию создаём диапазон "от 1 до ∞"
-                          const nextRow = {
-                            technology_code: firstTech,
-                            color_mode: 'color' as const,
-                            sides_mode: 'single' as const,
-                            tiers: [{ min_qty: 1, max_qty: undefined, unit_price: 0 }],
-                          }
-                          updateSize(selected.id, { print_prices: [...selected.print_prices, nextRow] })
+                          // Открываем модалку для добавления диапазона к первой цене печати
+                          setTierModal({
+                            type: 'print',
+                            printIdx: 0, // Первая цена печати
+                            tierIdx: undefined,
+                            isOpen: true,
+                            minQty: '1',
+                            maxQty: '',
+                          })
                         }}
-                        disabled={loadingLists}
                       >
-                        Добавить цену печати
+                        Добавить диапазон
                       </Button>
                     </div>
                     {tierModal.isOpen && tierModal.type === 'print' && tierModal.printIdx === 0 && (
@@ -424,133 +410,214 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                     )}
                   </div>
                   <div className="simplified-card__content">
+                    <div className="simplified-form-grid mb-3">
+                      <FormField label="Технология печати">
+                        <select
+                          className="form-select form-select--compact"
+                          value={selected.default_print?.technology_code || ''}
+                          onChange={(e) => {
+                            const techCode = e.target.value
+                            if (!techCode) {
+                              updateSize(selected.id, { default_print: undefined, print_prices: [] })
+                              return
+                            }
+
+                            // Создаем все вариации для выбранной технологии
+                            const variations = [
+                              // Полноцветные
+                              { technology_code: techCode, color_mode: 'color' as const, sides_mode: 'single' as const, tiers: defaultTiers() },
+                              { technology_code: techCode, color_mode: 'color' as const, sides_mode: 'duplex' as const, tiers: defaultTiers() },
+                              // Ч/б
+                              { technology_code: techCode, color_mode: 'bw' as const, sides_mode: 'single' as const, tiers: defaultTiers() },
+                              { technology_code: techCode, color_mode: 'bw' as const, sides_mode: 'duplex' as const, tiers: defaultTiers() },
+                            ]
+
+                            updateSize(selected.id, {
+                              default_print: { technology_code: techCode },
+                              print_prices: variations
+                            })
+                          }}
+                          disabled={loadingLists}
+                        >
+                          <option value="">-- Выберите технологию --</option>
+                          {printTechs.map(t => (
+                            <option key={t.code} value={t.code}>{t.name}</option>
+                          ))}
+                        </select>
+                      </FormField>
+                    </div>
+
                     {selected.print_prices.length === 0 ? (
-                      <div className="text-muted">Нет цен печати. Добавьте первую цену.</div>
+                      <div className="text-muted">Выберите технологию печати, чтобы увидеть доступные вариации.</div>
                     ) : (
-                      <div className="simplified-list">
-                        {selected.print_prices.map((row, idx) => (
-                          <div key={`${row.technology_code}_${row.color_mode}_${row.sides_mode}_${idx}`} className="simplified-row">
-                            <div className="simplified-row__head">
-                              <div className="simplified-row__title">
-                                {techName(row.technology_code)} • {row.color_mode === 'color' ? 'полноцвет' : 'ч/б'} • {row.sides_mode === 'single' ? '1 сторона' : row.sides_mode === 'duplex' ? '2 стороны' : '2 стороны (ч/б оборот)'}
-                              </div>
-                              <div className="simplified-row__actions">
-                                <Button
-                                  variant="error"
-                                  size="sm"
-                                  onClick={() => {
-                                    updateSize(selected.id, { print_prices: selected.print_prices.filter((_, i) => i !== idx) })
-                                  }}
-                                >
-                                  Удалить
-                                </Button>
-                              </div>
-                            </div>
+                      <div className="simplified-print-variations">
+                        {/* Полноцветные вариации */}
+                        <div className="simplified-print-group">
+                          <div className="simplified-print-group__title">Общий класс полноцвет</div>
+                          <div className="simplified-print-group__items">
+                            {selected.print_prices
+                              .filter(p => p.color_mode === 'color')
+                              .map((row, idx) => {
+                                const actualIdx = selected.print_prices.findIndex(p =>
+                                  p.technology_code === row.technology_code &&
+                                  p.color_mode === row.color_mode &&
+                                  p.sides_mode === row.sides_mode
+                                )
+                                return (
+                                  <div key={`${row.color_mode}_${row.sides_mode}`} className="simplified-row">
+                                    <div className="simplified-row__head">
+                                      <div className="simplified-row__title">
+                                        {row.sides_mode === 'single' ? 'односторонняя' : 'двухсторонняя'}
+                                      </div>
+                                    </div>
 
-                            <div className="simplified-row__grid">
-                              <FormField label="Технология">
-                                <select
-                                  className="form-select form-select--compact"
-                                  value={row.technology_code}
-                                  onChange={(e) => {
-                                    const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, technology_code: e.target.value } : r))
-                                    updateSize(selected.id, { print_prices: next })
-                                  }}
-                                >
-                                  {printTechs.map(t => (
-                                    <option key={t.code} value={t.code}>{t.name}</option>
-                                  ))}
-                                </select>
-                              </FormField>
-                              <FormField label="Цветность">
-                                <select
-                                  className="form-select form-select--compact"
-                                  value={row.color_mode}
-                                  onChange={(e) => {
-                                    const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, color_mode: (e.target.value as any) } : r))
-                                    updateSize(selected.id, { print_prices: next })
-                                  }}
-                                >
-                                  <option value="color">полноцвет</option>
-                                  <option value="bw">ч/б</option>
-                                </select>
-                              </FormField>
-                              <FormField label="Стороны">
-                                <select
-                                  className="form-select form-select--compact"
-                                  value={row.sides_mode}
-                                  onChange={(e) => {
-                                    const next = selected.print_prices.map((r, i) => (i === idx ? { ...r, sides_mode: (e.target.value as any) } : r))
-                                    updateSize(selected.id, { print_prices: next })
-                                  }}
-                                >
-                                  <option value="single">односторонняя</option>
-                                  <option value="duplex">двухсторонняя</option>
-                                  <option value="duplex_bw_back">с ч/б оборотом</option>
-                                </select>
-                              </FormField>
-                            </div>
-
-                            {row.tiers.length > 0 && (
-                              <div className="simplified-tiers-table">
-                                <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
-                                  <thead>
-                                    <tr>
-                                      <th>Цена за 1 ед.</th>
-                                      {row.tiers.map((t, ti) => {
-                                        const rangeLabel = `${t.min_qty}${t.max_qty == null ? '-∞' : `-${t.max_qty}`}`
-                                        return (
-                                          <th key={ti} className="simplified-table__range-cell">
-                                            {rangeLabel}
-                                            <Button
-                                              variant="error"
-                                              size="sm"
-                                              onClick={() => {
-                                                const next = selected.print_prices.map((r, i) => {
-                                                  if (i !== idx) return r
-                                                  return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
-                                                })
-                                                updateSize(selected.id, { print_prices: next })
-                                              }}
-                                            >
-                                              Удалить
-                                            </Button>
-                                          </th>
-                                        )
-                                      })}
-                                      <th></th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    <tr>
-                                      <td className="simplified-table__price-label">Цена</td>
-                                      {row.tiers.map((t, ti) => (
-                                        <td key={ti}>
-                                          <input
-                                            className="form-input form-input--compact-table"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={String(t.unit_price || 0)}
-                                            onChange={(e) => {
-                                              const v = Number(e.target.value) || 0
-                                              const next = selected.print_prices.map((r, i) => {
-                                                if (i !== idx) return r
-                                                return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, unit_price: v } : tt)) }
-                                              })
-                                              updateSize(selected.id, { print_prices: next })
-                                            }}
-                                          />
-                                        </td>
-                                      ))}
-                                      <td></td>
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
+                                    {row.tiers.length > 0 && (
+                                      <div className="simplified-tiers-table">
+                                        <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
+                                          <thead>
+                                            <tr>
+                                              <th>Параметры печати</th>
+                                              {row.tiers.map((t, ti) => {
+                                                const rangeLabel = t.max_qty == null ? `${t.min_qty} - ∞` : `${t.min_qty}-${t.max_qty}`
+                                                return (
+                                                  <th key={ti} className="simplified-table__range-cell">
+                                                    {rangeLabel}
+                                                    <Button
+                                                      variant="error"
+                                                      size="sm"
+                                                      onClick={() => {
+                                                        const next = selected.print_prices.map((r, i) => {
+                                                          if (i !== actualIdx) return r
+                                                          return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
+                                                        })
+                                                        updateSize(selected.id, { print_prices: next })
+                                                      }}
+                                                    >
+                                                      Удалить
+                                                    </Button>
+                                                  </th>
+                                                )
+                                              })}
+                                              <th></th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            <tr>
+                                              <td className="simplified-table__price-label">Цена за изделие</td>
+                                              {row.tiers.map((t, ti) => (
+                                                <td key={ti}>
+                                                  <input
+                                                    className="form-input form-input--compact-table"
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={String(t.unit_price || 0)}
+                                                    onChange={(e) => {
+                                                      const v = Number(e.target.value) || 0
+                                                      const next = selected.print_prices.map((r, i) => {
+                                                        if (i !== actualIdx) return r
+                                                        return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, unit_price: v } : tt)) }
+                                                      })
+                                                      updateSize(selected.id, { print_prices: next })
+                                                    }}
+                                                  />
+                                                </td>
+                                              ))}
+                                              <td></td>
+                                            </tr>
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
                           </div>
-                        ))}
+                        </div>
+
+                        {/* Ч/б вариации */}
+                        <div className="simplified-print-group">
+                          <div className="simplified-print-group__title">Чёрно-белая печать</div>
+                          <div className="simplified-print-group__items">
+                            {selected.print_prices
+                              .filter(p => p.color_mode === 'bw')
+                              .map((row, idx) => {
+                                const actualIdx = selected.print_prices.findIndex(p =>
+                                  p.technology_code === row.technology_code &&
+                                  p.color_mode === row.color_mode &&
+                                  p.sides_mode === row.sides_mode
+                                )
+                                return (
+                                  <div key={`${row.color_mode}_${row.sides_mode}`} className="simplified-row">
+                                    <div className="simplified-row__head">
+                                      <div className="simplified-row__title">
+                                        {row.sides_mode === 'single' ? 'односторонняя' : 'двухсторонняя'}
+                                      </div>
+                                    </div>
+
+                                    {row.tiers.length > 0 && (
+                                      <div className="simplified-tiers-table">
+                                        <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
+                                          <thead>
+                                            <tr>
+                                              <th>Параметры печати</th>
+                                              {row.tiers.map((t, ti) => {
+                                                const rangeLabel = t.max_qty == null ? `${t.min_qty} - ∞` : `${t.min_qty}-${t.max_qty}`
+                                                return (
+                                                  <th key={ti} className="simplified-table__range-cell">
+                                                    {rangeLabel}
+                                                    <Button
+                                                      variant="error"
+                                                      size="sm"
+                                                      onClick={() => {
+                                                        const next = selected.print_prices.map((r, i) => {
+                                                          if (i !== actualIdx) return r
+                                                          return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
+                                                        })
+                                                        updateSize(selected.id, { print_prices: next })
+                                                      }}
+                                                    >
+                                                      Удалить
+                                                    </Button>
+                                                  </th>
+                                                )
+                                              })}
+                                              <th></th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            <tr>
+                                              <td className="simplified-table__price-label">Цена за изделие</td>
+                                              {row.tiers.map((t, ti) => (
+                                                <td key={ti}>
+                                                  <input
+                                                    className="form-input form-input--compact-table"
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={String(t.unit_price || 0)}
+                                                    onChange={(e) => {
+                                                      const v = Number(e.target.value) || 0
+                                                      const next = selected.print_prices.map((r, i) => {
+                                                        if (i !== actualIdx) return r
+                                                        return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, unit_price: v } : tt)) }
+                                                      })
+                                                      updateSize(selected.id, { print_prices: next })
+                                                    }}
+                                                  />
+                                                </td>
+                                              ))}
+                                              <td></td>
+                                            </tr>
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -564,10 +631,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                     </div>
                   </div>
                   <div className="simplified-card__content">
-                    <div style={{ maxWidth: '200px', width: 'fit-content' }}>
+                    <div style={{ maxWidth: '200px', width: 'fit-content', alignSelf: 'flex-start', flexShrink: 0 }}>
                       <FormField label="Тип бумаги">
                         <select
                           className="form-select form-select--compact"
+                          style={{ width: 'auto', maxWidth: '180px' }}
                           value={selectedPaperTypeId || ''}
                           onChange={(e) => setSelectedPaperTypeId(e.target.value || null)}
                           disabled={loadingLists || paperTypes.length === 0}
@@ -589,28 +657,97 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                     {selectedPaperTypeId && materialsForSelectedPaperType.length > 0 && (
                       <div className="simplified-materials mt-3">
                         <div className="simplified-materials__group-title mb-2">Материалы ({materialsForSelectedPaperType.length})</div>
-                        <div className="simplified-materials__items">
+                        <div className="simplified-materials__list">
                           {materialsForSelectedPaperType.map(m => {
-                            const checked = selected.allowed_material_ids.includes(Number(m.id))
+                            const hasPricing = selected.material_prices.some(mp => mp.material_id === Number(m.id))
                             const densityInfo = paperTypes.find(pt => pt.id === selectedPaperTypeId)
                               ?.densities?.find(d => d.material_id === Number(m.id))
+
+                            // Автоматически добавляем материал в allowed_material_ids и создаем pricing, если его нет
+                            if (!selected.allowed_material_ids.includes(Number(m.id))) {
+                              const nextAllowed = [...selected.allowed_material_ids, Number(m.id)]
+                              const nextMaterialPrices = [...selected.material_prices, {
+                                material_id: Number(m.id),
+                                tiers: defaultTiers()
+                              }]
+                              updateSize(selected.id, {
+                                allowed_material_ids: nextAllowed,
+                                material_prices: nextMaterialPrices
+                              })
+                            }
+
                             return (
-                              <label key={m.id} className={`simplified-checkbox ${checked ? 'simplified-checkbox--checked' : ''}`}>
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => {
-                                    const nextAllowed = checked
-                                      ? selected.allowed_material_ids.filter(id => id !== Number(m.id))
-                                      : [...selected.allowed_material_ids, Number(m.id)]
-                                    updateSize(selected.id, { allowed_material_ids: nextAllowed })
-                                  }}
-                                />
-                                <span>
-                                  {m.name}
-                                  {densityInfo && <span className="text-muted text-sm"> ({densityInfo.value} г/м²)</span>}
-                                </span>
-                              </label>
+                              <div key={m.id} className="simplified-material-item">
+                                <div className="simplified-material-item__header">
+                                  <div className="simplified-material-item__title">
+                                    {m.name}
+                                    {densityInfo && <span className="text-muted text-sm"> ({densityInfo.value} г/м²)</span>}
+                                  </div>
+                                </div>
+
+                                {selected.material_prices.find(mp => mp.material_id === Number(m.id)) && (
+                                  <div className="simplified-material-item__pricing">
+                                    <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
+                                      <thead>
+                                        <tr>
+                                          <th>Цена за 1 ед.</th>
+                                          {selected.material_prices.find(mp => mp.material_id === Number(m.id))!.tiers.map((t, ti) => {
+                                            const rangeLabel = t.max_qty == null ? `${t.min_qty} - ∞` : `${t.min_qty}-${t.max_qty}`
+                                            const actualIdx = selected.material_prices.findIndex(mp => mp.material_id === Number(m.id))
+                                            return (
+                                              <th key={ti} className="simplified-table__range-cell">
+                                                {rangeLabel}
+                                                <Button
+                                                  variant="error"
+                                                  size="sm"
+                                                  onClick={() => {
+                                                    const next = selected.material_prices.map((r, i) => {
+                                                      if (i !== actualIdx) return r
+                                                      return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
+                                                    })
+                                                    updateSize(selected.id, { material_prices: next })
+                                                  }}
+                                                >
+                                                  Удалить
+                                                </Button>
+                                              </th>
+                                            )
+                                          })}
+                                          <th></th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        <tr>
+                                          <td className="simplified-table__price-label">Цена</td>
+                                          {selected.material_prices.find(mp => mp.material_id === Number(m.id))!.tiers.map((t, ti) => {
+                                            const actualIdx = selected.material_prices.findIndex(mp => mp.material_id === Number(m.id))
+                                            return (
+                                              <td key={ti}>
+                                                <input
+                                                  className="form-input form-input--compact-table"
+                                                  type="number"
+                                                  min="0"
+                                                  step="0.01"
+                                                  value={String(t.unit_price || 0)}
+                                                  onChange={(e) => {
+                                                    const v = Number(e.target.value) || 0
+                                                    const next = selected.material_prices.map((r, i) => {
+                                                      if (i !== actualIdx) return r
+                                                      return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, unit_price: v } : tt)) }
+                                                    })
+                                                    updateSize(selected.id, { material_prices: next })
+                                                  }}
+                                                />
+                                              </td>
+                                            )
+                                          })}
+                                          <td></td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
                             )
                           })}
                         </div>
@@ -622,223 +759,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                     )}
 
 
-                    {selected.material_prices.length > 0 && (
-                      <div className="simplified-list mt-3">
-                        {selected.material_prices.map((mp, idx) => (
-                          <div key={`${mp.material_id}_${idx}`} className="simplified-row">
-                            <div className="simplified-row__head">
-                              <div className="simplified-row__title">{materialName(mp.material_id)}</div>
-                              <div className="simplified-row__actions">
-                                <div className="simplified-row__add-range-wrapper">
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => {
-                                      setTierModal({
-                                        type: 'material',
-                                        materialIdx: idx,
-                                        tierIdx: undefined,
-                                        isOpen: true,
-                                        minQty: '1',
-                                        maxQty: '',
-                                      })
-                                    }}
-                                  >
-                                    ➕ Диапазон
-                                  </Button>
-                                  {tierModal.isOpen && tierModal.type === 'material' && tierModal.materialIdx === idx && (
-                                    <div
-                                      ref={tierModalRef}
-                                      className="simplified-tier-modal"
-                                      onMouseDown={(e) => e.stopPropagation()}
-                                    >
-                                      <div className="simplified-tier-modal__content">
-                                        <div className="simplified-tier-modal__header">
-                                          <strong>{tierModal.tierIdx !== undefined ? 'Редактировать диапазон' : 'Добавить диапазон'}</strong>
-                                          <button
-                                            type="button"
-                                            className="simplified-tier-modal__close"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              setTierModal({ type: 'print', isOpen: false, minQty: '1', maxQty: '' })
-                                            }}
-                                          >
-                                            ✕
-                                          </button>
-                                        </div>
-                                        <div className="simplified-tier-modal__body">
-                                          <FormField label="От">
-                                            <input
-                                              className="form-input form-input--compact"
-                                              type="number"
-                                              min="1"
-                                              step="1"
-                                              value={tierModal.minQty}
-                                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTierModal({ ...tierModal, minQty: e.target.value })}
-                                              onMouseDown={(e) => e.stopPropagation()}
-                                              onClick={(e) => e.stopPropagation()}
-                                              onFocus={(e) => e.stopPropagation()}
-                                            />
-                                          </FormField>
-                                          <FormField label="До (оставьте пустым для ∞)">
-                                            <input
-                                              className="form-input form-input--compact"
-                                              type="number"
-                                              min="1"
-                                              step="1"
-                                              placeholder="∞"
-                                              value={tierModal.maxQty}
-                                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTierModal({ ...tierModal, maxQty: e.target.value })}
-                                              onMouseDown={(e) => e.stopPropagation()}
-                                              onClick={(e) => e.stopPropagation()}
-                                              onFocus={(e) => e.stopPropagation()}
-                                            />
-                                          </FormField>
-                                          <div className="simplified-tier-modal__actions">
-                                            <Button
-                                              variant="secondary"
-                                              size="sm"
-                                              onClick={() => setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })}
-                                            >
-                                              Отмена
-                                            </Button>
-                                            <Button
-                                              variant="primary"
-                                              size="sm"
-                                              onClick={() => {
-                                                const minQty = Number(tierModal.minQty) || 1
-                                                const maxQty = tierModal.maxQty === '' ? undefined : (Number(tierModal.maxQty) || undefined)
-                                                const next = selected.material_prices.map((r, i) => {
-                                                  if (i !== idx) return r
-                                                  if (tierModal.tierIdx !== undefined) {
-                                                    return {
-                                                      ...r,
-                                                      tiers: r.tiers.map((tt, j) =>
-                                                        j === tierModal.tierIdx
-                                                          ? { ...tt, min_qty: minQty, max_qty: maxQty }
-                                                          : tt
-                                                      )
-                                                    }
-                                                  } else {
-                                                    return { ...r, tiers: [...r.tiers, { min_qty: minQty, max_qty: maxQty, unit_price: 0 }] }
-                                                  }
-                                                })
-                                                updateSize(selected.id, { material_prices: next })
-                                                setTierModal({ type: 'print', isOpen: false, minQty: '1', maxQty: '' })
-                                              }}
-                                            >
-                                              {tierModal.tierIdx !== undefined ? 'Сохранить' : 'Добавить'}
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                <Button
-                                  variant="error"
-                                  size="sm"
-                                  onClick={() => updateSize(selected.id, { material_prices: selected.material_prices.filter((_, i) => i !== idx) })}
-                                >
-                                  Удалить
-                                </Button>
-                              </div>
-                            </div>
-                            <FormField label="Материал">
-                              <select
-                                className="form-select form-select--compact"
-                                value={String(mp.material_id)}
-                                onChange={(e) => {
-                                  const v = Number(e.target.value)
-                                  const next = selected.material_prices.map((r, i) => (i === idx ? { ...r, material_id: v } : r))
-                                  updateSize(selected.id, { material_prices: next })
-                                }}
-                              >
-                                {selected.allowed_material_ids.map(id => (
-                                  <option key={id} value={id}>{materialName(id)}</option>
-                                ))}
-                              </select>
-                            </FormField>
-                            {mp.tiers.length > 0 && (
-                              <div className="simplified-tiers-table">
-                                <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
-                                  <thead>
-                                    <tr>
-                                      <th>Цена за 1 ед.</th>
-                                      {mp.tiers.map((t, ti) => {
-                                        const rangeLabel = `${t.min_qty}${t.max_qty == null ? '-∞' : `-${t.max_qty}`}`
-                                        return (
-                                          <th key={ti} className="simplified-table__range-cell">
-                                            {rangeLabel}
-                                            <div className="simplified-table__range-actions">
-                                              <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                onClick={() => {
-                                                  setTierModal({
-                                                    type: 'material',
-                                                    materialIdx: idx,
-                                                    tierIdx: ti,
-                                                    isOpen: true,
-                                                    minQty: String(t.min_qty),
-                                                    maxQty: t.max_qty ? String(t.max_qty) : '',
-                                                  })
-                                                }}
-                                              >
-                                                Изменить
-                                              </Button>
-                                              <Button
-                                                variant="error"
-                                                size="sm"
-                                                onClick={() => {
-                                                  const next = selected.material_prices.map((r, i) => {
-                                                    if (i !== idx) return r
-                                                    return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
-                                                  })
-                                                  updateSize(selected.id, { material_prices: next })
-                                                }}
-                                              >
-                                                ✕
-                                              </Button>
-                                            </div>
-                                          </th>
-                                        )
-                                      })}
-                                      <th></th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    <tr>
-                                      <td className="simplified-table__price-label">Цена</td>
-                                      {mp.tiers.map((t, ti) => (
-                                        <td key={ti}>
-                                          <input
-                                            className="form-input form-input--compact-table"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={String(t.unit_price || 0)}
-                                            onChange={(e) => {
-                                              const v = Number(e.target.value) || 0
-                                              const next = selected.material_prices.map((r, i) => {
-                                                if (i !== idx) return r
-                                                return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, unit_price: v } : tt)) }
-                                              })
-                                              updateSize(selected.id, { material_prices: next })
-                                            }}
-                                          />
-                                        </td>
-                                      ))}
-                                      <td></td>
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -848,256 +768,129 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                       <strong>Отделка (послепечатные услуги)</strong>
                       <div className="text-muted text-sm">Резка/биговка/фальцовка/ламинация. Цена задаётся "за рез/биг/фальц" или "за изделие".</div>
                     </div>
-                    <div className="flex gap-2">
-                      {selected.finishing.length > 0 && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            // Открываем модалку для добавления диапазона к первой услуге отделки
-                            setTierModal({
-                              type: 'finishing',
-                              finishingIdx: 0, // Первая услуга отделки
-                              tierIdx: undefined,
-                              isOpen: true,
-                              minQty: '1',
-                              maxQty: '',
-                            })
-                          }}
-                        >
-                          Добавить диапазон
-                        </Button>
-                      )}
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          const first = services[0]
-                          if (!first) {
-                            if (loadingLists) {
-                              void loadLists()
-                            }
-                            return
-                          }
-                          updateSize(selected.id, {
-                            finishing: [
-                              ...selected.finishing,
-                              { service_id: Number(first.id), price_unit: 'per_cut', units_per_item: 1, tiers: [{ min_qty: 1, max_qty: undefined, unit_price: 0 }] },
-                            ],
-                          })
-                        }}
-                        disabled={loadingLists}
-                      >
-                        Добавить услугу
-                      </Button>
-                    </div>
                   </div>
-                  {tierModal.isOpen && tierModal.type === 'finishing' && tierModal.finishingIdx === 0 && (
-                    <div
-                      ref={tierModalRef}
-                      className="simplified-tier-modal"
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 2000 }}
-                    >
-                      <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
-                        <div className="simplified-tier-modal__header">
-                          <strong>Добавить диапазон</strong>
-                          <button
-                            type="button"
-                            className="simplified-tier-modal__close"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setTierModal({ ...tierModal, isOpen: false, tierIdx: undefined })
-                            }}
-                            title="Закрыть"
-                          >
-                            ×
-                          </button>
-                        </div>
-                        <div className="simplified-tier-modal__body">
-                          <FormField label="От">
-                            <input
-                              className="form-input form-input--compact"
-                              type="number"
-                              min="1"
-                              step="1"
-                              value={tierModal.minQty}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTierModal({ ...tierModal, minQty: e.target.value })}
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onClick={(e) => e.stopPropagation()}
-                              onFocus={(e) => e.stopPropagation()}
-                            />
-                          </FormField>
-                          <FormField label="До (оставьте пустым для ∞)">
-                            <input
-                              className="form-input form-input--compact"
-                              type="number"
-                              min="1"
-                              step="1"
-                              placeholder="∞"
-                              value={tierModal.maxQty}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTierModal({ ...tierModal, maxQty: e.target.value })}
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onClick={(e) => e.stopPropagation()}
-                              onFocus={(e) => e.stopPropagation()}
-                            />
-                          </FormField>
-                          <div className="simplified-tier-modal__actions" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => {
-                                setTierModal({ type: 'print', isOpen: false, minQty: '1', maxQty: '' })
-                              }}
-                            >
-                              Отмена
-                            </Button>
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={(e) => {
-                                e?.stopPropagation()
-                                const minQty = Number(tierModal.minQty) || 1
-                                const maxQty = tierModal.maxQty === '' ? undefined : (Number(tierModal.maxQty) || undefined)
-                                const next = selected.finishing.map((r, i) => {
-                                  if (i === 0) {
-                                    return { ...r, tiers: [...r.tiers, { min_qty: minQty, max_qty: maxQty, unit_price: 0 }] }
-                                  }
-                                  return r
-                                })
-                                updateSize(selected.id, { finishing: next })
-                                setTierModal({ type: 'print', isOpen: false, minQty: '1', maxQty: '' })
-                              }}
-                            >
-                              Добавить
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                   <div className="simplified-card__content">
-                    {selected.finishing.length === 0 ? (
-                      <div className="text-muted">Нет услуг. Добавьте первую услугу.</div>
+                    {services.length === 0 ? (
+                      <div className="text-muted">Загрузка услуг отделки...</div>
                     ) : (
-                      <div className="simplified-list">
-                        {selected.finishing.map((f, idx) => (
-                          <div key={`${f.service_id}_${idx}`} className="simplified-row">
-                            <div className="simplified-row__head">
-                              <div className="simplified-row__title">{svcName(f.service_id)}</div>
-                              <div className="simplified-row__actions">
-                                <Button
-                                  variant="error"
-                                  size="sm"
-                                  onClick={() => updateSize(selected.id, { finishing: selected.finishing.filter((_, i) => i !== idx) })}
-                                >
-                                  Удалить
-                                </Button>
+                      <div className="simplified-finishing-list">
+                        {services.map((service, idx) => {
+                          const hasFinishing = selected.finishing.some(f => f.service_id === Number(service.id))
+
+                          // Автоматически добавляем услугу, если её нет
+                          if (!hasFinishing) {
+                            const nextFinishing = [...selected.finishing, {
+                              service_id: Number(service.id),
+                              price_unit: 'per_cut' as const,
+                              units_per_item: 1,
+                              tiers: defaultTiers()
+                            }]
+                            updateSize(selected.id, { finishing: nextFinishing })
+                          }
+
+                          const finishing = selected.finishing.find(f => f.service_id === Number(service.id))
+                          if (!finishing) return null
+
+                          const actualIdx = selected.finishing.findIndex(f => f.service_id === Number(service.id))
+
+                          return (
+                            <div key={service.id} className="simplified-finishing-item">
+                              <div className="simplified-finishing-item__header">
+                                <div className="simplified-finishing-item__title">{service.name}</div>
                               </div>
-                            </div>
-                            <div className="simplified-row__grid">
-                              <FormField label="Услуга">
-                                <select
-                                  className="form-select form-select--compact"
-                                  value={String(f.service_id)}
-                                  onChange={(e) => {
-                                    const v = Number(e.target.value)
-                                    const next = selected.finishing.map((r, i) => (i === idx ? { ...r, service_id: v } : r))
-                                    updateSize(selected.id, { finishing: next })
-                                  }}
-                                >
-                                  {services.map(s => (
-                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                  ))}
-                                </select>
-                              </FormField>
-                              <FormField label="Единица">
-                                <select
-                                  className="form-select form-select--compact"
-                                  value={f.price_unit}
-                                  onChange={(e) => {
-                                    const v = e.target.value as any
-                                    const next = selected.finishing.map((r, i) => (i === idx ? { ...r, price_unit: v } : r))
-                                    updateSize(selected.id, { finishing: next })
-                                  }}
-                                >
-                                  <option value="per_cut">за рез/биг/фальц</option>
-                                  <option value="per_item">за изделие</option>
-                                </select>
-                              </FormField>
-                              <FormField label="Ед. на изделие">
-                                <input
-                                  className="form-input"
-                                  value={String(f.units_per_item)}
-                                  onChange={(e) => {
-                                    const v = Number(e.target.value) || 0
-                                    const next = selected.finishing.map((r, i) => (i === idx ? { ...r, units_per_item: v } : r))
-                                    updateSize(selected.id, { finishing: next })
-                                  }}
-                                />
-                              </FormField>
-                            </div>
-                            {f.tiers.length > 0 && (
-                              <div className="simplified-tiers-table">
-                                <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
-                                  <thead>
-                                    <tr>
-                                      <th>Цена за 1 ед.</th>
-                                      {f.tiers.map((t, ti) => {
-                                        const rangeLabel = `${t.min_qty}${t.max_qty == null ? '-∞' : `-${t.max_qty}`}`
-                                        return (
-                                          <th key={ti} className="simplified-table__range-cell">
-                                            {rangeLabel}
-                                            <Button
-                                              variant="error"
-                                              size="sm"
-                                              onClick={() => {
+
+                              <div className="simplified-finishing-item__controls">
+                                <FormField label="Единица">
+                                  <select
+                                    className="form-select form-select--compact"
+                                    value={finishing.price_unit}
+                                    onChange={(e) => {
+                                      const v = e.target.value as any
+                                      const next = selected.finishing.map((r, i) => (i === actualIdx ? { ...r, price_unit: v } : r))
+                                      updateSize(selected.id, { finishing: next })
+                                    }}
+                                  >
+                                    <option value="per_cut">за рез/биг/фальц</option>
+                                    <option value="per_item">за изделие</option>
+                                  </select>
+                                </FormField>
+                                <FormField label="Ед. на изделие">
+                                  <input
+                                    className="form-input form-input--compact"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={String(finishing.units_per_item)}
+                                    onChange={(e) => {
+                                      const v = Number(e.target.value) || 0
+                                      const next = selected.finishing.map((r, i) => (i === actualIdx ? { ...r, units_per_item: v } : r))
+                                      updateSize(selected.id, { finishing: next })
+                                    }}
+                                  />
+                                </FormField>
+                              </div>
+
+                              {finishing.tiers.length > 0 && (
+                                <div className="simplified-finishing-item__pricing">
+                                  <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
+                                    <thead>
+                                      <tr>
+                                        <th>Цена за 1 ед.</th>
+                                        {finishing.tiers.map((t, ti) => {
+                                          const rangeLabel = t.max_qty == null ? `${t.min_qty} - ∞` : `${t.min_qty}-${t.max_qty}`
+                                          return (
+                                            <th key={ti} className="simplified-table__range-cell">
+                                              {rangeLabel}
+                                              <Button
+                                                variant="error"
+                                                size="sm"
+                                                onClick={() => {
+                                                  const next = selected.finishing.map((r, i) => {
+                                                    if (i !== actualIdx) return r
+                                                    return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
+                                                  })
+                                                  updateSize(selected.id, { finishing: next })
+                                                }}
+                                              >
+                                                Удалить
+                                              </Button>
+                                            </th>
+                                          )
+                                        })}
+                                        <th></th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      <tr>
+                                        <td className="simplified-table__price-label">Цена</td>
+                                        {finishing.tiers.map((t, ti) => (
+                                          <td key={ti}>
+                                            <input
+                                              className="form-input form-input--compact-table"
+                                              type="number"
+                                              min="0"
+                                              step="0.01"
+                                              value={String(t.unit_price || 0)}
+                                              onChange={(e) => {
+                                                const v = Number(e.target.value) || 0
                                                 const next = selected.finishing.map((r, i) => {
-                                                  if (i !== idx) return r
-                                                  return { ...r, tiers: r.tiers.filter((_, j) => j !== ti) }
+                                                  if (i !== actualIdx) return r
+                                                  return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, unit_price: v } : tt)) }
                                                 })
                                                 updateSize(selected.id, { finishing: next })
                                               }}
-                                            >
-                                              Удалить
-                                            </Button>
-                                          </th>
-                                        )
-                                      })}
-                                      <th></th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    <tr>
-                                      <td className="simplified-table__price-label">Цена</td>
-                                      {f.tiers.map((t, ti) => (
-                                        <td key={ti}>
-                                          <input
-                                            className="form-input form-input--compact-table"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={String(t.unit_price || 0)}
-                                            onChange={(e) => {
-                                              const v = Number(e.target.value) || 0
-                                              const next = selected.finishing.map((r, i) => {
-                                                if (i !== idx) return r
-                                                return { ...r, tiers: r.tiers.map((tt, j) => (j === ti ? { ...tt, unit_price: v } : tt)) }
-                                              })
-                                              updateSize(selected.id, { finishing: next })
-                                            }}
-                                          />
-                                        </td>
-                                      ))}
-                                      <td></td>
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                                            />
+                                          </td>
+                                        ))}
+                                        <td></td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
