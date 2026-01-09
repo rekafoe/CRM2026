@@ -624,12 +624,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                         )
                                       })}
                                 <th>
-                                  <div className="cell">Ед.изм.</div>
-                                </th>
-                                <th>
-                                  <div className="cell">Вес за ед</div>
-                                </th>
-                                <th>
                                   <div className="cell">
                                     <div className="simplified-row__add-range-wrapper">
                                       <button
@@ -680,8 +674,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                     {commonRanges.map(() => (
                                       <td key={Math.random()} style={{ backgroundColor: '#f5f7fa' }}></td>
                                     ))}
-                                    <td style={{ backgroundColor: '#f5f7fa' }}></td>
-                                    <td style={{ backgroundColor: '#f5f7fa' }}></td>
                                     <td style={{ backgroundColor: '#f5f7fa' }}></td>
                                   </tr>
                                   
@@ -740,31 +732,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                         </td>
                                           )
                                         })}
-                                        <td>
-                                          <div className="el-select el-select--small">
-                                            <div className="el-input el-input--small el-input--suffix">
-                                              <input
-                                                type="text"
-                                                readOnly
-                                                className="el-input__inner"
-                                                value="BLR"
-                                                style={{ cursor: 'default' }}
-                                              />
-                                              <span className="el-input__suffix">
-                                                <span className="el-input__suffix-inner">
-                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                                </span>
-                                              </span>
-                                            </div>
-                                          </div>
-                                        </td>
-                                        <td>
-                                          <input
-                                            className="form-input form-input--compact-table"
-                                            type="text"
-                                            placeholder=""
-                                          />
-                                        </td>
                                       <td></td>
                                     </tr>
                                     )
@@ -825,31 +792,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                             </td>
                                           )
                                         })}
-                                        <td>
-                                          <div className="el-select el-select--small">
-                                            <div className="el-input el-input--small el-input--suffix">
-                                              <input
-                                                type="text"
-                                                readOnly
-                                                className="el-input__inner"
-                                                value="BLR"
-                                                style={{ cursor: 'default' }}
-                                              />
-                                              <span className="el-input__suffix">
-                                                <span className="el-input__suffix-inner">
-                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                                </span>
-                                              </span>
-                      </div>
-                                          </div>
-                                        </td>
-                                        <td>
-                                          <input
-                                            className="form-input form-input--compact-table"
-                                            type="text"
-                                            placeholder=""
-                                          />
-                                        </td>
                                         <td></td>
                                       </tr>
                                     )
@@ -941,31 +883,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                             </td>
                                           )
                                         })}
-                                        <td>
-                                          <div className="el-select el-select--small">
-                                            <div className="el-input el-input--small el-input--suffix">
-                                              <input
-                                                type="text"
-                                                readOnly
-                                                className="el-input__inner"
-                                                value="BLR"
-                                                style={{ cursor: 'default' }}
-                                              />
-                                              <span className="el-input__suffix">
-                                                <span className="el-input__suffix-inner">
-                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                                </span>
-                                              </span>
-                    </div>
-                                          </div>
-                                        </td>
-                                        <td>
-                                          <input
-                                            className="form-input form-input--compact-table"
-                                            type="text"
-                                            placeholder=""
-                                          />
-                                        </td>
                                         <td></td>
                                       </tr>
                                     )
@@ -1026,31 +943,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                             </td>
                                           )
                                         })}
-                                        <td>
-                                          <div className="el-select el-select--small">
-                                            <div className="el-input el-input--small el-input--suffix">
-                                              <input
-                                                type="text"
-                                                readOnly
-                                                className="el-input__inner"
-                                                value="BLR"
-                                                style={{ cursor: 'default' }}
-                                              />
-                                              <span className="el-input__suffix">
-                                                <span className="el-input__suffix-inner">
-                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                                </span>
-                                              </span>
-                        </div>
-                      </div>
-                                        </td>
-                                        <td>
-                                          <input
-                                            className="form-input form-input--compact-table"
-                                            type="text"
-                                            placeholder=""
-                                          />
-                                        </td>
                                         <td></td>
                                       </tr>
                                     )
@@ -1234,12 +1126,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                         )
                                       })}
                                 <th>
-                                  <div className="cell">Ед.изм.</div>
-                                </th>
-                                <th>
-                                  <div className="cell">Вес за ед</div>
-                                </th>
-                                <th>
                                   <div className="cell">
                                     <div className="simplified-row__add-range-wrapper">
                                       <button
@@ -1331,31 +1217,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                         </td>
                                       )
                                     })}
-                                    <td>
-                                      <div className="el-select el-select--small">
-                                        <div className="el-input el-input--small el-input--suffix">
-                                          <input
-                                            type="text"
-                                            readOnly
-                                            className="el-input__inner"
-                                            value="BLR"
-                                            style={{ cursor: 'default' }}
-                                          />
-                                          <span className="el-input__suffix">
-                                            <span className="el-input__suffix-inner">
-                                              <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                            </span>
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </td>
-                                    <td>
-                                      <input
-                                        className="form-input form-input--compact-table"
-                                        type="text"
-                                        placeholder=""
-                                      />
-                                    </td>
                                       <td></td>
                                     </tr>
                                 )
@@ -1429,12 +1290,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                     </th>
                                   )
                                 })}
-                                <th>
-                                  <div className="cell">Ед.изм.</div>
-                                </th>
-                                <th>
-                                  <div className="cell">Вес за ед</div>
-                                </th>
                                 <th>
                                   <div className="cell">
                                     <div className="simplified-row__add-range-wrapper">
