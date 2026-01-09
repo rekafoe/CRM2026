@@ -1368,41 +1368,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                         </td>
                                       )
                                     })}
-                                    <td>
-                                      <div className="el-select el-select--small">
-                                        <div className="el-input el-input--small el-input--suffix">
-                                          <input
-                                            type="text"
-                                            readOnly
-                                            className="el-input__inner"
-                                            value={finishing.price_unit === 'per_cut' ? 'за рез/биг/фальц' : 'за изделие'}
-                                            style={{ cursor: 'default' }}
-                                          />
-                                          <span className="el-input__suffix">
-                                            <span className="el-input__suffix-inner">
-                                              <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                            </span>
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </td>
-                                    <td>
-                                          <input
-                                            className="form-input form-input--compact-table"
-                                            type="number"
-                                            min="0"
-                                        step="1"
-                                        value={String(finishing.units_per_item || 1)}
-                                            onChange={(e) => {
-                                          const v = Number(e.target.value) || 1
-                                              const next = selected.finishing.map((r, i) => {
-                                            if (i !== actualIdx) return r
-                                            return { ...r, units_per_item: v }
-                                              })
-                                              updateSize(selected.id, { finishing: next })
-                                            }}
-                                          />
-                                        </td>
                                       <td></td>
                                     </tr>
                                 )
