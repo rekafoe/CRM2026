@@ -1247,7 +1247,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                   <div className="simplified-card__header">
                     <div>
                       <strong>Отделка (послепечатные услуги)</strong>
-                      <div className="text-muted text-sm">Резка/биговка/фальцовка/ламинация. Цена задаётся "за рез/биг/фальц" или "за изделие".</div>
+                      <div className="text-muted text-sm">Выберите услуги из списка. Цены загружаются из pricing-admin. Отметьте услуги, которые нужно добавить в продукт.</div>
                     </div>
                   </div>
                   <div className="simplified-card__content">
@@ -1271,7 +1271,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                       // Преобразуем services в формат ServiceItem
                       const serviceItems: ServiceItem[] = services.map(s => ({
                         id: Number(s.id),
-                        name: s.name
+                        name: s.name,
+                        price_unit: (s.operation_type === 'cut' || s.operation_type === 'score' || s.operation_type === 'fold') 
+                          ? 'per_cut' as const 
+                          : 'per_item' as const,
+                        operation_type: s.operation_type || s.operationType
                       }))
                       
                       // Преобразуем finishing в формат ServicePricing
@@ -1296,6 +1300,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                           rangesEditable={true}
                           isMobile={isMobile}
                           title="Параметры отделки (цена за рез/биг/фальц или за изделие)"
+                          loadServiceTiers={true}
+                          allowPriceOverride={false}
                         />
                       )
                     })()}
