@@ -3,7 +3,7 @@
  * Использует модульную структуру с хуками и компонентами
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Button, Alert, Modal } from '../../common';
 import { PricingService } from '../../../types/pricing';
 import { ServiceFormState } from './components/ServiceForm';
@@ -112,6 +112,10 @@ const ServicesManagement: React.FC = () => {
     },
   });
 
+  // Используем ref для стабильной ссылки на serviceOperations
+  const serviceOperationsRef = useRef(serviceOperations);
+  serviceOperationsRef.current = serviceOperations;
+
   const tierOperations = useTierOperations({
     onSuccess: (message) => {
       setSuccess(message);
@@ -144,12 +148,12 @@ const ServicesManagement: React.FC = () => {
       rate: Number(state.editingServiceForm.rate || 0),
       isActive: state.editingServiceForm.isActive,
     };
-    await serviceOperations.updateService(state.editingService.id, payload);
+    await serviceOperationsRef.current.updateService(state.editingService.id, payload);
     resetEditingService();
-  }, [state.editingService, state.editingServiceForm, serviceOperations, resetEditingService]);
+  }, [state.editingService, state.editingServiceForm, resetEditingService]); // serviceOperations через ref
 
   const handleServiceCreate = useCallback(async () => {
-    const created = await serviceOperations.createService({
+    const created = await serviceOperationsRef.current.createService({
       name: state.newServiceForm.name.trim(),
       type: state.newServiceForm.type || 'postprint',
       unit: state.newServiceForm.unit || 'item',
@@ -162,15 +166,19 @@ const ServicesManagement: React.FC = () => {
       setShowCreateService(false);
       resetNewServiceForm(emptyServiceForm);
     }
-  }, [state.newServiceForm, serviceOperations, setShowCreateService, resetNewServiceForm]);
+  }, [state.newServiceForm, setShowCreateService, resetNewServiceForm]); // serviceOperations через ref
 
   const handleServiceDelete = useCallback(async (id: number, serviceName: string) => {
-    await serviceOperations.deleteService(id, serviceName);
+    await serviceOperationsRef.current.deleteService(id, serviceName);
     removeVolumeTiers(id);
     if (state.expandedServiceId === id) {
       setExpandedServiceId(null);
     }
-  }, [serviceOperations, removeVolumeTiers, state.expandedServiceId, setExpandedServiceId]);
+  }, [removeVolumeTiers, state.expandedServiceId, setExpandedServiceId]); // serviceOperations через ref
+
+  // Используем ref для стабильной ссылки на tierOperations
+  const tierOperationsRef = useRef(tierOperations);
+  tierOperationsRef.current = tierOperations;
 
   const handleToggleVolumeTiers = useCallback(async (serviceId: number) => {
     if (state.expandedServiceId === serviceId) {
@@ -179,9 +187,9 @@ const ServicesManagement: React.FC = () => {
     }
     setExpandedServiceId(serviceId);
     if (!state.volumeTiers[serviceId]) {
-      await tierOperations.loadTiers(serviceId);
+      await tierOperationsRef.current.loadTiers(serviceId);
     }
-  }, [state.expandedServiceId, state.volumeTiers, setExpandedServiceId, tierOperations]);
+  }, [state.expandedServiceId, state.volumeTiers, setExpandedServiceId]); // tierOperations через ref
 
   // Фильтрация и сортировка
   const filteredServices = useMemo(() => {
@@ -202,7 +210,7 @@ const ServicesManagement: React.FC = () => {
       <Button
         variant="warning"
         size="sm"
-        onClick={() => serviceOperations.updateService(service.id, { isActive: !service.isActive })}
+        onClick={() => serviceOperationsRef.current.updateService(service.id, { isActive: !service.isActive })}
       >
         {service.isActive ? '⏸️ Деактивировать' : '▶️ Активировать'}
       </Button>
@@ -213,7 +221,7 @@ const ServicesManagement: React.FC = () => {
         🗑️
       </Button>
     </div>
-  ), [openEditService, serviceOperations, handleToggleVolumeTiers, handleServiceDelete]);
+  ), [openEditService, handleToggleVolumeTiers, handleServiceDelete]); // serviceOperations через ref
 
   // Рендеринг развернутой строки
   const renderExpandedRow = useCallback((service: PricingService) => {
@@ -225,12 +233,12 @@ const ServicesManagement: React.FC = () => {
         service={service}
         tiers={state.volumeTiers[service.id] || []}
         loading={!!state.tiersLoading[service.id]}
-        onCreateTier={(payload) => tierOperations.createTier(service.id, payload)}
-        onUpdateTier={(tierId, payload) => tierOperations.updateTier(service.id, tierId, payload)}
-        onDeleteTier={(tierId) => tierOperations.deleteTier(service.id, tierId)}
+        onCreateTier={(payload) => tierOperationsRef.current.createTier(service.id, payload)}
+        onUpdateTier={(tierId, payload) => tierOperationsRef.current.updateTier(service.id, tierId, payload)}
+        onDeleteTier={(tierId) => tierOperationsRef.current.deleteTier(service.id, tierId)}
       />
     );
-  }, [servicesWithVariants, state.volumeTiers, state.tiersLoading, tierOperations]);
+  }, [servicesWithVariants, state.volumeTiers, state.tiersLoading]); // tierOperations через ref
 
   return (
     <div className="services-management">

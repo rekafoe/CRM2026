@@ -206,7 +206,10 @@ export async function getServiceVariantTiers(serviceId: number, variantId: numbe
  * Оптимизация: вместо N запросов делаем один
  */
 export async function getAllVariantTiers(serviceId: number): Promise<Record<number, ServiceVolumeTier[]>> {
-  const response = await api.get(`/pricing/services/${serviceId}/variants/tiers`);
+  // Увеличиваем таймаут для batch запроса до 30 секунд
+  const response = await api.get(`/pricing/services/${serviceId}/variants/tiers`, {
+    timeout: 30000,
+  });
   const data = response.data || {};
   
   // Преобразуем объект с ключами-строками в объект с числовыми ключами

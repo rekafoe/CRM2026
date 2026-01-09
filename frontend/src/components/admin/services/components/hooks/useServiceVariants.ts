@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { VariantWithTiers } from '../ServiceVariantsTable.types';
 import {
   getServiceVariants,
@@ -18,13 +18,17 @@ export function useServiceVariants(serviceId: number) {
   const [error, setError] = useState<string | null>(null);
   const cache = useTiersCache();
 
+  // Используем useRef для стабильной ссылки на cache
+  const cacheRef = useRef(cache);
+  cacheRef.current = cache;
+
   const loadVariants = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Проверяем кэш
-      const cachedTiers = cache.get(serviceId);
+      // Проверяем кэш через ref для избежания зависимостей
+      const cachedTiers = cacheRef.current.get(serviceId);
       
       // Загружаем варианты и tiers параллельно
       const [loadedVariants, allTiers] = await Promise.all([
@@ -34,10 +38,9 @@ export function useServiceVariants(serviceId: number) {
           : getAllVariantTiers(serviceId)
               .then((tiers) => {
                 // Сохраняем в кэш
-                cache.set(serviceId, tiers);
+                cacheRef.current.set(serviceId, tiers);
                 return tiers;
-              })
-              .catch(() => ({} as Record<number, any[]>)), // Fallback на пустой объект при ошибке
+              }),
       ]);
       
       // Сопоставляем tiers с вариантами
@@ -48,21 +51,23 @@ export function useServiceVariants(serviceId: number) {
       }));
       
       setVariants(variantsWithTiers);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Ошибка загрузки вариантов:', err);
-      setError('Не удалось загрузить варианты услуги');
+      const errorMessage = err?.response?.data?.error || err?.message || 'Не удалось загрузить варианты услуги';
+      setError(errorMessage);
+      // Не скрываем ошибку автоматически - пользователь должен видеть проблему
     } finally {
       setLoading(false);
     }
-  }, [serviceId, cache]);
+  }, [serviceId]); // cache через ref, не добавляем в зависимости
 
   useEffect(() => {
     void loadVariants();
   }, [loadVariants]);
 
   const invalidateCache = useCallback(() => {
-    cache.invalidate(serviceId);
-  }, [serviceId, cache]);
+    cacheRef.current.invalidate(serviceId);
+  }, [serviceId]); // cache через ref, не добавляем в зависимости
 
   return {
     variants,

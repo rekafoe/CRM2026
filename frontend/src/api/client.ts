@@ -43,12 +43,13 @@ apiClient.interceptors.response.use(
 // Типизированные методы для HTTP запросов
 export const api = {
   get: <T>(url: string, paramsOrConfig?: any) => {
-    // Если передан объект с params (конфиг axios), используем его
-    if (paramsOrConfig && typeof paramsOrConfig === 'object' && 'params' in paramsOrConfig) {
-      return apiClient.get<T>(url, paramsOrConfig);
-    }
-    // Если передан простой объект - это query параметры
+    // Если передан объект с axios конфигом (timeout, headers и т.д.), используем его напрямую
     if (paramsOrConfig && typeof paramsOrConfig === 'object') {
+      // Проверяем, это конфиг axios (есть timeout, headers, params) или просто query params
+      if ('timeout' in paramsOrConfig || 'headers' in paramsOrConfig || 'params' in paramsOrConfig) {
+        return apiClient.get<T>(url, paramsOrConfig);
+      }
+      // Иначе это query параметры
       return apiClient.get<T>(url, { params: paramsOrConfig });
     }
     // Иначе обычный запрос

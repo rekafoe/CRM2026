@@ -31,6 +31,16 @@ export function useVariantOperations(
   // Refs для debounce изменения цен
   const priceChangeTimeoutRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const priceChangeOriginalValuesRef = useRef<Map<string, number>>(new Map());
+  
+  // Используем refs для стабильных ссылок на функции, чтобы избежать рекурсии
+  const reloadVariantsRef = useRef(reloadVariants);
+  const invalidateCacheRef = useRef(invalidateCache);
+  const variantsRef = useRef(variants);
+  
+  // Обновляем refs при изменении
+  reloadVariantsRef.current = reloadVariants;
+  invalidateCacheRef.current = invalidateCache;
+  variantsRef.current = variants;
 
   // Очистка таймеров при размонтировании
   useEffect(() => {
@@ -94,10 +104,10 @@ export function useVariantOperations(
     } catch (err) {
       console.error('Ошибка обновления названия варианта:', err);
       setError('Не удалось обновить название варианта');
-      invalidateCache?.();
-      await reloadVariants();
+      invalidateCacheRef.current?.();
+      await reloadVariantsRef.current();
     }
-  }, [serviceId, variants, setVariants, setError, reloadVariants]);
+  }, [serviceId, variants, setVariants, setError]); // reloadVariants через ref
 
   const updateVariantParams = useCallback(async (variantId: number, params: Record<string, any>) => {
     try {
@@ -112,10 +122,10 @@ export function useVariantOperations(
     } catch (err) {
       console.error('Ошибка обновления параметров варианта:', err);
       setError('Не удалось обновить параметры варианта');
-      invalidateCache?.();
-      await reloadVariants();
+      invalidateCacheRef.current?.();
+      await reloadVariantsRef.current();
     }
-  }, [serviceId, variants, setVariants, setError, reloadVariants]);
+  }, [serviceId, variants, setVariants, setError]); // reloadVariants через ref
 
   const deleteVariant = useCallback(async (variantId: number) => {
     if (!confirm('Удалить этот вариант? Все связанные диапазоны цен будут удалены.')) {
@@ -183,7 +193,8 @@ export function useVariantOperations(
 
     // Устанавливаем новый таймер для сохранения
     const timeout = setTimeout(async () => {
-      const currentVariant = variants.find((v) => v.id === variantId);
+      // Используем ref для получения актуального значения variants
+      const currentVariant = variantsRef.current.find((v) => v.id === variantId);
       if (!currentVariant) return;
 
       const currentTier = currentVariant.tiers.find((t) => t.minQuantity === minQty);
@@ -219,7 +230,7 @@ export function useVariantOperations(
     }, 1000);
 
     priceChangeTimeoutRef.current.set(key, timeout);
-  }, [serviceId, variants, setVariants]);
+  }, [serviceId, setVariants]); // variants через ref, не добавляем в зависимости
 
   const addRangeBoundary = useCallback(async (boundary: number) => {
     try {

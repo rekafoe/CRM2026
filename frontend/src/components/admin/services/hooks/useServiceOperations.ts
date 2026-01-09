@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import {
   PricingService,
   UpdatePricingServicePayload,
@@ -27,6 +27,10 @@ export function useServiceOperations({
   onReload,
   onServiceCreated,
 }: UseServiceOperationsProps) {
+  // Используем refs для стабильных ссылок на колбэки, чтобы избежать рекурсии
+  const callbacksRef = useRef({ onSuccess, onError, onReload, onServiceCreated });
+  callbacksRef.current = { onSuccess, onError, onReload, onServiceCreated };
+
   const createService = useCallback(
     async (payload: {
       name: string;
@@ -38,7 +42,7 @@ export function useServiceOperations({
     }) => {
       try {
         if (!payload.name.trim() || !payload.unit.trim()) {
-          onError?.('Заполните обязательные поля: название, единица');
+          callbacksRef.current.onError?.('Заполните обязательные поля: название, единица');
           return null;
         }
 
@@ -59,36 +63,36 @@ export function useServiceOperations({
               sortOrder: 0,
               isActive: true,
             });
-            onServiceCreated?.(createdService.id);
+            callbacksRef.current.onServiceCreated?.(createdService.id);
           } catch (variantError) {
             console.error('Ошибка создания варианта:', variantError);
             // Не показываем ошибку пользователю, т.к. услуга уже создана
           }
         }
 
-        onSuccess?.('Услуга создана');
-        await onReload?.();
+        callbacksRef.current.onSuccess?.('Услуга создана');
+        await callbacksRef.current.onReload?.();
         return createdService;
       } catch (e: unknown) {
         console.error('Error creating service:', e);
-        onError?.(`Ошибка создания услуги: ${getErrorMessage(e)}`);
+        callbacksRef.current.onError?.(`Ошибка создания услуги: ${getErrorMessage(e)}`);
         return null;
       }
     },
-    [onSuccess, onError, onReload, onServiceCreated]
+    [] // Колбэки через ref, не добавляем в зависимости
   );
 
   const updateService = useCallback(
     async (id: number, payload: UpdatePricingServicePayload) => {
       try {
         await updatePricingService(id, payload);
-        onSuccess?.('Услуга обновлена');
-        await onReload?.();
+        callbacksRef.current.onSuccess?.('Услуга обновлена');
+        await callbacksRef.current.onReload?.();
       } catch (err) {
-        onError?.('Ошибка обновления услуги');
+        callbacksRef.current.onError?.('Ошибка обновления услуги');
       }
     },
-    [onSuccess, onError, onReload]
+    [] // Колбэки через ref, не добавляем в зависимости
   );
 
   const deleteService = useCallback(
@@ -102,14 +106,14 @@ export function useServiceOperations({
       }
       try {
         await deletePricingService(id);
-        onSuccess?.('Услуга удалена');
-        await onReload?.();
+        callbacksRef.current.onSuccess?.('Услуга удалена');
+        await callbacksRef.current.onReload?.();
       } catch (e: unknown) {
         console.error('Error deleting service:', e);
-        onError?.(`Ошибка удаления услуги: ${getErrorMessage(e)}`);
+        callbacksRef.current.onError?.(`Ошибка удаления услуги: ${getErrorMessage(e)}`);
       }
     },
-    [onSuccess, onError, onReload]
+    [] // Колбэки через ref, не добавляем в зависимости
   );
 
   return {

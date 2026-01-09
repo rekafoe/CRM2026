@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import {
   ServiceVolumeTierPayload,
 } from '../../../../types/pricing';
@@ -26,20 +26,24 @@ export function useTierOperations({
   onTiersLoaded,
   onTiersLoading,
 }: UseTierOperationsProps) {
+  // Используем refs для стабильных ссылок на колбэки, чтобы избежать рекурсии
+  const callbacksRef = useRef({ onSuccess, onError, onTiersLoaded, onTiersLoading });
+  callbacksRef.current = { onSuccess, onError, onTiersLoaded, onTiersLoading };
+
   const loadTiers = useCallback(
     async (serviceId: number) => {
       try {
-        onTiersLoading?.(serviceId, true);
+        callbacksRef.current.onTiersLoading?.(serviceId, true);
         const tiers = await getServiceVolumeTiers(serviceId);
-        onTiersLoaded?.(serviceId, tiers);
+        callbacksRef.current.onTiersLoaded?.(serviceId, tiers);
       } catch (err) {
         console.error(err);
-        onError?.('Не удалось загрузить диапазоны цен для услуги');
+        callbacksRef.current.onError?.('Не удалось загрузить диапазоны цен для услуги');
       } finally {
-        onTiersLoading?.(serviceId, false);
+        callbacksRef.current.onTiersLoading?.(serviceId, false);
       }
     },
-    [onError, onTiersLoaded, onTiersLoading]
+    [] // Колбэки через ref, не добавляем в зависимости
   );
 
   const createTier = useCallback(
@@ -47,14 +51,14 @@ export function useTierOperations({
       try {
         await createServiceVolumeTier(serviceId, payload);
         await loadTiers(serviceId);
-        onSuccess?.('Диапазон цены добавлен');
+        callbacksRef.current.onSuccess?.('Диапазон цены добавлен');
       } catch (e: unknown) {
         console.error(e);
-        onError?.(`Ошибка создания диапазона: ${getErrorMessage(e)}`);
+        callbacksRef.current.onError?.(`Ошибка создания диапазона: ${getErrorMessage(e)}`);
         throw e;
       }
     },
-    [loadTiers, onSuccess, onError]
+    [loadTiers] // Колбэки через ref
   );
 
   const updateTier = useCallback(
@@ -66,14 +70,14 @@ export function useTierOperations({
       try {
         await updateServiceVolumeTier(serviceId, tierId, payload);
         await loadTiers(serviceId);
-        onSuccess?.('Диапазон обновлён');
+        callbacksRef.current.onSuccess?.('Диапазон обновлён');
       } catch (e: unknown) {
         console.error(e);
-        onError?.(`Ошибка обновления диапазона: ${getErrorMessage(e)}`);
+        callbacksRef.current.onError?.(`Ошибка обновления диапазона: ${getErrorMessage(e)}`);
         throw e;
       }
     },
-    [loadTiers, onSuccess, onError]
+    [loadTiers] // Колбэки через ref
   );
 
   const deleteTier = useCallback(
@@ -81,14 +85,14 @@ export function useTierOperations({
       try {
         await deleteServiceVolumeTier(serviceId, tierId);
         await loadTiers(serviceId);
-        onSuccess?.('Диапазон удалён');
+        callbacksRef.current.onSuccess?.('Диапазон удалён');
       } catch (e: unknown) {
         console.error(e);
-        onError?.(`Ошибка удаления диапазона: ${getErrorMessage(e)}`);
+        callbacksRef.current.onError?.(`Ошибка удаления диапазона: ${getErrorMessage(e)}`);
         throw e;
       }
     },
-    [loadTiers, onSuccess, onError]
+    [loadTiers] // Колбэки через ref
   );
 
   return {
