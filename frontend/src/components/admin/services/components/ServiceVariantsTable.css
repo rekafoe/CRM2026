@@ -71,11 +71,19 @@
 }
 
 .el-table__row.expanded > td {
+  background-color: #fff;
+}
+
+.el-table__row.expanded:hover > td {
   background-color: #f5f7fa;
 }
 
 .el-table__row--level-0 > td {
   background-color: #fff;
+}
+
+.el-table__row--level-0:hover > td {
+  background-color: #f5f7fa;
 }
 
 .el-table__indent {

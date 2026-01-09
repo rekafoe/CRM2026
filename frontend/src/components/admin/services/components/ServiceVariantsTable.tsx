@@ -605,56 +605,50 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                       <tr className="el-table__row expanded">
                         <td>
                           <div className="cell">
-                            <div style={{ width: 'calc(100% + 0px)', marginLeft: '0px', display: 'inline-block' }}>
-                              <div className="el-input el-input--small">
-                                {editingVariantName === variant.id ? (
-                                  <input
-                                    type="text"
-                                    className="el-input__inner"
-                                    value={editingVariantNameValue}
-                                    onChange={(e) => setEditingVariantNameValue(e.target.value)}
-                                    onBlur={() => {
+                            <div className="el-input el-input--small">
+                              {editingVariantName === variant.id ? (
+                                <input
+                                  type="text"
+                                  className="el-input__inner"
+                                  value={editingVariantNameValue}
+                                  onChange={(e) => setEditingVariantNameValue(e.target.value)}
+                                  onBlur={() => {
+                                    if (editingVariantNameValue.trim()) {
+                                      handleUpdateVariantName(variant.id, editingVariantNameValue.trim());
+                                    } else {
+                                      setEditingVariantName(null);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
                                       if (editingVariantNameValue.trim()) {
                                         handleUpdateVariantName(variant.id, editingVariantNameValue.trim());
-                                      } else {
-                                        setEditingVariantName(null);
                                       }
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        if (editingVariantNameValue.trim()) {
-                                          handleUpdateVariantName(variant.id, editingVariantNameValue.trim());
-                                        }
-                                      } else if (e.key === 'Escape') {
-                                        setEditingVariantName(null);
-                                      }
-                                    }}
-                                    autoFocus
-                                  />
-                                ) : (
-                                  <input
-                                    type="text"
-                                    className="el-input__inner"
-                                    value={variant.variantName}
-                                    onClick={() => {
-                                      setEditingVariantName(variant.id);
-                                      setEditingVariantNameValue(variant.variantName);
-                                    }}
-                                    readOnly
-                                    style={{ cursor: 'pointer' }}
-                                  />
-                                )}
-                              </div>
+                                    } else if (e.key === 'Escape') {
+                                      setEditingVariantName(null);
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  className="el-input__inner"
+                                  value={variant.variantName}
+                                  onClick={() => {
+                                    setEditingVariantName(variant.id);
+                                    setEditingVariantNameValue(variant.variantName);
+                                  }}
+                                  readOnly
+                                  style={{ cursor: 'pointer' }}
+                                />
+                              )}
                             </div>
                           </div>
                         </td>
                         {commonRanges.map(() => (
                           <td key={Math.random()}>
-                            <div className="cell">
-                              <div className="el-input el-input--small is-disabled">
-                                <input type="text" className="el-input__inner" disabled />
-                              </div>
-                            </div>
+                            <div className="cell"></div>
                           </td>
                         ))}
                         <td>
