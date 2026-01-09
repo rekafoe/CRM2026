@@ -83,6 +83,9 @@ export function useVariantOperations(
       // Инвалидируем кэш
       invalidateCacheRef.current?.();
 
+      // Перезагружаем все варианты для корректного отображения группировки
+      await reloadVariantsRef.current();
+
       // Обновляем tiers для нового варианта через небольшую задержку
       setTimeout(async () => {
         try {
