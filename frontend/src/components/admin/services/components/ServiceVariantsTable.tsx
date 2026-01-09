@@ -48,9 +48,20 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   }, [commonRanges]);
 
   // Группируем варианты
-  const groupedVariants = useMemo(() => groupVariantsByType(variants), [variants]);
+  const groupedVariants = useMemo(() => {
+    const grouped = groupVariantsByType(variants);
+    console.log('=== GROUPING VARIANTS ===');
+    console.log('Total variants:', variants.length);
+    console.log('Grouped variants keys:', Object.keys(grouped));
+    console.log('Grouped variants:', grouped);
+    return grouped;
+  }, [variants]);
   const variantsIndexMap = useMemo(() => createVariantsIndexMap(variants), [variants]);
-  const typeNames = useMemo(() => Object.keys(groupedVariants), [groupedVariants]);
+  const typeNames = useMemo(() => {
+    const names = Object.keys(groupedVariants);
+    console.log('Type names:', names);
+    return names;
+  }, [groupedVariants]);
 
   // Обработчики
   const handleCreateVariant = useCallback(async () => {
