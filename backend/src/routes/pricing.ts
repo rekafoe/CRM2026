@@ -839,6 +839,27 @@ router.delete('/services/:serviceId/variants/:variantId/tiers/:tierId', asyncHan
   res.json({ success: true })
 }))
 
+// Batch endpoint: получить все tiers для всех вариантов услуги одним запросом
+router.get('/services/:serviceId/variants/tiers', asyncHandler(async (req, res) => {
+  const { serviceId } = req.params
+  const serviceIdNum = Number(serviceId)
+  
+  if (isNaN(serviceIdNum)) {
+    res.status(400).json({ error: 'Invalid serviceId' })
+    return
+  }
+  
+  const tiersMap = await ServiceManagementService.listAllVariantTiers(serviceIdNum)
+  
+  // Преобразуем Map в объект для JSON
+  const result: Record<string, any[]> = {}
+  tiersMap.forEach((tiers, variantId) => {
+    result[variantId.toString()] = tiers.map(toTierResponse)
+  })
+  
+  res.json(result)
+}))
+
 // POST /api/pricing/markup-settings - создать настройку наценки
 router.post('/markup-settings', asyncHandler(async (req, res) => {
   const { setting_name, setting_value, description } = req.body

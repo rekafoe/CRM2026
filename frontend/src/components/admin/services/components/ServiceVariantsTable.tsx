@@ -29,10 +29,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   serviceName,
 }) => {
   // Хуки для управления состоянием
-  const { variants, setVariants, loading, error, setError, reload } = useServiceVariants(serviceId);
+  const { variants, setVariants, loading, error, setError, reload, invalidateCache } = useServiceVariants(serviceId);
   const editing = useVariantEditing();
   const tierModal = useTierModal();
-  const operations = useVariantOperations(serviceId, variants, setVariants, setError, reload);
+  const operations = useVariantOperations(serviceId, variants, setVariants, setError, reload, invalidateCache);
 
   // Вычисляем общие диапазоны
   const commonRanges = useMemo(() => calculateCommonRanges(variants), [variants]);

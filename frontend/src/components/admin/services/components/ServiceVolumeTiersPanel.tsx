@@ -116,7 +116,7 @@ const ServiceVolumeTiersPanel: React.FC<ServiceVolumeTiersPanelProps> = ({
 
       <TiersTable
         tiers={sortedTiers}
-        loading={loading}
+        loading={false}
         editingTierId={tierForm.editingTierId}
         editForm={tierForm.editForm}
         editBusy={editBusy}

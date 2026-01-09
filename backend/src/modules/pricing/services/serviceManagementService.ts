@@ -60,6 +60,10 @@ export class ServiceManagementService {
   static deleteServiceVariant(variantId: number): Promise<void> {
     return PricingServiceRepository.deleteServiceVariant(variantId);
   }
+
+  static listAllVariantTiers(serviceId: number): Promise<Map<number, ServiceVolumeTierDTO[]>> {
+    return PricingServiceRepository.listAllVariantTiers(serviceId);
+  }
 }
 
 

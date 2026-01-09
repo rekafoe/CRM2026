@@ -2,33 +2,51 @@ import { useState, useCallback, useEffect } from 'react';
 import { VariantWithTiers } from '../ServiceVariantsTable.types';
 import {
   getServiceVariants,
-  getServiceVariantTiers,
+  getAllVariantTiers,
 } from '../../../../../services/pricing';
+import { useTiersCache } from '../../hooks/useTiersCache';
 
 /**
  * Хук для управления вариантами услуги
+ * Оптимизация: 
+ * - использует batch запрос для загрузки всех tiers одним запросом
+ * - кэширует результаты для уменьшения количества запросов
  */
 export function useServiceVariants(serviceId: number) {
   const [variants, setVariants] = useState<VariantWithTiers[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const cache = useTiersCache();
 
   const loadVariants = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const loadedVariants = await getServiceVariants(serviceId);
-      const variantsWithTiers: VariantWithTiers[] = await Promise.all(
-        loadedVariants.map(async (variant) => {
-          try {
-            const tiers = await getServiceVariantTiers(serviceId, variant.id);
-            return { ...variant, tiers, loadingTiers: false };
-          } catch (err) {
-            console.error(`Ошибка загрузки tiers для варианта ${variant.id}:`, err);
-            return { ...variant, tiers: [], loadingTiers: false };
-          }
-        })
-      );
+      
+      // Проверяем кэш
+      const cachedTiers = cache.get(serviceId);
+      
+      // Загружаем варианты и tiers параллельно
+      const [loadedVariants, allTiers] = await Promise.all([
+        getServiceVariants(serviceId),
+        cachedTiers 
+          ? Promise.resolve(cachedTiers)
+          : getAllVariantTiers(serviceId)
+              .then((tiers) => {
+                // Сохраняем в кэш
+                cache.set(serviceId, tiers);
+                return tiers;
+              })
+              .catch(() => ({} as Record<number, any[]>)), // Fallback на пустой объект при ошибке
+      ]);
+      
+      // Сопоставляем tiers с вариантами
+      const variantsWithTiers: VariantWithTiers[] = loadedVariants.map((variant: any) => ({
+        ...variant,
+        tiers: allTiers[variant.id] || [],
+        loadingTiers: false,
+      }));
+      
       setVariants(variantsWithTiers);
     } catch (err) {
       console.error('Ошибка загрузки вариантов:', err);
@@ -36,11 +54,15 @@ export function useServiceVariants(serviceId: number) {
     } finally {
       setLoading(false);
     }
-  }, [serviceId]);
+  }, [serviceId, cache]);
 
   useEffect(() => {
     void loadVariants();
   }, [loadVariants]);
+
+  const invalidateCache = useCallback(() => {
+    cache.invalidate(serviceId);
+  }, [serviceId, cache]);
 
   return {
     variants,
@@ -49,5 +71,6 @@ export function useServiceVariants(serviceId: number) {
     error,
     setError,
     reload: loadVariants,
+    invalidateCache,
   };
 }

@@ -343,6 +343,39 @@ export class PricingServiceRepository {
     }
   }
 
+  /**
+   * Получает все tiers для всех вариантов услуги одним запросом
+   * Оптимизация: вместо N запросов делаем один с JOIN
+   */
+  static async listAllVariantTiers(serviceId: number): Promise<Map<number, ServiceVolumeTierDTO[]>> {
+    const db = await this.getConnection();
+    await this.ensureSchema(db);
+    
+    // Загружаем все tiers для всех вариантов этой услуги одним запросом
+    const rows = await db.all<RawTierRow[]>(
+      `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active 
+       FROM service_volume_prices 
+       WHERE service_id = ? AND variant_id IS NOT NULL
+       ORDER BY variant_id, min_quantity`,
+      serviceId
+    );
+    
+    // Группируем по variant_id
+    const tiersMap = new Map<number, ServiceVolumeTierDTO[]>();
+    for (const row of rows) {
+      const variantId = row.variant_id;
+      if (variantId !== null && variantId !== undefined) {
+        const variantIdNum = Number(variantId);
+        if (!tiersMap.has(variantIdNum)) {
+          tiersMap.set(variantIdNum, []);
+        }
+        tiersMap.get(variantIdNum)!.push(this.mapTier(row));
+      }
+    }
+    
+    return tiersMap;
+  }
+
   static async createServiceTier(serviceId: number, payload: CreateServiceVolumeTierDTO): Promise<ServiceVolumeTierDTO> {
     const db = await this.getConnection();
     await this.ensureSchema(db);

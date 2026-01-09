@@ -2,6 +2,7 @@ import React from 'react';
 import { ServiceVolumeTier } from '../../../../types/pricing';
 import { TierRow } from './TierRow';
 import { TierFormState } from './hooks/useTierForm';
+import { TiersTableSkeleton } from './TiersTableSkeleton';
 
 interface TiersTableProps {
   tiers: ServiceVolumeTier[];
@@ -33,7 +34,11 @@ export const TiersTable: React.FC<TiersTableProps> = ({
   onDelete,
   onEditFormChange,
 }) => {
-  if (tiers.length === 0 && !loading) {
+  if (loading) {
+    return <TiersTableSkeleton />;
+  }
+
+  if (tiers.length === 0) {
     return (
       <div className="overflow-hidden border border-gray-200 rounded-lg">
         <table className="min-w-full divide-y divide-gray-200">

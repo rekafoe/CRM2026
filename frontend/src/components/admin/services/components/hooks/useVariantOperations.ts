@@ -25,7 +25,8 @@ export function useVariantOperations(
   variants: VariantWithTiers[],
   setVariants: React.Dispatch<React.SetStateAction<VariantWithTiers[]>>,
   setError: (error: string | null) => void,
-  reloadVariants: () => Promise<void>
+  reloadVariants: () => Promise<void>,
+  invalidateCache?: () => void
 ) {
   // Refs для debounce изменения цен
   const priceChangeTimeoutRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -93,6 +94,7 @@ export function useVariantOperations(
     } catch (err) {
       console.error('Ошибка обновления названия варианта:', err);
       setError('Не удалось обновить название варианта');
+      invalidateCache?.();
       await reloadVariants();
     }
   }, [serviceId, variants, setVariants, setError, reloadVariants]);
@@ -110,6 +112,7 @@ export function useVariantOperations(
     } catch (err) {
       console.error('Ошибка обновления параметров варианта:', err);
       setError('Не удалось обновить параметры варианта');
+      invalidateCache?.();
       await reloadVariants();
     }
   }, [serviceId, variants, setVariants, setError, reloadVariants]);

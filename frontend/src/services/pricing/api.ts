@@ -201,6 +201,27 @@ export async function getServiceVariantTiers(serviceId: number, variantId: numbe
   return list.map(mapTier);
 }
 
+/**
+ * Batch запрос: получить все tiers для всех вариантов услуги одним запросом
+ * Оптимизация: вместо N запросов делаем один
+ */
+export async function getAllVariantTiers(serviceId: number): Promise<Record<number, ServiceVolumeTier[]>> {
+  const response = await api.get(`/pricing/services/${serviceId}/variants/tiers`);
+  const data = response.data || {};
+  
+  // Преобразуем объект с ключами-строками в объект с числовыми ключами
+  const result: Record<number, ServiceVolumeTier[]> = {};
+  for (const [variantIdStr, tiers] of Object.entries(data)) {
+    const variantId = Number(variantIdStr);
+    if (!isNaN(variantId)) {
+      const tiersList = Array.isArray(tiers) ? tiers : [];
+      result[variantId] = tiersList.map(mapTier);
+    }
+  }
+  
+  return result;
+}
+
 export async function createServiceVariantTier(serviceId: number, variantId: number, payload: ServiceVolumeTierPayload): Promise<ServiceVolumeTier> {
   const response = await api.post(`/pricing/services/${serviceId}/variants/${variantId}/tiers`, {
     min_quantity: payload.minQuantity,
@@ -242,6 +263,7 @@ export default {
   updateServiceVariant,
   deleteServiceVariant,
   getServiceVariantTiers,
+  getAllVariantTiers,
   createServiceVariantTier,
 };
 
