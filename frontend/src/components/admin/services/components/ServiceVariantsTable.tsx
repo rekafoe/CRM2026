@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button, Alert, FormField } from '../../../common';
 import {
   ServiceVariant,
@@ -215,7 +215,16 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
     }
   }, [tierModal.isOpen]);
 
-  const handleCreateVariant = async () => {
+  // Очистка таймеров при размонтировании
+  useEffect(() => {
+    return () => {
+      priceChangeTimeoutRef.current.forEach((timeout) => clearTimeout(timeout));
+      priceChangeTimeoutRef.current.clear();
+      priceChangeOriginalValuesRef.current.clear();
+    };
+  }, []);
+
+  const handleCreateVariant = useCallback(async () => {
     try {
       const newVariant = await createServiceVariant(serviceId, {
         variantName: 'Новый тип',
@@ -223,8 +232,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         sortOrder: variants.length,
         isActive: true,
       });
-      setVariants([
-        ...variants,
+      setVariants((prev) => [
+        ...prev,
         { ...newVariant, tiers: defaultTiers().map((t) => ({ id: 0, serviceId, variantId: newVariant.id, minQuantity: t.min_qty, rate: t.unit_price, isActive: true })) },
       ]);
       // Сразу начинаем редактирование названия
@@ -234,11 +243,11 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       console.error('Ошибка создания варианта:', err);
       setError('Не удалось создать вариант');
     }
-  };
+  }, [serviceId, variants.length]);
 
-  const handleUpdateVariantName = async (variantId: number, newName: string) => {
+  const handleUpdateVariantName = useCallback(async (variantId: number, newName: string) => {
     try {
-      const variant = variants.find((v) => v.id === variantId);
+      const variant = variantsMap.get(variantId);
       if (!variant) return;
       const oldName = variant.variantName;
       
@@ -254,7 +263,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       const updatedVariants = await Promise.all(updatePromises);
       const updatedMap = new Map(updatedVariants.map((v) => [v.id, v]));
       
-      setVariants(variants.map((v) => {
+      setVariants((prev) => prev.map((v) => {
         const updated = updatedMap.get(v.id);
         return updated ? { ...v, ...updated } : v;
       }));
@@ -263,36 +272,36 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       console.error('Ошибка обновления названия варианта:', err);
       setError('Не удалось обновить название варианта');
     }
-  };
+  }, [serviceId, variants, variantsMap]);
 
-  const handleDeleteVariant = async (variantId: number) => {
+  const handleDeleteVariant = useCallback(async (variantId: number) => {
     if (!confirm('Удалить этот вариант? Все связанные диапазоны цен будут удалены.')) {
       return;
     }
     try {
       await deleteServiceVariant(serviceId, variantId);
-      setVariants(variants.filter((v) => v.id !== variantId));
+      setVariants((prev) => prev.filter((v) => v.id !== variantId));
     } catch (err) {
       console.error('Ошибка удаления варианта:', err);
       setError('Не удалось удалить вариант');
     }
-  };
+  }, [serviceId]);
 
-  const handleUpdateVariantParams = async (variantId: number, params: Record<string, any>) => {
+  const handleUpdateVariantParams = useCallback(async (variantId: number, params: Record<string, any>) => {
     try {
-      const variant = variants.find((v) => v.id === variantId);
+      const variant = variantsMap.get(variantId);
       if (!variant) return;
       const updated = await updateServiceVariant(serviceId, variantId, {
         variantName: variant.variantName,
         parameters: params,
       });
-      setVariants(variants.map((v) => (v.id === variantId ? { ...v, ...updated } : v)));
+      setVariants((prev) => prev.map((v) => (v.id === variantId ? { ...v, ...updated } : v)));
       setEditingVariantParams(null);
     } catch (err) {
       console.error('Ошибка обновления параметров варианта:', err);
       setError('Не удалось обновить параметры варианта');
     }
-  };
+  }, [serviceId, variantsMap]);
 
   const handleAddRange = (variantIndex: number, e?: React.MouseEvent<HTMLButtonElement>) => {
     const anchorElement = e?.currentTarget as HTMLElement;
@@ -319,7 +328,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
     });
   };
 
-  const handleSaveRange = async () => {
+  const handleSaveRange = useCallback(async () => {
     const boundary = Number(tierModal.boundary);
     if (!boundary || boundary < 1) {
       setError('Граница диапазона должна быть больше 0');
@@ -328,7 +337,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
     try {
       // Обновляем диапазоны для всех вариантов
-      const updatedVariants = variants.map((variant) => {
+      setVariants((prev) => prev.map((variant) => {
         const currentTiers: Tier[] = variant.tiers.map((t) => ({
           min_qty: t.minQuantity,
           max_qty: undefined,
@@ -367,9 +376,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
             isActive: true,
           })),
         };
-      });
+      }));
 
-      setVariants(updatedVariants);
       setTierModal({ type: 'add', isOpen: false, boundary: '' });
       setError(null);
       // Перезагружаем варианты для обновления commonRanges
@@ -378,16 +386,16 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       console.error('Ошибка сохранения диапазона:', err);
       setError('Не удалось сохранить диапазон');
     }
-  };
+  }, [tierModal, commonRanges, serviceId, loadVariants]);
 
-  const handleRemoveRange = async (rangeIndex: number) => {
+  const handleRemoveRange = useCallback(async (rangeIndex: number) => {
     if (!confirm('Удалить этот диапазон для всех вариантов?')) return;
     
     const rangeToRemove = commonRanges[rangeIndex];
     if (!rangeToRemove) return;
 
     // Обновляем диапазоны для всех вариантов
-    const updatedVariants = variants.map((variant) => {
+    setVariants((prev) => prev.map((variant) => {
       const currentTiers: Tier[] = variant.tiers.map((t) => ({
         min_qty: t.minQuantity,
         max_qty: undefined,
@@ -422,71 +430,155 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
             isActive: true,
           })),
       };
+    }));
+  }, [commonRanges, serviceId]);
+
+  // Мемоизируем обработчик изменения цены с debounce
+  const priceChangeTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const priceChangeOriginalValuesRef = useRef<Map<string, number>>(new Map());
+  
+  const handlePriceChange = useCallback(async (variantId: number, rangeMinQty: number, newPrice: number) => {
+    const variant = variantsMap.get(variantId);
+    if (!variant) return;
+
+    const tier = variant.tiers.find((t) => t.minQuantity === rangeMinQty);
+    const key = `${variantId}-${rangeMinQty}`;
+    
+    // Сохраняем исходное значение для возможного отката
+    if (!priceChangeOriginalValuesRef.current.has(key)) {
+      priceChangeOriginalValuesRef.current.set(key, tier?.rate ?? 0);
+    }
+    
+    // Оптимистичное обновление UI
+    setVariants((prevVariants) => {
+      const updated = prevVariants.map((v) => {
+        if (v.id !== variantId) return v;
+        if (!tier) {
+          // Добавляем новый tier локально
+          return {
+            ...v,
+            tiers: [...v.tiers, { id: 0, serviceId, variantId: v.id, minQuantity: rangeMinQty, rate: newPrice, isActive: true }].sort((a, b) => a.minQuantity - b.minQuantity),
+          };
+        }
+        return {
+          ...v,
+          tiers: v.tiers.map((t) =>
+            t.minQuantity === rangeMinQty ? { ...t, rate: newPrice } : t
+          ),
+        };
+      });
+      return updated;
     });
 
-    setVariants(updatedVariants);
-  };
-
-  const handlePriceChange = async (variantIndex: number, rangeMinQty: number, newPrice: number) => {
-    const variant = variants[variantIndex];
-    const tier = variant.tiers.find((t) => t.minQuantity === rangeMinQty);
-    if (!tier) {
-      // Создаем новый tier для этого диапазона
-      try {
-        const created = await createServiceVariantTier(serviceId, variant.id, {
-          minQuantity: rangeMinQty,
-          rate: newPrice,
-          isActive: true,
-        });
-        const updatedVariants = [...variants];
-        updatedVariants[variantIndex] = {
-          ...variant,
-          tiers: [...variant.tiers, created].sort((a, b) => a.minQuantity - b.minQuantity),
-        };
-        setVariants(updatedVariants);
-      } catch (err) {
-        console.error('Ошибка создания tier:', err);
-      }
-      return;
+    // Debounce для сохранения на сервере
+    const existingTimeout = priceChangeTimeoutRef.current.get(key);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
     }
 
-    const updatedVariants = [...variants];
-    updatedVariants[variantIndex] = {
-      ...variant,
-      tiers: variant.tiers.map((t) =>
-        t.minQuantity === rangeMinQty ? { ...t, rate: newPrice } : t
-      ),
-    };
-    setVariants(updatedVariants);
-
-    // Сохраняем на сервере
-    if (tier.id > 0) {
+    const timeout = setTimeout(async () => {
       try {
-        await updateServiceVariantTier(serviceId, variant.id, tier.id, {
-          minQuantity: tier.minQuantity,
-          rate: newPrice,
-        });
+        if (!tier || tier.id === 0) {
+          // Создаем новый tier
+          const created = await createServiceVariantTier(serviceId, variantId, {
+            minQuantity: rangeMinQty,
+            rate: newPrice,
+            isActive: true,
+          });
+          setVariants((prevVariants) => {
+            return prevVariants.map((v) => {
+              if (v.id !== variantId) return v;
+              const existingTier = v.tiers.find((t) => t.minQuantity === rangeMinQty && t.id === 0);
+              if (existingTier) {
+                return {
+                  ...v,
+                  tiers: v.tiers.map((t) => t.minQuantity === rangeMinQty && t.id === 0 ? created : t),
+                };
+              }
+              return v;
+            });
+          });
+        } else {
+          // Обновляем существующий tier
+          await updateServiceVariantTier(serviceId, variantId, tier.id, {
+            minQuantity: tier.minQuantity,
+            rate: newPrice,
+          });
+        }
+        priceChangeOriginalValuesRef.current.delete(key);
       } catch (err) {
-        console.error('Ошибка обновления цены:', err);
+        console.error('Ошибка сохранения цены:', err);
+        setError('Не удалось сохранить цену. Попробуйте еще раз.');
+        // Откатываем изменения при ошибке
+        const originalValue = priceChangeOriginalValuesRef.current.get(key) ?? 0;
+        setVariants((prevVariants) => {
+          return prevVariants.map((v) => {
+            if (v.id !== variantId) return v;
+            if (!tier || tier.id === 0) {
+              // Если tier был новым, удаляем его
+              return {
+                ...v,
+                tiers: v.tiers.filter((t) => !(t.minQuantity === rangeMinQty && t.id === 0)),
+              };
+            }
+            // Восстанавливаем исходное значение
+            return {
+              ...v,
+              tiers: v.tiers.map((t) =>
+                t.minQuantity === rangeMinQty ? { ...t, rate: originalValue } : t
+              ),
+            };
+          });
+        });
+        priceChangeOriginalValuesRef.current.delete(key);
       }
-    }
-  };
+      priceChangeTimeoutRef.current.delete(key);
+    }, 500); // 500ms debounce
+
+    priceChangeTimeoutRef.current.set(key, timeout);
+  }, [serviceId, variantsMap]);
+
+  // Мемоизируем вычисление общих диапазонов
+  const commonRanges = useMemo(() => {
+    const allMinQtys = new Set<number>();
+    variants.forEach((v) => {
+      v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
+    });
+    const sortedMinQtys = Array.from(allMinQtys).sort((a, b) => a - b);
+    return sortedMinQtys.map((minQty, idx) => ({
+      min_qty: minQty,
+      max_qty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
+      unit_price: 0,
+    }));
+  }, [variants]);
+
+  // Мемоизируем Map для быстрого поиска вариантов по ID
+  const variantsMap = useMemo(() => {
+    return new Map(variants.map((v) => [v.id, v]));
+  }, [variants]);
+
+  // Мемоизируем Map для быстрого поиска индексов вариантов
+  const variantsIndexMap = useMemo(() => {
+    return new Map(variants.map((v, idx) => [v.id, idx]));
+  }, [variants]);
+
+  // Мемоизируем группировку вариантов по типу
+  const groupedVariants = useMemo(() => {
+    return variants.reduce((acc, variant) => {
+      const typeName = variant.variantName;
+      if (!acc[typeName]) {
+        acc[typeName] = [];
+      }
+      acc[typeName].push(variant);
+      return acc;
+    }, {} as Record<string, VariantWithTiers[]>);
+  }, [variants]);
+
+  const typeNames = useMemo(() => Object.keys(groupedVariants), [groupedVariants]);
 
   if (loading) {
     return <div className="p-4 text-center text-gray-500">Загрузка вариантов...</div>;
   }
-
-  // Получаем общие диапазоны из всех вариантов (объединяем все min_qty)
-  const allMinQtys = new Set<number>();
-  variants.forEach((v) => {
-    v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
-  });
-  const sortedMinQtys = Array.from(allMinQtys).sort((a, b) => a - b);
-  const commonRanges: Tier[] = sortedMinQtys.map((minQty, idx) => ({
-    min_qty: minQty,
-    max_qty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
-    unit_price: 0,
-  }));
 
   return (
     <div className="service-variants-table">
@@ -612,23 +704,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
             <div className="el-table__body-wrapper is-scrolling-none">
               <table cellSpacing="0" cellPadding="0" border={0} className="el-table__body" style={{ width: '100%' }}>
                 <tbody>
-                  {(() => {
-                    // Группируем варианты по типу (variantName)
-                    const groupedVariants = variants.reduce((acc, variant) => {
-                      const typeName = variant.variantName;
-                      if (!acc[typeName]) {
-                        acc[typeName] = [];
-                      }
-                      acc[typeName].push(variant);
-                      return acc;
-                    }, {} as Record<string, VariantWithTiers[]>);
-
-                    const typeNames = Object.keys(groupedVariants);
-                    
-                    return typeNames.map((typeName, typeIndex) => {
+                  {typeNames.map((typeName, typeIndex) => {
                       const typeVariants = groupedVariants[typeName];
                       const firstVariant = typeVariants[0];
-                      const firstVariantIndex = variants.findIndex(v => v.id === firstVariant.id);
+                      const firstVariantIndex = variantsIndexMap.get(firstVariant.id) ?? -1;
                       
                       return (
                         <React.Fragment key={typeName}>
@@ -677,8 +756,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                 </div>
                               </div>
                             </td>
-                            {commonRanges.map(() => (
-                              <td key={Math.random()}>
+                            {commonRanges.map((_, rangeIdx) => (
+                              <td key={`empty-${rangeIdx}`}>
                                 <div className="cell"></div>
                               </td>
                             ))}
@@ -778,7 +857,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                           
                           {/* Дочерние строки - варианты этого типа */}
                           {typeVariants.map((variant, subVariantIndex) => {
-                            const variantIndex = variants.findIndex(v => v.id === variant.id);
+                            const variantIndex = variantsIndexMap.get(variant.id) ?? -1;
                             return (
                               <tr key={variant.id} className="el-table__row el-table__row--level-0">
                                 <td>
@@ -857,7 +936,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                     (t) => t.minQuantity === range.min_qty
                                   );
                                   return (
-                                    <td key={rangeIdx}>
+                                    <td key={`${variant.id}-${range.min_qty}`}>
                                       <div className="cell">
                                         <div className="el-input el-input--small">
                                           <input
@@ -865,7 +944,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                             className="el-input__inner"
                                             value={String(tier?.rate || 0)}
                                             onChange={(e) =>
-                                              handlePriceChange(variantIndex, range.min_qty, Number(e.target.value))
+                                              handlePriceChange(variant.id, range.min_qty, Number(e.target.value))
                                             }
                                           />
                                         </div>
