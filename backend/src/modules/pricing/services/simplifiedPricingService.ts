@@ -188,6 +188,14 @@ export class SimplifiedPricingService {
         p.sides_mode === configuration.print_sides_mode
       );
       
+      logger.info('Расчет цены печати', {
+        print_technology: configuration.print_technology,
+        print_color_mode: configuration.print_color_mode,
+        print_sides_mode: configuration.print_sides_mode,
+        foundConfig: !!printPriceConfig,
+        tiersCount: printPriceConfig?.tiers?.length || 0
+      });
+      
       if (printPriceConfig) {
         const tier = this.findTierForQuantity(printPriceConfig.tiers, quantity);
         if (tier) {
@@ -198,7 +206,18 @@ export class SimplifiedPricingService {
             tier: { ...tier, price: priceForTier },
             priceForQuantity: printPrice,
           };
+          logger.info('Цена печати рассчитана', { priceForTier, quantity, printPrice });
+        } else {
+          logger.warn('Не найден диапазон для печати', { quantity, tiers: printPriceConfig.tiers });
         }
+      } else {
+        logger.warn('Не найдена конфигурация печати', {
+          available: selectedSize.print_prices.map(p => ({
+            tech: p.technology_code,
+            color: p.color_mode,
+            sides: p.sides_mode
+          }))
+        });
       }
     }
     
@@ -209,6 +228,12 @@ export class SimplifiedPricingService {
     if (configuration.material_id) {
       const materialPriceConfig = selectedSize.material_prices.find(m => m.material_id === configuration.material_id);
       
+      logger.info('Расчет цены материала', {
+        material_id: configuration.material_id,
+        foundConfig: !!materialPriceConfig,
+        tiersCount: materialPriceConfig?.tiers?.length || 0
+      });
+      
       if (materialPriceConfig) {
         const tier = this.findTierForQuantity(materialPriceConfig.tiers, quantity);
         if (tier) {
@@ -218,7 +243,15 @@ export class SimplifiedPricingService {
             tier: { ...tier, price: priceForTier },
             priceForQuantity: materialPrice,
           };
+          logger.info('Цена материала рассчитана', { priceForTier, quantity, materialPrice });
+        } else {
+          logger.warn('Не найден диапазон для материала', { quantity, tiers: materialPriceConfig.tiers });
         }
+      } else {
+        logger.warn('Не найдена конфигурация материала', {
+          material_id: configuration.material_id,
+          available: selectedSize.material_prices.map(m => m.material_id)
+        });
       }
     }
     
@@ -274,6 +307,35 @@ export class SimplifiedPricingService {
     const subtotal = printPrice + materialPrice + finishingPrice;
     const finalPrice = subtotal; // В упрощённом калькуляторе не применяем наценки (они уже учтены в ценах)
     const pricePerUnit = quantity > 0 ? finalPrice / quantity : 0;
+    
+    logger.info('Итоговый расчет упрощенного калькулятора', {
+      productId,
+      quantity,
+      printPrice,
+      materialPrice,
+      finishingPrice,
+      subtotal,
+      finalPrice,
+      pricePerUnit,
+      hasPrintConfig: !!(configuration.print_technology && configuration.print_color_mode && configuration.print_sides_mode),
+      hasMaterialConfig: !!configuration.material_id,
+      hasFinishingConfig: !!(configuration.finishing && configuration.finishing.length > 0)
+    });
+    
+    if (finalPrice === 0) {
+      logger.error('Итоговая цена равна нулю!', {
+        printPrice,
+        materialPrice,
+        finishingPrice,
+        configuration,
+        selectedSize: {
+          id: selectedSize.id,
+          print_prices_count: selectedSize.print_prices.length,
+          material_prices_count: selectedSize.material_prices.length,
+          finishing_count: selectedSize.finishing.length
+        }
+      });
+    }
     
     // 8. Загружаем названия материалов
     let materialName = `Material #${configuration.material_id}`;
@@ -336,6 +398,11 @@ export class SimplifiedPricingService {
     tiers: SimplifiedQtyTier[],
     quantity: number
   ): SimplifiedQtyTier | null {
+    if (!tiers || tiers.length === 0) {
+      logger.warn('findTierForQuantity: tiers пустой', { quantity });
+      return null;
+    }
+    
     // Сортируем по min_qty (от большего к меньшему)
     const sortedTiers = [...tiers].sort((a, b) => {
       if (b.min_qty !== a.min_qty) {
@@ -348,9 +415,19 @@ export class SimplifiedPricingService {
       return a.max_qty - b.max_qty;
     });
     
+    logger.info('findTierForQuantity: поиск диапазона', {
+      quantity,
+      tiersCount: sortedTiers.length,
+      tiers: sortedTiers.map(t => ({ min_qty: t.min_qty, max_qty: t.max_qty, unit_price: t.unit_price }))
+    });
+    
     for (const tier of sortedTiers) {
       if (quantity >= tier.min_qty) {
         if (tier.max_qty === undefined || quantity <= tier.max_qty) {
+          logger.info('findTierForQuantity: найден диапазон', {
+            quantity,
+            tier: { min_qty: tier.min_qty, max_qty: tier.max_qty, unit_price: tier.unit_price }
+          });
           return tier;
         }
       }
@@ -358,6 +435,10 @@ export class SimplifiedPricingService {
     
     // Если не нашли, возвращаем первый (самый дешёвый)
     if (tiers.length > 0) {
+      logger.warn('findTierForQuantity: не найден подходящий диапазон, возвращаем первый', {
+        quantity,
+        firstTier: { min_qty: tiers[0].min_qty, max_qty: tiers[0].max_qty, unit_price: tiers[0].unit_price }
+      });
       return tiers[0];
     }
     
