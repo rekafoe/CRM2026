@@ -240,11 +240,24 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
     try {
       const variant = variants.find((v) => v.id === variantId);
       if (!variant) return;
-      const updated = await updateServiceVariant(serviceId, variantId, {
-        variantName: newName,
-        parameters: variant.parameters,
-      });
-      setVariants(variants.map((v) => (v.id === variantId ? { ...v, ...updated } : v)));
+      const oldName = variant.variantName;
+      
+      // Обновляем все варианты с тем же названием типа
+      const variantsToUpdate = variants.filter((v) => v.variantName === oldName);
+      const updatePromises = variantsToUpdate.map((v) =>
+        updateServiceVariant(serviceId, v.id, {
+          variantName: newName,
+          parameters: v.parameters,
+        })
+      );
+      
+      const updatedVariants = await Promise.all(updatePromises);
+      const updatedMap = new Map(updatedVariants.map((v) => [v.id, v]));
+      
+      setVariants(variants.map((v) => {
+        const updated = updatedMap.get(v.id);
+        return updated ? { ...v, ...updated } : v;
+      }));
       setEditingVariantName(null);
     } catch (err) {
       console.error('Ошибка обновления названия варианта:', err);
@@ -524,6 +537,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                             onClick={handleCreateVariant}
                             title="Добавить строку (тип)"
                           >
+                            <i className="el-icon-bottom"></i>
                           </button>
                         </div>
                       </div>
@@ -598,257 +612,285 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
             <div className="el-table__body-wrapper is-scrolling-none">
               <table cellSpacing="0" cellPadding="0" border={0} className="el-table__body" style={{ width: '100%' }}>
                 <tbody>
-                  {variants.map((variant, variantIndex) => (
-                    <React.Fragment key={variant.id}>
-                      {/* Родительская строка - тип */}
-                      <tr className="el-table__row expanded">
-                        <td>
-                          <div className="cell">
-                            <div className="el-input el-input--small">
-                              {editingVariantName === variant.id ? (
-                                <input
-                                  type="text"
-                                  className="el-input__inner"
-                                  value={editingVariantNameValue}
-                                  onChange={(e) => setEditingVariantNameValue(e.target.value)}
-                                  onBlur={() => {
-                                    if (editingVariantNameValue.trim()) {
-                                      handleUpdateVariantName(variant.id, editingVariantNameValue.trim());
-                                    } else {
-                                      setEditingVariantName(null);
-                                    }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      if (editingVariantNameValue.trim()) {
-                                        handleUpdateVariantName(variant.id, editingVariantNameValue.trim());
-                                      }
-                                    } else if (e.key === 'Escape') {
-                                      setEditingVariantName(null);
-                                    }
-                                  }}
-                                  autoFocus
-                                />
-                              ) : (
-                                <input
-                                  type="text"
-                                  className="el-input__inner"
-                                  value={variant.variantName}
-                                  onClick={() => {
-                                    setEditingVariantName(variant.id);
-                                    setEditingVariantNameValue(variant.variantName);
-                                  }}
-                                  readOnly
-                                  style={{ cursor: 'pointer' }}
-                                />
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        {commonRanges.map(() => (
-                          <td key={Math.random()}>
-                            <div className="cell"></div>
-                          </td>
-                        ))}
-                        <td>
-                          <div className="cell">
-                            <div className="active-panel">
-                              <button
-                                type="button"
-                                className="el-button el-button--success el-button--small"
-                                onClick={async () => {
-                                  // Создаем новую строку (тип) после текущей
-                                  try {
-                                    const newVariant = await createServiceVariant(serviceId, {
-                                      variantName: 'Новый тип',
-                                      parameters: {},
-                                      sortOrder: variantIndex + 1,
-                                      isActive: true,
-                                    });
-                                    const newVariantWithTiers: VariantWithTiers = {
-                                      ...newVariant,
-                                      tiers: defaultTiers().map((t) => ({
-                                        id: 0,
-                                        serviceId,
-                                        variantId: newVariant.id,
-                                        minQuantity: t.min_qty,
-                                        rate: t.unit_price,
-                                        isActive: true,
-                                      })),
-                                    };
-                                    // Вставляем новый вариант после текущего
-                                    const newVariants = [...variants];
-                                    newVariants.splice(variantIndex + 1, 0, newVariantWithTiers);
-                                    setVariants(newVariants);
-                                    // Сразу начинаем редактирование названия
-                                    setEditingVariantName(newVariant.id);
-                                    setEditingVariantNameValue(newVariant.variantName);
-                                  } catch (err) {
-                                    console.error('Ошибка создания строки:', err);
-                                    setError('Не удалось создать строку');
-                                  }
-                                }}
-                                title="Добавить строку (тип)"
-                              >
-                              </button>
-                              <button
-                                type="button"
-                                className="el-button el-button--danger el-button--small"
-                                onClick={() => handleDeleteVariant(variant.id)}
-                              >
-                              </button>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
+                  {(() => {
+                    // Группируем варианты по типу (variantName)
+                    const groupedVariants = variants.reduce((acc, variant) => {
+                      const typeName = variant.variantName;
+                      if (!acc[typeName]) {
+                        acc[typeName] = [];
+                      }
+                      acc[typeName].push(variant);
+                      return acc;
+                    }, {} as Record<string, VariantWithTiers[]>);
+
+                    const typeNames = Object.keys(groupedVariants);
+                    
+                    return typeNames.map((typeName, typeIndex) => {
+                      const typeVariants = groupedVariants[typeName];
+                      const firstVariant = typeVariants[0];
+                      const firstVariantIndex = variants.findIndex(v => v.id === firstVariant.id);
                       
-                      {/* Дочерняя строка - вариант с параметрами и ценами */}
-                      <tr className="el-table__row el-table__row--level-0">
-                        <td>
-                          <div className="cell">
-                            <span className="el-table__indent" style={{ paddingLeft: '16px' }}></span>
-                            <div className="el-table__expand-icon el-table__expand-icon--expanded">
-                              <i className="el-icon-arrow-right"></i>
-                            </div>
-                            <div style={{ width: 'calc(100% - 44px)', marginLeft: '5px', display: 'inline-block' }}>
-                              <div className="el-input el-input--small">
-                                {editingVariantParams === variant.id ? (
-                                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                    <input
-                                      type="text"
-                                      className="el-input__inner"
-                                      placeholder="Тип (например: глянец, мат)"
-                                      value={editingVariantParamsValue.type || ''}
-                                      onChange={(e) =>
-                                        setEditingVariantParamsValue({ ...editingVariantParamsValue, type: e.target.value })
-                                      }
-                                      style={{ flex: 1 }}
-                                    />
-                                    <input
-                                      type="text"
-                                      className="el-input__inner"
-                                      placeholder="Плотность (например: 32 мкм)"
-                                      value={editingVariantParamsValue.density || ''}
-                                      onChange={(e) =>
-                                        setEditingVariantParamsValue({ ...editingVariantParamsValue, density: e.target.value })
-                                      }
-                                      style={{ flex: 1 }}
-                                    />
-                                    <button
-                                      type="button"
-                                      className="el-button el-button--primary el-button--mini"
-                                      onClick={() => {
-                                        handleUpdateVariantParams(variant.id, editingVariantParamsValue);
-                                      }}
-                                    >
-                                      ✓
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="el-button el-button--text el-button--mini"
-                                      onClick={() => {
-                                        setEditingVariantParams(null);
-                                        setEditingVariantParamsValue({});
-                                      }}
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <input
-                                    type="text"
-                                    className="el-input__inner"
-                                    value={
-                                      variant.parameters.type && variant.parameters.density
-                                        ? `${variant.parameters.type} ${variant.parameters.density}`
-                                        : variant.parameters.type || variant.parameters.density || 'Вариант'
-                                    }
-                                    onClick={() => {
-                                      setEditingVariantParams(variant.id);
-                                      setEditingVariantParamsValue(variant.parameters || {});
-                                    }}
-                                    readOnly
-                                    style={{ cursor: 'pointer' }}
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        {commonRanges.map((range, rangeIdx) => {
-                          const tier = variant.tiers.find(
-                            (t) => t.minQuantity === range.min_qty
-                          );
-                          return (
-                            <td key={rangeIdx}>
+                      return (
+                        <React.Fragment key={typeName}>
+                          {/* Родительская строка - тип */}
+                          <tr className="el-table__row expanded">
+                            <td>
                               <div className="cell">
                                 <div className="el-input el-input--small">
-                                  <input
-                                    type="text"
-                                    className="el-input__inner"
-                                    value={String(tier?.rate || 0)}
-                                    onChange={(e) =>
-                                      handlePriceChange(variantIndex, range.min_qty, Number(e.target.value))
-                                    }
-                                  />
+                                  {editingVariantName === firstVariant.id ? (
+                                    <input
+                                      type="text"
+                                      className="el-input__inner"
+                                      value={editingVariantNameValue}
+                                      onChange={(e) => setEditingVariantNameValue(e.target.value)}
+                                      onBlur={() => {
+                                        if (editingVariantNameValue.trim()) {
+                                          handleUpdateVariantName(firstVariant.id, editingVariantNameValue.trim());
+                                        } else {
+                                          setEditingVariantName(null);
+                                        }
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          if (editingVariantNameValue.trim()) {
+                                            handleUpdateVariantName(firstVariant.id, editingVariantNameValue.trim());
+                                          }
+                                        } else if (e.key === 'Escape') {
+                                          setEditingVariantName(null);
+                                        }
+                                      }}
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      className="el-input__inner"
+                                      value={typeName}
+                                      onClick={() => {
+                                        setEditingVariantName(firstVariant.id);
+                                        setEditingVariantNameValue(typeName);
+                                      }}
+                                      readOnly
+                                      style={{ cursor: 'pointer' }}
+                                    />
+                                  )}
                                 </div>
                               </div>
                             </td>
-                          );
-                        })}
-                        <td>
-                          <div className="cell">
-                            <div className="active-panel">
-                              <button
-                                type="button"
-                                className="el-button el-button--success el-button--small is-plain"
-                                onClick={async () => {
-                                  // Создаем новый вариант для этого типа
-                                  try {
-                                    const newVariant = await createServiceVariant(serviceId, {
-                                      variantName: variant.variantName, // Тот же тип
-                                      parameters: { type: '', density: '' }, // Новые параметры
-                                      sortOrder: variants.length,
-                                      isActive: true,
-                                    });
-                                    const newVariantWithTiers: VariantWithTiers = {
-                                      ...newVariant,
-                                      tiers: defaultTiers().map((t) => ({
-                                        id: 0,
-                                        serviceId,
-                                        variantId: newVariant.id,
-                                        minQuantity: t.min_qty,
-                                        rate: t.unit_price,
-                                        isActive: true,
-                                      })),
-                                    };
-                                    // Вставляем новый вариант сразу после текущего
-                                    const newVariants = [...variants];
-                                    newVariants.splice(variantIndex + 1, 0, newVariantWithTiers);
-                                    setVariants(newVariants);
-                                    // Сразу начинаем редактирование параметров
-                                    setEditingVariantParams(newVariant.id);
-                                    setEditingVariantParamsValue({ type: '', density: '' });
-                                  } catch (err) {
-                                    console.error('Ошибка создания подварианта:', err);
-                                    setError('Не удалось создать подвариант');
-                                  }
-                                }}
-                                title="Добавить подстроку"
-                              >
-                              </button>
-                              <button
-                                type="button"
-                                className="el-button el-button--danger el-button--small"
-                                onClick={() => handleDeleteVariant(variant.id)}
-                              >
-                              </button>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    </React.Fragment>
-                  ))}
+                            {commonRanges.map(() => (
+                              <td key={Math.random()}>
+                                <div className="cell"></div>
+                              </td>
+                            ))}
+                            <td>
+                              <div className="cell">
+                                <div className="active-panel">
+                                  <button
+                                    type="button"
+                                    className="el-button el-button--success el-button--small"
+                                    onClick={async () => {
+                                      // Создаем новую строку (тип) после текущей
+                                      try {
+                                        const newVariant = await createServiceVariant(serviceId, {
+                                          variantName: 'Новый тип',
+                                          parameters: {},
+                                          sortOrder: variants.length,
+                                          isActive: true,
+                                        });
+                                        const newVariantWithTiers: VariantWithTiers = {
+                                          ...newVariant,
+                                          tiers: defaultTiers().map((t) => ({
+                                            id: 0,
+                                            serviceId,
+                                            variantId: newVariant.id,
+                                            minQuantity: t.min_qty,
+                                            rate: t.unit_price,
+                                            isActive: true,
+                                          })),
+                                        };
+                                        // Добавляем новый вариант в конец списка
+                                        setVariants([...variants, newVariantWithTiers]);
+                                        // Сразу начинаем редактирование названия
+                                        setEditingVariantName(newVariant.id);
+                                        setEditingVariantNameValue(newVariant.variantName);
+                                      } catch (err) {
+                                        console.error('Ошибка создания строки:', err);
+                                        setError('Не удалось создать строку');
+                                      }
+                                    }}
+                                    title="Добавить строку (тип)"
+                                  >
+                                    <i className="el-icon-bottom"></i>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="el-button el-button--danger el-button--small"
+                                    onClick={async () => {
+                                      // Удаляем все варианты этого типа
+                                      for (const variant of typeVariants) {
+                                        await handleDeleteVariant(variant.id);
+                                      }
+                                    }}
+                                  >
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                          
+                          {/* Дочерние строки - варианты этого типа */}
+                          {typeVariants.map((variant, subVariantIndex) => {
+                            const variantIndex = variants.findIndex(v => v.id === variant.id);
+                            return (
+                              <tr key={variant.id} className="el-table__row el-table__row--level-0">
+                                <td>
+                                  <div className="cell">
+                                    <span className="el-table__indent" style={{ paddingLeft: '16px' }}></span>
+                                    <div className="el-table__expand-icon el-table__expand-icon--expanded">
+                                      <i className="el-icon-arrow-right"></i>
+                                    </div>
+                                    <div style={{ width: 'calc(100% - 44px)', marginLeft: '5px', display: 'inline-block' }}>
+                                      <div className="el-input el-input--small">
+                                        {editingVariantParams === variant.id ? (
+                                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                            <input
+                                              type="text"
+                                              className="el-input__inner"
+                                              placeholder="Тип (например: глянец, мат)"
+                                              value={editingVariantParamsValue.type || ''}
+                                              onChange={(e) =>
+                                                setEditingVariantParamsValue({ ...editingVariantParamsValue, type: e.target.value })
+                                              }
+                                              style={{ flex: 1 }}
+                                            />
+                                            <input
+                                              type="text"
+                                              className="el-input__inner"
+                                              placeholder="Плотность (например: 32 мкм)"
+                                              value={editingVariantParamsValue.density || ''}
+                                              onChange={(e) =>
+                                                setEditingVariantParamsValue({ ...editingVariantParamsValue, density: e.target.value })
+                                              }
+                                              style={{ flex: 1 }}
+                                            />
+                                            <button
+                                              type="button"
+                                              className="el-button el-button--primary el-button--mini"
+                                              onClick={() => {
+                                                handleUpdateVariantParams(variant.id, editingVariantParamsValue);
+                                              }}
+                                            >
+                                              ✓
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="el-button el-button--text el-button--mini"
+                                              onClick={() => {
+                                                setEditingVariantParams(null);
+                                                setEditingVariantParamsValue({});
+                                              }}
+                                            >
+                                              ×
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <input
+                                            type="text"
+                                            className="el-input__inner"
+                                            value={
+                                              variant.parameters.type && variant.parameters.density
+                                                ? `${variant.parameters.type} ${variant.parameters.density}`
+                                                : variant.parameters.type || variant.parameters.density || 'Вариант'
+                                            }
+                                            onClick={() => {
+                                              setEditingVariantParams(variant.id);
+                                              setEditingVariantParamsValue(variant.parameters || {});
+                                            }}
+                                            readOnly
+                                            style={{ cursor: 'pointer' }}
+                                          />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                {commonRanges.map((range, rangeIdx) => {
+                                  const tier = variant.tiers.find(
+                                    (t) => t.minQuantity === range.min_qty
+                                  );
+                                  return (
+                                    <td key={rangeIdx}>
+                                      <div className="cell">
+                                        <div className="el-input el-input--small">
+                                          <input
+                                            type="text"
+                                            className="el-input__inner"
+                                            value={String(tier?.rate || 0)}
+                                            onChange={(e) =>
+                                              handlePriceChange(variantIndex, range.min_qty, Number(e.target.value))
+                                            }
+                                          />
+                                        </div>
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+                                <td>
+                                  <div className="cell">
+                                    <div className="active-panel">
+                                      <button
+                                        type="button"
+                                        className="el-button el-button--success el-button--small is-plain"
+                                        onClick={async () => {
+                                          // Создаем новый вариант (подстроку) для этого типа
+                                          try {
+                                            const newVariant = await createServiceVariant(serviceId, {
+                                              variantName: typeName, // Тот же тип
+                                              parameters: { type: '', density: '' }, // Новые параметры
+                                              sortOrder: variants.length,
+                                              isActive: true,
+                                            });
+                                            const newVariantWithTiers: VariantWithTiers = {
+                                              ...newVariant,
+                                              tiers: defaultTiers().map((t) => ({
+                                                id: 0,
+                                                serviceId,
+                                                variantId: newVariant.id,
+                                                minQuantity: t.min_qty,
+                                                rate: t.unit_price,
+                                                isActive: true,
+                                              })),
+                                            };
+                                            // Добавляем новый вариант в конец списка
+                                            setVariants([...variants, newVariantWithTiers]);
+                                            // Сразу начинаем редактирование параметров
+                                            setEditingVariantParams(newVariant.id);
+                                            setEditingVariantParamsValue({ type: '', density: '' });
+                                          } catch (err) {
+                                            console.error('Ошибка создания подварианта:', err);
+                                            setError('Не удалось создать подвариант');
+                                          }
+                                        }}
+                                        title="Добавить подстроку"
+                                      >
+                                        <i className="el-icon-bottom-right"></i>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="el-button el-button--danger el-button--small"
+                                        onClick={() => handleDeleteVariant(variant.id)}
+                                      >
+                                      </button>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
