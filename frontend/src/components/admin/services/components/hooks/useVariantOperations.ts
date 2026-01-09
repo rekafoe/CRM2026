@@ -11,6 +11,8 @@ import {
 } from '../../../../../services/pricing';
 import { PriceRangeUtils } from '../../../../../hooks/usePriceRanges';
 
+console.log('useVariantOperations: createServiceVariant function:', createServiceVariant);
+
 type Tier = { min_qty: number; max_qty?: number; unit_price: number };
 
 const defaultTiers = (): Tier[] => [
