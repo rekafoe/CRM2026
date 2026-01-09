@@ -53,12 +53,16 @@ export function useVariantOperations(
 
   const createVariant = useCallback(async (variantName: string, parameters: Record<string, any> = {}) => {
     try {
+      // Используем текущую длину через ref для избежания зависимостей
+      const currentLength = variantsRef.current.length;
       const newVariant = await createServiceVariant(serviceId, {
         variantName,
         parameters,
-        sortOrder: variants.length,
+        sortOrder: currentLength,
         isActive: true,
       });
+      
+      // Создаем вариант с tiers для немедленного отображения
       const newVariantWithTiers: VariantWithTiers = {
         ...newVariant,
         tiers: defaultTiers().map((t) => ({
@@ -70,14 +74,27 @@ export function useVariantOperations(
           isActive: true,
         })),
       };
+      
+      // Добавляем локально для немедленного отображения
       setVariants((prev) => [...prev, newVariantWithTiers]);
+      
+      // Инвалидируем кэш
+      invalidateCacheRef.current?.();
+      
+      // Перезагружаем варианты с небольшой задержкой, чтобы сервер успел обработать запрос
+      setTimeout(() => {
+        reloadVariantsRef.current().catch((err) => {
+          console.error('Ошибка перезагрузки вариантов после создания:', err);
+        });
+      }, 500);
+      
       return newVariantWithTiers;
     } catch (err) {
       console.error('Ошибка создания варианта:', err);
       setError('Не удалось создать вариант');
       throw err;
     }
-  }, [serviceId, variants.length, setVariants, setError]);
+  }, [serviceId, setVariants, setError]); // variants через ref, не добавляем в зависимости
 
   const updateVariantName = useCallback(async (variantId: number, newName: string) => {
     try {

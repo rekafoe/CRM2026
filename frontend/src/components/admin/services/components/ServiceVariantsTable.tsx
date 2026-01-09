@@ -222,7 +222,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                       const newVariant = await operations.createVariant('Новый тип', {});
                                       editing.startEditingName(newVariant.id, newVariant.variantName);
                                     } catch (err) {
-                                      // Ошибка обработана
+                                      console.error('Ошибка создания варианта на том же уровне:', err);
+                                      // Ошибка уже обработана в хуке и отображена через setError
                                     }
                                   }}
                                   title="Добавить строку на том же уровне"
@@ -237,7 +238,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                       const newVariant = await operations.createVariant(typeName, { type: '', density: '' });
                                       editing.startEditingParams(newVariant.id, { type: '', density: '' });
                                     } catch (err) {
-                                      // Ошибка обработана
+                                      console.error('Ошибка создания дочерней строки:', err);
+                                      // Ошибка уже обработана в хуке и отображена через setError
                                     }
                                   }}
                                   title="Добавить дочернюю строку"
@@ -361,7 +363,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                               const newVariant = await operations.createVariant(typeName, { type: '', density: '' });
                                               editing.startEditingParams(newVariant.id, { type: '', density: '' });
                                             } catch (err) {
-                                              // Ошибка обработана
+                                              console.error('Ошибка создания строки на том же уровне (уровень 1):', err);
+                                              // Ошибка уже обработана в хуке и отображена через setError
                                             }
                                           }}
                                           title="Добавить строку на том же уровне"
@@ -380,7 +383,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                               });
                                               editing.startEditingParams(newVariant.id, { ...variant.parameters, parentVariantId: variant.id, subType: '' });
                                             } catch (err) {
-                                              // Ошибка обработана
+                                              console.error('Ошибка создания дочерней строки (уровень 2):', err);
+                                              // Ошибка уже обработана в хуке и отображена через setError
                                             }
                                           }}
                                           title="Добавить дочернюю строку (уровень 2)"
@@ -484,7 +488,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                 });
                                                 editing.startEditingParams(newVariant.id, { ...level2Variant.parameters, subType: '' });
                                               } catch (err) {
-                                                // Ошибка обработана
+                                                console.error('Ошибка создания строки на том же уровне (уровень 2):', err);
+                                                // Ошибка уже обработана в хуке и отображена через setError
                                               }
                                             }}
                                             title="Добавить строку на том же уровне"
