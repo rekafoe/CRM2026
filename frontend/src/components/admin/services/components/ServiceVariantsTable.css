@@ -2,20 +2,301 @@
   margin-top: 1rem;
 }
 
-/* Дополнительные стили для таблицы вариантов услуг */
-.service-variants-table .simplified-table input[type="number"] {
-  text-align: center;
+/* Стили для Element UI таблицы */
+.el-table {
+  border: 1px solid #ebeef5;
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
-  padding: 4px 6px;
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 4px;
+}
+
+.el-table--border {
+  border-right: none;
+  border-bottom: none;
+}
+
+.el-table--border::after,
+.el-table--border::before {
+  content: '';
+  position: absolute;
+  background-color: #ebeef5;
+  z-index: 1;
+}
+
+.el-table__header-wrapper {
+  overflow: hidden;
+}
+
+.el-table__body-wrapper {
+  overflow: hidden;
+}
+
+.el-table__header {
+  width: 100%;
+}
+
+.el-table__body {
+  width: 100%;
+}
+
+.el-table th,
+.el-table td {
+  border-bottom: 1px solid #ebeef5;
+  border-right: 1px solid #ebeef5;
+  padding: 12px 0;
+}
+
+.el-table th:last-child,
+.el-table td:last-child {
+  border-right: none;
+}
+
+.el-table th {
+  background-color: #fafafa;
+  color: #606266;
+  font-weight: 500;
+  text-align: left;
+}
+
+.el-table th.is-center {
+  text-align: center;
+}
+
+.el-table td {
+  background-color: #fff;
+}
+
+.el-table__row:hover > td {
+  background-color: #f5f7fa;
+}
+
+.el-table__row.expanded > td {
+  background-color: #f5f7fa;
+}
+
+.el-table__row--level-0 > td {
+  background-color: #fff;
+}
+
+.el-table__indent {
+  display: inline-block;
+}
+
+.el-table__expand-icon {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  cursor: pointer;
+  color: #909399;
+}
+
+.el-table__expand-icon--expanded {
+  transform: rotate(90deg);
+}
+
+.el-table__placeholder {
+  display: inline-block;
+  width: 20px;
+}
+
+.cell {
+  padding: 0 10px;
+  word-break: break-word;
+  line-height: 23px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+
+/* Стили для Element UI input */
+.el-input {
+  position: relative;
+  font-size: 14px;
+  display: inline-block;
+  width: 100%;
+}
+
+.el-input--small {
   font-size: 12px;
 }
 
-.service-variants-table .simplified-table input[type="text"] {
-  font-size: 12px;
-  padding: 4px 6px;
-  border: 1px solid var(--border-color, #e5e7eb);
+.el-input__inner {
+  -webkit-appearance: none;
+  background-color: #fff;
+  background-image: none;
   border-radius: 4px;
+  border: 1px solid #dcdfe6;
+  box-sizing: border-box;
+  color: #606266;
+  display: inline-block;
+  font-size: inherit;
+  height: 32px;
+  line-height: 32px;
+  outline: none;
+  padding: 0 15px;
+  transition: border-color 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
+  width: 100%;
+}
+
+.el-input--small .el-input__inner {
+  height: 28px;
+  line-height: 28px;
+  font-size: 12px;
+}
+
+.el-input__inner:focus {
+  border-color: #409eff;
+}
+
+.el-input__inner:disabled {
+  background-color: #f5f7fa;
+  border-color: #e4e7ed;
+  color: #c0c4cc;
+  cursor: not-allowed;
+}
+
+.el-input.is-disabled .el-input__inner {
+  background-color: #f5f7fa;
+  border-color: #e4e7ed;
+  color: #c0c4cc;
+  cursor: not-allowed;
+}
+
+/* Стили для Element UI кнопок */
+.el-button {
+  display: inline-block;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  color: #606266;
+  -webkit-appearance: none;
+  text-align: center;
+  box-sizing: border-box;
+  outline: none;
+  margin: 0;
+  transition: 0.1s;
+  font-weight: 500;
+  padding: 8px 15px;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+.el-button--mini {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+.el-button--small {
+  padding: 7px 12px;
+  font-size: 13px;
+  border-radius: 3px;
+}
+
+.el-button--primary {
+  color: #fff;
+  background-color: #409eff;
+  border-color: #409eff;
+}
+
+.el-button--primary:hover {
+  background: #66b1ff;
+  border-color: #66b1ff;
+  color: #fff;
+}
+
+.el-button--danger {
+  color: #fff;
+  background-color: #f56c6c;
+  border-color: #f56c6c;
+}
+
+.el-button--danger:hover {
+  background: #f78989;
+  border-color: #f78989;
+  color: #fff;
+}
+
+.el-button--info {
+  color: #fff;
+  background-color: #909399;
+  border-color: #909399;
+}
+
+.el-button--info:hover {
+  background: #a6a9ad;
+  border-color: #a6a9ad;
+  color: #fff;
+}
+
+.el-button--text {
+  border-color: transparent;
+  color: #409eff;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.el-button.is-plain {
+  background: #fff;
+  border-color: #409eff;
+  color: #409eff;
+}
+
+.el-button.is-plain:hover {
+  background: #409eff;
+  border-color: #409eff;
+  color: #fff;
+}
+
+.el-button i {
+  font-style: normal;
+}
+
+/* Стили для active-panel */
+.active-panel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.active-panel-with-popover {
+  position: relative;
+}
+
+/* Стили для ссылок */
+.el-link {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  position: relative;
+  text-decoration: none;
+  outline: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.el-link--default {
+  color: #606266;
+}
+
+.el-link--default:hover {
+  color: #409eff;
+}
+
+.is-underline:hover {
+  text-decoration: underline;
+}
+
+.el-link i {
+  font-style: normal;
 }
 
