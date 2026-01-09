@@ -183,37 +183,37 @@ export class SimplifiedPricingService {
         const paperTypeName = String((configuration as any).paperType); // paperType - это name (строка), не ID
         const paperDensity = Number((configuration as any).paperDensity);
         
-        // Загружаем тип бумаги из склада по name (в калькуляторе id = name)
-        const paperType = await db.get<{ id: string; name: string; densities: string }>(
-          `SELECT id, name, densities FROM warehouse_paper_types WHERE name = ?`,
+        // 1. Находим тип бумаги в таблице paper_types по name
+        const paperType = await db.get<{ id: number; name: string }>(
+          `SELECT id, name FROM paper_types WHERE name = ? AND is_active = 1`,
           [paperTypeName]
         );
         
         if (paperType) {
-          const densities = typeof paperType.densities === 'string' 
-            ? JSON.parse(paperType.densities) 
-            : paperType.densities;
+          // 2. Находим материал в таблице materials по paper_type_id и density
+          const material = await db.get<{ id: number; name: string; density: number }>(
+            `SELECT id, name, density FROM materials WHERE paper_type_id = ? AND density = ? AND is_active = 1 LIMIT 1`,
+            [paperType.id, paperDensity]
+          );
           
-          const density = Array.isArray(densities) 
-            ? densities.find((d: any) => d.value === paperDensity)
-            : null;
-          
-          if (density && density.material_id) {
-            normalizedConfig.material_id = Number(density.material_id);
+          if (material) {
+            normalizedConfig.material_id = material.id;
             logger.info('Нормализация: найдено material_id по paperType и paperDensity', {
               paperType: paperTypeName,
+              paperTypeId: paperType.id,
               paperDensity,
-              material_id: normalizedConfig.material_id
+              material_id: normalizedConfig.material_id,
+              material_name: material.name
             });
           } else {
-            logger.warn('Не найдена плотность в типе бумаги', {
+            logger.warn('Материал не найден по типу бумаги и плотности', {
               paperType: paperTypeName,
-              paperDensity,
-              availableDensities: Array.isArray(densities) ? densities.map((d: any) => d.value) : []
+              paperTypeId: paperType.id,
+              paperDensity
             });
           }
         } else {
-          logger.warn('Тип бумаги не найден в складе', { paperType: paperTypeName });
+          logger.warn('Тип бумаги не найден', { paperType: paperTypeName });
         }
       } catch (error) {
         logger.error('Ошибка при поиске material_id', { error, paperType: (configuration as any).paperType, paperDensity: (configuration as any).paperDensity });
