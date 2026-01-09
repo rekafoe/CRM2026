@@ -98,6 +98,7 @@ export class PricingServiceRepository {
     }
 
     // Таблица диапазонов цен по объему
+    // ВАЖНО: service_id ссылается на post_processing_services, а не на service_prices
     await db.exec(`CREATE TABLE IF NOT EXISTS service_volume_prices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       service_id INTEGER NOT NULL,
@@ -106,7 +107,7 @@ export class PricingServiceRepository {
       is_active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(service_id) REFERENCES service_prices(id) ON DELETE CASCADE
+      FOREIGN KEY(service_id) REFERENCES post_processing_services(id) ON DELETE CASCADE
     )`);
 
     // Добавляем variant_id в service_volume_prices, если его нет
@@ -344,6 +345,26 @@ export class PricingServiceRepository {
 
   static async createServiceTier(serviceId: number, payload: CreateServiceVolumeTierDTO): Promise<ServiceVolumeTierDTO> {
     const db = await this.getConnection();
+    await this.ensureSchema(db);
+    
+    // Проверяем существование услуги
+    const service = await db.get(`SELECT id FROM post_processing_services WHERE id = ?`, serviceId);
+    if (!service) {
+      const err: any = new Error(`Service with id ${serviceId} not found`);
+      err.status = 404;
+      throw err;
+    }
+    
+    // Если передан variantId, проверяем его существование
+    if (payload.variantId !== undefined && payload.variantId !== null) {
+      const variant = await db.get(`SELECT id FROM service_variants WHERE id = ? AND service_id = ?`, payload.variantId, serviceId);
+      if (!variant) {
+        const err: any = new Error(`Variant with id ${payload.variantId} not found for service ${serviceId}`);
+        err.status = 404;
+        throw err;
+      }
+    }
+    
     const result = await db.run(
       `INSERT INTO service_volume_prices (service_id, variant_id, min_quantity, price_per_unit, is_active) VALUES (?, ?, ?, ?, ?)`,
       serviceId,
