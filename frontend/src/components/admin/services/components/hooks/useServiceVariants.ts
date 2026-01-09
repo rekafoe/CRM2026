@@ -30,9 +30,6 @@ export function useServiceVariants(serviceId: number) {
       // Проверяем кэш через ref для избежания зависимостей
       const cachedTiers = cacheRef.current.get(serviceId);
       
-      console.log('=== LOAD_VARIANTS START ===');
-      console.log('Loading variants for serviceId:', serviceId);
-
       // Загружаем варианты и tiers параллельно
       const [loadedVariants, allTiers] = await Promise.all([
         getServiceVariants(serviceId),
@@ -46,9 +43,6 @@ export function useServiceVariants(serviceId: number) {
               }),
       ]);
 
-      console.log('API returned loadedVariants:', loadedVariants);
-      console.log('API returned allTiers keys:', Object.keys(allTiers));
-
       // Сопоставляем tiers с вариантами
       const variantsWithTiers: VariantWithTiers[] = loadedVariants.map((variant: any) => ({
         ...variant,
@@ -56,9 +50,7 @@ export function useServiceVariants(serviceId: number) {
         loadingTiers: false,
       }));
 
-      console.log('Final variantsWithTiers:', variantsWithTiers);
       setVariants(variantsWithTiers);
-      console.log('=== LOAD_VARIANTS END ===');
     } catch (err: any) {
       console.error('Ошибка загрузки вариантов:', err);
       const errorMessage = err?.response?.data?.error || err?.message || 'Не удалось загрузить варианты услуги';

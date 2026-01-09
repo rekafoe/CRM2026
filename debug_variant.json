@@ -1,0 +1,9 @@
+{
+  "variant_name": "Отладочный вариант",
+  "parameters": {
+    "type": "тест",
+    "density": "100 мкм"
+  },
+  "sort_order": 200,
+  "is_active": true
+}

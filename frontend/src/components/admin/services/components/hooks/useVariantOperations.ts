@@ -54,10 +54,6 @@ export function useVariantOperations(
   }, []);
 
   const createVariant = useCallback(async (variantName: string, parameters: Record<string, any> = {}) => {
-    console.log('=== CREATE_VARIANT START ===');
-    console.log('variantName:', variantName, 'parameters:', parameters);
-    console.log('current variants length:', variantsRef.current.length);
-
     try {
       // Используем текущую длину через ref для избежания зависимостей
       const currentLength = variantsRef.current.length;
@@ -67,8 +63,6 @@ export function useVariantOperations(
         sortOrder: currentLength,
         isActive: true,
       });
-
-      console.log('API returned new variant:', newVariant);
 
       // Создаем вариант с tiers для немедленного отображения
       const newVariantWithTiers: VariantWithTiers = {
@@ -83,25 +77,13 @@ export function useVariantOperations(
         })),
       };
 
-      console.log('Created newVariantWithTiers:', newVariantWithTiers);
-
-      // Добавляем локально для немедленного отображения
-      setVariants((prev) => {
-        const newVariants = [...prev, newVariantWithTiers];
-        console.log('Updated local variants state, new length:', newVariants.length);
-        return newVariants;
-      });
-
-      // Инвалидируем кэш
+      // Инвалидируем кэш tiers для нового варианта
       invalidateCacheRef.current?.();
-      console.log('Cache invalidated');
 
-      // Перезагружаем все варианты для корректного отображения группировки
-      console.log('Calling reloadVariants...');
-      await reloadVariantsRef.current();
-      console.log('reloadVariants completed');
+      // Добавляем новый вариант в локальное состояние
+      // Важно: не делаем reload, чтобы избежать медленных API запросов
+      setVariants((prev) => [...prev, newVariantWithTiers]);
 
-      console.log('=== CREATE_VARIANT END ===');
       return newVariantWithTiers;
 
       // Обновляем tiers для нового варианта через небольшую задержку
