@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Alert, Modal } from '../../common';
 import {
   PricingService,
@@ -19,6 +19,8 @@ import usePricingServices from '../../../hooks/pricing/usePricingServices';
 import ServiceForm, { ServiceFormState } from './components/ServiceForm';
 import ServicesTable from './components/ServicesTable';
 import ServiceVolumeTiersPanel from './components/ServiceVolumeTiersPanel';
+import { ServiceVariantsTable } from './components/ServiceVariantsTable';
+import { getServiceVariants } from '../../../services/pricing';
 import { useServicesManagementState } from '../hooks/useServicesManagementState';
 import { getErrorMessage } from '../../../utils/errorUtils';
 import './ServicesManagement.css';
@@ -29,6 +31,7 @@ const emptyServiceForm: ServiceFormState = {
   unit: 'item',
   rate: '',
   isActive: true,
+  hasVariants: false,
 };
 
 const serviceToFormState = (service: PricingService): ServiceFormState => ({
@@ -37,6 +40,7 @@ const serviceToFormState = (service: PricingService): ServiceFormState => ({
   unit: service.priceUnit ?? service.unit,
   rate: service.rate.toString(),
   isActive: service.isActive,
+  hasVariants: false, // Будет определяться при загрузке вариантов
 });
 
 // markups removed
@@ -72,7 +76,32 @@ const ServicesManagement: React.FC = () => {
     reload: reloadServices,
   } = usePricingServices(true);
 
+  const [servicesWithVariants, setServicesWithVariants] = useState<Set<number>>(new Set());
+
   const combinedError = state.actionError || servicesError;
+
+  // Проверяем наличие вариантов для услуг
+  useEffect(() => {
+    const checkVariants = async () => {
+      const servicesWithVariantsSet = new Set<number>();
+      await Promise.all(
+        services.map(async (service) => {
+          try {
+            const variants = await getServiceVariants(service.id);
+            if (variants.length > 0) {
+              servicesWithVariantsSet.add(service.id);
+            }
+          } catch (err) {
+            // Игнорируем ошибки - просто не добавляем в список
+          }
+        })
+      );
+      setServicesWithVariants(servicesWithVariantsSet);
+    };
+    if (services.length > 0) {
+      void checkVariants();
+    }
+  }, [services]);
 
   const handleServiceUpdate = async (id: number, payload: UpdatePricingServicePayload) => {
     try {
@@ -302,16 +331,21 @@ const ServicesManagement: React.FC = () => {
       </div>
     );
 
-    const renderExpandedRow = (service: PricingService) => (
-      <ServiceVolumeTiersPanel
-        service={service}
-        tiers={state.volumeTiers[service.id] || []}
-        loading={!!state.tiersLoading[service.id]}
-        onCreateTier={(payload) => handleCreateTier(service.id, payload)}
-        onUpdateTier={(tierId, payload) => handleUpdateTier(service.id, tierId, payload)}
-        onDeleteTier={(tierId) => handleDeleteTier(service.id, tierId)}
-      />
-    );
+    const renderExpandedRow = (service: PricingService) => {
+      if (servicesWithVariants.has(service.id)) {
+        return <ServiceVariantsTable serviceId={service.id} serviceName={service.name} />;
+      }
+      return (
+        <ServiceVolumeTiersPanel
+          service={service}
+          tiers={state.volumeTiers[service.id] || []}
+          loading={!!state.tiersLoading[service.id]}
+          onCreateTier={(payload) => handleCreateTier(service.id, payload)}
+          onUpdateTier={(tierId, payload) => handleUpdateTier(service.id, tierId, payload)}
+          onDeleteTier={(tierId) => handleDeleteTier(service.id, tierId)}
+        />
+      );
+    };
 
     return (
       <div className="space-y-4">

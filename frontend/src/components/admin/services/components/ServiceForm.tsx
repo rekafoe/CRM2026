@@ -8,6 +8,7 @@ export interface ServiceFormState {
   unit: string;
   rate: string;
   isActive: boolean;
+  hasVariants: boolean; // true = сложная услуга (с вариантами), false = простая
 }
 
 interface ServiceFormProps {
@@ -72,6 +73,17 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
               {option.label}
             </option>
           ))}
+        </select>
+      </FormField>
+      <FormField label="Тип услуги" help="Простая — без вариантов, Сложная — с вариантами (например, ламинация с разными типами и плотностью)">
+        <select
+          className="px-2 py-1 border rounded w-full"
+          value={value.hasVariants ? 'complex' : 'simple'}
+          disabled={disabled}
+          onChange={(e) => updateField('hasVariants', e.target.value === 'complex')}
+        >
+          <option value="simple">Простая</option>
+          <option value="complex">Сложная</option>
         </select>
       </FormField>
       <FormField label="Единица" help="per_cut — за рез (умный расчет), per_item — за изделие, per_sheet — за лист, fixed — фиксированная цена">

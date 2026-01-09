@@ -13,6 +13,7 @@ export interface PricingService {
 export interface ServiceVolumeTier {
   id: number;
   serviceId: number;
+  variantId?: number; // Для сложных услуг - привязка к варианту
   minQuantity: number;
   rate: number;
   isActive: boolean;
@@ -21,6 +22,25 @@ export interface ServiceVolumeTier {
 export interface ServiceVolumeTierPayload {
   minQuantity: number;
   rate: number;
+  isActive?: boolean;
+  variantId?: number; // Для сложных услуг - привязка к варианту
+}
+
+export interface ServiceVariant {
+  id: number;
+  serviceId: number;
+  variantName: string;
+  parameters: Record<string, any>; // JSON с параметрами (type, density и т.д.)
+  sortOrder: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ServiceVariantPayload {
+  variantName: string;
+  parameters: Record<string, any>;
+  sortOrder?: number;
   isActive?: boolean;
 }
 

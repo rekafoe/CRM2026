@@ -5,6 +5,9 @@ import {
   ServiceVolumeTierDTO,
   UpdatePricingServiceDTO,
   UpdateServiceVolumeTierDTO,
+  ServiceVariantDTO,
+  CreateServiceVariantDTO,
+  UpdateServiceVariantDTO,
 } from '../dtos/service.dto';
 import { PricingServiceRepository } from '../repositories/serviceRepository';
 
@@ -39,6 +42,23 @@ export class ServiceManagementService {
 
   static deleteServiceTier(tierId: number): Promise<void> {
     return PricingServiceRepository.deleteServiceTier(tierId);
+  }
+
+  // Методы для работы с вариантами услуг
+  static listServiceVariants(serviceId: number): Promise<ServiceVariantDTO[]> {
+    return PricingServiceRepository.listServiceVariants(serviceId);
+  }
+
+  static createServiceVariant(serviceId: number, payload: CreateServiceVariantDTO): Promise<ServiceVariantDTO> {
+    return PricingServiceRepository.createServiceVariant(serviceId, payload);
+  }
+
+  static updateServiceVariant(variantId: number, payload: UpdateServiceVariantDTO): Promise<ServiceVariantDTO | null> {
+    return PricingServiceRepository.updateServiceVariant(variantId, payload);
+  }
+
+  static deleteServiceVariant(variantId: number): Promise<void> {
+    return PricingServiceRepository.deleteServiceVariant(variantId);
   }
 }
 

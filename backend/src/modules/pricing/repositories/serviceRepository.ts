@@ -7,6 +7,9 @@ import {
   CreateServiceVolumeTierDTO,
   UpdatePricingServiceDTO,
   UpdateServiceVolumeTierDTO,
+  ServiceVariantDTO,
+  CreateServiceVariantDTO,
+  UpdateServiceVariantDTO,
 } from '../dtos/service.dto';
 
 const DEFAULT_CURRENCY = 'BYN';
@@ -57,6 +60,7 @@ type RawServiceRow = {
 type RawTierRow = {
   id: number;
   service_id: number;
+  variant_id?: number | null;
   min_quantity: number;
   price_per_unit: number;
   is_active: number;
@@ -104,6 +108,34 @@ export class PricingServiceRepository {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(service_id) REFERENCES service_prices(id) ON DELETE CASCADE
     )`);
+
+    // Добавляем variant_id в service_volume_prices, если его нет
+    try {
+      const columns = await db.all(`PRAGMA table_info('service_volume_prices')`);
+      const hasVariantId = columns.some((column: any) => column.name === 'variant_id');
+      if (!hasVariantId) {
+        await db.run(`ALTER TABLE service_volume_prices ADD COLUMN variant_id INTEGER REFERENCES service_variants(id) ON DELETE CASCADE`);
+      }
+    } catch {
+      // ignore
+    }
+
+    // Таблица вариантов услуг (для сложных услуг типа ламинации)
+    await db.exec(`CREATE TABLE IF NOT EXISTS service_variants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      service_id INTEGER NOT NULL,
+      variant_name TEXT NOT NULL,
+      parameters TEXT,
+      sort_order INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(service_id) REFERENCES post_processing_services(id) ON DELETE CASCADE
+    )`);
+
+    // Создаем индекс для быстрого поиска по service_id
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_variants_service_id ON service_variants(service_id)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_volume_prices_variant_id ON service_volume_prices(variant_id)`);
   }
 
   private static mapService(row: RawServiceRow): PricingServiceDTO {
@@ -129,6 +161,7 @@ export class PricingServiceRepository {
     return {
       id: row.id,
       serviceId: row.service_id,
+      variantId: row.variant_id ? Number(row.variant_id) : undefined,
       minQuantity: Number(row.min_quantity ?? 0),
       rate: Number(row.price_per_unit ?? 0),
       isActive: !!row.is_active,
@@ -280,25 +313,35 @@ export class PricingServiceRepository {
     await db.run(`DELETE FROM post_processing_services WHERE id = ?`, id);
   }
 
-  static async listServiceTiers(serviceId: number): Promise<ServiceVolumeTierDTO[]> {
+  static async listServiceTiers(serviceId: number, variantId?: number): Promise<ServiceVolumeTierDTO[]> {
     const db = await this.getConnection();
-    const rows = await db.all<RawTierRow[]>(
-      `SELECT id, service_id, min_quantity, price_per_unit, is_active FROM service_volume_prices WHERE service_id = ? ORDER BY min_quantity`,
-      serviceId,
-    );
+    let query = `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active FROM service_volume_prices WHERE service_id = ?`;
+    const params: any[] = [serviceId];
+    
+    if (variantId !== undefined) {
+      query += ` AND (variant_id = ? OR variant_id IS NULL)`;
+      params.push(variantId);
+    } else {
+      query += ` AND variant_id IS NULL`;
+    }
+    
+    query += ` ORDER BY min_quantity`;
+    
+    const rows = await db.all<RawTierRow[]>(query, ...params);
     return rows.map(this.mapTier);
   }
 
   static async createServiceTier(serviceId: number, payload: CreateServiceVolumeTierDTO): Promise<ServiceVolumeTierDTO> {
     const db = await this.getConnection();
     const result = await db.run(
-      `INSERT INTO service_volume_prices (service_id, min_quantity, price_per_unit, is_active) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO service_volume_prices (service_id, variant_id, min_quantity, price_per_unit, is_active) VALUES (?, ?, ?, ?, ?)`,
       serviceId,
+      payload.variantId ?? null,
       Number(payload.minQuantity ?? 0),
       Number(payload.rate ?? 0),
       payload.isActive === undefined || payload.isActive ? 1 : 0,
     );
-    const row = await db.get<RawTierRow>(`SELECT id, service_id, min_quantity, price_per_unit, is_active FROM service_volume_prices WHERE id = ?`, result.lastID);
+    const row = await db.get<RawTierRow>(`SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active FROM service_volume_prices WHERE id = ?`, result.lastID);
     if (!row) {
       throw new Error('Failed to retrieve created volume tier');
     }
@@ -313,20 +356,126 @@ export class PricingServiceRepository {
     }
 
     await db.run(
-      `UPDATE service_volume_prices SET min_quantity = ?, price_per_unit = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE service_volume_prices SET min_quantity = ?, price_per_unit = ?, is_active = ?, variant_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       payload.minQuantity !== undefined ? payload.minQuantity : current.min_quantity,
       payload.rate !== undefined ? payload.rate : current.price_per_unit,
       payload.isActive !== undefined ? (payload.isActive ? 1 : 0) : current.is_active,
+      payload.variantId !== undefined ? payload.variantId : (current.variant_id ?? null),
       tierId,
     );
 
-    const updated = await db.get<RawTierRow>(`SELECT id, service_id, min_quantity, price_per_unit, is_active FROM service_volume_prices WHERE id = ?`, tierId);
+    const updated = await db.get<RawTierRow>(`SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active FROM service_volume_prices WHERE id = ?`, tierId);
     return updated ? this.mapTier(updated) : null;
   }
 
   static async deleteServiceTier(tierId: number): Promise<void> {
     const db = await this.getConnection();
     await db.run(`DELETE FROM service_volume_prices WHERE id = ?`, tierId);
+  }
+
+  // Методы для работы с вариантами услуг
+  static async listServiceVariants(serviceId: number): Promise<ServiceVariantDTO[]> {
+    const db = await this.getConnection();
+    await this.ensureSchema(db);
+    const rows = await db.all<any[]>(
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at 
+       FROM service_variants 
+       WHERE service_id = ? 
+       ORDER BY sort_order, id`,
+      serviceId,
+    );
+    return rows.map(row => ({
+      id: row.id,
+      serviceId: row.service_id,
+      variantName: row.variant_name,
+      parameters: typeof row.parameters === 'string' ? JSON.parse(row.parameters) : (row.parameters || {}),
+      sortOrder: row.sort_order || 0,
+      isActive: row.is_active !== undefined ? !!row.is_active : true,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  }
+
+  static async createServiceVariant(serviceId: number, payload: CreateServiceVariantDTO): Promise<ServiceVariantDTO> {
+    const db = await this.getConnection();
+    await this.ensureSchema(db);
+    const result = await db.run(
+      `INSERT INTO service_variants (service_id, variant_name, parameters, sort_order, is_active) 
+       VALUES (?, ?, ?, ?, ?)`,
+      serviceId,
+      payload.variantName,
+      JSON.stringify(payload.parameters || {}),
+      payload.sortOrder ?? 0,
+      payload.isActive === undefined || payload.isActive ? 1 : 0,
+    );
+    const row = await db.get<any>(
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at 
+       FROM service_variants 
+       WHERE id = ?`,
+      result.lastID,
+    );
+    if (!row) {
+      throw new Error('Failed to retrieve created service variant');
+    }
+    return {
+      id: row.id,
+      serviceId: row.service_id,
+      variantName: row.variant_name,
+      parameters: typeof row.parameters === 'string' ? JSON.parse(row.parameters) : (row.parameters || {}),
+      sortOrder: row.sort_order || 0,
+      isActive: row.is_active !== undefined ? !!row.is_active : true,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  static async updateServiceVariant(variantId: number, payload: UpdateServiceVariantDTO): Promise<ServiceVariantDTO | null> {
+    const db = await this.getConnection();
+    await this.ensureSchema(db);
+    const current = await db.get<any>(`SELECT * FROM service_variants WHERE id = ?`, variantId);
+    if (!current) {
+      return null;
+    }
+
+    await db.run(
+      `UPDATE service_variants 
+       SET variant_name = ?, parameters = ?, sort_order = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = ?`,
+      payload.variantName ?? current.variant_name,
+      payload.parameters !== undefined ? JSON.stringify(payload.parameters) : current.parameters,
+      payload.sortOrder !== undefined ? payload.sortOrder : current.sort_order,
+      payload.isActive !== undefined ? (payload.isActive ? 1 : 0) : current.is_active,
+      variantId,
+    );
+
+    const updated = await db.get<any>(
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at 
+       FROM service_variants 
+       WHERE id = ?`,
+      variantId,
+    );
+    if (!updated) {
+      return null;
+    }
+    return {
+      id: updated.id,
+      serviceId: updated.service_id,
+      variantName: updated.variant_name,
+      parameters: typeof updated.parameters === 'string' ? JSON.parse(updated.parameters) : (updated.parameters || {}),
+      sortOrder: updated.sort_order || 0,
+      isActive: updated.is_active !== undefined ? !!updated.is_active : true,
+      createdAt: updated.created_at,
+      updatedAt: updated.updated_at,
+    };
+  }
+
+  static async deleteServiceVariant(variantId: number): Promise<void> {
+    const db = await this.getConnection();
+    await this.ensureSchema(db);
+    // Удаляем все tiers варианта
+    await db.run(`DELETE FROM service_volume_prices WHERE variant_id = ?`, variantId);
+    // Удаляем вариант
+    await db.run(`DELETE FROM service_variants WHERE id = ?`, variantId);
   }
 }
 

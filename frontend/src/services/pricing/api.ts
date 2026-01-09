@@ -5,6 +5,8 @@ import {
   ServiceVolumeTierPayload,
   CreatePricingServicePayload,
   UpdatePricingServicePayload,
+  ServiceVariant,
+  ServiceVariantPayload,
 } from '../../types/pricing';
 
 export interface CalculatePriceRequest {
@@ -100,11 +102,18 @@ export async function getServiceVolumeTiers(serviceId: number): Promise<ServiceV
 }
 
 export async function createServiceVolumeTier(serviceId: number, payload: ServiceVolumeTierPayload): Promise<ServiceVolumeTier> {
-  const response = await api.post(`/pricing/services/${serviceId}/tiers`, {
+  const requestBody: any = {
     min_quantity: payload.minQuantity,
     price_per_unit: payload.rate,
     is_active: payload.isActive ?? true,
-  });
+  };
+  // Если есть variantId, используем специальный роут для варианта
+  if (payload.variantId !== undefined) {
+    const response = await api.post(`/pricing/services/${serviceId}/variants/${payload.variantId}/tiers`, requestBody);
+    const data = (response.data as any)?.data ?? response.data;
+    return mapTier(data);
+  }
+  const response = await api.post(`/pricing/services/${serviceId}/tiers`, requestBody);
   const data = (response.data as any)?.data ?? response.data;
   return mapTier(data);
 }
@@ -140,6 +149,84 @@ export async function calculatePrice(payload: CalculatePriceRequest): Promise<Ca
   }
 }
 
+// Service Variants API
+const mapVariant = (data: any): ServiceVariant => ({
+  id: data.id ?? data.variant_id,
+  serviceId: data.serviceId ?? data.service_id,
+  variantName: data.variantName ?? data.variant_name ?? '',
+  parameters: data.parameters ?? {},
+  sortOrder: data.sortOrder ?? data.sort_order ?? 0,
+  isActive: data.isActive ?? data.is_active ?? true,
+  createdAt: data.createdAt ?? data.created_at,
+  updatedAt: data.updatedAt ?? data.updated_at,
+});
+
+export async function getServiceVariants(serviceId: number): Promise<ServiceVariant[]> {
+  const response = await api.get(`/pricing/services/${serviceId}/variants`);
+  const payload: any = (response.data as any)?.data ?? response.data ?? [];
+  const list = Array.isArray(payload) ? payload : [];
+  return list.map(mapVariant);
+}
+
+export async function createServiceVariant(serviceId: number, payload: ServiceVariantPayload): Promise<ServiceVariant> {
+  const response = await api.post(`/pricing/services/${serviceId}/variants`, {
+    variant_name: payload.variantName,
+    parameters: payload.parameters ?? {},
+    sort_order: payload.sortOrder ?? 0,
+    is_active: payload.isActive ?? true,
+  });
+  const data = (response.data as any)?.data ?? response.data;
+  return mapVariant(data);
+}
+
+export async function updateServiceVariant(serviceId: number, variantId: number, payload: ServiceVariantPayload): Promise<ServiceVariant> {
+  const response = await api.put(`/pricing/services/${serviceId}/variants/${variantId}`, {
+    variant_name: payload.variantName,
+    parameters: payload.parameters,
+    sort_order: payload.sortOrder,
+    is_active: payload.isActive,
+  });
+  const data = (response.data as any)?.data ?? response.data;
+  return mapVariant(data);
+}
+
+export async function deleteServiceVariant(serviceId: number, variantId: number): Promise<void> {
+  await api.delete(`/pricing/services/${serviceId}/variants/${variantId}`);
+}
+
+export async function getServiceVariantTiers(serviceId: number, variantId: number): Promise<ServiceVolumeTier[]> {
+  const response = await api.get(`/pricing/services/${serviceId}/variants/${variantId}/tiers`);
+  const payload: any = (response.data as any)?.data ?? response.data ?? [];
+  const list = Array.isArray(payload) ? payload : [];
+  return list.map(mapTier);
+}
+
+export async function createServiceVariantTier(serviceId: number, variantId: number, payload: ServiceVolumeTierPayload): Promise<ServiceVolumeTier> {
+  const response = await api.post(`/pricing/services/${serviceId}/variants/${variantId}/tiers`, {
+    min_quantity: payload.minQuantity,
+    price_per_unit: payload.rate,
+    is_active: payload.isActive ?? true,
+  });
+  const data = (response.data as any)?.data ?? response.data;
+  return mapTier(data);
+}
+
+export async function updateServiceVariantTier(serviceId: number, variantId: number, tierId: number, payload: ServiceVolumeTierPayload): Promise<ServiceVolumeTier> {
+  // Используем общий роут для обновления tier, но передаем variantId в payload
+  const response = await api.put(`/pricing/services/${serviceId}/tiers/${tierId}`, {
+    min_quantity: payload.minQuantity,
+    price_per_unit: payload.rate,
+    is_active: payload.isActive,
+    variant_id: variantId,
+  });
+  const data = (response.data as any)?.data ?? response.data;
+  return mapTier(data);
+}
+
+export async function deleteServiceVariantTier(serviceId: number, tierId: number): Promise<void> {
+  await api.delete(`/pricing/services/${serviceId}/tiers/${tierId}`);
+}
+
 export default {
   calculatePrice,
   getPricingServices,
@@ -150,6 +237,12 @@ export default {
   createServiceVolumeTier,
   updateServiceVolumeTier,
   deleteServiceVolumeTier,
+  getServiceVariants,
+  createServiceVariant,
+  updateServiceVariant,
+  deleteServiceVariant,
+  getServiceVariantTiers,
+  createServiceVariantTier,
 };
 
 

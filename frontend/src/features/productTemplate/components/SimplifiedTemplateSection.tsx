@@ -1247,7 +1247,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                   <div className="simplified-card__header">
                     <div>
                       <strong>Отделка (послепечатные услуги)</strong>
-                      <div className="text-muted text-sm">Выберите услуги из списка. Цены загружаются из pricing-admin. Отметьте услуги, которые нужно добавить в продукт.</div>
+                      <div className="text-muted text-sm">Выберите услуги из списка. Цены загружаются из services-management. Отметьте услуги, которые нужно добавить в продукт.</div>
                     </div>
                   </div>
                   <div className="simplified-card__content">

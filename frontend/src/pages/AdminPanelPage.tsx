@@ -128,7 +128,7 @@ const AdminPanelHome: React.FC = () => {
           <button onClick={() => navigate('/adminpanel/printers')} className="nav-btn">
             🖨️ Принтеры
           </button>
-          <button onClick={() => navigate('/adminpanel/pricing-admin')} className="nav-btn">
+          <button onClick={() => navigate('/adminpanel/services-management')} className="nav-btn">
             🔧 Настройка операций
           </button>
           <button onClick={() => navigate('/adminpanel/users')} className="nav-btn">
@@ -242,7 +242,7 @@ export const AdminPanelPage: React.FC = () => {
           
           {/* Ценообразование */}
           <Route path="/pricing" element={<PricingPage onBack={() => window.history.back()} />} />
-          <Route path="/pricing-admin" element={<AdminDashboard />} />
+          <Route path="/services-management" element={<AdminDashboard />} />
           <Route path="/discounts" element={<PricingPage onBack={() => window.history.back()} />} />
           <Route path="/printers" element={<PrintersPage />} />
           

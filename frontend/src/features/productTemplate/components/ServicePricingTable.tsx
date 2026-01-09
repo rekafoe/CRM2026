@@ -21,7 +21,7 @@ export interface ServicePricing {
 }
 
 export interface ServiceWithTiers extends ServiceItem {
-  tiers: Tier[] // Предустановленные tiers из pricing-admin
+  tiers: Tier[] // Предустановленные tiers из services-management
   loading?: boolean
 }
 
@@ -472,7 +472,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
               const pricing = servicePricings.find(p => p.service_id === Number(service.id))
               const isSelected = !!pricing
               
-              // Предустановленные tiers из pricing-admin
+              // Предустановленные tiers из services-management
               const presetTiers = serviceWithTiers.tiers || commonRanges.map(r => ({ ...r, unit_price: 0 }))
               
               // Если услуга выбрана, используем её pricing, иначе показываем предустановленные цены
@@ -541,7 +541,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                               const v = Number(e.target.value) || 0
                               handlePriceChange(Number(service.id), ti, v)
                             }}
-                            title={isPresetPrice ? 'Предустановленная цена из pricing-admin' : 'Переопределенная цена для продукта'}
+                            title={isPresetPrice ? 'Предустановленная цена из services-management' : 'Переопределенная цена для продукта'}
                           />
                         ) : (
                           <div 
@@ -552,7 +552,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                               borderRadius: '4px',
                               textAlign: 'right'
                             }}
-                            title={isSelected ? 'Предустановленная цена из pricing-admin' : 'Выберите услугу, чтобы добавить в продукт'}
+                            title={isSelected ? 'Предустановленная цена из services-management' : 'Выберите услугу, чтобы добавить в продукт'}
                           >
                             {priceTier.unit_price || 0}
                           </div>

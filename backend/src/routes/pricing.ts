@@ -517,6 +517,85 @@ router.delete('/services/:serviceId/tiers/:tierId', asyncHandler(async (req, res
   res.json({ success: true })
 }))
 
+// --- Service variants ---
+const toVariantResponse = (variant: any) => ({
+  id: variant.id,
+  serviceId: variant.serviceId,
+  service_id: variant.serviceId,
+  variantName: variant.variantName,
+  variant_name: variant.variantName,
+  parameters: variant.parameters,
+  sortOrder: variant.sortOrder,
+  sort_order: variant.sortOrder,
+  isActive: variant.isActive,
+  is_active: variant.isActive,
+  createdAt: variant.createdAt,
+  created_at: variant.createdAt,
+  updatedAt: variant.updatedAt,
+  updated_at: variant.updatedAt,
+})
+
+router.get('/services/:serviceId/variants', asyncHandler(async (req, res) => {
+  const { serviceId } = req.params
+  const variants = await ServiceManagementService.listServiceVariants(Number(serviceId))
+  res.json(variants.map(toVariantResponse))
+}))
+
+router.post('/services/:serviceId/variants', asyncHandler(async (req, res) => {
+  const { serviceId } = req.params
+  const { variant_name, variantName, parameters, sort_order, sortOrder, is_active, isActive } = req.body
+  const variant = await ServiceManagementService.createServiceVariant(Number(serviceId), {
+    variantName: variant_name ?? variantName ?? '',
+    parameters: parameters ?? {},
+    sortOrder: sort_order ?? sortOrder ?? 0,
+    isActive: is_active !== undefined ? !!is_active : isActive,
+  })
+  res.status(201).json(toVariantResponse(variant))
+}))
+
+router.put('/services/:serviceId/variants/:variantId', asyncHandler(async (req, res) => {
+  const { variantId } = req.params
+  const { variant_name, variantName, parameters, sort_order, sortOrder, is_active, isActive } = req.body
+  const updated = await ServiceManagementService.updateServiceVariant(Number(variantId), {
+    variantName: variant_name ?? variantName,
+    parameters,
+    sortOrder: sort_order ?? sortOrder,
+    isActive: is_active !== undefined ? !!is_active : isActive,
+  })
+
+  if (!updated) {
+    res.status(404).json({ success: false })
+    return
+  }
+
+  res.json(toVariantResponse(updated))
+}))
+
+router.delete('/services/:serviceId/variants/:variantId', asyncHandler(async (req, res) => {
+  const { variantId } = req.params
+  await ServiceManagementService.deleteServiceVariant(Number(variantId))
+  res.json({ success: true })
+}))
+
+// Tiers для вариантов
+router.get('/services/:serviceId/variants/:variantId/tiers', asyncHandler(async (req, res) => {
+  const { serviceId, variantId } = req.params
+  const tiers = await ServiceManagementService.listServiceTiers(Number(serviceId), Number(variantId))
+  res.json(tiers.map(toTierResponse))
+}))
+
+router.post('/services/:serviceId/variants/:variantId/tiers', asyncHandler(async (req, res) => {
+  const { serviceId, variantId } = req.params
+  const { min_quantity, minQuantity, price_per_unit, rate, is_active, isActive } = req.body
+  const tier = await ServiceManagementService.createServiceTier(Number(serviceId), {
+    minQuantity: Number(min_quantity ?? minQuantity ?? 0),
+    rate: Number(price_per_unit ?? rate ?? 0),
+    isActive: is_active !== undefined ? !!is_active : isActive,
+    variantId: Number(variantId),
+  })
+  res.status(201).json(toTierResponse(tier))
+}))
+
 // POST /api/pricing/markup-settings - создать настройку наценки
 router.post('/markup-settings', asyncHandler(async (req, res) => {
   const { setting_name, setting_value, description } = req.body
