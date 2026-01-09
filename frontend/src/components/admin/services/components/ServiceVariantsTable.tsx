@@ -171,6 +171,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   });
   const tierModalRef = useRef<HTMLDivElement>(null);
   const addRangeButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // Refs для debounce
+  const priceChangeTimeoutRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const priceChangeOriginalValuesRef = useRef<Map<string, number>>(new Map());
 
   const loadVariants = useCallback(async () => {
     try {
@@ -247,11 +251,25 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
   const handleUpdateVariantName = useCallback(async (variantId: number, newName: string) => {
     try {
-      const variant = variantsMap.get(variantId);
+      setVariants((prev) => {
+        const variant = prev.find((v) => v.id === variantId);
+        if (!variant) return prev;
+        const oldName = variant.variantName;
+        
+        // Обновляем все варианты с тем же названием типа
+        return prev.map((v) => {
+          if (v.variantName === oldName) {
+            // Обновляем локально, API вызов будет сделан отдельно
+            return { ...v, variantName: newName };
+          }
+          return v;
+        });
+      });
+      
+      // Обновляем на сервере
+      const variant = variants.find((v) => v.id === variantId);
       if (!variant) return;
       const oldName = variant.variantName;
-      
-      // Обновляем все варианты с тем же названием типа
       const variantsToUpdate = variants.filter((v) => v.variantName === oldName);
       const updatePromises = variantsToUpdate.map((v) =>
         updateServiceVariant(serviceId, v.id, {
@@ -260,19 +278,14 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         })
       );
       
-      const updatedVariants = await Promise.all(updatePromises);
-      const updatedMap = new Map(updatedVariants.map((v) => [v.id, v]));
-      
-      setVariants((prev) => prev.map((v) => {
-        const updated = updatedMap.get(v.id);
-        return updated ? { ...v, ...updated } : v;
-      }));
+      await Promise.all(updatePromises);
       setEditingVariantName(null);
     } catch (err) {
       console.error('Ошибка обновления названия варианта:', err);
       setError('Не удалось обновить название варианта');
+      await loadVariants(); // Откатываем изменения
     }
-  }, [serviceId, variants, variantsMap]);
+  }, [serviceId, variants, loadVariants]);
 
   const handleDeleteVariant = useCallback(async (variantId: number) => {
     if (!confirm('Удалить этот вариант? Все связанные диапазоны цен будут удалены.')) {
@@ -289,19 +302,25 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
   const handleUpdateVariantParams = useCallback(async (variantId: number, params: Record<string, any>) => {
     try {
-      const variant = variantsMap.get(variantId);
+      setVariants((prev) => {
+        const variant = prev.find((v) => v.id === variantId);
+        if (!variant) return prev;
+        return prev.map((v) => (v.id === variantId ? { ...v, parameters: params } : v));
+      });
+      
+      const variant = variants.find((v) => v.id === variantId);
       if (!variant) return;
-      const updated = await updateServiceVariant(serviceId, variantId, {
+      await updateServiceVariant(serviceId, variantId, {
         variantName: variant.variantName,
         parameters: params,
       });
-      setVariants((prev) => prev.map((v) => (v.id === variantId ? { ...v, ...updated } : v)));
       setEditingVariantParams(null);
     } catch (err) {
       console.error('Ошибка обновления параметров варианта:', err);
       setError('Не удалось обновить параметры варианта');
+      await loadVariants(); // Откатываем изменения
     }
-  }, [serviceId, variantsMap]);
+  }, [serviceId, variants, loadVariants]);
 
   const handleAddRange = (variantIndex: number, e?: React.MouseEvent<HTMLButtonElement>) => {
     const anchorElement = e?.currentTarget as HTMLElement;
@@ -314,8 +333,20 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
     });
   };
 
-  const handleEditRange = (variantIndex: number, rangeIndex: number, e?: React.MouseEvent<HTMLButtonElement>) => {
-    const range = commonRanges[rangeIndex];
+  const handleEditRange = useCallback((variantIndex: number, rangeIndex: number, e?: React.MouseEvent<HTMLButtonElement>) => {
+    // Вычисляем commonRanges на лету
+    const allMinQtys = new Set<number>();
+    variants.forEach((v) => {
+      v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
+    });
+    const sortedMinQtys = Array.from(allMinQtys).sort((a, b) => a - b);
+    const currentCommonRanges: Tier[] = sortedMinQtys.map((minQty, idx) => ({
+      min_qty: minQty,
+      max_qty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
+      unit_price: 0,
+    }));
+    
+    const range = currentCommonRanges[rangeIndex];
     if (!range) return;
     const anchorElement = e?.currentTarget as HTMLElement;
     setTierModal({
@@ -326,7 +357,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       variantIndex,
       anchorElement,
     });
-  };
+  }, [variants]);
 
   const handleSaveRange = useCallback(async () => {
     const boundary = Number(tierModal.boundary);
@@ -336,66 +367,94 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
     }
 
     try {
+      // Перезагружаем варианты для обновления commonRanges
+      await loadVariants();
+      
       // Обновляем диапазоны для всех вариантов
-      setVariants((prev) => prev.map((variant) => {
-        const currentTiers: Tier[] = variant.tiers.map((t) => ({
-          min_qty: t.minQuantity,
-          max_qty: undefined,
-          unit_price: t.rate,
-        }));
-
-        let newTiers: Tier[];
-        if (tierModal.type === 'add') {
-          newTiers = addRangeBoundary(currentTiers, boundary);
-        } else {
-          if (tierModal.tierIndex === undefined) return variant;
-          // Находим tier по min_qty из commonRanges
-          const rangeToEdit = commonRanges[tierModal.tierIndex];
-          if (!rangeToEdit) return variant;
-          const tierIndex = currentTiers.findIndex((t) => t.min_qty === rangeToEdit.min_qty);
-          if (tierIndex === -1) return variant;
-          newTiers = editRangeBoundary(currentTiers, tierIndex, boundary);
-        }
-
-        const normalizedTiers = normalizeTiers(newTiers);
-        
-        // Сохраняем существующие цены для диапазонов, которые остались
-        const preservedPrices = new Map<number, number>();
-        variant.tiers.forEach((t) => {
-          preservedPrices.set(t.minQuantity, t.rate);
+      setVariants((prev) => {
+        // Вычисляем commonRanges из текущих вариантов
+        const allMinQtys = new Set<number>();
+        prev.forEach((v) => {
+          v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
         });
+        const sortedMinQtys = Array.from(allMinQtys).sort((a, b) => a - b);
+        const currentCommonRanges: Tier[] = sortedMinQtys.map((minQty, idx) => ({
+          min_qty: minQty,
+          max_qty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
+          unit_price: 0,
+        }));
+        
+        return prev.map((variant) => {
+          const currentTiers: Tier[] = variant.tiers.map((t) => ({
+            min_qty: t.minQuantity,
+            max_qty: undefined,
+            unit_price: t.rate,
+          }));
 
-        return {
-          ...variant,
-          tiers: normalizedTiers.map((t) => ({
-            id: 0, // Временный ID, будет обновлен при сохранении
-            serviceId,
-            variantId: variant.id,
-            minQuantity: t.min_qty,
-            rate: preservedPrices.get(t.min_qty) ?? t.unit_price,
-            isActive: true,
-          })),
-        };
-      }));
+          let newTiers: Tier[];
+          if (tierModal.type === 'add') {
+            newTiers = addRangeBoundary(currentTiers, boundary);
+          } else {
+            if (tierModal.tierIndex === undefined) return variant;
+            // Находим tier по min_qty из commonRanges
+            const rangeToEdit = currentCommonRanges[tierModal.tierIndex];
+            if (!rangeToEdit) return variant;
+            const tierIndex = currentTiers.findIndex((t) => t.min_qty === rangeToEdit.min_qty);
+            if (tierIndex === -1) return variant;
+            newTiers = editRangeBoundary(currentTiers, tierIndex, boundary);
+          }
+
+          const normalizedTiers = normalizeTiers(newTiers);
+          
+          // Сохраняем существующие цены для диапазонов, которые остались
+          const preservedPrices = new Map<number, number>();
+          variant.tiers.forEach((t) => {
+            preservedPrices.set(t.minQuantity, t.rate);
+          });
+
+          return {
+            ...variant,
+            tiers: normalizedTiers.map((t) => ({
+              id: 0, // Временный ID, будет обновлен при сохранении
+              serviceId,
+              variantId: variant.id,
+              minQuantity: t.min_qty,
+              rate: preservedPrices.get(t.min_qty) ?? t.unit_price,
+              isActive: true,
+            })),
+          };
+        });
+      });
 
       setTierModal({ type: 'add', isOpen: false, boundary: '' });
       setError(null);
-      // Перезагружаем варианты для обновления commonRanges
-      await loadVariants();
     } catch (err) {
       console.error('Ошибка сохранения диапазона:', err);
       setError('Не удалось сохранить диапазон');
     }
-  }, [tierModal, commonRanges, serviceId, loadVariants]);
+  }, [tierModal, serviceId, loadVariants]);
 
   const handleRemoveRange = useCallback(async (rangeIndex: number) => {
     if (!confirm('Удалить этот диапазон для всех вариантов?')) return;
     
-    const rangeToRemove = commonRanges[rangeIndex];
-    if (!rangeToRemove) return;
+    setVariants((prev) => {
+      // Вычисляем commonRanges из текущих вариантов
+      const allMinQtys = new Set<number>();
+      prev.forEach((v) => {
+        v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
+      });
+      const sortedMinQtys = Array.from(allMinQtys).sort((a, b) => a - b);
+      const currentCommonRanges: Tier[] = sortedMinQtys.map((minQty, idx) => ({
+        min_qty: minQty,
+        max_qty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
+        unit_price: 0,
+      }));
+      
+      const rangeToRemove = currentCommonRanges[rangeIndex];
+      if (!rangeToRemove) return prev;
 
-    // Обновляем диапазоны для всех вариантов
-    setVariants((prev) => prev.map((variant) => {
+      // Обновляем диапазоны для всех вариантов
+      return prev.map((variant) => {
       const currentTiers: Tier[] = variant.tiers.map((t) => ({
         min_qty: t.minQuantity,
         max_qty: undefined,
@@ -430,28 +489,26 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
             isActive: true,
           })),
       };
-    }));
-  }, [commonRanges, serviceId]);
+    });
+    });
+  }, [serviceId]);
 
   // Мемоизируем обработчик изменения цены с debounce
-  const priceChangeTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const priceChangeOriginalValuesRef = useRef<Map<string, number>>(new Map());
-  
   const handlePriceChange = useCallback(async (variantId: number, rangeMinQty: number, newPrice: number) => {
-    const variant = variantsMap.get(variantId);
-    if (!variant) return;
+    setVariants((prev) => {
+      const variant = prev.find((v) => v.id === variantId);
+      if (!variant) return prev;
 
-    const tier = variant.tiers.find((t) => t.minQuantity === rangeMinQty);
-    const key = `${variantId}-${rangeMinQty}`;
-    
-    // Сохраняем исходное значение для возможного отката
-    if (!priceChangeOriginalValuesRef.current.has(key)) {
-      priceChangeOriginalValuesRef.current.set(key, tier?.rate ?? 0);
-    }
-    
-    // Оптимистичное обновление UI
-    setVariants((prevVariants) => {
-      const updated = prevVariants.map((v) => {
+      const tier = variant.tiers.find((t) => t.minQuantity === rangeMinQty);
+      const key = `${variantId}-${rangeMinQty}`;
+      
+      // Сохраняем исходное значение для возможного отката
+      if (!priceChangeOriginalValuesRef.current.has(key)) {
+        priceChangeOriginalValuesRef.current.set(key, tier?.rate ?? 0);
+      }
+      
+      // Оптимистичное обновление UI
+      return prev.map((v) => {
         if (v.id !== variantId) return v;
         if (!tier) {
           // Добавляем новый tier локально
@@ -467,8 +524,12 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
           ),
         };
       });
-      return updated;
     });
+    
+    const variant = variants.find((v) => v.id === variantId);
+    if (!variant) return;
+    const tier = variant.tiers.find((t) => t.minQuantity === rangeMinQty);
+    const key = `${variantId}-${rangeMinQty}`;
 
     // Debounce для сохранения на сервере
     const existingTimeout = priceChangeTimeoutRef.current.get(key);
@@ -477,8 +538,12 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
     }
 
     const timeout = setTimeout(async () => {
+      const currentVariant = variants.find((v) => v.id === variantId);
+      if (!currentVariant) return;
+      const currentTier = currentVariant.tiers.find((t) => t.minQuantity === rangeMinQty);
+      
       try {
-        if (!tier || tier.id === 0) {
+        if (!currentTier || currentTier.id === 0) {
           // Создаем новый tier
           const created = await createServiceVariantTier(serviceId, variantId, {
             minQuantity: rangeMinQty,
@@ -500,8 +565,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
           });
         } else {
           // Обновляем существующий tier
-          await updateServiceVariantTier(serviceId, variantId, tier.id, {
-            minQuantity: tier.minQuantity,
+          await updateServiceVariantTier(serviceId, variantId, currentTier.id, {
+            minQuantity: currentTier.minQuantity,
             rate: newPrice,
           });
         }
@@ -514,7 +579,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         setVariants((prevVariants) => {
           return prevVariants.map((v) => {
             if (v.id !== variantId) return v;
-            if (!tier || tier.id === 0) {
+            if (!currentTier || currentTier.id === 0) {
               // Если tier был новым, удаляем его
               return {
                 ...v,
@@ -536,7 +601,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
     }, 500); // 500ms debounce
 
     priceChangeTimeoutRef.current.set(key, timeout);
-  }, [serviceId, variantsMap]);
+  }, [serviceId, variants]);
 
   // Мемоизируем вычисление общих диапазонов
   const commonRanges = useMemo(() => {
@@ -562,17 +627,75 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
     return new Map(variants.map((v, idx) => [v.id, idx]));
   }, [variants]);
 
-  // Мемоизируем группировку вариантов по типу
+  // Функция для определения уровня вложенности варианта
+  const getVariantLevel = useCallback((variant: VariantWithTiers): number => {
+    const params = variant.parameters || {};
+    // Уровень 0: родительский тип (нет параметров type/density)
+    if (!params.type && !params.density) {
+      return 0;
+    }
+    // Уровень 2: есть parentVariantId (внучатый вариант)
+    if (params.parentVariantId) {
+      return 2;
+    }
+    // Уровень 1: есть type или density, но нет parentVariantId (дочерний вариант)
+    return 1;
+  }, []);
+
+  // Мемоизируем группировку вариантов по типу с поддержкой трехуровневой иерархии
   const groupedVariants = useMemo(() => {
-    return variants.reduce((acc, variant) => {
+    const grouped: Record<string, {
+      level0: VariantWithTiers[];
+      level1: Map<number, VariantWithTiers[]>; // key = parent variant id
+      level2: Map<number, VariantWithTiers[]>; // key = parent variant id
+    }> = {};
+
+    variants.forEach((variant) => {
       const typeName = variant.variantName;
-      if (!acc[typeName]) {
-        acc[typeName] = [];
+      const level = getVariantLevel(variant);
+      
+      if (!grouped[typeName]) {
+        grouped[typeName] = {
+          level0: [],
+          level1: new Map(),
+          level2: new Map(),
+        };
       }
-      acc[typeName].push(variant);
-      return acc;
-    }, {} as Record<string, VariantWithTiers[]>);
-  }, [variants]);
+
+      if (level === 0) {
+        grouped[typeName].level0.push(variant);
+      }
+    });
+
+    // Второй проход: группируем уровни 1 и 2
+    variants.forEach((variant) => {
+      const typeName = variant.variantName;
+      const level = getVariantLevel(variant);
+      
+      if (level === 1) {
+        // Для уровня 1, родителем является первый вариант уровня 0 этого типа
+        const parentLevel0 = grouped[typeName]?.level0[0];
+        if (parentLevel0) {
+          const parentId = parentLevel0.id;
+          if (!grouped[typeName].level1.has(parentId)) {
+            grouped[typeName].level1.set(parentId, []);
+          }
+          grouped[typeName].level1.get(parentId)!.push(variant);
+        }
+      } else if (level === 2) {
+        // Для уровня 2, родителем является вариант из level 1
+        const parentVariantId = variant.parameters?.parentVariantId;
+        if (parentVariantId) {
+          if (!grouped[typeName].level2.has(parentVariantId)) {
+            grouped[typeName].level2.set(parentVariantId, []);
+          }
+          grouped[typeName].level2.get(parentVariantId)!.push(variant);
+        }
+      }
+    });
+
+    return grouped;
+  }, [variants, getVariantLevel]);
 
   const typeNames = useMemo(() => Object.keys(groupedVariants), [groupedVariants]);
 
@@ -705,13 +828,21 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
               <table cellSpacing="0" cellPadding="0" border={0} className="el-table__body" style={{ width: '100%' }}>
                 <tbody>
                   {typeNames.map((typeName, typeIndex) => {
-                      const typeVariants = groupedVariants[typeName];
-                      const firstVariant = typeVariants[0];
+                      const typeGroup = groupedVariants[typeName];
+                      const firstVariant = typeGroup.level0[0];
+                      if (!firstVariant) return null;
                       const firstVariantIndex = variantsIndexMap.get(firstVariant.id) ?? -1;
+                      
+                      // Собираем все варианты этого типа для удаления
+                      const allTypeVariants: VariantWithTiers[] = [
+                        ...typeGroup.level0,
+                        ...Array.from(typeGroup.level1.values()).flat(),
+                        ...Array.from(typeGroup.level2.values()).flat(),
+                      ];
                       
                       return (
                         <React.Fragment key={typeName}>
-                          {/* Родительская строка - тип */}
+                          {/* Родительская строка - тип (уровень 0) */}
                           <tr className="el-table__row expanded">
                             <td>
                               <div className="cell">
@@ -842,7 +973,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                       if (!confirm(`Удалить тип "${typeName}" и все его варианты?`)) {
                                         return;
                                       }
-                                      for (const variant of typeVariants) {
+                                      for (const variant of allTypeVariants) {
                                         await handleDeleteVariant(variant.id);
                                       }
                                     }}
@@ -855,204 +986,359 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                             </td>
                           </tr>
                           
-                          {/* Дочерние строки - варианты этого типа */}
-                          {typeVariants.map((variant, subVariantIndex) => {
-                            const variantIndex = variantsIndexMap.get(variant.id) ?? -1;
-                            return (
-                              <tr key={variant.id} className="el-table__row el-table__row--level-0">
-                                <td>
-                                  <div className="cell">
-                                    <span className="el-table__indent" style={{ paddingLeft: '16px' }}></span>
-                                    <div className="el-table__expand-icon el-table__expand-icon--expanded">
-                                      <i className="el-icon-arrow-right"></i>
-                                    </div>
-                                    <div style={{ width: 'calc(100% - 44px)', marginLeft: '5px', display: 'inline-block' }}>
-                                      <div className="el-input el-input--small">
-                                        {editingVariantParams === variant.id ? (
-                                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                            <input
-                                              type="text"
-                                              className="el-input__inner"
-                                              placeholder="Тип (например: глянец, мат)"
-                                              value={editingVariantParamsValue.type || ''}
-                                              onChange={(e) =>
-                                                setEditingVariantParamsValue({ ...editingVariantParamsValue, type: e.target.value })
-                                              }
-                                              style={{ flex: 1 }}
-                                            />
-                                            <input
-                                              type="text"
-                                              className="el-input__inner"
-                                              placeholder="Плотность (например: 32 мкм)"
-                                              value={editingVariantParamsValue.density || ''}
-                                              onChange={(e) =>
-                                                setEditingVariantParamsValue({ ...editingVariantParamsValue, density: e.target.value })
-                                              }
-                                              style={{ flex: 1 }}
-                                            />
-                                            <button
-                                              type="button"
-                                              className="el-button el-button--primary el-button--mini"
-                                              onClick={() => {
-                                                handleUpdateVariantParams(variant.id, editingVariantParamsValue);
-                                              }}
-                                            >
-                                              ✓
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className="el-button el-button--text el-button--mini"
-                                              onClick={() => {
-                                                setEditingVariantParams(null);
-                                                setEditingVariantParamsValue({});
-                                              }}
-                                            >
-                                              ×
-                                            </button>
-                                          </div>
-                                        ) : (
-                                          <input
-                                            type="text"
-                                            className="el-input__inner"
-                                            value={
-                                              variant.parameters.type && variant.parameters.density
-                                                ? `${variant.parameters.type} ${variant.parameters.density}`
-                                                : variant.parameters.type || variant.parameters.density || 'Вариант'
-                                            }
-                                            onClick={() => {
-                                              setEditingVariantParams(variant.id);
-                                              setEditingVariantParamsValue(variant.parameters || {});
-                                            }}
-                                            readOnly
-                                            style={{ cursor: 'pointer' }}
-                                          />
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </td>
-                                {commonRanges.map((range, rangeIdx) => {
-                                  const tier = variant.tiers.find(
-                                    (t) => t.minQuantity === range.min_qty
-                                  );
-                                  return (
-                                    <td key={`${variant.id}-${range.min_qty}`}>
+                          {/* Дочерние строки - варианты уровня 1 */}
+                          {Array.from(typeGroup.level1.entries()).map(([parentId, level1Variants]) => 
+                            level1Variants.map((variant) => {
+                              const variantIndex = variantsIndexMap.get(variant.id) ?? -1;
+                              const level2Variants = typeGroup.level2.get(variant.id) || [];
+                              const hasChildren = level2Variants.length > 0;
+                              
+                              return (
+                                <React.Fragment key={variant.id}>
+                                  <tr className="el-table__row el-table__row--level-1">
+                                    <td>
                                       <div className="cell">
-                                        <div className="el-input el-input--small">
-                                          <input
-                                            type="text"
-                                            className="el-input__inner"
-                                            value={String(tier?.rate || 0)}
-                                            onChange={(e) =>
-                                              handlePriceChange(variant.id, range.min_qty, Number(e.target.value))
-                                            }
-                                          />
+                                        <span className="el-table__indent" style={{ paddingLeft: '16px' }}></span>
+                                        {hasChildren && (
+                                          <div className="el-table__expand-icon el-table__expand-icon--expanded">
+                                            <i className="el-icon-arrow-right"></i>
+                                          </div>
+                                        )}
+                                        {!hasChildren && <span className="el-table__placeholder"></span>}
+                                        <div style={{ width: hasChildren ? 'calc(100% - 44px)' : 'calc(100% - 20px)', marginLeft: hasChildren ? '5px' : '8px', display: 'inline-block' }}>
+                                          <div className="el-input el-input--small">
+                                            {editingVariantParams === variant.id ? (
+                                              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                <input
+                                                  type="text"
+                                                  className="el-input__inner"
+                                                  placeholder="Тип (например: глянец, мат)"
+                                                  value={editingVariantParamsValue.type || ''}
+                                                  onChange={(e) =>
+                                                    setEditingVariantParamsValue({ ...editingVariantParamsValue, type: e.target.value })
+                                                  }
+                                                  style={{ flex: 1 }}
+                                                />
+                                                <input
+                                                  type="text"
+                                                  className="el-input__inner"
+                                                  placeholder="Плотность (например: 32 мкм)"
+                                                  value={editingVariantParamsValue.density || ''}
+                                                  onChange={(e) =>
+                                                    setEditingVariantParamsValue({ ...editingVariantParamsValue, density: e.target.value })
+                                                  }
+                                                  style={{ flex: 1 }}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  className="el-button el-button--primary el-button--mini"
+                                                  onClick={() => {
+                                                    handleUpdateVariantParams(variant.id, editingVariantParamsValue);
+                                                  }}
+                                                >
+                                                  ✓
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className="el-button el-button--text el-button--mini"
+                                                  onClick={() => {
+                                                    setEditingVariantParams(null);
+                                                    setEditingVariantParamsValue({});
+                                                  }}
+                                                >
+                                                  ×
+                                                </button>
+                                              </div>
+                                            ) : (
+                                              <input
+                                                type="text"
+                                                className="el-input__inner"
+                                                value={
+                                                  variant.parameters.type && variant.parameters.density
+                                                    ? `${variant.parameters.type} ${variant.parameters.density}`
+                                                    : variant.parameters.type || variant.parameters.density || 'Вариант'
+                                                }
+                                                onClick={() => {
+                                                  setEditingVariantParams(variant.id);
+                                                  setEditingVariantParamsValue(variant.parameters || {});
+                                                }}
+                                                readOnly
+                                                style={{ cursor: 'pointer' }}
+                                              />
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </td>
-                                  );
-                                })}
-                                <td>
-                                  <div className="cell">
-                                    <div className="active-panel">
-                                      <button
-                                        type="button"
-                                        className="el-button el-button--success el-button--small"
-                                        onClick={async () => {
-                                          // Создаем новую строку на том же уровне (вариант того же типа)
-                                          try {
-                                            const newVariant = await createServiceVariant(serviceId, {
-                                              variantName: typeName, // Тот же тип
-                                              parameters: { type: '', density: '' },
-                                              sortOrder: variants.length,
-                                              isActive: true,
-                                            });
-                                            const newVariantWithTiers: VariantWithTiers = {
-                                              ...newVariant,
-                                              tiers: defaultTiers().map((t) => ({
-                                                id: 0,
-                                                serviceId,
-                                                variantId: newVariant.id,
-                                                minQuantity: t.min_qty,
-                                                rate: t.unit_price,
-                                                isActive: true,
-                                              })),
-                                            };
-                                            setVariants([...variants, newVariantWithTiers]);
-                                            setEditingVariantParams(newVariant.id);
-                                            setEditingVariantParamsValue({ type: '', density: '' });
-                                          } catch (err) {
-                                            console.error('Ошибка создания строки:', err);
-                                            setError('Не удалось создать строку');
-                                          }
-                                        }}
-                                        title="Добавить строку на том же уровне"
-                                      >
-                                        <span style={{ fontSize: '14px' }}>↓</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="el-button el-button--success el-button--small is-plain"
-                                        onClick={async () => {
-                                          // Создаем новый тип (родительскую строку) - текущая строка становится родительской
-                                          try {
-                                            // Сначала создаем новый тип с параметрами текущего варианта
-                                            const newTypeName = variant.parameters.type && variant.parameters.density
-                                              ? `${variant.parameters.type} ${variant.parameters.density}`
-                                              : variant.parameters.type || variant.parameters.density || 'Новый тип';
-                                            
-                                            const newVariant = await createServiceVariant(serviceId, {
-                                              variantName: newTypeName,
-                                              parameters: {},
-                                              sortOrder: variants.length,
-                                              isActive: true,
-                                            });
-                                            const newVariantWithTiers: VariantWithTiers = {
-                                              ...newVariant,
-                                              tiers: defaultTiers().map((t) => ({
-                                                id: 0,
-                                                serviceId,
-                                                variantId: newVariant.id,
-                                                minQuantity: t.min_qty,
-                                                rate: t.unit_price,
-                                                isActive: true,
-                                              })),
-                                            };
-                                            setVariants([...variants, newVariantWithTiers]);
-                                            setEditingVariantName(newVariant.id);
-                                            setEditingVariantNameValue(newVariant.variantName);
-                                          } catch (err) {
-                                            console.error('Ошибка создания нового типа:', err);
-                                            setError('Не удалось создать новый тип');
-                                          }
-                                        }}
-                                        title="Создать новый уровень вложенности (строка становится родительской)"
-                                      >
-                                        <span style={{ fontSize: '14px' }}>↘</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="el-button el-button--danger el-button--small"
-                                        onClick={() => {
-                                          if (!confirm('Удалить этот вариант?')) {
-                                            return;
-                                          }
-                                          handleDeleteVariant(variant.id);
-                                        }}
-                                        title="Удалить строку"
-                                      >
-                                        <span style={{ fontSize: '14px' }}>×</span>
-                                      </button>
-                                    </div>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
+                                    {commonRanges.map((range, rangeIdx) => {
+                                      const tier = variant.tiers.find(
+                                        (t) => t.minQuantity === range.min_qty
+                                      );
+                                      return (
+                                        <td key={`${variant.id}-${range.min_qty}`}>
+                                          <div className="cell">
+                                            <div className="el-input el-input--small">
+                                              <input
+                                                type="text"
+                                                className="el-input__inner"
+                                                value={String(tier?.rate || 0)}
+                                                onChange={(e) =>
+                                                  handlePriceChange(variant.id, range.min_qty, Number(e.target.value))
+                                                }
+                                              />
+                                            </div>
+                                          </div>
+                                        </td>
+                                      );
+                                    })}
+                                    <td>
+                                      <div className="cell">
+                                        <div className="active-panel">
+                                          <button
+                                            type="button"
+                                            className="el-button el-button--success el-button--small"
+                                            onClick={async () => {
+                                              // Создаем новую строку на том же уровне (вариант уровня 1)
+                                              try {
+                                                const newVariant = await createServiceVariant(serviceId, {
+                                                  variantName: typeName,
+                                                  parameters: { type: '', density: '' },
+                                                  sortOrder: variants.length,
+                                                  isActive: true,
+                                                });
+                                                const newVariantWithTiers: VariantWithTiers = {
+                                                  ...newVariant,
+                                                  tiers: defaultTiers().map((t) => ({
+                                                    id: 0,
+                                                    serviceId,
+                                                    variantId: newVariant.id,
+                                                    minQuantity: t.min_qty,
+                                                    rate: t.unit_price,
+                                                    isActive: true,
+                                                  })),
+                                                };
+                                                setVariants([...variants, newVariantWithTiers]);
+                                                setEditingVariantParams(newVariant.id);
+                                                setEditingVariantParamsValue({ type: '', density: '' });
+                                              } catch (err) {
+                                                console.error('Ошибка создания строки:', err);
+                                                setError('Не удалось создать строку');
+                                              }
+                                            }}
+                                            title="Добавить строку на том же уровне"
+                                          >
+                                            <span style={{ fontSize: '14px' }}>↓</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="el-button el-button--success el-button--small is-plain"
+                                            onClick={async () => {
+                                              // Создаем дочернюю строку уровня 2 для этого варианта
+                                              try {
+                                                const newVariant = await createServiceVariant(serviceId, {
+                                                  variantName: typeName,
+                                                  parameters: { 
+                                                    ...variant.parameters,
+                                                    parentVariantId: variant.id,
+                                                    subType: ''
+                                                  },
+                                                  sortOrder: variants.length,
+                                                  isActive: true,
+                                                });
+                                                const newVariantWithTiers: VariantWithTiers = {
+                                                  ...newVariant,
+                                                  tiers: defaultTiers().map((t) => ({
+                                                    id: 0,
+                                                    serviceId,
+                                                    variantId: newVariant.id,
+                                                    minQuantity: t.min_qty,
+                                                    rate: t.unit_price,
+                                                    isActive: true,
+                                                  })),
+                                                };
+                                                setVariants([...variants, newVariantWithTiers]);
+                                                setEditingVariantParams(newVariant.id);
+                                                setEditingVariantParamsValue({ ...variant.parameters, parentVariantId: variant.id, subType: '' });
+                                              } catch (err) {
+                                                console.error('Ошибка создания дочерней строки:', err);
+                                                setError('Не удалось создать дочернюю строку');
+                                              }
+                                            }}
+                                            title="Добавить дочернюю строку (уровень 2)"
+                                          >
+                                            <span style={{ fontSize: '14px' }}>↘</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="el-button el-button--danger el-button--small"
+                                            onClick={() => {
+                                              if (!confirm('Удалить этот вариант и все его дочерние варианты?')) {
+                                                return;
+                                              }
+                                              // Удаляем вариант и все его дочерние варианты уровня 2
+                                              const childVariants = level2Variants.map(v => v.id);
+                                              Promise.all([
+                                                handleDeleteVariant(variant.id),
+                                                ...childVariants.map(id => handleDeleteVariant(id))
+                                              ]);
+                                            }}
+                                            title="Удалить строку"
+                                          >
+                                            <span style={{ fontSize: '14px' }}>×</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  
+                                  {/* Внучатые строки - варианты уровня 2 */}
+                                  {level2Variants.map((level2Variant) => {
+                                    const level2VariantIndex = variantsIndexMap.get(level2Variant.id) ?? -1;
+                                    return (
+                                      <tr key={level2Variant.id} className="el-table__row el-table__row--level-2">
+                                        <td>
+                                          <div className="cell">
+                                            <span className="el-table__indent" style={{ paddingLeft: '32px' }}></span>
+                                            <span className="el-table__placeholder"></span>
+                                            <div style={{ width: 'calc(100% - 60px)', marginLeft: '8px', display: 'inline-block' }}>
+                                              <div className="el-input el-input--small">
+                                                {editingVariantParams === level2Variant.id ? (
+                                                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                    <input
+                                                      type="text"
+                                                      className="el-input__inner"
+                                                      placeholder="Подтип"
+                                                      value={editingVariantParamsValue.subType || ''}
+                                                      onChange={(e) =>
+                                                        setEditingVariantParamsValue({ ...editingVariantParamsValue, subType: e.target.value })
+                                                      }
+                                                      style={{ flex: 1 }}
+                                                    />
+                                                    <button
+                                                      type="button"
+                                                      className="el-button el-button--primary el-button--mini"
+                                                      onClick={() => {
+                                                        handleUpdateVariantParams(level2Variant.id, editingVariantParamsValue);
+                                                      }}
+                                                    >
+                                                      ✓
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      className="el-button el-button--text el-button--mini"
+                                                      onClick={() => {
+                                                        setEditingVariantParams(null);
+                                                        setEditingVariantParamsValue({});
+                                                      }}
+                                                    >
+                                                      ×
+                                                    </button>
+                                                  </div>
+                                                ) : (
+                                                  <input
+                                                    type="text"
+                                                    className="el-input__inner"
+                                                    value={level2Variant.parameters.subType || 'Подвариант'}
+                                                    onClick={() => {
+                                                      setEditingVariantParams(level2Variant.id);
+                                                      setEditingVariantParamsValue(level2Variant.parameters || {});
+                                                    }}
+                                                    readOnly
+                                                    style={{ cursor: 'pointer' }}
+                                                  />
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        {commonRanges.map((range, rangeIdx) => {
+                                          const tier = level2Variant.tiers.find(
+                                            (t) => t.minQuantity === range.min_qty
+                                          );
+                                          return (
+                                            <td key={`${level2Variant.id}-${range.min_qty}`}>
+                                              <div className="cell">
+                                                <div className="el-input el-input--small">
+                                                  <input
+                                                    type="text"
+                                                    className="el-input__inner"
+                                                    value={String(tier?.rate || 0)}
+                                                    onChange={(e) =>
+                                                      handlePriceChange(level2Variant.id, range.min_qty, Number(e.target.value))
+                                                    }
+                                                  />
+                                                </div>
+                                              </div>
+                                            </td>
+                                          );
+                                        })}
+                                        <td>
+                                          <div className="cell">
+                                            <div className="active-panel">
+                                              <button
+                                                type="button"
+                                                className="el-button el-button--success el-button--small"
+                                                onClick={async () => {
+                                                  // Создаем новую строку на том же уровне (вариант уровня 2)
+                                                  try {
+                                                    const newVariant = await createServiceVariant(serviceId, {
+                                                      variantName: typeName,
+                                                      parameters: { 
+                                                        ...level2Variant.parameters,
+                                                        subType: ''
+                                                      },
+                                                      sortOrder: variants.length,
+                                                      isActive: true,
+                                                    });
+                                                    const newVariantWithTiers: VariantWithTiers = {
+                                                      ...newVariant,
+                                                      tiers: defaultTiers().map((t) => ({
+                                                        id: 0,
+                                                        serviceId,
+                                                        variantId: newVariant.id,
+                                                        minQuantity: t.min_qty,
+                                                        rate: t.unit_price,
+                                                        isActive: true,
+                                                      })),
+                                                    };
+                                                    setVariants([...variants, newVariantWithTiers]);
+                                                    setEditingVariantParams(newVariant.id);
+                                                    setEditingVariantParamsValue({ ...level2Variant.parameters, subType: '' });
+                                                  } catch (err) {
+                                                    console.error('Ошибка создания строки:', err);
+                                                    setError('Не удалось создать строку');
+                                                  }
+                                                }}
+                                                title="Добавить строку на том же уровне"
+                                              >
+                                                <span style={{ fontSize: '14px' }}>↓</span>
+                                              </button>
+                                              <button
+                                                type="button"
+                                                className="el-button el-button--danger el-button--small"
+                                                onClick={() => {
+                                                  if (!confirm('Удалить этот вариант?')) {
+                                                    return;
+                                                  }
+                                                  handleDeleteVariant(level2Variant.id);
+                                                }}
+                                                title="Удалить строку"
+                                              >
+                                                <span style={{ fontSize: '14px' }}>×</span>
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </React.Fragment>
+                              );
+                            })
+                          )}
                         </React.Fragment>
                       );
-                    });
-                  })()}
+                    })}
                 </tbody>
               </table>
             </div>
