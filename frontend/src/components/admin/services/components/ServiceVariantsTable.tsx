@@ -96,10 +96,11 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-semibold">Варианты услуги: {serviceName}</h3>
-        <Button variant="primary" size="sm" onClick={() => {
+        <Button variant="primary" size="sm" onClick={async () => {
           console.log('=== MAIN BUTTON CLICK START ===');
-          console.log('Main create button clicked');
-          console.log('Main button element clicked');
+          console.log('Main create button clicked - about to call handleCreateVariant');
+          console.log('handleCreateVariant exists:', typeof handleCreateVariant);
+          await handleCreateVariant();
         }}>
           + Добавить тип
         </Button>
@@ -129,10 +130,11 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                           <button
                             type="button"
                             className="el-button el-button--success el-button--small"
-                            onClick={() => {
+                            onClick={async () => {
                               console.log('=== HEADER BUTTON CLICK START ===');
-                              console.log('Header create button clicked');
-                              console.log('Header button element clicked');
+                              console.log('Header create button clicked - about to call handleCreateVariant');
+                              console.log('handleCreateVariant exists:', typeof handleCreateVariant);
+                              await handleCreateVariant();
                             }}
                             title="Добавить строку (тип)"
                             style={{ zIndex: 1000, position: 'relative' }}

@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../config/constants';
 // Создаем базовый HTTP клиент
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000, // Увеличиваем таймаут до 30 секунд для операций с БД
   headers: {
     'Content-Type': 'application/json',
   },

@@ -476,9 +476,9 @@ export class PricingServiceRepository {
 
   static async createServiceVariant(serviceId: number, payload: CreateServiceVariantDTO): Promise<ServiceVariantDTO> {
     const db = await this.getConnection();
-    await this.ensureSchema(db);
+    // Убираем ensureSchema отсюда - схема проверяется при getConnection()
     const result = await db.run(
-      `INSERT INTO service_variants (service_id, variant_name, parameters, sort_order, is_active) 
+      `INSERT INTO service_variants (service_id, variant_name, parameters, sort_order, is_active)
        VALUES (?, ?, ?, ?, ?)`,
       serviceId,
       payload.variantName,
