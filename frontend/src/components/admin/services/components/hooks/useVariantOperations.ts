@@ -61,7 +61,7 @@ export function useVariantOperations(
         sortOrder: currentLength,
         isActive: true,
       });
-      
+
       // Создаем вариант с tiers для немедленного отображения
       const newVariantWithTiers: VariantWithTiers = {
         ...newVariant,
@@ -74,20 +74,33 @@ export function useVariantOperations(
           isActive: true,
         })),
       };
-      
+
       // Добавляем локально для немедленного отображения
       setVariants((prev) => [...prev, newVariantWithTiers]);
-      
+
       // Инвалидируем кэш
       invalidateCacheRef.current?.();
-      
-      // Перезагружаем варианты с небольшой задержкой, чтобы сервер успел обработать запрос
-      setTimeout(() => {
-        reloadVariantsRef.current().catch((err) => {
-          console.error('Ошибка перезагрузки вариантов после создания:', err);
-        });
-      }, 500);
-      
+
+      // Перезагружаем tiers для нового варианта через небольшую задержку
+      setTimeout(async () => {
+        try {
+          // Обновляем только tiers для нового варианта, не перезагружая все варианты
+          const allTiers = await getAllVariantTiers(serviceId);
+          cacheRef.current.set(serviceId, allTiers);
+
+          // Обновляем локальный вариант с актуальными tiers
+          setVariants((prev) =>
+            prev.map((v) =>
+              v.id === newVariant.id
+                ? { ...v, tiers: allTiers[newVariant.id] || v.tiers }
+                : v
+            )
+          );
+        } catch (err) {
+          console.error('Ошибка обновления tiers после создания варианта:', err);
+        }
+      }, 300);
+
       return newVariantWithTiers;
     } catch (err) {
       console.error('Ошибка создания варианта:', err);
