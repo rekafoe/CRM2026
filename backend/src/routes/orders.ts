@@ -11,10 +11,120 @@ const router = Router()
 // Все маршруты заказов требуют аутентификации
 router.use(authenticate)
 
-// Order routes
+/**
+ * @swagger
+ * /api/orders:
+ *   get:
+ *     summary: Получить список всех заказов
+ *     description: Возвращает список всех заказов с возможностью фильтрации и пагинации
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Номер страницы
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: Количество элементов на странице
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Фильтр по статусу заказа
+ *     responses:
+ *       200:
+ *         description: Список заказов
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 orders:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 total:
+ *                   type: integer
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ */
 router.get('/', asyncHandler(OrderController.getAllOrders))
+
+/**
+ * @swagger
+ * /api/orders/search:
+ *   get:
+ *     summary: Поиск заказов
+ *     description: Поиск заказов по различным критериям
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: Поисковый запрос
+ *     responses:
+ *       200:
+ *         description: Результаты поиска
+ */
 router.get('/search', asyncHandler(OrderController.searchOrders))
+
+/**
+ * @swagger
+ * /api/orders/stats:
+ *   get:
+ *     summary: Получить статистику по заказам
+ *     description: Возвращает статистическую информацию о заказах
+ *     tags: [Orders]
+ *     responses:
+ *       200:
+ *         description: Статистика заказов
+ */
 router.get('/stats', asyncHandler(OrderController.getOrdersStats))
+
+/**
+ * @swagger
+ * /api/orders:
+ *   post:
+ *     summary: Создать новый заказ
+ *     description: Создает новый заказ с указанными параметрами
+ *     tags: [Orders]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - customer_name
+ *               - items
+ *             properties:
+ *               customer_name:
+ *                 type: string
+ *                 example: Иван Иванов
+ *               customer_phone:
+ *                 type: string
+ *                 example: +375 29 123 45 67
+ *               customer_email:
+ *                 type: string
+ *                 format: email
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *     responses:
+ *       201:
+ *         description: Заказ успешно создан
+ *       400:
+ *         description: Ошибка валидации данных
+ */
 router.post('/', asyncHandler(OrderController.createOrder))
 router.post('/with-auto-deduction', asyncHandler(OrderController.createOrderWithAutoDeduction))
 router.put('/:id/status', asyncHandler(OrderController.updateOrderStatus))

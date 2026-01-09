@@ -2,6 +2,11 @@ import { Request, Response, NextFunction } from 'express'
 import { gzip, deflate } from 'zlib'
 
 export function compressionMiddleware(req: Request, res: Response, next: NextFunction) {
+  // Исключаем Swagger UI из сжатия, чтобы избежать проблем с отображением
+  if (req.path.startsWith('/api-docs')) {
+    return next()
+  }
+  
   const originalSend = res.send
   const acceptEncoding = req.headers['accept-encoding'] || ''
 

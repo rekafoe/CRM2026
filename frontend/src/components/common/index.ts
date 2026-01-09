@@ -8,3 +8,5 @@ export { FormField } from './FormField';
 export { LoadingState } from './LoadingState';
 export { EmptyState } from './EmptyState';
 export { ConfirmDialog } from './ConfirmDialog';
+export { PriceRangesTable } from './PriceRangesTable';
+export type { PriceRangesTableProps } from './PriceRangesTable';

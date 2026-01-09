@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import path from 'path'
+import swaggerUi from 'swagger-ui-express'
 import { initDB } from './config/database'
 import { config } from './config/app'
 import { uploadsDir } from './config/upload'
@@ -16,6 +17,12 @@ import { AutoOrderService } from './services/autoOrderService'
 import { UserNotificationService } from './services/userNotificationService'
 import { logger } from './utils/logger'
 import { AuthController } from './controllers'
+import { swaggerSpec } from './config/swagger'
+
+// Проверяем, что swaggerSpec загружен
+if (!swaggerSpec) {
+  logger.warn('Swagger spec не загружен, документация может быть недоступна')
+}
 
 // Load environment variables
 dotenv.config()
@@ -24,6 +31,54 @@ const app = express()
 
 // Middleware
 app.use(cors({ origin: config.corsOrigin }))
+
+// Swagger JSON endpoint (ДО compressionMiddleware)
+app.get('/api-docs.json', (req, res) => {
+  try {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    res.json(swaggerSpec)
+  } catch (error: any) {
+    logger.error('Ошибка при отправке Swagger JSON', { error: error.message })
+    res.status(500).json({ error: 'Ошибка загрузки Swagger документации' })
+  }
+})
+
+// Swagger UI (ДО compressionMiddleware, чтобы избежать проблем с заголовками)
+try {
+  const swaggerUiOptions = {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'CRM API Documentation',
+    swaggerOptions: {
+      url: '/api-docs.json',
+      persistAuthorization: true,
+    },
+  }
+  
+  // Стандартный способ: массив middleware
+  // swaggerUi.serve обрабатывает статические файлы (CSS, JS, и т.д.)
+  // swaggerUi.setup обрабатывает главную HTML страницу
+  app.use(
+    '/api-docs',
+    (req, res, next) => {
+      // Устанавливаем заголовки для предотвращения кэширования HTML
+      if (req.path === '/api-docs' || req.path === '/api-docs/') {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8')
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+        res.setHeader('Pragma', 'no-cache')
+        res.setHeader('Expires', '0')
+      }
+      next()
+    },
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, swaggerUiOptions)
+  )
+  
+  logger.info('Swagger UI настроен на /api-docs')
+  logger.info('Swagger JSON доступен на /api-docs.json')
+} catch (error: any) {
+  logger.error('Ошибка при настройке Swagger UI', { error: error.message, stack: error.stack })
+}
+
 app.use(compressionMiddleware) // Сжатие ответов
 app.use(performanceMiddleware) // Мониторинг производительности
 app.use(performanceLoggingMiddleware) // Логирование производительности

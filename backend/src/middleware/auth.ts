@@ -15,6 +15,9 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     // infra / health
     /^\/$/,
     /^\/health$/,
+    // Swagger documentation
+    /^\/api-docs/,
+    /^\/api-docs\.json$/,
     // public widget needs these
     /^\/api\/presets/,
     /^\/api\/orders\/[0-9]+\/items$/,

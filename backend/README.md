@@ -54,7 +54,18 @@ GET  /api/operations            # Список операций (auth)
 POST /api/orders                # Создание заказа
 
 GET  /health                    # Healthcheck
+GET  /api-docs                  # Swagger UI документация
+GET  /api-docs.json             # Swagger JSON спецификация
 ```
+
+## 📚 API Документация (Swagger)
+
+После установки пакетов Swagger (`npm install swagger-ui-express swagger-jsdoc @types/swagger-ui-express @types/swagger-jsdoc`):
+
+- **Swagger UI**: `http://localhost:3001/api-docs` - интерактивная документация API
+- **Swagger JSON**: `http://localhost:3001/api-docs.json` - JSON спецификация
+
+Подробная инструкция по настройке и использованию: `SWAGGER_SETUP.md`
 
 ## 🔧 Миграции
 

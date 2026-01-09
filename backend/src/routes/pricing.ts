@@ -33,13 +33,73 @@ const toTierResponse = (tier: any) => ({
   is_active: tier.isActive,
 })
 
-// Test route without authentication
+/**
+ * @swagger
+ * /api/pricing/test:
+ *   get:
+ *     summary: Тестовый роут для проверки работы pricing API
+ *     tags: [Pricing]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Успешный ответ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Pricing routes work!
+ */
 router.get('/test', (req: any, res: any) => {
   console.log('Pricing test route called')
   res.json({ message: 'Pricing routes work!' })
 })
 
-// GET /api/pricing/product-types - список типов продуктов
+/**
+ * @swagger
+ * /api/pricing/product-types:
+ *   get:
+ *     summary: Получить список типов продуктов
+ *     description: Возвращает список всех активных типов продуктов с их ключами и описаниями
+ *     tags: [Pricing]
+ *     responses:
+ *       200:
+ *         description: Список типов продуктов
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                     example: 1
+ *                   key:
+ *                     type: string
+ *                     example: business_cards
+ *                   name:
+ *                     type: string
+ *                     example: Визитки
+ *                   category:
+ *                     type: string
+ *                     example: printing
+ *                   description:
+ *                     type: string
+ *                   is_active:
+ *                     type: integer
+ *                     example: 1
+ *                   sort_order:
+ *                     type: integer
+ *                   created_at:
+ *                     type: string
+ *                     format: date-time
+ *                   updated_at:
+ *                     type: string
+ *                     format: date-time
+ */
 router.get('/product-types', asyncHandler(async (req, res) => {
   const db = await getDb()
   const products = await db.all<any>(`
@@ -65,7 +125,60 @@ router.get('/product-types', asyncHandler(async (req, res) => {
   res.json(products)
 }))
 
-// GET /api/pricing/product-types/:key/schema - схема продукта для калькулятора
+/**
+ * @swagger
+ * /api/pricing/product-types/{key}/schema:
+ *   get:
+ *     summary: Получить схему продукта для калькулятора
+ *     description: Возвращает схему конфигурации продукта с параметрами и операциями
+ *     tags: [Pricing]
+ *     parameters:
+ *       - in: path
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Ключ типа продукта (например, business_cards, flyers, booklets)
+ *         example: business_cards
+ *     responses:
+ *       200:
+ *         description: Схема продукта
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 key:
+ *                   type: string
+ *                   example: business_cards
+ *                 name:
+ *                   type: string
+ *                   example: Визитки
+ *                 parameters:
+ *                   type: object
+ *                   description: Параметры конфигурации продукта
+ *                 operations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       operation:
+ *                         type: string
+ *                       service_id:
+ *                         type: integer
+ *                       service:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                       unit:
+ *                         type: string
+ *                       rate:
+ *                         type: number
+ *                       price_unit:
+ *                         type: string
+ *                       formula:
+ *                         type: string
+ */
 router.get('/product-types/:key/schema', asyncHandler(async (req, res) => {
   const { key } = req.params
   const db = await getDb()
@@ -116,7 +229,52 @@ router.get('/product-types/:key/schema', asyncHandler(async (req, res) => {
   res.json(schema)
 }))
 
-// GET /api/pricing/print-prices - цены печати
+/**
+ * @swagger
+ * /api/pricing/print-prices:
+ *   get:
+ *     summary: Получить цены печати
+ *     description: Возвращает список всех активных цен печати по технологиям
+ *     tags: [Pricing]
+ *     responses:
+ *       200:
+ *         description: Список цен печати
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                   technology_code:
+ *                     type: string
+ *                     example: digital
+ *                   counter_unit:
+ *                     type: string
+ *                     example: per_sheet
+ *                   price_bw_single:
+ *                     type: number
+ *                   price_bw_duplex:
+ *                     type: number
+ *                   price_color_single:
+ *                     type: number
+ *                   price_color_duplex:
+ *                     type: number
+ *                   price_bw_per_meter:
+ *                     type: number
+ *                   price_color_per_meter:
+ *                     type: number
+ *                   is_active:
+ *                     type: integer
+ *                   created_at:
+ *                     type: string
+ *                     format: date-time
+ *                   updated_at:
+ *                     type: string
+ *                     format: date-time
+ */
 router.get('/print-prices', asyncHandler(async (req, res) => {
   try {
     const db = await getDb()
@@ -175,7 +333,50 @@ router.get('/service-prices', asyncHandler(async (req, res) => {
   }
 }))
 
-// Services API (новая система + совместимость с фронтом)
+/**
+ * @swagger
+ * /api/pricing/services:
+ *   get:
+ *     summary: Получить список услуг
+ *     description: Возвращает список всех активных услуг с их ценами и параметрами
+ *     tags: [Pricing]
+ *     responses:
+ *       200:
+ *         description: Список услуг
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                   name:
+ *                     type: string
+ *                     example: Ламинация
+ *                   type:
+ *                     type: string
+ *                     example: lamination
+ *                   service_type:
+ *                     type: string
+ *                   unit:
+ *                     type: string
+ *                     example: per_item
+ *                   price_unit:
+ *                     type: string
+ *                   rate:
+ *                     type: number
+ *                   price_per_unit:
+ *                     type: number
+ *                   currency:
+ *                     type: string
+ *                     example: BYN
+ *                   isActive:
+ *                     type: boolean
+ *                   is_active:
+ *                     type: boolean
+ */
 router.get('/services', asyncHandler(async (_req, res) => {
   const services = await ServiceManagementService.listServices()
   res.json(services.map(toServiceResponse))
