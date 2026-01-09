@@ -243,6 +243,7 @@ export const AdminPanelPage: React.FC = () => {
           {/* Ценообразование */}
           <Route path="/pricing" element={<PricingPage onBack={() => window.history.back()} />} />
           <Route path="/services-management" element={<AdminDashboard />} />
+          <Route path="/pricing-admin" element={<AdminDashboard />} /> {/* Старый URL для обратной совместимости */}
           <Route path="/discounts" element={<PricingPage onBack={() => window.history.back()} />} />
           <Route path="/printers" element={<PrintersPage />} />
           

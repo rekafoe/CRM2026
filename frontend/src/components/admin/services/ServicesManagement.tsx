@@ -142,13 +142,31 @@ const ServicesManagement: React.FC = () => {
 
       const rateValue = Number(state.newServiceForm.rate || 0);
 
-      await createPricingService({
+      const createdService = await createPricingService({
         name: state.newServiceForm.name.trim(),
         type: state.newServiceForm.type || 'postprint',
         unit: state.newServiceForm.unit || 'item',
         rate: Number.isFinite(rateValue) ? rateValue : 0,
         isActive: state.newServiceForm.isActive,
       });
+
+      // Если услуга сложная (hasVariants = true), создаем первый вариант-тип
+      if (state.newServiceForm.hasVariants) {
+        try {
+          const { createServiceVariant } = await import('../../../services/pricing');
+          await createServiceVariant(createdService.id, {
+            variantName: 'Новый тип',
+            parameters: {},
+            sortOrder: 0,
+            isActive: true,
+          });
+          // Обновляем список услуг с вариантами
+          setServicesWithVariants((prev) => new Set(prev).add(createdService.id));
+        } catch (variantError) {
+          console.error('Ошибка создания варианта:', variantError);
+          // Не показываем ошибку пользователю, т.к. услуга уже создана
+        }
+      }
 
       setShowCreateService(false);
       resetNewServiceForm(emptyServiceForm);
