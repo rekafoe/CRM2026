@@ -160,16 +160,76 @@ export class SimplifiedPricingService {
       throw new Error('No sizes configured in simplified config');
     }
     
+    // 2.5. Нормализуем конфигурацию: преобразуем sides в print_sides_mode и находим material_id
+    let normalizedConfig = { ...configuration };
+    
+    // Преобразуем sides (1 или 2) в print_sides_mode
+    if (!normalizedConfig.print_sides_mode && (configuration as any).sides) {
+      const sides = (configuration as any).sides;
+      if (sides === 1) {
+        normalizedConfig.print_sides_mode = 'single';
+      } else if (sides === 2) {
+        normalizedConfig.print_sides_mode = 'duplex';
+      }
+      logger.info('Нормализация: sides -> print_sides_mode', {
+        sides,
+        print_sides_mode: normalizedConfig.print_sides_mode
+      });
+    }
+    
+    // Находим material_id по paperType и paperDensity, если material_id не указан
+    if (!normalizedConfig.material_id && (configuration as any).paperType && (configuration as any).paperDensity) {
+      try {
+        const paperTypeId = (configuration as any).paperType;
+        const paperDensity = Number((configuration as any).paperDensity);
+        
+        // Загружаем тип бумаги из склада
+        const paperType = await db.get<{ id: string; densities: string }>(
+          `SELECT id, densities FROM warehouse_paper_types WHERE id = ?`,
+          [paperTypeId]
+        );
+        
+        if (paperType) {
+          const densities = typeof paperType.densities === 'string' 
+            ? JSON.parse(paperType.densities) 
+            : paperType.densities;
+          
+          const density = Array.isArray(densities) 
+            ? densities.find((d: any) => d.value === paperDensity)
+            : null;
+          
+          if (density && density.material_id) {
+            normalizedConfig.material_id = Number(density.material_id);
+            logger.info('Нормализация: найдено material_id по paperType и paperDensity', {
+              paperType: paperTypeId,
+              paperDensity,
+              material_id: normalizedConfig.material_id
+            });
+          } else {
+            logger.warn('Не найдена плотность в типе бумаги', {
+              paperType: paperTypeId,
+              paperDensity,
+              availableDensities: Array.isArray(densities) ? densities.map((d: any) => d.value) : []
+            });
+          }
+        } else {
+          logger.warn('Тип бумаги не найден в складе', { paperType: paperTypeId });
+        }
+      } catch (error) {
+        logger.error('Ошибка при поиске material_id', { error, paperType: (configuration as any).paperType, paperDensity: (configuration as any).paperDensity });
+      }
+    }
+    
     // 3. Находим выбранный размер
     let selectedSize: SimplifiedSizeConfig | null = null;
     
-    if (configuration.size_id) {
-      selectedSize = simplifiedConfig.sizes.find(s => s.id === configuration.size_id) || null;
-    } else if (configuration.trim_size) {
+    if (normalizedConfig.size_id) {
+      selectedSize = simplifiedConfig.sizes.find(s => s.id === normalizedConfig.size_id) || null;
+    } else if (normalizedConfig.trim_size) {
       // Ищем по размерам (примерное совпадение с допуском ±1мм)
       selectedSize = simplifiedConfig.sizes.find(s => 
-        Math.abs(s.width_mm - configuration.trim_size!.width) <= 1 &&
-        Math.abs(s.height_mm - configuration.trim_size!.height) <= 1
+        Math.abs(s.width_mm - normalizedConfig.trim_size!.width) <= 1 &&
+        Math.abs(s.height_mm - normalizedConfig.trim_size!.height) <= 1
       ) || null;
     }
     
@@ -181,17 +241,17 @@ export class SimplifiedPricingService {
     let printPrice = 0;
     let printDetails: SimplifiedPricingResult['printDetails'] | undefined;
     
-    if (configuration.print_technology && configuration.print_color_mode && configuration.print_sides_mode) {
+    if (normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode) {
       const printPriceConfig = selectedSize.print_prices.find(p =>
-        p.technology_code === configuration.print_technology &&
-        p.color_mode === configuration.print_color_mode &&
-        p.sides_mode === configuration.print_sides_mode
+        p.technology_code === normalizedConfig.print_technology &&
+        p.color_mode === normalizedConfig.print_color_mode &&
+        p.sides_mode === normalizedConfig.print_sides_mode
       );
       
       logger.info('Расчет цены печати', {
-        print_technology: configuration.print_technology,
-        print_color_mode: configuration.print_color_mode,
-        print_sides_mode: configuration.print_sides_mode,
+        print_technology: normalizedConfig.print_technology,
+        print_color_mode: normalizedConfig.print_color_mode,
+        print_sides_mode: normalizedConfig.print_sides_mode,
         foundConfig: !!printPriceConfig,
         tiersCount: printPriceConfig?.tiers?.length || 0
       });
@@ -225,11 +285,11 @@ export class SimplifiedPricingService {
     let materialPrice = 0;
     let materialDetails: SimplifiedPricingResult['materialDetails'] | undefined;
     
-    if (configuration.material_id) {
-      const materialPriceConfig = selectedSize.material_prices.find(m => m.material_id === configuration.material_id);
+    if (normalizedConfig.material_id) {
+      const materialPriceConfig = selectedSize.material_prices.find(m => m.material_id === normalizedConfig.material_id);
       
       logger.info('Расчет цены материала', {
-        material_id: configuration.material_id,
+        material_id: normalizedConfig.material_id,
         foundConfig: !!materialPriceConfig,
         tiersCount: materialPriceConfig?.tiers?.length || 0
       });
@@ -249,7 +309,7 @@ export class SimplifiedPricingService {
         }
       } else {
         logger.warn('Не найдена конфигурация материала', {
-          material_id: configuration.material_id,
+          material_id: normalizedConfig.material_id,
           available: selectedSize.material_prices.map(m => m.material_id)
         });
       }
@@ -259,16 +319,16 @@ export class SimplifiedPricingService {
     let finishingPrice = 0;
     const finishingDetails: SimplifiedPricingResult['finishingDetails'] = [];
     
-    if (configuration.finishing && configuration.finishing.length > 0) {
+    if (normalizedConfig.finishing && normalizedConfig.finishing.length > 0) {
       // Загружаем названия услуг из БД
-      const serviceIds = configuration.finishing.map(f => f.service_id);
+      const serviceIds = normalizedConfig.finishing.map(f => f.service_id);
       const services = await db.all<Array<{ id: number; name: string }>>(
         `SELECT id, name FROM post_processing_services WHERE id IN (${serviceIds.map(() => '?').join(',')})`,
         serviceIds
       );
       const serviceNamesMap = new Map(services.map(s => [s.id, s.name]));
       
-      for (const finConfig of configuration.finishing) {
+      for (const finConfig of normalizedConfig.finishing) {
         const finishingPriceConfig = selectedSize.finishing.find(f =>
           f.service_id === finConfig.service_id
         );
@@ -317,9 +377,9 @@ export class SimplifiedPricingService {
       subtotal,
       finalPrice,
       pricePerUnit,
-      hasPrintConfig: !!(configuration.print_technology && configuration.print_color_mode && configuration.print_sides_mode),
-      hasMaterialConfig: !!configuration.material_id,
-      hasFinishingConfig: !!(configuration.finishing && configuration.finishing.length > 0)
+      hasPrintConfig: !!(normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode),
+      hasMaterialConfig: !!normalizedConfig.material_id,
+      hasFinishingConfig: !!(normalizedConfig.finishing && normalizedConfig.finishing.length > 0)
     });
     
     if (finalPrice === 0) {
@@ -327,7 +387,8 @@ export class SimplifiedPricingService {
         printPrice,
         materialPrice,
         finishingPrice,
-        configuration,
+        originalConfiguration: configuration,
+        normalizedConfig,
         selectedSize: {
           id: selectedSize.id,
           print_prices_count: selectedSize.print_prices.length,
@@ -338,11 +399,11 @@ export class SimplifiedPricingService {
     }
     
     // 8. Загружаем названия материалов
-    let materialName = `Material #${configuration.material_id}`;
-    if (configuration.material_id) {
+    let materialName = `Material #${normalizedConfig.material_id}`;
+    if (normalizedConfig.material_id) {
       const material = await db.get<{ name: string }>(
         `SELECT name FROM materials WHERE id = ?`,
-        [configuration.material_id]
+        [normalizedConfig.material_id]
       );
       if (material) {
         materialName = material.name;
@@ -359,13 +420,13 @@ export class SimplifiedPricingService {
         width_mm: selectedSize.width_mm,
         height_mm: selectedSize.height_mm,
       },
-      selectedPrint: configuration.print_technology && configuration.print_color_mode && configuration.print_sides_mode ? {
-        technology_code: configuration.print_technology,
-        color_mode: configuration.print_color_mode,
-        sides_mode: configuration.print_sides_mode,
+      selectedPrint: normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode ? {
+        technology_code: normalizedConfig.print_technology,
+        color_mode: normalizedConfig.print_color_mode,
+        sides_mode: normalizedConfig.print_sides_mode,
       } : undefined,
-      selectedMaterial: configuration.material_id ? {
-        material_id: configuration.material_id,
+      selectedMaterial: normalizedConfig.material_id ? {
+        material_id: normalizedConfig.material_id,
         material_name: materialName,
       } : undefined,
       selectedFinishing: finishingDetails.map(d => {
