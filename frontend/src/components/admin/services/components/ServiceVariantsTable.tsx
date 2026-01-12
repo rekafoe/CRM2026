@@ -53,14 +53,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   }, [commonRanges]);
 
   // Группируем варианты
-  const groupedVariants = useMemo(() => {
-    const result = groupVariantsByType(variants);
-    console.log('=== GROUPING DEBUG ===');
-    console.log('variants array:', variants);
-    console.log('groupedVariants:', result);
-    console.log('typeNames:', Object.keys(result));
-    return result;
-  }, [variants]);
+  const groupedVariants = useMemo(() => groupVariantsByType(variants), [variants]);
   const variantsIndexMap = useMemo(() => createVariantsIndexMap(variants), [variants]);
   const typeNames = useMemo(() => Object.keys(groupedVariants), [groupedVariants]);
 
@@ -271,10 +264,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
                                     try {
                                       console.log('Calling operations.createVariant...');
-                                      const newVariant = await operations.createVariant(typeName, { type: '', density: '' });
+                                      const newVariant = await operations.createVariant(typeName, { type: 'Новый тип', density: 'Новая плотность' });
                                       console.log('✅ createVariant returned:', newVariant);
                                       console.log('Calling editing.startEditingParams...');
-                                      editing.startEditingParams(newVariant.id, { type: '', density: '' });
+                                      editing.startEditingParams(newVariant.id, { type: 'Новый тип', density: 'Новая плотность' });
                                       console.log('✅ editing.startEditingParams completed');
                                     } catch (err) {
                                       console.error('❌ Ошибка создания дочерней строки:', err);
@@ -401,8 +394,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                             console.log('Level 1 button clicked');
                                             const handler = async () => {
                                               try {
-                                                const newVariant = await operations.createVariant(typeName, { type: '', density: '' });
-                                                editing.startEditingParams(newVariant.id, { type: '', density: '' });
+                                                const newVariant = await operations.createVariant(typeName, { type: 'Новый тип', density: 'Новая плотность' });
+                                                editing.startEditingParams(newVariant.id, { type: 'Новый тип', density: 'Новая плотность' });
                                               } catch (err) {
                                                 console.error('Ошибка создания строки на том же уровне (уровень 1):', err);
                                                 // Ошибка уже обработана в хуке и отображена через setError

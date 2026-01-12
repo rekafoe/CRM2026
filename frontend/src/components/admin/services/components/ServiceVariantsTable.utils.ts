@@ -11,8 +11,8 @@ export function getVariantLevel(variant: VariantWithTiers): number {
     return 2;
   }
   
-  // Уровень 1: есть type или density (дочерний вариант)
-  if (params.type || params.density) {
+  // Уровень 1: есть непустые type или density (дочерний вариант)
+  if ((params.type && params.type.trim()) || (params.density && params.density.trim())) {
     return 1;
   }
   

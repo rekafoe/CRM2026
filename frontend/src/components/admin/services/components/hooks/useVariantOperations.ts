@@ -57,12 +57,13 @@ export function useVariantOperations(
 
   const createVariant = useCallback(async (variantName: string, parameters: Record<string, any> = {}) => {
     try {
-      // Используем текущую длину через ref для избежания зависимостей
-      const currentLength = variantsRef.current.length;
+      // Используем максимальный sortOrder + 1 для уникальности
+      const currentVariants = variantsRef.current;
+      const maxSortOrder = currentVariants.length > 0 ? Math.max(...currentVariants.map(v => v.sortOrder)) : 0;
       const newVariant = await createServiceVariant(serviceId, {
         variantName,
         parameters,
-        sortOrder: currentLength,
+        sortOrder: maxSortOrder + 1,
         isActive: true,
       });
 
