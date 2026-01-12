@@ -61,6 +61,16 @@ function OrderPoolPageWrapper() {
   );
 }
 
+// Отключаем изменение значения скроллом мыши для всех input[type="number"]
+if (typeof window !== 'undefined') {
+  document.addEventListener('wheel', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'number' && document.activeElement === target) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+}
+
 // Проверяем, не создан ли уже root
 let root = (window as any).__reactRoot;
 if (!root) {
