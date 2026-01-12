@@ -468,9 +468,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
     }
   }, [selectedPaperTypeId, materialsForSelectedPaperType, selected, getSizeRanges, updateSize])
 
-  // Автоматическое добавление услуг отделки
+  // Автоматическое добавление услуг отделки только при первой загрузке
+  // Не добавляем автоматически, если пользователь уже взаимодействовал с услугами
+  const hasUserInteractedWithServicesRef = useRef(false)
+  
   useEffect(() => {
     if (!selected || services.length === 0) return
+    // Если пользователь уже взаимодействовал с услугами, не добавляем автоматически
+    if (hasUserInteractedWithServicesRef.current) return
 
     const servicesToAdd = services.filter(s => 
       !selected.finishing.some(f => f.service_id === Number(s.id))
@@ -1321,6 +1326,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                           servicePricings={servicePricings}
                           commonRanges={commonRanges}
                           onUpdate={(newPricings) => {
+                            hasUserInteractedWithServicesRef.current = true
                             updateSize(selected.id, { finishing: newPricings })
                           }}
                           onRangesUpdate={(newRanges) => {
