@@ -22,7 +22,7 @@ import {
   ServiceVariantsTableProps,
   VariantWithTiers,
 } from './ServiceVariantsTable.types';
-import { RangeChange, PriceChange } from './hooks/useLocalRangeChanges';
+import { RangeChange, PriceChange, VariantChange } from './hooks/useLocalRangeChanges';
 import '../../../../features/productTemplate/components/SimplifiedTemplateSection.css';
 import './ServiceVariantsTable.css';
 
@@ -37,8 +37,24 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   const operations = useVariantOperations(serviceId, serverVariants, () => {}, setError, reload, invalidateCache);
 
   // Локальное состояние для несохраненных изменений
-  const saveChangesToServer = useCallback(async (rangeChanges: RangeChange[], priceChanges: PriceChange[]) => {
+  const saveChangesToServer = useCallback(async (rangeChanges: RangeChange[], priceChanges: PriceChange[], variantChanges: VariantChange[]) => {
     try {
+      // Применяем изменения вариантов
+      for (const change of variantChanges) {
+        switch (change.type) {
+          case 'create':
+            if (change.variantName) {
+              await operations.createVariant(change.variantName, change.parameters || {});
+            }
+            break;
+          case 'delete':
+            if (change.variantId) {
+              await operations.deleteVariant(change.variantId);
+            }
+            break;
+        }
+      }
+
       // Применяем изменения диапазонов
       for (const change of rangeChanges) {
         switch (change.type) {
@@ -89,6 +105,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
   console.log('=== ServiceVariantsTable ===');
   console.log('localChanges.hasUnsavedChanges:', localChanges.hasUnsavedChanges);
+  console.log('localChanges.variantChanges:', localChanges.variantChanges);
   console.log('localChanges.rangeChanges:', localChanges.rangeChanges);
   console.log('localChanges.priceChanges:', localChanges.priceChanges);
 
@@ -100,12 +117,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   // Обработчики
   const handleCreateVariant = useCallback(async () => {
     try {
-      const newVariant = await operations.createVariant('Новый тип', {});
+      const newVariant = localChanges.createVariant('Новый тип', {});
       editing.startEditingName(newVariant.id, newVariant.variantName);
     } catch (err) {
-      // Ошибка уже обработана в хуке
+      console.error('Error creating variant locally:', err);
+      setError('Не удалось создать вариант');
     }
-  }, [operations, editing]);
+  }, [localChanges, editing, setError]);
 
   const handleSaveRange = useCallback(async () => {
     const boundary = Number(tierModal.tierModal.boundary);
@@ -143,10 +161,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h3 className="text-lg font-semibold">Варианты услуги: {serviceName}</h3>
-          {(localChanges.hasUnsavedChanges || localChanges.rangeChanges.length > 0 || localChanges.priceChanges.length > 0) && (
+          {(localChanges.hasUnsavedChanges || localChanges.rangeChanges.length > 0 || localChanges.priceChanges.length > 0 || localChanges.variantChanges.length > 0) && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-orange-600 font-medium">
-                Есть несохраненные изменения ({localChanges.rangeChanges.length} диапазонов, {localChanges.priceChanges.length} цен)
+                Есть несохраненные изменения ({localChanges.variantChanges.length} вариантов, {localChanges.rangeChanges.length} диапазонов, {localChanges.priceChanges.length} цен)
               </span>
               <Button
                 variant="success"
@@ -306,7 +324,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                     className="el-button el-button--success el-button--small is-plain"
                                     onClick={async () => {
                                       try {
-                                        const newVariant = await operations.createVariant(typeName, { type: 'Новый тип', density: 'Новая плотность' });
+                                        const newVariant = localChanges.createVariant(typeName, { type: 'Новый тип', density: 'Новая плотность' });
                                         editing.startEditingParams(newVariant.id, { type: 'Новый тип', density: 'Новая плотность' });
                                       } catch (err) {
                                         console.error('Ошибка создания дочерней строки:', err);
@@ -320,14 +338,14 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                   <button
                                     type="button"
                                     className="el-button el-button--danger el-button--small"
-                                    onClick={async () => {
-                                      if (!confirm(`Удалить тип "${typeName}" и все его варианты?`)) {
-                                        return;
-                                      }
-                                      for (const variant of allTypeVariants) {
-                                        await operations.deleteVariant(variant.id, true); // skipConfirm = true
-                                      }
-                                    }}
+                                  onClick={async () => {
+                                    if (!confirm(`Удалить тип "${typeName}" и все его варианты?`)) {
+                                      return;
+                                    }
+                                    for (const variant of allTypeVariants) {
+                                      localChanges.deleteVariant(variant.id);
+                                    }
+                                  }}
                                     title="Удалить тип"
                                   >
                                     <span style={{ fontSize: '14px' }}>×</span>
@@ -350,11 +368,11 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                   className="el-button el-button--success el-button--small"
                                   onClick={async () => {
                                     try {
-                                      const newVariant = await operations.createVariant('Новый тип', {});
+                                      const newVariant = localChanges.createVariant('Новый тип', {});
                                       editing.startEditingName(newVariant.id, newVariant.variantName);
                                     } catch (err) {
                                       console.error('Ошибка создания варианта на том же уровне:', err);
-                                      // Ошибка уже обработана в хуке и отображена через setError
+                                      setError('Не удалось создать вариант');
                                     }
                                   }}
                                   title="Добавить тип на том же уровне"
@@ -503,10 +521,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                               return;
                                             }
                                             const childVariants = level2Variants.map(v => v.id);
-                                            Promise.all([
-                                              operations.deleteVariant(variant.id),
-                                              ...childVariants.map(id => operations.deleteVariant(id))
-                                            ]);
+                                            localChanges.deleteVariant(variant.id);
+                                            childVariants.forEach(id => localChanges.deleteVariant(id));
                                           }}
                                           title="Удалить строку"
                                         >
@@ -611,7 +627,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                               if (!confirm('Удалить этот вариант?')) {
                                                 return;
                                               }
-                                              operations.deleteVariant(level2Variant.id);
+                                              localChanges.deleteVariant(level2Variant.id);
                                             }}
                                             title="Удалить строку"
                                           >

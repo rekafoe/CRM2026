@@ -3,6 +3,11 @@ import { VariantWithTiers } from '../ServiceVariantsTable.types';
 import { PriceRange, PriceRangeUtils } from '../../../../../hooks/usePriceRanges';
 import { calculateCommonRanges } from '../ServiceVariantsTable.utils';
 
+// Локальное определение defaultTiers для создания новых вариантов
+const defaultTiers = () => [
+  { min_qty: 1, max_qty: undefined, unit_price: 0 },
+];
+
 /**
  * Тип для отслеживания изменений диапазонов
  */
@@ -23,16 +28,32 @@ export interface PriceChange {
 }
 
 /**
+ * Тип для отслеживания изменений вариантов
+ */
+export interface VariantChange {
+  type: 'create' | 'delete';
+  variantId?: number;
+  variantName?: string;
+  parameters?: Record<string, any>;
+}
+
+/**
  * Хук для управления локальными изменениями диапазонов и цен
  */
 export function useLocalRangeChanges(
   initialVariants: VariantWithTiers[],
-  onSaveChanges: (rangeChanges: RangeChange[], priceChanges: PriceChange[]) => Promise<void>
+  onSaveChanges: (rangeChanges: RangeChange[], priceChanges: PriceChange[], variantChanges: VariantChange[]) => Promise<void>
 ) {
   const [localVariants, setLocalVariants] = useState<VariantWithTiers[]>(initialVariants);
   const [rangeChanges, setRangeChanges] = useState<RangeChange[]>([]);
   const [priceChanges, setPriceChanges] = useState<PriceChange[]>([]);
+  const [variantChanges, setVariantChanges] = useState<VariantChange[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [nextVariantId, setNextVariantId] = useState(() => {
+    // Находим максимальный ID среди существующих вариантов
+    const maxId = initialVariants.length > 0 ? Math.max(...initialVariants.map(v => v.id)) : 0;
+    return maxId + 1;
+  });
 
   // Вычисляем общие диапазоны на основе локальных вариантов
   const commonRanges = useMemo(() => calculateCommonRanges(localVariants), [localVariants]);
@@ -49,7 +70,11 @@ export function useLocalRangeChanges(
     setLocalVariants(externalVariants);
     setRangeChanges([]);
     setPriceChanges([]);
+    setVariantChanges([]);
     setHasUnsavedChanges(false);
+    // Обновляем nextVariantId
+    const maxId = externalVariants.length > 0 ? Math.max(...externalVariants.map(v => v.id)) : 0;
+    setNextVariantId(maxId + 1);
   }, []);
 
   // Локальное добавление диапазона
@@ -250,21 +275,68 @@ export function useLocalRangeChanges(
     console.log('=== CHANGE PRICE === hasUnsavedChanges set to true');
   }, []);
 
+  // Локальное создание варианта
+  const createVariant = useCallback((variantName: string, parameters: Record<string, any> = {}) => {
+    const newVariantId = nextVariantId;
+    setNextVariantId(prev => prev + 1);
+
+    const newVariant: VariantWithTiers = {
+      id: newVariantId,
+      serviceId: localVariants[0]?.serviceId || 1, // Берем serviceId из первого варианта
+      variantName,
+      parameters,
+      sortOrder: localVariants.length,
+      isActive: true,
+      tiers: defaultTiers().map((t) => ({
+        id: 0,
+        serviceId: localVariants[0]?.serviceId || 1,
+        variantId: newVariantId,
+        minQuantity: t.min_qty,
+        rate: t.unit_price,
+        isActive: true,
+      })),
+    };
+
+    setLocalVariants(prev => [...prev, newVariant]);
+    setVariantChanges(prev => [...prev, {
+      type: 'create',
+      variantId: newVariantId,
+      variantName,
+      parameters,
+    }]);
+    setHasUnsavedChanges(true);
+    console.log('=== CREATE VARIANT LOCALLY === hasUnsavedChanges set to true, variant:', newVariant);
+
+    return newVariant;
+  }, [localVariants, nextVariantId]);
+
+  // Локальное удаление варианта
+  const deleteVariant = useCallback((variantId: number) => {
+    setLocalVariants(prev => prev.filter(v => v.id !== variantId));
+    setVariantChanges(prev => [...prev, {
+      type: 'delete',
+      variantId,
+    }]);
+    setHasUnsavedChanges(true);
+    console.log('=== DELETE VARIANT LOCALLY === hasUnsavedChanges set to true, variantId:', variantId);
+  }, []);
+
   // Сохранение всех изменений на сервер
   const saveChanges = useCallback(async () => {
-    if (rangeChanges.length === 0 && priceChanges.length === 0) return;
+    if (rangeChanges.length === 0 && priceChanges.length === 0 && variantChanges.length === 0) return;
 
     try {
-      await onSaveChanges(rangeChanges, priceChanges);
+      await onSaveChanges(rangeChanges, priceChanges, variantChanges);
 
       // Очищаем локальные изменения после успешного сохранения
       setRangeChanges([]);
       setPriceChanges([]);
+      setVariantChanges([]);
       setHasUnsavedChanges(false);
     } catch (error) {
       throw error; // Пробрасываем ошибку выше
     }
-  }, [rangeChanges, priceChanges, onSaveChanges]);
+  }, [rangeChanges, priceChanges, variantChanges, onSaveChanges]);
 
   // Отмена изменений
   const cancelChanges = useCallback(() => {
@@ -280,12 +352,15 @@ export function useLocalRangeChanges(
     hasUnsavedChanges,
     rangeChanges,
     priceChanges,
+    variantChanges,
 
     // Функции для локальных изменений
     addRangeBoundary,
     editRangeBoundary,
     removeRange,
     changePrice,
+    createVariant,
+    deleteVariant,
 
     // Функции для сохранения/отмены
     saveChanges,
