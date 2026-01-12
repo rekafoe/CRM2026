@@ -286,7 +286,8 @@ export function useVariantOperations(
       } catch (apiErr: any) {
         // Если новый API недоступен (404), используем старую логику синхронизации
         if (apiErr?.response?.status === 404) {
-          console.warn('Новый API недоступен, используем старую логику синхронизации');
+          // Это ожидаемо - новый API еще не развернут на продакшене, используется fallback
+          console.info('ℹ️ Новый оптимизированный API недоступен (404 - ожидаемо), используем старую логику синхронизации');
           
           const currentVariants = [...variants];
           const updatedVariants = currentVariants.map((variant) => {
@@ -404,7 +405,8 @@ export function useVariantOperations(
       } catch (apiErr: any) {
         // Если новый API недоступен (404), используем старую логику синхронизации
         if (apiErr?.response?.status === 404) {
-          console.warn('Новый API недоступен, используем старую логику синхронизации');
+          // Это ожидаемо - новый API еще не развернут на продакшене, используется fallback
+          console.info('ℹ️ Новый оптимизированный API недоступен (404 - ожидаемо), используем старую логику синхронизации');
           
           const currentVariants = [...variants];
           const updatedVariants = currentVariants.map((variant) => {
@@ -534,7 +536,8 @@ export function useVariantOperations(
       } catch (apiErr: any) {
         // Если новый API недоступен (404), используем старую логику синхронизации
         if (apiErr?.response?.status === 404) {
-          console.warn('Новый API недоступен, используем старую логику синхронизации');
+          // Это ожидаемо - новый API еще не развернут на продакшене, используется fallback
+          console.info('ℹ️ Новый оптимизированный API недоступен (404 - ожидаемо), используем старую логику синхронизации');
           
           const currentVariants = [...variants];
           const updatedVariants = currentVariants.map((variant) => {

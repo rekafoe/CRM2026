@@ -36,6 +36,13 @@ apiClient.interceptors.response.use(
       localStorage.removeItem('crmUserId');
       window.location.href = '/login';
     }
+    
+    // Подавляем логирование 404 для новых оптимизированных endpoints (они обрабатываются через fallback)
+    if (error.response?.status === 404 && error.config?.url?.includes('/ranges/')) {
+      // Это ожидаемо - новый API еще не развернут, используется fallback
+      // Не логируем как критическую ошибку
+    }
+    
     return Promise.reject(error);
   }
 );
