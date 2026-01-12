@@ -4,8 +4,6 @@ import { Product } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import { useLogger } from '../../utils/logger';
 import { useToastNotifications } from '../Toast';
-import { QuickTemplates } from './QuickTemplates';
-import { AuxiliaryModals } from './components/AuxiliaryModals';
 import '../../styles/improved-printing-calculator.css';
 import { ParamsSection } from './components/ParamsSection';
 import { MaterialsSection } from './components/MaterialsSection';
@@ -88,13 +86,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const [productTypeLabels, setProductTypeLabels] = useState<Record<string, string>>({});
   
   const { ui, open, close } = useCalculatorUI({ showProductSelection: !initialProductType });
-  const [comparisonItems, setComparisonItems] = useState<Array<{
-    id: string;
-    name: string;
-    specs: ProductSpecs;
-    result: CalculationResult;
-    isSelected: boolean;
-  }>>([]);
   const [selectedProduct, setSelectedProduct] = useState<(Product & { resolvedProductType?: string }) | null>(null);
   
   // Схема и типы — вынесено в хук
@@ -536,58 +527,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     ]
   );
 
-  // Обработка применения шаблона
-  const handleApplyTemplate = useCallback((templateSpecs: Partial<ProductSpecs>) => {
-    setSpecs(prev => ({ ...prev, ...templateSpecs }));
-    setUserInteracted(true);
-    logger.info('Применен шаблон', { templateSpecs });
-  }, [logger, setSpecs, setUserInteracted]);
-
-  // Добавление в сравнение
-  const handleAddToComparison = useCallback(() => {
-    if (!result) return;
-
-    const comparisonItem = {
-      id: `comparison_${Date.now()}`,
-      name: `${(backendProductSchema?.type || currentConfig?.name || specs.productType)} ${specs.format}`,
-      specs: { ...specs },
-      result: { ...result },
-      isSelected: false
-    };
-
-    setComparisonItems(prev => [...prev, comparisonItem]);
-    logger.info('Элемент добавлен в сравнение', { itemName: comparisonItem.name });
-    toast.success('Элемент добавлен в сравнение!');
-  }, [result, currentConfig, specs, logger, toast, setComparisonItems]);
-
-  // Обработка выбора варианта из сравнения
-  const handleSelectVariant = useCallback((variantSpecs: ProductSpecs) => {
-    setSpecs(variantSpecs);
-    setUserInteracted(true);
-    logger.info('Выбран вариант из сравнения', { variantSpecs });
-  }, [logger, setSpecs, setUserInteracted]);
-
-  // Обработка обновления цен
-  const handlePriceUpdate = useCallback(() => {
-    // Очищаем результат для пересчета с новыми ценами
-    setResult(null);
-    setUserInteracted(true);
-    logger.info('Цены обновлены, пересчитываем результат');
-  }, [logger, setResult, setUserInteracted]);
-
-  // Обработка применения рекомендации ИИ
-  const handleApplyAIRecommendation = useCallback((recommendation: any) => {
-    setSpecs(prev => ({
-      ...prev,
-      productType: recommendation.productType,
-      format: recommendation.format,
-      quantity: recommendation.quantity
-    }));
-    setResult(null); // Clear result to trigger recalculation
-    setUserInteracted(true);
-    logger.info('Применена рекомендация ИИ', { recommendation });
-    toast.success('Рекомендация ИИ применена!');
-  }, [logger, setResult, setSpecs, setUserInteracted, toast]);
 
   if (!isOpen) return null;
 
@@ -603,10 +542,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
             <p>Рассчитайте стоимость печатной продукции</p>
           </div>
           <CalculatorHeaderActions
-            onShowQuickTemplates={() => open('showQuickTemplates')}
-            onShowComparison={() => open('showComparison')}
-            onShowAI={() => open('showAIDashboard')}
-            onShowDynamicPricing={() => open('showDynamicPricingManager')}
             onClose={onClose}
           />
         </div>
@@ -619,7 +554,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
               result={result as any}
               isValid={isValid}
               onAddToOrder={() => handleAddToOrder()}
-              onAddToComparison={handleAddToComparison}
               mode={isEditMode ? 'edit' : 'create'}
             />
 
@@ -674,24 +608,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         />
       )}
 
-      {/* Модальное окно быстрых шаблонов */}
-      {ui.showQuickTemplates && (
-        <QuickTemplates
-          onApplyTemplate={handleApplyTemplate}
-          onClose={() => close('showQuickTemplates')}
-        />
-      )}
-
-           <AuxiliaryModals
-             showComparison={ui.showComparison}
-             showAIDashboard={ui.showAIDashboard}
-             showDynamicPricingManager={ui.showDynamicPricingManager}
-             onCloseComparison={() => close('showComparison')}
-             onCloseAI={() => close('showAIDashboard')}
-             onCloseDynamicPricing={() => close('showDynamicPricingManager')}
-             onSelectVariant={handleSelectVariant}
-             comparisonItems={comparisonItems}
-           />
          </div>
        );
      };

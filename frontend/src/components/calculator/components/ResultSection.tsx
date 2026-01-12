@@ -11,7 +11,6 @@ interface ResultSectionProps {
   } | null;
   isValid: boolean;
   onAddToOrder: () => void;
-  onAddToComparison: () => void;
   mode?: 'create' | 'edit';
 }
 
@@ -19,7 +18,6 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   result,
   isValid,
   onAddToOrder,
-  onAddToComparison,
   mode = 'create',
 }) => {
   if (!result) return null;
@@ -77,13 +75,6 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
           disabled={!isValid}
         >
           {addButtonLabel}
-        </button>
-        <button 
-          className="btn btn-outline"
-          onClick={onAddToComparison}
-          disabled={!isValid}
-        >
-          ⚖️ Сравнить
         </button>
       </div>
     </div>
