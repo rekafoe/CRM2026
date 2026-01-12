@@ -10,7 +10,6 @@ import { CalculatorToolbar } from './CalculatorToolbar';
 import { ProductSelectionModal } from './ProductSelectionModal';
 import { CalculatorHeader } from './CalculatorHeader';
 import { CalculatorMainContent } from './CalculatorMainContent';
-import { QuickTemplates } from '../QuickTemplates';
 import { LoadingSpinner } from '../../LoadingSpinner';
 import { ErrorDisplay } from '../../ErrorStates';
 import { useLogger } from '../../../utils/logger';
@@ -149,11 +148,6 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({
     }
   };
 
-  const handleApplyTemplate = (templateSpecs: any) => {
-    calculatorState.applyTemplate(templateSpecs);
-    calculatorState.setShowQuickTemplates(false);
-    toast.success('Шаблон применен');
-  };
 
   const handleSelectProductType = (productType: string) => {
     const defaultFormat = calculatorLogic.getDefaultFormat(productType, calculatorData.productConfigs);
@@ -194,10 +188,10 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({
               // Toolbar props
               onCalculate={handleCalculate}
               onShowPresets={() => calculatorState.setShowPresets(true)}
-              onShowQuickTemplates={() => calculatorState.setShowQuickTemplates(true)}
-              onShowComparison={() => calculatorState.setShowComparison(true)}
-              onShowAIDashboard={() => calculatorState.setShowAIDashboard(true)}
-              onShowDynamicPricingManager={() => calculatorState.setShowDynamicPricingManager(true)}
+              onShowQuickTemplates={() => {}}
+              onShowComparison={() => {}}
+              onShowAIDashboard={() => {}}
+              onShowDynamicPricingManager={() => {}}
               onUpdatePrices={calculatorData.updatePrices}
               onReloadData={calculatorData.loadAllData}
               onShowProductSelection={() => calculatorState.setShowProductSelection(true)}
@@ -322,13 +316,6 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({
           </div>
         )}
 
-        {/* Модальное окно быстрых шаблонов - временно отключено */}
-        {/* {calculatorState.showQuickTemplates && (
-          <QuickTemplates
-            onApplyTemplate={handleApplyTemplate}
-            onClose={() => calculatorState.setShowQuickTemplates(false)}
-          />
-        )} */}
 
         {/* Модальные окна - временно отключены */}
         {/* 
