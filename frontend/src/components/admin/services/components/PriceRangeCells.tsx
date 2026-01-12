@@ -4,7 +4,7 @@
  * Сохраняет стили Element UI и интегрируется с текущей структурой
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useRef } from 'react';
 import { PriceRange, PriceRangeUtils } from '../../../../hooks/usePriceRanges';
 import { ServiceVolumeTier } from '../../../../types/pricing';
 
@@ -45,7 +45,18 @@ export const PriceRangeCells: React.FC<PriceRangeCellsProps> = ({
     return new Map(tiers.map(t => [t.minQuantity, t]));
   }, [tiers]);
 
+  // Состояние для отслеживания фокуса и локального значения ввода
+  const [focusedInput, setFocusedInput] = useState<number | null>(null);
+  const [localValues, setLocalValues] = useState<Map<number, string>>(new Map());
+
   const handlePriceChange = useCallback((minQty: number, value: string) => {
+    // Обновляем локальное значение
+    setLocalValues(prev => {
+      const newMap = new Map(prev);
+      newMap.set(minQty, value);
+      return newMap;
+    });
+
     // Разрешаем пустую строку для промежуточного ввода
     if (value === '' || value === '.') {
       return;
@@ -63,10 +74,49 @@ export const PriceRangeCells: React.FC<PriceRangeCellsProps> = ({
     }
   }, [onPriceChange]);
 
+  const handleFocus = useCallback((minQty: number, currentValue: number | null | undefined) => {
+    setFocusedInput(minQty);
+    // Если значение равно 0, очищаем поле
+    if (currentValue === 0 || currentValue === null || currentValue === undefined) {
+      setLocalValues(prev => {
+        const newMap = new Map(prev);
+        newMap.set(minQty, '');
+        return newMap;
+      });
+    }
+  }, []);
+
+  const handleBlur = useCallback((minQty: number, currentInputValue: string) => {
+    setFocusedInput(null);
+    
+    // Если поле пустое при потере фокуса, устанавливаем 0
+    if (currentInputValue === '' || currentInputValue === '.') {
+      if (onPriceChange) {
+        onPriceChange(minQty, 0);
+      }
+    }
+    
+    // Очищаем локальное значение при потере фокуса, чтобы вернуться к реальному значению
+    setLocalValues(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(minQty);
+      return newMap;
+    });
+  }, [onPriceChange]);
+
   return (
     <>
       {commonRanges.map((range) => {
         const tier = tiersMap.get(range.minQty);
+        const isFocused = focusedInput === range.minQty;
+        const localValue = localValues.get(range.minQty);
+        
+        // Если поле в фокусе и есть локальное значение, используем его
+        // Иначе используем реальное значение из tier, но если оно 0 и поле не в фокусе, показываем пустую строку
+        const displayValue = isFocused && localValue !== undefined
+          ? localValue
+          : (tier?.rate !== undefined && tier.rate !== 0 ? tier.rate : '');
+
         return (
           <td key={range.minQty} style={{ width: '120px', textAlign: 'center' }}>
             <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -76,8 +126,10 @@ export const PriceRangeCells: React.FC<PriceRangeCellsProps> = ({
                   step="0.01"
                   min="0"
                   className="el-input__inner"
-                  value={tier?.rate ?? ''}
+                  value={displayValue}
                   onChange={(e) => handlePriceChange(range.minQty, e.target.value)}
+                  onFocus={() => handleFocus(range.minQty, tier?.rate)}
+                  onBlur={(e) => handleBlur(range.minQty, e.target.value)}
                   disabled={!editable}
                   style={{ textAlign: 'center' }}
                 />
