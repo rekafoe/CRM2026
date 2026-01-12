@@ -280,10 +280,91 @@ export function useVariantOperations(
 
   const addRangeBoundary = useCallback(async (boundary: number) => {
     try {
-      // Используем новый оптимизированный API - одна операция вместо сотен!
-      await addRangeBoundaryAPI(serviceId, boundary);
+      try {
+        // Пытаемся использовать новый оптимизированный API
+        await addRangeBoundaryAPI(serviceId, boundary);
+      } catch (apiErr: any) {
+        // Если новый API недоступен (404), используем старую логику синхронизации
+        if (apiErr?.response?.status === 404) {
+          console.warn('Новый API недоступен, используем старую логику синхронизации');
+          
+          const currentVariants = [...variants];
+          const updatedVariants = currentVariants.map((variant) => {
+            const currentRanges = variant.tiers.map((t) => ({
+              minQty: t.minQuantity,
+              price: t.rate,
+            }));
+
+            const newRanges = PriceRangeUtils.addBoundary(currentRanges, boundary);
+            const normalizedRanges = PriceRangeUtils.normalize(newRanges);
+
+            // Сохраняем цены из исходных диапазонов
+            const originalRangePrices = new Map<number, number>();
+            variant.tiers.forEach((originalTier) => {
+              const originalMin = originalTier.minQuantity;
+              const nextTier = variant.tiers.find((t) => t.minQuantity > originalMin);
+              const originalMax = nextTier ? nextTier.minQuantity : Infinity;
+
+              normalizedRanges.forEach((newRange) => {
+                if (newRange.minQty >= originalMin && newRange.minQty < originalMax) {
+                  if (!originalRangePrices.has(newRange.minQty)) {
+                    originalRangePrices.set(newRange.minQty, originalTier.rate);
+                  }
+                }
+              });
+            });
+
+            const newTiersWithPrices = normalizedRanges.map((r) => ({
+              minQty: r.minQty,
+              price: originalRangePrices.get(r.minQty) ?? r.price,
+            }));
+
+            return {
+              ...variant,
+              tiers: newTiersWithPrices.map((t) => ({
+                id: 0,
+                serviceId,
+                variantId: variant.id,
+                minQuantity: t.minQty,
+                rate: t.price,
+                isActive: true,
+              })),
+            };
+          });
+
+          // Синхронизируем с сервером через старую логику
+          const allTiersByVariantId = await getAllVariantTiers(serviceId);
+          for (const variant of updatedVariants) {
+            const existingTiers = allTiersByVariantId[variant.id] || [];
+            const existingTiersMap = new Map(existingTiers.map((t) => [t.minQuantity, t]));
+            const newTiersMinQtys = new Set(variant.tiers.map((t) => t.minQuantity));
+
+            // Создаем или обновляем tiers
+            for (const newTier of variant.tiers) {
+              const existingTier = existingTiersMap.get(newTier.minQuantity);
+              if (existingTier) {
+                if (existingTier.rate !== newTier.rate) {
+                  await updateServiceVariantTier(serviceId, variant.id, existingTier.id, {
+                    minQuantity: newTier.minQuantity,
+                    rate: newTier.rate,
+                  });
+                }
+              } else {
+                await createServiceVariantTier(serviceId, variant.id, {
+                  minQuantity: newTier.minQuantity,
+                  rate: newTier.rate,
+                });
+              }
+            }
+          }
+          
+          setVariants(updatedVariants);
+          return;
+        }
+        throw apiErr; // Пробрасываем другие ошибки
+      }
       
-      // Перезагружаем данные с сервера
+      // Перезагружаем данные с сервера (если новый API сработал)
       const allTiersByVariantId = await getAllVariantTiers(serviceId);
       
       // Обновляем локальное состояние
@@ -317,10 +398,103 @@ export function useVariantOperations(
         return;
       }
       
-      // Используем новый оптимизированный API - одна операция!
-      await updateRangeBoundaryAPI(serviceId, oldMinQuantity, newBoundary);
+      try {
+        // Пытаемся использовать новый оптимизированный API
+        await updateRangeBoundaryAPI(serviceId, oldMinQuantity, newBoundary);
+      } catch (apiErr: any) {
+        // Если новый API недоступен (404), используем старую логику синхронизации
+        if (apiErr?.response?.status === 404) {
+          console.warn('Новый API недоступен, используем старую логику синхронизации');
+          
+          const currentVariants = [...variants];
+          const updatedVariants = currentVariants.map((variant) => {
+            const currentRanges = variant.tiers.map((t) => ({
+              minQty: t.minQuantity,
+              price: t.rate,
+            }));
+
+            const tierIndex = currentRanges.findIndex((r) => r.minQty === oldMinQuantity);
+            if (tierIndex === -1) return variant;
+
+            const newRanges = PriceRangeUtils.editBoundary(currentRanges, tierIndex, newBoundary);
+            const normalizedRanges = PriceRangeUtils.normalize(newRanges);
+
+            // Сохраняем цены
+            const originalRangePrices = new Map<number, number>();
+            variant.tiers.forEach((originalTier) => {
+              const originalMin = originalTier.minQuantity;
+              const nextTier = variant.tiers.find((t) => t.minQuantity > originalMin);
+              const originalMax = nextTier ? nextTier.minQuantity : Infinity;
+
+              normalizedRanges.forEach((newRange) => {
+                if (newRange.minQty >= originalMin && newRange.minQty < originalMax) {
+                  if (!originalRangePrices.has(newRange.minQty)) {
+                    originalRangePrices.set(newRange.minQty, originalTier.rate);
+                  }
+                }
+              });
+            });
+
+            const newTiersWithPrices = normalizedRanges.map((r) => ({
+              minQty: r.minQty,
+              price: originalRangePrices.get(r.minQty) ?? r.price,
+            }));
+
+            return {
+              ...variant,
+              tiers: newTiersWithPrices.map((t) => ({
+                id: 0,
+                serviceId,
+                variantId: variant.id,
+                minQuantity: t.minQty,
+                rate: t.price,
+                isActive: true,
+              })),
+            };
+          });
+
+          // Синхронизируем с сервером через старую логику
+          const allTiersByVariantId = await getAllVariantTiers(serviceId);
+          for (const variant of updatedVariants) {
+            const existingTiers = allTiersByVariantId[variant.id] || [];
+            const existingTiersMap = new Map(existingTiers.map((t) => [t.minQuantity, t]));
+            const newTiersMinQtys = new Set(variant.tiers.map((t) => t.minQuantity));
+
+            for (const newTier of variant.tiers) {
+              const existingTier = existingTiersMap.get(newTier.minQuantity);
+              if (existingTier) {
+                if (existingTier.rate !== newTier.rate) {
+                  await updateServiceVariantTier(serviceId, variant.id, existingTier.id, {
+                    minQuantity: newTier.minQuantity,
+                    rate: newTier.rate,
+                  });
+                }
+              } else {
+                await createServiceVariantTier(serviceId, variant.id, {
+                  minQuantity: newTier.minQuantity,
+                  rate: newTier.rate,
+                });
+              }
+            }
+
+            // Удаляем старые tiers
+            const tiersToDelete = existingTiers.filter(
+              (existingTier) => !newTiersMinQtys.has(existingTier.minQuantity),
+            );
+            if (tiersToDelete.length > 0) {
+              await Promise.all(
+                tiersToDelete.map((tier) => deleteServiceVariantTier(serviceId, tier.id)),
+              );
+            }
+          }
+          
+          setVariants(updatedVariants);
+          return;
+        }
+        throw apiErr; // Пробрасываем другие ошибки
+      }
       
-      // Перезагружаем данные с сервера
+      // Перезагружаем данные с сервера (если новый API сработал)
       const allTiersByVariantId = await getAllVariantTiers(serviceId);
       
       // Обновляем локальное состояние
@@ -354,10 +528,75 @@ export function useVariantOperations(
         return;
       }
       
-      // Используем новый оптимизированный API - одна операция удаляет все связанные цены!
-      await removeRangeBoundaryAPI(serviceId, minQuantityToRemove);
+      try {
+        // Пытаемся использовать новый оптимизированный API
+        await removeRangeBoundaryAPI(serviceId, minQuantityToRemove);
+      } catch (apiErr: any) {
+        // Если новый API недоступен (404), используем старую логику синхронизации
+        if (apiErr?.response?.status === 404) {
+          console.warn('Новый API недоступен, используем старую логику синхронизации');
+          
+          const currentVariants = [...variants];
+          const updatedVariants = currentVariants.map((variant) => {
+            const currentRanges = variant.tiers.map((t) => ({
+              minQty: t.minQuantity,
+              price: t.rate,
+            }));
+
+            const tierIndex = currentRanges.findIndex((r) => r.minQty === minQuantityToRemove);
+            if (tierIndex === -1) return variant;
+
+            const newRanges = PriceRangeUtils.removeRange(currentRanges, tierIndex);
+            const normalizedRanges = PriceRangeUtils.normalize(newRanges);
+
+            // Сохраняем существующие цены (исключаем tiers, которые попадают в удаляемый диапазон)
+            const preservedPrices = new Map<number, number>();
+            variant.tiers.forEach((t) => {
+              const isInRemovedRange = t.minQuantity === minQuantityToRemove;
+              if (!isInRemovedRange) {
+                preservedPrices.set(t.minQuantity, t.rate);
+              }
+            });
+
+            return {
+              ...variant,
+              tiers: normalizedRanges
+                .filter((r) => preservedPrices.has(r.minQty))
+                .map((t) => ({
+                  id: 0,
+                  serviceId,
+                  variantId: variant.id,
+                  minQuantity: t.minQty,
+                  rate: preservedPrices.get(t.minQty)!,
+                  isActive: true,
+                })),
+            };
+          });
+
+          // Синхронизируем с сервером через старую логику
+          const allTiersByVariantId = await getAllVariantTiers(serviceId);
+          for (const variant of updatedVariants) {
+            const existingTiers = allTiersByVariantId[variant.id] || [];
+            const newTiersMinQtys = new Set(variant.tiers.map((t) => t.minQuantity));
+            
+            // Удаляем tiers, которые исчезли
+            const tiersToDelete = existingTiers.filter(
+              (existingTier) => !newTiersMinQtys.has(existingTier.minQuantity),
+            );
+            if (tiersToDelete.length > 0) {
+              await Promise.all(
+                tiersToDelete.map((tier) => deleteServiceVariantTier(serviceId, tier.id)),
+              );
+            }
+          }
+          
+          setVariants(updatedVariants);
+          return;
+        }
+        throw apiErr; // Пробрасываем другие ошибки
+      }
       
-      // Перезагружаем данные с сервера
+      // Перезагружаем данные с сервера (если новый API сработал)
       const allTiersByVariantId = await getAllVariantTiers(serviceId);
       
       // Обновляем локальное состояние
