@@ -63,33 +63,21 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   }, [operations, editing]);
 
   const handleSaveRange = useCallback(async () => {
-    console.log('=== HANDLE SAVE RANGE ===');
     const boundary = Number(tierModal.tierModal.boundary);
-    console.log('boundary value:', boundary);
-
     if (!boundary || boundary < 1) {
       setError('Граница диапазона должна быть больше 0');
       return;
     }
 
     try {
-      console.log('tierModal type:', tierModal.tierModal.type);
       if (tierModal.tierModal.type === 'add') {
-        console.log('Calling addRangeBoundary with:', boundary);
         await operations.addRangeBoundary(boundary);
-        console.log('addRangeBoundary completed');
       } else if (tierModal.tierModal.type === 'edit' && tierModal.tierModal.tierIndex !== undefined) {
-        console.log('Calling editRangeBoundary with:', tierModal.tierModal.tierIndex, boundary);
         await operations.editRangeBoundary(tierModal.tierModal.tierIndex, boundary);
-        console.log('editRangeBoundary completed');
       }
-
-      console.log('Closing modal...');
       tierModal.closeModal();
       setError(null);
-      console.log('=== HANDLE SAVE RANGE END ===');
     } catch (err) {
-      console.error('Error in handleSaveRange:', err);
       // Ошибка уже обработана в хуке
     }
   }, [tierModal, operations, setError]);
@@ -162,6 +150,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                       onAddRange={() => {
                         tierModal.openAddModal(tierModal.addRangeButtonRef.current || undefined);
                       }}
+                      addRangeButtonRef={tierModal.addRangeButtonRef}
                     />
                     <th>
                       <div className="cell">

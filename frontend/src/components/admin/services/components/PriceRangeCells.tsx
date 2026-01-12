@@ -84,21 +84,26 @@ export interface PriceRangeHeadersProps {
    * Общие диапазоны
    */
   commonRanges: PriceRange[];
-  
+
   /**
    * Callback при клике на заголовок (для редактирования)
    */
   onEditRange?: (rangeIndex: number, minQty: number) => void;
-  
+
   /**
    * Callback при удалении диапазона
    */
   onRemoveRange?: (rangeIndex: number) => void;
-  
+
   /**
    * Callback при добавлении диапазона
    */
   onAddRange?: () => void;
+
+  /**
+   * Ref для кнопки добавления диапазона
+   */
+  addRangeButtonRef?: React.RefObject<HTMLButtonElement>;
 }
 
 export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
@@ -106,6 +111,7 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
   onEditRange,
   onRemoveRange,
   onAddRange,
+  addRangeButtonRef,
 }) => {
   const formatRangeLabel = useCallback((range: PriceRange): string => {
     if (range.maxQty === undefined) {
@@ -152,6 +158,7 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
             <div className="active-panel active-panel-with-popover">
               <span>
                 <button
+                  ref={addRangeButtonRef}
                   type="button"
                   className="el-button el-button--info el-button--mini is-plain"
                   style={{ width: '100%', marginLeft: '0px' }}

@@ -268,11 +268,8 @@ export function useVariantOperations(
   }, [serviceId, setVariants]); // variants через ref, не добавляем в зависимости
 
   const addRangeBoundary = useCallback(async (boundary: number) => {
-    console.log('=== ADD RANGE BOUNDARY START ===');
-    console.log('boundary:', boundary);
     try {
       const currentVariants = [...variants];
-      console.log('currentVariants count:', currentVariants.length);
 
       // Обновляем диапазоны для всех вариантов
       const updatedVariants = currentVariants.map((variant) => {
@@ -358,9 +355,7 @@ export function useVariantOperations(
       }
 
       // Обновляем локальное состояние
-      console.log('Setting variants with updatedVariants, count:', updatedVariants.length);
       setVariants(updatedVariants);
-      console.log('=== ADD RANGE BOUNDARY END ===');
     } catch (err) {
       console.error('Ошибка сохранения диапазона:', err);
       setError('Не удалось сохранить диапазон');
@@ -368,8 +363,6 @@ export function useVariantOperations(
   }, [serviceId, variants, setVariants, setError]);
 
   const editRangeBoundary = useCallback(async (rangeIndex: number, newBoundary: number) => {
-    console.log('=== EDIT RANGE BOUNDARY START ===');
-    console.log('rangeIndex:', rangeIndex, 'newBoundary:', newBoundary);
     try {
       const currentVariants = [...variants];
       
@@ -471,9 +464,7 @@ export function useVariantOperations(
         }
       }
 
-      console.log('Setting variants for editRangeBoundary, count:', updatedVariants.length);
       setVariants(updatedVariants);
-      console.log('=== EDIT RANGE BOUNDARY END ===');
     } catch (err) {
       console.error('Ошибка редактирования диапазона:', err);
       setError('Не удалось отредактировать диапазон');
