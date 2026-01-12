@@ -284,10 +284,10 @@ export function useVariantOperations(
         // Пытаемся использовать новый оптимизированный API
         await addRangeBoundaryAPI(serviceId, boundary);
       } catch (apiErr: any) {
-        // Если новый API недоступен (404), используем старую логику синхронизации
-        if (apiErr?.response?.status === 404) {
-          // Это ожидаемо - новый API еще не развернут на продакшене, используется fallback
-          console.info('ℹ️ Новый оптимизированный API недоступен (404 - ожидаемо), используем старую логику синхронизации');
+        // Если новый API недоступен (404) или падает с ошибкой (500), используем старую логику синхронизации
+        if (apiErr?.response?.status === 404 || apiErr?.response?.status === 500) {
+          // Это ожидаемо - новый API еще не развернут на продакшене или есть проблемы, используется fallback
+          console.info(`ℹ️ Новый оптимизированный API недоступен (${apiErr?.response?.status} - ожидаемо), используем старую логику синхронизации`);
           
           const currentVariants = [...variants];
           const updatedVariants = currentVariants.map((variant) => {
@@ -403,10 +403,10 @@ export function useVariantOperations(
         // Пытаемся использовать новый оптимизированный API
         await updateRangeBoundaryAPI(serviceId, oldMinQuantity, newBoundary);
       } catch (apiErr: any) {
-        // Если новый API недоступен (404), используем старую логику синхронизации
-        if (apiErr?.response?.status === 404) {
-          // Это ожидаемо - новый API еще не развернут на продакшене, используется fallback
-          console.info('ℹ️ Новый оптимизированный API недоступен (404 - ожидаемо), используем старую логику синхронизации');
+        // Если новый API недоступен (404) или падает с ошибкой (500), используем старую логику синхронизации
+        if (apiErr?.response?.status === 404 || apiErr?.response?.status === 500) {
+          // Это ожидаемо - новый API еще не развернут на продакшене или есть проблемы, используется fallback
+          console.info(`ℹ️ Новый оптимизированный API недоступен (${apiErr?.response?.status} - ожидаемо), используем старую логику синхронизации`);
           
           const currentVariants = [...variants];
           const updatedVariants = currentVariants.map((variant) => {
@@ -534,10 +534,10 @@ export function useVariantOperations(
         // Пытаемся использовать новый оптимизированный API
         await removeRangeBoundaryAPI(serviceId, minQuantityToRemove);
       } catch (apiErr: any) {
-        // Если новый API недоступен (404), используем старую логику синхронизации
-        if (apiErr?.response?.status === 404) {
-          // Это ожидаемо - новый API еще не развернут на продакшене, используется fallback
-          console.info('ℹ️ Новый оптимизированный API недоступен (404 - ожидаемо), используем старую логику синхронизации');
+        // Если новый API недоступен (404) или падает с ошибкой (500), используем старую логику синхронизации
+        if (apiErr?.response?.status === 404 || apiErr?.response?.status === 500) {
+          // Это ожидаемо - новый API еще не развернут на продакшене или есть проблемы, используется fallback
+          console.info(`ℹ️ Новый оптимизированный API недоступен (${apiErr?.response?.status} - ожидаемо), используем старую логику синхронизации`);
           
           const currentVariants = [...variants];
           const updatedVariants = currentVariants.map((variant) => {

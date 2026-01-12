@@ -650,6 +650,7 @@ export class PricingServiceRepository {
    */
   static async addRangeBoundary(serviceId: number, minQuantity: number): Promise<number> {
     const db = await this.getConnection();
+    await this.ensureSchema(db);
     
     // Проверяем существование сервиса
     const service = await db.get(`SELECT id FROM post_processing_services WHERE id = ?`, serviceId);
@@ -700,6 +701,7 @@ export class PricingServiceRepository {
    */
   static async removeRangeBoundary(serviceId: number, minQuantity: number): Promise<void> {
     const db = await this.getConnection();
+    await this.ensureSchema(db);
     
     // Находим range_id по min_quantity
     const range = await db.get<{ id: number }>(`
@@ -725,6 +727,7 @@ export class PricingServiceRepository {
    */
   static async updateRangeBoundary(serviceId: number, oldMinQuantity: number, newMinQuantity: number): Promise<void> {
     const db = await this.getConnection();
+    await this.ensureSchema(db);
     
     // Находим range_id
     const range = await db.get<{ id: number }>(`
@@ -751,7 +754,8 @@ export class PricingServiceRepository {
    */
   static async updateVariantPrice(variantId: number, minQuantity: number, price: number): Promise<void> {
     const db = await this.getConnection();
-    
+    await this.ensureSchema(db);
+
     // Находим range_id по min_quantity через service_id варианта
     const variant = await db.get<{ service_id: number }>(`
       SELECT service_id FROM service_variants WHERE id = ?
