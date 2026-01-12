@@ -8,6 +8,7 @@ import {
   updateServiceVariantTier,
   deleteServiceVariantTier,
   getServiceVariantTiers,
+  getAllVariantTiers,
 } from '../../../../../services/pricing';
 import { PriceRangeUtils } from '../../../../../hooks/usePriceRanges';
 
@@ -315,16 +316,13 @@ export function useVariantOperations(
         };
       });
 
-      // Загружаем существующие tiers и синхронизируем
-      const existingTiersPromises = currentVariants.map((variant) =>
-        getServiceVariantTiers(serviceId, variant.id)
-      );
-      const allExistingTiers = await Promise.all(existingTiersPromises);
+      // Загружаем существующие tiers одним batch запросом
+      const allTiersByVariantId = await getAllVariantTiers(serviceId);
 
       // Обновляем tiers на сервере
       for (let variantIndex = 0; variantIndex < updatedVariants.length; variantIndex++) {
         const variant = updatedVariants[variantIndex];
-        const existingTiers = allExistingTiers[variantIndex];
+        const existingTiers = allTiersByVariantId[variant.id] || [];
         const existingTiersMap = new Map(existingTiers.map((t) => [t.minQuantity, t]));
         const newTiersMinQtys = new Set(variant.tiers.map((t) => t.minQuantity));
 
@@ -428,15 +426,12 @@ export function useVariantOperations(
         };
       });
 
-      // Синхронизируем с сервером (аналогично addRangeBoundary)
-      const existingTiersPromises = currentVariants.map((variant) =>
-        getServiceVariantTiers(serviceId, variant.id)
-      );
-      const allExistingTiers = await Promise.all(existingTiersPromises);
+      // Синхронизируем с сервером (аналогично addRangeBoundary) - используем batch запрос
+      const allTiersByVariantId = await getAllVariantTiers(serviceId);
 
       for (let variantIndex = 0; variantIndex < updatedVariants.length; variantIndex++) {
         const variant = updatedVariants[variantIndex];
-        const existingTiers = allExistingTiers[variantIndex];
+        const existingTiers = allTiersByVariantId[variant.id] || [];
         const existingTiersMap = new Map(existingTiers.map((t) => [t.minQuantity, t]));
         const newTiersMinQtys = new Set(variant.tiers.map((t) => t.minQuantity));
 
@@ -527,15 +522,12 @@ export function useVariantOperations(
         };
       });
 
-      // Синхронизируем с сервером
-      const existingTiersPromises = currentVariants.map((variant) =>
-        getServiceVariantTiers(serviceId, variant.id)
-      );
-      const allExistingTiers = await Promise.all(existingTiersPromises);
+      // Синхронизируем с сервером - используем batch запрос
+      const allTiersByVariantId = await getAllVariantTiers(serviceId);
 
       for (let variantIndex = 0; variantIndex < updatedVariants.length; variantIndex++) {
         const variant = updatedVariants[variantIndex];
-        const existingTiers = allExistingTiers[variantIndex];
+        const existingTiers = allTiersByVariantId[variant.id] || [];
         const newTiersMinQtys = new Set(variant.tiers.map((t) => t.minQuantity));
 
         for (const existingTier of existingTiers) {
