@@ -472,23 +472,35 @@ export function useVariantOperations(
   }, [serviceId, variants, setVariants, setError]);
 
   const removeRange = useCallback(async (rangeIndex: number) => {
+    console.log('=== REMOVE_RANGE START ===');
+    console.log('rangeIndex:', rangeIndex);
+
     try {
       const currentVariants = [...variants];
-      
+      console.log('currentVariants:', currentVariants);
+
       // Вычисляем commonRanges
       const allMinQtys = new Set<number>();
       currentVariants.forEach((v) => {
         v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
       });
       const sortedMinQtys = Array.from(allMinQtys).sort((a, b) => a - b);
+      console.log('sortedMinQtys:', sortedMinQtys);
+
       const currentCommonRanges = sortedMinQtys.map((minQty, idx) => ({
         minQty,
         maxQty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
         price: 0,
       }));
+      console.log('currentCommonRanges:', currentCommonRanges);
 
       const rangeToRemove = currentCommonRanges[rangeIndex];
-      if (!rangeToRemove) return;
+      console.log('rangeToRemove:', rangeToRemove);
+
+      if (!rangeToRemove) {
+        console.log('Range not found, returning');
+        return;
+      }
 
       // Обновляем диапазоны для всех вариантов
       const updatedVariants = currentVariants.map((variant) => {
@@ -544,7 +556,9 @@ export function useVariantOperations(
         }
       }
 
+      console.log('updatedVariants:', updatedVariants);
       setVariants(updatedVariants);
+      console.log('=== REMOVE_RANGE END ===');
     } catch (err) {
       console.error('Ошибка удаления диапазона:', err);
       setError('Не удалось удалить диапазон');

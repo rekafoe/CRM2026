@@ -143,8 +143,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                         tierModal.openEditModal(rangeIndex, minQty);
                       }}
                       onRemoveRange={(rangeIndex) => {
+                        console.log('=== REMOVE RANGE CLICK ===');
+                        console.log('rangeIndex:', rangeIndex);
                         if (confirm('Удалить этот диапазон для всех вариантов?')) {
+                          console.log('Confirmed, calling operations.removeRange...');
                           operations.removeRange(rangeIndex);
+                        } else {
+                          console.log('Cancelled by user');
                         }
                       }}
                       onAddRange={() => {
