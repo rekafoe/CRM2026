@@ -271,11 +271,11 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
               <table cellSpacing="0" cellPadding="0" border={0} className="el-table__header" style={{ width: '100%' }}>
                 <thead>
                   <tr>
-                    <th>
+                    <th style={{ width: '200px', minWidth: '200px', maxWidth: '200px' }}>
                       <div className="cell">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ flex: 1 }}>{serviceName}</div>
-                          <div className="active-panel" style={{ marginLeft: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflow: 'hidden' }}>
+                          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={serviceName}>{serviceName}</div>
+                          <div className="active-panel" style={{ marginLeft: '8px', flexShrink: 0 }}>
                             <button
                               type="button"
                               className="el-button el-button--success el-button--small"
@@ -306,7 +306,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                       }}
                       addRangeButtonRef={tierModal.addRangeButtonRef}
                     />
-                    <th>
+                    <th style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
                       <div className="cell">
                         <div className="active-panel">
                           <span style={{ fontSize: '12px', color: '#909399' }}>Действия</span>
@@ -338,10 +338,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                       <React.Fragment key={typeName}>
                         {/* Родительская строка - тип (уровень 0) */}
                         <tr className="el-table__row expanded">
-                          <td>
+                          <td style={{ width: '200px', minWidth: '200px', maxWidth: '200px' }}>
                             <div className="cell">
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div className="el-input el-input--small" style={{ flex: 1, marginRight: '8px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflow: 'hidden' }}>
+                                <div className="el-input el-input--small" style={{ flex: 1, marginRight: '8px', minWidth: 0 }}>
                                   {editing.editingVariantName === firstVariant.id ? (
                                     <input
                                       type="text"
@@ -419,7 +419,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                             onPriceChange={() => {}} // Пустая функция для заголовка
                             editable={false}
                           />
-                          <td>
+                          <td style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
                             <div className="cell">
                               <div className="active-panel">
                                 <button
@@ -452,7 +452,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                             return (
                               <React.Fragment key={variant.id}>
                                 <tr className="el-table__row el-table__row--level-1">
-                                  <td>
+                                  <td style={{ width: '200px', minWidth: '200px', maxWidth: '200px' }}>
                                     <div className="cell">
                                       <span className="el-table__indent" style={{ paddingLeft: '16px' }}></span>
                                       {hasChildren && (
@@ -529,7 +529,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                     }
                                     editable={true}
                                   />
-                                  <td>
+                                  <td style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
                                     <div className="cell">
                                       <div className="active-panel">
                                         <button
@@ -595,7 +595,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                 {/* Внучатые строки - варианты уровня 2 */}
                                 {level2Variants.map((level2Variant) => (
                                   <tr key={level2Variant.id} className="el-table__row el-table__row--level-2">
-                                    <td>
+                                    <td style={{ width: '200px', minWidth: '200px', maxWidth: '200px' }}>
                                       <div className="cell">
                                         <span className="el-table__indent" style={{ paddingLeft: '32px' }}></span>
                                         <span className="el-table__placeholder"></span>
@@ -653,7 +653,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                       }
                                       editable={true}
                                     />
-                                    <td>
+                                    <td style={{ width: '120px', minWidth: '120px', maxWidth: '120px' }}>
                                       <div className="cell">
                                         <div className="active-panel">
                                           <button

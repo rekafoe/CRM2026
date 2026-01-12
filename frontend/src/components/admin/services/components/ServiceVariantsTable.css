@@ -8,6 +8,7 @@
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
+  table-layout: fixed; /* Фиксированная ширина столбцов для выравнивания */
 }
 
 .el-table--border {
@@ -44,6 +45,8 @@
   border-bottom: 1px solid #ebeef5;
   border-right: 1px solid #ebeef5;
   padding: 12px 0;
+  overflow: hidden; /* Предотвращаем переполнение содержимого */
+  text-overflow: ellipsis; /* Обрезаем текст при переполнении */
 }
 
 .el-table th:last-child,
@@ -116,6 +119,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Стили для Element UI input */
