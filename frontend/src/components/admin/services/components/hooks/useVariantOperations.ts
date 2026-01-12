@@ -54,16 +54,24 @@ export function useVariantOperations(
   }, []);
 
   const createVariant = useCallback(async (variantName: string, parameters: Record<string, any> = {}) => {
+    console.log('=== CREATE_VARIANT START ===');
+    console.log('variantName:', variantName, 'parameters:', parameters);
+    console.log('serviceId:', serviceId);
+
     try {
       // Используем максимальный sortOrder + 1 для уникальности
       const currentVariants = variantsRef.current;
       const maxSortOrder = currentVariants.length > 0 ? Math.max(...currentVariants.map(v => v.sortOrder)) : 0;
+      console.log('maxSortOrder:', maxSortOrder);
+
       const newVariant = await createServiceVariant(serviceId, {
         variantName,
         parameters,
         sortOrder: maxSortOrder + 1,
         isActive: true,
       });
+
+      console.log('✅ API call successful, newVariant:', newVariant);
 
       // Создаем вариант с tiers для немедленного отображения
       const newVariantWithTiers: VariantWithTiers = {
@@ -78,13 +86,21 @@ export function useVariantOperations(
         })),
       };
 
+      console.log('✅ Created newVariantWithTiers:', newVariantWithTiers);
+
       // Инвалидируем кэш tiers для нового варианта
       invalidateCacheRef.current?.();
+      console.log('✅ Cache invalidated');
 
       // Добавляем новый вариант в локальное состояние
       // Важно: не делаем reload, чтобы избежать медленных API запросов
-      setVariants((prev) => [...prev, newVariantWithTiers]);
+      setVariants((prev) => {
+        const newVariants = [...prev, newVariantWithTiers];
+        console.log('✅ Updated variants state, new length:', newVariants.length);
+        return newVariants;
+      });
 
+      console.log('=== CREATE_VARIANT END ===');
       return newVariantWithTiers;
 
       // Обновляем tiers для нового варианта через небольшую задержку

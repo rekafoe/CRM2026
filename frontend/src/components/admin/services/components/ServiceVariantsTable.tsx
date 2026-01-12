@@ -28,8 +28,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   serviceId,
   serviceName,
 }) => {
+  console.log('=== ServiceVariantsTable RENDER ===');
+  console.log('serviceId:', serviceId, 'serviceName:', serviceName);
+
   // Хуки для управления состоянием
   const { variants, setVariants, loading, error, setError, reload, invalidateCache } = useServiceVariants(serviceId);
+  console.log('variants from hook:', variants);
+  console.log('variants length:', variants.length);
   const editing = useVariantEditing();
   const tierModal = useTierModal();
   const operations = useVariantOperations(serviceId, variants, setVariants, setError, reload, invalidateCache);
@@ -48,9 +53,20 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   }, [commonRanges]);
 
   // Группируем варианты
-  const groupedVariants = useMemo(() => groupVariantsByType(variants), [variants]);
+  const groupedVariants = useMemo(() => {
+    const result = groupVariantsByType(variants);
+    console.log('=== GROUPING VARIANTS ===');
+    console.log('Input variants:', variants);
+    console.log('Grouped result:', result);
+    console.log('Type names:', Object.keys(result));
+    return result;
+  }, [variants]);
   const variantsIndexMap = useMemo(() => createVariantsIndexMap(variants), [variants]);
-  const typeNames = useMemo(() => Object.keys(groupedVariants), [groupedVariants]);
+  const typeNames = useMemo(() => {
+    const names = Object.keys(groupedVariants);
+    console.log('Final type names:', names);
+    return names;
+  }, [groupedVariants]);
 
   // Обработчики
   const handleCreateVariant = useCallback(async () => {
