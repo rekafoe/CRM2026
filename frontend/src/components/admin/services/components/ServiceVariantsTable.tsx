@@ -94,7 +94,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   // Синхронизируем локальное состояние при изменении серверных данных
   React.useEffect(() => {
     localChanges.syncWithExternal(serverVariants);
-  }, [serverVariants, localChanges]);
+  }, [serverVariants]);
 
   // Используем локальные варианты
   const variants = localChanges.localVariants;
