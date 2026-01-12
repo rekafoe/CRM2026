@@ -96,9 +96,6 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
     localChanges.syncWithExternal(serverVariants);
   }, [serverVariants, localChanges]);
 
-  console.log('operations object:', operations);
-  console.log('createVariant function:', operations.createVariant);
-
   // Используем локальные варианты
   const variants = localChanges.localVariants;
 
@@ -111,12 +108,6 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       price: 0,
     }));
   }, [commonRanges]);
-
-  console.log('=== ServiceVariantsTable ===');
-  console.log('localChanges.hasUnsavedChanges:', localChanges.hasUnsavedChanges);
-  console.log('localChanges.variantChanges:', localChanges.variantChanges);
-  console.log('localChanges.rangeChanges:', localChanges.rangeChanges);
-  console.log('localChanges.priceChanges:', localChanges.priceChanges);
 
   // Группируем варианты
   const groupedVariants = useMemo(() => groupVariantsByType(variants), [variants]);
