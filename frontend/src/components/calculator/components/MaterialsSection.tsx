@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { checkMaterialAvailability, calculateMaterialCost } from '../../../services/calculatorMaterialService';
 import type { CalculationResult } from '../types/calculator.types';
+import { getMaterials } from '../../../api';
 
 interface MaterialsSectionProps {
   specs: {
@@ -9,6 +10,7 @@ interface MaterialsSectionProps {
     lamination: 'none' | 'matte' | 'glossy';
     quantity: number;
     material_id?: number; // 🆕 ID материала из схемы
+    size_id?: string; // 🆕 ID размера для упрощённых продуктов
     [key: string]: any; // Для других полей
   };
   warehousePaperTypes: Array<{ 
@@ -34,7 +36,16 @@ interface MaterialsSectionProps {
       placeholder?: string;
       enum?: any[];
     }>; 
-    constraints?: { allowed_paper_types?: string[] | null } 
+    constraints?: { allowed_paper_types?: string[] | null };
+    template?: { 
+      simplified?: { 
+        sizes?: Array<{ 
+          id: string; 
+          label: string; 
+          allowed_material_ids?: number[];
+        }> 
+      } | null;
+    } | null;
   } | null;
   // Результат расчета
   result?: CalculationResult | null;
@@ -62,6 +73,27 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     price_per_sheet: number;
   } | null>(null);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [allMaterials, setAllMaterials] = useState<Array<{ id: number; name: string; unit?: string; price?: number }>>([]);
+  const [loadingMaterials, setLoadingMaterials] = useState(false);
+
+  // 🆕 Загружаем список всех материалов для упрощённых продуктов
+  useEffect(() => {
+    const simplifiedSizes = schema?.template?.simplified?.sizes;
+    if (simplifiedSizes && simplifiedSizes.length > 0 && allMaterials.length === 0 && !loadingMaterials) {
+      setLoadingMaterials(true);
+      getMaterials()
+        .then(response => {
+          const materials = Array.isArray(response.data) ? response.data : [];
+          setAllMaterials(materials);
+        })
+        .catch(error => {
+          console.error('Ошибка загрузки материалов:', error);
+        })
+        .finally(() => {
+          setLoadingMaterials(false);
+        });
+    }
+  }, [schema?.template?.simplified, allMaterials.length, loadingMaterials]);
 
   const hasField = (name: string) => !!schema?.fields?.some(f => f.name === name);
   const getLabel = (name: string, fallback: string) => (schema?.fields as any)?.find((f: any) => f.name === name)?.label || fallback;
@@ -162,17 +194,50 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     }
   }, [filteredPaperTypes, specs.paperType, updateSpecs, getDefaultPaperDensity]);
 
+  // 🆕 Проверяем, является ли продукт упрощённым
+  const simplifiedSizes = schema?.template?.simplified?.sizes;
+  const isSimplifiedProduct = simplifiedSizes && simplifiedSizes.length > 0;
+  
+  // 🆕 Получаем разрешённые материалы для выбранного размера
+  const allowedMaterialsForSize = useMemo(() => {
+    if (!isSimplifiedProduct || !specs.size_id) return [];
+    
+    const selectedSize = simplifiedSizes.find(s => s.id === specs.size_id);
+    if (!selectedSize || !selectedSize.allowed_material_ids || selectedSize.allowed_material_ids.length === 0) {
+      return [];
+    }
+    
+    // Фильтруем материалы по allowed_material_ids
+    return allMaterials.filter(m => selectedSize.allowed_material_ids!.includes(Number(m.id)));
+  }, [isSimplifiedProduct, specs.size_id, simplifiedSizes, allMaterials]);
+
+  // 🆕 Сбрасываем material_id, если он не входит в разрешённые для выбранного размера
+  useEffect(() => {
+    if (isSimplifiedProduct && specs.size_id && specs.material_id) {
+      const isMaterialAllowed = allowedMaterialsForSize.some(m => Number(m.id) === specs.material_id);
+      if (!isMaterialAllowed && allowedMaterialsForSize.length > 0) {
+        // Материал больше не разрешён - сбрасываем
+        updateSpecs({ material_id: undefined }, true);
+      }
+    }
+  }, [isSimplifiedProduct, specs.size_id, specs.material_id, allowedMaterialsForSize, updateSpecs]);
+
   return (
     <div className="form-section compact">
       <h3>📄 Материалы</h3>
-      {allowedPaperTypes && Array.isArray(allowedPaperTypes) && allowedPaperTypes.length > 0 && (
+      {allowedPaperTypes && Array.isArray(allowedPaperTypes) && allowedPaperTypes.length > 0 && !isSimplifiedProduct && (
         <div className="alert alert-info" style={{ fontSize: '0.85em', marginBottom: '1rem' }}>
           <small>ℹ️ Для этого продукта доступны только выбранные типы бумаги: {allowedPaperTypes.join(', ')}</small>
         </div>
       )}
+      {isSimplifiedProduct && !specs.size_id && (
+        <div className="alert alert-warning" style={{ fontSize: '0.85em', marginBottom: '1rem' }}>
+          <small>⚠️ Сначала выберите размер изделия в разделе "Параметры"</small>
+        </div>
+      )}
       <div className="materials-grid compact">
-        {/* Тип бумаги */}
-        {hasField('paperType') && (
+        {/* Тип бумаги (скрываем для упрощённых продуктов) */}
+        {hasField('paperType') && !isSimplifiedProduct && (
         <div className="param-group">
           <label>
             {getLabel('paperType', 'Тип бумаги')}
@@ -206,8 +271,8 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         </div>
         )}
 
-        {/* Плотность бумаги */}
-        {hasField('paperDensity') && (
+        {/* Плотность бумаги (скрываем для упрощённых продуктов) */}
+        {hasField('paperDensity') && !isSimplifiedProduct && (
         <div className="param-group">
           <label>
             {getLabel('paperDensity', 'Плотность')}
@@ -245,8 +310,8 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         </div>
         )}
 
-        {/* Ламинация */}
-        {hasField('lamination') && (
+        {/* Ламинация (скрываем для упрощённых продуктов) */}
+        {hasField('lamination') && !isSimplifiedProduct && (
         <div className="param-group">
           <label>
             {getLabel('lamination', 'Ламинация')}
@@ -264,8 +329,43 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         </div>
         )}
 
-        {/* Материал (material_id) - если есть в схеме */}
-        {hasField('material_id') && (() => {
+        {/* 🆕 Материал для упрощённых продуктов */}
+        {isSimplifiedProduct && specs.size_id && (
+          <div className="param-group">
+            <label>
+              Материал <span style={{ color: 'var(--danger, #c53030)' }}>*</span>
+            </label>
+            {loadingMaterials ? (
+              <div className="form-control" style={{ color: '#666' }}>
+                Загрузка материалов...
+              </div>
+            ) : allowedMaterialsForSize.length === 0 ? (
+              <div className="alert alert-warning">
+                <small>⚠️ Для выбранного размера нет разрешённых материалов</small>
+              </div>
+            ) : (
+              <select
+                value={specs.material_id ? String(specs.material_id) : ''}
+                onChange={(e) => {
+                  const newValue = e.target.value ? Number(e.target.value) : undefined;
+                  updateSpecs({ material_id: newValue }, true);
+                }}
+                className="form-control"
+                required
+              >
+                <option value="">-- Выберите материал --</option>
+                {allowedMaterialsForSize.map(material => (
+                  <option key={material.id} value={String(material.id)}>
+                    {material.name} {material.price ? `(${material.price} BYN/${material.unit || 'шт'})` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
+        {/* Материал (material_id) - если есть в схеме (для обычных продуктов) */}
+        {!isSimplifiedProduct && hasField('material_id') && (() => {
           const materialField = schema?.fields?.find((f: any) => f.name === 'material_id');
           if (!materialField || !Array.isArray(materialField.enum) || materialField.enum.length === 0) {
             return null;
@@ -355,8 +455,8 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         })()}
       </div>
 
-      {/* Информация о доступности и стоимости материалов */}
-      {specs.paperType && specs.paperDensity && specs.quantity > 0 && (
+      {/* Информация о доступности и стоимости материалов (только для обычных продуктов) */}
+      {!isSimplifiedProduct && specs.paperType && specs.paperDensity && specs.quantity > 0 && (
         <div className="material-info-section">
           <h4>📊 Информация о материалах</h4>
           

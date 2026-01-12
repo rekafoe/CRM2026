@@ -73,7 +73,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           />
 
           <ParamsSection
-            specs={{ productType: specs.productType, format: specs.format, quantity: specs.quantity, sides: specs.sides }}
+            specs={{ productType: specs.productType, format: specs.format, quantity: specs.quantity, sides: specs.sides, size_id: (specs as any).size_id }}
             availableFormats={availableFormats}
             validationErrors={validationErrors}
             isCustomFormat={isCustomFormat}
@@ -98,7 +98,8 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
               paperDensity: specs.paperDensity, 
               lamination: specs.lamination, 
               quantity: specs.quantity,
-              material_id: specs.material_id // 🆕 Передаем material_id
+              material_id: (specs as any).material_id, // 🆕 Передаем material_id
+              size_id: (specs as any).size_id // 🆕 Передаем size_id для упрощённых продуктов
             }}
             warehousePaperTypes={warehousePaperTypes}
             availableDensities={availableDensities.map(d => ({ value: d.value, label: d.label }))}

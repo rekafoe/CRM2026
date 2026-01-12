@@ -6,6 +6,7 @@ interface ParamsSectionProps {
     format: string;
     quantity: number;
     sides: 1 | 2;
+    size_id?: string; // 🆕 Для упрощённых продуктов
   };
   availableFormats: string[];
   validationErrors: Record<string, string>;
@@ -14,7 +15,10 @@ interface ParamsSectionProps {
   setIsCustomFormat: (v: boolean) => void;
   setCustomFormat: (updater: (prev: { width: string; height: string }) => { width: string; height: string }) => void;
   updateSpecs: (updates: Partial<any>, instant?: boolean) => void; // 🆕 Добавили instant параметр
-  schema?: { fields?: Array<{ name: string; type?: string; enum?: any[]; label?: string; required?: boolean; min?: number; max?: number; placeholder?: string }> } | null;
+  schema?: { 
+    fields?: Array<{ name: string; type?: string; enum?: any[]; label?: string; required?: boolean; min?: number; max?: number; placeholder?: string }>; 
+    template?: { simplified?: { sizes?: Array<{ id: string; label: string; width_mm: number; height_mm: number }> } } | null;
+  } | null;
 }
 
 export const ParamsSection: React.FC<ParamsSectionProps> = ({
@@ -35,12 +39,46 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   const getMin = (name: string) => schema?.fields?.find(f => f.name === name)?.min;
   const getMax = (name: string) => schema?.fields?.find(f => f.name === name)?.max;
   const getPlaceholder = (name: string, fb: string) => schema?.fields?.find(f => f.name === name)?.placeholder || fb;
+  // 🆕 Проверяем, является ли продукт упрощённым
+  const simplifiedSizes = schema?.template?.simplified?.sizes;
+  const isSimplifiedProduct = simplifiedSizes && simplifiedSizes.length > 0;
+
   return (
     <div className="form-section compact">
       <h3>⚙️ Параметры</h3>
       <div className="params-grid compact">
-        {/* Формат */}
-        {hasField('format') && (
+        {/* 🆕 Размер изделия для упрощённых продуктов */}
+        {isSimplifiedProduct && (
+          <div className="param-group">
+            <label>
+              Размер изделия <span style={{ color: 'var(--danger, #c53030)' }}>*</span>
+            </label>
+            <select
+              value={specs.size_id || ''}
+              onChange={(e) => {
+                const selectedSizeId = e.target.value;
+                const selectedSize = simplifiedSizes.find(s => s.id === selectedSizeId);
+                updateSpecs({ 
+                  size_id: selectedSizeId,
+                  // Обновляем format на основе выбранного размера
+                  format: selectedSize ? `${selectedSize.width_mm}×${selectedSize.height_mm}` : specs.format
+                }, true);
+              }}
+              className="form-control"
+              required
+            >
+              <option value="">-- Выберите размер --</option>
+              {simplifiedSizes.map(size => (
+                <option key={size.id} value={size.id}>
+                  {size.label} ({size.width_mm}×{size.height_mm} мм)
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Формат (скрываем для упрощённых продуктов) */}
+        {hasField('format') && !isSimplifiedProduct && (
         <div className="param-group">
           <label>
             {getLabel('format', 'Формат')}

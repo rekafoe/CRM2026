@@ -40,6 +40,8 @@ export interface ProductSpecs {
   specialServices?: string[];
   materialType?: 'office' | 'coated' | 'designer' | 'selfAdhesive';
   name?: string;
+  size_id?: string; // 🆕 Для упрощённых продуктов
+  material_id?: number; // 🆕 ID материала (для упрощённых и обычных продуктов)
   [key: string]: any;
 }
 

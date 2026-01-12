@@ -190,6 +190,9 @@ export function useCalculatorPricingActions({
           printTechnology,
           print_color_mode: printColorMode,
           printColorMode,
+          // 🆕 Для упрощённых продуктов передаем size_id и material_id
+          ...(specs.size_id ? { size_id: specs.size_id } : {}),
+          ...(specs.material_id ? { material_id: specs.material_id } : {}),
         };
 
         // ✅ Логируем trim_size для отладки
