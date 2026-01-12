@@ -92,8 +92,29 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   const localChanges = useLocalRangeChanges(serverVariants, saveChangesToServer);
 
   // Синхронизируем локальное состояние при изменении серверных данных
+  // Используем useRef для хранения предыдущего значения и функции синхронизации
+  const prevServerVariantsRef = React.useRef<string>('');
+  const syncWithExternalRef = React.useRef(localChanges.syncWithExternal);
+  const localChangesRef = React.useRef(localChanges);
+  
+  // Обновляем refs при каждом рендере
+  syncWithExternalRef.current = localChanges.syncWithExternal;
+  localChangesRef.current = localChanges;
+  
   React.useEffect(() => {
-    localChanges.syncWithExternal(serverVariants);
+    // Сравниваем по JSON для определения реального изменения данных
+    const currentVariantsStr = JSON.stringify(serverVariants);
+    if (prevServerVariantsRef.current !== currentVariantsStr) {
+      prevServerVariantsRef.current = currentVariantsStr;
+      // Синхронизируем только если нет несохраненных изменений
+      const currentLocalChanges = localChangesRef.current;
+      if (!currentLocalChanges.hasUnsavedChanges && 
+          currentLocalChanges.rangeChanges.length === 0 && 
+          currentLocalChanges.priceChanges.length === 0 && 
+          currentLocalChanges.variantChanges.length === 0) {
+        syncWithExternalRef.current(serverVariants);
+      }
+    }
   }, [serverVariants]);
 
   // Используем локальные варианты
