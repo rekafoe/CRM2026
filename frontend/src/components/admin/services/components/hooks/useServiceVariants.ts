@@ -51,7 +51,7 @@ export function useServiceVariants(serviceId: number) {
         loadingTiers: false,
       }));
 
-      debugSetVariants(variantsWithTiers);
+      setVariants(variantsWithTiers);
     } catch (err: any) {
       console.error('Ошибка загрузки вариантов:', err);
       const errorMessage = err?.response?.data?.error || err?.message || 'Не удалось загрузить варианты услуги';

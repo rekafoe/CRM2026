@@ -170,10 +170,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                     const firstVariant = typeGroup.level0[0];
                     if (!firstVariant) return null;
 
+                    const level1Variants = Array.from(typeGroup.level1.values()).flat();
+                    const level2Variants = Array.from(typeGroup.level2.values()).flat();
+
                     const allTypeVariants: VariantWithTiers[] = [
                       ...typeGroup.level0,
-                      ...Array.from(typeGroup.level1.values()).flat(),
-                      ...Array.from(typeGroup.level2.values()).flat(),
+                      ...level1Variants,
+                      ...level2Variants,
                     ];
 
                     return (
