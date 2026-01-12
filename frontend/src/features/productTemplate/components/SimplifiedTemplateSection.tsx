@@ -207,17 +207,33 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
       const [pt, techResp, svcResp] = await Promise.all([
         getPaperTypesFromWarehouse(),
         getPrintTechnologies().then(r => (Array.isArray(r.data) ? r.data : [])),
-        api.get('/pricing/services').then(r => (Array.isArray(r.data) ? r.data : [])).catch(err => {
+        api.get('/pricing/services').then(r => {
+          const data = (r.data as any)?.data ?? r.data ?? []
+          return Array.isArray(data) ? data : []
+        }).catch(err => {
           console.error('Ошибка загрузки услуг отделки:', err)
           return []
         }),
       ])
       setPaperTypes(pt || [])
       setPrintTechs((techResp || []).filter((t: any) => t && t.code))
-      const allowedOps = new Set(['cut', 'score', 'fold', 'laminate'])
-      const filteredServices = (svcResp || []).filter((s: any) => allowedOps.has(String(s.operation_type ?? s.operationType ?? '').toLowerCase()))
+      
+      // Загружаем все услуги, не фильтруя по operation_type
+      // Фильтрация будет происходить только для отображения в UI
+      const allServices = (svcResp || []).filter((s: any) => s && s.id && s.name)
+      console.log('Все загруженные услуги:', allServices.length, allServices)
+      
+      // Фильтруем только для отображения в таблице отделки
+      const allowedOps = new Set(['cut', 'score', 'fold', 'laminate', 'post_processing'])
+      const filteredServices = allServices.filter((s: any) => {
+        const opType = String(s.operation_type ?? s.operationType ?? s.type ?? '').toLowerCase()
+        // Если operation_type не указан, показываем услугу (может быть post_processing)
+        if (!opType) return true
+        return allowedOps.has(opType) || opType === 'post_processing'
+      })
+      
       setServices(filteredServices)
-      console.log('Загружены услуги отделки:', filteredServices.length, filteredServices)
+      console.log('Отфильтрованные услуги отделки:', filteredServices.length, filteredServices)
       // Автоматически выбираем первый тип бумаги, если он есть
       if (pt && pt.length > 0 && !selectedPaperTypeId) {
         setSelectedPaperTypeId(pt[0].id)
