@@ -472,12 +472,8 @@ export function useVariantOperations(
   }, [serviceId, variants, setVariants, setError]);
 
   const removeRange = useCallback(async (rangeIndex: number) => {
-    console.log('=== REMOVE_RANGE START ===');
-    console.log('rangeIndex:', rangeIndex);
-
     try {
       const currentVariants = [...variants];
-      console.log('currentVariants:', currentVariants);
 
       // Вычисляем commonRanges
       const allMinQtys = new Set<number>();
@@ -485,22 +481,15 @@ export function useVariantOperations(
         v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
       });
       const sortedMinQtys = Array.from(allMinQtys).sort((a, b) => a - b);
-      console.log('sortedMinQtys:', sortedMinQtys);
 
       const currentCommonRanges = sortedMinQtys.map((minQty, idx) => ({
-        minQty,
-        maxQty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
-        price: 0,
+        min_qty: minQty,
+        max_qty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
+        unit_price: 0,
       }));
-      console.log('currentCommonRanges:', currentCommonRanges);
 
       const rangeToRemove = currentCommonRanges[rangeIndex];
-      console.log('rangeToRemove:', rangeToRemove);
-
-      if (!rangeToRemove) {
-        console.log('Range not found, returning');
-        return;
-      }
+      if (!rangeToRemove) return;
 
       // Обновляем диапазоны для всех вариантов
       const updatedVariants = currentVariants.map((variant) => {
@@ -509,7 +498,7 @@ export function useVariantOperations(
           price: t.rate,
         }));
 
-        const tierIndex = currentRanges.findIndex((r) => r.minQty === rangeToRemove.minQty);
+        const tierIndex = currentRanges.findIndex((r) => r.minQty === rangeToRemove.min_qty);
         if (tierIndex === -1) return variant;
 
         const newRanges = PriceRangeUtils.removeRange(currentRanges, tierIndex);
@@ -518,7 +507,7 @@ export function useVariantOperations(
         // Сохраняем существующие цены
         const preservedPrices = new Map<number, number>();
         variant.tiers.forEach((t) => {
-          if (t.minQuantity !== rangeToRemove.minQty) {
+          if (t.minQuantity !== rangeToRemove.min_qty) {
             preservedPrices.set(t.minQuantity, t.rate);
           }
         });
@@ -556,9 +545,7 @@ export function useVariantOperations(
         }
       }
 
-      console.log('updatedVariants:', updatedVariants);
       setVariants(updatedVariants);
-      console.log('=== REMOVE_RANGE END ===');
     } catch (err) {
       console.error('Ошибка удаления диапазона:', err);
       setError('Не удалось удалить диапазон');
