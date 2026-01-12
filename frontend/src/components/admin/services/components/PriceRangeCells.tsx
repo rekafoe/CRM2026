@@ -46,11 +46,19 @@ export const PriceRangeCells: React.FC<PriceRangeCellsProps> = ({
   }, [tiers]);
 
   const handlePriceChange = useCallback((minQty: number, value: string) => {
-    const newPrice = Number(value);
+    // Разрешаем пустую строку для промежуточного ввода
+    if (value === '' || value === '.') {
+      return;
+    }
+    
+    // Парсим дробные числа (поддерживаем запятую и точку как разделитель)
+    const normalizedValue = value.replace(',', '.');
+    const newPrice = parseFloat(normalizedValue);
+    
     console.log('=== PRICE RANGE CELLS === handlePriceChange', { minQty, value, newPrice, isNaN: isNaN(newPrice) });
-    if (!isNaN(newPrice) && onPriceChange) {
+    if (!isNaN(newPrice) && isFinite(newPrice) && onPriceChange) {
       onPriceChange(minQty, newPrice);
-    } else {
+    } else if (value !== '' && value !== '.') {
       console.warn('=== PRICE RANGE CELLS === Invalid price change', { minQty, value, newPrice });
     }
   }, [onPriceChange]);
@@ -60,15 +68,18 @@ export const PriceRangeCells: React.FC<PriceRangeCellsProps> = ({
       {commonRanges.map((range) => {
         const tier = tiersMap.get(range.minQty);
         return (
-          <td key={range.minQty}>
-            <div className="cell">
-              <div className="el-input el-input--small">
+          <td key={range.minQty} style={{ width: '120px', textAlign: 'center' }}>
+            <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div className="el-input el-input--small" style={{ width: '100%' }}>
                 <input
-                  type="text"
+                  type="number"
+                  step="0.01"
+                  min="0"
                   className="el-input__inner"
-                  value={String(tier?.rate || 0)}
+                  value={tier?.rate ?? ''}
                   onChange={(e) => handlePriceChange(range.minQty, e.target.value)}
                   disabled={!editable}
+                  style={{ textAlign: 'center' }}
                 />
               </div>
             </div>
@@ -131,8 +142,8 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
       {commonRanges.map((range, idx) => {
         const rangeLabel = formatRangeLabel(range);
         return (
-          <th key={idx} className="is-center">
-            <div className="cell">
+          <th key={idx} className="is-center" style={{ width: '120px', textAlign: 'center' }}>
+            <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
               <span
                 style={{ cursor: onEditRange ? 'pointer' : 'default' }}
                 onClick={() => onEditRange?.(idx, range.minQty)}
@@ -140,11 +151,11 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
                 {rangeLabel}
               </span>
               {onRemoveRange && (
-                <span>
+                <span style={{ marginLeft: '4px' }}>
                   <button
                     type="button"
                     className="el-button el-button--text el-button--mini"
-                    style={{ color: 'red', marginLeft: '4px' }}
+                    style={{ color: 'red', padding: '0', minHeight: 'auto', lineHeight: '1' }}
                     onClick={() => onRemoveRange(idx)}
                   >
                     ×

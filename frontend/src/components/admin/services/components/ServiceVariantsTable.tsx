@@ -66,28 +66,40 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         console.log('=== SAVE CHANGES TO SERVER === Variant changes applied');
       }
 
-      // Применяем изменения диапазонов (последовательно)
+      // Применяем изменения диапазонов (оптимизировано: группируем по типу)
       if (rangeChanges.length > 0) {
         console.log('=== SAVE CHANGES TO SERVER === Applying range changes...');
-        for (const change of rangeChanges) {
-          switch (change.type) {
-            case 'add':
-              if (change.boundary) {
-                await operations.addRangeBoundary(change.boundary);
-              }
-              break;
-            case 'edit':
-              if (change.rangeIndex !== undefined && change.newBoundary !== undefined) {
-                await operations.editRangeBoundary(change.rangeIndex, change.newBoundary);
-              }
-              break;
-            case 'remove':
-              if (change.rangeIndex !== undefined) {
-                await operations.removeRange(change.rangeIndex);
-              }
-              break;
+        
+        // Группируем изменения по типу для оптимизации
+        const addChanges = rangeChanges.filter(c => c.type === 'add' && c.boundary);
+        const editChanges = rangeChanges.filter(c => c.type === 'edit' && c.rangeIndex !== undefined && c.newBoundary !== undefined);
+        const removeChanges = rangeChanges.filter(c => c.type === 'remove' && c.rangeIndex !== undefined);
+        
+        // Выполняем удаления первыми (они могут влиять на индексы)
+        if (removeChanges.length > 0) {
+          console.log(`=== SAVE CHANGES TO SERVER === Removing ${removeChanges.length} ranges...`);
+          // Удаления выполняем последовательно, т.к. они меняют индексы
+          for (const change of removeChanges) {
+            await operations.removeRange(change.rangeIndex!);
           }
         }
+        
+        // Добавления можно выполнять параллельно
+        if (addChanges.length > 0) {
+          console.log(`=== SAVE CHANGES TO SERVER === Adding ${addChanges.length} range boundaries...`);
+          await Promise.all(
+            addChanges.map(change => operations.addRangeBoundary(change.boundary!))
+          );
+        }
+        
+        // Редактирования выполняем последовательно (могут влиять на индексы)
+        if (editChanges.length > 0) {
+          console.log(`=== SAVE CHANGES TO SERVER === Editing ${editChanges.length} ranges...`);
+          for (const change of editChanges) {
+            await operations.editRangeBoundary(change.rangeIndex!, change.newBoundary!);
+          }
+        }
+        
         console.log('=== SAVE CHANGES TO SERVER === Range changes applied');
       }
 
