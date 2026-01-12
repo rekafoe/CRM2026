@@ -198,6 +198,29 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
     [value.sizes, selectedSizeId],
   )
 
+  // Восстанавливаем selectedPaperTypeId при смене размера
+  useEffect(() => {
+    if (!selected || !paperTypes.length) return
+    
+    // Если есть allowed_material_ids, определяем тип бумаги по материалам
+    if (selected.allowed_material_ids && selected.allowed_material_ids.length > 0) {
+      for (const paperType of paperTypes) {
+        const materialIds = new Set(
+          paperType.densities?.map(d => d.material_id).filter(id => id && id > 0) || []
+        )
+        // Проверяем, все ли allowed_material_ids принадлежат этому типу бумаги
+        const allMaterialsMatch = selected.allowed_material_ids.every(id => materialIds.has(id))
+        if (allMaterialsMatch && materialIds.size > 0) {
+          if (selectedPaperTypeId !== paperType.id) {
+            setSelectedPaperTypeId(paperType.id)
+            hasUserInteractedWithMaterialsRef.current = true // Помечаем, что материалы уже выбраны
+          }
+          return
+        }
+      }
+    }
+  }, [selected, paperTypes, selectedPaperTypeId])
+
   const updateSize = useCallback((id: string, patch: Partial<SimplifiedSizeConfig>) => {
     onChange({
       ...value,
@@ -244,7 +267,26 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
       
       console.log('Все загруженные услуги:', allServices.length, allServices)
       setServices(allServices)
-      // Автоматически выбираем первый тип бумаги, если он есть
+      
+      // Восстанавливаем selectedPaperTypeId из сохраненных данных
+      // Если есть allowed_material_ids, определяем тип бумаги по материалам
+      if (selected && selected.allowed_material_ids && selected.allowed_material_ids.length > 0 && pt && pt.length > 0) {
+        // Ищем тип бумаги, который содержит эти материалы
+        for (const paperType of pt) {
+          const materialIds = new Set(
+            paperType.densities?.map(d => d.material_id).filter(id => id && id > 0) || []
+          )
+          // Проверяем, все ли allowed_material_ids принадлежат этому типу бумаги
+          const allMaterialsMatch = selected.allowed_material_ids.every(id => materialIds.has(id))
+          if (allMaterialsMatch && materialIds.size > 0) {
+            setSelectedPaperTypeId(paperType.id)
+            hasUserInteractedWithMaterialsRef.current = true // Помечаем, что материалы уже выбраны
+            break
+          }
+        }
+      }
+      
+      // Автоматически выбираем первый тип бумаги, если он есть и еще не выбран
       if (pt && pt.length > 0 && !selectedPaperTypeId) {
         setSelectedPaperTypeId(pt[0].id)
       }
@@ -253,7 +295,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
     } finally {
       setLoadingLists(false)
     }
-  }, [selectedPaperTypeId])
+  }, [selectedPaperTypeId, selected])
 
   // Загружаем списки при монтировании компонента
   useEffect(() => {
@@ -447,10 +489,26 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
   const hasUserInteractedWithMaterialsRef = useRef(false)
   
   // Автоматическое добавление материалов при выборе типа бумаги только при первой загрузке
+  // НЕ добавляем автоматически, если уже есть сохраненные allowed_material_ids (пользователь уже выбирал)
   useEffect(() => {
     if (!selected || !selectedPaperTypeId || materialsForSelectedPaperType.length === 0) return
     // Если пользователь уже взаимодействовал с материалами, не добавляем автоматически
     if (hasUserInteractedWithMaterialsRef.current) return
+    
+    // Если уже есть сохраненные allowed_material_ids, значит пользователь уже выбирал материалы
+    // Не добавляем автоматически, чтобы не перезаписать выбор пользователя
+    // Также проверяем, что материалы из allowed_material_ids действительно относятся к выбранному типу бумаги
+    if (selected.allowed_material_ids && selected.allowed_material_ids.length > 0) {
+      const materialIds = new Set(
+        paperTypes.find(pt => pt.id === selectedPaperTypeId)?.densities?.map(d => d.material_id).filter(id => id && id > 0) || []
+      )
+      // Если хотя бы один материал из allowed_material_ids относится к текущему типу бумаги - не добавляем автоматически
+      const hasMatchingMaterials = selected.allowed_material_ids.some(id => materialIds.has(id))
+      if (hasMatchingMaterials) {
+        hasUserInteractedWithMaterialsRef.current = true
+        return
+      }
+    }
 
     const materialsToAdd = materialsForSelectedPaperType.filter(m => 
       !selected.allowed_material_ids.includes(Number(m.id))
