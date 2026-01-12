@@ -119,28 +119,21 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                   <tr>
                     <th>
                       <div className="cell">
-                        <div style={{ display: 'flex' }}>
-                          <div style={{ width: '100%' }}>{serviceName}</div>
-                        </div>
-                      </div>
-                    </th>
-                    <th>
-                      <div className="cell">
-                        <div className="active-panel">
-                          <button
-                            type="button"
-                            className="el-button el-button--success el-button--small"
-                            onClick={async () => {
-                              console.log('=== HEADER BUTTON CLICK START ===');
-                              console.log('Header create button clicked - about to call handleCreateVariant');
-                              console.log('handleCreateVariant exists:', typeof handleCreateVariant);
-                              await handleCreateVariant();
-                            }}
-                            title="Добавить строку (тип)"
-                            style={{ zIndex: 1000, position: 'relative' }}
-                          >
-                            <span style={{ fontSize: '14px' }}>↓</span>
-                          </button>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ flex: 1 }}>{serviceName}</div>
+                          <div className="active-panel" style={{ marginLeft: '8px' }}>
+                            <button
+                              type="button"
+                              className="el-button el-button--success el-button--small"
+                              onClick={async () => {
+                                await handleCreateVariant();
+                              }}
+                              title="Добавить тип"
+                              style={{ zIndex: 1000, position: 'relative' }}
+                            >
+                              <span style={{ fontSize: '14px' }}>↓</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </th>
@@ -158,6 +151,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                         tierModal.openAddModal(tierModal.addRangeButtonRef.current || undefined);
                       }}
                     />
+                    <th>
+                      <div className="cell">
+                        <div className="active-panel">
+                          <span style={{ fontSize: '12px', color: '#909399' }}>Действия</span>
+                        </div>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
               </table>
@@ -185,49 +185,85 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                         <tr className="el-table__row expanded">
                           <td>
                             <div className="cell">
-                              <div className="el-input el-input--small">
-                                {editing.editingVariantName === firstVariant.id ? (
-                                  <input
-                                    type="text"
-                                    className="el-input__inner"
-                                    value={editing.editingVariantNameValue}
-                                    onChange={(e) => editing.setEditingVariantNameValue(e.target.value)}
-                                    onBlur={() => {
-                                      if (editing.editingVariantNameValue.trim()) {
-                                        operations.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
-                                        editing.cancelEditingName();
-                                      }
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div className="el-input el-input--small" style={{ flex: 1, marginRight: '8px' }}>
+                                  {editing.editingVariantName === firstVariant.id ? (
+                                    <input
+                                      type="text"
+                                      className="el-input__inner"
+                                      value={editing.editingVariantNameValue}
+                                      onChange={(e) => editing.setEditingVariantNameValue(e.target.value)}
+                                      onBlur={() => {
                                         if (editing.editingVariantNameValue.trim()) {
                                           operations.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
                                           editing.cancelEditingName();
                                         }
-                                      } else if (e.key === 'Escape') {
-                                        editing.cancelEditingName();
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          if (editing.editingVariantNameValue.trim()) {
+                                            operations.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
+                                            editing.cancelEditingName();
+                                          }
+                                        } else if (e.key === 'Escape') {
+                                          editing.cancelEditingName();
+                                        }
+                                      }}
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      className="el-input__inner"
+                                      value={typeName}
+                                      onClick={() => editing.startEditingName(firstVariant.id, typeName)}
+                                      readOnly
+                                      style={{ cursor: 'pointer' }}
+                                    />
+                                  )}
+                                </div>
+                                <div className="active-panel">
+                                  <button
+                                    type="button"
+                                    className="el-button el-button--success el-button--small is-plain"
+                                    onClick={async () => {
+                                      try {
+                                        const newVariant = await operations.createVariant(typeName, { type: 'Новый тип', density: 'Новая плотность' });
+                                        editing.startEditingParams(newVariant.id, { type: 'Новый тип', density: 'Новая плотность' });
+                                      } catch (err) {
+                                        console.error('Ошибка создания дочерней строки:', err);
+                                        // Ошибка уже обработана в хуке и отображена через setError
                                       }
                                     }}
-                                    autoFocus
-                                  />
-                                ) : (
-                                  <input
-                                    type="text"
-                                    className="el-input__inner"
-                                    value={typeName}
-                                    onClick={() => editing.startEditingName(firstVariant.id, typeName)}
-                                    readOnly
-                                    style={{ cursor: 'pointer' }}
-                                  />
-                                )}
+                                    title="Добавить дочернюю строку"
+                                  >
+                                    <span style={{ fontSize: '14px' }}>↘</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="el-button el-button--danger el-button--small"
+                                    onClick={async () => {
+                                      if (!confirm(`Удалить тип "${typeName}" и все его варианты?`)) {
+                                        return;
+                                      }
+                                      for (const variant of allTypeVariants) {
+                                        await operations.deleteVariant(variant.id, true); // skipConfirm = true
+                                      }
+                                    }}
+                                    title="Удалить тип"
+                                  >
+                                    <span style={{ fontSize: '14px' }}>×</span>
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </td>
-                          {commonRanges.map((_, rangeIdx) => (
-                            <td key={`empty-${rangeIdx}`}>
-                              <div className="cell"></div>
-                            </td>
-                          ))}
+                          <PriceRangeCells
+                            tiers={[]} // Пустой массив для заголовка типа
+                            commonRanges={commonRangesAsPriceRanges}
+                            onPriceChange={() => {}} // Пустая функция для заголовка
+                            editable={false}
+                          />
                           <td>
                             <div className="cell">
                               <div className="active-panel">
@@ -243,40 +279,9 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                       // Ошибка уже обработана в хуке и отображена через setError
                                     }
                                   }}
-                                  title="Добавить строку на том же уровне"
+                                  title="Добавить тип на том же уровне"
                                 >
                                   <span style={{ fontSize: '14px' }}>↓</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="el-button el-button--success el-button--small is-plain"
-                                  onClick={async () => {
-                                    try {
-                                      const newVariant = await operations.createVariant(typeName, { type: 'Новый тип', density: 'Новая плотность' });
-                                      editing.startEditingParams(newVariant.id, { type: 'Новый тип', density: 'Новая плотность' });
-                                    } catch (err) {
-                                      console.error('❌ Ошибка создания дочерней строки:', err);
-                                      // Ошибка уже обработана в хуке и отображена через setError
-                                    }
-                                  }}
-                                  title="Добавить дочернюю строку"
-                                >
-                                  <span style={{ fontSize: '14px' }}>↘</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="el-button el-button--danger el-button--small"
-                                  onClick={async () => {
-                                    if (!confirm(`Удалить тип "${typeName}" и все его варианты?`)) {
-                                      return;
-                                    }
-                                    for (const variant of allTypeVariants) {
-                                      await operations.deleteVariant(variant.id, true); // skipConfirm = true
-                                    }
-                                  }}
-                                  title="Удалить строку"
-                                >
-                                  <span style={{ fontSize: '14px' }}>×</span>
                                 </button>
                               </div>
                             </div>
