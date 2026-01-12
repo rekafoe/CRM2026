@@ -637,7 +637,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                       tiers={level2Variant.tiers}
                                       commonRanges={commonRangesAsPriceRanges}
                                       onPriceChange={(minQty, newPrice) =>
-                                        operations.changePrice(level2Variant.id, minQty, newPrice)
+                                        localChanges.changePrice(level2Variant.id, minQty, newPrice)
                                       }
                                       editable={true}
                                     />

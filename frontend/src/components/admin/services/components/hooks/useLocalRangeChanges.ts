@@ -232,20 +232,28 @@ export function useLocalRangeChanges(
 
   // Локальное изменение цены
   const changePrice = useCallback((variantId: number, minQty: number, newPrice: number) => {
-    setLocalVariants(prev =>
-      prev.map(variant => {
+    console.log('=== CHANGE PRICE ===', { variantId, minQty, newPrice });
+    setLocalVariants(prev => {
+      const updated = prev.map(variant => {
         if (variant.id !== variantId) return variant;
 
         const updatedTiers = variant.tiers.map(tier => {
           if (tier.minQuantity === minQty) {
+            console.log('=== CHANGE PRICE === Found tier to update:', { tier, newPrice });
             return { ...tier, rate: newPrice };
           }
           return tier;
         });
 
+        console.log('=== CHANGE PRICE === Updated variant:', { 
+          variantId, 
+          oldTiers: variant.tiers, 
+          newTiers: updatedTiers 
+        });
         return { ...variant, tiers: updatedTiers };
-      })
-    );
+      });
+      return updated;
+    });
 
     // Добавляем или обновляем изменение цены
     setPriceChanges(prev => {

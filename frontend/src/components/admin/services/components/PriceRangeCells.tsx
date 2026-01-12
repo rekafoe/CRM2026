@@ -47,8 +47,11 @@ export const PriceRangeCells: React.FC<PriceRangeCellsProps> = ({
 
   const handlePriceChange = useCallback((minQty: number, value: string) => {
     const newPrice = Number(value);
+    console.log('=== PRICE RANGE CELLS === handlePriceChange', { minQty, value, newPrice, isNaN: isNaN(newPrice) });
     if (!isNaN(newPrice) && onPriceChange) {
       onPriceChange(minQty, newPrice);
+    } else {
+      console.warn('=== PRICE RANGE CELLS === Invalid price change', { minQty, value, newPrice });
     }
   }, [onPriceChange]);
 
