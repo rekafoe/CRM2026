@@ -443,9 +443,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
       .sort((a, b) => String(a.name).localeCompare(String(b.name))) || []
   }, [selectedPaperTypeId, paperTypes, allMaterials])
 
-  // Автоматическое добавление материалов при выборе типа бумаги
+  // Отслеживание взаимодействия пользователя с материалами
+  const hasUserInteractedWithMaterialsRef = useRef(false)
+  
+  // Автоматическое добавление материалов при выборе типа бумаги только при первой загрузке
   useEffect(() => {
     if (!selected || !selectedPaperTypeId || materialsForSelectedPaperType.length === 0) return
+    // Если пользователь уже взаимодействовал с материалами, не добавляем автоматически
+    if (hasUserInteractedWithMaterialsRef.current) return
 
     const materialsToAdd = materialsForSelectedPaperType.filter(m => 
       !selected.allowed_material_ids.includes(Number(m.id))
@@ -1119,15 +1124,90 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                             </FormField>
                     </div>
 
-                    {selectedPaperTypeId && materialsForSelectedPaperType.length > 0 && (() => {
-                      const commonRanges = getSizeRanges(selected)
-                      
-                      return (
-                        <div className="simplified-tiers-table mt-3">
-                                <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
-                                  <thead>
-                                    <tr>
-                                <th>Параметры материалов (цена за изделие указанного формата)</th>
+                    {selectedPaperTypeId && materialsForSelectedPaperType.length > 0 && (
+                      <>
+                        {/* Список материалов с чекбоксами для выбора разрешенных */}
+                        <div className="mt-3 mb-3" style={{ border: '1px solid #e5e7eb', borderRadius: '4px', padding: '12px' }}>
+                          <div className="text-sm font-medium mb-2">Выберите разрешенные материалы:</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                            {materialsForSelectedPaperType.map(m => {
+                              const densityInfo = paperTypes.find(pt => pt.id === selectedPaperTypeId)
+                                ?.densities?.find(d => d.material_id === Number(m.id))
+                              const isAllowed = selected.allowed_material_ids.includes(Number(m.id))
+                              
+                              return (
+                                <label
+                                  key={m.id}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    cursor: 'pointer',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    backgroundColor: isAllowed ? '#f0f9ff' : 'transparent',
+                                    border: isAllowed ? '1px solid #3b82f6' : '1px solid #e5e7eb'
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isAllowed}
+                                    onChange={(e) => {
+                                      hasUserInteractedWithMaterialsRef.current = true
+                                      const checked = e.target.checked
+                                      const commonRanges = getSizeRanges(selected)
+                                      
+                                      if (checked) {
+                                        // Добавляем материал
+                                        const nextAllowed = [...selected.allowed_material_ids, Number(m.id)]
+                                        const materialPrice = selected.material_prices.find(mp => mp.material_id === Number(m.id))
+                                        const nextMaterialPrices = materialPrice
+                                          ? selected.material_prices
+                                          : [
+                                              ...selected.material_prices,
+                                              {
+                                                material_id: Number(m.id),
+                                                tiers: commonRanges.map(r => ({ ...r, unit_price: 0 }))
+                                              }
+                                            ]
+                                        updateSize(selected.id, {
+                                          allowed_material_ids: nextAllowed,
+                                          material_prices: nextMaterialPrices
+                                        })
+                                      } else {
+                                        // Удаляем материал
+                                        const nextAllowed = selected.allowed_material_ids.filter(id => id !== Number(m.id))
+                                        const nextMaterialPrices = selected.material_prices.filter(mp => mp.material_id !== Number(m.id))
+                                        updateSize(selected.id, {
+                                          allowed_material_ids: nextAllowed,
+                                          material_prices: nextMaterialPrices
+                                        })
+                                      }
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                  <span>
+                                    {m.name}{densityInfo ? ` (${densityInfo.value} г/м²)` : ''}
+                                  </span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Таблица с ценами для выбранных материалов */}
+                        {selected.allowed_material_ids.length > 0 && (() => {
+                          const commonRanges = getSizeRanges(selected)
+                          const allowedMaterials = materialsForSelectedPaperType.filter(m => 
+                            selected.allowed_material_ids.includes(Number(m.id))
+                          )
+                          
+                          return (
+                            <div className="simplified-tiers-table mt-3">
+                              <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
+                                <thead>
+                                  <tr>
+                                    <th>Параметры материалов (цена за изделие указанного формата)</th>
                                 {commonRanges.map((t, ti) => {
                                   const rangeLabel = t.max_qty == null ? `${t.min_qty} - ∞` : String(t.min_qty)
                                         return (
@@ -1189,7 +1269,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                     </tr>
                                   </thead>
                                   <tbody>
-                              {materialsForSelectedPaperType.map(m => {
+                              {allowedMaterials.map(m => {
                                 const densityInfo = paperTypes.find(pt => pt.id === selectedPaperTypeId)
                                   ?.densities?.find(d => d.material_id === Number(m.id))
                                 const materialPrice = selected.material_prices.find(mp => mp.material_id === Number(m.id))
@@ -1198,20 +1278,39 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                 return (
                                   <tr key={m.id}>
                                     <td>
-                                      <div className="el-select el-select--small" style={{ width: '100%' }}>
-                                        <div className="el-input el-input--small el-input--suffix">
-                                          <input
-                                            type="text"
-                                            readOnly
-                                            className="el-input__inner"
-                                            value={`${m.name}${densityInfo ? ` (${densityInfo.value} г/м²)` : ''}`}
-                                            style={{ cursor: 'default' }}
-                                          />
-                                          <span className="el-input__suffix">
-                                            <span className="el-input__suffix-inner">
-                                              <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={true}
+                                          onChange={(e) => {
+                                            hasUserInteractedWithMaterialsRef.current = true
+                                            if (!e.target.checked) {
+                                              // Удаляем материал
+                                              const nextAllowed = selected.allowed_material_ids.filter(id => id !== Number(m.id))
+                                              const nextMaterialPrices = selected.material_prices.filter(mp => mp.material_id !== Number(m.id))
+                                              updateSize(selected.id, {
+                                                allowed_material_ids: nextAllowed,
+                                                material_prices: nextMaterialPrices
+                                              })
+                                            }
+                                          }}
+                                          style={{ cursor: 'pointer' }}
+                                        />
+                                        <div className="el-select el-select--small" style={{ flex: 1 }}>
+                                          <div className="el-input el-input--small el-input--suffix">
+                                            <input
+                                              type="text"
+                                              readOnly
+                                              className="el-input__inner"
+                                              value={`${m.name}${densityInfo ? ` (${densityInfo.value} г/м²)` : ''}`}
+                                              style={{ cursor: 'default' }}
+                                            />
+                                            <span className="el-input__suffix">
+                                              <span className="el-input__suffix-inner">
+                                                <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                              </span>
                                             </span>
-                                          </span>
+                                          </div>
                                         </div>
                                       </div>
                                     </td>
@@ -1263,8 +1362,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                   </tbody>
                                 </table>
                               </div>
-                      )
-                    })()}
+                            )
+                          })()}
+                        </>
+                    )}
 
                     {selectedPaperTypeId && materialsForSelectedPaperType.length === 0 && !loadingLists && (
                       <Alert type="info" className="mt-3">Нет материалов для выбранного типа бумаги.</Alert>
