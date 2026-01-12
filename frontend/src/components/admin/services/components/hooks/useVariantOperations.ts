@@ -30,8 +30,6 @@ export function useVariantOperations(
   reloadVariants: () => Promise<void>,
   invalidateCache?: () => void
 ) {
-  console.log('=== useVariantOperations INIT ===');
-  console.log('setVariants function:', setVariants);
   // Refs для debounce изменения цен
   const priceChangeTimeoutRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const priceChangeOriginalValuesRef = useRef<Map<string, number>>(new Map());
@@ -85,16 +83,7 @@ export function useVariantOperations(
 
       // Добавляем новый вариант в локальное состояние
       // Важно: не делаем reload, чтобы избежать медленных API запросов
-      console.log('=== SETTING VARIANTS ===');
-      console.log('Previous variants length:', variantsRef.current.length);
-      console.log('New variant to add:', newVariantWithTiers);
-
-      setVariants((prev) => {
-        const newVariants = [...prev, newVariantWithTiers];
-        console.log('✅ New variants array length:', newVariants.length);
-        console.log('✅ New variants array:', newVariants);
-        return newVariants;
-      });
+      setVariants((prev) => [...prev, newVariantWithTiers]);
 
       return newVariantWithTiers;
 
