@@ -99,6 +99,7 @@ export function useLocalRangeChanges(
     setLocalVariants(updatedVariants);
     setRangeChanges(prev => [...prev, { type: 'add', boundary }]);
     setHasUnsavedChanges(true);
+    console.log('=== ADD RANGE BOUNDARY === hasUnsavedChanges set to true');
   }, [localVariants]);
 
   // Локальное редактирование диапазона
@@ -154,6 +155,7 @@ export function useLocalRangeChanges(
     setLocalVariants(updatedVariants);
     setRangeChanges(prev => [...prev, { type: 'edit', rangeIndex, newBoundary }]);
     setHasUnsavedChanges(true);
+    console.log('=== EDIT RANGE BOUNDARY === hasUnsavedChanges set to true');
   }, [localVariants]);
 
   // Локальное удаление диапазона
@@ -209,6 +211,7 @@ export function useLocalRangeChanges(
     setLocalVariants(updatedVariants);
     setRangeChanges(prev => [...prev, { type: 'remove', rangeIndex }]);
     setHasUnsavedChanges(true);
+    console.log('=== REMOVE RANGE === hasUnsavedChanges set to true');
   }, [localVariants]);
 
   // Локальное изменение цены
@@ -244,6 +247,7 @@ export function useLocalRangeChanges(
     });
 
     setHasUnsavedChanges(true);
+    console.log('=== CHANGE PRICE === hasUnsavedChanges set to true');
   }, []);
 
   // Сохранение всех изменений на сервер

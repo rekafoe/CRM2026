@@ -87,6 +87,11 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   const variants = localChanges.localVariants;
   const commonRangesAsPriceRanges = localChanges.commonRangesAsPriceRanges;
 
+  console.log('=== ServiceVariantsTable ===');
+  console.log('localChanges.hasUnsavedChanges:', localChanges.hasUnsavedChanges);
+  console.log('localChanges.rangeChanges:', localChanges.rangeChanges);
+  console.log('localChanges.priceChanges:', localChanges.priceChanges);
+
   // Группируем варианты
   const groupedVariants = useMemo(() => groupVariantsByType(variants), [variants]);
   const variantsIndexMap = useMemo(() => createVariantsIndexMap(variants), [variants]);
@@ -138,10 +143,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h3 className="text-lg font-semibold">Варианты услуги: {serviceName}</h3>
-          {localChanges.hasUnsavedChanges && (
+          {(localChanges.hasUnsavedChanges || localChanges.rangeChanges.length > 0 || localChanges.priceChanges.length > 0) && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-orange-600 font-medium">
-                Есть несохраненные изменения
+                Есть несохраненные изменения ({localChanges.rangeChanges.length} диапазонов, {localChanges.priceChanges.length} цен)
               </span>
               <Button
                 variant="success"
