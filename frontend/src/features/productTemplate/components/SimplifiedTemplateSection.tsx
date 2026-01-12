@@ -553,35 +553,56 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
     }
   }, [selectedPaperTypeId, materialsForSelectedPaperType, selected, getSizeRanges, updateSize])
 
-  // Автоматическое добавление услуг отделки только при первой загрузке
-  // Не добавляем автоматически, если пользователь уже взаимодействовал с услугами
-  const hasUserInteractedWithServicesRef = useRef(false)
+  // Отслеживание взаимодействия пользователя с услугами для каждого размера отдельно
+  // Ключ - ID размера, значение - был ли пользователь взаимодействовал с услугами
+  const hasUserInteractedWithServicesRef = useRef<Map<string, boolean>>(new Map())
   
   // Восстанавливаем флаг взаимодействия при смене размера
   useEffect(() => {
     if (!selected) return
     
-    // Если есть сохраненные finishing, значит пользователь уже выбирал услуги
-    if (selected.finishing && selected.finishing.length > 0) {
-      hasUserInteractedWithServicesRef.current = true
-    } else {
-      // Если finishing пустой, сбрасываем флаг для нового размера
-      hasUserInteractedWithServicesRef.current = false
+    // Если размер уже был настроен (есть print_prices или material_prices), 
+    // и finishing пустой - значит пользователь явно удалил все услуги
+    const hasOtherData = (selected.print_prices && selected.print_prices.length > 0) || 
+                        (selected.material_prices && selected.material_prices.length > 0) ||
+                        (selected.allowed_material_ids && selected.allowed_material_ids.length > 0)
+    
+    if (hasOtherData && selected.finishing && selected.finishing.length === 0) {
+      // Размер был настроен, но услуг нет - пользователь явно удалил их
+      hasUserInteractedWithServicesRef.current.set(selected.id, true)
+    } else if (selected.finishing && selected.finishing.length > 0) {
+      // Есть сохраненные услуги - пользователь выбирал их
+      hasUserInteractedWithServicesRef.current.set(selected.id, true)
     }
+    // Если размер новый (нет других данных) и finishing пустой - не помечаем как взаимодействие
   }, [selected])
   
   useEffect(() => {
     if (!selected || services.length === 0) return
-    // Если пользователь уже взаимодействовал с услугами, не добавляем автоматически
-    if (hasUserInteractedWithServicesRef.current) return
+    
+    // Проверяем, взаимодействовал ли пользователь с услугами для этого размера
+    const hasInteracted = hasUserInteractedWithServicesRef.current.get(selected.id) || false
+    if (hasInteracted) return
 
     // Если уже есть сохраненные finishing, значит пользователь уже выбирал услуги
-    // Не добавляем автоматически, чтобы не перезаписать выбор пользователя
     if (selected.finishing && selected.finishing.length > 0) {
-      hasUserInteractedWithServicesRef.current = true
+      hasUserInteractedWithServicesRef.current.set(selected.id, true)
       return
     }
 
+    // Проверяем, был ли размер настроен ранее (есть другие данные)
+    const hasOtherData = (selected.print_prices && selected.print_prices.length > 0) || 
+                        (selected.material_prices && selected.material_prices.length > 0) ||
+                        (selected.allowed_material_ids && selected.allowed_material_ids.length > 0)
+    
+    // Если размер был настроен, но услуг нет - не добавляем автоматически
+    // (пользователь мог явно удалить их)
+    if (hasOtherData) {
+      hasUserInteractedWithServicesRef.current.set(selected.id, true)
+      return
+    }
+
+    // Размер новый, можно добавить услуги автоматически
     const servicesToAdd = services.filter(s => 
       !selected.finishing.some(f => f.service_id === Number(s.id))
     )
@@ -1538,7 +1559,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                           servicePricings={servicePricings}
                           commonRanges={commonRanges}
                           onUpdate={(newPricings) => {
-                            hasUserInteractedWithServicesRef.current = true
+                            // Помечаем, что пользователь взаимодействовал с услугами для этого размера
+                            hasUserInteractedWithServicesRef.current.set(selected.id, true)
                             updateSize(selected.id, { finishing: newPricings })
                           }}
                           onRangesUpdate={(newRanges) => {
