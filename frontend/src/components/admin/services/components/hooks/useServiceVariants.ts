@@ -16,6 +16,15 @@ export function useServiceVariants(serviceId: number) {
   const [variants, setVariants] = useState<VariantWithTiers[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Отладка изменений состояния
+  const debugSetVariants = useCallback((newVariants: VariantWithTiers[] | ((prev: VariantWithTiers[]) => VariantWithTiers[])) => {
+    console.log('=== SET_VARIANTS CALLED ===');
+    const actualNewVariants = typeof newVariants === 'function' ? newVariants(variants) : newVariants;
+    console.log('Current variants:', variants);
+    console.log('New variants:', actualNewVariants);
+    setVariants(newVariants);
+  }, [variants]);
   const cache = useTiersCache();
 
   // Используем useRef для стабильной ссылки на cache
@@ -50,7 +59,7 @@ export function useServiceVariants(serviceId: number) {
         loadingTiers: false,
       }));
 
-      setVariants(variantsWithTiers);
+      debugSetVariants(variantsWithTiers);
     } catch (err: any) {
       console.error('Ошибка загрузки вариантов:', err);
       const errorMessage = err?.response?.data?.error || err?.message || 'Не удалось загрузить варианты услуги';
@@ -65,13 +74,20 @@ export function useServiceVariants(serviceId: number) {
     void loadVariants();
   }, [loadVariants]);
 
+  // Отладка изменений variants
+  useEffect(() => {
+    console.log('=== VARIANTS STATE CHANGED ===');
+    console.log('New variants length:', variants.length);
+    console.log('New variants:', variants);
+  }, [variants]);
+
   const invalidateCache = useCallback(() => {
     cacheRef.current.invalidate(serviceId);
   }, [serviceId]); // cache через ref, не добавляем в зависимости
 
   return {
     variants,
-    setVariants,
+    setVariants: debugSetVariants,
     loading,
     error,
     setError,

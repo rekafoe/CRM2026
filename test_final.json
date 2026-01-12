@@ -1,9 +1,0 @@
-{
-  "variant_name": "Финальный тест",
-  "parameters": {
-    "type": "финал",
-    "density": "200 мкм"
-  },
-  "sort_order": 300,
-  "is_active": true
-}

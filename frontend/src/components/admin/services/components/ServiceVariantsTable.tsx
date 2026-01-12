@@ -28,8 +28,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   serviceId,
   serviceName,
 }) => {
+  console.log('=== ServiceVariantsTable RENDER ===');
+  console.log('serviceId:', serviceId, 'serviceName:', serviceName);
+
   // Хуки для управления состоянием
   const { variants, setVariants, loading, error, setError, reload, invalidateCache } = useServiceVariants(serviceId);
+  console.log('variants from hook:', variants);
+  console.log('variants length:', variants.length);
   const editing = useVariantEditing();
   const tierModal = useTierModal();
   const operations = useVariantOperations(serviceId, variants, setVariants, setError, reload, invalidateCache);
@@ -48,7 +53,14 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   }, [commonRanges]);
 
   // Группируем варианты
-  const groupedVariants = useMemo(() => groupVariantsByType(variants), [variants]);
+  const groupedVariants = useMemo(() => {
+    const result = groupVariantsByType(variants);
+    console.log('=== GROUPING DEBUG ===');
+    console.log('variants array:', variants);
+    console.log('groupedVariants:', result);
+    console.log('typeNames:', Object.keys(result));
+    return result;
+  }, [variants]);
   const variantsIndexMap = useMemo(() => createVariantsIndexMap(variants), [variants]);
   const typeNames = useMemo(() => Object.keys(groupedVariants), [groupedVariants]);
 
@@ -102,7 +114,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
           console.log('handleCreateVariant exists:', typeof handleCreateVariant);
           await handleCreateVariant();
         }}>
-          + Добавить тип
+          + Добавить тип 
         </Button>
       </div>
 
@@ -165,9 +177,14 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
             <div className="el-table__body-wrapper is-scrolling-none">
               <table cellSpacing="0" cellPadding="0" border={0} className="el-table__body" style={{ width: '100%' }}>
                 <tbody>
+                  {console.log('=== RENDERING TABLE ===') || null}
+                  {console.log('typeNames to render:', typeNames) || null}
                   {typeNames.map((typeName) => {
+                    console.log('Rendering typeName:', typeName);
                     const typeGroup = groupedVariants[typeName];
                     const firstVariant = typeGroup.level0[0];
+                    console.log('typeGroup:', typeGroup);
+                    console.log('firstVariant:', firstVariant);
                     if (!firstVariant) return null;
 
                     const allTypeVariants: VariantWithTiers[] = [
@@ -248,14 +265,19 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                   type="button"
                                   className="el-button el-button--success el-button--small is-plain"
                                   onClick={async () => {
-                                    console.log('Child button clicked - about to call createVariant');
+                                    console.log('=== CHILD BUTTON CLICK ===');
+                                    console.log('typeName:', typeName);
+                                    console.log('operations.createVariant exists:', typeof operations.createVariant);
+
                                     try {
-                                      console.log('Calling operations.createVariant with:', typeName, { type: '', density: '' });
+                                      console.log('Calling operations.createVariant...');
                                       const newVariant = await operations.createVariant(typeName, { type: '', density: '' });
-                                      console.log('createVariant returned:', newVariant);
+                                      console.log('✅ createVariant returned:', newVariant);
+                                      console.log('Calling editing.startEditingParams...');
                                       editing.startEditingParams(newVariant.id, { type: '', density: '' });
+                                      console.log('✅ editing.startEditingParams completed');
                                     } catch (err) {
-                                      console.error('Ошибка создания дочерней строки:', err);
+                                      console.error('❌ Ошибка создания дочерней строки:', err);
                                       // Ошибка уже обработана в хуке и отображена через setError
                                     }
                                   }}
