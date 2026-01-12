@@ -3,7 +3,7 @@
  * Использует модульную структуру с хуками и утилитами
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect } from 'react';
 import { Button, Alert } from '../../../common';
 import { PriceRangeCells, PriceRangeHeaders } from './PriceRangeCells';
 import { PriceRange } from '../../../../hooks/usePriceRanges';
@@ -12,6 +12,7 @@ import { useServiceVariants } from './hooks/useServiceVariants';
 import { useVariantEditing } from './hooks/useVariantEditing';
 import { useTierModal } from './hooks/useTierModal';
 import { useVariantOperations } from './hooks/useVariantOperations';
+import { useLocalRangeChanges } from './hooks/useLocalRangeChanges';
 import {
   groupVariantsByType,
   calculateCommonRanges,
@@ -21,6 +22,7 @@ import {
   ServiceVariantsTableProps,
   VariantWithTiers,
 } from './ServiceVariantsTable.types';
+import { RangeChange, PriceChange } from './hooks/useLocalRangeChanges';
 import '../../../../features/productTemplate/components/SimplifiedTemplateSection.css';
 import './ServiceVariantsTable.css';
 
@@ -29,23 +31,61 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   serviceName,
 }) => {
   // Хуки для управления состоянием
-  const { variants, setVariants, loading, error, setError, reload, invalidateCache } = useServiceVariants(serviceId);
+  const { variants: serverVariants, loading, error, setError, reload, invalidateCache } = useServiceVariants(serviceId);
   const editing = useVariantEditing();
   const tierModal = useTierModal();
-  const operations = useVariantOperations(serviceId, variants, setVariants, setError, reload, invalidateCache);
+  const operations = useVariantOperations(serviceId, serverVariants, () => {}, setError, reload, invalidateCache);
+
+  // Локальное состояние для несохраненных изменений
+  const saveChangesToServer = useCallback(async (rangeChanges: RangeChange[], priceChanges: PriceChange[]) => {
+    try {
+      // Применяем изменения диапазонов
+      for (const change of rangeChanges) {
+        switch (change.type) {
+          case 'add':
+            if (change.boundary) {
+              await operations.addRangeBoundary(change.boundary);
+            }
+            break;
+          case 'edit':
+            if (change.rangeIndex !== undefined && change.newBoundary !== undefined) {
+              await operations.editRangeBoundary(change.rangeIndex, change.newBoundary);
+            }
+            break;
+          case 'remove':
+            if (change.rangeIndex !== undefined) {
+              await operations.removeRange(change.rangeIndex);
+            }
+            break;
+        }
+      }
+
+      // Применяем изменения цен
+      for (const change of priceChanges) {
+        await operations.changePrice(change.variantId, change.minQty, change.newPrice);
+      }
+
+      // Перезагружаем данные с сервера
+      await reload();
+    } catch (err) {
+      console.error('Error saving changes:', err);
+      throw err;
+    }
+  }, [operations, reload]);
+
+  const localChanges = useLocalRangeChanges(serverVariants, saveChangesToServer);
+
+  // Синхронизируем локальное состояние при изменении серверных данных
+  React.useEffect(() => {
+    localChanges.syncWithExternal(serverVariants);
+  }, [serverVariants, localChanges]);
 
   console.log('operations object:', operations);
   console.log('createVariant function:', operations.createVariant);
 
-  // Вычисляем общие диапазоны
-  const commonRanges = useMemo(() => calculateCommonRanges(variants), [variants]);
-  const commonRangesAsPriceRanges: PriceRange[] = useMemo(() => {
-    return commonRanges.map(r => ({
-      minQty: r.min_qty,
-      maxQty: r.max_qty,
-      price: 0,
-    }));
-  }, [commonRanges]);
+  // Используем локальные варианты и диапазоны
+  const variants = localChanges.localVariants;
+  const commonRangesAsPriceRanges = localChanges.commonRangesAsPriceRanges;
 
   // Группируем варианты
   const groupedVariants = useMemo(() => groupVariantsByType(variants), [variants]);
@@ -71,16 +111,17 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
     try {
       if (tierModal.tierModal.type === 'add') {
-        await operations.addRangeBoundary(boundary);
+        localChanges.addRangeBoundary(boundary);
       } else if (tierModal.tierModal.type === 'edit' && tierModal.tierModal.tierIndex !== undefined) {
-        await operations.editRangeBoundary(tierModal.tierModal.tierIndex, boundary);
+        localChanges.editRangeBoundary(tierModal.tierModal.tierIndex, boundary);
       }
       tierModal.closeModal();
       setError(null);
     } catch (err) {
-      // Ошибка уже обработана в хуке
+      console.error('Error in handleSaveRange:', err);
+      setError('Не удалось сохранить диапазон');
     }
-  }, [tierModal, operations, setError]);
+  }, [tierModal, localChanges, setError]);
 
   if (loading) {
     return <div className="p-4 text-center text-gray-500">Загрузка вариантов...</div>;
@@ -95,14 +136,45 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       )}
 
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Варианты услуги: {serviceName}</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-semibold">Варианты услуги: {serviceName}</h3>
+          {localChanges.hasUnsavedChanges && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-orange-600 font-medium">
+                Есть несохраненные изменения
+              </span>
+              <Button
+                variant="success"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await localChanges.saveChanges();
+                    setError(null);
+                  } catch (err) {
+                    setError('Не удалось сохранить изменения');
+                  }
+                }}
+              >
+                💾 Сохранить
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  if (confirm('Отменить все несохраненные изменения?')) {
+                    localChanges.cancelChanges();
+                  }
+                }}
+              >
+                ↶ Отменить
+              </Button>
+            </div>
+          )}
+        </div>
         <Button variant="primary" size="sm" onClick={async () => {
-          console.log('=== MAIN BUTTON CLICK START ===');
-          console.log('Main create button clicked - about to call handleCreateVariant');
-          console.log('handleCreateVariant exists:', typeof handleCreateVariant);
           await handleCreateVariant();
         }}>
-          + Добавить тип 
+          + Добавить тип
         </Button>
       </div>
 
@@ -144,7 +216,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                       }}
                       onRemoveRange={(rangeIndex) => {
                         if (confirm('Удалить этот диапазон для всех вариантов?')) {
-                          operations.removeRange(rangeIndex);
+                          localChanges.removeRange(rangeIndex);
                         }
                       }}
                       onAddRange={() => {
@@ -371,7 +443,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                     tiers={variant.tiers}
                                     commonRanges={commonRangesAsPriceRanges}
                                     onPriceChange={(minQty, newPrice) =>
-                                      operations.changePrice(variant.id, minQty, newPrice)
+                                      localChanges.changePrice(variant.id, minQty, newPrice)
                                     }
                                     editable={true}
                                   />
