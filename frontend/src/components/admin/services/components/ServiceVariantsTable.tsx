@@ -13,7 +13,6 @@ import { useVariantEditing } from './hooks/useVariantEditing';
 import { useTierModal } from './hooks/useTierModal';
 import { useVariantOperations } from './hooks/useVariantOperations';
 import { useLocalRangeChanges } from './hooks/useLocalRangeChanges';
-import { calculateCommonRanges } from './ServiceVariantsTable.utils';
 import {
   groupVariantsByType,
   calculateCommonRanges,
