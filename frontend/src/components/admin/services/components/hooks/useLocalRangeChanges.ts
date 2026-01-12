@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { VariantWithTiers } from '../ServiceVariantsTable.types';
-import { PriceRange, PriceRangeUtils } from '../../../../hooks/usePriceRanges';
+import { PriceRange, PriceRangeUtils } from '../../../../../hooks/usePriceRanges';
 import { calculateCommonRanges } from '../ServiceVariantsTable.utils';
 
 /**
@@ -74,7 +74,7 @@ export function useLocalRangeChanges(
         const nextTier = variant.tiers.find((t) => t.minQuantity > originalMin);
         const originalMax = nextTier ? nextTier.minQuantity : Infinity;
 
-        normalizedRanges.forEach((newRange) => {
+        normalizedRanges.forEach((newRange: PriceRange) => {
           if (newRange.minQty >= originalMin && newRange.minQty < originalMax) {
             if (!originalRangePrices.has(newRange.minQty)) {
               originalRangePrices.set(newRange.minQty, originalTier.rate);
@@ -83,9 +83,9 @@ export function useLocalRangeChanges(
         });
       });
 
-      return {
-        ...variant,
-        tiers: normalizedRanges.map((t) => ({
+        return {
+          ...variant,
+          tiers: normalizedRanges.map((t: PriceRange) => ({
           id: 0, // Локальный ID
           serviceId: variant.tiers[0]?.serviceId || 0,
           variantId: variant.id,
@@ -139,8 +139,8 @@ export function useLocalRangeChanges(
       return {
         ...variant,
         tiers: normalizedRanges
-          .filter((r) => preservedPrices.has(r.minQty))
-          .map((t) => ({
+            .filter((r: PriceRange) => preservedPrices.has(r.minQty))
+            .map((t: PriceRange) => ({
             id: 0,
             serviceId: variant.tiers[0]?.serviceId || 0,
             variantId: variant.id,
@@ -194,8 +194,8 @@ export function useLocalRangeChanges(
       return {
         ...variant,
         tiers: normalizedRanges
-          .filter((r) => preservedPrices.has(r.minQty))
-          .map((t) => ({
+            .filter((r: PriceRange) => preservedPrices.has(r.minQty))
+            .map((t: PriceRange) => ({
             id: 0,
             serviceId: variant.tiers[0]?.serviceId || 0,
             variantId: variant.id,
