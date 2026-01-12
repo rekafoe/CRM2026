@@ -10,7 +10,17 @@ import './SimplifiedTemplateSection.css'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean }
 type PaperTypeRow = PaperTypeForCalculator
-type ServiceRow = { id: number; name: string; operationType?: string; operation_type?: string; priceUnit?: string; price_unit?: string }
+type ServiceRow = { 
+  id: number; 
+  name?: string; 
+  service_name?: string;
+  operationType?: string; 
+  operation_type?: string; 
+  type?: string;
+  service_type?: string;
+  priceUnit?: string; 
+  price_unit?: string 
+}
 
 interface Props {
   value: SimplifiedConfig
@@ -218,22 +228,22 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
       setPaperTypes(pt || [])
       setPrintTechs((techResp || []).filter((t: any) => t && t.code))
       
-      // Загружаем все услуги, не фильтруя по operation_type
-      // Фильтрация будет происходить только для отображения в UI
-      const allServices = (svcResp || []).filter((s: any) => s && s.id && s.name)
-      console.log('Все загруженные услуги:', allServices.length, allServices)
-      
-      // Фильтруем только для отображения в таблице отделки
-      const allowedOps = new Set(['cut', 'score', 'fold', 'laminate', 'post_processing'])
-      const filteredServices = allServices.filter((s: any) => {
-        const opType = String(s.operation_type ?? s.operationType ?? s.type ?? '').toLowerCase()
-        // Если operation_type не указан, показываем услугу (может быть post_processing)
+      // Загружаем все услуги - показываем все, кроме явно исключенных типов
+      const allServices = (svcResp || []).filter((s: any) => {
+        // Базовая валидация - услуга должна иметь id и name
+        if (!s || !s.id || !s.name) return false
+        
+        // Исключаем только явно ненужные типы (например, печать, если такие есть)
+        const excludedTypes = new Set(['print', 'printing'])
+        const opType = String(s.operation_type ?? s.operationType ?? s.type ?? s.service_type ?? '').toLowerCase()
+        
+        // Если тип не указан или не в списке исключенных - показываем услугу
         if (!opType) return true
-        return allowedOps.has(opType) || opType === 'post_processing'
+        return !excludedTypes.has(opType)
       })
       
-      setServices(filteredServices)
-      console.log('Отфильтрованные услуги отделки:', filteredServices.length, filteredServices)
+      console.log('Все загруженные услуги:', allServices.length, allServices)
+      setServices(allServices)
       // Автоматически выбираем первый тип бумаги, если он есть
       if (pt && pt.length > 0 && !selectedPaperTypeId) {
         setSelectedPaperTypeId(pt[0].id)
@@ -1285,14 +1295,17 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                       const commonRanges = getSizeRanges(selected)
                       
                       // Преобразуем services в формат ServiceItem
-                      const serviceItems: ServiceItem[] = services.map(s => ({
-                        id: Number(s.id),
-                        name: s.name,
-                        price_unit: (s.operation_type === 'cut' || s.operation_type === 'score' || s.operation_type === 'fold') 
-                          ? 'per_cut' as const 
-                          : 'per_item' as const,
-                        operation_type: s.operation_type || s.operationType
-                      }))
+                      const serviceItems: ServiceItem[] = services.map(s => {
+                        const opType = s.operation_type ?? s.operationType ?? s.type ?? s.service_type ?? ''
+                        return {
+                          id: Number(s.id),
+                          name: s.name || s.service_name || `Услуга #${s.id}`,
+                          price_unit: (opType === 'cut' || opType === 'score' || opType === 'fold') 
+                            ? 'per_cut' as const 
+                            : 'per_item' as const,
+                          operation_type: opType
+                        }
+                      })
                       
                       // Преобразуем finishing в формат ServicePricing
                       const servicePricings: ServicePricing[] = selected.finishing.map(f => ({
