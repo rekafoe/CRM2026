@@ -55,15 +55,6 @@ export function useLocalRangeChanges(
     return maxId + 1;
   });
 
-  // Вычисляем общие диапазоны на основе локальных вариантов
-  const commonRanges = useMemo(() => calculateCommonRanges(localVariants), [localVariants]);
-  const commonRangesAsPriceRanges: PriceRange[] = useMemo(() => {
-    return commonRanges.map(r => ({
-      minQty: r.min_qty,
-      maxQty: r.max_qty,
-      price: 0,
-    }));
-  }, [commonRanges]);
 
   // Синхронизировать локальное состояние с внешним
   const syncWithExternal = useCallback((externalVariants: VariantWithTiers[]) => {
@@ -348,7 +339,6 @@ export function useLocalRangeChanges(
 
   return {
     localVariants,
-    commonRangesAsPriceRanges,
     hasUnsavedChanges,
     rangeChanges,
     priceChanges,

@@ -13,6 +13,7 @@ import { useVariantEditing } from './hooks/useVariantEditing';
 import { useTierModal } from './hooks/useTierModal';
 import { useVariantOperations } from './hooks/useVariantOperations';
 import { useLocalRangeChanges } from './hooks/useLocalRangeChanges';
+import { calculateCommonRanges } from './ServiceVariantsTable.utils';
 import {
   groupVariantsByType,
   calculateCommonRanges,
@@ -99,9 +100,18 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   console.log('operations object:', operations);
   console.log('createVariant function:', operations.createVariant);
 
-  // Используем локальные варианты и диапазоны
+  // Используем локальные варианты
   const variants = localChanges.localVariants;
-  const commonRangesAsPriceRanges = localChanges.commonRangesAsPriceRanges;
+
+  // Вычисляем общие диапазоны локально, чтобы избежать цикла зависимостей
+  const commonRanges = useMemo(() => calculateCommonRanges(variants), [variants]);
+  const commonRangesAsPriceRanges: PriceRange[] = useMemo(() => {
+    return commonRanges.map(r => ({
+      minQty: r.min_qty,
+      maxQty: r.max_qty,
+      price: 0,
+    }));
+  }, [commonRanges]);
 
   console.log('=== ServiceVariantsTable ===');
   console.log('localChanges.hasUnsavedChanges:', localChanges.hasUnsavedChanges);
