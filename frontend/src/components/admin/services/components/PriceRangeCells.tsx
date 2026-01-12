@@ -118,9 +118,9 @@ export const PriceRangeCells: React.FC<PriceRangeCellsProps> = ({
           : (tier?.rate !== undefined && tier.rate !== 0 ? tier.rate : '');
 
         return (
-          <td key={range.minQty} style={{ width: '120px', minWidth: '120px', maxWidth: '120px', textAlign: 'center' }}>
-            <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-              <div className="el-input el-input--small" style={{ width: '100%', maxWidth: '100%' }}>
+          <td key={range.minQty} style={{ width: '120px', minWidth: '120px', maxWidth: '120px', textAlign: 'center', padding: 0 }}>
+            <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', width: '100%' }}>
+              <div className="el-input el-input--small" style={{ width: '100%', maxWidth: '100%', flex: '1 1 auto' }}>
                 <input
                   type="number"
                   step="0.01"
@@ -194,21 +194,21 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
       {commonRanges.map((range, idx) => {
         const rangeLabel = formatRangeLabel(range);
         return (
-          <th key={idx} className="is-center" style={{ width: '120px', minWidth: '120px', maxWidth: '120px', textAlign: 'center' }}>
-            <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap', overflow: 'hidden' }}>
+          <th key={idx} className="is-center" style={{ width: '120px', minWidth: '120px', maxWidth: '120px', textAlign: 'center', padding: 0 }}>
+            <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap', overflow: 'hidden', width: '100%' }}>
               <span
-                style={{ cursor: onEditRange ? 'pointer' : 'default', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: '1', minWidth: 0 }}
+                style={{ cursor: onEditRange ? 'pointer' : 'default', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: '1 1 auto', minWidth: 0, textAlign: 'center' }}
                 onClick={() => onEditRange?.(idx, range.minQty)}
                 title={rangeLabel}
               >
                 {rangeLabel}
               </span>
               {onRemoveRange && (
-                <span style={{ marginLeft: '4px', flexShrink: 0 }}>
+                <span style={{ marginLeft: '4px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                   <button
                     type="button"
                     className="el-button el-button--text el-button--mini"
-                    style={{ color: 'red', padding: '0', minHeight: 'auto', lineHeight: '1', width: '16px', height: '16px' }}
+                    style={{ color: 'red', padding: '0', minHeight: 'auto', lineHeight: '1', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onClick={() => onRemoveRange(idx)}
                   >
                     ×
@@ -220,9 +220,9 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
         );
       })}
       {onAddRange && (
-        <th>
-          <div className="cell">
-            <div className="active-panel active-panel-with-popover">
+        <th style={{ padding: 0 }}>
+          <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+            <div className="active-panel active-panel-with-popover" style={{ width: '100%' }}>
               <span>
                 <button
                   ref={addRangeButtonRef}
