@@ -344,11 +344,14 @@ export function useVariantOperations(
           }
         }
 
-        // Удаляем старые tiers
-        for (const existingTier of existingTiers) {
-          if (!newTiersMinQtys.has(existingTier.minQuantity)) {
-            await deleteServiceVariantTier(serviceId, existingTier.id);
-          }
+        // Удаляем старые tiers (параллельно для ускорения)
+        const tiersToDelete = existingTiers.filter(
+          (existingTier) => !newTiersMinQtys.has(existingTier.minQuantity),
+        );
+        if (tiersToDelete.length > 0) {
+          await Promise.all(
+            tiersToDelete.map((tier) => deleteServiceVariantTier(serviceId, tier.id)),
+          );
         }
       }
 
@@ -452,10 +455,14 @@ export function useVariantOperations(
           }
         }
 
-        for (const existingTier of existingTiers) {
-          if (!newTiersMinQtys.has(existingTier.minQuantity)) {
-            await deleteServiceVariantTier(serviceId, existingTier.id);
-          }
+        // Удаляем старые tiers (параллельно)
+        const tiersToDelete = existingTiers.filter(
+          (existingTier) => !newTiersMinQtys.has(existingTier.minQuantity),
+        );
+        if (tiersToDelete.length > 0) {
+          await Promise.all(
+            tiersToDelete.map((tier) => deleteServiceVariantTier(serviceId, tier.id)),
+          );
         }
       }
 
@@ -499,10 +506,15 @@ export function useVariantOperations(
         const newRanges = PriceRangeUtils.removeRange(currentRanges, tierIndex);
         const normalizedRanges = PriceRangeUtils.normalize(newRanges);
 
-        // Сохраняем существующие цены
+        // Сохраняем существующие цены (исключаем tiers, которые попадают в удаляемый диапазон)
         const preservedPrices = new Map<number, number>();
         variant.tiers.forEach((t) => {
-          if (t.minQuantity !== rangeToRemove.min_qty) {
+          // Проверяем, попадает ли tier в удаляемый диапазон
+          const isInRemovedRange = 
+            t.minQuantity >= rangeToRemove.min_qty && 
+            (rangeToRemove.max_qty === undefined || t.minQuantity <= rangeToRemove.max_qty);
+          
+          if (!isInRemovedRange) {
             preservedPrices.set(t.minQuantity, t.rate);
           }
         });
@@ -530,10 +542,14 @@ export function useVariantOperations(
         const existingTiers = allTiersByVariantId[variant.id] || [];
         const newTiersMinQtys = new Set(variant.tiers.map((t) => t.minQuantity));
 
-        for (const existingTier of existingTiers) {
-          if (!newTiersMinQtys.has(existingTier.minQuantity)) {
-            await deleteServiceVariantTier(serviceId, existingTier.id);
-          }
+        // Удаляем только те tiers, которые реально исчезли, и делаем это параллельно
+        const tiersToDelete = existingTiers.filter(
+          (existingTier) => !newTiersMinQtys.has(existingTier.minQuantity),
+        );
+        if (tiersToDelete.length > 0) {
+          await Promise.all(
+            tiersToDelete.map((tier) => deleteServiceVariantTier(serviceId, tier.id)),
+          );
         }
       }
 
