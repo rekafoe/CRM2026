@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { ServiceManagementService } from '../modules/pricing/services/serviceManagementService'
+import { PricingServiceRepository } from '../modules/pricing/repositories/serviceRepository'
 
 console.log('Loading pricing routes...')
 
@@ -858,6 +859,115 @@ router.get('/services/:serviceId/variants/tiers', asyncHandler(async (req, res) 
   })
   
   res.json(result)
+}))
+
+// ========== Новые endpoints для оптимизированной структуры диапазонов ==========
+
+// POST /api/pricing/services/:serviceId/ranges - добавить границу диапазона
+router.post('/services/:serviceId/ranges', asyncHandler(async (req, res) => {
+  const { serviceId } = req.params
+  const { minQuantity } = req.body
+  const serviceIdNum = Number(serviceId)
+  
+  if (isNaN(serviceIdNum)) {
+    res.status(400).json({ error: 'Invalid serviceId' })
+    return
+  }
+  
+  if (typeof minQuantity !== 'number' || minQuantity < 1) {
+    res.status(400).json({ error: 'Invalid minQuantity. Must be a positive number' })
+    return
+  }
+  
+  try {
+    const rangeId = await PricingServiceRepository.addRangeBoundary(serviceIdNum, minQuantity)
+    res.json({ id: rangeId, serviceId: serviceIdNum, minQuantity, message: 'Range boundary added successfully' })
+  } catch (error: any) {
+    if (error.status) {
+      res.status(error.status).json({ error: error.message })
+    } else {
+      res.status(500).json({ error: 'Failed to add range boundary' })
+    }
+  }
+}))
+
+// DELETE /api/pricing/services/:serviceId/ranges/:minQuantity - удалить границу диапазона
+router.delete('/services/:serviceId/ranges/:minQuantity', asyncHandler(async (req, res) => {
+  const { serviceId, minQuantity } = req.params
+  const serviceIdNum = Number(serviceId)
+  const minQuantityNum = Number(minQuantity)
+  
+  if (isNaN(serviceIdNum) || isNaN(minQuantityNum)) {
+    res.status(400).json({ error: 'Invalid serviceId or minQuantity' })
+    return
+  }
+  
+  try {
+    await PricingServiceRepository.removeRangeBoundary(serviceIdNum, minQuantityNum)
+    res.json({ message: 'Range boundary removed successfully' })
+  } catch (error: any) {
+    if (error.status) {
+      res.status(error.status).json({ error: error.message })
+    } else {
+      res.status(500).json({ error: 'Failed to remove range boundary' })
+    }
+  }
+}))
+
+// PUT /api/pricing/services/:serviceId/ranges/:minQuantity - обновить границу диапазона
+router.put('/services/:serviceId/ranges/:minQuantity', asyncHandler(async (req, res) => {
+  const { serviceId, minQuantity } = req.params
+  const { newMinQuantity } = req.body
+  const serviceIdNum = Number(serviceId)
+  const minQuantityNum = Number(minQuantity)
+  const newMinQuantityNum = Number(newMinQuantity)
+  
+  if (isNaN(serviceIdNum) || isNaN(minQuantityNum) || isNaN(newMinQuantityNum)) {
+    res.status(400).json({ error: 'Invalid serviceId, minQuantity or newMinQuantity' })
+    return
+  }
+  
+  if (newMinQuantityNum < 1) {
+    res.status(400).json({ error: 'Invalid newMinQuantity. Must be a positive number' })
+    return
+  }
+  
+  try {
+    await PricingServiceRepository.updateRangeBoundary(serviceIdNum, minQuantityNum, newMinQuantityNum)
+    res.json({ message: 'Range boundary updated successfully' })
+  } catch (error: any) {
+    if (error.status) {
+      res.status(error.status).json({ error: error.message })
+    } else {
+      res.status(500).json({ error: 'Failed to update range boundary' })
+    }
+  }
+}))
+
+// PUT /api/pricing/services/:serviceId/variants/:variantId/prices/:minQuantity - обновить цену варианта
+router.put('/services/:serviceId/variants/:variantId/prices/:minQuantity', asyncHandler(async (req, res) => {
+  const { serviceId, variantId, minQuantity } = req.params
+  const { price } = req.body
+  const serviceIdNum = Number(serviceId)
+  const variantIdNum = Number(variantId)
+  const minQuantityNum = Number(minQuantity)
+  const priceNum = Number(price)
+  
+  if (isNaN(serviceIdNum) || isNaN(variantIdNum) || isNaN(minQuantityNum) || isNaN(priceNum)) {
+    res.status(400).json({ error: 'Invalid serviceId, variantId, minQuantity or price' })
+    return
+  }
+  
+  try {
+    await PricingServiceRepository.updateVariantPrice(variantIdNum, minQuantityNum, priceNum)
+    res.json({ message: 'Variant price updated successfully' })
+  } catch (error: any) {
+    if (error.status) {
+      res.status(error.status).json({ error: error.message })
+    } else {
+      res.status(500).json({ error: 'Failed to update variant price' })
+    }
+  }
 }))
 
 // POST /api/pricing/markup-settings - создать настройку наценки

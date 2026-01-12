@@ -9,6 +9,10 @@ import {
   deleteServiceVariantTier,
   getServiceVariantTiers,
   getAllVariantTiers,
+  addRangeBoundary as addRangeBoundaryAPI,
+  removeRangeBoundary as removeRangeBoundaryAPI,
+  updateRangeBoundary as updateRangeBoundaryAPI,
+  updateVariantPrice as updateVariantPriceAPI,
 } from '../../../../../services/pricing';
 import { PriceRangeUtils } from '../../../../../hooks/usePriceRanges';
 
@@ -235,7 +239,7 @@ export function useVariantOperations(
 
       const currentTier = currentVariant.tiers.find((t) => t.minQuantity === minQty);
       if (!currentTier || currentTier.id === 0) {
-        // Создаем новый tier
+        // Создаем новый tier (используем старый API для обратной совместимости)
         const created = await createServiceVariantTier(serviceId, variantId, {
           minQuantity: minQty,
           rate: newPrice,
@@ -254,11 +258,17 @@ export function useVariantOperations(
           })
         );
       } else {
-        // Обновляем существующий tier
-        await updateServiceVariantTier(serviceId, variantId, currentTier.id, {
-          minQuantity: currentTier.minQuantity,
-          rate: newPrice,
-        });
+        // Используем новый оптимизированный API для обновления цены
+        try {
+          await updateVariantPriceAPI(serviceId, variantId, minQty, newPrice);
+        } catch (err) {
+          // Fallback на старый API, если новый не работает (для обратной совместимости)
+          console.warn('Failed to use new API, falling back to old API:', err);
+          await updateServiceVariantTier(serviceId, variantId, currentTier.id, {
+            minQuantity: currentTier.minQuantity,
+            rate: newPrice,
+          });
+        }
       }
 
       priceChangeTimeoutRef.current.delete(key);
@@ -270,289 +280,95 @@ export function useVariantOperations(
 
   const addRangeBoundary = useCallback(async (boundary: number) => {
     try {
-      const currentVariants = [...variants];
-
-      // Обновляем диапазоны для всех вариантов
-      const updatedVariants = currentVariants.map((variant) => {
-        const currentRanges = variant.tiers.map((t) => ({
-          minQty: t.minQuantity,
-          price: t.rate,
-        }));
-
-        const newRanges = PriceRangeUtils.addBoundary(currentRanges, boundary);
-        const normalizedRanges = PriceRangeUtils.normalize(newRanges);
-
-        // Сохраняем цены из исходных диапазонов
-        const originalRangePrices = new Map<number, number>();
-        variant.tiers.forEach((originalTier) => {
-          const originalMin = originalTier.minQuantity;
-          const nextTier = variant.tiers.find((t) => t.minQuantity > originalMin);
-          const originalMax = nextTier ? nextTier.minQuantity : Infinity;
-
-          normalizedRanges.forEach((newRange) => {
-            if (newRange.minQty >= originalMin && newRange.minQty < originalMax) {
-              if (!originalRangePrices.has(newRange.minQty)) {
-                originalRangePrices.set(newRange.minQty, originalTier.rate);
-              }
-            }
-          });
-        });
-
-        const newTiersWithPrices = normalizedRanges.map((r) => ({
-          minQty: r.minQty,
-          price: originalRangePrices.get(r.minQty) ?? r.price,
-        }));
-
+      // Используем новый оптимизированный API - одна операция вместо сотен!
+      await addRangeBoundaryAPI(serviceId, boundary);
+      
+      // Перезагружаем данные с сервера
+      const allTiersByVariantId = await getAllVariantTiers(serviceId);
+      
+      // Обновляем локальное состояние
+      const updatedVariants = variants.map((variant) => {
+        const variantTiers = allTiersByVariantId[variant.id] || [];
         return {
           ...variant,
-          tiers: newTiersWithPrices.map((t) => ({
-            id: 0,
-            serviceId,
-            variantId: variant.id,
-            minQuantity: t.minQty,
-            rate: t.price,
-            isActive: true,
-          })),
+          tiers: variantTiers,
         };
       });
-
-      // Загружаем существующие tiers одним batch запросом
-      const allTiersByVariantId = await getAllVariantTiers(serviceId);
-
-      // Обновляем tiers на сервере
-      for (let variantIndex = 0; variantIndex < updatedVariants.length; variantIndex++) {
-        const variant = updatedVariants[variantIndex];
-        const existingTiers = allTiersByVariantId[variant.id] || [];
-        const existingTiersMap = new Map(existingTiers.map((t) => [t.minQuantity, t]));
-        const newTiersMinQtys = new Set(variant.tiers.map((t) => t.minQuantity));
-
-        // Создаем или обновляем tiers
-        for (const newTier of variant.tiers) {
-          const existingTier = existingTiersMap.get(newTier.minQuantity);
-          if (existingTier) {
-            if (existingTier.rate !== newTier.rate) {
-              await updateServiceVariantTier(serviceId, variant.id, existingTier.id, {
-                minQuantity: newTier.minQuantity,
-                rate: newTier.rate,
-              });
-            }
-          } else {
-            await createServiceVariantTier(serviceId, variant.id, {
-              minQuantity: newTier.minQuantity,
-              rate: newTier.rate,
-            });
-          }
-        }
-
-        // Удаляем старые tiers (параллельно для ускорения)
-        const tiersToDelete = existingTiers.filter(
-          (existingTier) => !newTiersMinQtys.has(existingTier.minQuantity),
-        );
-        if (tiersToDelete.length > 0) {
-          await Promise.all(
-            tiersToDelete.map((tier) => deleteServiceVariantTier(serviceId, tier.id)),
-          );
-        }
-      }
-
-      // Обновляем локальное состояние
+      
       setVariants(updatedVariants);
     } catch (err) {
-      console.error('Ошибка сохранения диапазона:', err);
-      setError('Не удалось сохранить диапазон');
+      console.error('Ошибка добавления границы диапазона:', err);
+      setError('Не удалось добавить границу диапазона');
     }
   }, [serviceId, variants, setVariants, setError]);
 
   const editRangeBoundary = useCallback(async (rangeIndex: number, newBoundary: number) => {
     try {
-      const currentVariants = [...variants];
-      
-      // Вычисляем commonRanges
+      // Находим текущую границу диапазона
       const allMinQtys = new Set<number>();
-      currentVariants.forEach((v) => {
+      variants.forEach((v) => {
         v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
       });
       const sortedMinQtys = Array.from(allMinQtys).sort((a, b) => a - b);
-      const currentCommonRanges = sortedMinQtys.map((minQty, idx) => ({
-        minQty,
-        maxQty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
-        price: 0,
-      }));
-
-      const rangeToEdit = currentCommonRanges[rangeIndex];
-      if (!rangeToEdit) return;
-
-      // Обновляем диапазоны для всех вариантов
-      const updatedVariants = currentVariants.map((variant) => {
-        const currentRanges = variant.tiers.map((t) => ({
-          minQty: t.minQuantity,
-          price: t.rate,
-        }));
-
-        const tierIndex = currentRanges.findIndex((r) => r.minQty === rangeToEdit.minQty);
-        if (tierIndex === -1) return variant;
-
-        const newRanges = PriceRangeUtils.editBoundary(currentRanges, tierIndex, newBoundary);
-        const normalizedRanges = PriceRangeUtils.normalize(newRanges);
-
-        // Сохраняем цены
-        const originalRangePrices = new Map<number, number>();
-        variant.tiers.forEach((originalTier) => {
-          const originalMin = originalTier.minQuantity;
-          const nextTier = variant.tiers.find((t) => t.minQuantity > originalMin);
-          const originalMax = nextTier ? nextTier.minQuantity : Infinity;
-
-          normalizedRanges.forEach((newRange) => {
-            if (newRange.minQty >= originalMin && newRange.minQty < originalMax) {
-              if (!originalRangePrices.has(newRange.minQty)) {
-                originalRangePrices.set(newRange.minQty, originalTier.rate);
-              }
-            }
-          });
-        });
-
-        const newTiersWithPrices = normalizedRanges.map((r) => ({
-          minQty: r.minQty,
-          price: originalRangePrices.get(r.minQty) ?? r.price,
-        }));
-
+      const oldMinQuantity = sortedMinQtys[rangeIndex];
+      
+      if (oldMinQuantity === undefined) {
+        setError('Диапазон не найден');
+        return;
+      }
+      
+      // Используем новый оптимизированный API - одна операция!
+      await updateRangeBoundaryAPI(serviceId, oldMinQuantity, newBoundary);
+      
+      // Перезагружаем данные с сервера
+      const allTiersByVariantId = await getAllVariantTiers(serviceId);
+      
+      // Обновляем локальное состояние
+      const updatedVariants = variants.map((variant) => {
+        const variantTiers = allTiersByVariantId[variant.id] || [];
         return {
           ...variant,
-          tiers: newTiersWithPrices.map((t) => ({
-            id: 0,
-            serviceId,
-            variantId: variant.id,
-            minQuantity: t.minQty,
-            rate: t.price,
-            isActive: true,
-          })),
+          tiers: variantTiers,
         };
       });
-
-      // Синхронизируем с сервером (аналогично addRangeBoundary) - используем batch запрос
-      const allTiersByVariantId = await getAllVariantTiers(serviceId);
-
-      for (let variantIndex = 0; variantIndex < updatedVariants.length; variantIndex++) {
-        const variant = updatedVariants[variantIndex];
-        const existingTiers = allTiersByVariantId[variant.id] || [];
-        const existingTiersMap = new Map(existingTiers.map((t) => [t.minQuantity, t]));
-        const newTiersMinQtys = new Set(variant.tiers.map((t) => t.minQuantity));
-
-        for (const newTier of variant.tiers) {
-          const existingTier = existingTiersMap.get(newTier.minQuantity);
-          if (existingTier) {
-            if (existingTier.rate !== newTier.rate) {
-              await updateServiceVariantTier(serviceId, variant.id, existingTier.id, {
-                minQuantity: newTier.minQuantity,
-                rate: newTier.rate,
-              });
-            }
-          } else {
-            await createServiceVariantTier(serviceId, variant.id, {
-              minQuantity: newTier.minQuantity,
-              rate: newTier.rate,
-            });
-          }
-        }
-
-        // Удаляем старые tiers (параллельно)
-        const tiersToDelete = existingTiers.filter(
-          (existingTier) => !newTiersMinQtys.has(existingTier.minQuantity),
-        );
-        if (tiersToDelete.length > 0) {
-          await Promise.all(
-            tiersToDelete.map((tier) => deleteServiceVariantTier(serviceId, tier.id)),
-          );
-        }
-      }
-
+      
       setVariants(updatedVariants);
     } catch (err) {
-      console.error('Ошибка редактирования диапазона:', err);
-      setError('Не удалось отредактировать диапазон');
+      console.error('Ошибка редактирования границы диапазона:', err);
+      setError('Не удалось отредактировать границу диапазона');
     }
   }, [serviceId, variants, setVariants, setError]);
 
   const removeRange = useCallback(async (rangeIndex: number) => {
     try {
-      const currentVariants = [...variants];
-
-      // Вычисляем commonRanges
+      // Находим границу диапазона для удаления
       const allMinQtys = new Set<number>();
-      currentVariants.forEach((v) => {
+      variants.forEach((v) => {
         v.tiers.forEach((t) => allMinQtys.add(t.minQuantity));
       });
       const sortedMinQtys = Array.from(allMinQtys).sort((a, b) => a - b);
-
-      const currentCommonRanges = sortedMinQtys.map((minQty, idx) => ({
-        min_qty: minQty,
-        max_qty: idx < sortedMinQtys.length - 1 ? sortedMinQtys[idx + 1] - 1 : undefined,
-        unit_price: 0,
-      }));
-
-      const rangeToRemove = currentCommonRanges[rangeIndex];
-      if (!rangeToRemove) return;
-
-      // Обновляем диапазоны для всех вариантов
-      const updatedVariants = currentVariants.map((variant) => {
-        const currentRanges = variant.tiers.map((t) => ({
-          minQty: t.minQuantity,
-          price: t.rate,
-        }));
-
-        const tierIndex = currentRanges.findIndex((r) => r.minQty === rangeToRemove.min_qty);
-        if (tierIndex === -1) return variant;
-
-        const newRanges = PriceRangeUtils.removeRange(currentRanges, tierIndex);
-        const normalizedRanges = PriceRangeUtils.normalize(newRanges);
-
-        // Сохраняем существующие цены (исключаем tiers, которые попадают в удаляемый диапазон)
-        const preservedPrices = new Map<number, number>();
-        variant.tiers.forEach((t) => {
-          // Проверяем, попадает ли tier в удаляемый диапазон
-          const isInRemovedRange = 
-            t.minQuantity >= rangeToRemove.min_qty && 
-            (rangeToRemove.max_qty === undefined || t.minQuantity <= rangeToRemove.max_qty);
-          
-          if (!isInRemovedRange) {
-            preservedPrices.set(t.minQuantity, t.rate);
-          }
-        });
-
+      const minQuantityToRemove = sortedMinQtys[rangeIndex];
+      
+      if (minQuantityToRemove === undefined) {
+        setError('Диапазон не найден');
+        return;
+      }
+      
+      // Используем новый оптимизированный API - одна операция удаляет все связанные цены!
+      await removeRangeBoundaryAPI(serviceId, minQuantityToRemove);
+      
+      // Перезагружаем данные с сервера
+      const allTiersByVariantId = await getAllVariantTiers(serviceId);
+      
+      // Обновляем локальное состояние
+      const updatedVariants = variants.map((variant) => {
+        const variantTiers = allTiersByVariantId[variant.id] || [];
         return {
           ...variant,
-          tiers: normalizedRanges
-            .filter((r) => preservedPrices.has(r.minQty))
-            .map((t) => ({
-              id: 0,
-              serviceId,
-              variantId: variant.id,
-              minQuantity: t.minQty,
-              rate: preservedPrices.get(t.minQty)!,
-              isActive: true,
-            })),
+          tiers: variantTiers,
         };
       });
-
-      // Синхронизируем с сервером - используем batch запрос
-      const allTiersByVariantId = await getAllVariantTiers(serviceId);
-
-      for (let variantIndex = 0; variantIndex < updatedVariants.length; variantIndex++) {
-        const variant = updatedVariants[variantIndex];
-        const existingTiers = allTiersByVariantId[variant.id] || [];
-        const newTiersMinQtys = new Set(variant.tiers.map((t) => t.minQuantity));
-
-        // Удаляем только те tiers, которые реально исчезли, и делаем это параллельно
-        const tiersToDelete = existingTiers.filter(
-          (existingTier) => !newTiersMinQtys.has(existingTier.minQuantity),
-        );
-        if (tiersToDelete.length > 0) {
-          await Promise.all(
-            tiersToDelete.map((tier) => deleteServiceVariantTier(serviceId, tier.id)),
-          );
-        }
-      }
-
+      
       setVariants(updatedVariants);
     } catch (err) {
       console.error('Ошибка удаления диапазона:', err);

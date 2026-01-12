@@ -143,6 +143,36 @@ export class PricingServiceRepository {
     // Создаем индекс для быстрого поиска по service_id
     await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_variants_service_id ON service_variants(service_id)`);
     await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_volume_prices_variant_id ON service_volume_prices(variant_id)`);
+    
+    // Создаем новые оптимизированные таблицы (если их еще нет - миграция создаст их)
+    await db.exec(`CREATE TABLE IF NOT EXISTS service_range_boundaries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      service_id INTEGER NOT NULL,
+      min_quantity INTEGER NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(service_id) REFERENCES post_processing_services(id) ON DELETE CASCADE,
+      UNIQUE(service_id, min_quantity)
+    )`);
+    
+    await db.exec(`CREATE TABLE IF NOT EXISTS service_variant_prices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      variant_id INTEGER NOT NULL,
+      range_id INTEGER NOT NULL,
+      price_per_unit REAL NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(variant_id) REFERENCES service_variants(id) ON DELETE CASCADE,
+      FOREIGN KEY(range_id) REFERENCES service_range_boundaries(id) ON DELETE CASCADE,
+      UNIQUE(variant_id, range_id)
+    )`);
+    
+    // Создаем индексы для новых таблиц
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_range_boundaries_service_id ON service_range_boundaries(service_id)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_variant_prices_variant_id ON service_variant_prices(variant_id)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_variant_prices_range_id ON service_variant_prices(range_id)`);
   }
 
   private static mapService(row: RawServiceRow): PricingServiceDTO {
@@ -355,36 +385,80 @@ export class PricingServiceRepository {
    */
   static async listAllVariantTiers(serviceId: number): Promise<Map<number, ServiceVolumeTierDTO[]>> {
     const db = await this.getConnection();
-    // Убираем ensureSchema отсюда - схема проверяется при getConnection()
     
     try {
-      // Загружаем все tiers для всех вариантов этой услуги одним запросом
-      const rows = await db.all<RawTierRow[]>(
-        `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active 
-         FROM service_volume_prices 
-         WHERE service_id = ? AND variant_id IS NOT NULL
-         ORDER BY variant_id, min_quantity`,
-        serviceId
-      );
+      // Используем новую оптимизированную структуру с JOIN
+      // Если новые таблицы существуют, используем их, иначе fallback на старую структуру
+      const hasNewStructure = await db.get(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name='service_range_boundaries'
+      `);
       
-      // Группируем по variant_id
-      const tiersMap = new Map<number, ServiceVolumeTierDTO[]>();
-      for (const row of rows) {
-        const variantId = row.variant_id;
-        if (variantId !== null && variantId !== undefined) {
-          const variantIdNum = Number(variantId);
-          if (!tiersMap.has(variantIdNum)) {
-            tiersMap.set(variantIdNum, []);
+      if (hasNewStructure) {
+        // Новая структура: JOIN между service_variant_prices и service_range_boundaries
+        const rows = await db.all<any[]>(
+          `SELECT 
+            svp.id, 
+            svp.variant_id, 
+            srb.service_id, 
+            srb.min_quantity, 
+            svp.price_per_unit, 
+            svp.is_active
+           FROM service_variant_prices svp
+           JOIN service_range_boundaries srb ON svp.range_id = srb.id
+           WHERE srb.service_id = ? AND svp.variant_id IS NOT NULL
+           ORDER BY svp.variant_id, srb.min_quantity`,
+          serviceId
+        );
+        
+        // Группируем по variant_id
+        const tiersMap = new Map<number, ServiceVolumeTierDTO[]>();
+        for (const row of rows) {
+          const variantId = row.variant_id;
+          if (variantId !== null && variantId !== undefined) {
+            const variantIdNum = Number(variantId);
+            if (!tiersMap.has(variantIdNum)) {
+              tiersMap.set(variantIdNum, []);
+            }
+            tiersMap.get(variantIdNum)!.push({
+              id: row.id,
+              serviceId: row.service_id,
+              variantId: variantIdNum,
+              minQuantity: row.min_quantity,
+              rate: row.price_per_unit,
+              isActive: !!row.is_active,
+            });
           }
-          tiersMap.get(variantIdNum)!.push(this.mapTier(row));
         }
+        
+        return tiersMap;
+      } else {
+        // Fallback на старую структуру для обратной совместимости
+        const rows = await db.all<RawTierRow[]>(
+          `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active 
+           FROM service_volume_prices 
+           WHERE service_id = ? AND variant_id IS NOT NULL
+           ORDER BY variant_id, min_quantity`,
+          serviceId
+        );
+        
+        const tiersMap = new Map<number, ServiceVolumeTierDTO[]>();
+        for (const row of rows) {
+          const variantId = row.variant_id;
+          if (variantId !== null && variantId !== undefined) {
+            const variantIdNum = Number(variantId);
+            if (!tiersMap.has(variantIdNum)) {
+              tiersMap.set(variantIdNum, []);
+            }
+            tiersMap.get(variantIdNum)!.push(this.mapTier(row));
+          }
+        }
+        
+        return tiersMap;
       }
-      
-      return tiersMap;
     } catch (error: any) {
       console.error('Error in listAllVariantTiers:', error);
       console.error('ServiceId:', serviceId);
-      // Пробрасываем ошибку дальше - никаких fallback'ов
       throw error;
     }
   }
@@ -550,10 +624,174 @@ export class PricingServiceRepository {
   static async deleteServiceVariant(variantId: number): Promise<void> {
     const db = await this.getConnection();
     await this.ensureSchema(db);
-    // Удаляем все tiers варианта
-    await db.run(`DELETE FROM service_volume_prices WHERE variant_id = ?`, variantId);
+    
+    // Проверяем, используем ли мы новую структуру
+    const hasNewStructure = await db.get(`
+      SELECT name FROM sqlite_master 
+      WHERE type='table' AND name='service_variant_prices'
+    `);
+    
+    if (hasNewStructure) {
+      // Новая структура: удаляем цены варианта
+      await db.run(`DELETE FROM service_variant_prices WHERE variant_id = ?`, variantId);
+    } else {
+      // Старая структура: удаляем tiers варианта
+      await db.run(`DELETE FROM service_volume_prices WHERE variant_id = ?`, variantId);
+    }
+    
     // Удаляем вариант
     await db.run(`DELETE FROM service_variants WHERE id = ?`, variantId);
+  }
+
+  // ========== Новые методы для работы с оптимизированной структурой ==========
+  
+  /**
+   * Добавляет границу диапазона для сервиса (общую для всех вариантов)
+   */
+  static async addRangeBoundary(serviceId: number, minQuantity: number): Promise<number> {
+    const db = await this.getConnection();
+    
+    // Проверяем существование сервиса
+    const service = await db.get(`SELECT id FROM post_processing_services WHERE id = ?`, serviceId);
+    if (!service) {
+      const err: any = new Error(`Service with id ${serviceId} not found`);
+      err.status = 404;
+      throw err;
+    }
+    
+    // Получаем текущий максимальный sort_order
+    const maxSort = await db.get<{ max_sort: number }>(`
+      SELECT COALESCE(MAX(sort_order), -1) as max_sort 
+      FROM service_range_boundaries 
+      WHERE service_id = ?
+    `, serviceId);
+    
+    const result = await db.run(`
+      INSERT INTO service_range_boundaries (service_id, min_quantity, sort_order, is_active)
+      VALUES (?, ?, ?, 1)
+    `, serviceId, minQuantity, (maxSort?.max_sort ?? -1) + 1);
+    
+    const rangeId = result.lastID;
+    
+    // Создаем цены для всех существующих вариантов с ценой 0
+    const variants = await db.all<{ id: number }[]>(`
+      SELECT id FROM service_variants WHERE service_id = ?
+    `, serviceId);
+    
+    for (const variant of variants) {
+      try {
+        await db.run(`
+          INSERT INTO service_variant_prices (variant_id, range_id, price_per_unit, is_active)
+          VALUES (?, ?, 0, 1)
+        `, variant.id, rangeId);
+      } catch (err: any) {
+        // Игнорируем ошибки UNIQUE constraint
+        if (!err.message?.includes('UNIQUE constraint')) {
+          throw err;
+        }
+      }
+    }
+    
+    return rangeId;
+  }
+  
+  /**
+   * Удаляет границу диапазона (и все связанные цены вариантов)
+   */
+  static async removeRangeBoundary(serviceId: number, minQuantity: number): Promise<void> {
+    const db = await this.getConnection();
+    
+    // Находим range_id по min_quantity
+    const range = await db.get<{ id: number }>(`
+      SELECT id FROM service_range_boundaries 
+      WHERE service_id = ? AND min_quantity = ?
+    `, serviceId, minQuantity);
+    
+    if (!range) {
+      const err: any = new Error(`Range boundary with min_quantity ${minQuantity} not found for service ${serviceId}`);
+      err.status = 404;
+      throw err;
+    }
+    
+    // Удаляем все связанные цены (CASCADE через foreign key)
+    await db.run(`DELETE FROM service_variant_prices WHERE range_id = ?`, range.id);
+    
+    // Удаляем границу диапазона
+    await db.run(`DELETE FROM service_range_boundaries WHERE id = ?`, range.id);
+  }
+  
+  /**
+   * Обновляет границу диапазона (изменяет min_quantity)
+   */
+  static async updateRangeBoundary(serviceId: number, oldMinQuantity: number, newMinQuantity: number): Promise<void> {
+    const db = await this.getConnection();
+    
+    // Находим range_id
+    const range = await db.get<{ id: number }>(`
+      SELECT id FROM service_range_boundaries 
+      WHERE service_id = ? AND min_quantity = ?
+    `, serviceId, oldMinQuantity);
+    
+    if (!range) {
+      const err: any = new Error(`Range boundary with min_quantity ${oldMinQuantity} not found for service ${serviceId}`);
+      err.status = 404;
+      throw err;
+    }
+    
+    // Обновляем min_quantity
+    await db.run(`
+      UPDATE service_range_boundaries 
+      SET min_quantity = ? 
+      WHERE id = ?
+    `, newMinQuantity, range.id);
+  }
+  
+  /**
+   * Обновляет цену варианта для конкретного диапазона
+   */
+  static async updateVariantPrice(variantId: number, minQuantity: number, price: number): Promise<void> {
+    const db = await this.getConnection();
+    
+    // Находим range_id по min_quantity через service_id варианта
+    const variant = await db.get<{ service_id: number }>(`
+      SELECT service_id FROM service_variants WHERE id = ?
+    `, variantId);
+    
+    if (!variant) {
+      const err: any = new Error(`Variant with id ${variantId} not found`);
+      err.status = 404;
+      throw err;
+    }
+    
+    const range = await db.get<{ id: number }>(`
+      SELECT id FROM service_range_boundaries 
+      WHERE service_id = ? AND min_quantity = ?
+    `, variant.service_id, minQuantity);
+    
+    if (!range) {
+      const err: any = new Error(`Range boundary with min_quantity ${minQuantity} not found`);
+      err.status = 404;
+      throw err;
+    }
+    
+    // Обновляем или создаем цену
+    const existing = await db.get<{ id: number }>(`
+      SELECT id FROM service_variant_prices 
+      WHERE variant_id = ? AND range_id = ?
+    `, variantId, range.id);
+    
+    if (existing) {
+      await db.run(`
+        UPDATE service_variant_prices 
+        SET price_per_unit = ?, updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `, price, existing.id);
+    } else {
+      await db.run(`
+        INSERT INTO service_variant_prices (variant_id, range_id, price_per_unit, is_active)
+        VALUES (?, ?, ?, 1)
+      `, variantId, range.id, price);
+    }
   }
 }
 

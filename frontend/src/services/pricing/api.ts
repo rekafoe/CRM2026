@@ -251,6 +251,37 @@ export async function deleteServiceVariantTier(serviceId: number, tierId: number
   await api.delete(`/pricing/services/${serviceId}/tiers/${tierId}`);
 }
 
+// ========== Новые функции для оптимизированной структуры диапазонов ==========
+
+/**
+ * Добавить границу диапазона для сервиса (общую для всех вариантов)
+ */
+export async function addRangeBoundary(serviceId: number, minQuantity: number): Promise<{ id: number; serviceId: number; minQuantity: number }> {
+  const response = await api.post(`/pricing/services/${serviceId}/ranges`, { minQuantity });
+  return response.data as { id: number; serviceId: number; minQuantity: number };
+}
+
+/**
+ * Удалить границу диапазона (и все связанные цены вариантов)
+ */
+export async function removeRangeBoundary(serviceId: number, minQuantity: number): Promise<void> {
+  await api.delete(`/pricing/services/${serviceId}/ranges/${minQuantity}`);
+}
+
+/**
+ * Обновить границу диапазона (изменить min_quantity)
+ */
+export async function updateRangeBoundary(serviceId: number, oldMinQuantity: number, newMinQuantity: number): Promise<void> {
+  await api.put(`/pricing/services/${serviceId}/ranges/${oldMinQuantity}`, { newMinQuantity });
+}
+
+/**
+ * Обновить цену варианта для конкретного диапазона
+ */
+export async function updateVariantPrice(serviceId: number, variantId: number, minQuantity: number, price: number): Promise<void> {
+  await api.put(`/pricing/services/${serviceId}/variants/${variantId}/prices/${minQuantity}`, { price });
+}
+
 export default {
   calculatePrice,
   getPricingServices,
@@ -268,6 +299,11 @@ export default {
   getServiceVariantTiers,
   getAllVariantTiers,
   createServiceVariantTier,
+  // Новые функции для оптимизированной структуры
+  addRangeBoundary,
+  removeRangeBoundary,
+  updateRangeBoundary,
+  updateVariantPrice,
 };
 
 
