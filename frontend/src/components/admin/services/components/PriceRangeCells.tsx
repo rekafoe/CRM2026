@@ -119,8 +119,8 @@ export const PriceRangeCells: React.FC<PriceRangeCellsProps> = ({
 
         return (
           <td key={range.minQty} style={{ width: '120px', minWidth: '120px', maxWidth: '120px', textAlign: 'center', padding: 0 }}>
-            <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', width: '100%' }}>
-              <div className="el-input el-input--small" style={{ width: '100%', maxWidth: '100%', flex: '1 1 auto' }}>
+            <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', width: '100%', position: 'relative' }}>
+              <div className="el-input el-input--small" style={{ width: '100%', maxWidth: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                 <input
                   type="number"
                   step="0.01"
@@ -131,7 +131,7 @@ export const PriceRangeCells: React.FC<PriceRangeCellsProps> = ({
                   onFocus={() => handleFocus(range.minQty, tier?.rate)}
                   onBlur={(e) => handleBlur(range.minQty, e.target.value)}
                   disabled={!editable}
-                  style={{ textAlign: 'center', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
+                  style={{ textAlign: 'center', width: '100%', maxWidth: '100%', boxSizing: 'border-box', margin: 0 }}
                 />
               </div>
             </div>
@@ -194,26 +194,44 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
       {commonRanges.map((range, idx) => {
         const rangeLabel = formatRangeLabel(range);
         return (
-          <th key={idx} className="is-center" style={{ width: '120px', minWidth: '120px', maxWidth: '120px', textAlign: 'center', padding: 0 }}>
-            <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap', overflow: 'hidden', width: '100%' }}>
+          <th key={idx} className="is-center" style={{ width: '120px', minWidth: '120px', maxWidth: '120px', textAlign: 'center', padding: 0, position: 'relative' }}>
+            <div className="cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', width: '100%', position: 'relative' }}>
               <span
-                style={{ cursor: onEditRange ? 'pointer' : 'default', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: '1 1 auto', minWidth: 0, textAlign: 'center' }}
+                style={{ cursor: onEditRange ? 'pointer' : 'default', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center', display: 'inline-block', width: '100%' }}
                 onClick={() => onEditRange?.(idx, range.minQty)}
                 title={rangeLabel}
               >
                 {rangeLabel}
               </span>
               {onRemoveRange && (
-                <span style={{ marginLeft: '4px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    className="el-button el-button--text el-button--mini"
-                    style={{ color: 'red', padding: '0', minHeight: 'auto', lineHeight: '1', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    onClick={() => onRemoveRange(idx)}
-                  >
-                    ×
-                  </button>
-                </span>
+                <button
+                  type="button"
+                  className="el-button el-button--text el-button--mini"
+                  style={{ 
+                    color: 'red', 
+                    padding: '0', 
+                    minHeight: 'auto', 
+                    lineHeight: '1', 
+                    width: '16px', 
+                    height: '16px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    margin: 0,
+                    background: 'transparent',
+                    border: 'none'
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveRange(idx);
+                  }}
+                >
+                  ×
+                </button>
               )}
             </div>
           </th>
