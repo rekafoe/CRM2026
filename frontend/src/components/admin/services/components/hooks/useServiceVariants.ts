@@ -17,16 +17,6 @@ export function useServiceVariants(serviceId: number) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Отладка изменений состояния
-  const debugSetVariants = useCallback((newVariants: VariantWithTiers[] | ((prev: VariantWithTiers[]) => VariantWithTiers[])) => {
-    console.log('=== SET_VARIANTS CALLED ===');
-    const actualNewVariants = typeof newVariants === 'function' ? newVariants(variants) : newVariants;
-    console.log('Current variants:', variants);
-    console.log('New variants:', actualNewVariants);
-    console.log('Length change:', variants.length, '->', actualNewVariants.length);
-    setVariants(newVariants);
-  }, [variants]);
-
   const cache = useTiersCache();
 
   // Используем useRef для стабильной ссылки на cache
@@ -76,13 +66,6 @@ export function useServiceVariants(serviceId: number) {
     void loadVariants();
   }, [loadVariants]);
 
-  // Отладка изменений variants
-  useEffect(() => {
-    console.log('=== VARIANTS STATE CHANGED ===');
-    console.log('New variants length:', variants.length);
-    console.log('New variants:', variants);
-  }, [variants]);
-
 
   const invalidateCache = useCallback(() => {
     cacheRef.current.invalidate(serviceId);
@@ -90,7 +73,7 @@ export function useServiceVariants(serviceId: number) {
 
   return {
     variants,
-    setVariants: debugSetVariants,
+    setVariants,
     loading,
     error,
     setError,
