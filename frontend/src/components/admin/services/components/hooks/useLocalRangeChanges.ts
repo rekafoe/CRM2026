@@ -314,7 +314,16 @@ export function useLocalRangeChanges(
 
   // Сохранение всех изменений на сервер
   const saveChanges = useCallback(async () => {
-    if (rangeChanges.length === 0 && priceChanges.length === 0 && variantChanges.length === 0) return;
+    if (rangeChanges.length === 0 && priceChanges.length === 0 && variantChanges.length === 0) {
+      console.log('=== SAVE CHANGES === No changes to save');
+      return;
+    }
+
+    console.log('=== SAVE CHANGES ===', {
+      rangeChanges: rangeChanges.length,
+      priceChanges: priceChanges.length,
+      variantChanges: variantChanges.length,
+    });
 
     try {
       await onSaveChanges(rangeChanges, priceChanges, variantChanges);
@@ -324,7 +333,9 @@ export function useLocalRangeChanges(
       setPriceChanges([]);
       setVariantChanges([]);
       setHasUnsavedChanges(false);
+      console.log('=== SAVE CHANGES === Successfully saved');
     } catch (error) {
+      console.error('=== SAVE CHANGES === Error:', error);
       throw error; // Пробрасываем ошибку выше
     }
   }, [rangeChanges, priceChanges, variantChanges, onSaveChanges]);

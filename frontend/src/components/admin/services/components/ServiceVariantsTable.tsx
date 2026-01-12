@@ -35,57 +35,82 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   const editing = useVariantEditing();
   const tierModal = useTierModal();
   const operations = useVariantOperations(serviceId, serverVariants, () => {}, setError, reload, invalidateCache);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   // Локальное состояние для несохраненных изменений
   const saveChangesToServer = useCallback(async (rangeChanges: RangeChange[], priceChanges: PriceChange[], variantChanges: VariantChange[]) => {
+    console.log('=== SAVE CHANGES TO SERVER === Starting', {
+      variantChanges: variantChanges.length,
+      rangeChanges: rangeChanges.length,
+      priceChanges: priceChanges.length,
+    });
+    setIsSaving(true);
     try {
-      // Применяем изменения вариантов
-      for (const change of variantChanges) {
-        switch (change.type) {
-          case 'create':
-            if (change.variantName) {
-              await operations.createVariant(change.variantName, change.parameters || {});
-            }
-            break;
-          case 'delete':
-            if (change.variantId) {
-              await operations.deleteVariant(change.variantId);
-            }
-            break;
+      // Применяем изменения вариантов (последовательно, т.к. могут быть зависимости)
+      if (variantChanges.length > 0) {
+        console.log('=== SAVE CHANGES TO SERVER === Applying variant changes...');
+        for (const change of variantChanges) {
+          switch (change.type) {
+            case 'create':
+              if (change.variantName) {
+                await operations.createVariant(change.variantName, change.parameters || {});
+              }
+              break;
+            case 'delete':
+              if (change.variantId) {
+                await operations.deleteVariant(change.variantId);
+              }
+              break;
+          }
         }
+        console.log('=== SAVE CHANGES TO SERVER === Variant changes applied');
       }
 
-      // Применяем изменения диапазонов
-      for (const change of rangeChanges) {
-        switch (change.type) {
-          case 'add':
-            if (change.boundary) {
-              await operations.addRangeBoundary(change.boundary);
-            }
-            break;
-          case 'edit':
-            if (change.rangeIndex !== undefined && change.newBoundary !== undefined) {
-              await operations.editRangeBoundary(change.rangeIndex, change.newBoundary);
-            }
-            break;
-          case 'remove':
-            if (change.rangeIndex !== undefined) {
-              await operations.removeRange(change.rangeIndex);
-            }
-            break;
+      // Применяем изменения диапазонов (последовательно)
+      if (rangeChanges.length > 0) {
+        console.log('=== SAVE CHANGES TO SERVER === Applying range changes...');
+        for (const change of rangeChanges) {
+          switch (change.type) {
+            case 'add':
+              if (change.boundary) {
+                await operations.addRangeBoundary(change.boundary);
+              }
+              break;
+            case 'edit':
+              if (change.rangeIndex !== undefined && change.newBoundary !== undefined) {
+                await operations.editRangeBoundary(change.rangeIndex, change.newBoundary);
+              }
+              break;
+            case 'remove':
+              if (change.rangeIndex !== undefined) {
+                await operations.removeRange(change.rangeIndex);
+              }
+              break;
+          }
         }
+        console.log('=== SAVE CHANGES TO SERVER === Range changes applied');
       }
 
-      // Применяем изменения цен
-      for (const change of priceChanges) {
-        await operations.changePrice(change.variantId, change.minQty, change.newPrice);
+      // Применяем изменения цен (параллельно для ускорения)
+      if (priceChanges.length > 0) {
+        console.log('=== SAVE CHANGES TO SERVER === Applying price changes...');
+        await Promise.all(
+          priceChanges.map(change => 
+            operations.changePrice(change.variantId, change.minQty, change.newPrice)
+          )
+        );
+        console.log('=== SAVE CHANGES TO SERVER === Price changes applied');
       }
 
       // Перезагружаем данные с сервера
+      console.log('=== SAVE CHANGES TO SERVER === Reloading data...');
       await reload();
+      console.log('=== SAVE CHANGES TO SERVER === Successfully completed');
     } catch (err) {
-      console.error('Error saving changes:', err);
+      console.error('=== SAVE CHANGES TO SERVER === Error:', err);
       throw err;
+    } finally {
+      setIsSaving(false);
     }
   }, [operations, reload]);
 
@@ -190,6 +215,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
               <Button
                 variant="success"
                 size="sm"
+                disabled={isSaving}
                 onClick={async () => {
                   try {
                     await localChanges.saveChanges();
@@ -199,7 +225,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                   }
                 }}
               >
-                💾 Сохранить
+                {isSaving ? '⏳ Сохранение...' : '💾 Сохранить'}
               </Button>
               <Button
                 variant="secondary"
