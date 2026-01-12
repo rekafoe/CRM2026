@@ -198,28 +198,15 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
     [value.sizes, selectedSizeId],
   )
 
-  // Восстанавливаем selectedPaperTypeId при смене размера
+  // Восстанавливаем флаг взаимодействия с материалами при смене размера
   useEffect(() => {
-    if (!selected || !paperTypes.length) return
+    if (!selected) return
     
-    // Если есть allowed_material_ids, определяем тип бумаги по материалам
+    // Если есть сохраненные allowed_material_ids, значит пользователь уже выбирал материалы
     if (selected.allowed_material_ids && selected.allowed_material_ids.length > 0) {
-      for (const paperType of paperTypes) {
-        const materialIds = new Set(
-          paperType.densities?.map(d => d.material_id).filter(id => id && id > 0) || []
-        )
-        // Проверяем, все ли allowed_material_ids принадлежат этому типу бумаги
-        const allMaterialsMatch = selected.allowed_material_ids.every(id => materialIds.has(id))
-        if (allMaterialsMatch && materialIds.size > 0) {
-          if (selectedPaperTypeId !== paperType.id) {
-            setSelectedPaperTypeId(paperType.id)
-            hasUserInteractedWithMaterialsRef.current = true // Помечаем, что материалы уже выбраны
-          }
-          return
-        }
-      }
+      hasUserInteractedWithMaterialsRef.current = true
     }
-  }, [selected, paperTypes, selectedPaperTypeId])
+  }, [selected])
 
   const updateSize = useCallback((id: string, patch: Partial<SimplifiedSizeConfig>) => {
     onChange({
@@ -268,17 +255,17 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
       console.log('Все загруженные услуги:', allServices.length, allServices)
       setServices(allServices)
       
-      // Восстанавливаем selectedPaperTypeId из сохраненных данных
-      // Если есть allowed_material_ids, определяем тип бумаги по материалам
-      if (selected && selected.allowed_material_ids && selected.allowed_material_ids.length > 0 && pt && pt.length > 0) {
-        // Ищем тип бумаги, который содержит эти материалы
+      // Восстанавливаем selectedPaperTypeId из сохраненных данных (но не блокируем переключение)
+      // Если есть allowed_material_ids, определяем тип бумаги по материалам для начальной установки
+      if (selected && selected.allowed_material_ids && selected.allowed_material_ids.length > 0 && pt && pt.length > 0 && !selectedPaperTypeId) {
+        // Ищем тип бумаги, который содержит хотя бы один из сохраненных материалов
         for (const paperType of pt) {
           const materialIds = new Set(
             paperType.densities?.map(d => d.material_id).filter(id => id && id > 0) || []
           )
-          // Проверяем, все ли allowed_material_ids принадлежат этому типу бумаги
-          const allMaterialsMatch = selected.allowed_material_ids.every(id => materialIds.has(id))
-          if (allMaterialsMatch && materialIds.size > 0) {
+          // Проверяем, есть ли хотя бы один материал из allowed_material_ids в этом типе бумаги
+          const hasMatchingMaterial = selected.allowed_material_ids.some(id => materialIds.has(id))
+          if (hasMatchingMaterial && materialIds.size > 0) {
             setSelectedPaperTypeId(paperType.id)
             hasUserInteractedWithMaterialsRef.current = true // Помечаем, что материалы уже выбраны
             break
@@ -448,9 +435,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
     })
   }, [value.sizes, updateSize])
 
-  // Материалы выбранного типа бумаги
+  // Материалы выбранного типа бумаги (или всех типов, если selectedPaperTypeId не выбран)
+  // Поддерживаем выбор нескольких типов бумаги - показываем материалы из выбранного типа
   const materialsForSelectedPaperType = useMemo(() => {
-    if (!selectedPaperTypeId || !paperTypes.length) return []
+    if (!paperTypes.length) return []
+    
+    // Если тип бумаги не выбран, возвращаем пустой массив (пользователь должен выбрать тип)
+    if (!selectedPaperTypeId) return []
+    
     const paperType = paperTypes.find(pt => pt.id === selectedPaperTypeId)
     if (!paperType) return []
     
@@ -484,6 +476,44 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
       } as any as CalculatorMaterial))
       .sort((a, b) => String(a.name).localeCompare(String(b.name))) || []
   }, [selectedPaperTypeId, paperTypes, allMaterials])
+  
+  // Все материалы из всех типов бумаги (для отображения в таблице)
+  const allMaterialsFromAllPaperTypes = useMemo(() => {
+    if (!paperTypes.length) return []
+    
+    const allMaterialIds = new Set<number>()
+    paperTypes.forEach(pt => {
+      pt.densities?.forEach(d => {
+        if (d.material_id && d.material_id > 0) {
+          allMaterialIds.add(d.material_id)
+        }
+      })
+    })
+    
+    if (allMaterials && allMaterials.length > 0) {
+      return allMaterials.filter(m => allMaterialIds.has(Number(m.id)))
+    }
+    
+    // Создаем материалы из всех типов бумаги
+    const materialsMap = new Map<number, CalculatorMaterial>()
+    paperTypes.forEach(pt => {
+      pt.densities?.forEach(d => {
+        if (d.material_id && d.material_id > 0 && !materialsMap.has(d.material_id)) {
+          materialsMap.set(d.material_id, {
+            id: d.material_id,
+            name: `${pt.display_name || pt.name} ${d.value} г/м²`,
+            price: d.price || 0,
+            unit: 'лист',
+            quantity: d.available_quantity || 0,
+            is_active: d.is_available ? 1 : 0,
+            category_name: pt.display_name || pt.name,
+          } as any as CalculatorMaterial)
+        }
+      })
+    })
+    
+    return Array.from(materialsMap.values())
+  }, [paperTypes, allMaterials])
 
   // Отслеживание взаимодействия пользователя с материалами
   const hasUserInteractedWithMaterialsRef = useRef(false)
@@ -497,17 +527,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
     
     // Если уже есть сохраненные allowed_material_ids, значит пользователь уже выбирал материалы
     // Не добавляем автоматически, чтобы не перезаписать выбор пользователя
-    // Также проверяем, что материалы из allowed_material_ids действительно относятся к выбранному типу бумаги
     if (selected.allowed_material_ids && selected.allowed_material_ids.length > 0) {
-      const materialIds = new Set(
-        paperTypes.find(pt => pt.id === selectedPaperTypeId)?.densities?.map(d => d.material_id).filter(id => id && id > 0) || []
-      )
-      // Если хотя бы один материал из allowed_material_ids относится к текущему типу бумаги - не добавляем автоматически
-      const hasMatchingMaterials = selected.allowed_material_ids.some(id => materialIds.has(id))
-      if (hasMatchingMaterials) {
-        hasUserInteractedWithMaterialsRef.current = true
-        return
-      }
+      hasUserInteractedWithMaterialsRef.current = true
+      return
     }
 
     const materialsToAdd = materialsForSelectedPaperType.filter(m => 
@@ -535,15 +557,35 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
   // Не добавляем автоматически, если пользователь уже взаимодействовал с услугами
   const hasUserInteractedWithServicesRef = useRef(false)
   
+  // Восстанавливаем флаг взаимодействия при смене размера
+  useEffect(() => {
+    if (!selected) return
+    
+    // Если есть сохраненные finishing, значит пользователь уже выбирал услуги
+    if (selected.finishing && selected.finishing.length > 0) {
+      hasUserInteractedWithServicesRef.current = true
+    } else {
+      // Если finishing пустой, сбрасываем флаг для нового размера
+      hasUserInteractedWithServicesRef.current = false
+    }
+  }, [selected])
+  
   useEffect(() => {
     if (!selected || services.length === 0) return
     // Если пользователь уже взаимодействовал с услугами, не добавляем автоматически
     if (hasUserInteractedWithServicesRef.current) return
 
+    // Если уже есть сохраненные finishing, значит пользователь уже выбирал услуги
+    // Не добавляем автоматически, чтобы не перезаписать выбор пользователя
+    if (selected.finishing && selected.finishing.length > 0) {
+      hasUserInteractedWithServicesRef.current = true
+      return
+    }
+
     const servicesToAdd = services.filter(s => 
       !selected.finishing.some(f => f.service_id === Number(s.id))
     )
-    
+
     if (servicesToAdd.length > 0) {
       const commonRanges = getSizeRanges(selected)
       const nextFinishing = [
@@ -1256,7 +1298,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                         {/* Таблица с ценами для выбранных материалов */}
                         {selected.allowed_material_ids.length > 0 && (() => {
                           const commonRanges = getSizeRanges(selected)
-                          const allowedMaterials = materialsForSelectedPaperType.filter(m => 
+                          // Показываем все разрешенные материалы из всех типов бумаги
+                          const allowedMaterials = allMaterialsFromAllPaperTypes.filter(m => 
                             selected.allowed_material_ids.includes(Number(m.id))
                           )
                           
@@ -1328,8 +1371,18 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                   </thead>
                                   <tbody>
                               {allowedMaterials.map(m => {
-                                const densityInfo = paperTypes.find(pt => pt.id === selectedPaperTypeId)
-                                  ?.densities?.find(d => d.material_id === Number(m.id))
+                                // Находим тип бумаги и плотность для этого материала
+                                let densityInfo: any = null
+                                let materialPaperType: any = null
+                                for (const pt of paperTypes) {
+                                  const density = pt.densities?.find(d => d.material_id === Number(m.id))
+                                  if (density) {
+                                    densityInfo = density
+                                    materialPaperType = pt
+                                    break
+                                  }
+                                }
+                                
                                 const materialPrice = selected.material_prices.find(mp => mp.material_id === Number(m.id))
                                 const actualIdx = selected.material_prices.findIndex(mp => mp.material_id === Number(m.id))
                                 
@@ -1360,7 +1413,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                                               type="text"
                                               readOnly
                                               className="el-input__inner"
-                                              value={`${m.name}${densityInfo ? ` (${densityInfo.value} г/м²)` : ''}`}
+                                              value={`${m.name}${densityInfo ? ` (${densityInfo.value} г/м²)` : ''}${materialPaperType ? ` [${materialPaperType.display_name || materialPaperType.name}]` : ''}`}
                                               style={{ cursor: 'default' }}
                                             />
                                             <span className="el-input__suffix">
