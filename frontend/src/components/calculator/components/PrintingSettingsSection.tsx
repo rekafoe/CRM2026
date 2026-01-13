@@ -85,9 +85,9 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     };
   }, [selectedProduct?.id]);
 
-  // Получаем разрешенные типы печати из constraints или из принтеров
+  // Получаем разрешенные типы печати из constraints, цен печати продукта или из принтеров
   const allowedPrintTechnologies = useMemo(() => {
-    // Если есть constraints в схеме продукта с allowed_print_technologies
+    // 1) Приоритет: constraints.allowed_print_technologies (явно заданные для продукта)
     const constraints = backendProductSchema?.constraints;
     if (constraints?.allowed_print_technologies && Array.isArray(constraints.allowed_print_technologies)) {
       return printTechnologies.filter(tech => 
@@ -95,8 +95,51 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       );
     }
 
-    // Иначе получаем уникальные типы печати из принтеров
-    if (printers.length > 0) {
+    // 2) Для упрощённых продуктов: извлекаем технологии из template.simplified.sizes[].print_prices[]
+    // Это технологии, для которых настроены цены в шаблоне продукта
+    const template = backendProductSchema?.template;
+    if (template?.simplified?.sizes && Array.isArray(template.simplified.sizes)) {
+      const techCodesFromPrintPrices = new Set<string>();
+      template.simplified.sizes.forEach((size: any) => {
+        if (Array.isArray(size.print_prices)) {
+          size.print_prices.forEach((priceConfig: any) => {
+            const techCode = priceConfig.technology_code || priceConfig.technologyCode;
+            if (techCode && typeof techCode === 'string') {
+              techCodesFromPrintPrices.add(techCode);
+            }
+          });
+        }
+      });
+      
+      if (techCodesFromPrintPrices.size > 0) {
+        return printTechnologies.filter(tech => techCodesFromPrintPrices.has(tech.code));
+      }
+    }
+
+    // 3) Для обычных продуктов: проверяем config_data.print_prices (если есть)
+    // На странице шаблона продукта могут быть сохранены цены печати по технологиям
+    const configData = template?.config_data || template;
+    if (configData?.print_prices && Array.isArray(configData.print_prices)) {
+      const techCodesFromConfig = new Set<string>();
+      configData.print_prices.forEach((priceConfig: any) => {
+        const techCode = priceConfig.technology_code || priceConfig.technologyCode || priceConfig.technology;
+        if (techCode && typeof techCode === 'string') {
+          techCodesFromConfig.add(techCode);
+        }
+      });
+      
+      if (techCodesFromConfig.size > 0) {
+        return printTechnologies.filter(tech => techCodesFromConfig.has(tech.code));
+      }
+    }
+
+    // 4) Fallback: если есть операции печати, но нет явных настроек - используем принтеры
+    const operations = backendProductSchema?.operations || [];
+    const hasPrintOperations = operations.some((op: any) => 
+      op.operationType === 'print' || op.type === 'print' || op.operation_type === 'print'
+    );
+    
+    if (hasPrintOperations && printers.length > 0) {
       const uniqueTechCodes = new Set(
         printers
           .map(p => p.technology_code)
@@ -105,8 +148,8 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       return printTechnologies.filter(tech => uniqueTechCodes.has(tech.code));
     }
 
-    // Если нет принтеров и нет constraints - показываем все типы печати
-    return printTechnologies;
+    // 5) Если ничего не найдено - возвращаем пустой массив (не показываем лишние технологии)
+    return [];
   }, [printTechnologies, printers, backendProductSchema]);
 
   // Получаем разрешенные режимы цвета для выбранного типа печати
