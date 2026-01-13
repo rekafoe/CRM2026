@@ -75,7 +75,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     urgency: 'standard',
     vipLevel: 'bronze',
     specialServices: [],
-    materialType: 'coated'
+    // 🆕 materialType будет установлен динамически из типов бумаги со склада
+    // materialType: 'coated' // Убрано захардкоженное значение
   });
   
   // Состояние для типа печати и режима цвета
@@ -262,6 +263,26 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       setPrintColorMode(null);
     }
   }, [isOpen]);
+
+  // 🆕 Устанавливаем materialType на основе выбранного paperType из типов бумаги со склада
+  // materialType = тип бумаги со склада (вторая вкладка "Типы бумаги")
+  useEffect(() => {
+    if (warehousePaperTypes.length > 0 && specs.paperType) {
+      // Находим тип бумаги со склада, который соответствует выбранному paperType
+      const selectedPaperType = warehousePaperTypes.find(pt => pt.name === specs.paperType);
+      if (selectedPaperType) {
+        // materialType должен быть равен name типа бумаги со склада
+        // Это и есть "тип материала" - тип бумаги из второй вкладки склада
+        setSpecs(prev => {
+          // Устанавливаем materialType = name типа бумаги со склада
+          if (!prev.materialType || prev.materialType !== selectedPaperType.name) {
+            return { ...prev, materialType: selectedPaperType.name as any };
+          }
+          return prev;
+        });
+      }
+    }
+  }, [warehousePaperTypes, specs.paperType]);
 
 
   // Выбор типа продукта
