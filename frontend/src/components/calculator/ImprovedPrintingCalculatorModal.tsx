@@ -175,14 +175,23 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   // 🆕 При смене продукта сбрасываем завязанные на схему поля упрощенного продукта,
   // чтобы новые allowed_* и размеры/материалы подтянулись корректно
+  const prevProductIdRef = useRef<number | null>(null);
   useEffect(() => {
     if (!selectedProduct?.id || editContext?.item) {
+      prevProductIdRef.current = selectedProduct?.id || null;
       return;
     }
+
+    // Проверяем, действительно ли продукт изменился
+    if (prevProductIdRef.current === selectedProduct.id) {
+      return;
+    }
+    prevProductIdRef.current = selectedProduct.id;
 
     setSpecs(prev => {
       const next: any = { ...prev };
       // Для упрощённых продуктов сбрасываем size_id и material_id
+      // ParamsSection автоматически установит первый размер из нового продукта
       if (next.size_id) {
         delete next.size_id;
       }

@@ -44,12 +44,18 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   const isSimplifiedProduct = simplifiedSizes && simplifiedSizes.length > 0;
 
   // 🆕 Устанавливаем первый размер для упрощённых продуктов, если не выбран
+  // Важно: также срабатывает при изменении simplifiedSizes (при смене продукта)
   React.useEffect(() => {
-    if (isSimplifiedProduct && simplifiedSizes.length > 0 && !specs.size_id) {
-      updateSpecs({ 
-        size_id: simplifiedSizes[0].id,
-        format: `${simplifiedSizes[0].width_mm}×${simplifiedSizes[0].height_mm}`
-      }, true);
+    if (isSimplifiedProduct && simplifiedSizes.length > 0) {
+      // Если size_id не установлен ИЛИ size_id не соответствует ни одному размеру из текущего продукта
+      // (это может произойти при смене продукта, когда старый size_id не валиден для нового продукта)
+      const isValidSizeId = specs.size_id && simplifiedSizes.some(s => s.id === specs.size_id);
+      if (!isValidSizeId) {
+        updateSpecs({ 
+          size_id: simplifiedSizes[0].id,
+          format: `${simplifiedSizes[0].width_mm}×${simplifiedSizes[0].height_mm}`
+        }, true);
+      }
     }
   }, [isSimplifiedProduct, simplifiedSizes, specs.size_id, updateSpecs]);
 
