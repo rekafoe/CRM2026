@@ -173,6 +173,39 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     isCustomFormat // ✅ Передаем флаг кастомного формата
   });
 
+  // 🆕 При смене продукта сбрасываем завязанные на схему поля упрощенного продукта,
+  // чтобы новые allowed_* и размеры/материалы подтянулись корректно
+  useEffect(() => {
+    if (!selectedProduct?.id || editContext?.item) {
+      return;
+    }
+
+    setSpecs(prev => {
+      const next: any = { ...prev };
+      if (next.size_id) {
+        delete next.size_id;
+      }
+      if (next.material_id) {
+        delete next.material_id;
+      }
+      return next;
+    });
+
+    // Сбрасываем флаг взаимодействия, чтобы автопересчет не дергался лишний раз
+    setUserInteracted(false);
+  }, [selectedProduct?.id, editContext, setSpecs, setUserInteracted]);
+
+  // 🆕 При смене продукта сбрасываем параметры печати,
+  // чтобы PrintingSettingsSection смог проставить корректные дефолты по новым ограничениям
+  useEffect(() => {
+    if (!selectedProduct?.id || editContext?.item) {
+      return;
+    }
+
+    setPrintTechnology('');
+    setPrintColorMode(null);
+  }, [selectedProduct?.id, editContext]);
+
   // 🆕 Автопересчет при изменении параметров печати
   // Параметры печати передаются в configuration при расчете,
   // поэтому useAutoCalculate не отслеживает их изменения напрямую

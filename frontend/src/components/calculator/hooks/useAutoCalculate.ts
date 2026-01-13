@@ -21,6 +21,8 @@ function getSpecsKey(specs: any, customFormat?: { width: string; height: string 
     priceType: specs.priceType,
     pages: specs.pages, // ✅ Страницы тоже важны
     material_id: specs.material_id, // ✅ ID материала тоже важен
+    // 🆕 Для упрощённых продуктов размер влияет на расчет
+    size_id: specs.size_id,
     // ✅ Кастомный формат тоже важен для расчета
     customFormat: isCustomFormat ? customFormat : undefined,
     isCustomFormat: isCustomFormat || false,

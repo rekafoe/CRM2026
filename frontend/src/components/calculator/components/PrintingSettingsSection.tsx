@@ -298,7 +298,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
               <label>
                 Режим печати <span style={{ color: 'red' }}>*</span>
               </label>
-              {isColorOnly ? (
+                {isColorOnly ? (
                 // Если технология поддерживает только цветную печать - показываем как текст
                 <div className="form-control" style={{ color: '#1a202c', fontWeight: 500 }}>
                   Цветная (только)
