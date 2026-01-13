@@ -26,14 +26,14 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   selectedProduct,
   backendProductSchema,
 }) => {
-  const [printTechnologies, setPrintTechnologies] = useState<Array<{ code: string; name: string; pricing_mode: string }>>([]);
+  const [printTechnologies, setPrintTechnologies] = useState<Array<{ code: string; name: string; pricing_mode: string; supports_duplex?: number | boolean }>>([]);
   const [printers, setPrinters] = useState<Array<{ id: number; name: string; technology_code?: string | null; color_mode?: 'bw' | 'color' | 'both' }>>([]);
   const [loading, setLoading] = useState(true);
 
   // Загружаем типы печати
   useEffect(() => {
     // Проверяем кэш
-    const cached = apiCache.get<Array<{ code: string; name: string; pricing_mode: string }>>(CACHE_KEY);
+    const cached = apiCache.get<Array<{ code: string; name: string; pricing_mode: string; supports_duplex?: number | boolean }>>(CACHE_KEY);
     if (cached) {
       setPrintTechnologies(cached);
     } else {
@@ -152,10 +152,39 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     return [];
   }, [printTechnologies, printers, backendProductSchema]);
 
+  // Получаем информацию о выбранной технологии печати
+  const selectedPrintTechnology = useMemo(() => {
+    if (!printTechnology) return null;
+    return printTechnologies.find(tech => tech.code === printTechnology) || null;
+  }, [printTechnology, printTechnologies]);
+
+  // Проверяем, поддерживает ли технология двухстороннюю печать
+  const supportsDuplex = useMemo(() => {
+    if (!selectedPrintTechnology) return true; // По умолчанию поддерживает
+    const supports = selectedPrintTechnology.supports_duplex;
+    return supports === 1 || supports === true;
+  }, [selectedPrintTechnology]);
+
+  // Проверяем, поддерживает ли технология только цветную печать
+  // Для струйных пигментных технологий обычно только цветная печать
+  const isColorOnly = useMemo(() => {
+    if (!selectedPrintTechnology) return false;
+    const code = selectedPrintTechnology.code?.toLowerCase() || '';
+    const name = selectedPrintTechnology.name?.toLowerCase() || '';
+    // Проверяем по коду или названию
+    return code.includes('inkjet_pigment') || 
+           code.includes('inkjet') && (code.includes('pigment') || name.includes('пигмент'));
+  }, [selectedPrintTechnology]);
+
   // Получаем разрешенные режимы цвета для выбранного типа печати
   const allowedColorModes = useMemo(() => {
     if (!printTechnology) {
       return [];
+    }
+
+    // Если технология поддерживает только цветную печать - возвращаем только 'color'
+    if (isColorOnly) {
+      return ['color'];
     }
 
     const printersForTech = printers.filter(p => p.technology_code === printTechnology);
@@ -172,7 +201,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     });
 
     return Array.from(colorModes);
-  }, [printTechnology, printers]);
+  }, [printTechnology, printers, isColorOnly]);
 
   // 🆕 Устанавливаем дефолтные значения для селекторов печати
   useEffect(() => {
@@ -189,9 +218,19 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     if (!printTechnology || loading) return;
     
     if (allowedColorModes.length > 0 && !printColorMode) {
-      onPrintColorModeChange(allowedColorModes[0]);
+      const firstMode = allowedColorModes[0];
+      onPrintColorModeChange(firstMode === 'bw' ? 'bw' : firstMode === 'color' ? 'color' : null);
     }
   }, [printTechnology, loading, allowedColorModes, printColorMode, onPrintColorModeChange]);
+
+  // 🆕 Если технология не поддерживает двухстороннюю печать - устанавливаем sides = 1
+  useEffect(() => {
+    if (!printTechnology || !supportsDuplex) {
+      if (sides === 2) {
+        onSidesChange(1);
+      }
+    }
+  }, [printTechnology, supportsDuplex, sides, onSidesChange]);
 
   if (loading) {
     return (
@@ -259,22 +298,29 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
               <label>
                 Режим печати <span style={{ color: 'red' }}>*</span>
               </label>
-              <select
-                value={printColorMode || (allowedColorModes.length > 0 ? allowedColorModes[0] : '')}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  onPrintColorModeChange(value === 'bw' ? 'bw' : value === 'color' ? 'color' : null);
-                }}
-                className="form-control"
-                required
-              >
-                {allowedColorModes.includes('bw') && (
-                  <option value="bw">Чёрно-белая</option>
-                )}
-                {allowedColorModes.includes('color') && (
-                  <option value="color">Цветная</option>
-                )}
-              </select>
+              {isColorOnly ? (
+                // Если технология поддерживает только цветную печать - показываем как текст
+                <div className="form-control" style={{ color: '#1a202c', fontWeight: 500 }}>
+                  Цветная (только)
+                </div>
+              ) : (
+                <select
+                  value={printColorMode || (allowedColorModes.length > 0 ? allowedColorModes[0] : '')}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    onPrintColorModeChange(value === 'bw' ? 'bw' : value === 'color' ? 'color' : null);
+                  }}
+                  className="form-control"
+                  required
+                >
+                  {allowedColorModes.includes('bw') && (
+                    <option value="bw">Чёрно-белая</option>
+                  )}
+                  {allowedColorModes.includes('color') && (
+                    <option value="color">Цветная</option>
+                  )}
+                </select>
+              )}
             </div>
           ) : (
             <div className="param-group">
@@ -288,27 +334,40 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
           )
         ) : null}
 
-        <div className="param-group">
-          <label>
-            Двухсторонняя печать <span style={{ color: 'red' }}>*</span>
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={sides === 2}
-                onChange={(e) => {
-                  onSidesChange(e.target.checked ? 2 : 1);
-                }}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
-              <span>Двухсторонняя</span>
+        {/* Двухсторонняя печать - скрываем, если технология не поддерживает duplex */}
+        {supportsDuplex ? (
+          <div className="param-group">
+            <label>
+              Двухсторонняя печать <span style={{ color: 'red' }}>*</span>
             </label>
-            {sides === 1 && (
-              <span style={{ color: '#666', fontSize: '14px' }}>Односторонняя</span>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={sides === 2}
+                  onChange={(e) => {
+                    onSidesChange(e.target.checked ? 2 : 1);
+                  }}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span>Двухсторонняя</span>
+              </label>
+              {sides === 1 && (
+                <span style={{ color: '#666', fontSize: '14px' }}>Односторонняя</span>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          // Если не поддерживает duplex - показываем как текст "Односторонняя"
+          <div className="param-group">
+            <label>
+              Двухсторонняя печать
+            </label>
+            <div className="form-control" style={{ color: '#666', fontWeight: 500 }}>
+              Односторонняя (только)
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

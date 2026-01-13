@@ -8,7 +8,7 @@ import type { SimplifiedConfig, SimplifiedSizeConfig } from '../hooks/useProduct
 import { ServicePricingTable, type ServiceItem, type ServicePricing } from './ServicePricingTable'
 import './SimplifiedTemplateSection.css'
 
-type PrintTechRow = { code: string; name: string; is_active?: number | boolean }
+type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
 type PaperTypeRow = PaperTypeForCalculator
 type ServiceRow = { 
   id: number; 
@@ -712,17 +712,52 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                               return
                             }
 
-                            // Создаем все вариации для выбранной технологии
+                            // Получаем информацию о технологии
+                            const selectedTech = printTechs.find(t => t.code === techCode)
+                            const supportsDuplex = selectedTech?.supports_duplex === 1 || selectedTech?.supports_duplex === true
+                            
+                            // Проверяем, поддерживает ли технология только цветную печать
+                            // Для струйных пигментных технологий обычно только цветная печать
+                            const isColorOnly = techCode.toLowerCase().includes('inkjet_pigment') || 
+                                               (techCode.toLowerCase().includes('inkjet') && selectedTech?.name?.toLowerCase().includes('пигмент'))
+
+                            // Создаем вариации для выбранной технологии с учётом ограничений
                             // Используем общие диапазоны, если они уже есть, иначе создаем дефолтные
                             const existingRanges = getSizeRanges(selected)
-                            const variations = [
-                              // Полноцветные
-                              { technology_code: techCode, color_mode: 'color' as const, sides_mode: 'single' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) },
-                              { technology_code: techCode, color_mode: 'color' as const, sides_mode: 'duplex' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) },
-                              // Ч/б
-                              { technology_code: techCode, color_mode: 'bw' as const, sides_mode: 'single' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) },
-                              { technology_code: techCode, color_mode: 'bw' as const, sides_mode: 'duplex' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) },
-                            ]
+                            const variations: Array<{ technology_code: string; color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex'; tiers: Array<{ min_qty: number; max_qty?: number; unit_price: number }> }> = []
+                            
+                            if (isColorOnly) {
+                              // Только цветная печать
+                              if (supportsDuplex) {
+                                // Односторонняя и двухсторонняя цветная
+                                variations.push(
+                                  { technology_code: techCode, color_mode: 'color' as const, sides_mode: 'single' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) },
+                                  { technology_code: techCode, color_mode: 'color' as const, sides_mode: 'duplex' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) }
+                                )
+                              } else {
+                                // Только односторонняя цветная
+                                variations.push(
+                                  { technology_code: techCode, color_mode: 'color' as const, sides_mode: 'single' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) }
+                                )
+                              }
+                            } else {
+                              // Обычная технология - все вариации
+                              if (supportsDuplex) {
+                                // Все 4 вариации: цветная/чб × односторонняя/двухсторонняя
+                                variations.push(
+                                  { technology_code: techCode, color_mode: 'color' as const, sides_mode: 'single' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) },
+                                  { technology_code: techCode, color_mode: 'color' as const, sides_mode: 'duplex' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) },
+                                  { technology_code: techCode, color_mode: 'bw' as const, sides_mode: 'single' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) },
+                                  { technology_code: techCode, color_mode: 'bw' as const, sides_mode: 'duplex' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) }
+                                )
+                              } else {
+                                // Только односторонняя: цветная и ч/б
+                                variations.push(
+                                  { technology_code: techCode, color_mode: 'color' as const, sides_mode: 'single' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) },
+                                  { technology_code: techCode, color_mode: 'bw' as const, sides_mode: 'single' as const, tiers: existingRanges.map(r => ({ ...r, unit_price: 0 })) }
+                                )
+                              }
+                            }
 
                             updateSize(selected.id, {
                               default_print: { technology_code: techCode },
