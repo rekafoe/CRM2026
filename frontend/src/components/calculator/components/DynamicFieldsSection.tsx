@@ -45,7 +45,7 @@ export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({ sche
         <div className="param-group" key={field.name}>
           <label>{field.label || field.name}{field.required && '*'}</label>
           <select
-            value={value ?? ''}
+            value={value ?? (field.enum.length > 0 ? (isObjectEnum ? field.enum[0].value : field.enum[0]) : '')}
             onChange={(e) => {
               const newValue = isObjectEnum
                   ? (shouldCastToNumber ? Number(e.target.value) : e.target.value)
@@ -54,7 +54,6 @@ export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({ sche
             }}
             className="form-control"
           >
-            <option value="">-- Выберите --</option>
             {field.enum.map((opt: any) => {
                 const optValue = isObjectEnum ? opt.value : opt;
                 const optLabel = isObjectEnum ? opt.label : opt;

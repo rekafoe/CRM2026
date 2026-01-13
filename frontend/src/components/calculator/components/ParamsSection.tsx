@@ -43,6 +43,16 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   const simplifiedSizes = schema?.template?.simplified?.sizes;
   const isSimplifiedProduct = simplifiedSizes && simplifiedSizes.length > 0;
 
+  // 🆕 Устанавливаем первый размер для упрощённых продуктов, если не выбран
+  React.useEffect(() => {
+    if (isSimplifiedProduct && simplifiedSizes.length > 0 && !specs.size_id) {
+      updateSpecs({ 
+        size_id: simplifiedSizes[0].id,
+        format: `${simplifiedSizes[0].width_mm}×${simplifiedSizes[0].height_mm}`
+      }, true);
+    }
+  }, [isSimplifiedProduct, simplifiedSizes, specs.size_id, updateSpecs]);
+
   return (
     <div className="form-section compact">
       <h3>⚙️ Параметры</h3>
@@ -54,7 +64,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
               Размер изделия <span style={{ color: 'var(--danger, #c53030)' }}>*</span>
             </label>
             <select
-              value={specs.size_id || ''}
+              value={specs.size_id || (simplifiedSizes.length > 0 ? simplifiedSizes[0].id : '')}
               onChange={(e) => {
                 const selectedSizeId = e.target.value;
                 const selectedSize = simplifiedSizes.find(s => s.id === selectedSizeId);
@@ -67,7 +77,6 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
               className="form-control"
               required
             >
-              <option value="">-- Выберите размер --</option>
               {simplifiedSizes.map(size => (
                 <option key={size.id} value={size.id}>
                   {size.label} ({size.width_mm}×{size.height_mm} мм)
@@ -85,7 +94,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             {isRequired('format') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
           </label>
           <select
-            value={isCustomFormat ? 'custom' : specs.format}
+            value={isCustomFormat ? 'custom' : (specs.format || (getEnum('format').length ? getEnum('format')[0] : availableFormats[0] || ''))}
             onChange={(e) => {
               if (e.target.value === 'custom') {
                 setIsCustomFormat(true);

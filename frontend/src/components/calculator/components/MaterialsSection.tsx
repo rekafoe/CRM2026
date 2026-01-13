@@ -223,6 +223,31 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     }
   }, [isSimplifiedProduct, specs.size_id, specs.material_id, allowedMaterialsForSize, updateSpecs]);
 
+  // 🆕 Устанавливаем первый материал для упрощённых продуктов, если не выбран
+  useEffect(() => {
+    if (isSimplifiedProduct && specs.size_id && allowedMaterialsForSize.length > 0 && !specs.material_id) {
+      const firstMaterial = allowedMaterialsForSize[0];
+      if (firstMaterial && warehousePaperTypes.length > 0) {
+        const selectedMaterial = allMaterials.find(m => m.id === firstMaterial.id);
+        if (selectedMaterial && (selectedMaterial as any).paper_type_name) {
+          const paperType = warehousePaperTypes.find(pt => 
+            pt.display_name === (selectedMaterial as any).paper_type_name
+          );
+          if (paperType) {
+            updateSpecs({ 
+              material_id: firstMaterial.id,
+              materialType: paperType.name as any
+            }, true);
+          } else {
+            updateSpecs({ material_id: firstMaterial.id }, true);
+          }
+        } else {
+          updateSpecs({ material_id: firstMaterial.id }, true);
+        }
+      }
+    }
+  }, [isSimplifiedProduct, specs.size_id, specs.material_id, allowedMaterialsForSize, allMaterials, warehousePaperTypes, updateSpecs]);
+
   return (
     <div className="form-section compact">
       <h3>📄 Материалы</h3>
@@ -346,7 +371,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
               </div>
             ) : (
               <select
-                value={specs.material_id ? String(specs.material_id) : ''}
+                value={specs.material_id ? String(specs.material_id) : (allowedMaterialsForSize.length > 0 ? String(allowedMaterialsForSize[0].id) : '')}
                 onChange={(e) => {
                   const newValue = e.target.value ? Number(e.target.value) : undefined;
                   // 🆕 При выборе материала устанавливаем materialType на основе paper_type_id материала
@@ -372,7 +397,6 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
                 className="form-control"
                 required
               >
-                <option value="">-- Выберите материал --</option>
                 {allowedMaterialsForSize.map(material => (
                   <option key={material.id} value={String(material.id)}>
                     {material.name} {material.price ? `(${material.price} BYN/${material.unit || 'шт'})` : ''}

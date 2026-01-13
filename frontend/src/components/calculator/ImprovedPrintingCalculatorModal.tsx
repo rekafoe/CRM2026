@@ -264,6 +264,38 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     }
   }, [isOpen]);
 
+  // 🆕 Устанавливаем дефолтные значения для всех селекторов (первый элемент)
+  useEffect(() => {
+    if (!isOpen || editContext?.item) return; // Пропускаем при редактировании
+    
+    // Устанавливаем первый тип бумаги, если не выбран
+    if (warehousePaperTypes.length > 0 && !specs.paperType) {
+      const firstPaperType = warehousePaperTypes[0];
+      setSpecs(prev => ({
+        ...prev,
+        paperType: firstPaperType.name as any,
+        paperDensity: getDefaultPaperDensity(firstPaperType.name)
+      }));
+    }
+    
+    // Устанавливаем первый формат, если не выбран
+    if (availableFormats.length > 0 && !specs.format) {
+      setSpecs(prev => ({
+        ...prev,
+        format: availableFormats[0]
+      }));
+    }
+    
+    // Устанавливаем дефолтные значения для других полей
+    setSpecs(prev => ({
+      ...prev,
+      sides: prev.sides || 1,
+      lamination: prev.lamination || 'none',
+      priceType: prev.priceType || 'online',
+      customerType: prev.customerType || 'regular',
+    }));
+  }, [isOpen, warehousePaperTypes, specs.paperType, specs.format, availableFormats, getDefaultPaperDensity, editContext]);
+
   // 🆕 Устанавливаем materialType на основе выбранного материала или paperType
   // materialType = тип бумаги со склада (вторая вкладка "Типы бумаги")
   useEffect(() => {
@@ -649,15 +681,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         {/* Основной контент */}
         <div className="calculator-content">
           <div className="calculator-main">
-            {/* Результат расчета - фиксированный вверху */}
-            <ResultSection
-              result={result as any}
-              isValid={isValid}
-              onAddToOrder={() => handleAddToOrder()}
-              mode={isEditMode ? 'edit' : 'create'}
-            />
-
-            {/* Ошибки валидации - показываем сразу после результата */}
+            {/* Ошибки валидации */}
             {Object.keys(validationErrors).length > 0 && (
               <div className="validation-errors" style={{ marginBottom: '20px' }}>
                 {Object.entries(validationErrors).map(([key, message]) => (
@@ -691,6 +715,14 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
               selectedProduct={selectedProduct}
               currentConfig={currentConfig}
               onOpenProductSelector={() => open('showProductSelection')}
+            />
+
+            {/* Результат расчета - фиксированный внизу */}
+            <ResultSection
+              result={result as any}
+              isValid={isValid}
+              onAddToOrder={() => handleAddToOrder()}
+              mode={isEditMode ? 'edit' : 'create'}
             />
 
           </div>

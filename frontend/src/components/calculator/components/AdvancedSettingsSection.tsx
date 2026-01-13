@@ -14,7 +14,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
         <div className="param-group">
           <label>Тип цены:</label>
           <select
-            value={specs.priceType}
+            value={specs.priceType || 'online'}
             onChange={(e) => updateSpecs({ priceType: e.target.value }, true)} // 🆕 instant
             className="form-control"
           >
@@ -27,7 +27,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
         <div className="param-group">
           <label>Тип клиента:</label>
           <select
-            value={specs.customerType}
+            value={specs.customerType || 'regular'}
             onChange={(e) => updateSpecs({ customerType: e.target.value }, true)} // 🆕 instant
             className="form-control"
           >

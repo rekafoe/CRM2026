@@ -330,9 +330,12 @@
 .calculator-main {
   flex: 1;
   padding: 32px;
+  padding-bottom: 0; /* Убираем отступ снизу, так как результат фиксированный */
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #cbd5e0 #f7fafc;
+  display: flex;
+  flex-direction: column;
 }
 
 .calculator-main::-webkit-scrollbar {
@@ -361,6 +364,17 @@
   border-radius: 16px;
   padding: 24px;
   transition: all 0.3s ease;
+}
+
+/* Результат расчета - фиксированный внизу */
+.form-section.result-section {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  background: white;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  margin-bottom: 0;
+  margin-top: auto;
 }
 
 .form-section:hover {
@@ -459,16 +473,16 @@
   color: #1a202c;
 }
 
-/* Сетка параметров */
+/* Сетка параметров - 2 колонки */
 .params-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
 
-/* Компактная сетка параметров */
+/* Компактная сетка параметров - 2 колонки */
 .params-grid.compact {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
@@ -652,16 +666,16 @@
   font-weight: 600;
 }
 
-/* Сетка материалов */
+/* Сетка материалов - 2 колонки */
 .materials-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
 
-/* Компактная сетка материалов */
+/* Компактная сетка материалов - 2 колонки */
 .materials-grid.compact {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
@@ -691,13 +705,13 @@
 
 .advanced-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
 
-/* Компактная сетка расширенных настроек */
+/* Компактная сетка расширенных настроек - 2 колонки */
 .advanced-grid.compact {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
@@ -978,13 +992,17 @@
   .product-type-grid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
-  
+
   .params-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr; /* На мобильных - 1 колонка */
   }
-  
+
   .materials-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr; /* На мобильных - 1 колонка */
+  }
+
+  .advanced-grid {
+    grid-template-columns: 1fr; /* На мобильных - 1 колонка */
   }
 }
 
@@ -2229,12 +2247,7 @@
   margin-bottom: 0;
 }
 
-/* Улучшение отступов между секциями */
-.calculator-main {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+/* Улучшение отступов между секциями - уже определено выше */
 
 /* Компактное отображение секций внутри групп */
 .section-group-content .form-section.compact {

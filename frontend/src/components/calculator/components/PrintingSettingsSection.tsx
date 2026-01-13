@@ -131,6 +131,25 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     return Array.from(colorModes);
   }, [printTechnology, printers]);
 
+  // 🆕 Устанавливаем дефолтные значения для селекторов печати
+  useEffect(() => {
+    if (!selectedProduct?.id || loading) return;
+    
+    // Устанавливаем первый тип печати, если не выбран
+    if (allowedPrintTechnologies.length > 0 && !printTechnology) {
+      onPrintTechnologyChange(allowedPrintTechnologies[0].code);
+    }
+  }, [selectedProduct?.id, loading, allowedPrintTechnologies, printTechnology, onPrintTechnologyChange]);
+
+  // 🆕 Устанавливаем первый режим цвета, если тип печати выбран, но режим не выбран
+  useEffect(() => {
+    if (!printTechnology || loading) return;
+    
+    if (allowedColorModes.length > 0 && !printColorMode) {
+      onPrintColorModeChange(allowedColorModes[0]);
+    }
+  }, [printTechnology, loading, allowedColorModes, printColorMode, onPrintColorModeChange]);
+
   if (loading) {
     return (
       <div className="form-section compact" style={{ padding: 0, border: 'none', background: 'transparent' }}>
@@ -170,7 +189,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
             Тип печати <span style={{ color: 'red' }}>*</span>
           </label>
           <select
-            value={printTechnology || ''}
+            value={printTechnology || (allowedPrintTechnologies.length > 0 ? allowedPrintTechnologies[0].code : '')}
             onChange={(e) => {
               const value = e.target.value;
               onPrintTechnologyChange(value);
@@ -182,7 +201,6 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
             className="form-control"
             required
           >
-            <option value="">Выберите тип печати</option>
             {allowedPrintTechnologies.map((tech) => (
               <option key={tech.code} value={tech.code}>
                 {tech.name}
@@ -197,7 +215,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
               Режим печати <span style={{ color: 'red' }}>*</span>
             </label>
             <select
-              value={printColorMode || ''}
+              value={printColorMode || (allowedColorModes.length > 0 ? allowedColorModes[0] : '')}
               onChange={(e) => {
                 const value = e.target.value;
                 onPrintColorModeChange(value === 'bw' ? 'bw' : value === 'color' ? 'color' : null);
@@ -205,7 +223,6 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
               className="form-control"
               required
             >
-              <option value="">Выберите режим</option>
               {allowedColorModes.includes('bw') && (
                 <option value="bw">Чёрно-белая</option>
               )}
