@@ -427,6 +427,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         printTechnology: printTechnology || undefined,
         print_color_mode: printColorMode || undefined,
         printColorMode: printColorMode || undefined,
+        // 🆕 Сохраняем material_id и size_id для упрощённых продуктов
+        ...(result.specifications.material_id ? { material_id: result.specifications.material_id } : {}),
+        ...(result.specifications.size_id ? { size_id: result.specifications.size_id } : {}),
       };
 
       const paramsPayload = {

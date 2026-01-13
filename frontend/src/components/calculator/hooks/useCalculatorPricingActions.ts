@@ -282,10 +282,32 @@ export function useCalculatorPricingActions({
         const materials = (backendResult.materials || []) as any[];
         const services = (backendResult.operations || []) as any[];
 
+        // 🆕 Логируем материалы для отладки
+        logger.info('📦 Материалы от бэкенда', {
+          materialsCount: materials.length,
+          materials: materials.map((m: any) => ({
+            materialId: m.materialId ?? m.material_id ?? m.id,
+            materialName: m.materialName || m.material || m.name,
+            quantity: m.quantity,
+            unitPrice: m.unitPrice ?? m.unit_price ?? m.price,
+            totalCost: m.totalCost ?? m.total
+          })),
+          hasMaterialId: specs.material_id ? true : false,
+          materialId: specs.material_id
+        });
+
         // ✅ Проверяем, что бэкенд вернул материалы и операции
-        if (materials.length === 0) {
-          logger.info('⚠️ Бэкенд не вернул материалы', { productId: selectedProduct.id });
-          throw new Error('Для продукта не настроены материалы. Добавьте материалы в админке.');
+        // Для упрощённых продуктов материалы могут быть пустыми, если не выбран материал
+        if (materials.length === 0 && !specs.material_id) {
+          logger.info('⚠️ Бэкенд не вернул материалы', { 
+            productId: selectedProduct.id,
+            isSimplified: !!specs.size_id,
+            hasMaterialId: !!specs.material_id
+          });
+          // Для упрощённых продуктов не выбрасываем ошибку, если материал не выбран
+          if (!specs.size_id) {
+            throw new Error('Для продукта не настроены материалы. Добавьте материалы в админке.');
+          }
         }
 
         if (services.length === 0) {
@@ -531,15 +553,49 @@ export function useCalculatorPricingActions({
           allSummary: parameterSummary.map(p => `${p.label}: ${p.value}`)
         });
 
-        const normalizedMaterials = materials.map((m: any) => ({
-          materialId: m.materialId ?? m.material_id ?? m.id,
-          material: m.materialName || m.material || m.name,
-          quantity: Number(m.quantity) || 0,
-          unit: m.unit || m.unitName || 'шт',
-          unitPrice: m.unitPrice ?? m.unit_price ?? m.price ?? 0,
-          price: m.unitPrice ?? m.unit_price ?? m.price ?? 0,
-          total: m.totalCost ?? m.total ?? 0,
-        }));
+        // 🆕 Нормализуем материалы, добавляя material_id из specs для упрощённых продуктов
+        const normalizedMaterials = materials.map((m: any) => {
+          const materialId = m.materialId ?? m.material_id ?? m.id;
+          // Для упрощённых продуктов, если material_id не в результате, используем из specs
+          const finalMaterialId = materialId || (specs.material_id ? specs.material_id : undefined);
+          
+          return {
+            materialId: finalMaterialId,
+            material: m.materialName || m.material || m.name,
+            quantity: Number(m.quantity) || 0,
+            unit: m.unit || m.unitName || 'шт',
+            unitPrice: m.unitPrice ?? m.unit_price ?? m.price ?? 0,
+            price: m.unitPrice ?? m.unit_price ?? m.price ?? 0,
+            total: m.totalCost ?? m.total ?? 0,
+          };
+        });
+        
+        // 🆕 Для упрощённых продуктов, если материалов нет в результате, но material_id есть в specs - добавляем
+        if (normalizedMaterials.length === 0 && specs.material_id && specs.size_id) {
+          logger.info('🆕 Добавляем материал из specs для упрощённого продукта', {
+            material_id: specs.material_id,
+            size_id: specs.size_id
+          });
+          // Добавляем пустой материал с material_id, чтобы он попал в components
+          normalizedMaterials.push({
+            materialId: specs.material_id,
+            material: 'Материал',
+            quantity: specs.quantity || 0,
+            unit: 'шт',
+            unitPrice: 0,
+            price: 0,
+            total: 0,
+          });
+        }
+        
+        logger.info('📦 Нормализованные материалы', {
+          materialsCount: normalizedMaterials.length,
+          materials: normalizedMaterials.map(m => ({
+            materialId: m.materialId,
+            material: m.material,
+            quantity: m.quantity
+          }))
+        });
 
         const normalizedServices = services.map((s: any) => ({
           operationId: s.operationId ?? s.operation_id ?? s.id,
