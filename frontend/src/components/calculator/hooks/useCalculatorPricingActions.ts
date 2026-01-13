@@ -432,29 +432,41 @@ export function useCalculatorPricingActions({
 
         const specSnapshot = { ...specs };
         
-        // ⚠️ ВАЖНО: Используем реальную плотность из материала, если доступна
-        // Пробуем получить плотность из материала в результате бэкенда
+        // ⚠️ ВАЖНО: Используем плотность из specs как приоритетную (то, что выбрал пользователь)
+        // Для упрощённых продуктов бэкенд может возвращать материал с другой плотностью,
+        // но мы должны использовать то, что пользователь явно выбрал в интерфейсе
         let actualPaperDensity = specSnapshot.paperDensity;
-        if (materials.length > 0) {
+        
+        // Проверяем, что плотность из материала бэкенда совпадает с выбранной пользователем
+        if (materials.length > 0 && actualPaperDensity) {
           const material = materials[0] as any;
+          const backendDensity = material.density;
           
-          // Пробуем получить плотность из материала (может быть в разных полях)
-          if (material.density) {
-            actualPaperDensity = material.density;
-            logger.info('✅ Используем плотность из материала бэкенда', { 
+          if (backendDensity && backendDensity !== actualPaperDensity) {
+            // Плотность из бэкенда не совпадает с выбранной - используем выбранную пользователем
+            logger.info('⚠️ Плотность из материала бэкенда не совпадает с выбранной пользователем, используем выбранную', { 
               materialId: material.materialId ?? material.material_id ?? material.id,
-              density: actualPaperDensity,
-              originalDensity: specSnapshot.paperDensity
+              backendDensity,
+              userSelectedDensity: actualPaperDensity,
+              usingUserSelected: true
             });
-          } else {
-            // Если плотности нет в результате, используем значение из specs
-            logger.info('ℹ️ Плотность не найдена в результате, используем значение из specs', { 
+          } else if (backendDensity && backendDensity === actualPaperDensity) {
+            // Плотности совпадают - всё хорошо
+            logger.info('✅ Плотность из материала бэкенда совпадает с выбранной', { 
+              materialId: material.materialId ?? material.material_id ?? material.id,
+              density: actualPaperDensity
+            });
+          } else if (!actualPaperDensity && backendDensity) {
+            // Если пользователь не выбрал плотность, но бэкенд вернул - используем её
+            actualPaperDensity = backendDensity;
+            logger.info('ℹ️ Используем плотность из материала бэкенда (пользователь не выбрал)', { 
+              materialId: material.materialId ?? material.material_id ?? material.id,
               density: actualPaperDensity
             });
           }
         }
         
-        // Обновляем плотность в snapshot
+        // Обновляем плотность в snapshot (используем выбранную пользователем или из бэкенда, если не выбрана)
         specSnapshot.paperDensity = actualPaperDensity;
         
         // ⚠️ ВАЖНО: Используем реальный размер из результата бэкенда, а не из specs.format
