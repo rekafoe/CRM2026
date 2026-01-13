@@ -288,12 +288,15 @@ export function useCalculatorPricingActions({
           materials: materials.map((m: any) => ({
             materialId: m.materialId ?? m.material_id ?? m.id,
             materialName: m.materialName || m.material || m.name,
+            density: m.density,
             quantity: m.quantity,
             unitPrice: m.unitPrice ?? m.unit_price ?? m.price,
             totalCost: m.totalCost ?? m.total
           })),
           hasMaterialId: specs.material_id ? true : false,
-          materialId: specs.material_id
+          materialId: specs.material_id,
+          specsPaperDensity: specs.paperDensity,
+          specsSizeId: specs.size_id
         });
 
         // ✅ Проверяем, что бэкенд вернул материалы и операции
@@ -454,13 +457,46 @@ export function useCalculatorPricingActions({
 
         const specSnapshot = { ...specs };
         
-        // ⚠️ ВАЖНО: Используем плотность из specs как приоритетную (то, что выбрал пользователь)
-        // Для упрощённых продуктов бэкенд может возвращать материал с другой плотностью,
-        // но мы должны использовать то, что пользователь явно выбрал в интерфейсе
+        // ⚠️ ВАЖНО: Для упрощённых продуктов плотность нужно получать из выбранного материала
+        // Поле плотности скрыто для упрощённых продуктов, поэтому specs.paperDensity может быть 0 или undefined
         let actualPaperDensity = specSnapshot.paperDensity;
         
-        // Проверяем, что плотность из материала бэкенда совпадает с выбранной пользователем
-        if (materials.length > 0 && actualPaperDensity) {
+        // 🆕 Для упрощённых продуктов: получаем плотность из материала бэкенда, если material_id есть
+        // Для упрощённых продуктов поле плотности скрыто, поэтому specs.paperDensity может быть 0 или undefined
+        // Нужно использовать плотность из выбранного материала
+        if (specs.material_id && specs.size_id) {
+          // Для упрощённых продуктов плотность должна быть в материалах из бэкенда
+          if (materials.length > 0) {
+            const material = materials.find((m: any) => 
+              (m.materialId ?? m.material_id ?? m.id) === specs.material_id
+            ) || materials[0];
+            const materialDensity = material.density;
+            if (materialDensity) {
+              // Для упрощённых продуктов ВСЕГДА используем плотность из материала бэкенда
+              // (потому что пользователь не может выбрать плотность вручную - поле скрыто)
+              actualPaperDensity = materialDensity;
+              logger.info('🆕 Для упрощённого продукта используем плотность из материала бэкенда', {
+                material_id: specs.material_id,
+                materialName: material.materialName || material.material || material.name,
+                density: actualPaperDensity,
+                originalSpecsDensity: specSnapshot.paperDensity,
+                note: 'Поле плотности скрыто для упрощённых продуктов, поэтому используем плотность из материала'
+              });
+            } else {
+              logger.info('⚠️ Для упрощённого продукта не найдена плотность в материале бэкенда', {
+                material_id: specs.material_id,
+                material: material.materialName || material.material || material.name,
+                materialKeys: Object.keys(material)
+              });
+            }
+          } else {
+            logger.info('⚠️ Для упрощённого продукта нет материалов в результате бэкенда', {
+              material_id: specs.material_id,
+              size_id: specs.size_id
+            });
+          }
+        } else if (materials.length > 0 && actualPaperDensity) {
+          // Для обычных продуктов проверяем, что плотность из материала бэкенда совпадает с выбранной пользователем
           const material = materials[0] as any;
           const backendDensity = material.density;
           
@@ -470,16 +506,23 @@ export function useCalculatorPricingActions({
               materialId: material.materialId ?? material.material_id ?? material.id,
               backendDensity,
               userSelectedDensity: actualPaperDensity,
-              usingUserSelected: true
+              usingUserSelected: true,
+              specsMaterialId: specs.material_id,
+              specsPaperDensity: specSnapshot.paperDensity
             });
+            // ⚠️ ВАЖНО: НЕ перезаписываем actualPaperDensity - используем выбранную пользователем
           } else if (backendDensity && backendDensity === actualPaperDensity) {
             // Плотности совпадают - всё хорошо
             logger.info('✅ Плотность из материала бэкенда совпадает с выбранной', { 
               materialId: material.materialId ?? material.material_id ?? material.id,
               density: actualPaperDensity
             });
-          } else if (!actualPaperDensity && backendDensity) {
-            // Если пользователь не выбрал плотность, но бэкенд вернул - используем её
+          }
+        } else if (!actualPaperDensity && materials.length > 0) {
+          // Если пользователь не выбрал плотность, но бэкенд вернул - используем её
+          const material = materials[0] as any;
+          const backendDensity = material.density;
+          if (backendDensity) {
             actualPaperDensity = backendDensity;
             logger.info('ℹ️ Используем плотность из материала бэкенда (пользователь не выбрал)', { 
               materialId: material.materialId ?? material.material_id ?? material.id,
@@ -550,7 +593,10 @@ export function useCalculatorPricingActions({
         
         logger.info('📋 parameterSummary сформирован', {
           formatInSummary: parameterSummary.find(p => p.key === 'format'),
-          allSummary: parameterSummary.map(p => `${p.label}: ${p.value}`)
+          densityInSummary: parameterSummary.find(p => p.key === 'paperDensity'),
+          allSummary: parameterSummary.map(p => `${p.label}: ${p.value}`),
+          specSnapshotPaperDensity: specSnapshot.paperDensity,
+          actualPaperDensity: actualPaperDensity
         });
 
         // 🆕 Нормализуем материалы, добавляя material_id из specs для упрощённых продуктов
@@ -610,13 +656,6 @@ export function useCalculatorPricingActions({
         const finalTotalCost = backendResult.finalPrice as number;
         const finalPricePerItem = backendResult.pricePerUnit as number;
 
-        // ❌ УДАЛЕНО: Применение скидок на фронтенде
-        // Скидки должны передаваться бэкенду через API и применяться там
-        // if (appliedDiscount) {
-        //   const discountAmount = (backendResult.finalPrice * appliedDiscount.discount_percent) / 100;
-        //   finalTotalCost = backendResult.finalPrice - discountAmount;
-        //   finalPricePerItem = finalTotalCost / specs.quantity;
-        // }
 
         const calculationResult: CalculationResult = {
           productName: `${selectedProduct.name} ${formatInfo || specSnapshot.format} (${specSnapshot.paperType} ${specSnapshot.paperDensity}г/м², ${

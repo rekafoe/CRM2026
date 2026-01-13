@@ -192,7 +192,10 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
   // Извлекаем данные о материале для отображения
   const materialTypeRaw = specsAny?.paperType || specsAny?.materialType || null;
   const materialFormat = specsAny?.format || item.params.formatInfo || sheetSize || null;
-  const materialDensity = specsAny?.paperDensity || item.params.paperDensity || null;
+  // 🆕 Приоритет: плотность из specifications (то, что выбрал пользователь), затем из parameterSummary, затем из params
+  const densityFromSummary = parameterSummary.find((p) => p.label === 'Плотность бумаги' || p.label === 'Плотность')?.value;
+  const densityFromSummaryNum = densityFromSummary ? Number(densityFromSummary.replace(/[^\d]/g, '')) : null;
+  const materialDensity = specsAny?.paperDensity || densityFromSummaryNum || item.params.paperDensity || null;
   const [materialTypeDisplay, setMaterialTypeDisplay] = useState<string | null>(null);
 
   const handleSave = async () => {
