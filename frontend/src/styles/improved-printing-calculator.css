@@ -2199,44 +2199,14 @@
   }
 }
 
-/* Двухколоночный layout для секций калькулятора */
-.calculator-sections-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  align-items: start;
-}
-
-.calculator-sections-column {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 24px;
-  align-items: start;
-}
-
-/* Выравниваем высоту первых двух блоков между колонками */
-.calculator-sections-grid {
-  align-items: stretch;
-}
-
-/* Первые два блока в левой колонке и первый блок в правой колонке имеют одинаковую высоту */
-.calculator-sections-column-left > .calculator-section-group:first-child,
-.calculator-sections-column-left > .calculator-section-group:nth-child(2),
-.calculator-sections-column-right > .calculator-section-group:first-child {
-  display: flex;
-  flex-direction: column;
-}
-
-/* На мобильных устройствах - одна колонка */
-@media (max-width: 1024px) {
-  .calculator-sections-grid {
-    grid-template-columns: 1fr;
-  }
+/* Единый блок для всех параметров */
+.calculator-section-unified {
+  margin-bottom: 24px;
 }
 
 /* Группировка секций калькулятора */
 .calculator-section-group {
-  margin-bottom: 0; /* Убираем margin-bottom, так как gap в grid уже задан */
+  margin-bottom: 24px;
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
@@ -2246,35 +2216,6 @@
   min-height: 0; /* Позволяет flex-элементам сжиматься */
 }
 
-/* Одинаковая высота для всех блоков в каждой колонке */
-.calculator-sections-column {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 24px;
-  align-items: stretch; /* Растягиваем блоки по высоте */
-}
-
-/* Выравниваем высоту первых двух блоков между колонками */
-.calculator-sections-grid {
-  align-items: stretch;
-}
-
-/* Используем CSS Grid для выравнивания высоты первых двух блоков */
-.calculator-sections-column-left {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  gap: 24px;
-}
-
-.calculator-sections-column-left > .calculator-section-group:first-child,
-.calculator-sections-column-left > .calculator-section-group:nth-child(2) {
-  min-height: 0;
-}
-
-/* Первый блок в правой колонке растягивается на высоту первых двух блоков левой колонки */
-.calculator-sections-column-right > .calculator-section-group:first-child {
-  min-height: 0;
-}
 
 /* Содержимое секции растягивается */
 .section-group-content {
@@ -2355,6 +2296,11 @@
 
 /* Скрываем только заголовки h3 внутри compact секций, если они есть */
 .section-group-content .form-section.compact > h3 {
+  display: none;
+}
+
+/* Скрываем заголовки h3 внутри единого блока "Основные параметры" */
+.calculator-section-unified .section-group-content .form-section.compact > h3 {
   display: none;
 }
 

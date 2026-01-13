@@ -59,118 +59,76 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   onOpenProductSelector,
 }) => {
   return (
-    <div className="calculator-sections-grid">
-      {/* Левая колонка */}
-      <div className="calculator-sections-column calculator-sections-column-left">
-        {/* Основные параметры */}
-        <div className="calculator-section-group">
-          <div className="section-group-header">
-            <h3>📦 Основные параметры</h3>
-          </div>
-          <div className="section-group-content">
-            <SelectedProductCard
-              productType={specs.productType}
-              displayName={selectedProduct?.name || (backendProductSchema?.type || currentConfig?.name || specs.productType) as string}
-              onOpenSelector={onOpenProductSelector}
-            />
-
-            <ParamsSection
-              specs={{ productType: specs.productType, format: specs.format, quantity: specs.quantity, sides: specs.sides, size_id: (specs as any).size_id }}
-              availableFormats={availableFormats}
-              validationErrors={validationErrors}
-              isCustomFormat={isCustomFormat}
-              customFormat={customFormat}
-              setIsCustomFormat={setIsCustomFormat}
-              setCustomFormat={setCustomFormat}
-              updateSpecs={updateSpecs}
-              schema={backendProductSchema}
-            />
-          </div>
-        </div>
-
-        {/* Печать */}
-        <div className="calculator-section-group">
-          <div className="section-group-header">
-            <h3>🖨️ Печать</h3>
-          </div>
-          <div className="section-group-content">
-            <PrintingSettingsSection
-              printTechnology={printTechnology}
-              printColorMode={printColorMode}
-              sides={specs.sides}
-              onPrintTechnologyChange={setPrintTechnology}
-              onPrintColorModeChange={setPrintColorMode}
-              onSidesChange={(value) => updateSpecs({ sides: value as 1 | 2 })}
-              selectedProduct={selectedProduct}
-              backendProductSchema={backendProductSchema}
-            />
-          </div>
-        </div>
+    <div className="calculator-section-group calculator-section-unified">
+      <div className="section-group-header">
+        <h3>📦 Основные параметры</h3>
       </div>
+      <div className="section-group-content">
+        <SelectedProductCard
+          productType={specs.productType}
+          displayName={selectedProduct?.name || (backendProductSchema?.type || currentConfig?.name || specs.productType) as string}
+          onOpenSelector={onOpenProductSelector}
+        />
 
-      {/* Правая колонка */}
-      <div className="calculator-sections-column calculator-sections-column-right">
-        {/* Материалы */}
-        <div className="calculator-section-group">
-          <div className="section-group-header">
-            <h3>📄 Материалы</h3>
-          </div>
-          <div className="section-group-content">
-            <MaterialsSection
-              specs={{ 
-                paperType: specs.paperType, 
-                paperDensity: specs.paperDensity, 
-                lamination: specs.lamination, 
-                quantity: specs.quantity,
-                material_id: (specs as any).material_id, // 🆕 Передаем material_id
-                size_id: (specs as any).size_id // 🆕 Передаем size_id для упрощённых продуктов
-              }}
-              warehousePaperTypes={warehousePaperTypes}
-              availableDensities={availableDensities.map(d => ({ value: d.value, label: d.label }))}
-              loadingPaperTypes={loadingPaperTypes}
-              getDefaultPaperDensity={getDefaultPaperDensity}
-              updateSpecs={updateSpecs}
-              schema={backendProductSchema}
-              result={result} // 🆕 Передаем результат расчета с реальными данными
-            />
-          </div>
-        </div>
+        <ParamsSection
+          specs={{ productType: specs.productType, format: specs.format, quantity: specs.quantity, sides: specs.sides, size_id: (specs as any).size_id }}
+          availableFormats={availableFormats}
+          validationErrors={validationErrors}
+          isCustomFormat={isCustomFormat}
+          customFormat={customFormat}
+          setIsCustomFormat={setIsCustomFormat}
+          setCustomFormat={setCustomFormat}
+          updateSpecs={updateSpecs}
+          schema={backendProductSchema}
+        />
 
-        {/* Дополнительные параметры */}
+        <PrintingSettingsSection
+          printTechnology={printTechnology}
+          printColorMode={printColorMode}
+          sides={specs.sides}
+          onPrintTechnologyChange={setPrintTechnology}
+          onPrintColorModeChange={setPrintColorMode}
+          onSidesChange={(value) => updateSpecs({ sides: value as 1 | 2 })}
+          selectedProduct={selectedProduct}
+          backendProductSchema={backendProductSchema}
+        />
+
+        <MaterialsSection
+          specs={{ 
+            paperType: specs.paperType, 
+            paperDensity: specs.paperDensity, 
+            lamination: specs.lamination, 
+            quantity: specs.quantity,
+            material_id: (specs as any).material_id,
+            size_id: (specs as any).size_id
+          }}
+          warehousePaperTypes={warehousePaperTypes}
+          availableDensities={availableDensities.map(d => ({ value: d.value, label: d.label }))}
+          loadingPaperTypes={loadingPaperTypes}
+          getDefaultPaperDensity={getDefaultPaperDensity}
+          updateSpecs={updateSpecs}
+          schema={backendProductSchema}
+          result={result}
+        />
+
         <DynamicFieldsSection
           schema={backendProductSchema}
           specs={specs as any}
           updateSpecs={updateSpecs as any}
         />
 
-        {/* Дополнительные настройки */}
-        <div className="calculator-section-group">
-          <div className="section-group-header">
-            <h3>⚙️ Дополнительные настройки</h3>
-          </div>
-          <div className="section-group-content">
-            <AdvancedSettingsSection
-              specs={{ priceType: specs.priceType, customerType: specs.customerType, pages: specs.pages, magnetic: specs.magnetic, cutting: specs.cutting, folding: specs.folding, roundCorners: specs.roundCorners } as any}
-              updateSpecs={updateSpecs as any}
-              backendProductSchema={backendProductSchema}
-            />
-          </div>
-        </div>
+        <AdvancedSettingsSection
+          specs={{ priceType: specs.priceType, customerType: specs.customerType, pages: specs.pages, magnetic: specs.magnetic, cutting: specs.cutting, folding: specs.folding, roundCorners: specs.roundCorners } as any}
+          updateSpecs={updateSpecs as any}
+          backendProductSchema={backendProductSchema}
+        />
 
-        {/* Скидки по тиражам */}
         {result && (
-          <div className="calculator-section-group">
-            <div className="section-group-header">
-              <h3>💰 Скидки</h3>
-            </div>
-            <div className="section-group-content">
-              <QuantityDiscountsSection
-                quantity={specs.quantity}
-                basePrice={result.pricePerItem}
-                onDiscountChange={(discount) => setAppliedDiscount(discount?.discount_percent ?? 0)}
-              />
-            </div>
-          </div>
+          <QuantityDiscountsSection
+            quantity={specs.quantity}
+            basePrice={result.pricePerItem}
+            onDiscountChange={(discount) => setAppliedDiscount(discount?.discount_percent ?? 0)}
+          />
         )}
       </div>
     </div>
