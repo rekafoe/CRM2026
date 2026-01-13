@@ -12,19 +12,6 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
       <h3>🔧 Настройки</h3>
       <div className="advanced-grid compact">
         <div className="param-group">
-          <label>Тип цены:</label>
-          <select
-            value={specs.priceType || 'online'}
-            onChange={(e) => updateSpecs({ priceType: e.target.value }, true)} // 🆕 instant
-            className="form-control"
-          >
-            <option value="online">Онлайн (стандарт)</option>
-            <option value="rush">Срочно (+50%)</option>
-            <option value="promo">Промо (-30%)</option>
-          </select>
-        </div>
-
-        <div className="param-group">
           <label>Тип клиента:</label>
           <select
             value={specs.customerType || 'regular'}

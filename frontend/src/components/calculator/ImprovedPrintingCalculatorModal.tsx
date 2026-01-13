@@ -64,7 +64,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     paperType: 'semi-matte' as any,
     paperDensity: 0,
     lamination: 'none',
-    priceType: 'standard',
+    priceType: 'online', // Всегда используем онлайн по умолчанию
     customerType: 'regular',
     pages: 4,
     magnetic: false,
@@ -341,7 +341,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       ...prev,
       sides: prev.sides || 1,
       lamination: prev.lamination || 'none',
-      priceType: prev.priceType || 'online',
+      priceType: 'online', // Всегда используем онлайн по умолчанию
       customerType: prev.customerType || 'regular',
     }));
   }, [isOpen, warehousePaperTypes, specs.paperType, specs.format, availableFormats, getDefaultPaperDensity, editContext]);
