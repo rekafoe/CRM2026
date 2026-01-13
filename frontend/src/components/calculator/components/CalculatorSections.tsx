@@ -6,7 +6,6 @@ import { MaterialsSection } from './MaterialsSection';
 import { PrintingSettingsSection } from './PrintingSettingsSection';
 import { DynamicFieldsSection } from './DynamicFieldsSection';
 import { AdvancedSettingsSection } from './AdvancedSettingsSection';
-import { QuantityDiscountsSection } from './QuantityDiscountsSection';
 import { SelectedProductCard } from './SelectedProductCard';
 
 interface CalculatorSectionsProps {
@@ -29,7 +28,6 @@ interface CalculatorSectionsProps {
   setPrintColorMode: (value: 'bw' | 'color' | null) => void;
   selectedProduct: (Product & { resolvedProductType?: string }) | null;
   result: CalculationResult | null;
-  setAppliedDiscount: (value: number) => void;
   currentConfig?: { name?: string } | null;
   onOpenProductSelector: () => void;
 }
@@ -53,7 +51,6 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   setPrintTechnology,
   setPrintColorMode,
   result,
-  setAppliedDiscount,
   selectedProduct,
   currentConfig,
   onOpenProductSelector,
@@ -122,14 +119,6 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           updateSpecs={updateSpecs as any}
           backendProductSchema={backendProductSchema}
         />
-
-        {result && (
-          <QuantityDiscountsSection
-            quantity={specs.quantity}
-            basePrice={result.pricePerItem}
-            onDiscountChange={(discount) => setAppliedDiscount(discount?.discount_percent ?? 0)}
-          />
-        )}
       </div>
     </div>
   );

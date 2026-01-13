@@ -16,7 +16,6 @@ import { DynamicFieldsSection } from './components/DynamicFieldsSection';
 import { useCalculatorUI } from './hooks/useCalculatorUI';
 import { AdvancedSettingsSection } from './components/AdvancedSettingsSection';
 import { SelectedProductCard } from './components/SelectedProductCard';
-import { QuantityDiscountsSection } from './components/QuantityDiscountsSection';
 import { DynamicProductSelector } from './components/DynamicProductSelector';
 import { PrintingSettingsSection } from './components/PrintingSettingsSection';
 import { getProductionTimeLabel, getProductionDaysByPriceType } from './utils/time';
@@ -762,7 +761,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
               setPrintTechnology={setPrintTechnology}
               setPrintColorMode={setPrintColorMode}
               result={result}
-              setAppliedDiscount={setAppliedDiscount}
               selectedProduct={selectedProduct}
               currentConfig={currentConfig}
               onOpenProductSelector={() => open('showProductSelection')}
