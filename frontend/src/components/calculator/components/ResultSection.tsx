@@ -53,12 +53,24 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
       </div>
       {parameterSummary.length > 0 && (
         <div className="result-parameter-summary">
-          {parameterSummary.map((param) => (
-            <div className="parameter-chip" key={`${param.label}-${param.value}`}>
-              <span className="parameter-label">{param.label}</span>
-              <span className="parameter-value">{param.value}</span>
-            </div>
-          ))}
+          {parameterSummary
+            .filter((param) => {
+              // 🆕 Исключаем "Тип материала", если он совпадает с "Материал"
+              // Это предотвращает показ "coated" когда материал "glossy" (дублирование)
+              if (param.label === 'Тип материала') {
+                const materialParam = parameterSummary.find((p) => p.label === 'Материал');
+                if (materialParam && materialParam.value === param.value) {
+                  return false; // Не показываем, если совпадает с "Материал"
+                }
+              }
+              return true;
+            })
+            .map((param) => (
+              <div className="parameter-chip" key={`${param.label}-${param.value}`}>
+                <span className="parameter-label">{param.label}</span>
+                <span className="parameter-value">{param.value}</span>
+              </div>
+            ))}
         </div>
       )}
       {(sheetsNeeded || itemsPerSheet || sheetSize) && (
