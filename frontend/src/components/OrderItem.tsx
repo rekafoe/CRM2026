@@ -190,7 +190,8 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
   const sheetSize = item.params.layout?.sheetSize ?? null;
   
   // Извлекаем данные о материале для отображения
-  const materialTypeRaw = specsAny?.paperType || specsAny?.materialType || null;
+  // 🆕 Приоритет: materialType (тип материала, например 'coated'), затем paperType (тип бумаги, например 'glossy')
+  const materialTypeRaw = specsAny?.materialType || specsAny?.paperType || null;
   const materialFormat = specsAny?.format || item.params.formatInfo || sheetSize || null;
   // 🆕 Приоритет: плотность из specifications (то, что выбрал пользователь), затем из parameterSummary, затем из params
   const densityFromSummary = parameterSummary.find((p) => p.label === 'Плотность бумаги' || p.label === 'Плотность')?.value;

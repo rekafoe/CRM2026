@@ -151,7 +151,9 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
           return null;
         }
         
-        const raw = String(fromWarehouse || fromMaterial || fromType || materialTypeRaw || '').trim();
+        // 🆕 Приоритет: сначала "Тип материала" из parameterSummary, затем из склада, затем materialTypeRaw
+        // Это гарантирует, что показывается правильный тип материала (coated), а не тип бумаги (glossy)
+        const raw = String(fromType || fromWarehouse || materialTypeRaw || fromMaterial || '').trim();
         if (!raw) return null;
         return (
           <>
