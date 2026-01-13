@@ -267,10 +267,23 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   // 🆕 Устанавливаем materialType на основе выбранного материала или paperType
   // materialType = тип бумаги со склада (вторая вкладка "Типы бумаги")
   useEffect(() => {
-    if (warehousePaperTypes.length === 0) return;
+    console.log('🔍 [ImprovedPrintingCalculatorModal] useEffect для materialType', {
+      warehousePaperTypesLength: warehousePaperTypes.length,
+      material_id: specs.material_id,
+      isSimplified: backendProductSchema?.template?.simplified,
+      hasResult: !!result,
+      resultMaterialsLength: result?.materials?.length || 0,
+      currentMaterialType: specs.materialType
+    });
+    
+    if (warehousePaperTypes.length === 0) {
+      console.log('⚠️ [ImprovedPrintingCalculatorModal] warehousePaperTypes пустой, выходим');
+      return;
+    }
     
     // 🆕 Для упрощённых продуктов: materialType берётся из paper_type_id выбранного материала
     if (specs.material_id && backendProductSchema?.template?.simplified) {
+      console.log('✅ [ImprovedPrintingCalculatorModal] Упрощённый продукт с material_id, ищем materialType');
       // Получаем материал из результата расчёта
       // В результате расчёта может быть paper_type_name или paper_type_id
       if (result?.materials && result.materials.length > 0) {

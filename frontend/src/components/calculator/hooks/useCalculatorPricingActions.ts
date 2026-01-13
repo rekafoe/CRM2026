@@ -291,13 +291,26 @@ export function useCalculatorPricingActions({
             density: m.density,
             quantity: m.quantity,
             unitPrice: m.unitPrice ?? m.unit_price ?? m.price,
-            totalCost: m.totalCost ?? m.total
+            totalCost: m.totalCost ?? m.total,
+            paper_type_name: m.paper_type_name, // 🆕 Добавляем для отладки
+            allKeys: Object.keys(m) // 🆕 Показываем все ключи для отладки
           })),
           hasMaterialId: specs.material_id ? true : false,
           materialId: specs.material_id,
           specsPaperDensity: specs.paperDensity,
           specsSizeId: specs.size_id
         });
+        
+        // 🆕 Дополнительное логирование для отладки paper_type_name
+        console.log('🔍 [useCalculatorPricingActions] Детальный анализ материалов от бэкенда:', 
+          materials.map((m: any) => ({
+            materialId: m.materialId ?? m.material_id ?? m.id,
+            materialName: m.materialName || m.material || m.name,
+            paper_type_name: m.paper_type_name,
+            hasPaperTypeName: !!m.paper_type_name,
+            allKeys: Object.keys(m)
+          }))
+        );
 
         // ✅ Проверяем, что бэкенд вернул материалы и операции
         // Для упрощённых продуктов материалы могут быть пустыми, если не выбран материал
@@ -605,7 +618,7 @@ export function useCalculatorPricingActions({
           // Для упрощённых продуктов, если material_id не в результате, используем из specs
           const finalMaterialId = materialId || (specs.material_id ? specs.material_id : undefined);
           
-          return {
+          const normalized = {
             materialId: finalMaterialId,
             material: m.materialName || m.material || m.name,
             quantity: Number(m.quantity) || 0,
@@ -616,6 +629,18 @@ export function useCalculatorPricingActions({
             // 🆕 Добавляем paper_type_name для установки materialType на фронтенде
             paper_type_name: m.paper_type_name,
           };
+          
+          // 🆕 Логирование для отладки
+          if (specs.material_id && finalMaterialId === specs.material_id) {
+            console.log('🔍 [useCalculatorPricingActions] Нормализация материала для упрощённого продукта', {
+              originalMaterial: m,
+              normalized,
+              hasPaperTypeName: !!m.paper_type_name,
+              paper_type_name: m.paper_type_name
+            });
+          }
+          
+          return normalized;
         });
         
         // 🆕 Для упрощённых продуктов, если материалов нет в результате, но material_id есть в specs - добавляем
