@@ -11,18 +11,6 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
     <div className="form-section advanced-settings compact">
       <h3>🔧 Настройки</h3>
       <div className="advanced-grid compact">
-        <div className="param-group">
-          <label>Тип клиента:</label>
-          <select
-            value={specs.customerType || 'regular'}
-            onChange={(e) => updateSpecs({ customerType: e.target.value }, true)} // 🆕 instant
-            className="form-control"
-          >
-            <option value="regular">Обычный</option>
-            <option value="vip">VIP (-10%)</option>
-          </select>
-        </div>
-
         {Array.isArray((backendProductSchema?.fields || []).find((f: any) => f.name === 'pages')?.enum) && (
           <div className="param-group">
             <label>Страниц:</label>

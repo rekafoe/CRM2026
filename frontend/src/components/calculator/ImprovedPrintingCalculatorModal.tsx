@@ -342,7 +342,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       sides: prev.sides || 1,
       lamination: prev.lamination || 'none',
       priceType: 'online', // Всегда используем онлайн по умолчанию
-      customerType: prev.customerType || 'regular',
+      customerType: 'regular', // Всегда используем обычный тип клиента по умолчанию
     }));
   }, [isOpen, warehousePaperTypes, specs.paperType, specs.format, availableFormats, getDefaultPaperDensity, editContext]);
 
