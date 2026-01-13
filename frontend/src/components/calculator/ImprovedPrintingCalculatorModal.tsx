@@ -182,18 +182,27 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
     setSpecs(prev => {
       const next: any = { ...prev };
+      // Для упрощённых продуктов сбрасываем size_id и material_id
       if (next.size_id) {
         delete next.size_id;
       }
       if (next.material_id) {
         delete next.material_id;
       }
+      // Для обычных продуктов сбрасываем paperType, чтобы MaterialsSection
+      // мог выбрать первый разрешённый тип бумаги из нового продукта
+      const isSimplified = backendProductSchema?.template?.simplified?.sizes?.length > 0;
+      if (!isSimplified && next.paperType) {
+        delete next.paperType;
+        // Также сбрасываем плотность, так как она зависит от типа бумаги
+        next.paperDensity = 0;
+      }
       return next;
     });
 
     // Сбрасываем флаг взаимодействия, чтобы автопересчет не дергался лишний раз
     setUserInteracted(false);
-  }, [selectedProduct?.id, editContext, setSpecs, setUserInteracted]);
+  }, [selectedProduct?.id, editContext, backendProductSchema, setSpecs, setUserInteracted]);
 
   // 🆕 При смене продукта сбрасываем параметры печати,
   // чтобы PrintingSettingsSection смог проставить корректные дефолты по новым ограничениям

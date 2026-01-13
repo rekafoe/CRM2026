@@ -186,12 +186,16 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   }, [warehousePaperTypes, allowedPaperTypes]);
 
   // 🆕 Если текущий тип бумаги не входит в разрешенные - сбрасываем на первый разрешенный
+  // Также устанавливаем первый тип бумаги, если paperType не установлен, но есть разрешённые типы
   useEffect(() => {
-    if (filteredPaperTypes.length > 0 && specs.paperType && !filteredPaperTypes.some(pt => pt.name === specs.paperType)) {
-      updateSpecs({ 
-        paperType: filteredPaperTypes[0].name,
-        paperDensity: getDefaultPaperDensity(filteredPaperTypes[0].name)
-      }, true);
+    if (filteredPaperTypes.length > 0) {
+      // Если paperType не установлен или не входит в разрешённые - устанавливаем первый
+      if (!specs.paperType || !filteredPaperTypes.some(pt => pt.name === specs.paperType)) {
+        updateSpecs({ 
+          paperType: filteredPaperTypes[0].name,
+          paperDensity: getDefaultPaperDensity(filteredPaperTypes[0].name)
+        }, true);
+      }
     }
   }, [filteredPaperTypes, specs.paperType, updateSpecs, getDefaultPaperDensity]);
 
