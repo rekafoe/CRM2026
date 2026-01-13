@@ -163,7 +163,14 @@ export const BASE_SUMMARY_FIELDS: Array<{ key: string; label: string; formatter?
   {
     key: 'materialType',
     label: 'Тип материала',
-    formatter: (value) => (value ? String(value) : null),
+    formatter: (value, { options }) => {
+      if (!value) return null;
+      // 🆕 Используем display_name из типов бумаги со склада для транслирования
+      // Это позволяет оператору видеть понятное название типа бумаги (например, "Глянцевая" вместо "glossy")
+      // Плотности для материалов разных типов могут быть одинаковыми, поэтому нужен именно тип бумаги
+      const paperType = options.warehousePaperTypes?.find(pt => pt.name === String(value));
+      return paperType?.display_name || String(value);
+    },
   },
   {
     key: 'specialServices',
