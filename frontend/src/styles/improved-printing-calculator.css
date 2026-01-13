@@ -2199,9 +2199,30 @@
   }
 }
 
+/* Двухколоночный layout для секций калькулятора */
+.calculator-sections-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.calculator-sections-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* На мобильных устройствах - одна колонка */
+@media (max-width: 1024px) {
+  .calculator-sections-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Группировка секций калькулятора */
 .calculator-section-group {
-  margin-bottom: 24px;
+  margin-bottom: 0; /* Убираем margin-bottom, так как gap в grid уже задан */
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
