@@ -613,6 +613,8 @@ export function useCalculatorPricingActions({
             unitPrice: m.unitPrice ?? m.unit_price ?? m.price ?? 0,
             price: m.unitPrice ?? m.unit_price ?? m.price ?? 0,
             total: m.totalCost ?? m.total ?? 0,
+            // 🆕 Добавляем paper_type_name для установки materialType на фронтенде
+            paper_type_name: m.paper_type_name,
           };
         });
         
@@ -631,6 +633,7 @@ export function useCalculatorPricingActions({
             unitPrice: 0,
             price: 0,
             total: 0,
+            paper_type_name: undefined, // Будет установлено из результата расчёта или из API
           });
         }
         

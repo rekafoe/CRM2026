@@ -282,18 +282,44 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
           // Пытаемся найти тип бумаги по paper_type_name из материала
           // paper_type_name может быть "Офисная", нужно найти соответствующий тип в warehousePaperTypes
           const paperTypeName = (selectedMaterial as any).paper_type_name;
+          console.log('🔍 [ImprovedPrintingCalculatorModal] Ищем materialType для упрощённого продукта', {
+            material_id: specs.material_id,
+            selectedMaterial,
+            paper_type_name: paperTypeName,
+            warehousePaperTypes: warehousePaperTypes.map(pt => ({ name: pt.name, display_name: pt.display_name }))
+          });
+          
           if (paperTypeName) {
             // Ищем тип бумаги по display_name (например, "Офисная")
             const paperType = warehousePaperTypes.find(pt => pt.display_name === paperTypeName);
             if (paperType) {
+              console.log('✅ [ImprovedPrintingCalculatorModal] Найден тип бумаги для materialType', {
+                paperTypeName,
+                paperTypeName_found: paperType.name,
+                current_materialType: specs.materialType
+              });
               setSpecs(prev => {
                 if (!prev.materialType || prev.materialType !== paperType.name) {
+                  console.log('🔄 [ImprovedPrintingCalculatorModal] Устанавливаем materialType', {
+                    old: prev.materialType,
+                    new: paperType.name
+                  });
                   return { ...prev, materialType: paperType.name as any };
                 }
                 return prev;
               });
               return; // Выходим, чтобы не перезаписывать для обычных продуктов
+            } else {
+              console.warn('⚠️ [ImprovedPrintingCalculatorModal] Тип бумаги не найден по display_name', {
+                paperTypeName,
+                availableDisplayNames: warehousePaperTypes.map(pt => pt.display_name)
+              });
             }
+          } else {
+            console.warn('⚠️ [ImprovedPrintingCalculatorModal] paper_type_name отсутствует в материале', {
+              material_id: specs.material_id,
+              selectedMaterialKeys: Object.keys(selectedMaterial)
+            });
           }
         }
       }
