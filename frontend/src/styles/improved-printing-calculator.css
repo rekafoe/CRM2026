@@ -2214,6 +2214,19 @@
   align-items: start;
 }
 
+/* Выравниваем высоту первых двух блоков между колонками */
+.calculator-sections-grid {
+  align-items: stretch;
+}
+
+/* Первые два блока в левой колонке и первый блок в правой колонке имеют одинаковую высоту */
+.calculator-sections-column-left > .calculator-section-group:first-child,
+.calculator-sections-column-left > .calculator-section-group:nth-child(2),
+.calculator-sections-column-right > .calculator-section-group:first-child {
+  display: flex;
+  flex-direction: column;
+}
+
 /* На мобильных устройствах - одна колонка */
 @media (max-width: 1024px) {
   .calculator-sections-grid {
@@ -2246,11 +2259,21 @@
   align-items: stretch;
 }
 
-/* Первые два блока в каждой колонке имеют одинаковую высоту */
+/* Используем CSS Grid для выравнивания высоты первых двух блоков */
+.calculator-sections-column-left {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 24px;
+}
+
 .calculator-sections-column-left > .calculator-section-group:first-child,
-.calculator-sections-column-left > .calculator-section-group:nth-child(2),
+.calculator-sections-column-left > .calculator-section-group:nth-child(2) {
+  min-height: 0;
+}
+
+/* Первый блок в правой колонке растягивается на высоту первых двух блоков левой колонки */
 .calculator-sections-column-right > .calculator-section-group:first-child {
-  height: 100%;
+  min-height: 0;
 }
 
 /* Содержимое секции растягивается */
