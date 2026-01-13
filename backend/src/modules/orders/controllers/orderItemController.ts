@@ -125,11 +125,11 @@ export class OrderItemController {
         }
 
         const clicks = computeClicks(sheets, sides)
-        const insertItem = await db.run(
-          'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          orderId,
-          type,
-          JSON.stringify({
+        
+        // 🆕 Безопасная сериализация params с обработкой циклических ссылок и несериализуемых данных
+        let paramsJson: string
+        try {
+          const paramsToSave = {
             ...params,
             components: Array.isArray(components)
               ? components.map((c) => {
@@ -137,7 +137,49 @@ export class OrderItemController {
                   return { ...c, reservationId: r?.id }
                 })
               : undefined
-          }),
+          }
+          
+          // Удаляем undefined значения и функции для безопасной сериализации
+          const seen = new WeakSet()
+          paramsJson = JSON.stringify(paramsToSave, (key, value) => {
+            // Пропускаем функции и undefined
+            if (typeof value === 'function' || value === undefined) {
+              return null
+            }
+            // Обрабатываем циклические ссылки
+            if (typeof value === 'object' && value !== null) {
+              if (seen.has(value)) {
+                return '[Circular]'
+              }
+              seen.add(value)
+            }
+            return value
+          })
+        } catch (serializeError: any) {
+          logger.error('Ошибка сериализации params', {
+            error: serializeError,
+            message: serializeError?.message,
+            stack: serializeError?.stack,
+            paramsKeys: Object.keys(params || {}),
+            paramsType: typeof params
+          })
+          // Fallback: сохраняем только базовые поля
+          paramsJson = JSON.stringify({
+            description: params?.description || type,
+            components: Array.isArray(components)
+              ? components.map((c) => {
+                  const r = reservations.find((rr) => rr.material_id === Number(c.materialId))
+                  return { materialId: c.materialId, qtyPerItem: c.qtyPerItem, reservationId: r?.id }
+                })
+              : undefined
+          })
+        }
+        
+        const insertItem = await db.run(
+          'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          orderId,
+          type,
+          paramsJson,
           price,
           Math.max(1, Number(quantity) || 1),
           printerId || null,
