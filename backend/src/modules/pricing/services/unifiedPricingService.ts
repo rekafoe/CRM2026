@@ -35,6 +35,7 @@ export interface UnifiedPricingResult {
     unitPrice: number;
     totalCost: number;
     density?: number; // 🆕 Плотность материала
+    paper_type_name?: string; // 🆕 display_name типа бумаги для установки materialType на фронтенде
   }>;
   operations: Array<{
     operationId: number;
@@ -356,6 +357,8 @@ export class UnifiedPricingService {
         totalCost: result.materialPrice,
         // 🆕 Добавляем плотность материала из БД
         density: result.selectedMaterial.density,
+        // 🆕 Добавляем paper_type_name для установки materialType на фронтенде
+        paper_type_name: result.selectedMaterial.paper_type_name,
       }] : [],
       operations: [
         ...(result.printDetails ? [{

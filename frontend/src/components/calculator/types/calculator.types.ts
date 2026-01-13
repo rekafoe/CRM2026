@@ -56,6 +56,7 @@ export interface CalculationResult {
     total: number;
     materialId?: number;
     unitPrice?: number;
+    paper_type_name?: string; // 🆕 display_name типа бумаги для установки materialType
   }>;
   services: Array<{
     service: string;

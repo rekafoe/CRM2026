@@ -73,7 +73,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     price_per_sheet: number;
   } | null>(null);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
-  const [allMaterials, setAllMaterials] = useState<Array<{ id: number; name: string; unit?: string; price?: number }>>([]);
+  const [allMaterials, setAllMaterials] = useState<Array<{ id: number; name: string; unit?: string; price?: number; paper_type_id?: number; paper_type_name?: string }>>([]);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
 
   // 🆕 Загружаем список всех материалов для упрощённых продуктов
@@ -84,6 +84,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       getMaterials()
         .then(response => {
           const materials = Array.isArray(response.data) ? response.data : [];
+          // 🆕 Материалы из API содержат paper_type_id и paper_type_name
           setAllMaterials(materials);
         })
         .catch(error => {
@@ -348,6 +349,24 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
                 value={specs.material_id ? String(specs.material_id) : ''}
                 onChange={(e) => {
                   const newValue = e.target.value ? Number(e.target.value) : undefined;
+                  // 🆕 При выборе материала устанавливаем materialType на основе paper_type_id материала
+                  if (newValue && warehousePaperTypes.length > 0) {
+                    const selectedMaterial = allMaterials.find(m => m.id === newValue);
+                    if (selectedMaterial && (selectedMaterial as any).paper_type_name) {
+                      // Ищем тип бумаги по display_name из материала
+                      const paperType = warehousePaperTypes.find(pt => 
+                        pt.display_name === (selectedMaterial as any).paper_type_name
+                      );
+                      if (paperType) {
+                        // Устанавливаем materialType = name типа бумаги (например, "office")
+                        updateSpecs({ 
+                          material_id: newValue,
+                          materialType: paperType.name as any
+                        }, true);
+                        return;
+                      }
+                    }
+                  }
                   updateSpecs({ material_id: newValue }, true);
                 }}
                 className="form-control"

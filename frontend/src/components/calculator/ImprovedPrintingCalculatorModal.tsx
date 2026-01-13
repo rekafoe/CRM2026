@@ -264,10 +264,47 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     }
   }, [isOpen]);
 
-  // 🆕 Устанавливаем materialType на основе выбранного paperType из типов бумаги со склада
+  // 🆕 Устанавливаем materialType на основе выбранного материала или paperType
   // materialType = тип бумаги со склада (вторая вкладка "Типы бумаги")
   useEffect(() => {
-    if (warehousePaperTypes.length > 0 && specs.paperType) {
+    if (warehousePaperTypes.length === 0) return;
+    
+    // 🆕 Для упрощённых продуктов: materialType берётся из paper_type_id выбранного материала
+    if (specs.material_id && backendProductSchema?.template?.simplified) {
+      // Получаем материал из результата расчёта
+      // В результате расчёта может быть paper_type_name или paper_type_id
+      if (result?.materials && result.materials.length > 0) {
+        const selectedMaterial = result.materials.find((m: any) => 
+          (m.materialId ?? m.material_id ?? m.id) === specs.material_id
+        );
+        
+        if (selectedMaterial) {
+          // Пытаемся найти тип бумаги по paper_type_name из материала
+          // paper_type_name может быть "Офисная", нужно найти соответствующий тип в warehousePaperTypes
+          const paperTypeName = (selectedMaterial as any).paper_type_name;
+          if (paperTypeName) {
+            // Ищем тип бумаги по display_name (например, "Офисная")
+            const paperType = warehousePaperTypes.find(pt => pt.display_name === paperTypeName);
+            if (paperType) {
+              setSpecs(prev => {
+                if (!prev.materialType || prev.materialType !== paperType.name) {
+                  return { ...prev, materialType: paperType.name as any };
+                }
+                return prev;
+              });
+              return; // Выходим, чтобы не перезаписывать для обычных продуктов
+            }
+          }
+        }
+      }
+      
+      // 🆕 Fallback: если нет результата расчёта, используем материал из API
+      // Это нужно для установки materialType до первого расчёта
+      // TODO: Получить материалы из MaterialsSection или загрузить отдельно
+    }
+    
+    // Для обычных продуктов: materialType берётся из выбранного paperType
+    if (specs.paperType && !(specs.material_id && backendProductSchema?.template?.simplified)) {
       // Находим тип бумаги со склада, который соответствует выбранному paperType
       const selectedPaperType = warehousePaperTypes.find(pt => pt.name === specs.paperType);
       if (selectedPaperType) {
@@ -282,7 +319,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         });
       }
     }
-  }, [warehousePaperTypes, specs.paperType]);
+  }, [warehousePaperTypes, specs.paperType, specs.material_id, backendProductSchema, result]);
 
 
   // Выбор типа продукта

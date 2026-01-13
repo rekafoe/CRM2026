@@ -29,6 +29,7 @@ export interface SimplifiedPricingResult {
     material_id: number;
     material_name: string;
     density?: number; // 🆕 Плотность материала
+    paper_type_name?: string; // 🆕 display_name типа бумаги для установки materialType на фронтенде
   };
   selectedFinishing?: Array<{
     service_id: number;
@@ -399,17 +400,32 @@ export class SimplifiedPricingService {
       });
     }
     
-    // 8. Загружаем названия и плотность материалов
+    // 8. Загружаем названия, плотность и тип бумаги материалов
     let materialName = `Material #${normalizedConfig.material_id}`;
     let materialDensity: number | undefined = undefined;
+    let materialPaperTypeName: string | undefined = undefined;
     if (normalizedConfig.material_id) {
-      const material = await db.get<{ name: string; density?: number }>(
-        `SELECT name, density FROM materials WHERE id = ?`,
+      // 🆕 Загружаем также paper_type_name для установки materialType на фронтенде
+      const material = await db.get<{ name: string; density?: number; paper_type_id?: number }>(
+        `SELECT m.name, m.density, m.paper_type_id 
+         FROM materials m 
+         WHERE m.id = ?`,
         [normalizedConfig.material_id]
       );
       if (material) {
         materialName = material.name;
         materialDensity = material.density || undefined;
+        
+        // 🆕 Получаем display_name типа бумаги для материала
+        if (material.paper_type_id) {
+          const paperType = await db.get<{ display_name: string }>(
+            `SELECT display_name FROM paper_types WHERE id = ? AND is_active = 1`,
+            [material.paper_type_id]
+          );
+          if (paperType) {
+            materialPaperTypeName = paperType.display_name;
+          }
+        }
       }
     }
     
@@ -432,6 +448,7 @@ export class SimplifiedPricingService {
         material_id: normalizedConfig.material_id,
         material_name: materialName,
         density: materialDensity, // 🆕 Добавляем плотность материала
+        paper_type_name: materialPaperTypeName, // 🆕 Добавляем display_name типа бумаги для установки materialType
       } : undefined,
       selectedFinishing: finishingDetails.map(d => {
         const finConfig = selectedSize.finishing.find(f => f.service_id === d.service_id);
