@@ -2208,9 +2208,10 @@
 }
 
 .calculator-sections-column {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 24px;
+  align-items: start;
 }
 
 /* На мобильных устройствах - одна колонка */
@@ -2227,6 +2228,37 @@
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   transition: box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Позволяет flex-элементам сжиматься */
+}
+
+/* Одинаковая высота для всех блоков в каждой колонке */
+.calculator-sections-column {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: stretch; /* Растягиваем блоки по высоте */
+}
+
+/* Выравниваем высоту первых двух блоков между колонками */
+.calculator-sections-grid {
+  align-items: stretch;
+}
+
+/* Первые два блока в каждой колонке имеют одинаковую высоту */
+.calculator-sections-column-left > .calculator-section-group:first-child,
+.calculator-sections-column-left > .calculator-section-group:nth-child(2),
+.calculator-sections-column-right > .calculator-section-group:first-child {
+  height: 100%;
+}
+
+/* Содержимое секции растягивается */
+.section-group-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .section-group-content {
