@@ -138,11 +138,19 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
         </>
       )}
 
-      {/* Тип материала */}
+      {/* Тип материала - показываем только если он отличается от материала */}
       {(() => {
         const fromWarehouse = materialTypeDisplay;
         const fromMaterial = parameterSummary.find((p) => p.label === 'Материал')?.value;
         const fromType = parameterSummary.find((p) => p.label === 'Тип материала')?.value;
+        
+        // 🆕 Показываем "Тип материала" только если он отличается от "Материал"
+        // Это предотвращает показ "coated" когда материал "glossy" (дублирование)
+        if (fromType && fromMaterial && fromType === fromMaterial) {
+          // Если "Тип материала" совпадает с "Материал" - не показываем отдельно
+          return null;
+        }
+        
         const raw = String(fromWarehouse || fromMaterial || fromType || materialTypeRaw || '').trim();
         if (!raw) return null;
         return (
