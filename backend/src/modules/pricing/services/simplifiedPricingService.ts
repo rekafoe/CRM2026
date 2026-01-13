@@ -28,6 +28,7 @@ export interface SimplifiedPricingResult {
   selectedMaterial?: {
     material_id: number;
     material_name: string;
+    density?: number; // 🆕 Плотность материала
   };
   selectedFinishing?: Array<{
     service_id: number;
@@ -398,15 +399,17 @@ export class SimplifiedPricingService {
       });
     }
     
-    // 8. Загружаем названия материалов
+    // 8. Загружаем названия и плотность материалов
     let materialName = `Material #${normalizedConfig.material_id}`;
+    let materialDensity: number | undefined = undefined;
     if (normalizedConfig.material_id) {
-      const material = await db.get<{ name: string }>(
-        `SELECT name FROM materials WHERE id = ?`,
+      const material = await db.get<{ name: string; density?: number }>(
+        `SELECT name, density FROM materials WHERE id = ?`,
         [normalizedConfig.material_id]
       );
       if (material) {
         materialName = material.name;
+        materialDensity = material.density || undefined;
       }
     }
     
@@ -428,6 +431,7 @@ export class SimplifiedPricingService {
       selectedMaterial: normalizedConfig.material_id ? {
         material_id: normalizedConfig.material_id,
         material_name: materialName,
+        density: materialDensity, // 🆕 Добавляем плотность материала
       } : undefined,
       selectedFinishing: finishingDetails.map(d => {
         const finConfig = selectedSize.finishing.find(f => f.service_id === d.service_id);

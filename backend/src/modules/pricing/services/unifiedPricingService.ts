@@ -34,6 +34,7 @@ export interface UnifiedPricingResult {
     quantity: number;
     unitPrice: number;
     totalCost: number;
+    density?: number; // 🆕 Плотность материала
   }>;
   operations: Array<{
     operationId: number;
@@ -353,6 +354,8 @@ export class UnifiedPricingService {
         quantity: result.quantity,
         unitPrice: result.materialDetails?.tier.price || 0,
         totalCost: result.materialPrice,
+        // 🆕 Добавляем плотность материала из БД
+        density: result.selectedMaterial.density,
       }] : [],
       operations: [
         ...(result.printDetails ? [{
