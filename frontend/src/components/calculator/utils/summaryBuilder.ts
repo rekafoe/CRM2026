@@ -77,9 +77,21 @@ export const BASE_SUMMARY_FIELDS: Array<{ key: string; label: string; formatter?
   {
     key: 'paperType',
     label: 'Материал',
-    formatter: (value, { options }) => {
+    formatter: (value, { options, specs }) => {
       if (!value) return null;
-      // Используем display_name из типов бумаги со склада
+      
+      // 🆕 Для упрощённых продуктов: если есть materialType, используем его вместо paperType
+      // materialType содержит правильный тип бумаги из paper_type_id выбранного материала
+      // paperType может быть не установлен или установлен неправильно для упрощённых продуктов
+      if (specs.materialType && specs.material_id) {
+        // Это упрощённый продукт - используем materialType
+        const materialTypePaperType = options.warehousePaperTypes?.find(pt => pt.name === String(specs.materialType));
+        if (materialTypePaperType) {
+          return materialTypePaperType.display_name;
+        }
+      }
+      
+      // Для обычных продуктов: используем display_name из типов бумаги со склада
       const paperType = options.warehousePaperTypes?.find(pt => pt.name === String(value));
       return paperType?.display_name || String(value);
     },
