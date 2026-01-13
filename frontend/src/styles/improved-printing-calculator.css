@@ -2214,6 +2214,15 @@
   border-radius: 0 0 12px 12px;
 }
 
+/* Обеспечиваем, что grid работает внутри section-group-content */
+.section-group-content .params-grid,
+.section-group-content .materials-grid,
+.section-group-content .advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
 .calculator-section-group:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -2276,4 +2285,13 @@
 /* Улучшение отступов для материалов внутри групп */
 .section-group-content .materials-grid {
   gap: 16px;
+}
+
+/* Обеспечиваем, что grid работает внутри section-group-content */
+.section-group-content .params-grid,
+.section-group-content .materials-grid,
+.section-group-content .advanced-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 12px;
 }

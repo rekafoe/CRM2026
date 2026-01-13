@@ -209,29 +209,41 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
           </select>
         </div>
 
-        {printTechnology && allowedColorModes.length > 0 && (
-          <div className="param-group">
-            <label>
-              Режим печати <span style={{ color: 'red' }}>*</span>
-            </label>
-            <select
-              value={printColorMode || (allowedColorModes.length > 0 ? allowedColorModes[0] : '')}
-              onChange={(e) => {
-                const value = e.target.value;
-                onPrintColorModeChange(value === 'bw' ? 'bw' : value === 'color' ? 'color' : null);
-              }}
-              className="form-control"
-              required
-            >
-              {allowedColorModes.includes('bw') && (
-                <option value="bw">Чёрно-белая</option>
-              )}
-              {allowedColorModes.includes('color') && (
-                <option value="color">Цветная</option>
-              )}
-            </select>
-          </div>
-        )}
+        {/* Режим печати - показываем всегда, если выбран тип печати */}
+        {printTechnology ? (
+          allowedColorModes.length > 0 ? (
+            <div className="param-group">
+              <label>
+                Режим печати <span style={{ color: 'red' }}>*</span>
+              </label>
+              <select
+                value={printColorMode || (allowedColorModes.length > 0 ? allowedColorModes[0] : '')}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  onPrintColorModeChange(value === 'bw' ? 'bw' : value === 'color' ? 'color' : null);
+                }}
+                className="form-control"
+                required
+              >
+                {allowedColorModes.includes('bw') && (
+                  <option value="bw">Чёрно-белая</option>
+                )}
+                {allowedColorModes.includes('color') && (
+                  <option value="color">Цветная</option>
+                )}
+              </select>
+            </div>
+          ) : (
+            <div className="param-group">
+              <label>
+                Режим печати <span style={{ color: 'red' }}>*</span>
+              </label>
+              <div className="form-control" style={{ color: '#666' }}>
+                Загрузка режимов печати...
+              </div>
+            </div>
+          )
+        ) : null}
 
         <div className="param-group">
           <label>

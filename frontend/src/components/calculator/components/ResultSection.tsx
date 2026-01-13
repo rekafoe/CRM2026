@@ -20,7 +20,28 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   onAddToOrder,
   mode = 'create',
 }) => {
-  if (!result) return null;
+  // Всегда показываем секцию, даже если result null (показываем заглушку)
+  if (!result) {
+    return (
+      <div className="form-section result-section compact">
+        <h3>💰 Стоимость: —</h3>
+        <div className="result-details">
+          <div className="result-item">
+            <span>Заполните параметры для расчёта</span>
+          </div>
+        </div>
+        <div className="result-actions">
+          <button 
+            className="btn btn-primary"
+            onClick={onAddToOrder}
+            disabled={true}
+          >
+            {mode === 'edit' ? '💾 Обновить позицию' : '➕ Добавить в заказ'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const sheetsNeeded = result.layout?.sheetsNeeded;
   const itemsPerSheet = result.layout?.itemsPerSheet;
