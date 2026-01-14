@@ -329,7 +329,7 @@
 /* Основная область */
 .calculator-main {
   flex: 1;
-  padding: 32px;
+  padding: 20px;
   padding-bottom: 0; /* Убираем отступ снизу, так как результат фиксированный */
   overflow-y: auto;
   scrollbar-width: thin;
@@ -358,7 +358,7 @@
 
 /* Секции формы */
 .form-section {
-  margin-bottom: 32px;
+  margin-bottom: 16px;
   background: white;
   border: 2px solid #f1f5f9;
   border-radius: 16px;
@@ -396,8 +396,8 @@
 
 /* Компактные секции */
 .form-section.compact {
-  padding: 16px;
-  margin-bottom: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
 }
 
 .form-section.compact h3 {
@@ -1843,12 +1843,12 @@
 
 /* Единый блок для всех параметров */
 .calculator-section-unified {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 
 /* Группировка секций калькулятора */
 .calculator-section-group {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
@@ -1904,11 +1904,11 @@
 }
 
 .section-group-content {
-  padding: 20px;
+  padding: 16px;
 }
 
 .section-group-content > * {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .section-group-content > *:last-child {
