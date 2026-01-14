@@ -378,7 +378,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
   const svcName = useCallback((id: number) => services.find(s => Number(s.id) === Number(id))?.name || `#${id}`, [services])
   const materialName = useCallback((id: number) => allMaterials.find(m => Number(m.id) === Number(id))?.name || `#${id}`, [allMaterials])
 
-  // Получить общие диапазоны для размера (из первой вариации печати, материалов или отделки)
+  // Получить общие диапазоны для размера (из первой вариации печати или материалов)
+  // ✅ finishing.tiers больше не используются - цены берутся из централизованной системы
   const getSizeRanges = useCallback((size: SimplifiedSizeConfig): Tier[] => {
     if (size.print_prices.length > 0 && size.print_prices[0].tiers.length > 0) {
       return normalizeTiers(size.print_prices[0].tiers)
@@ -386,9 +387,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
     if (size.material_prices.length > 0 && size.material_prices[0].tiers.length > 0) {
       return normalizeTiers(size.material_prices[0].tiers)
     }
-    if (size.finishing.length > 0 && size.finishing[0].tiers.length > 0) {
-      return normalizeTiers(size.finishing[0].tiers)
-    }
+    // ✅ finishing.tiers больше не проверяем - они не хранятся в шаблоне
     return defaultTiers()
   }, [])
 
@@ -418,15 +417,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
       return { ...mp, tiers: newTiers }
     })
 
-    // Обновляем диапазоны в отделке
-    const updatedFinishing = size.finishing.map(f => {
-      const priceMap = new Map(f.tiers.map(t => [t.min_qty, t.unit_price]))
-      const newTiers = newRanges.map(r => ({
-        ...r,
-        unit_price: priceMap.get(r.min_qty) ?? 0
-      }))
-      return { ...f, tiers: newTiers }
-    })
+    // ✅ Обновляем только структуру finishing (service_id, price_unit, units_per_item)
+    // tiers больше не сохраняем - цены берутся из централизованной системы услуг
+    const updatedFinishing = size.finishing.map(f => ({
+      service_id: f.service_id,
+      price_unit: f.price_unit,
+      units_per_item: f.units_per_item,
+      // tiers не сохраняем
+    }))
 
     updateSize(sizeId, {
       print_prices: updatedPrintPrices,
@@ -608,14 +606,16 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
     )
 
     if (servicesToAdd.length > 0) {
-      const commonRanges = getSizeRanges(selected)
+      // ✅ Добавляем услуги БЕЗ tiers - цены будут браться из централизованной системы услуг
       const nextFinishing = [
         ...selected.finishing,
         ...servicesToAdd.map(s => ({
           service_id: Number(s.id),
-          price_unit: 'per_cut' as const,
+          price_unit: (s.operation_type === 'cut' || s.operation_type === 'score' || s.operation_type === 'fold') 
+            ? 'per_cut' as const 
+            : 'per_item' as const,
           units_per_item: 1,
-          tiers: commonRanges.map(r => ({ ...r, unit_price: 0 }))
+          // tiers не сохраняем - цены берутся из services-management
         }))
       ]
       updateSize(selected.id, { finishing: nextFinishing })
@@ -1580,12 +1580,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                         }
                       })
                       
-                      // Преобразуем finishing в формат ServicePricing
+                      // ✅ Преобразуем finishing в формат ServicePricing БЕЗ tiers
+                      // tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг
                       const servicePricings: ServicePricing[] = selected.finishing.map(f => ({
                         service_id: f.service_id,
                         price_unit: f.price_unit,
                         units_per_item: f.units_per_item,
-                        tiers: f.tiers
+                        // tiers не сохраняем - только для чтения старых данных (если есть)
+                        tiers: f.tiers // Опционально, только для обратной совместимости
                       }))
                       
                       return (
@@ -1596,7 +1598,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                           onUpdate={(newPricings) => {
                             // Помечаем, что пользователь взаимодействовал с услугами для этого размера
                             hasUserInteractedWithServicesRef.current.set(selected.id, true)
-                            updateSize(selected.id, { finishing: newPricings })
+                            // ✅ Сохраняем только service_id, price_unit, units_per_item - без tiers
+                            const finishingWithoutTiers = newPricings.map(p => ({
+                              service_id: p.service_id,
+                              price_unit: p.price_unit,
+                              units_per_item: p.units_per_item,
+                              // tiers не сохраняем - цены берутся из централизованной системы
+                            }))
+                            updateSize(selected.id, { finishing: finishingWithoutTiers })
                           }}
                           onRangesUpdate={(newRanges) => {
                             updateSizeRanges(selected.id, newRanges)

@@ -7,6 +7,7 @@
 
 import { getDb } from '../../../db';
 import { logger } from '../../../utils/logger';
+import { PricingServiceRepository } from '../repositories/serviceRepository';
 
 export interface SimplifiedPricingResult {
   productId: number;
@@ -95,7 +96,9 @@ interface SimplifiedSizeConfig {
     service_id: number;
     price_unit: 'per_cut' | 'per_item';
     units_per_item: number;
-    tiers: SimplifiedQtyTier[];
+    // ✅ tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг
+    // tiers оставлен только для обратной совместимости со старыми данными
+    tiers?: SimplifiedQtyTier[]; // Опционально, только для чтения старых данных
   }>;
 }
 
@@ -318,49 +321,108 @@ export class SimplifiedPricingService {
     }
     
     // 6. Рассчитываем цену отделки
+    // ⛔ Раньше брали цены из selectedSize.finishing[].tiers (локальные цены в шаблоне продукта)
+    // ✅ Теперь всегда берём цены из централизованной системы услуг (service_volume_prices / post_processing_services),
+    //    а в simplified-конфиге используем только ссылки на service_id и конфиг units_per_item/price_unit.
     let finishingPrice = 0;
     const finishingDetails: SimplifiedPricingResult['finishingDetails'] = [];
     
     if (normalizedConfig.finishing && normalizedConfig.finishing.length > 0) {
-      // Загружаем названия услуг из БД
-      const serviceIds = normalizedConfig.finishing.map(f => f.service_id);
-      const services = await db.all<Array<{ id: number; name: string }>>(
-        `SELECT id, name FROM post_processing_services WHERE id IN (${serviceIds.map(() => '?').join(',')})`,
-        serviceIds
+      // Загружаем названия услуг и централизованные тарифы
+      const uniqueServiceIds = Array.from(
+        new Set(
+          normalizedConfig.finishing
+            .map(f => f.service_id)
+            .filter((id): id is number => typeof id === 'number' && Number.isFinite(id))
+        )
       );
-      const serviceNamesMap = new Map(services.map(s => [s.id, s.name]));
       
-      for (const finConfig of normalizedConfig.finishing) {
-        const finishingPriceConfig = selectedSize.finishing.find(f =>
-          f.service_id === finConfig.service_id
+      if (uniqueServiceIds.length > 0) {
+        const services = await db.all<Array<{ id: number; name: string }>>(
+          `SELECT id, name FROM post_processing_services WHERE id IN (${uniqueServiceIds.map(() => '?').join(',')})`,
+          uniqueServiceIds
         );
-        
-        if (finishingPriceConfig) {
-          const tier = this.findTierForQuantity(finishingPriceConfig.tiers, quantity);
-          if (tier) {
-            const unitsPerItem = finConfig.units_per_item ?? finishingPriceConfig.units_per_item ?? 1;
-            const totalUnits = quantity * unitsPerItem;
-            const priceForTier = this.getPriceForQuantityTier(tier);
-            
-            let servicePrice = 0;
-            if (finishingPriceConfig.price_unit === 'per_cut' || finConfig.price_unit === 'per_cut') {
-              // Цена за единицу операции (рез/биг/фальц)
-              servicePrice = priceForTier * totalUnits;
+        const serviceNamesMap = new Map(services.map(s => [s.id, s.name]));
+
+        // Загружаем тарифы из service_volume_prices / service_variant_prices через репозиторий
+        const serviceTiersMap = new Map<number, SimplifiedQtyTier[]>();
+        for (const serviceId of uniqueServiceIds) {
+          try {
+            const tiers = await PricingServiceRepository.listServiceTiers(serviceId);
+            if (tiers && tiers.length > 0) {
+              // Конвертируем ServiceVolumeTierDTO -> SimplifiedQtyTier с расчётом max_qty по следующему minQuantity
+              const sorted = [...tiers].sort((a, b) => a.minQuantity - b.minQuantity);
+              const simplifiedTiers: SimplifiedQtyTier[] = sorted.map((t, idx) => ({
+                min_qty: t.minQuantity,
+                max_qty: idx < sorted.length - 1 ? sorted[idx + 1].minQuantity - 1 : undefined,
+                unit_price: t.rate,
+              }));
+              serviceTiersMap.set(serviceId, simplifiedTiers);
             } else {
-              // Цена за изделие
-              servicePrice = priceForTier * quantity;
+              // Если нет объёмных тарифов, пробуем взять базовую цену услуги и сделать один бесконечный диапазон
+              const baseService = await PricingServiceRepository.getServiceById(serviceId);
+              if (baseService && baseService.rate > 0) {
+                serviceTiersMap.set(serviceId, [{
+                  min_qty: 1,
+                  max_qty: undefined,
+                  unit_price: baseService.rate,
+                }]);
+              }
             }
-            
-            finishingPrice += servicePrice;
-            
-            finishingDetails.push({
-              service_id: finConfig.service_id,
-              service_name: serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`,
-              tier: { ...tier, price: priceForTier },
-              units_needed: totalUnits,
-              priceForQuantity: servicePrice,
+          } catch (error) {
+            logger.warn('Не удалось загрузить тарифы услуги для упрощённого калькулятора', {
+              productId,
+              serviceId,
+              error: (error as Error).message,
             });
           }
+        }
+
+        for (const finConfig of normalizedConfig.finishing) {
+          const tiers = serviceTiersMap.get(finConfig.service_id);
+          if (!tiers || tiers.length === 0) {
+            logger.warn('Не найдены тарифы для услуги отделки в упрощённом калькуляторе', {
+              productId,
+              serviceId: finConfig.service_id,
+            });
+            continue;
+          }
+
+          const tier = this.findTierForQuantity(tiers, quantity);
+          if (!tier) {
+            logger.warn('Не найден диапазон для услуги отделки', {
+              productId,
+              serviceId: finConfig.service_id,
+              quantity,
+              tiers,
+            });
+            continue;
+          }
+
+          const priceForTier = this.getPriceForQuantityTier(tier);
+          const priceUnit = finConfig.price_unit ?? 'per_item';
+          const unitsPerItem = finConfig.units_per_item ?? 1;
+          
+          let servicePrice = 0;
+          let totalUnits = quantity;
+          if (priceUnit === 'per_cut') {
+            // Цена за единицу операции (рез/биг/фальц) — считаем общее количество операций
+            totalUnits = quantity * unitsPerItem;
+            servicePrice = priceForTier * totalUnits;
+          } else {
+            // Цена за изделие
+            servicePrice = priceForTier * quantity;
+          }
+          
+          finishingPrice += servicePrice;
+          
+          finishingDetails.push({
+            service_id: finConfig.service_id,
+            service_name: serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`,
+            tier: { ...tier, price: priceForTier },
+            units_needed: totalUnits,
+            priceForQuantity: servicePrice,
+          });
         }
       }
     }

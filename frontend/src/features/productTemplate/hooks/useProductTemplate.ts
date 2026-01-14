@@ -15,7 +15,9 @@ export type SimplifiedFinishingPrice = {
   service_id: number;
   price_unit: 'per_cut' | 'per_item';
   units_per_item: number; // сколько "резов/бигов/фальцев" на изделие
-  tiers: SimplifiedQtyTier[];
+  // ✅ tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг
+  // tiers оставлен только для обратной совместимости со старыми данными
+  tiers?: SimplifiedQtyTier[]; // Опционально, только для чтения старых данных
 }
 export type SimplifiedSizeConfig = {
   id: string;

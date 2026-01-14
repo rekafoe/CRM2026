@@ -17,7 +17,9 @@ export interface ServicePricing {
   service_id: number
   price_unit: 'per_cut' | 'per_item'
   units_per_item: number
-  tiers: Tier[]
+  // 🆕 tiers больше не храним в шаблоне продукта - цены берутся из централизованной системы услуг
+  // tiers оставлен только для обратной совместимости со старыми данными, но не используется при сохранении
+  tiers?: Tier[] // Опционально, только для чтения старых данных
 }
 
 export interface ServiceWithTiers extends ServiceItem {
@@ -286,11 +288,16 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
     }
   }, [tierModal.isOpen])
 
+  // ⛔ handlePriceChange больше не используется - цены редактируются только в services-management
+  // Оставлено для обратной совместимости, но не вызывается при allowPriceOverride={false}
   const handlePriceChange = (serviceId: number, tierIndex: number, newPrice: number) => {
+    // ⚠️ Эта функция больше не должна вызываться, т.к. цены берутся из централизованной системы
+    console.warn('handlePriceChange called but prices should be edited in services-management, not in product template')
+    // Если всё же нужно переопределение цен для продукта (в будущем), можно раскомментировать:
+    /*
     const existingIdx = servicePricings.findIndex(p => p.service_id === serviceId)
     
     if (existingIdx === -1) {
-      // Создаем новую запись для услуги
       const newPricing: ServicePricing = {
         service_id: serviceId,
         price_unit: 'per_cut',
@@ -302,18 +309,17 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
       }
       onUpdate([...servicePricings, newPricing])
     } else {
-      // Обновляем существующую запись
       const updated = servicePricings.map((p, i) => {
         if (i !== existingIdx) return p
-        const updatedTiers = commonRanges.map((rt, rti) => {
+        const updatedTiers = (p.tiers || []).map((rt, rti) => {
           if (rti === tierIndex) return { ...rt, unit_price: newPrice }
-          const existingTier = p.tiers.find(t => t.min_qty === rt.min_qty)
-          return existingTier || rt
+          return rt
         })
         return { ...p, tiers: updatedTiers }
       })
       onUpdate(updated)
     }
+    */
   }
 
   const handleAddRange = () => {
@@ -324,17 +330,8 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
 
     const newRanges = addRangeBoundary(commonRanges, boundary)
     
-    // Обновляем диапазоны во всех услугах
-    const updatedPricings = servicePricings.map(p => {
-      const priceMap = new Map(p.tiers.map(t => [t.min_qty, t.unit_price]))
-      const newTiers = newRanges.map(r => ({
-        ...r,
-        unit_price: priceMap.get(r.min_qty) ?? 0
-      }))
-      return { ...p, tiers: newTiers }
-    })
-
-    onUpdate(updatedPricings)
+    // ✅ Обновляем только структуру диапазонов через onRangesUpdate
+    // tiers больше не сохраняем в шаблоне продукта - цены берутся из services-management
     if (onRangesUpdate) {
       onRangesUpdate(newRanges)
     }
@@ -350,17 +347,8 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
 
     const newRanges = editRangeBoundary(commonRanges, tierModal.tierIndex, boundary)
     
-    // Обновляем диапазоны во всех услугах
-    const updatedPricings = servicePricings.map(p => {
-      const priceMap = new Map(p.tiers.map(t => [t.min_qty, t.unit_price]))
-      const newTiers = newRanges.map(r => ({
-        ...r,
-        unit_price: priceMap.get(r.min_qty) ?? 0
-      }))
-      return { ...p, tiers: newTiers }
-    })
-
-    onUpdate(updatedPricings)
+    // ✅ Обновляем только структуру диапазонов через onRangesUpdate
+    // tiers больше не сохраняем в шаблоне продукта
     if (onRangesUpdate) {
       onRangesUpdate(newRanges)
     }
@@ -371,17 +359,8 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
   const handleRemoveRange = (tierIndex: number) => {
     const newRanges = removeRange(commonRanges, tierIndex)
     
-    // Обновляем диапазоны во всех услугах
-    const updatedPricings = servicePricings.map(p => {
-      const priceMap = new Map(p.tiers.map(t => [t.min_qty, t.unit_price]))
-      const newTiers = newRanges.map(r => ({
-        ...r,
-        unit_price: priceMap.get(r.min_qty) ?? 0
-      }))
-      return { ...p, tiers: newTiers }
-    })
-
-    onUpdate(updatedPricings)
+    // ✅ Обновляем только структуру диапазонов через onRangesUpdate
+    // tiers больше не сохраняем в шаблоне продукта
     if (onRangesUpdate) {
       onRangesUpdate(newRanges)
     }
@@ -472,20 +451,20 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
               const pricing = servicePricings.find(p => p.service_id === Number(service.id))
               const isSelected = !!pricing
               
-              // Предустановленные tiers из services-management
+              // ✅ Предустановленные tiers из services-management (централизованная система)
               const presetTiers = serviceWithTiers.tiers || commonRanges.map(r => ({ ...r, unit_price: 0 }))
               
-              // Если услуга выбрана, используем её pricing, иначе показываем предустановленные цены
-              const displayTiers = isSelected && pricing ? pricing.tiers : presetTiers
+              // ✅ Всегда используем presetTiers - tiers из pricing.tiers больше не используются
+              // (оставлены только для обратной совместимости со старыми данными)
               
               const handleServiceToggle = (checked: boolean) => {
                 if (checked) {
-                  // Добавляем услугу с её предустановленными tiers
+                  // ✅ Добавляем услугу БЕЗ tiers - цены будут браться из централизованной системы услуг
                   const newPricing: ServicePricing = {
                     service_id: Number(service.id),
                     price_unit: service.price_unit || 'per_cut',
                     units_per_item: 1,
-                    tiers: presetTiers.map(t => ({ ...t })) // Копируем tiers
+                    // tiers не сохраняем - цены берутся из services-management
                   }
                   onUpdate([...servicePricings, newPricing])
                 } else {
@@ -524,39 +503,27 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                     </div>
                   </td>
                   {commonRanges.map((t, ti) => {
-                    const priceTier = displayTiers.find(rt => rt.min_qty === t.min_qty) || t
-                    const isPresetPrice = !isSelected || !pricing || 
-                      presetTiers.find(pt => pt.min_qty === t.min_qty)?.unit_price === priceTier.unit_price
+                    // ✅ Всегда показываем цены из presetTiers (централизованная система услуг)
+                    // tiers из pricing.tiers больше не используются для отображения
+                    const priceTier = presetTiers.find(rt => rt.min_qty === t.min_qty) || { ...t, unit_price: 0 }
                     
                     return (
                       <td key={ti}>
-                        {isSelected && allowPriceOverride ? (
-                          <input
-                            className="form-input form-input--compact-table"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={String(priceTier.unit_price || 0)}
-                            onChange={(e) => {
-                              const v = Number(e.target.value) || 0
-                              handlePriceChange(Number(service.id), ti, v)
-                            }}
-                            title={isPresetPrice ? 'Предустановленная цена из services-management' : 'Переопределенная цена для продукта'}
-                          />
-                        ) : (
-                          <div 
-                            style={{ 
-                              padding: '4px 8px', 
-                              backgroundColor: isSelected ? '#f5f7fa' : '#fafafa',
-                              color: isSelected ? '#606266' : '#909399',
-                              borderRadius: '4px',
-                              textAlign: 'right'
-                            }}
-                            title={isSelected ? 'Предустановленная цена из services-management' : 'Выберите услугу, чтобы добавить в продукт'}
-                          >
-                            {priceTier.unit_price || 0}
-                          </div>
-                        )}
+                        {/* ✅ Цены только для чтения - редактируются в services-management */}
+                        <div 
+                          style={{ 
+                            padding: '4px 8px', 
+                            backgroundColor: isSelected ? '#f5f7fa' : '#fafafa',
+                            color: isSelected ? '#606266' : '#909399',
+                            borderRadius: '4px',
+                            textAlign: 'right'
+                          }}
+                          title={isSelected 
+                            ? 'Цена из services-management (редактируется в управлении услугами)' 
+                            : 'Выберите услугу, чтобы добавить в продукт'}
+                        >
+                          {priceTier.unit_price || 0}
+                        </div>
                       </td>
                     )
                   })}
