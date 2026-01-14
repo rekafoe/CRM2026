@@ -544,6 +544,25 @@ router.get('/:productId/schema', async (req, res) => {
         'pps.parameters'
       ];
       
+      // 🆕 Проверяем, есть ли записи в product_operations_link для этого продукта
+      const allLinks = await db.all(`
+        SELECT pol.id, pol.product_id, pol.operation_id, pps.name as operation_name, pps.is_active as service_is_active
+        FROM product_operations_link pol
+        LEFT JOIN post_processing_services pps ON pol.operation_id = pps.id
+        WHERE pol.product_id = ?
+      `, [productId]);
+      
+      logger.info('[GET /products/:id/schema] Все связи операций для продукта', {
+        productId,
+        totalLinks: allLinks.length,
+        links: allLinks.map((link: any) => ({
+          linkId: link.id,
+          operationId: link.operation_id,
+          operationName: link.operation_name,
+          serviceIsActive: link.service_is_active
+        }))
+      });
+      
       productOperations = await db.all(`
         SELECT ${selectFields.join(', ')}
         FROM product_operations_link pol
@@ -551,6 +570,17 @@ router.get('/:productId/schema', async (req, res) => {
         WHERE pol.product_id = ? AND pps.is_active = 1
         ORDER BY pol.sequence, pol.sort_order
       `, [productId]);
+      
+      logger.info('[GET /products/:id/schema] Операции после фильтрации is_active', {
+        productId,
+        operationsCount: productOperations.length,
+        operations: productOperations.map((op: any) => ({
+          operationId: op.operation_id,
+          operationName: op.operation_name,
+          isRequired: op.is_required,
+          isOptional: op.is_optional
+        }))
+      });
       
       // Парсим JSON поля
       productOperations = productOperations.map(op => {
