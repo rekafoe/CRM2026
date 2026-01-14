@@ -29,6 +29,17 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   specs,
   updateSpecs,
 }) => {
+  // 🆕 Логируем схему для отладки
+  console.log('🔍 [OperationsSection] Рендер компонента', {
+    hasSchema: !!backendProductSchema,
+    schemaKeys: backendProductSchema ? Object.keys(backendProductSchema) : [],
+    hasOperations: !!backendProductSchema?.operations,
+    operationsType: typeof backendProductSchema?.operations,
+    operationsIsArray: Array.isArray(backendProductSchema?.operations),
+    operationsLength: backendProductSchema?.operations?.length,
+    operations: backendProductSchema?.operations
+  });
+
   // Получаем операции из схемы
   const operations = useMemo(() => {
     if (!backendProductSchema?.operations || !Array.isArray(backendProductSchema.operations)) {
@@ -37,7 +48,8 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
         hasOperations: !!backendProductSchema?.operations,
         operationsType: typeof backendProductSchema?.operations,
         operationsIsArray: Array.isArray(backendProductSchema?.operations),
-        operationsLength: backendProductSchema?.operations?.length
+        operationsLength: backendProductSchema?.operations?.length,
+        fullSchema: backendProductSchema
       });
       return [];
     }
