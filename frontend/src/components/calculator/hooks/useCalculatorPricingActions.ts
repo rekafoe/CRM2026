@@ -216,7 +216,9 @@ export function useCalculatorPricingActions({
               const priceUnit: 'per_cut' | 'per_item' =
                 opType === 'cut' || opType === 'score' || opType === 'fold' ? 'per_cut' : 'per_item';
 
-              // Количество из UI трактуем как units_per_item (сколько операций на изделие)
+              // ✅ Количество из UI:
+              // - Для per_cut: количество резов/бигов/фальцев на одно изделие (умножается на тираж на бэкенде)
+              // - Для per_item: общее количество единиц услуги на весь заказ (НЕ умножается на тираж)
               const unitsPerItem = Number(sel.quantity) > 0 ? Number(sel.quantity) : 1;
 
               return {

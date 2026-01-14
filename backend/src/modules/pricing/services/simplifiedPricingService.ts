@@ -438,13 +438,14 @@ export class SimplifiedPricingService {
           let totalUnits = quantity;
           if (priceUnit === 'per_cut') {
             // Цена за единицу операции (рез/биг/фальц) — считаем общее количество операций
+            // units_per_item = количество резов на одно изделие, умножаем на тираж
             totalUnits = quantity * unitsPerItem;
             servicePrice = priceForTier * totalUnits;
           } else {
-            // ✅ Цена за изделие (per_item): units_per_item означает "сколько единиц услуги на одно изделие"
-            // Например, для "Упаковка в файл": если units_per_item = 1, то на каждое изделие нужен 1 файл
-            // При тираже 100 изделий = 100 файлов, цена = unit_price * 100
-            totalUnits = quantity * unitsPerItem;
+            // ✅ Цена за изделие (per_item): units_per_item означает "общее количество единиц услуги на весь заказ"
+            // Например, для "Упаковка в файл": если пользователь ввёл "Количество" = 1, то это 1 файл на весь заказ
+            // Цена = unit_price * 1 (не умножаем на тираж!)
+            totalUnits = unitsPerItem;
             servicePrice = priceForTier * totalUnits;
           }
           
