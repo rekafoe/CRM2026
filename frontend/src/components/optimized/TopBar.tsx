@@ -9,7 +9,6 @@ interface TopBarProps {
   isAdmin: boolean;
   onShowPageSwitcher: () => void;
   onShowOrderPool: () => void;
-  onShowUserOrderPage: () => void;
   onShowCountersPage: () => void;
   onLogout: () => void;
 }
@@ -20,7 +19,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   isAdmin,
   onShowPageSwitcher,
   onShowOrderPool,
-  onShowUserOrderPage,
   onShowCountersPage,
   onLogout,
 }) => {
@@ -48,14 +46,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           className="app-icon-btn app-icon-btn--blue"
         >
           📋
-        </button>
-        <button 
-          onClick={onShowUserOrderPage}
-          title="Мои заказы" 
-          aria-label="Мои заказы" 
-          className="app-icon-btn app-icon-btn--green"
-        >
-          📄
         </button>
         <button 
           onClick={onShowCountersPage}

@@ -2,11 +2,9 @@ import { useState, useCallback } from 'react';
 
 export const useModalState = () => {
   const [showAddItem, setShowAddItem] = useState(false);
-  const [showPresets, setShowPresets] = useState(false);
   const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
   const [showTopPicker, setShowTopPicker] = useState(false);
   const [showPrintingCalculator, setShowPrintingCalculator] = useState(false);
-  const [showPaperTypesManager, setShowPaperTypesManager] = useState(false);
   const [showFilesModal, setShowFilesModal] = useState(false);
   const [showOrderPool, setShowOrderPool] = useState(false);
   const [showUserOrderPage, setShowUserOrderPage] = useState(false);
@@ -60,16 +58,12 @@ export const useModalState = () => {
   return {
     showAddItem,
     setShowAddItem,
-    showPresets,
-    setShowPresets,
     showPrepaymentModal,
     setShowPrepaymentModal,
     showTopPicker,
     setShowTopPicker,
     showPrintingCalculator,
     setShowPrintingCalculator,
-    showPaperTypesManager,
-    setShowPaperTypesManager,
     showFilesModal,
     setShowFilesModal,
     showOrderPool,

@@ -20,9 +20,7 @@ interface OrderDetailSectionProps {
   onLoadOrders: () => void;
   onShowFilesModal: () => void;
   onShowPrepaymentModal: () => void;
-  onShowPresets: () => void;
   onOpenCalculator: () => void;
-  onShowPaperTypesManager: () => void;
   onEditOrderItem: (orderId: number, item: any) => void;
   onGetDailyReportByDate: (date: string) => Promise<any>;
   onCreateDailyReport: (params: { report_date: string; user_id: number }) => Promise<any>;
@@ -41,9 +39,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   onLoadOrders,
   onShowFilesModal,
   onShowPrepaymentModal,
-  onShowPresets,
   onOpenCalculator,
-  onShowPaperTypesManager,
   onEditOrderItem,
   onGetDailyReportByDate,
   onCreateDailyReport,
@@ -234,11 +230,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               <option key={s.id} value={s.sort_order}>{s.name}</option>
             ))}
           </select>
-          {typeof window !== 'undefined' && localStorage.getItem('crmRole') === 'admin' && (
-            <button onClick={onShowPresets}>Пресеты</button>
-          )}
           <button onClick={onOpenCalculator}>+ Калькулятор</button>
-          <button onClick={onShowPaperTypesManager}>📄 Типы бумаги</button>
         </div>
       </div>
 

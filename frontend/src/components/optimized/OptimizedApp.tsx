@@ -11,10 +11,8 @@ import {
 } from "../../api";
 import { useNavigate } from 'react-router-dom';
 import AddItemModal from "../AddItemModal";
-import ManagePresetsModal from "../ManagePresetsModal";
 import { PrepaymentModal } from "../PrepaymentModal";
 import { FeatureFlaggedCalculator } from "../calculator/FeatureFlaggedCalculator";
-import { PaperTypesManager } from "../PaperTypesManager";
 import { CountersPage } from "../../pages/CountersPage";
 import { useToastNotifications } from "../Toast";
 import { useLogger } from "../../utils/logger";
@@ -88,15 +86,11 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   const {
     showAddItem,
     setShowAddItem,
-    showPresets,
-    setShowPresets,
     showPrepaymentModal,
     setShowPrepaymentModal,
     showTopPicker,
     setShowTopPicker,
     showPrintingCalculator,
-    showPaperTypesManager,
-    setShowPaperTypesManager,
     showFilesModal,
     setShowFilesModal,
     showOrderPool,
@@ -144,8 +138,6 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   // Мемоизированные колбэки для модальных окон
   const handleShowFilesModal = useCallback(() => setShowFilesModal(true), [setShowFilesModal]);
   const handleShowPrepaymentModal = useCallback(() => setShowPrepaymentModal(true), [setShowPrepaymentModal]);
-  const handleShowPresets = useCallback(() => setShowPresets(true), [setShowPresets]);
-  const handleShowPaperTypesManager = useCallback(() => setShowPaperTypesManager(true), [setShowPaperTypesManager]);
 
   // Мемоизированные обёртки для API функций
   const handleGetDailyReportByDate = useCallback(async (date: string) => {
@@ -210,10 +202,6 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
             isAdmin={currentUser?.role === 'admin'}
             onShowPageSwitcher={useCallback(() => setShowPageSwitcher(true), [setShowPageSwitcher])}
             onShowOrderPool={useCallback(() => navigate('/order-pool'), [navigate])}
-            onShowUserOrderPage={useCallback(() => {
-              setOrderManagementTab('page');
-              setShowUserOrderPage(true);
-            }, [setOrderManagementTab, setShowUserOrderPage])}
             onShowCountersPage={useCallback(() => setShowCountersPage(true), [setShowCountersPage])}
             onLogout={handleLogout}
           />
@@ -272,16 +260,6 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
               statuses={statuses}
               onSelect={setSelectedId}
             />
-            
-            {currentUser?.role === 'admin' && (
-              <button
-                className="add-order-btn"
-                style={{ marginTop: 8 }}
-                onClick={() => handleOpenCalculator()}
-              >
-                🧮 Калькулятор
-              </button>
-            )}
           </aside>
 
           <section className="detail">
@@ -299,9 +277,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 onLoadOrders={loadOrders}
                 onShowFilesModal={handleShowFilesModal}
                 onShowPrepaymentModal={handleShowPrepaymentModal}
-                onShowPresets={handleShowPresets}
                 onOpenCalculator={handleOpenCalculator}
-                onShowPaperTypesManager={handleShowPaperTypesManager}
                 onEditOrderItem={handleOpenCalculatorForEdit}
                 onGetDailyReportByDate={handleGetDailyReportByDate}
                 onCreateDailyReport={handleCreateDailyReport}
@@ -349,13 +325,6 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
         />
       )}
 
-
-      {showPresets && (
-        <ManagePresetsModal
-          onClose={() => setShowPresets(false)}
-          onSave={() => setShowPresets(false)}
-        />
-      )}
 
       {showPrepaymentModal && selectedOrder && (
         <PrepaymentModal
@@ -417,13 +386,6 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
       />
 
       {/* Настройки калькулятора - теперь это страница, а не модальное окно */}
-
-      {/* Управление типами бумаги */}
-      <PaperTypesManager
-        isOpen={showPaperTypesManager}
-        onClose={() => setShowPaperTypesManager(false)}
-      />
-
 
       {/* Модальное окно файлов макетов */}
       <FilesModal
