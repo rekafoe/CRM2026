@@ -175,6 +175,65 @@ export function useCalculatorPricingActions({
           );
         }
 
+        // 🆕 Нормализуем выбранные операции в формат finishing для SimplifiedPricingService
+        // selectedOperations (фронтенд) -> finishing (бэкенд, simplified-конфиг)
+        let finishingConfig: Array<{
+          service_id: number;
+          price_unit: 'per_cut' | 'per_item';
+          units_per_item: number;
+        }> | undefined;
+
+        if (Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0) {
+          const backendOps: any[] = Array.isArray(backendProductSchema?.operations)
+            ? backendProductSchema.operations
+            : [];
+
+          finishingConfig = specs.selectedOperations
+            .map((sel: any) => {
+              const op = backendOps.find((o) => {
+                const opId = o.operation_id ?? o.id;
+                return opId === sel.operationId;
+              });
+
+              if (!op) {
+                logger.info('⚠️ Не найдена операция в schema для selectedOperation', { selectedOperation: sel });
+                return null;
+              }
+
+              const serviceId: number | undefined = op.operation_id ?? op.id;
+              if (!serviceId || !Number.isFinite(serviceId)) {
+                logger.info('⚠️ Невалидный service_id для операции', { op });
+                return null;
+              }
+
+              const opType: string | undefined =
+                op.operation_type ??
+                op.type ??
+                op.service_type ??
+                (op.parameters && typeof op.parameters === 'object' ? op.parameters.operation_type : undefined);
+
+              // Для операций типа рез/биг/фальц считаем цену за "рез" (per_cut), иначе за изделие (per_item)
+              const priceUnit: 'per_cut' | 'per_item' =
+                opType === 'cut' || opType === 'score' || opType === 'fold' ? 'per_cut' : 'per_item';
+
+              // Количество из UI трактуем как units_per_item (сколько операций на изделие)
+              const unitsPerItem = Number(sel.quantity) > 0 ? Number(sel.quantity) : 1;
+
+              return {
+                service_id: Number(serviceId),
+                price_unit: priceUnit,
+                units_per_item: unitsPerItem,
+              };
+            })
+            .filter((f): f is { service_id: number; price_unit: 'per_cut' | 'per_item'; units_per_item: number } => !!f);
+
+          logger.info('🧮 Нормализованные finishing из selectedOperations', {
+            selectedOperationsCount: specs.selectedOperations.length,
+            finishingCount: finishingConfig.length,
+            finishing: finishingConfig,
+          });
+        }
+
         const configuration = {
           ...specs,
           productType: resolvedType,
@@ -193,10 +252,12 @@ export function useCalculatorPricingActions({
           // 🆕 Для упрощённых продуктов передаем size_id и material_id
           ...(specs.size_id ? { size_id: specs.size_id } : {}),
           ...(specs.material_id ? { material_id: specs.material_id } : {}),
-          // 🆕 Передаем выбранные операции с подтипами и количеством
+          // 🆕 Передаем выбранные операции (для обратной совместимости и отладки)
           ...(specs.selectedOperations && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0
             ? { selectedOperations: specs.selectedOperations }
             : {}),
+          // 🆕 Передаем нормализованный список finishing для SimplifiedPricingService
+          ...(finishingConfig && finishingConfig.length > 0 ? { finishing: finishingConfig } : {}),
         };
 
         // ✅ Логируем trim_size для отладки
