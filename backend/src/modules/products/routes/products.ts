@@ -890,6 +890,123 @@ router.put('/:productId/configs/:configId', asyncHandler(async (req, res) => {
     res.status(404).json({ error: 'Config not found' });
     return;
   }
+  
+  // 🆕 Синхронизация операций для упрощённых продуктов
+  // Если в config_data есть simplified.finishing, создаём записи в product_operations_link
+  if (config_data?.simplified?.sizes) {
+    try {
+      const parsedConfigData = typeof config_data === 'string' ? JSON.parse(config_data) : config_data;
+      const simplified = parsedConfigData?.simplified;
+      
+      if (simplified?.sizes && Array.isArray(simplified.sizes)) {
+        // Собираем все уникальные service_id из finishing всех размеров
+        const serviceIds = new Set<number>();
+        simplified.sizes.forEach((size: any) => {
+          if (Array.isArray(size.finishing)) {
+            size.finishing.forEach((finish: any) => {
+              if (finish.service_id && Number.isFinite(Number(finish.service_id))) {
+                serviceIds.add(Number(finish.service_id));
+              }
+            });
+          }
+        });
+        
+        logger.info('[PUT /products/:id/configs/:configId] Синхронизация операций для упрощённого продукта', {
+          productId,
+          serviceIds: Array.from(serviceIds),
+          serviceIdsCount: serviceIds.size
+        });
+        
+        // Получаем существующие операции продукта
+        const existingLinks = await db.all(
+          `SELECT id, operation_id FROM product_operations_link WHERE product_id = ?`,
+          [Number(productId)]
+        );
+        const existingOperationIds = new Set(existingLinks.map((link: any) => Number(link.operation_id)));
+        
+        // Проверяем структуру таблицы
+        const columns: any[] = await db.all('PRAGMA table_info(product_operations_link)');
+        const hasIsOptional = columns.some((c: any) => c.name === 'is_optional');
+        const hasLinkedParam = columns.some((c: any) => c.name === 'linked_parameter_name');
+        
+        // Добавляем новые операции
+        let sequence = 1;
+        for (const serviceId of serviceIds) {
+          if (!existingOperationIds.has(serviceId)) {
+            // Проверяем, что операция активна в post_processing_services
+            const service = await db.get(
+              `SELECT id, name, is_active FROM post_processing_services WHERE id = ?`,
+              [serviceId]
+            );
+            
+            if (service && service.is_active === 1) {
+              const insertFields = ['product_id', 'operation_id', 'sequence', 'sort_order', 'is_required', 'is_default', 'price_multiplier'];
+              const insertValues: any[] = [
+                Number(productId),
+                serviceId,
+                sequence++,
+                sequence - 1,
+                0, // is_required = false (операции из finishing не обязательны)
+                0, // is_default = false
+                1.0 // price_multiplier = 1.0
+              ];
+              
+              if (hasIsOptional) {
+                insertFields.push('is_optional');
+                insertValues.push(1); // is_optional = true (операции из finishing опциональны)
+              }
+              
+              if (hasLinkedParam) {
+                insertFields.push('linked_parameter_name');
+                insertValues.push(null);
+              }
+              
+              await db.run(
+                `INSERT INTO product_operations_link (${insertFields.join(', ')})
+                 VALUES (${insertFields.map(() => '?').join(', ')})`,
+                insertValues
+              );
+              
+              logger.info('[PUT /products/:id/configs/:configId] Добавлена операция в product_operations_link', {
+                productId,
+                operationId: serviceId,
+                operationName: service.name
+              });
+            } else {
+              logger.warn('[PUT /products/:id/configs/:configId] Пропущена неактивная операция', {
+                productId,
+                operationId: serviceId
+              });
+            }
+          }
+        }
+        
+        // Удаляем операции, которых больше нет в finishing
+        for (const link of existingLinks) {
+          const operationId = Number(link.operation_id);
+          if (!serviceIds.has(operationId)) {
+            await db.run(
+              `DELETE FROM product_operations_link WHERE id = ? AND product_id = ?`,
+              [link.id, Number(productId)]
+            );
+            
+            logger.info('[PUT /products/:id/configs/:configId] Удалена операция из product_operations_link', {
+              productId,
+              linkId: link.id,
+              operationId
+            });
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn('[PUT /products/:id/configs/:configId] Ошибка синхронизации операций', {
+        productId,
+        error: (error as Error).message
+      });
+      // Не прерываем сохранение конфига, только логируем ошибку
+    }
+  }
+  
   res.json(mapTemplateConfig(updated));
 }));
 
