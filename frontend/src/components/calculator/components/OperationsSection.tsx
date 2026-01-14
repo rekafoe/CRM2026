@@ -352,23 +352,62 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   
                   // 🆕 Находим выбранный тип по variantId или используем первый
                   const selectedVariantId = selectedData?.variantId;
-                  const selectedVariant = allVariants.find(v => v.id === selectedVariantId);
-                  const selectedTypeName = selectedVariant?.variantName || uniqueTypes[0]?.variantName;
+                  let selectedVariant = allVariants.find(v => v.id === selectedVariantId);
+                  
+                  // Если вариант не найден, но есть выбранный subtype, пытаемся найти вариант по subtype
+                  if (!selectedVariant && selectedData?.subtype) {
+                    selectedVariant = allVariants.find(v => 
+                      v.parameters?.subtypes?.some((st: string | { value: string; label: string }) => {
+                        const stValue = typeof st === 'string' ? st : st.value;
+                        return stValue === selectedData.subtype;
+                      })
+                    );
+                  }
+                  
+                  const selectedTypeName = selectedVariant?.variantName || uniqueTypes[0]?.variantName || '';
                   
                   // 🆕 Собираем все подтипы из всех вариантов с выбранным типом
                   const variantsOfSelectedType = allVariants.filter(v => v.variantName === selectedTypeName);
-                  const allSubtypes = variantsOfSelectedType.flatMap(v => 
-                    (v.parameters?.subtypes || []).map((st: string | { value: string; label: string }) => ({
-                      value: typeof st === 'string' ? st : st.value,
-                      label: typeof st === 'string' ? st : st.label,
-                      variantId: v.id // Сохраняем variantId для каждого подтипа
+                  
+                  console.log('🔍 [OperationsSection] Варианты выбранного типа', {
+                    selectedTypeName,
+                    variantsOfSelectedTypeCount: variantsOfSelectedType.length,
+                    variants: variantsOfSelectedType.map(v => ({
+                      id: v.id,
+                      name: v.variantName,
+                      hasSubtypes: !!(v.parameters?.subtypes),
+                      subtypesCount: v.parameters?.subtypes?.length || 0,
+                      subtypes: v.parameters?.subtypes
                     }))
-                  );
+                  });
+                  
+                  const allSubtypes = variantsOfSelectedType.flatMap(v => {
+                    const subtypes = v.parameters?.subtypes || [];
+                    return subtypes.map((st: string | { value: string; label: string }) => ({
+                      value: typeof st === 'string' ? st : (st.value || st),
+                      label: typeof st === 'string' ? st : (st.label || st.value || st),
+                      variantId: v.id // Сохраняем variantId для каждого подтипа
+                    }));
+                  });
                   
                   // 🆕 Дедуплицируем подтипы по value
                   const uniqueSubtypes = Array.from(
                     new Map(allSubtypes.map(st => [st.value, st])).values()
                   );
+                  
+                  console.log('🔍 [OperationsSection] Отображение подтипов для ламинации', {
+                    operationId,
+                    selectedTypeName,
+                    variantsOfSelectedTypeCount: variantsOfSelectedType.length,
+                    allSubtypesCount: allSubtypes.length,
+                    uniqueSubtypesCount: uniqueSubtypes.length,
+                    uniqueSubtypes,
+                    variantsOfSelectedType: variantsOfSelectedType.map(v => ({
+                      id: v.id,
+                      name: v.variantName,
+                      subtypes: v.parameters?.subtypes
+                    }))
+                  });
                   
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginLeft: '26px' }}>
@@ -417,7 +456,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       </div>
                       
                       {/* 🆕 2-й уровень: Селектор подтипа с плотностью (глянец 32 мк, мат 100 мк и т.д.) */}
-                      {uniqueSubtypes.length > 0 && (
+                      {uniqueSubtypes.length > 0 ? (
                         <div className="param-group">
                           <label style={{ fontSize: '14px', color: '#666', fontWeight: 500, marginBottom: '6px', display: 'block' }}>
                             2. Подтип с плотностью:
@@ -456,6 +495,10 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                               </option>
                             ))}
                           </select>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>
+                          Подтипы не найдены для выбранного типа
                         </div>
                       )}
 
