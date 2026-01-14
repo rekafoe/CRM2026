@@ -544,6 +544,20 @@ router.get('/:productId/schema', async (req, res) => {
         'pps.parameters'
       ];
       
+      // 🆕 Проверяем, есть ли вообще записи для этого продукта (без фильтра is_active)
+      const allOperationsForProduct = await db.all(`
+        SELECT pol.id as link_id, pol.product_id, pol.operation_id, pps.name as operation_name, pps.is_active
+        FROM product_operations_link pol
+        LEFT JOIN post_processing_services pps ON pol.operation_id = pps.id
+        WHERE pol.product_id = ?
+      `, [productId]);
+      
+      logger.info('[GET /products/:id/schema] Все операции для продукта (без фильтра)', { 
+        productId,
+        totalLinks: allOperationsForProduct?.length || 0,
+        links: allOperationsForProduct
+      });
+      
       // 🆕 Логируем запрос для отладки
       logger.info('[GET /products/:id/schema] Загружаем операции', { 
         productId,
