@@ -349,11 +349,12 @@ export class SimplifiedPricingService {
       });
 
       if (uniqueServiceIds.length > 0) {
-        const services = await db.all<Array<{ id: number; name: string }>>(
-          `SELECT id, name FROM post_processing_services WHERE id IN (${uniqueServiceIds.map(() => '?').join(',')})`,
+        const services = await db.all<Array<{ id: number; name: string; operation_type: string | null }>>(
+          `SELECT id, name, operation_type FROM post_processing_services WHERE id IN (${uniqueServiceIds.map(() => '?').join(',')})`,
           uniqueServiceIds
         );
         const serviceNamesMap = new Map(services.map(s => [s.id, s.name]));
+        const serviceTypesMap = new Map(services.map(s => [s.id, s.operation_type || '']));
 
         // Загружаем тарифы из service_volume_prices / service_variant_prices через репозиторий
         // 🆕 Для услуг с вариантами используем тарифы варианта, иначе базовые тарифы услуги
@@ -456,8 +457,11 @@ export class SimplifiedPricingService {
           const unitsPerItem = finConfig.units_per_item ?? 1;
           
           // 🆕 Определяем, является ли операция ламинацией
+          // Проверяем по operation_type из базы данных (более надежно, чем по названию)
+          const operationType = serviceTypesMap.get(finConfig.service_id) || '';
           const serviceName = serviceNamesMap.get(finConfig.service_id) || '';
-          const isLamination = serviceName.toLowerCase().includes('ламинация') || 
+          const isLamination = operationType === 'laminate' || 
+                               serviceName.toLowerCase().includes('ламинация') || 
                                serviceName.toLowerCase().includes('lamination');
           
           let servicePrice = 0;
@@ -484,8 +488,12 @@ export class SimplifiedPricingService {
           logger.info('💰 [SimplifiedPricingService] Рассчитана цена услуги отделки', {
             productId,
             service_id: finConfig.service_id,
+            serviceName,
+            operationType,
+            isLamination,
             priceUnit,
             unitsPerItem,
+            quantity,
             totalUnits,
             priceForTier,
             servicePrice,
