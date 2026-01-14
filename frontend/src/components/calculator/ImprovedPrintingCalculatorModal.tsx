@@ -74,6 +74,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     urgency: 'standard',
     vipLevel: 'bronze',
     specialServices: [],
+    selectedOperations: [], // 🆕 Выбранные операции с подтипами и количеством
     // 🆕 materialType будет установлен динамически из типов бумаги со склада
     // materialType: 'coated' // Убрано захардкоженное значение
   });
@@ -197,6 +198,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       if (next.material_id) {
         delete next.material_id;
       }
+      // 🆕 Сбрасываем выбранные операции при смене продукта
+      next.selectedOperations = [];
       // Для обычных продуктов сбрасываем paperType, чтобы MaterialsSection
       // мог выбрать первый разрешённый тип бумаги из нового продукта
       const isSimplified = backendProductSchema?.template?.simplified?.sizes?.length > 0;
@@ -311,6 +314,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       // Сбрасываем тип печати и режим цвета при закрытии
       setPrintTechnology('');
       setPrintColorMode(null);
+      // 🆕 Сбрасываем выбранные операции при закрытии
+      setSpecs(prev => ({ ...prev, selectedOperations: [] }));
     }
   }, [isOpen]);
 

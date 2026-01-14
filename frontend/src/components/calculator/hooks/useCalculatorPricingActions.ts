@@ -193,6 +193,10 @@ export function useCalculatorPricingActions({
           // 🆕 Для упрощённых продуктов передаем size_id и material_id
           ...(specs.size_id ? { size_id: specs.size_id } : {}),
           ...(specs.material_id ? { material_id: specs.material_id } : {}),
+          // 🆕 Передаем выбранные операции с подтипами и количеством
+          ...(specs.selectedOperations && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0
+            ? { selectedOperations: specs.selectedOperations }
+            : {}),
         };
 
         // ✅ Логируем trim_size для отладки

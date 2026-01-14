@@ -6,6 +6,7 @@ import { MaterialsSection } from './MaterialsSection';
 import { PrintingSettingsSection } from './PrintingSettingsSection';
 import { DynamicFieldsSection } from './DynamicFieldsSection';
 import { AdvancedSettingsSection } from './AdvancedSettingsSection';
+import { OperationsSection } from './OperationsSection';
 import { SelectedProductCard } from './SelectedProductCard';
 
 interface CalculatorSectionsProps {
@@ -110,6 +111,12 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
 
         <DynamicFieldsSection
           schema={backendProductSchema}
+          specs={specs as any}
+          updateSpecs={updateSpecs as any}
+        />
+
+        <OperationsSection
+          backendProductSchema={backendProductSchema}
           specs={specs as any}
           updateSpecs={updateSpecs as any}
         />

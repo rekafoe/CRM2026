@@ -42,6 +42,11 @@ export interface ProductSpecs {
   name?: string;
   size_id?: string; // 🆕 Для упрощённых продуктов
   material_id?: number; // 🆕 ID материала (для упрощённых и обычных продуктов)
+  selectedOperations?: Array<{ // 🆕 Выбранные операции с подтипами и количеством
+    operationId: number;
+    subtype?: string;
+    quantity?: number;
+  }>;
   [key: string]: any;
 }
 
