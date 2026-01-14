@@ -544,6 +544,12 @@ router.get('/:productId/schema', async (req, res) => {
         'pps.parameters'
       ];
       
+      // 🆕 Логируем запрос для отладки
+      logger.info('[GET /products/:id/schema] Загружаем операции', { 
+        productId,
+        query: `SELECT ${selectFields.join(', ')} FROM product_operations_link pol JOIN post_processing_services pps ON pol.operation_id = pps.id WHERE pol.product_id = ? AND pps.is_active = 1`
+      });
+      
       productOperations = await db.all(`
         SELECT ${selectFields.join(', ')}
         FROM product_operations_link pol
@@ -551,6 +557,13 @@ router.get('/:productId/schema', async (req, res) => {
         WHERE pol.product_id = ? AND pps.is_active = 1
         ORDER BY pol.sequence, pol.sort_order
       `, [productId]);
+      
+      // 🆕 Логируем результат запроса
+      logger.info('[GET /products/:id/schema] Результат запроса операций', { 
+        productId,
+        operationsCount: productOperations?.length || 0,
+        rawOperations: productOperations
+      });
       
       // Парсим JSON поля
       productOperations = productOperations.map(op => {
@@ -579,12 +592,29 @@ router.get('/:productId/schema', async (req, res) => {
         return parsed;
       });
       
-      logger.debug('[GET /products/:id/schema] Загружено операций', { count: productOperations.length });
+      logger.debug('[GET /products/:id/schema] Загружено операций', { 
+        productId, 
+        count: productOperations.length,
+        operations: productOperations.map((op: any) => ({
+          id: op.id,
+          operation_id: op.operation_id,
+          operation_name: op.operation_name,
+          is_required: op.is_required,
+          is_optional: op.is_optional,
+          is_active: op.is_active
+        }))
+      });
     } catch (error) {
-      logger.warn('Failed to load product operations', error);
+      logger.warn('Failed to load product operations', { productId, error });
     }
     
     // Собираем полную schema с данными из шаблона
+    logger.info('[GET /products/:id/schema] Формируем схему', {
+      productId,
+      operationsCount: productOperations?.length || 0,
+      operations: productOperations
+    });
+    
     const schema = {
       id: Number(productId),
       key: product.name.toLowerCase().replace(/\s+/g, '_'),
@@ -593,7 +623,7 @@ router.get('/:productId/schema', async (req, res) => {
       description: product.description || '',
       fields,
       materials: productMaterials, // 📦 Список материалов
-      operations: productOperations, // 🔧 Список операций
+      operations: productOperations || [], // 🔧 Список операций (гарантируем массив)
       template: {
         // 📐 Данные из шаблона продукта
         trim_size: templateConfigData?.trim_size || null, // Формат (ширина × высота)
