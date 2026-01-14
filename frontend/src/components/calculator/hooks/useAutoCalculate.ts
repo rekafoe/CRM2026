@@ -23,6 +23,8 @@ function getSpecsKey(specs: any, customFormat?: { width: string; height: string 
     material_id: specs.material_id, // ✅ ID материала тоже важен
     // 🆕 Для упрощённых продуктов размер влияет на расчет
     size_id: specs.size_id,
+    // 🆕 Выбранные операции влияют на расчет (finishing)
+    selectedOperations: specs.selectedOperations ? JSON.stringify(specs.selectedOperations) : undefined,
     // ✅ Кастомный формат тоже важен для расчета
     customFormat: isCustomFormat ? customFormat : undefined,
     isCustomFormat: isCustomFormat || false,
