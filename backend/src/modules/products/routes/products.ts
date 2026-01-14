@@ -680,6 +680,26 @@ router.get('/:productId/schema', async (req, res) => {
       }
     });
     
+    // 🆕 Явное логирование перед отправкой ответа
+    console.log('🔍 [GET /products/:id/schema] Отправляем ответ клиенту', {
+      productId,
+      schemaOperationsCount: schema.operations?.length || 0,
+      schemaOperations: schema.operations,
+      productOperationsCount: productOperations.length,
+      productOperations: productOperations.map((op: any) => ({
+        id: op.operation_id,
+        name: op.operation_name,
+        isRequired: op.is_required,
+        isOptional: op.is_optional
+      }))
+    });
+    
+    logger.info('[GET /products/:id/schema] Отправляем ответ клиенту', {
+      productId,
+      schemaOperationsCount: schema.operations?.length || 0,
+      productOperationsCount: productOperations.length
+    });
+    
     res.json({ data: schema });
   } catch (error) {
     logger.error('Error fetching product schema', error);
