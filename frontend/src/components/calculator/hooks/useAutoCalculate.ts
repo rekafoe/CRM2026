@@ -24,7 +24,10 @@ function getSpecsKey(specs: any, customFormat?: { width: string; height: string 
     // 🆕 Для упрощённых продуктов размер влияет на расчет
     size_id: specs.size_id,
     // 🆕 Выбранные операции влияют на расчет (finishing)
-    selectedOperations: specs.selectedOperations ? JSON.stringify(specs.selectedOperations) : undefined,
+    // Нормализуем массив для стабильного сравнения (сортируем по operationId)
+    selectedOperations: specs.selectedOperations && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0
+      ? JSON.stringify([...specs.selectedOperations].sort((a: any, b: any) => (a.operationId || 0) - (b.operationId || 0)))
+      : undefined,
     // ✅ Кастомный формат тоже важен для расчета
     customFormat: isCustomFormat ? customFormat : undefined,
     isCustomFormat: isCustomFormat || false,
