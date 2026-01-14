@@ -51,7 +51,7 @@ export class OrderController {
   static async createOrder(req: Request, res: Response) {
     try {
       const authUser = (req as any).user as { id: number } | undefined
-      const { customerName, customerPhone, customerEmail, prepaymentAmount, date } = req.body || {}
+      const { customerName, customerPhone, customerEmail, prepaymentAmount, date, customer_id } = req.body || {}
       
       const order = await OrderService.createOrder(
         customerName,
@@ -59,7 +59,9 @@ export class OrderController {
         customerEmail,
         prepaymentAmount,
         authUser?.id,
-        date
+        date,
+        undefined,
+        customer_id
       )
       
       res.status(201).json(order)
@@ -71,7 +73,7 @@ export class OrderController {
   static async createOrderWithAutoDeduction(req: Request, res: Response) {
     try {
       const authUser = (req as any).user as { id: number } | undefined
-      const { customerName, customerPhone, customerEmail, prepaymentAmount, items } = req.body || {}
+      const { customerName, customerPhone, customerEmail, prepaymentAmount, items, customer_id } = req.body || {}
       
       if (!items || !Array.isArray(items)) {
         res.status(400).json({ 
@@ -86,6 +88,7 @@ export class OrderController {
         customerEmail,
         prepaymentAmount,
         userId: authUser?.id,
+        customer_id,
         items
       })
       
@@ -113,6 +116,24 @@ export class OrderController {
       res.json(updated)
     } catch (error: any) {
       logger.error(`Error updating order ${req.params.id} status`, error)
+      res.status(500).json({ error: error.message })
+    }
+  }
+
+  static async updateOrderCustomer(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id)
+      const { customer_id } = req.body
+      if (isNaN(id)) {
+        return res.status(400).json({ error: 'Неверный ID заказа' })
+      }
+      const customerId = customer_id === null || customer_id === undefined ? null : Number(customer_id)
+      if (customerId !== null && isNaN(customerId)) {
+        return res.status(400).json({ error: 'Неверный ID клиента' })
+      }
+      const updated = await OrderService.updateOrderCustomer(id, customerId)
+      res.json(updated)
+    } catch (error: any) {
       res.status(500).json({ error: error.message })
     }
   }

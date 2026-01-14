@@ -11,11 +11,33 @@ export interface User {
   is_active: boolean;
 }
 
+export interface Customer {
+  id: number;
+  type: 'individual' | 'legal';
+  // Поля для физ. лица
+  first_name?: string;
+  last_name?: string;
+  middle_name?: string;
+  // Поля для юр. лица
+  company_name?: string;
+  legal_name?: string;
+  tax_id?: string;
+  // Общие поля
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Order {
   id: number;
   customer_name: string;
   customer_phone: string;
   customer_email?: string;
+  customer_id?: number; // Связь с таблицей customers
+  customer?: Customer; // Полная информация о клиенте
   status: string;
   notes?: string;
   total_amount?: number;

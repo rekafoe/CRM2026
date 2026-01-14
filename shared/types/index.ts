@@ -13,6 +13,7 @@ export * from './common';
 export type {
   // Основные сущности
   User,
+  Customer,
   Order,
   OrderItem,
   Material,

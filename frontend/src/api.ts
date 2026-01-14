@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { calculatePrice as unifiedCalculatePrice } from './services/pricing';
-import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG } from './types';
+import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer } from './types';
 import { API_BASE_URL } from './config/constants';
 
 const api = axios.create({ baseURL: API_BASE_URL });
@@ -58,6 +58,8 @@ export const getOrders = () => api.get<Order[]>('/orders');
 export const createOrder = (date?: string) => api.post<Order>('/orders', { date });
 export const updateOrderStatus = (id: number, status: number) =>
   api.put<Order>(`/orders/${id}/status`, { status });
+export const updateOrderCustomer = (id: number, customer_id: number | null) =>
+  api.put<Order>(`/orders/${id}/customer`, { customer_id });
 
 // Order Pool helpers
 export const reassignOrderByNumber = (number: string, userId: number) =>
@@ -612,3 +614,15 @@ export const calculateDatabasePrice = (params: any) =>
 // Order Management API
 export const getPageChanges = (pageId: number, lastUpdate: string) => 
   api.get(`/order-management/pages/${pageId}/changes?lastUpdate=${lastUpdate}`);
+
+// Customers API
+export const getCustomers = (params?: { type?: 'individual' | 'legal'; search?: string }) => 
+  api.get<Customer[]>('/customers', { params });
+export const getCustomer = (id: number) => 
+  api.get<Customer>(`/customers/${id}`);
+export const createCustomer = (customer: Omit<Customer, 'id' | 'created_at' | 'updated_at'>) => 
+  api.post<Customer>('/customers', customer);
+export const updateCustomer = (id: number, customer: Partial<Omit<Customer, 'id' | 'created_at' | 'updated_at'>>) => 
+  api.put<Customer>(`/customers/${id}`, customer);
+export const deleteCustomer = (id: number) => 
+  api.delete(`/customers/${id}`);

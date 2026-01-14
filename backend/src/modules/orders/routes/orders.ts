@@ -31,6 +31,7 @@ router.get('/stats', asyncHandler((req: Request, res: Response) => OrderControll
 router.post('/', createOrderRateLimit, asyncHandler((req: Request, res: Response) => OrderController.createOrder(req, res)))
 router.post('/with-auto-deduction', asyncHandler((req: Request, res: Response) => OrderController.createOrderWithAutoDeduction(req, res)))
 router.put('/:id/status', asyncHandler((req: Request, res: Response) => OrderController.updateOrderStatus(req, res)))
+router.put('/:id/customer', asyncHandler((req: Request, res: Response) => OrderController.updateOrderCustomer(req, res)))
 router.delete('/:id', asyncHandler((req: Request, res: Response) => OrderController.deleteOrder(req, res)))
 router.post('/:id/duplicate', asyncHandler((req: Request, res: Response) => OrderController.duplicateOrder(req, res)))
 

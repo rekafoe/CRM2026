@@ -24,17 +24,18 @@ export const OrderRepository = {
     const db = await getDb()
     const orders = await db.all<Order>(
       `SELECT 
-        id, 
+        o.id, 
         CASE 
-          WHEN source = 'website' THEN 'site-ord-' || id
-          ELSE number
+          WHEN o.source = 'website' THEN 'site-ord-' || o.id
+          ELSE o.number
         END as number,
-        status, created_at, customerName, customerPhone, customerEmail, 
-        prepaymentAmount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, userId,
-        source
-      FROM orders 
-      WHERE userId = ? OR userId IS NULL 
-      ORDER BY id DESC`,
+        o.status, o.created_at, o.customerName, o.customerPhone, o.customerEmail, 
+        o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
+        o.source, o.customer_id
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.userId = ? OR o.userId IS NULL 
+      ORDER BY o.id DESC`,
       userId
     )
     return orders as unknown as Order[]

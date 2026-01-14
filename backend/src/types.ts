@@ -20,6 +20,7 @@ export interface Order {
   customerName?: string;
   customerPhone?: string;
   customerEmail?: string;
+  customer_id?: number;
   prepaymentAmount?: number;
   prepaymentStatus?: string;
   paymentUrl?: string;

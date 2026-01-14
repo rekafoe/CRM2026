@@ -19,6 +19,7 @@ import suppliersRoutes from './suppliers'
 import notificationsRoutes from './notifications'
 import warehouseReportsRoutes from './warehouseReports'
 import quickTemplatesRoutes from './quickTemplates'
+import { customerRoutes } from '../modules/customers'
 
 const router = Router()
 
@@ -41,6 +42,7 @@ router.use('/suppliers', suppliersRoutes)
 router.use('/notifications', notificationsRoutes)
 router.use('/warehouse-reports', warehouseReportsRoutes)
 router.use('/quick-templates', quickTemplatesRoutes)
+router.use('/customers', customerRoutes)
 
 console.log('Routes setup complete')
 

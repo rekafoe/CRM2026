@@ -6,6 +6,7 @@ import { MemoizedOrderItem } from '../MemoizedOrderItem';
 import { OrderDates } from '../../order/OrderDates';
 import { useToast } from '../../Toast';
 import { generateOrderBlankPdf } from '../../../api';
+import { CustomerSelector } from '../../customers/CustomerSelector';
 
 interface OrderDetailSectionProps {
   selectedOrder: Order;
@@ -158,6 +159,13 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               </button>
             </div>
           </div>
+          
+          <CustomerSelector
+            orderId={selectedOrder.id}
+            currentCustomerId={selectedOrder.customer_id}
+            onCustomerChange={onLoadOrders}
+          />
+          
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
               <label style={{ fontSize: 12, color: '#666' }}>Дата</label>

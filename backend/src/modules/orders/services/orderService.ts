@@ -47,7 +47,7 @@ export class OrderService {
     return allOrders
   }
 
-  static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm') {
+  static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm', customerId?: number) {
     const createdAt = date ? `${date}T12:00:00.000Z` : getCurrentTimestamp()
     const db = await getDb()
 
@@ -69,7 +69,7 @@ export class OrderService {
     } catch {}
 
     const insertRes = await db.run(
-      'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source, customer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         defaultStatusId, // FK -> order_statuses.id (обычно "Новый")
         createdAt,
@@ -78,7 +78,8 @@ export class OrderService {
         customerEmail || null,
         Number(prepaymentAmount || 0),
         userId ?? null,
-        source || 'crm'
+        source || 'crm',
+        customerId || null
       ]
     )
     const id = (insertRes as any).lastID!
@@ -101,6 +102,7 @@ export class OrderService {
       customerEmail?: string;
       prepaymentAmount?: number;
       userId?: number;
+      customer_id?: number;
       items: Array<{
         type: string;
         params: string;
@@ -126,7 +128,8 @@ export class OrderService {
         orderData.prepaymentAmount,
         orderData.userId,
         undefined,
-        'crm'
+        'crm',
+        orderData.customer_id
       );
       
       // 2. Добавляем товары в заказ
@@ -174,6 +177,7 @@ export class OrderService {
       customerEmail?: string;
       prepaymentAmount?: number;
       userId?: number;
+      customer_id?: number;
       items: Array<{
         type: string;
         params: string;
@@ -199,7 +203,8 @@ export class OrderService {
         orderData.prepaymentAmount,
         orderData.userId,
         undefined,
-        'crm'
+        'crm',
+        orderData.customer_id
       );
       
       // 2. Добавляем товары в заказ
@@ -236,6 +241,35 @@ export class OrderService {
       await db.run('ROLLBACK');
       throw error;
     }
+  }
+
+  /**
+   * Обновить customer_id заказа
+   */
+  static async updateOrderCustomer(id: number, customerId: number | null): Promise<Order> {
+    const db = await getDb()
+    
+    // Проверяем существование заказа
+    const order = await db.get('SELECT id FROM orders WHERE id = ?', [id])
+    if (!order) {
+      throw new Error('Заказ не найден')
+    }
+
+    // Если указан customer_id, проверяем его существование
+    if (customerId !== null) {
+      const customer = await db.get('SELECT id FROM customers WHERE id = ?', [customerId])
+      if (!customer) {
+        throw new Error('Клиент не найден')
+      }
+    }
+
+    await db.run(
+      'UPDATE orders SET customer_id = ?, updated_at = datetime("now") WHERE id = ?',
+      [customerId, id]
+    )
+
+    const updated = await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id])
+    return { ...(updated as any as Order), items: [] }
   }
 
   static async updateOrderStatus(id: number, status: number) {
