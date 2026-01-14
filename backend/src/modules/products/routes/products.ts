@@ -275,6 +275,7 @@ router.get('/category/:categoryId', async (req, res) => {
 router.get('/:productId/schema', async (req, res) => {
   try {
     const { productId } = req.params;
+    logger.info('[GET /products/:id/schema] 🚀 Эндпоинт вызван', { productId });
     const db = await getDb();
     
     // Получаем продукт
