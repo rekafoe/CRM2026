@@ -65,7 +65,7 @@ export class PaperTypeService {
           paperType.id
         ) as unknown as Material[]
         
-        console.log(`Материалы для ${paperType.display_name}:`, materials)
+        // Логирование материалов убрано для уменьшения шума в логах
         
         // Создаем объект цен из материалов для обратной совместимости
         const pricesObject = materials.reduce((acc: any, material: any) => {
@@ -75,7 +75,7 @@ export class PaperTypeService {
           return acc
         }, {} as { [density: number]: number })
         
-        console.log(`Цены из материалов для ${paperType.display_name}:`, pricesObject)
+        // Логирование цен материалов убрано для уменьшения шума в логах
         
         return {
           ...paperType,
@@ -85,7 +85,7 @@ export class PaperTypeService {
       })
     )
     
-    console.log('Итоговые данные с материалами:', paperTypesWithMaterials)
+    // Логирование итоговых данных убрано для уменьшения шума в логах
     return paperTypesWithMaterials
   }
 
