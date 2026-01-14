@@ -479,17 +479,39 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       resolvedType,
       willSetSelectedProduct: true
     });
+    
+    // ✅ Сбрасываем все поля, зависящие от продукта, при смене продукта
     setSelectedProduct({ ...product, resolvedProductType: resolvedType });
-    setSpecs(prev => ({
-      ...prev,
-      productType: resolvedType,
-      format: getDefaultFormat(),
-      paperDensity: getDefaultPaperDensity(prev.paperType)
-    }));
+    setSpecs(prev => {
+      const reset: Partial<ProductSpecs> = {
+        productType: resolvedType,
+        format: getDefaultFormat(),
+        // ✅ Сбрасываем все поля, которые зависят от продукта
+        size_id: undefined,
+        material_id: undefined,
+        paperType: undefined,
+        paperDensity: 0,
+        materialType: undefined, // Сбрасываем тип материала
+        selectedOperations: [], // Сбрасываем выбранные операции
+        // Оставляем только базовые поля, которые не зависят от продукта
+        quantity: prev.quantity || 1,
+        sides: prev.sides || 1,
+        lamination: prev.lamination || 'none',
+        priceType: prev.priceType || 'online',
+        customerType: prev.customerType || 'regular',
+        pages: prev.pages || 4,
+      };
+      return { ...prev, ...reset };
+    });
+    
+    // ✅ Сбрасываем параметры печати
+    setPrintTechnology('');
+    setPrintColorMode(null);
+    
     close('showProductSelection');
-    setUserInteracted(true);
+    setUserInteracted(false); // ✅ Сбрасываем флаг взаимодействия, чтобы автопересчет не дергался
     logger.info('Выбран продукт из базы данных', { productId: product.id, productName: product.name, resolvedType });
-  }, [close, getDefaultFormat, getDefaultPaperDensity, logger, resolveProductType, setSelectedProduct, setSpecs, setUserInteracted, specs.productType]);
+  }, [close, getDefaultFormat, logger, resolveProductType, setSelectedProduct, setSpecs, setUserInteracted, specs.productType]);
 
   // Автовыбор продукта по initialProductId (например, при редактировании заказа)
   useEffect(() => {
