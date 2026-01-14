@@ -456,13 +456,9 @@ export class SimplifiedPricingService {
           const priceUnit = finConfig.price_unit ?? 'per_item';
           const unitsPerItem = finConfig.units_per_item ?? 1;
           
-          // 🆕 Определяем, является ли операция ламинацией
-          // Проверяем по operation_type из базы данных (более надежно, чем по названию)
+          // 🆕 Определяем, является ли операция ламинацией по строгому типу
           const operationType = serviceTypesMap.get(finConfig.service_id) || '';
-          const serviceName = serviceNamesMap.get(finConfig.service_id) || '';
-          const isLamination = operationType === 'laminate' || 
-                               serviceName.toLowerCase().includes('ламинация') || 
-                               serviceName.toLowerCase().includes('lamination');
+          const isLamination = operationType === 'laminate';
           
           let servicePrice = 0;
           let totalUnits = quantity;
@@ -488,7 +484,6 @@ export class SimplifiedPricingService {
           logger.info('💰 [SimplifiedPricingService] Рассчитана цена услуги отделки', {
             productId,
             service_id: finConfig.service_id,
-            serviceName,
             operationType,
             isLamination,
             priceUnit,
