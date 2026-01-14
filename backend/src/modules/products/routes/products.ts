@@ -275,7 +275,9 @@ router.get('/category/:categoryId', async (req, res) => {
 router.get('/:productId/schema', async (req, res) => {
   try {
     const { productId } = req.params;
-    logger.info('[GET /products/:id/schema] 🚀 Эндпоинт вызван', { productId });
+    // 🆕 Явное логирование для диагностики
+    console.log('🚀 [GET /products/:id/schema] Эндпоинт вызван', { productId, url: req.url, path: req.path });
+    logger.info('[GET /products/:id/schema] 🚀 Эндпоинт вызван', { productId, url: req.url, path: req.path });
     const db = await getDb();
     
     // Получаем продукт
@@ -553,6 +555,13 @@ router.get('/:productId/schema', async (req, res) => {
         WHERE pol.product_id = ?
       `, [productId]);
       
+      // 🆕 Явное логирование для диагностики
+      console.log('🔍 [GET /products/:id/schema] Все связи операций для продукта', {
+        productId,
+        totalLinks: allLinks.length,
+        links: allLinks
+      });
+      
       logger.info('[GET /products/:id/schema] Все связи операций для продукта', {
         productId,
         totalLinks: allLinks.length,
@@ -571,6 +580,13 @@ router.get('/:productId/schema', async (req, res) => {
         WHERE pol.product_id = ? AND pps.is_active = 1
         ORDER BY pol.sequence, pol.sort_order
       `, [productId]);
+      
+      // 🆕 Явное логирование для диагностики
+      console.log('🔍 [GET /products/:id/schema] Операции после фильтрации is_active', {
+        productId,
+        operationsCount: productOperations.length,
+        operations: productOperations
+      });
       
       logger.info('[GET /products/:id/schema] Операции после фильтрации is_active', {
         productId,
