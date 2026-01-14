@@ -59,7 +59,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const [specs, setSpecs] = useState<ProductSpecs>({
     productType: initialProductType || 'flyers',
     format: 'A6',
-    quantity: 100,
+    quantity: 1,
     sides: 1,
     paperType: 'semi-matte' as any,
     paperDensity: 0,
