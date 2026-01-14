@@ -10,7 +10,6 @@ import { MaterialsSection } from './components/MaterialsSection';
 import { useCalculatorValidation } from './hooks/useCalculatorValidation';
 import { useCalculatorSchema } from './hooks/useCalculatorSchema';
 import { useCalculatorMaterials } from './hooks/useCalculatorMaterials';
-import { CalculatorHeaderActions } from './components/CalculatorHeaderActions';
 import { ResultSection } from './components/ResultSection';
 import { DynamicFieldsSection } from './components/DynamicFieldsSection';
 import { useCalculatorUI } from './hooks/useCalculatorUI';
@@ -759,16 +758,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
       {/* Основной калькулятор */}
       <div className="improved-printing-calculator">
-        {/* Заголовок */}
-        <div className="calculator-header">
-          <div className="header-content">
-            <h2>Калькулятор печати</h2>
-          </div>
-          <CalculatorHeaderActions
-            onClose={onClose}
-          />
-        </div>
-
         {/* Основной контент */}
         <div className="calculator-content">
           <div className="calculator-main">
