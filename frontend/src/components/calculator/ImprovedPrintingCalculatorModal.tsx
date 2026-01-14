@@ -97,6 +97,15 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     log: logger,
     setSpecs
   });
+  
+  // 🆕 Логируем состояние selectedProduct для диагностики
+  useEffect(() => {
+    console.log('🔍 [ImprovedPrintingCalculatorModal] selectedProduct изменился', {
+      selectedProductId: selectedProduct?.id,
+      selectedProductName: selectedProduct?.name,
+      willPassToUseCalculatorSchema: selectedProduct?.id || null
+    });
+  }, [selectedProduct?.id]);
 
   const { resolveProductType } = useCalculatorEditContext({
     isOpen,
@@ -464,6 +473,12 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   // Выбор продукта из базы данных
   const handleProductSelect = useCallback((product: Product) => {
     const resolvedType = resolveProductType(product) ?? specs.productType ?? 'flyers';
+    console.log('🔍 [ImprovedPrintingCalculatorModal] handleProductSelect вызван', {
+      productId: product.id,
+      productName: product.name,
+      resolvedType,
+      willSetSelectedProduct: true
+    });
     setSelectedProduct({ ...product, resolvedProductType: resolvedType });
     setSpecs(prev => ({
       ...prev,
