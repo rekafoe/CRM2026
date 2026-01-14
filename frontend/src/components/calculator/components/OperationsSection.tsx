@@ -116,6 +116,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     if (isSelected) {
       // Удаляем операцию
       const filtered = currentOps.filter((op: SelectedOperation) => op.operationId !== operationId);
+      console.log('🔧 [OperationsSection] Удаляем операцию', { operationId, filtered });
       updateSpecs({ selectedOperations: filtered }, true);
     } else {
       // Добавляем операцию с дефолтными значениями
@@ -125,6 +126,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
         quantity: 1,
         ...(subtypes.length > 0 && { subtype: subtypes[0].value }),
       };
+      console.log('🔧 [OperationsSection] Добавляем операцию', { operationId, newOp, allOps: [...currentOps, newOp] });
       updateSpecs({ selectedOperations: [...currentOps, newOp] }, true);
     }
   };

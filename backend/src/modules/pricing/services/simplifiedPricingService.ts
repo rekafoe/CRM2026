@@ -441,8 +441,11 @@ export class SimplifiedPricingService {
             totalUnits = quantity * unitsPerItem;
             servicePrice = priceForTier * totalUnits;
           } else {
-            // Цена за изделие
-            servicePrice = priceForTier * quantity;
+            // ✅ Цена за изделие (per_item): units_per_item означает "сколько единиц услуги на одно изделие"
+            // Например, для "Упаковка в файл": если units_per_item = 1, то на каждое изделие нужен 1 файл
+            // При тираже 100 изделий = 100 файлов, цена = unit_price * 100
+            totalUnits = quantity * unitsPerItem;
+            servicePrice = priceForTier * totalUnits;
           }
           
           finishingPrice += servicePrice;
