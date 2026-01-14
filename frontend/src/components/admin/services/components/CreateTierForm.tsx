@@ -28,9 +28,10 @@ export const CreateTierForm: React.FC<CreateTierFormProps> = ({
             type="number"
             min={1}
             className="w-full border border-gray-300 rounded px-3 py-2"
-            value={form.minQuantity}
+            value={form.minQuantity || ''}
             onChange={(e) => onFormChange({ minQuantity: e.target.value })}
             disabled={busy}
+            placeholder="Например: 1"
           />
         </div>
         <div>
@@ -40,9 +41,10 @@ export const CreateTierForm: React.FC<CreateTierFormProps> = ({
             min={0}
             step="0.01"
             className="w-full border border-gray-300 rounded px-3 py-2"
-            value={form.rate}
+            value={form.rate || ''}
             onChange={(e) => onFormChange({ rate: e.target.value })}
             disabled={busy}
+            placeholder="Например: 10.50"
           />
         </div>
         <div className="flex items-center">
