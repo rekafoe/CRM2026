@@ -7,6 +7,7 @@ export interface PricingServiceDTO {
   rate: number;
   currency?: string;
   isActive: boolean;
+  operationType?: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
 }
 
 export interface CreatePricingServiceDTO {
@@ -17,6 +18,7 @@ export interface CreatePricingServiceDTO {
   rate: number;
   currency?: string;
   isActive?: boolean;
+  operationType?: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
 }
 
 export interface UpdatePricingServiceDTO {
@@ -27,6 +29,7 @@ export interface UpdatePricingServiceDTO {
   rate?: number;
   currency?: string;
   isActive?: boolean;
+  operationType?: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
 }
 
 export interface ServiceVolumeTierDTO {

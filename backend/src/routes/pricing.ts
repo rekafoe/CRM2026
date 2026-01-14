@@ -20,6 +20,7 @@ const toServiceResponse = (service: any) => ({
   currency: service.currency ?? 'BYN',
   isActive: service.isActive,
   is_active: service.isActive,
+  operation_type: service.operationType ?? service.operation_type, // 🆕
 })
 
 const toTierResponse = (tier: any) => ({

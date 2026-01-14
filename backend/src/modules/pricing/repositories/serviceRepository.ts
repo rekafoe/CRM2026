@@ -51,6 +51,7 @@ type RawServiceRow = {
   id: number;
   service_name: string;
   service_type?: string;
+  operation_type?: string; // 🆕
   unit: string;
   price_unit?: string;
   price_per_unit: number;
@@ -191,6 +192,7 @@ export class PricingServiceRepository {
       rate: Number(row.price_per_unit ?? 0),
       currency: DEFAULT_CURRENCY,
       isActive: !!row.is_active,
+      operationType: row.operation_type, // 🆕
     };
   }
 
@@ -212,7 +214,8 @@ export class PricingServiceRepository {
       SELECT 
         id, 
         name as service_name, 
-        operation_type as service_type, 
+        operation_type as service_type,
+        operation_type, 
         unit, 
         price_unit,
         price as price_per_unit, 
@@ -244,7 +247,8 @@ export class PricingServiceRepository {
   static async createService(payload: CreatePricingServiceDTO): Promise<PricingServiceDTO> {
     const db = await this.getConnection();
     // ИЗМЕНЕНО: Создаем в post_processing_services
-    const operationType = normalizeOperationType(payload.type);
+    // 🆕 Используем operationType из payload, если есть, иначе из type
+    const operationType = normalizeOperationType(payload.operationType || payload.type);
     if (typeof payload.type === 'string' && payload.type.trim() && !ALLOWED_OPERATION_TYPES.has(payload.type.trim()) && payload.type.trim() !== 'postprint' && payload.type.trim() !== 'generic') {
       const err: any = new Error(
         `Недопустимый operation_type: "${payload.type}". Разрешено: ${Array.from(ALLOWED_OPERATION_TYPES).join(', ')}`
@@ -273,7 +277,8 @@ export class PricingServiceRepository {
       SELECT 
         id, 
         name as service_name, 
-        operation_type as service_type, 
+        operation_type as service_type,
+        operation_type, 
         unit, 
         price_unit,
         price as price_per_unit, 
@@ -295,9 +300,12 @@ export class PricingServiceRepository {
       return null;
     }
 
-    const operationType = payload.type !== undefined
-      ? normalizeOperationType(payload.type)
-      : (current.operation_type ?? 'other');
+    // 🆕 Используем operationType из payload, если есть, иначе из type, иначе текущее значение
+    const operationType = payload.operationType !== undefined
+      ? normalizeOperationType(payload.operationType)
+      : (payload.type !== undefined
+        ? normalizeOperationType(payload.type)
+        : (current.operation_type ?? 'other'));
 
     if (typeof payload.type === 'string' && payload.type.trim() && !ALLOWED_OPERATION_TYPES.has(payload.type.trim()) && payload.type.trim() !== 'postprint' && payload.type.trim() !== 'generic') {
       const err: any = new Error(
@@ -332,7 +340,8 @@ export class PricingServiceRepository {
       SELECT 
         id, 
         name as service_name, 
-        operation_type as service_type, 
+        operation_type as service_type,
+        operation_type, 
         unit, 
         price_unit,
         price as price_per_unit, 
