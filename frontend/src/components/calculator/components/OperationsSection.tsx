@@ -351,9 +351,11 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginLeft: '26px' }}>
-                      {/* 🆕 Селектор типов (вариантов) */}
+                      {/* 🆕 1-й уровень: Селектор типа (Рулонная, Пакетная и т.д.) */}
                       <div className="param-group">
-                        <label style={{ fontSize: '14px', color: '#666' }}>Тип ламинации:</label>
+                        <label style={{ fontSize: '14px', color: '#666', fontWeight: 500, marginBottom: '6px', display: 'block' }}>
+                          1. Тип:
+                        </label>
                         <select
                           value={selectedVariant?.id || variants[0]?.id || ''}
                           onChange={(e) => {
@@ -374,7 +376,13 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                             }, true);
                           }}
                           className="form-control"
-                          style={{ fontSize: '14px' }}
+                          style={{ 
+                            fontSize: '14px',
+                            padding: '8px 12px',
+                            border: '1px solid #dcdfe6',
+                            borderRadius: '4px',
+                            width: '100%'
+                          }}
                         >
                           {variants.map((variant) => (
                             <option key={variant.id} value={variant.id}>
@@ -384,15 +392,23 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         </select>
                       </div>
                       
-                      {/* 🆕 Селектор подтипов (из выбранного типа) */}
+                      {/* 🆕 2-й уровень: Селектор подтипа с плотностью (глянец 32 мк, мат 100 мк и т.д.) */}
                       {variantSubtypes.length > 0 && (
                         <div className="param-group">
-                          <label style={{ fontSize: '14px', color: '#666' }}>Подтип:</label>
+                          <label style={{ fontSize: '14px', color: '#666', fontWeight: 500, marginBottom: '6px', display: 'block' }}>
+                            2. Подтип с плотностью:
+                          </label>
                           <select
                             value={selectedData?.subtype || variantSubtypes[0]?.value || variantSubtypes[0] || ''}
                             onChange={(e) => updateOperationSubtype(operationId, e.target.value)}
                             className="form-control"
-                            style={{ fontSize: '14px' }}
+                            style={{ 
+                              fontSize: '14px',
+                              padding: '8px 12px',
+                              border: '1px solid #dcdfe6',
+                              borderRadius: '4px',
+                              width: '100%'
+                            }}
                           >
                             {variantSubtypes.map((st: string | { value: string; label: string }) => {
                               const value = typeof st === 'string' ? st : st.value;
