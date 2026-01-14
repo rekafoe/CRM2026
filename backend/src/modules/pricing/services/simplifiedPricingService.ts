@@ -361,7 +361,7 @@ export class SimplifiedPricingService {
         
         for (const finConfig of normalizedConfig.finishing) {
           const serviceId = finConfig.service_id;
-          const variantId = finConfig.variant_id;
+          const variantId = (finConfig as any).variant_id as number | undefined;
           const mapKey = variantId ? `${serviceId}:${variantId}` : String(serviceId);
           
           // Пропускаем, если уже загрузили для этого ключа
@@ -429,7 +429,8 @@ export class SimplifiedPricingService {
 
         for (const finConfig of normalizedConfig.finishing) {
           // 🆕 Используем ключ с variantId, если он есть
-          const mapKey = finConfig.variant_id ? `${finConfig.service_id}:${finConfig.variant_id}` : String(finConfig.service_id);
+          const variantId = (finConfig as any).variant_id as number | undefined;
+          const mapKey = variantId ? `${finConfig.service_id}:${variantId}` : String(finConfig.service_id);
           const tiers = serviceTiersMap.get(mapKey);
           if (!tiers || tiers.length === 0) {
             logger.warn('Не найдены тарифы для услуги отделки в упрощённом калькуляторе', {
