@@ -762,8 +762,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         {/* Заголовок */}
         <div className="calculator-header">
           <div className="header-content">
-            <h2>🖨️ Калькулятор печати</h2>
-            <p>Рассчитайте стоимость печатной продукции</p>
+            <h2>Калькулятор печати</h2>
           </div>
           <CalculatorHeaderActions
             onClose={onClose}
