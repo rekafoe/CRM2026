@@ -91,6 +91,21 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
         
         if (cancelled || !mountedRef.current) return;
         
+        // 🆕 Логируем операции для отладки
+        console.log('🔍 [useCalculatorSchema] Схема загружена', {
+          key,
+          productId,
+          productType,
+          hasSchema: !!schema,
+          schemaKeys: schema ? Object.keys(schema) : [],
+          hasOperations: !!schema?.operations,
+          operationsType: typeof schema?.operations,
+          operationsIsArray: Array.isArray(schema?.operations),
+          operationsLength: schema?.operations?.length || 0,
+          operations: schema?.operations,
+          fields: schema?.fields?.length || 0
+        });
+        
         // Сохраняем в глобальный кэш
         globalSchemaCache.set(key, { schema: schema || null, timestamp: Date.now() });
         
@@ -99,7 +114,8 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
           key, 
           productId, 
           productType,
-          fields: schema?.fields?.length || 0
+          fields: schema?.fields?.length || 0,
+          operations: schema?.operations?.length || 0
         });
 
         // Initialize defaults from schema
