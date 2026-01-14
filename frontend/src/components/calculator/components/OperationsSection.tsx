@@ -356,17 +356,19 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   
                   // Если вариант не найден, но есть выбранный subtype, пытаемся найти вариант по subtype
                   if (!selectedVariant && selectedData?.subtype) {
-                    selectedVariant = allVariants.find(v => 
-                      v.parameters?.subtypes?.some((st: string | { value: string; label: string }) => {
-                        const stValue = typeof st === 'string' ? st : st.value;
-                        return stValue === selectedData.subtype;
-                      })
-                    );
+                    selectedVariant = allVariants.find(v => {
+                      // Проверяем по parameters.type + parameters.density
+                      const type = v.parameters?.type || '';
+                      const density = v.parameters?.density || '';
+                      const subtypeLabel = type && density ? `${type} ${density}` : type || density;
+                      return subtypeLabel === selectedData.subtype;
+                    });
                   }
                   
+                  // 🆕 Определяем выбранный тип: из выбранного варианта или первый доступный
                   const selectedTypeName = selectedVariant?.variantName || uniqueTypes[0]?.variantName || '';
                   
-                  // 🆕 Собираем все подтипы из всех вариантов с выбранным типом
+                  // 🆕 Собираем все подтипы ТОЛЬКО из вариантов с выбранным типом
                   const variantsOfSelectedType = allVariants.filter(v => v.variantName === selectedTypeName);
                   
                   // 🆕 Детальное логирование для отладки
@@ -393,8 +395,16 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   });
                   
                   // 🆕 Подтипы формируются из parameters.type + parameters.density (как в ServiceVariantsTable)
+                  // ⚠️ ВАЖНО: Фильтруем ТОЛЬКО варианты с выбранным типом (selectedTypeName)
                   const allSubtypes = variantsOfSelectedType
-                    .filter(v => v.parameters?.type || v.parameters?.density) // Фильтруем только варианты с type или density
+                    .filter(v => {
+                      // Дополнительная проверка: вариант должен принадлежать выбранному типу
+                      if (v.variantName !== selectedTypeName) {
+                        return false;
+                      }
+                      // И должен иметь type или density
+                      return v.parameters?.type || v.parameters?.density;
+                    })
                     .map(v => {
                       const type = v.parameters?.type || '';
                       const density = v.parameters?.density || '';
@@ -441,10 +451,17 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                           value={selectedTypeName || uniqueTypes[0]?.variantName || ''}
                           onChange={(e) => {
                             const newTypeName = e.target.value;
-                            // Находим первый вариант с таким типом для получения первого подтипа
-                            const firstVariantOfType = allVariants.find(v => v.variantName === newTypeName);
-                            const firstSubtype = firstVariantOfType?.parameters?.subtypes?.[0];
-                            const firstSubtypeValue = typeof firstSubtype === 'string' ? firstSubtype : firstSubtype?.value;
+                            // 🆕 Находим варианты с новым типом и берем первый подтип из них
+                            const variantsOfNewType = allVariants.filter(v => v.variantName === newTypeName);
+                            const firstVariantOfType = variantsOfNewType[0];
+                            
+                            // Формируем первый подтип из parameters.type + parameters.density
+                            let firstSubtypeValue: string | undefined;
+                            if (firstVariantOfType) {
+                              const type = firstVariantOfType.parameters?.type || '';
+                              const density = firstVariantOfType.parameters?.density || '';
+                              firstSubtypeValue = type && density ? `${type} ${density}` : type || density || undefined;
+                            }
                             
                             updateSpecs({
                               selectedOperations: selectedOperations.map((op: SelectedOperation) => {
