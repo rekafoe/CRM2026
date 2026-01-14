@@ -455,11 +455,21 @@ export class SimplifiedPricingService {
           const priceUnit = finConfig.price_unit ?? 'per_item';
           const unitsPerItem = finConfig.units_per_item ?? 1;
           
+          // 🆕 Определяем, является ли операция ламинацией
+          const serviceName = serviceNamesMap.get(finConfig.service_id) || '';
+          const isLamination = serviceName.toLowerCase().includes('ламинация') || 
+                               serviceName.toLowerCase().includes('lamination');
+          
           let servicePrice = 0;
           let totalUnits = quantity;
           if (priceUnit === 'per_cut') {
             // Цена за единицу операции (рез/биг/фальц) — считаем общее количество операций
             // units_per_item = количество резов на одно изделие, умножаем на тираж
+            totalUnits = quantity * unitsPerItem;
+            servicePrice = priceForTier * totalUnits;
+          } else if (isLamination) {
+            // 🆕 Для ламинации: цена за одно изделие, умножаем на тираж
+            // units_per_item обычно = 1 (одна ламинация на одно изделие)
             totalUnits = quantity * unitsPerItem;
             servicePrice = priceForTier * totalUnits;
           } else {

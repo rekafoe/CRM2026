@@ -754,10 +754,25 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   if (!isOpen) return null;
 
   return (
-    <div className="improved-printing-calculator-overlay">
-
+    <div className="improved-printing-calculator-overlay" onClick={(e) => {
+      // Закрываем модалку при клике на overlay
+      if (e.target === e.currentTarget) {
+        onClose();
+      }
+    }}>
       {/* Основной калькулятор */}
       <div className="improved-printing-calculator">
+        {/* Кнопка закрытия */}
+        <button
+          className="calculator-close-button"
+          onClick={onClose}
+          aria-label="Закрыть"
+          type="button"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
         {/* Основной контент */}
         <div className="calculator-content">
           <div className="calculator-main">
