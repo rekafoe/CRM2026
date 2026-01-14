@@ -9,6 +9,7 @@ export interface ServiceFormState {
   rate: string;
   isActive: boolean;
   hasVariants: boolean; // true = сложная услуга (с вариантами), false = простая
+  operationType: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
 }
 
 interface ServiceFormProps {
@@ -40,6 +41,23 @@ const defaultUnitOptions = [
   { value: 'per_order', label: 'per_order (за заказ)' },
 ];
 
+const operationTypeOptions = [
+  { value: 'other', label: 'other (прочее)' },
+  { value: 'print', label: 'print (печать)' },
+  { value: 'laminate', label: 'laminate (ламинация)' },
+  { value: 'cut', label: 'cut (резка)' },
+  { value: 'fold', label: 'fold (фальцовка)' },
+  { value: 'score', label: 'score (биговка)' },
+  { value: 'bind', label: 'bind (переплет)' },
+  { value: 'perforate', label: 'perforate (перфорация)' },
+  { value: 'emboss', label: 'emboss (тиснение)' },
+  { value: 'foil', label: 'foil (фольга)' },
+  { value: 'varnish', label: 'varnish (лакировка)' },
+  { value: 'package', label: 'package (упаковка)' },
+  { value: 'design', label: 'design (дизайн)' },
+  { value: 'delivery', label: 'delivery (доставка)' },
+];
+
 const ServiceForm: React.FC<ServiceFormProps> = ({
   value,
   onChange,
@@ -69,6 +87,20 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
           onChange={(e) => updateField('type', e.target.value as PricingServiceType)}
         >
           {typeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </FormField>
+      <FormField label="Тип операции" help="Строгий тип операции для расчета цены (laminate — ламинация, cut — резка, и т.д.)">
+        <select
+          className="px-2 py-1 border rounded w-full"
+          value={value.operationType || 'other'}
+          disabled={disabled}
+          onChange={(e) => updateField('operationType', e.target.value)}
+        >
+          {operationTypeOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

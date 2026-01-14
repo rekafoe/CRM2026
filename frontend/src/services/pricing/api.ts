@@ -38,6 +38,7 @@ const mapService = (svc: any): PricingService => ({
   priceUnit: svc.price_unit ?? svc.priceUnit,
   rate: Number(svc.price_per_unit ?? svc.rate ?? 0),
   isActive: svc.is_active !== undefined ? !!svc.is_active : true,
+  operationType: svc.operation_type ?? svc.operationType, // 🆕
 });
 
 const mapTier = (tier: any): ServiceVolumeTier => ({
@@ -68,6 +69,7 @@ export async function createPricingService(payload: CreatePricingServicePayload)
     price_unit: resolvedPriceUnit,
     rate: payload.rate,
     is_active: payload.isActive ?? true,
+    operation_type: payload.operationType || 'other', // 🆕
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);
@@ -85,6 +87,7 @@ export async function updatePricingService(id: number, payload: UpdatePricingSer
     price_unit: resolvedPriceUnit,
     rate: payload.rate,
     is_active: payload.isActive,
+    ...(payload.operationType !== undefined ? { operation_type: payload.operationType } : {}), // 🆕
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);

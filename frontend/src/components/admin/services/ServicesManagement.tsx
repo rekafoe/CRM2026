@@ -29,6 +29,7 @@ const emptyServiceForm: ServiceFormState = {
   rate: '',
   isActive: true,
   hasVariants: false,
+  operationType: 'other', // 🆕
 };
 
 const serviceToFormState = (service: PricingService): ServiceFormState => ({
@@ -38,6 +39,7 @@ const serviceToFormState = (service: PricingService): ServiceFormState => ({
   rate: service.rate.toString(),
   isActive: service.isActive,
   hasVariants: false,
+  operationType: service.operationType || 'other', // 🆕
 });
 
 const ServicesManagement: React.FC = () => {
@@ -147,6 +149,7 @@ const ServicesManagement: React.FC = () => {
       unit: state.editingServiceForm.unit,
       rate: Number(state.editingServiceForm.rate || 0),
       isActive: state.editingServiceForm.isActive,
+      operationType: state.editingServiceForm.operationType || 'other', // 🆕
     };
     await serviceOperationsRef.current.updateService(state.editingService.id, payload);
     resetEditingService();
@@ -160,6 +163,7 @@ const ServicesManagement: React.FC = () => {
       rate: Number(state.newServiceForm.rate || 0),
       isActive: state.newServiceForm.isActive,
       hasVariants: state.newServiceForm.hasVariants,
+      operationType: state.newServiceForm.operationType || 'other', // 🆕
     });
     
     if (created) {
