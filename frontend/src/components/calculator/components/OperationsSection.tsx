@@ -340,14 +340,35 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
 
               {isSelected && (() => {
                 // 🆕 Проверяем, есть ли варианты для этой операции (например, ламинация)
-                const variants = serviceVariants.get(operationId) || [];
-                const hasVariants = variants.length > 0;
+                const allVariants = serviceVariants.get(operationId) || [];
+                const hasVariants = allVariants.length > 0;
                 
-                // Если есть варианты, используем их как типы
+                // Если есть варианты, группируем их по названию типа (variantName) для первого уровня
                 if (hasVariants) {
+                  // 🆕 Группируем варианты по variantName (уникальные типы)
+                  const uniqueTypes = Array.from(
+                    new Map(allVariants.map(v => [v.variantName, v])).values()
+                  );
+                  
+                  // 🆕 Находим выбранный тип по variantId или используем первый
                   const selectedVariantId = selectedData?.variantId;
-                  const selectedVariant = variants.find(v => v.id === selectedVariantId) || variants[0];
-                  const variantSubtypes = selectedVariant?.parameters?.subtypes || [];
+                  const selectedVariant = allVariants.find(v => v.id === selectedVariantId);
+                  const selectedTypeName = selectedVariant?.variantName || uniqueTypes[0]?.variantName;
+                  
+                  // 🆕 Собираем все подтипы из всех вариантов с выбранным типом
+                  const variantsOfSelectedType = allVariants.filter(v => v.variantName === selectedTypeName);
+                  const allSubtypes = variantsOfSelectedType.flatMap(v => 
+                    (v.parameters?.subtypes || []).map((st: string | { value: string; label: string }) => ({
+                      value: typeof st === 'string' ? st : st.value,
+                      label: typeof st === 'string' ? st : st.label,
+                      variantId: v.id // Сохраняем variantId для каждого подтипа
+                    }))
+                  );
+                  
+                  // 🆕 Дедуплицируем подтипы по value
+                  const uniqueSubtypes = Array.from(
+                    new Map(allSubtypes.map(st => [st.value, st])).values()
+                  );
                   
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginLeft: '26px' }}>
@@ -357,18 +378,21 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                           1. Тип:
                         </label>
                         <select
-                          value={selectedVariant?.id || variants[0]?.id || ''}
+                          value={selectedTypeName || uniqueTypes[0]?.variantName || ''}
                           onChange={(e) => {
-                            const newVariantId = Number(e.target.value);
-                            const newVariant = variants.find(v => v.id === newVariantId);
-                            const firstSubtype = newVariant?.parameters?.subtypes?.[0];
+                            const newTypeName = e.target.value;
+                            // Находим первый вариант с таким типом для получения первого подтипа
+                            const firstVariantOfType = allVariants.find(v => v.variantName === newTypeName);
+                            const firstSubtype = firstVariantOfType?.parameters?.subtypes?.[0];
+                            const firstSubtypeValue = typeof firstSubtype === 'string' ? firstSubtype : firstSubtype?.value;
+                            
                             updateSpecs({
                               selectedOperations: selectedOperations.map((op: SelectedOperation) => {
                                 if (op.operationId === operationId) {
                                   return {
                                     ...op,
-                                    variantId: newVariantId,
-                                    subtype: firstSubtype?.value || firstSubtype || undefined,
+                                    variantId: firstVariantOfType?.id, // Используем ID первого варианта этого типа
+                                    subtype: firstSubtypeValue || undefined,
                                   };
                                 }
                                 return op;
@@ -384,8 +408,8 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                             width: '100%'
                           }}
                         >
-                          {variants.map((variant) => (
-                            <option key={variant.id} value={variant.id}>
+                          {uniqueTypes.map((variant) => (
+                            <option key={variant.variantName} value={variant.variantName}>
                               {variant.variantName}
                             </option>
                           ))}
@@ -393,14 +417,30 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       </div>
                       
                       {/* 🆕 2-й уровень: Селектор подтипа с плотностью (глянец 32 мк, мат 100 мк и т.д.) */}
-                      {variantSubtypes.length > 0 && (
+                      {uniqueSubtypes.length > 0 && (
                         <div className="param-group">
                           <label style={{ fontSize: '14px', color: '#666', fontWeight: 500, marginBottom: '6px', display: 'block' }}>
                             2. Подтип с плотностью:
                           </label>
                           <select
-                            value={selectedData?.subtype || variantSubtypes[0]?.value || variantSubtypes[0] || ''}
-                            onChange={(e) => updateOperationSubtype(operationId, e.target.value)}
+                            value={selectedData?.subtype || uniqueSubtypes[0]?.value || ''}
+                            onChange={(e) => {
+                              const newSubtypeValue = e.target.value;
+                              // Находим подтип и его variantId
+                              const selectedSubtype = uniqueSubtypes.find(st => st.value === newSubtypeValue);
+                              updateSpecs({
+                                selectedOperations: selectedOperations.map((op: SelectedOperation) => {
+                                  if (op.operationId === operationId) {
+                                    return {
+                                      ...op,
+                                      variantId: selectedSubtype?.variantId || op.variantId, // Обновляем variantId при выборе подтипа
+                                      subtype: newSubtypeValue,
+                                    };
+                                  }
+                                  return op;
+                                }),
+                              }, true);
+                            }}
                             className="form-control"
                             style={{ 
                               fontSize: '14px',
@@ -410,15 +450,11 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                               width: '100%'
                             }}
                           >
-                            {variantSubtypes.map((st: string | { value: string; label: string }) => {
-                              const value = typeof st === 'string' ? st : st.value;
-                              const label = typeof st === 'string' ? st : st.label;
-                              return (
-                                <option key={value} value={value}>
-                                  {label}
-                                </option>
-                              );
-                            })}
+                            {uniqueSubtypes.map((st) => (
+                              <option key={st.value} value={st.value}>
+                                {st.label}
+                              </option>
+                            ))}
                           </select>
                         </div>
                       )}
