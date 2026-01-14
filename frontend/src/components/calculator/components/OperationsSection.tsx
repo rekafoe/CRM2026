@@ -91,14 +91,24 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       const operationsToLoad = operations.filter((op: Operation) => {
         const operationId = op.operation_id || op.id;
         if (!operationId) return false;
-        // Загружаем варианты для операций типа 'laminate' или если в parameters указано, что есть варианты
+        
+        // 🆕 Проверяем несколько условий для определения операций с вариантами:
+        // 1. Тип операции 'laminate'
+        // 2. Название операции содержит "Ламинация" или "lamination" (case-insensitive)
+        // 3. В parameters указано, что есть варианты
         const opType = op.operation_type || (op.parameters && typeof op.parameters === 'object' ? op.parameters.operation_type : null);
-        const shouldLoad = opType === 'laminate' || (op.parameters && typeof op.parameters === 'object' && op.parameters.hasVariants);
+        const operationName = (op.operation_name || op.name || '').toLowerCase();
+        const isLamination = operationName.includes('ламинация') || operationName.includes('lamination');
+        const hasVariantsFlag = op.parameters && typeof op.parameters === 'object' && op.parameters.hasVariants;
+        
+        const shouldLoad = opType === 'laminate' || isLamination || hasVariantsFlag;
         
         console.log('🔍 [OperationsSection] Проверка операции для загрузки вариантов', {
           operationId,
           operationName: op.operation_name || op.name,
           opType,
+          isLamination,
+          hasVariantsFlag,
           shouldLoad,
           hasParameters: !!op.parameters,
           parametersType: typeof op.parameters
