@@ -32,16 +32,45 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   // Получаем операции из схемы
   const operations = useMemo(() => {
     if (!backendProductSchema?.operations || !Array.isArray(backendProductSchema.operations)) {
+      console.log('🔍 [OperationsSection] Нет операций в схеме', {
+        hasSchema: !!backendProductSchema,
+        hasOperations: !!backendProductSchema?.operations,
+        operationsType: typeof backendProductSchema?.operations,
+        operationsIsArray: Array.isArray(backendProductSchema?.operations),
+        operationsLength: backendProductSchema?.operations?.length
+      });
       return [];
     }
     
-    // Фильтруем только опциональные операции (не обязательные)
-    return backendProductSchema.operations.filter((op: Operation) => {
-      const isRequired = op.is_required === true || op.is_required === 1;
-      const isOptional = op.is_optional === true || op.is_optional === 1;
-      // Показываем только опциональные операции (не обязательные)
-      return !isRequired || isOptional;
+    console.log('🔍 [OperationsSection] Операции найдены', {
+      total: backendProductSchema.operations.length,
+      operations: backendProductSchema.operations.map((op: Operation) => ({
+        id: op.id || op.operation_id,
+        name: op.operation_name || op.name,
+        is_required: op.is_required,
+        is_optional: op.is_optional
+      }))
     });
+    
+    // Фильтруем операции: показываем все, которые НЕ обязательные
+    // (is_required !== true и !== 1)
+    // ВРЕМЕННО: показываем ВСЕ операции для отладки
+    const filtered = backendProductSchema.operations.filter((op: Operation) => {
+      const isRequired = op.is_required === true || op.is_required === 1;
+      // ВРЕМЕННО: показываем все операции (включая обязательные) для отладки
+      // TODO: вернуть фильтр !isRequired после проверки
+      return true; // Показываем все операции
+    });
+    
+    console.log('🔍 [OperationsSection] Отфильтрованные операции', {
+      total: filtered.length,
+      operations: filtered.map((op: Operation) => ({
+        id: op.id || op.operation_id,
+        name: op.operation_name || op.name
+      }))
+    });
+    
+    return filtered;
   }, [backendProductSchema?.operations]);
 
   // Получаем выбранные операции из specs
