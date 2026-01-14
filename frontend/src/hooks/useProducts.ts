@@ -228,13 +228,13 @@ export const useProducts = (): UseProductsReturn => {
     );
   }, [logger, executeAsync]);
 
-  // Загрузка всех продуктов
-  const loadAllProducts = useCallback(async () => {
+  // Загрузка всех продуктов (только активные для калькулятора/заказов)
+  const loadAllProducts = useCallback(async (activeOnly: boolean = true) => {
     await executeAsync(
       async () => {
-        logger.info('🔄 Загружаем все продукты...');
-        const productsData = await getAllProducts();
-        logger.info(`✅ Все продукты загружены (${productsData.length})`);
+        logger.info('🔄 Загружаем все продукты...', { activeOnly });
+        const productsData = await getAllProducts(false, activeOnly);
+        logger.info(`✅ Все продукты загружены (${productsData.length})`, { activeOnly });
         return productsData;
       },
       { type: 'SET_LOADING_PRODUCTS', payload: true },
@@ -262,11 +262,11 @@ export const useProducts = (): UseProductsReturn => {
     );
   }, [logger, executeAsync]);
 
-  // Поиск продуктов
+  // Поиск продуктов (только активные для калькулятора/заказов)
   const searchProductsHandler = useCallback(async (query: string): Promise<Product[]> => {
     try {
       logger.info(`🔍 Поиск продуктов: ${query}`);
-      const searchResults = await searchProducts(query);
+      const searchResults = await searchProducts(query, true); // ✅ Ищем только активные продукты
       logger.info(`✅ Поиск завершен (${searchResults.length})`);
       return searchResults;
     } catch (error) {
@@ -288,7 +288,7 @@ export const useProducts = (): UseProductsReturn => {
     logger.info('🔄 Обновляем данные продуктов...');
     clearProductCache();
     await loadCategories();
-    await loadAllProducts();
+    await loadAllProducts(true); // ✅ Загружаем только активные продукты
     logger.info('✅ Данные продуктов обновлены');
   }, [logger, loadCategories, loadAllProducts]);
 
@@ -315,7 +315,7 @@ export const useProducts = (): UseProductsReturn => {
       initializationRef.current = true;
       logger.info('🚀 Инициализация хука useProducts');
       void loadCategories();
-      void loadAllProducts();
+      void loadAllProducts(true); // ✅ Загружаем только активные продукты для калькулятора/заказов
       dispatch({ type: 'SET_INITIALIZED', payload: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

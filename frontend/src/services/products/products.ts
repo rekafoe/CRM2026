@@ -8,7 +8,7 @@ import { KeyedCache, SimpleCache } from './utils/cache';
 import { apiRequest, apiRequestSafe, extractData } from './utils/apiHelpers';
 
 const productsByCategoryCache = new KeyedCache<Product[]>(5 * 60 * 1000);
-const allProductsCache = new SimpleCache<Product[]>(5 * 60 * 1000);
+const allProductsCache = new KeyedCache<Product[]>(5 * 60 * 1000); // ✅ Используем KeyedCache для поддержки activeOnly
 const productDetailsCache = new KeyedCache<ProductWithDetails>(5 * 60 * 1000);
 
 /**
@@ -37,20 +37,24 @@ export async function getProductsByCategory(
 
 /**
  * Получить все продукты
+ * @param force - принудительно обновить кэш
+ * @param activeOnly - показывать только активные продукты (для калькулятора/заказов)
  */
-export async function getAllProducts(force: boolean = false): Promise<Product[]> {
+export async function getAllProducts(force: boolean = false, activeOnly: boolean = false): Promise<Product[]> {
+  const cacheKey = activeOnly ? 'active' : 'all';
+  
   if (!force) {
-    const cached = allProductsCache.get();
+    const cached = allProductsCache.get(cacheKey);
     if (cached) return cached;
   }
 
   const products = await apiRequestSafe<Product[]>(
-    () => api.get('/products'),
+    () => api.get('/products', { params: activeOnly ? { activeOnly: 'true' } : {} }),
     'загрузки всех продуктов',
     []
   );
 
-  allProductsCache.set(products);
+  allProductsCache.set(cacheKey, products);
   return products;
 }
 
@@ -110,7 +114,7 @@ export async function createProduct(productData: {
   
   // Инвалидируем кэши
   productsByCategoryCache.clear();
-  allProductsCache.clear();
+  allProductsCache.clear(); // Очищаем все ключи (all и active)
   
   return extractData(response, { id: 0, name: '' });
 }
@@ -128,11 +132,11 @@ export async function deleteProduct(productId: number): Promise<void> {
 }
 
 /**
- * Поиск продуктов
+ * Поиск продуктов (только активные для калькулятора/заказов)
  */
-export async function searchProducts(query: string): Promise<Product[]> {
+export async function searchProducts(query: string, activeOnly: boolean = true): Promise<Product[]> {
   return apiRequestSafe<Product[]>(
-    () => api.get('/products', { params: { search: query } }),
+    () => api.get('/products', { params: { search: query, ...(activeOnly ? { activeOnly: 'true' } : {}) } }),
     `поиска продуктов "${query}"`,
     []
   );
@@ -188,7 +192,7 @@ export async function createProductWithSetup(payload: {
   
   // Инвалидируем кэши
   productsByCategoryCache.clear();
-  allProductsCache.clear();
+  allProductsCache.clear(); // Очищаем все ключи (all и active)
   
   return extractData(response, { id: 0, name: '' });
 }

@@ -39,7 +39,8 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/products');
+      // ✅ Загружаем только активные продукты для заказов
+      const response = await api.get('/products', { params: { activeOnly: 'true' } });
       setProducts(response.data);
     } catch (error) {
       console.error('Error loading products:', error);
