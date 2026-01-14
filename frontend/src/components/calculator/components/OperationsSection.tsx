@@ -369,26 +369,47 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   // 🆕 Собираем все подтипы из всех вариантов с выбранным типом
                   const variantsOfSelectedType = allVariants.filter(v => v.variantName === selectedTypeName);
                   
+                  // 🆕 Детальное логирование для отладки
+                  const firstVariant = variantsOfSelectedType[0];
                   console.log('🔍 [OperationsSection] Варианты выбранного типа', {
                     selectedTypeName,
                     variantsOfSelectedTypeCount: variantsOfSelectedType.length,
-                    variants: variantsOfSelectedType.map(v => ({
+                    firstVariant: firstVariant ? {
+                      id: firstVariant.id,
+                      name: firstVariant.variantName,
+                      hasParameters: !!firstVariant.parameters,
+                      parametersType: typeof firstVariant.parameters,
+                      parametersKeys: firstVariant.parameters ? Object.keys(firstVariant.parameters) : [],
+                      fullParameters: firstVariant.parameters, // 🆕 Полные parameters для анализа
+                      hasSubtypes: !!(firstVariant.parameters?.subtypes),
+                      subtypesCount: firstVariant.parameters?.subtypes?.length || 0,
+                      subtypes: firstVariant.parameters?.subtypes
+                    } : null,
+                    sampleVariants: variantsOfSelectedType.slice(0, 5).map(v => ({
                       id: v.id,
                       name: v.variantName,
-                      hasSubtypes: !!(v.parameters?.subtypes),
-                      subtypesCount: v.parameters?.subtypes?.length || 0,
-                      subtypes: v.parameters?.subtypes
+                      parametersKeys: v.parameters ? Object.keys(v.parameters) : []
                     }))
                   });
                   
-                  const allSubtypes = variantsOfSelectedType.flatMap(v => {
-                    const subtypes = v.parameters?.subtypes || [];
-                    return subtypes.map((st: string | { value: string; label: string }) => ({
-                      value: typeof st === 'string' ? st : (st.value || st),
-                      label: typeof st === 'string' ? st : (st.label || st.value || st),
-                      variantId: v.id // Сохраняем variantId для каждого подтипа
-                    }));
-                  });
+                  // 🆕 Подтипы формируются из parameters.type + parameters.density (как в ServiceVariantsTable)
+                  const allSubtypes = variantsOfSelectedType
+                    .filter(v => v.parameters?.type || v.parameters?.density) // Фильтруем только варианты с type или density
+                    .map(v => {
+                      const type = v.parameters?.type || '';
+                      const density = v.parameters?.density || '';
+                      // Формируем подтип как "type density" (например, "глянец 32 мк")
+                      const subtypeLabel = type && density 
+                        ? `${type} ${density}` 
+                        : type || density || `Вариант ${v.id}`;
+                      const subtypeValue = subtypeLabel; // Используем label как value
+                      
+                      return {
+                        value: subtypeValue,
+                        label: subtypeLabel,
+                        variantId: v.id // Сохраняем variantId для каждого подтипа
+                      };
+                    });
                   
                   // 🆕 Дедуплицируем подтипы по value
                   const uniqueSubtypes = Array.from(
