@@ -4,7 +4,8 @@ export type PaymentMethod = 'online' | 'offline' | 'telegram';
 export type OrderStatus = 'new' | 'in_production' | 'ready_to_ship' | 'shipped' | 'completed';
 
 // Реэкспорт типов калькулятора из shared, чтобы импорты вида "../../types" работали консистентно
-export type { ProductSpecs, CalculationResult, Customer } from '../../shared/types/entities';
+import type { Customer } from '../../shared/types/entities';
+export type { ProductSpecs, CalculationResult, Customer };
 
 export interface ItemParams {
   description: string;
