@@ -1,5 +1,22 @@
 import { getDb } from '../../../config/database'
-import { Customer } from '../../../../shared/types/entities'
+
+// Интерфейс Customer определен локально, так как shared/types может быть недоступен в backend
+export interface Customer {
+  id: number;
+  type: 'individual' | 'legal';
+  first_name?: string;
+  last_name?: string;
+  middle_name?: string;
+  company_name?: string;
+  legal_name?: string;
+  tax_id?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export class CustomerService {
   /**

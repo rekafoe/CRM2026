@@ -125,11 +125,13 @@ export class OrderController {
       const id = Number(req.params.id)
       const { customer_id } = req.body
       if (isNaN(id)) {
-        return res.status(400).json({ error: 'Неверный ID заказа' })
+        res.status(400).json({ error: 'Неверный ID заказа' })
+        return
       }
       const customerId = customer_id === null || customer_id === undefined ? null : Number(customer_id)
       if (customerId !== null && isNaN(customerId)) {
-        return res.status(400).json({ error: 'Неверный ID клиента' })
+        res.status(400).json({ error: 'Неверный ID клиента' })
+        return
       }
       const updated = await OrderService.updateOrderCustomer(id, customerId)
       res.json(updated)

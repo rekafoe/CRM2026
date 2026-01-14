@@ -12,6 +12,6 @@
     "allowJs": false,
     "checkJs": false
   },
-  "include": ["src", "migrations"],
+  "include": ["src", "migrations", "../shared"],
   "exclude": ["node_modules", "dist"]
 }

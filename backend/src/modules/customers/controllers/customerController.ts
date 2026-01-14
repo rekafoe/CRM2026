@@ -20,12 +20,14 @@ export class CustomerController {
   static getById = asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) {
-      return res.status(400).json({ error: 'Неверный ID клиента' })
+      res.status(400).json({ error: 'Неверный ID клиента' })
+      return
     }
 
     const customer = await CustomerService.getCustomerById(id)
     if (!customer) {
-      return res.status(404).json({ error: 'Клиент не найден' })
+      res.status(404).json({ error: 'Клиент не найден' })
+      return
     }
 
     res.json(customer)
@@ -50,7 +52,8 @@ export class CustomerController {
     } = req.body
 
     if (!type || !['individual', 'legal'].includes(type)) {
-      return res.status(400).json({ error: 'Необходимо указать тип клиента (individual или legal)' })
+      res.status(400).json({ error: 'Необходимо указать тип клиента (individual или legal)' })
+      return
     }
 
     try {
@@ -80,7 +83,8 @@ export class CustomerController {
   static update = asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) {
-      return res.status(400).json({ error: 'Неверный ID клиента' })
+      res.status(400).json({ error: 'Неверный ID клиента' })
+      return
     }
 
     const {
@@ -115,7 +119,8 @@ export class CustomerController {
       res.json(customer)
     } catch (error: any) {
       if (error.message === 'Клиент не найден') {
-        return res.status(404).json({ error: error.message })
+        res.status(404).json({ error: error.message })
+        return
       }
       res.status(400).json({ error: error.message || 'Ошибка обновления клиента' })
     }
@@ -127,7 +132,8 @@ export class CustomerController {
   static delete = asyncHandler(async (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) {
-      return res.status(400).json({ error: 'Неверный ID клиента' })
+      res.status(400).json({ error: 'Неверный ID клиента' })
+      return
     }
 
     try {
@@ -135,7 +141,8 @@ export class CustomerController {
       res.status(204).send()
     } catch (error: any) {
       if (error.message.includes('не найден')) {
-        return res.status(404).json({ error: error.message })
+        res.status(404).json({ error: error.message })
+        return
       }
       res.status(400).json({ error: error.message || 'Ошибка удаления клиента' })
     }
