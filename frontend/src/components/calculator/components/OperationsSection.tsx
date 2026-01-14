@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 
 interface Operation {
   id?: number;
@@ -51,88 +51,97 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     return Array.isArray(ops) ? ops : [];
   }, [specs.selectedOperations]);
 
-  // Парсим параметры операции для получения подтипов
-  const getOperationSubtypes = (operation: Operation): Array<{ value: string; label: string }> => {
-    if (!operation.parameters) return [];
-    
-    try {
-      const params = typeof operation.parameters === 'string' 
-        ? JSON.parse(operation.parameters) 
-        : operation.parameters;
+  // Мемоизируем карту операций с подтипами для производительности
+  const operationsWithSubtypes = useMemo(() => {
+    return operations.map((operation: Operation) => {
+      let subtypes: Array<{ value: string; label: string }> = [];
       
-      // Ищем поле с подтипами (например, для ламинации: matte, glossy)
-      if (params.subtypes && Array.isArray(params.subtypes)) {
-        return params.subtypes.map((st: string | { value: string; label: string }) => {
-          if (typeof st === 'string') {
-            return { value: st, label: st };
+      if (operation.parameters) {
+        try {
+          const params = typeof operation.parameters === 'string' 
+            ? JSON.parse(operation.parameters) 
+            : operation.parameters;
+          
+          // Ищем поле с подтипами (например, для ламинации: matte, glossy)
+          if (params.subtypes && Array.isArray(params.subtypes)) {
+            subtypes = params.subtypes.map((st: string | { value: string; label: string }) => {
+              if (typeof st === 'string') {
+                return { value: st, label: st };
+              }
+              return st;
+            });
+          } else if (params.options && Array.isArray(params.options)) {
+            subtypes = params.options.map((opt: string | { value: string; label: string }) => {
+              if (typeof opt === 'string') {
+                return { value: opt, label: opt };
+              }
+              return opt;
+            });
+          } else if (params.enum && Array.isArray(params.enum)) {
+            subtypes = params.enum.map((opt: string | { value: string; label: string }) => {
+              if (typeof opt === 'string') {
+                return { value: opt, label: opt };
+              }
+              return opt;
+            });
           }
-          return st;
-        });
+        } catch (e) {
+          console.warn('Ошибка парсинга параметров операции:', e);
+        }
       }
       
-      // Альтернативный формат: options или enum
-      if (params.options && Array.isArray(params.options)) {
-        return params.options.map((opt: string | { value: string; label: string }) => {
-          if (typeof opt === 'string') {
-            return { value: opt, label: opt };
-          }
-          return opt;
-        });
-      }
-      
-      if (params.enum && Array.isArray(params.enum)) {
-        return params.enum.map((opt: string | { value: string; label: string }) => {
-          if (typeof opt === 'string') {
-            return { value: opt, label: opt };
-          }
-          return opt;
-        });
-      }
-    } catch (e) {
-      console.warn('Ошибка парсинга параметров операции:', e);
-    }
-    
-    return [];
-  };
+      return { operation, subtypes };
+    });
+  }, [operations]);
 
-  // Проверяем, выбрана ли операция
-  const isOperationSelected = (operationId: number): boolean => {
-    return selectedOperations.some((op: SelectedOperation) => op.operationId === operationId);
-  };
+  // Мемоизируем карту выбранных операций для быстрого доступа
+  const selectedOperationsMap = useMemo(() => {
+    const map = new Map<number, SelectedOperation>();
+    selectedOperations.forEach((op: SelectedOperation) => {
+      map.set(op.operationId, op);
+    });
+    return map;
+  }, [selectedOperations]);
 
-  // Получаем данные выбранной операции
-  const getSelectedOperationData = (operationId: number): SelectedOperation | null => {
-    return selectedOperations.find((op: SelectedOperation) => op.operationId === operationId) || null;
-  };
+  // Проверяем, выбрана ли операция (мемоизированная версия)
+  const isOperationSelected = useCallback((operationId: number): boolean => {
+    return selectedOperationsMap.has(operationId);
+  }, [selectedOperationsMap]);
 
-  // Переключаем выбор операции
-  const toggleOperation = (operation: Operation) => {
+  // Получаем данные выбранной операции (мемоизированная версия)
+  const getSelectedOperationData = useCallback((operationId: number): SelectedOperation | null => {
+    return selectedOperationsMap.get(operationId) || null;
+  }, [selectedOperationsMap]);
+
+  // Переключаем выбор операции (мемоизированная версия)
+  const toggleOperation = useCallback((operation: Operation) => {
     const operationId = operation.operation_id || operation.id;
     if (!operationId) return;
 
-    const isSelected = isOperationSelected(operationId);
+    const isSelected = selectedOperationsMap.has(operationId);
     const currentOps = [...selectedOperations];
 
     if (isSelected) {
       // Удаляем операцию
       const filtered = currentOps.filter((op: SelectedOperation) => op.operationId !== operationId);
-      console.log('🔧 [OperationsSection] Удаляем операцию', { operationId, filtered });
       updateSpecs({ selectedOperations: filtered }, true);
     } else {
       // Добавляем операцию с дефолтными значениями
-      const subtypes = getOperationSubtypes(operation);
+      const opWithSubtypes = operationsWithSubtypes.find((item: { operation: Operation; subtypes: Array<{ value: string; label: string }> }) => 
+        (item.operation.operation_id || item.operation.id) === operationId
+      );
+      const subtypes = opWithSubtypes?.subtypes || [];
       const newOp: SelectedOperation = {
         operationId,
         quantity: 1,
         ...(subtypes.length > 0 && { subtype: subtypes[0].value }),
       };
-      console.log('🔧 [OperationsSection] Добавляем операцию', { operationId, newOp, allOps: [...currentOps, newOp] });
       updateSpecs({ selectedOperations: [...currentOps, newOp] }, true);
     }
-  };
+  }, [selectedOperations, selectedOperationsMap, operationsWithSubtypes, updateSpecs]);
 
-  // Обновляем подтип операции
-  const updateOperationSubtype = (operationId: number, subtype: string) => {
+  // Обновляем подтип операции (мемоизированная версия)
+  const updateOperationSubtype = useCallback((operationId: number, subtype: string) => {
     const updated = selectedOperations.map((op: SelectedOperation) => {
       if (op.operationId === operationId) {
         return { ...op, subtype };
@@ -140,10 +149,10 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       return op;
     });
     updateSpecs({ selectedOperations: updated }, true);
-  };
+  }, [selectedOperations, updateSpecs]);
 
-  // Обновляем количество операции
-  const updateOperationQuantity = (operationId: number, quantity: number) => {
+  // Обновляем количество операции (мемоизированная версия)
+  const updateOperationQuantity = useCallback((operationId: number, quantity: number) => {
     const updated = selectedOperations.map((op: SelectedOperation) => {
       if (op.operationId === operationId) {
         return { ...op, quantity: Math.max(1, quantity) };
@@ -151,7 +160,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       return op;
     });
     updateSpecs({ selectedOperations: updated }, true);
-  };
+  }, [selectedOperations, updateSpecs]);
 
   if (operations.length === 0) {
     return null;
@@ -161,14 +170,13 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     <div className="form-section compact">
       <h3>🔧 Операции</h3>
       <div className="advanced-grid compact">
-        {operations.map((operation: Operation) => {
+        {operationsWithSubtypes.map(({ operation, subtypes }: { operation: Operation; subtypes: Array<{ value: string; label: string }> }) => {
           const operationId = operation.operation_id || operation.id;
           if (!operationId) return null;
 
           const operationName = operation.operation_name || operation.name || 'Операция';
           const isSelected = isOperationSelected(operationId);
           const selectedData = getSelectedOperationData(operationId);
-          const subtypes = getOperationSubtypes(operation);
 
           return (
             <div key={operationId} className="param-group operation-group" style={{ gridColumn: 'span 2' }}>
@@ -196,7 +204,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         className="form-control"
                         style={{ fontSize: '14px' }}
                       >
-                        {subtypes.map((st) => (
+                        {subtypes.map((st: { value: string; label: string }) => (
                           <option key={st.value} value={st.value}>
                             {st.label}
                           </option>
@@ -219,14 +227,25 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         style={{
                           width: '32px',
                           height: '32px',
-                          border: '1px solid #ddd',
-                          background: '#fff',
+                          border: '1px solid #dcdfe6',
+                          background: '#f5f7fa',
+                          color: '#606266',
                           borderRadius: '4px',
                           cursor: 'pointer',
                           fontSize: '18px',
+                          fontWeight: '500',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#e4e7ed';
+                          e.currentTarget.style.borderColor = '#c0c4cc';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#f5f7fa';
+                          e.currentTarget.style.borderColor = '#dcdfe6';
                         }}
                       >
                         −
@@ -258,14 +277,25 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         style={{
                           width: '32px',
                           height: '32px',
-                          border: '1px solid #ddd',
-                          background: '#fff',
+                          border: '1px solid #dcdfe6',
+                          background: '#f5f7fa',
+                          color: '#606266',
                           borderRadius: '4px',
                           cursor: 'pointer',
                           fontSize: '18px',
+                          fontWeight: '500',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#e4e7ed';
+                          e.currentTarget.style.borderColor = '#c0c4cc';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#f5f7fa';
+                          e.currentTarget.style.borderColor = '#dcdfe6';
                         }}
                       >
                         +
