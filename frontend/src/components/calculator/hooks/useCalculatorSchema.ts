@@ -91,6 +91,15 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
         
         if (cancelled || !mountedRef.current) return;
         
+        // 🆕 Логируем полный ответ от API ПЕРЕД извлечением схемы
+        console.log('🔍 [useCalculatorSchema] Полный ответ от API', {
+          resp: resp,
+          respData: resp?.data,
+          respDataData: resp?.data?.data,
+          respDataDataOperations: resp?.data?.data?.operations,
+          respDataDataOperationsLength: resp?.data?.data?.operations?.length
+        });
+        
         // 🆕 Логируем операции для отладки
         console.log('🔍 [useCalculatorSchema] Схема загружена', {
           key,
@@ -103,7 +112,8 @@ export function useCalculatorSchema({ productType, productId, log, setSpecs }: U
           operationsIsArray: Array.isArray(schema?.operations),
           operationsLength: schema?.operations?.length || 0,
           operations: schema?.operations,
-          fields: schema?.fields?.length || 0
+          fields: schema?.fields?.length || 0,
+          fullSchema: schema // 🆕 Полная схема для диагностики
         });
         
         // Сохраняем в глобальный кэш
