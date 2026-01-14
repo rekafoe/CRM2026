@@ -96,6 +96,7 @@ interface SimplifiedSizeConfig {
     service_id: number;
     price_unit: 'per_cut' | 'per_item';
     units_per_item: number;
+    variant_id?: number; // 🆕 ID варианта для услуг с вариантами (например, ламинация)
     // ✅ tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг
     // tiers оставлен только для обратной совместимости со старыми данными
     tiers?: SimplifiedQtyTier[]; // Опционально, только для чтения старых данных
@@ -355,10 +356,23 @@ export class SimplifiedPricingService {
         const serviceNamesMap = new Map(services.map(s => [s.id, s.name]));
 
         // Загружаем тарифы из service_volume_prices / service_variant_prices через репозиторий
-        const serviceTiersMap = new Map<number, SimplifiedQtyTier[]>();
-        for (const serviceId of uniqueServiceIds) {
+        // 🆕 Для услуг с вариантами используем тарифы варианта, иначе базовые тарифы услуги
+        const serviceTiersMap = new Map<string, SimplifiedQtyTier[]>(); // Ключ: "serviceId" или "serviceId:variantId"
+        
+        for (const finConfig of normalizedConfig.finishing) {
+          const serviceId = finConfig.service_id;
+          const variantId = finConfig.variant_id;
+          const mapKey = variantId ? `${serviceId}:${variantId}` : String(serviceId);
+          
+          // Пропускаем, если уже загрузили для этого ключа
+          if (serviceTiersMap.has(mapKey)) continue;
+          
           try {
-            const tiers = await PricingServiceRepository.listServiceTiers(serviceId);
+            // 🆕 Если есть variantId, загружаем тарифы варианта, иначе базовые тарифы услуги
+            const tiers = variantId 
+              ? await PricingServiceRepository.listServiceTiers(serviceId, variantId)
+              : await PricingServiceRepository.listServiceTiers(serviceId);
+            
             if (tiers && tiers.length > 0) {
               // Конвертируем ServiceVolumeTierDTO -> SimplifiedQtyTier с расчётом max_qty по следующему minQuantity
               const sorted = [...tiers].sort((a, b) => a.minQuantity - b.minQuantity);
@@ -367,10 +381,11 @@ export class SimplifiedPricingService {
                 max_qty: idx < sorted.length - 1 ? sorted[idx + 1].minQuantity - 1 : undefined,
                 unit_price: t.rate,
               }));
-              serviceTiersMap.set(serviceId, simplifiedTiers);
+              serviceTiersMap.set(mapKey, simplifiedTiers);
               logger.info('🔧 [SimplifiedPricingService] Загружены объёмные тарифы для услуги', {
                 productId,
                 serviceId,
+                variantId,
                 tiersCount: simplifiedTiers.length,
                 tiers: simplifiedTiers,
               });
@@ -378,7 +393,7 @@ export class SimplifiedPricingService {
               // Если нет объёмных тарифов, пробуем взять базовую цену услуги и сделать один бесконечный диапазон
               const baseService = await PricingServiceRepository.getServiceById(serviceId);
               if (baseService && baseService.rate > 0) {
-                serviceTiersMap.set(serviceId, [{
+                serviceTiersMap.set(mapKey, [{
                   min_qty: 1,
                   max_qty: undefined,
                   unit_price: baseService.rate,
@@ -386,12 +401,14 @@ export class SimplifiedPricingService {
                 logger.info('🔧 [SimplifiedPricingService] Используем базовую ставку услуги как единый диапазон', {
                   productId,
                   serviceId,
+                  variantId,
                   rate: baseService.rate,
                 });
               } else {
                 logger.warn('⚠️ [SimplifiedPricingService] Не найдены ни объёмные тарифы, ни базовая ставка для услуги', {
                   productId,
                   serviceId,
+                  variantId,
                 });
               }
             }
@@ -399,6 +416,7 @@ export class SimplifiedPricingService {
             logger.warn('Не удалось загрузить тарифы услуги для упрощённого калькулятора', {
               productId,
               serviceId,
+              variantId,
               error: (error as Error).message,
             });
           }
@@ -410,7 +428,9 @@ export class SimplifiedPricingService {
         });
 
         for (const finConfig of normalizedConfig.finishing) {
-          const tiers = serviceTiersMap.get(finConfig.service_id);
+          // 🆕 Используем ключ с variantId, если он есть
+          const mapKey = finConfig.variant_id ? `${finConfig.service_id}:${finConfig.variant_id}` : String(finConfig.service_id);
+          const tiers = serviceTiersMap.get(mapKey);
           if (!tiers || tiers.length === 0) {
             logger.warn('Не найдены тарифы для услуги отделки в упрощённом калькуляторе', {
               productId,

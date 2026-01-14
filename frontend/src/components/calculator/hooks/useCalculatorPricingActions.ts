@@ -225,6 +225,8 @@ export function useCalculatorPricingActions({
                 service_id: Number(serviceId),
                 price_unit: priceUnit,
                 units_per_item: unitsPerItem,
+                // 🆕 Передаём variantId для услуг с вариантами (например, ламинация)
+                ...(sel.variantId ? { variant_id: Number(sel.variantId) } : {}),
               };
             })
             .filter((f): f is { service_id: number; price_unit: 'per_cut' | 'per_item'; units_per_item: number } => !!f);

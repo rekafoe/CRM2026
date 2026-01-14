@@ -1,4 +1,6 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import { getServiceVariants } from '../../../services/pricing/api';
+import type { ServiceVariant } from '../../../types/pricing';
 
 interface Operation {
   id?: number;
@@ -10,6 +12,7 @@ interface Operation {
   is_default?: boolean | number;
   parameters?: string | any; // JSON строка или объект
   linked_parameter_name?: string;
+  operation_type?: string; // Тип операции (например, 'laminate')
 }
 
 interface OperationsSectionProps {
@@ -20,7 +23,8 @@ interface OperationsSectionProps {
 
 interface SelectedOperation {
   operationId: number;
-  subtype?: string;
+  subtype?: string; // Подтип (например, "глянец 32 мк")
+  variantId?: number; // ID варианта (типа) для услуг с вариантами (например, ламинация)
   quantity?: number;
 }
 
@@ -45,11 +49,97 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     return filtered;
   }, [backendProductSchema?.operations]);
 
+  // 🆕 Состояние для вариантов услуг (типы и подтипы)
+  const [serviceVariants, setServiceVariants] = useState<Map<number, ServiceVariant[]>>(new Map());
+  const [loadingVariants, setLoadingVariants] = useState<Set<number>>(new Set());
+
   // Получаем выбранные операции из specs
   const selectedOperations = useMemo(() => {
     const ops = specs.selectedOperations || [];
     return Array.isArray(ops) ? ops : [];
   }, [specs.selectedOperations]);
+
+  // 🆕 Загружаем варианты для операций, которые их поддерживают (например, ламинация)
+  useEffect(() => {
+    const loadVariantsForOperations = async () => {
+      const operationsToLoad = operations.filter((op: Operation) => {
+        const operationId = op.operation_id || op.id;
+        if (!operationId) return false;
+        // Загружаем варианты для операций типа 'laminate' или если в parameters указано, что есть варианты
+        const opType = op.operation_type || (op.parameters && typeof op.parameters === 'object' ? op.parameters.operation_type : null);
+        return opType === 'laminate' || (op.parameters && typeof op.parameters === 'object' && op.parameters.hasVariants);
+      });
+
+      for (const op of operationsToLoad) {
+        const operationId = op.operation_id || op.id;
+        if (!operationId || serviceVariants.has(operationId) || loadingVariants.has(operationId)) continue;
+
+        setLoadingVariants(prev => new Set(prev).add(operationId));
+        try {
+          const variants = await getServiceVariants(operationId);
+          setServiceVariants(prev => {
+            const next = new Map(prev);
+            next.set(operationId, variants.filter(v => v.isActive));
+            return next;
+          });
+        } catch (error) {
+          console.error(`Ошибка загрузки вариантов для операции ${operationId}:`, error);
+        } finally {
+          setLoadingVariants(prev => {
+            const next = new Set(prev);
+            next.delete(operationId);
+            return next;
+          });
+        }
+      }
+    };
+
+    if (operations.length > 0) {
+      void loadVariantsForOperations();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operations.length]); // Загружаем только при изменении количества операций
+
+  // 🆕 Загружаем варианты для операций, которые их поддерживают (например, ламинация)
+  useEffect(() => {
+    const loadVariantsForOperations = async () => {
+      const operationsToLoad = operations.filter((op: Operation) => {
+        const operationId = op.operation_id || op.id;
+        if (!operationId) return false;
+        // Загружаем варианты для операций типа 'laminate' или если в parameters указано, что есть варианты
+        const opType = op.operation_type || (op.parameters && typeof op.parameters === 'object' ? op.parameters.operation_type : null);
+        return opType === 'laminate' || (op.parameters && typeof op.parameters === 'object' && op.parameters.hasVariants);
+      });
+
+      for (const op of operationsToLoad) {
+        const operationId = op.operation_id || op.id;
+        if (!operationId || serviceVariants.has(operationId) || loadingVariants.has(operationId)) continue;
+
+        setLoadingVariants(prev => new Set(prev).add(operationId));
+        try {
+          const variants = await getServiceVariants(operationId);
+          setServiceVariants(prev => {
+            const next = new Map(prev);
+            next.set(operationId, variants.filter(v => v.isActive));
+            return next;
+          });
+        } catch (error) {
+          console.error(`Ошибка загрузки вариантов для операции ${operationId}:`, error);
+        } finally {
+          setLoadingVariants(prev => {
+            const next = new Set(prev);
+            next.delete(operationId);
+            return next;
+          });
+        }
+      }
+    };
+
+    if (operations.length > 0) {
+      void loadVariantsForOperations();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operations.length]); // Загружаем только при изменении количества операций
 
   // Мемоизируем карту операций с подтипами для производительности
   const operationsWithSubtypes = useMemo(() => {
@@ -127,18 +217,36 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       updateSpecs({ selectedOperations: filtered }, true);
     } else {
       // Добавляем операцию с дефолтными значениями
-      const opWithSubtypes = operationsWithSubtypes.find((item: { operation: Operation; subtypes: Array<{ value: string; label: string }> }) => 
-        (item.operation.operation_id || item.operation.id) === operationId
-      );
-      const subtypes = opWithSubtypes?.subtypes || [];
-      const newOp: SelectedOperation = {
+      const variants = serviceVariants.get(operationId) || [];
+      const hasVariants = variants.length > 0;
+      
+      let newOp: SelectedOperation = {
         operationId,
         quantity: 1,
-        ...(subtypes.length > 0 && { subtype: subtypes[0].value }),
       };
+      
+      if (hasVariants) {
+        // Если есть варианты, выбираем первый вариант и первый подтип
+        const firstVariant = variants[0];
+        const firstSubtype = firstVariant?.parameters?.subtypes?.[0];
+        newOp.variantId = firstVariant.id;
+        if (firstSubtype) {
+          newOp.subtype = typeof firstSubtype === 'string' ? firstSubtype : firstSubtype.value;
+        }
+      } else {
+        // Старая логика: подтипы из parameters
+        const opWithSubtypes = operationsWithSubtypes.find((item: { operation: Operation; subtypes: Array<{ value: string; label: string }> }) => 
+          (item.operation.operation_id || item.operation.id) === operationId
+        );
+        const subtypes = opWithSubtypes?.subtypes || [];
+        if (subtypes.length > 0) {
+          newOp.subtype = subtypes[0].value;
+        }
+      }
+      
       updateSpecs({ selectedOperations: [...currentOps, newOp] }, true);
     }
-  }, [selectedOperations, selectedOperationsMap, operationsWithSubtypes, updateSpecs]);
+  }, [selectedOperations, selectedOperationsMap, operationsWithSubtypes, serviceVariants, updateSpecs]);
 
   // Обновляем подтип операции (мемоизированная версия)
   const updateOperationSubtype = useCallback((operationId: number, subtype: string) => {
@@ -192,30 +300,78 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                 </label>
               </div>
 
-              {isSelected && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginLeft: '26px' }}>
-                  {/* Селектор подтипов (если есть) */}
-                  {subtypes.length > 0 && (
-                    <div className="param-group">
-                      <label style={{ fontSize: '14px', color: '#666' }}>Тип операции:</label>
-                      <select
-                        value={selectedData?.subtype || subtypes[0].value}
-                        onChange={(e) => updateOperationSubtype(operationId, e.target.value)}
-                        className="form-control"
-                        style={{ fontSize: '14px' }}
-                      >
-                        {subtypes.map((st: { value: string; label: string }) => (
-                          <option key={st.value} value={st.value}>
-                            {st.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+              {isSelected && (() => {
+                // 🆕 Проверяем, есть ли варианты для этой операции (например, ламинация)
+                const variants = serviceVariants.get(operationId) || [];
+                const hasVariants = variants.length > 0;
+                
+                // Если есть варианты, используем их как типы
+                if (hasVariants) {
+                  const selectedVariantId = selectedData?.variantId;
+                  const selectedVariant = variants.find(v => v.id === selectedVariantId) || variants[0];
+                  const variantSubtypes = selectedVariant?.parameters?.subtypes || [];
+                  
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginLeft: '26px' }}>
+                      {/* 🆕 Селектор типов (вариантов) */}
+                      <div className="param-group">
+                        <label style={{ fontSize: '14px', color: '#666' }}>Тип ламинации:</label>
+                        <select
+                          value={selectedVariant?.id || variants[0]?.id || ''}
+                          onChange={(e) => {
+                            const newVariantId = Number(e.target.value);
+                            const newVariant = variants.find(v => v.id === newVariantId);
+                            const firstSubtype = newVariant?.parameters?.subtypes?.[0];
+                            updateSpecs({
+                              selectedOperations: selectedOperations.map((op: SelectedOperation) => {
+                                if (op.operationId === operationId) {
+                                  return {
+                                    ...op,
+                                    variantId: newVariantId,
+                                    subtype: firstSubtype?.value || firstSubtype || undefined,
+                                  };
+                                }
+                                return op;
+                              }),
+                            }, true);
+                          }}
+                          className="form-control"
+                          style={{ fontSize: '14px' }}
+                        >
+                          {variants.map((variant) => (
+                            <option key={variant.id} value={variant.id}>
+                              {variant.variantName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {/* 🆕 Селектор подтипов (из выбранного типа) */}
+                      {variantSubtypes.length > 0 && (
+                        <div className="param-group">
+                          <label style={{ fontSize: '14px', color: '#666' }}>Подтип:</label>
+                          <select
+                            value={selectedData?.subtype || variantSubtypes[0]?.value || variantSubtypes[0] || ''}
+                            onChange={(e) => updateOperationSubtype(operationId, e.target.value)}
+                            className="form-control"
+                            style={{ fontSize: '14px' }}
+                          >
+                            {variantSubtypes.map((st: string | { value: string; label: string }) => {
+                              const value = typeof st === 'string' ? st : st.value;
+                              const label = typeof st === 'string' ? st : st.label;
+                              return (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      )}
 
-                  {/* Поле количества */}
-                  <div className="param-group">
-                    <label style={{ fontSize: '14px', color: '#666' }}>Количество:</label>
+                      {/* Поле количества */}
+                      <div className="param-group">
+                        <label style={{ fontSize: '14px', color: '#666' }}>Количество:</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <button
                         type="button"
@@ -302,8 +458,124 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       </button>
                     </div>
                   </div>
-                </div>
-              )}
+                    </div>
+                  );
+                }
+                
+                // Если нет вариантов, используем старую логику с подтипами из parameters
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginLeft: '26px' }}>
+                    {/* Селектор подтипов (если есть) */}
+                    {subtypes.length > 0 && (
+                      <div className="param-group">
+                        <label style={{ fontSize: '14px', color: '#666' }}>Тип операции:</label>
+                        <select
+                          value={selectedData?.subtype || subtypes[0].value}
+                          onChange={(e) => updateOperationSubtype(operationId, e.target.value)}
+                          className="form-control"
+                          style={{ fontSize: '14px' }}
+                        >
+                          {subtypes.map((st: { value: string; label: string }) => (
+                            <option key={st.value} value={st.value}>
+                              {st.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Поле количества */}
+                    <div className="param-group">
+                      <label style={{ fontSize: '14px', color: '#666' }}>Количество:</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          type="button"
+                          className="quantity-btn quantity-btn-minus"
+                          onClick={() => {
+                            const currentQty = selectedData?.quantity || 1;
+                            updateOperationQuantity(operationId, currentQty - 1);
+                          }}
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            border: '1px solid #dcdfe6',
+                            background: '#f5f7fa',
+                            color: '#606266',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '18px',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#e4e7ed';
+                            e.currentTarget.style.borderColor = '#c0c4cc';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#f5f7fa';
+                            e.currentTarget.style.borderColor = '#dcdfe6';
+                          }}
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          value={selectedData?.quantity || 1}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value) || 1;
+                            updateOperationQuantity(operationId, value);
+                          }}
+                          min={1}
+                          className="quantity-input"
+                          style={{
+                            flex: 1,
+                            padding: '6px 12px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            fontSize: '14px',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="quantity-btn quantity-btn-plus"
+                          onClick={() => {
+                            const currentQty = selectedData?.quantity || 1;
+                            updateOperationQuantity(operationId, currentQty + 1);
+                          }}
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            border: '1px solid #dcdfe6',
+                            background: '#f5f7fa',
+                            color: '#606266',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '18px',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#e4e7ed';
+                            e.currentTarget.style.borderColor = '#c0c4cc';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#f5f7fa';
+                            e.currentTarget.style.borderColor = '#dcdfe6';
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
