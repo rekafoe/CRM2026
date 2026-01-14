@@ -758,8 +758,18 @@ router.post('/services/:serviceId/variants', asyncHandler(async (req, res) => {
 
 router.put('/services/:serviceId/variants/:variantId', asyncHandler(async (req, res) => {
   const { variantId } = req.params
+  // 🆕 Нормализуем variantId - извлекаем только числовую часть (на случай, если пришла строка типа "154:1")
+  const normalizedVariantId = typeof variantId === 'string' 
+    ? parseInt(variantId.split(':')[0], 10) 
+    : Number(variantId);
+  
+  if (isNaN(normalizedVariantId)) {
+    res.status(400).json({ success: false, error: `Invalid variantId: ${variantId}` });
+    return;
+  }
+  
   const { variant_name, variantName, parameters, sort_order, sortOrder, is_active, isActive } = req.body
-  const updated = await ServiceManagementService.updateServiceVariant(Number(variantId), {
+  const updated = await ServiceManagementService.updateServiceVariant(normalizedVariantId, {
     variantName: variant_name ?? variantName,
     parameters,
     sortOrder: sort_order ?? sortOrder,
@@ -767,7 +777,7 @@ router.put('/services/:serviceId/variants/:variantId', asyncHandler(async (req, 
   })
 
   if (!updated) {
-    res.status(404).json({ success: false })
+    res.status(404).json({ success: false, error: `Variant with id ${normalizedVariantId} not found` })
     return
   }
 
@@ -776,7 +786,17 @@ router.put('/services/:serviceId/variants/:variantId', asyncHandler(async (req, 
 
 router.delete('/services/:serviceId/variants/:variantId', asyncHandler(async (req, res) => {
   const { variantId } = req.params
-  await ServiceManagementService.deleteServiceVariant(Number(variantId))
+  // 🆕 Нормализуем variantId
+  const normalizedVariantId = typeof variantId === 'string' 
+    ? parseInt(variantId.split(':')[0], 10) 
+    : Number(variantId);
+  
+  if (isNaN(normalizedVariantId)) {
+    res.status(400).json({ success: false, error: `Invalid variantId: ${variantId}` });
+    return;
+  }
+  
+  await ServiceManagementService.deleteServiceVariant(normalizedVariantId)
   res.json({ success: true })
 }))
 
@@ -784,14 +804,17 @@ router.delete('/services/:serviceId/variants/:variantId', asyncHandler(async (re
 router.get('/services/:serviceId/variants/:variantId/tiers', asyncHandler(async (req, res) => {
   const { serviceId, variantId } = req.params
   const serviceIdNum = Number(serviceId)
-  const variantIdNum = Number(variantId)
+  // 🆕 Нормализуем variantId
+  const normalizedVariantId = typeof variantId === 'string' 
+    ? parseInt(variantId.split(':')[0], 10) 
+    : Number(variantId);
   
-  if (isNaN(serviceIdNum) || isNaN(variantIdNum)) {
-    res.status(400).json({ error: 'Invalid serviceId or variantId' })
+  if (isNaN(serviceIdNum) || isNaN(normalizedVariantId)) {
+    res.status(400).json({ error: `Invalid serviceId or variantId: serviceId=${serviceId}, variantId=${variantId}` })
     return
   }
   
-  const tiers = await ServiceManagementService.listServiceTiers(serviceIdNum, variantIdNum)
+  const tiers = await ServiceManagementService.listServiceTiers(serviceIdNum, normalizedVariantId)
   res.json(tiers.map(toTierResponse))
 }))
 
@@ -800,10 +823,13 @@ router.post('/services/:serviceId/variants/:variantId/tiers', asyncHandler(async
   const { min_quantity, minQuantity, price_per_unit, rate, is_active, isActive } = req.body
   
   const serviceIdNum = Number(serviceId)
-  const variantIdNum = Number(variantId)
+  // 🆕 Нормализуем variantId
+  const normalizedVariantId = typeof variantId === 'string' 
+    ? parseInt(variantId.split(':')[0], 10) 
+    : Number(variantId);
   
-  if (isNaN(serviceIdNum) || isNaN(variantIdNum)) {
-    res.status(400).json({ error: 'Invalid serviceId or variantId' })
+  if (isNaN(serviceIdNum) || isNaN(normalizedVariantId)) {
+    res.status(400).json({ error: `Invalid serviceId or variantId: serviceId=${serviceId}, variantId=${variantId}` })
     return
   }
   
@@ -811,7 +837,7 @@ router.post('/services/:serviceId/variants/:variantId/tiers', asyncHandler(async
     minQuantity: Number(min_quantity ?? minQuantity ?? 0),
     rate: Number(price_per_unit ?? rate ?? 0),
     isActive: is_active !== undefined ? !!is_active : isActive,
-    variantId: variantIdNum,
+    variantId: normalizedVariantId,
   })
   res.status(201).json(toTierResponse(tier))
 }))
@@ -950,17 +976,20 @@ router.put('/services/:serviceId/variants/:variantId/prices/:minQuantity', async
   const { serviceId, variantId, minQuantity } = req.params
   const { price } = req.body
   const serviceIdNum = Number(serviceId)
-  const variantIdNum = Number(variantId)
+  // 🆕 Нормализуем variantId
+  const normalizedVariantId = typeof variantId === 'string' 
+    ? parseInt(variantId.split(':')[0], 10) 
+    : Number(variantId);
   const minQuantityNum = Number(minQuantity)
   const priceNum = Number(price)
   
-  if (isNaN(serviceIdNum) || isNaN(variantIdNum) || isNaN(minQuantityNum) || isNaN(priceNum)) {
-    res.status(400).json({ error: 'Invalid serviceId, variantId, minQuantity or price' })
+  if (isNaN(serviceIdNum) || isNaN(normalizedVariantId) || isNaN(minQuantityNum) || isNaN(priceNum)) {
+    res.status(400).json({ error: `Invalid serviceId, variantId, minQuantity or price: serviceId=${serviceId}, variantId=${variantId}` })
     return
   }
   
   try {
-    await PricingServiceRepository.updateVariantPrice(variantIdNum, minQuantityNum, priceNum)
+    await PricingServiceRepository.updateVariantPrice(normalizedVariantId, minQuantityNum, priceNum)
     res.json({ message: 'Variant price updated successfully' })
   } catch (error: any) {
     if (error.status) {
