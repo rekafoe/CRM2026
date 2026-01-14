@@ -231,6 +231,18 @@ export function useCalculatorPricingActions({
             selectedOperationsCount: specs.selectedOperations.length,
             finishingCount: finishingConfig.length,
             finishing: finishingConfig,
+            backendOpsCount: backendOps.length,
+            backendOps: backendOps.map((o: any) => ({
+              operation_id: o.operation_id,
+              id: o.id,
+              name: o.operation_name || o.name,
+            })),
+          });
+        } else {
+          logger.info('⚠️ selectedOperations пуст или не массив', {
+            selectedOperations: specs.selectedOperations,
+            isArray: Array.isArray(specs.selectedOperations),
+            length: Array.isArray(specs.selectedOperations) ? specs.selectedOperations.length : 0,
           });
         }
 
@@ -288,6 +300,10 @@ export function useCalculatorPricingActions({
             print_technology: configuration.print_technology,
             print_color_mode: configuration.print_color_mode,
             sides: configuration.sides,
+            // 🆕 Явно логируем finishing для отладки
+            finishing: configuration.finishing,
+            hasFinishing: !!(configuration.finishing && Array.isArray(configuration.finishing) && configuration.finishing.length > 0),
+            selectedOperations: configuration.selectedOperations,
           },
           quantity: specs.quantity,
           trimSize,
@@ -346,6 +362,22 @@ export function useCalculatorPricingActions({
 
         const materials = (backendResult.materials || []) as any[];
         const services = (backendResult.operations || []) as any[];
+        
+        // 🆕 Логируем операции для отладки finishing
+        logger.info('🔧 Операции от бэкенда (включая finishing)', {
+          operationsCount: services.length,
+          operations: services.map((op: any) => ({
+            operationId: op.operationId ?? op.operation_id ?? op.id,
+            operationName: op.operationName || op.operation_name || op.name,
+            operationType: op.operationType || op.operation_type,
+            priceUnit: op.priceUnit ?? op.price_unit,
+            unitPrice: op.unitPrice ?? op.unit_price ?? op.price,
+            quantity: op.quantity,
+            totalCost: op.totalCost ?? op.total,
+            allKeys: Object.keys(op),
+          })),
+          selectedOperationsFromSpecs: specs.selectedOperations,
+        });
 
         // 🆕 Логируем материалы для отладки
         logger.info('📦 Материалы от бэкенда', {

@@ -328,6 +328,11 @@ export class SimplifiedPricingService {
     const finishingDetails: SimplifiedPricingResult['finishingDetails'] = [];
     
     if (normalizedConfig.finishing && normalizedConfig.finishing.length > 0) {
+      logger.info('🔧 [SimplifiedPricingService] Получена конфигурация finishing из фронтенда', {
+        productId,
+        quantity,
+        finishing: normalizedConfig.finishing,
+      });
       // Загружаем названия услуг и централизованные тарифы
       const uniqueServiceIds = Array.from(
         new Set(
@@ -337,6 +342,11 @@ export class SimplifiedPricingService {
         )
       );
       
+      logger.info('🔧 [SimplifiedPricingService] Уникальные service_id для finishing', {
+        productId,
+        uniqueServiceIds,
+      });
+
       if (uniqueServiceIds.length > 0) {
         const services = await db.all<Array<{ id: number; name: string }>>(
           `SELECT id, name FROM post_processing_services WHERE id IN (${uniqueServiceIds.map(() => '?').join(',')})`,
@@ -358,6 +368,12 @@ export class SimplifiedPricingService {
                 unit_price: t.rate,
               }));
               serviceTiersMap.set(serviceId, simplifiedTiers);
+              logger.info('🔧 [SimplifiedPricingService] Загружены объёмные тарифы для услуги', {
+                productId,
+                serviceId,
+                tiersCount: simplifiedTiers.length,
+                tiers: simplifiedTiers,
+              });
             } else {
               // Если нет объёмных тарифов, пробуем взять базовую цену услуги и сделать один бесконечный диапазон
               const baseService = await PricingServiceRepository.getServiceById(serviceId);
@@ -367,6 +383,16 @@ export class SimplifiedPricingService {
                   max_qty: undefined,
                   unit_price: baseService.rate,
                 }]);
+                logger.info('🔧 [SimplifiedPricingService] Используем базовую ставку услуги как единый диапазон', {
+                  productId,
+                  serviceId,
+                  rate: baseService.rate,
+                });
+              } else {
+                logger.warn('⚠️ [SimplifiedPricingService] Не найдены ни объёмные тарифы, ни базовая ставка для услуги', {
+                  productId,
+                  serviceId,
+                });
               }
             }
           } catch (error) {
@@ -377,6 +403,11 @@ export class SimplifiedPricingService {
             });
           }
         }
+
+        logger.info('🔧 [SimplifiedPricingService] Итоговая карта тарифов услуг для finishing', {
+          productId,
+          serviceIds: Array.from(serviceTiersMap.keys()),
+        });
 
         for (const finConfig of normalizedConfig.finishing) {
           const tiers = serviceTiersMap.get(finConfig.service_id);
@@ -415,6 +446,15 @@ export class SimplifiedPricingService {
           }
           
           finishingPrice += servicePrice;
+          logger.info('💰 [SimplifiedPricingService] Рассчитана цена услуги отделки', {
+            productId,
+            service_id: finConfig.service_id,
+            priceUnit,
+            unitsPerItem,
+            totalUnits,
+            priceForTier,
+            servicePrice,
+          });
           
           finishingDetails.push({
             service_id: finConfig.service_id,

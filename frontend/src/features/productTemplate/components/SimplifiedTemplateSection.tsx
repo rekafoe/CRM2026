@@ -1581,13 +1581,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                       })
                       
                       // ✅ Преобразуем finishing в формат ServicePricing БЕЗ tiers
-                      // tiers больше не храним в шаблоне - цены берутся из централизованной системы услуг
+                      // tiers для услуг в simplifiedTemplate больше нигде не используем
                       const servicePricings: ServicePricing[] = selected.finishing.map(f => ({
                         service_id: f.service_id,
                         price_unit: f.price_unit,
                         units_per_item: f.units_per_item,
-                        // tiers не сохраняем - только для чтения старых данных (если есть)
-                        tiers: f.tiers // Опционально, только для обратной совместимости
                       }))
                       
                       return (
