@@ -36,6 +36,11 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   // Получаем операции из схемы
   const operations = useMemo(() => {
     if (!backendProductSchema?.operations || !Array.isArray(backendProductSchema.operations)) {
+      console.log('🔍 [OperationsSection] Нет операций в схеме', {
+        hasSchema: !!backendProductSchema,
+        operations: backendProductSchema?.operations,
+        isArray: Array.isArray(backendProductSchema?.operations)
+      });
       return [];
     }
     
@@ -44,6 +49,17 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     const filtered = backendProductSchema.operations.filter((op: Operation) => {
       const isRequired = op.is_required === true || op.is_required === 1;
       return !isRequired; // Показываем только необязательные операции
+    });
+    
+    console.log('🔍 [OperationsSection] Операции после фильтрации', {
+      total: backendProductSchema.operations.length,
+      filtered: filtered.length,
+      operations: filtered.map((op: Operation) => ({
+        id: op.operation_id || op.id,
+        name: op.operation_name || op.name,
+        type: op.operation_type,
+        isRequired: op.is_required
+      }))
     });
     
     return filtered;
@@ -62,69 +78,66 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   // 🆕 Загружаем варианты для операций, которые их поддерживают (например, ламинация)
   useEffect(() => {
     const loadVariantsForOperations = async () => {
+      console.log('🔍 [OperationsSection] Начинаем загрузку вариантов', {
+        operationsCount: operations.length,
+        operations: operations.map((op: Operation) => ({
+          id: op.operation_id || op.id,
+          name: op.operation_name || op.name,
+          type: op.operation_type,
+          parameters: op.parameters
+        }))
+      });
+
       const operationsToLoad = operations.filter((op: Operation) => {
         const operationId = op.operation_id || op.id;
         if (!operationId) return false;
         // Загружаем варианты для операций типа 'laminate' или если в parameters указано, что есть варианты
         const opType = op.operation_type || (op.parameters && typeof op.parameters === 'object' ? op.parameters.operation_type : null);
-        return opType === 'laminate' || (op.parameters && typeof op.parameters === 'object' && op.parameters.hasVariants);
+        const shouldLoad = opType === 'laminate' || (op.parameters && typeof op.parameters === 'object' && op.parameters.hasVariants);
+        
+        console.log('🔍 [OperationsSection] Проверка операции для загрузки вариантов', {
+          operationId,
+          operationName: op.operation_name || op.name,
+          opType,
+          shouldLoad,
+          hasParameters: !!op.parameters,
+          parametersType: typeof op.parameters
+        });
+        
+        return shouldLoad;
+      });
+
+      console.log('🔍 [OperationsSection] Операции для загрузки вариантов', {
+        count: operationsToLoad.length,
+        operations: operationsToLoad.map((op: Operation) => ({
+          id: op.operation_id || op.id,
+          name: op.operation_name || op.name
+        }))
       });
 
       for (const op of operationsToLoad) {
         const operationId = op.operation_id || op.id;
-        if (!operationId || serviceVariants.has(operationId) || loadingVariants.has(operationId)) continue;
-
-        setLoadingVariants(prev => new Set(prev).add(operationId));
-        try {
-          const variants = await getServiceVariants(operationId);
-          setServiceVariants(prev => {
-            const next = new Map(prev);
-            next.set(operationId, variants.filter(v => v.isActive));
-            return next;
-          });
-        } catch (error) {
-          console.error(`Ошибка загрузки вариантов для операции ${operationId}:`, error);
-        } finally {
-          setLoadingVariants(prev => {
-            const next = new Set(prev);
-            next.delete(operationId);
-            return next;
-          });
+        if (!operationId || serviceVariants.has(operationId) || loadingVariants.has(operationId)) {
+          console.log('🔍 [OperationsSection] Пропускаем операцию (уже загружена или загружается)', { operationId });
+          continue;
         }
-      }
-    };
 
-    if (operations.length > 0) {
-      void loadVariantsForOperations();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operations.length]); // Загружаем только при изменении количества операций
-
-  // 🆕 Загружаем варианты для операций, которые их поддерживают (например, ламинация)
-  useEffect(() => {
-    const loadVariantsForOperations = async () => {
-      const operationsToLoad = operations.filter((op: Operation) => {
-        const operationId = op.operation_id || op.id;
-        if (!operationId) return false;
-        // Загружаем варианты для операций типа 'laminate' или если в parameters указано, что есть варианты
-        const opType = op.operation_type || (op.parameters && typeof op.parameters === 'object' ? op.parameters.operation_type : null);
-        return opType === 'laminate' || (op.parameters && typeof op.parameters === 'object' && op.parameters.hasVariants);
-      });
-
-      for (const op of operationsToLoad) {
-        const operationId = op.operation_id || op.id;
-        if (!operationId || serviceVariants.has(operationId) || loadingVariants.has(operationId)) continue;
-
+        console.log('🔍 [OperationsSection] Загружаем варианты для операции', { operationId, name: op.operation_name || op.name });
         setLoadingVariants(prev => new Set(prev).add(operationId));
         try {
           const variants = await getServiceVariants(operationId);
+          console.log('🔍 [OperationsSection] Варианты загружены', {
+            operationId,
+            variantsCount: variants.length,
+            variants: variants.map(v => ({ id: v.id, name: v.variantName, active: v.isActive }))
+          });
           setServiceVariants(prev => {
             const next = new Map(prev);
             next.set(operationId, variants.filter(v => v.isActive));
             return next;
           });
         } catch (error) {
-          console.error(`Ошибка загрузки вариантов для операции ${operationId}:`, error);
+          console.error(`❌ [OperationsSection] Ошибка загрузки вариантов для операции ${operationId}:`, error);
         } finally {
           setLoadingVariants(prev => {
             const next = new Set(prev);
@@ -270,7 +283,22 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     updateSpecs({ selectedOperations: updated }, true);
   }, [selectedOperations, updateSpecs]);
 
+  // 🆕 Логирование для отладки
+  useEffect(() => {
+    console.log('🔍 [OperationsSection] Рендер компонента', {
+      operationsCount: operations.length,
+      operationsWithSubtypesCount: operationsWithSubtypes.length,
+      serviceVariantsCount: serviceVariants.size,
+      selectedOperationsCount: selectedOperations.length,
+      backendSchema: {
+        hasOperations: !!backendProductSchema?.operations,
+        operationsCount: backendProductSchema?.operations?.length || 0
+      }
+    });
+  }, [operations.length, operationsWithSubtypes.length, serviceVariants.size, selectedOperations.length, backendProductSchema?.operations]);
+
   if (operations.length === 0) {
+    console.log('🔍 [OperationsSection] Нет операций для отображения');
     return null;
   }
 
