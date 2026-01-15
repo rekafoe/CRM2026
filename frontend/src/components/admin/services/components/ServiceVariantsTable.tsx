@@ -56,6 +56,19 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                 await operations.createVariant(change.variantName, change.parameters || {});
               }
               break;
+            case 'update':
+              if (change.variantId) {
+                // Обновляем имя варианта (если изменилось)
+                if (change.variantName && change.oldVariantName) {
+                  // Обновляем все варианты с таким именем
+                  await operations.updateVariantName(change.variantId, change.variantName);
+                }
+                // Обновляем параметры варианта
+                if (change.parameters) {
+                  await operations.updateVariantParams(change.variantId, change.parameters);
+                }
+              }
+              break;
             case 'delete':
               if (change.variantId) {
                 await operations.deleteVariant(change.variantId);
@@ -350,37 +363,17 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                       onChange={(e) => editing.setEditingVariantNameValue(e.target.value)}
                                       onBlur={() => {
                                         if (editing.editingVariantNameValue.trim()) {
-                                          // 🆕 Проверяем, является ли вариант новым (еще не создан на сервере)
-                                          const isNewVariant = localChanges.variantChanges.some(
-                                            change => change.type === 'create' && change.variantId === firstVariant.id
-                                          );
-                                          
-                                          if (isNewVariant) {
-                                            // Обновляем имя в локальном состоянии для нового варианта
-                                            localChanges.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
-                                          } else {
-                                            // Для существующих вариантов обновляем через operations
-                                            operations.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
-                                          }
+                                          // Все изменения сохраняются локально, отправка на сервер только при нажатии "Сохранить"
+                                          localChanges.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
                                           editing.cancelEditingName();
                                         }
                                       }}
                                       onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
-                                          e.preventDefault(); // 🆕 Предотвращаем стандартное поведение
+                                          e.preventDefault();
                                           if (editing.editingVariantNameValue.trim()) {
-                                            // 🆕 Проверяем, является ли вариант новым (еще не создан на сервере)
-                                            const isNewVariant = localChanges.variantChanges.some(
-                                              change => change.type === 'create' && change.variantId === firstVariant.id
-                                            );
-                                            
-                                            if (isNewVariant) {
-                                              // Обновляем имя в локальном состоянии для нового варианта
-                                              localChanges.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
-                                            } else {
-                                              // Для существующих вариантов обновляем через operations
-                                              operations.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
-                                            }
+                                            // Все изменения сохраняются локально, отправка на сервер только при нажатии "Сохранить"
+                                            localChanges.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
                                             editing.cancelEditingName();
                                           }
                                         } else if (e.key === 'Escape') {
@@ -509,18 +502,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                     // Убираем density и другие поля, оставляем только type
                                                   };
                                                   
-                                                  // 🆕 Проверяем, является ли вариант новым (еще не создан на сервере)
-                                                  const isNewVariant = localChanges.variantChanges.some(
-                                                    change => change.type === 'create' && change.variantId === variant.id
-                                                  );
-                                                  
-                                                  if (isNewVariant) {
-                                                    // Обновляем параметры в локальном состоянии для нового варианта
-                                                    localChanges.updateVariantParams(variant.id, paramsToSave);
-                                                  } else {
-                                                    // Для существующих вариантов обновляем через operations
-                                                    operations.updateVariantParams(variant.id, paramsToSave);
-                                                  }
+                                                  // Все изменения сохраняются локально, отправка на сервер только при нажатии "Сохранить"
+                                                  localChanges.updateVariantParams(variant.id, paramsToSave);
                                                   editing.cancelEditingParams();
                                                 }}
                                               >
@@ -567,18 +550,15 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                           type="button"
                                           className="el-button el-button--success el-button--small"
                                           onClick={() => {
-                                            console.log('Level 1 button clicked');
-                                            const handler = async () => {
-                                              try {
-                                                // 🆕 Для вариантов уровня 1 сохраняем только type, без плотности (density)
-                                                const newVariant = await operations.createVariant(typeName, { type: 'Новый тип' });
-                                                editing.startEditingParams(newVariant.id, { type: 'Новый тип' });
-                                              } catch (err) {
-                                                console.error('Ошибка создания строки на том же уровне (уровень 1):', err);
-                                                // Ошибка уже обработана в хуке и отображена через setError
-                                              }
-                                            };
-                                            handler();
+                                            try {
+                                              // Все изменения сохраняются локально, отправка на сервер только при нажатии "Сохранить"
+                                              // 🆕 Для вариантов уровня 1 сохраняем только type, без плотности (density)
+                                              const newVariant = localChanges.createVariant(typeName, { type: 'Новый тип' });
+                                              editing.startEditingParams(newVariant.id, { type: 'Новый тип' });
+                                            } catch (err) {
+                                              console.error('Ошибка создания строки на том же уровне (уровень 1):', err);
+                                              setError('Не удалось создать вариант');
+                                            }
                                           }}
                                           title="Добавить строку на том же уровне"
                                         >
@@ -587,17 +567,18 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         <button
                                           type="button"
                                           className="el-button el-button--success el-button--small is-plain"
-                                          onClick={async () => {
+                                          onClick={() => {
                                             try {
+                                              // Все изменения сохраняются локально, отправка на сервер только при нажатии "Сохранить"
                                               // 🆕 Для подтипов сохраняем только subType, без плотности (density) и других полей
-                                              const newVariant = await operations.createVariant(typeName, {
+                                              const newVariant = localChanges.createVariant(typeName, {
                                                 parentVariantId: variant.id,
                                                 subType: '',
                                               });
                                               editing.startEditingParams(newVariant.id, { parentVariantId: variant.id, subType: '' });
                                             } catch (err) {
                                               console.error('Ошибка создания дочерней строки (уровень 2):', err);
-                                              // Ошибка уже обработана в хуке и отображена через setError
+                                              setError('Не удалось создать вариант');
                                             }
                                           }}
                                           title="Добавить дочернюю строку (уровень 2)"
@@ -655,18 +636,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                       // Убираем density и другие поля, оставляем только subType
                                                     };
                                                     
-                                                    // 🆕 Проверяем, является ли вариант новым (еще не создан на сервере)
-                                                    const isNewVariant = localChanges.variantChanges.some(
-                                                      change => change.type === 'create' && change.variantId === level2Variant.id
-                                                    );
-                                                    
-                                                    if (isNewVariant) {
-                                                      // Обновляем параметры в локальном состоянии для нового варианта
-                                                      localChanges.updateVariantParams(level2Variant.id, paramsToSave);
-                                                    } else {
-                                                      // Для существующих вариантов обновляем через operations
-                                                      operations.updateVariantParams(level2Variant.id, paramsToSave);
-                                                    }
+                                                    // Все изменения сохраняются локально, отправка на сервер только при нажатии "Сохранить"
+                                                    localChanges.updateVariantParams(level2Variant.id, paramsToSave);
                                                     editing.cancelEditingParams();
                                                   }}
                                                 >
@@ -716,21 +687,18 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                             type="button"
                                             className="el-button el-button--success el-button--small"
                                             onClick={() => {
-                                              console.log('Level 2 sibling button clicked');
-                                              const handler = async () => {
-                                                try {
-                                                  // 🆕 Для подтипов сохраняем только subType, без плотности (density) и других полей
-                                                  const newVariant = await operations.createVariant(typeName, {
-                                                    parentVariantId: level2Variant.parameters?.parentVariantId,
-                                                    subType: '',
-                                                  });
-                                                  editing.startEditingParams(newVariant.id, { parentVariantId: level2Variant.parameters?.parentVariantId, subType: '' });
-                                                } catch (err) {
-                                                  console.error('Ошибка создания строки на том же уровне (уровень 2):', err);
-                                                  // Ошибка уже обработана в хуке и отображена через setError
-                                                }
-                                              };
-                                              handler();
+                                              try {
+                                                // Все изменения сохраняются локально, отправка на сервер только при нажатии "Сохранить"
+                                                // 🆕 Для подтипов сохраняем только subType, без плотности (density) и других полей
+                                                const newVariant = localChanges.createVariant(typeName, {
+                                                  parentVariantId: level2Variant.parameters?.parentVariantId,
+                                                  subType: '',
+                                                });
+                                                editing.startEditingParams(newVariant.id, { parentVariantId: level2Variant.parameters?.parentVariantId, subType: '' });
+                                              } catch (err) {
+                                                console.error('Ошибка создания строки на том же уровне (уровень 2):', err);
+                                                setError('Не удалось создать вариант');
+                                              }
                                             }}
                                             title="Добавить строку на том же уровне"
                                           >
