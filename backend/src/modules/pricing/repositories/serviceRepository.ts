@@ -363,108 +363,56 @@ export class PricingServiceRepository {
     const db = await this.getConnection();
     await this.ensureSchema(db);
     
-    let query = `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active FROM service_volume_prices WHERE service_id = ?`;
-    const params: any[] = [serviceId];
-    
-    if (variantId !== undefined && variantId !== null) {
-      // Для варианта возвращаем только его tiers
-      query += ` AND variant_id = ?`;
-      params.push(variantId);
-    } else {
-      // Для услуги без варианта возвращаем только общие tiers
-      query += ` AND variant_id IS NULL`;
-    }
-    
-    query += ` ORDER BY min_quantity`;
+    // 🆕 Tiers теперь общие для всех вариантов одной услуги
+    // Всегда возвращаем общие tiers (variant_id IS NULL), игнорируя variantId
+    const query = `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active 
+                   FROM service_volume_prices 
+                   WHERE service_id = ? AND variant_id IS NULL
+                   ORDER BY min_quantity`;
     
     try {
-      const rows = await db.all<RawTierRow[]>(query, ...params);
+      const rows = await db.all<RawTierRow[]>(query, serviceId);
       return rows.map(this.mapTier);
     } catch (error: any) {
       console.error('Error in listServiceTiers:', error);
       console.error('Query:', query);
-      console.error('Params:', params);
       throw error;
     }
   }
 
   /**
    * Получает все tiers для всех вариантов услуги одним запросом
-   * Оптимизация: вместо N запросов делаем один с JOIN
+   * 🆕 Tiers теперь общие для всех вариантов одной услуги
+   * Возвращает одни и те же общие tiers для всех вариантов
    */
   static async listAllVariantTiers(serviceId: number): Promise<Map<number, ServiceVolumeTierDTO[]>> {
     const db = await this.getConnection();
     
     try {
-      // Используем новую оптимизированную структуру с JOIN
-      // Если новые таблицы существуют, используем их, иначе fallback на старую структуру
-      const hasNewStructure = await db.get(`
-        SELECT name FROM sqlite_master 
-        WHERE type='table' AND name='service_range_boundaries'
-      `);
+      // 🆕 Загружаем общие tiers (variant_id IS NULL)
+      const rows = await db.all<RawTierRow[]>(
+        `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active 
+         FROM service_volume_prices 
+         WHERE service_id = ? AND variant_id IS NULL
+         ORDER BY min_quantity`,
+        serviceId
+      );
       
-      if (hasNewStructure) {
-        // Новая структура: JOIN между service_variant_prices и service_range_boundaries
-        const rows = await db.all<any[]>(
-          `SELECT 
-            svp.id, 
-            svp.variant_id, 
-            srb.service_id, 
-            srb.min_quantity, 
-            svp.price_per_unit, 
-            svp.is_active
-           FROM service_variant_prices svp
-           JOIN service_range_boundaries srb ON svp.range_id = srb.id
-           WHERE srb.service_id = ? AND svp.variant_id IS NOT NULL
-           ORDER BY svp.variant_id, srb.min_quantity`,
-          serviceId
-        );
-        
-        // Группируем по variant_id
-        const tiersMap = new Map<number, ServiceVolumeTierDTO[]>();
-        for (const row of rows) {
-          const variantId = row.variant_id;
-          if (variantId !== null && variantId !== undefined) {
-            const variantIdNum = Number(variantId);
-            if (!tiersMap.has(variantIdNum)) {
-              tiersMap.set(variantIdNum, []);
-            }
-            tiersMap.get(variantIdNum)!.push({
-              id: row.id,
-              serviceId: row.service_id,
-              variantId: variantIdNum,
-              minQuantity: row.min_quantity,
-              rate: row.price_per_unit,
-              isActive: !!row.is_active,
-            });
-          }
-        }
-        
-        return tiersMap;
-      } else {
-        // Fallback на старую структуру для обратной совместимости
-        const rows = await db.all<RawTierRow[]>(
-          `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active 
-           FROM service_volume_prices 
-           WHERE service_id = ? AND variant_id IS NOT NULL
-           ORDER BY variant_id, min_quantity`,
-          serviceId
-        );
-        
-        const tiersMap = new Map<number, ServiceVolumeTierDTO[]>();
-        for (const row of rows) {
-          const variantId = row.variant_id;
-          if (variantId !== null && variantId !== undefined) {
-            const variantIdNum = Number(variantId);
-            if (!tiersMap.has(variantIdNum)) {
-              tiersMap.set(variantIdNum, []);
-            }
-            tiersMap.get(variantIdNum)!.push(this.mapTier(row));
-          }
-        }
-        
-        return tiersMap;
+      const commonTiers = rows.map(this.mapTier);
+      
+      // Получаем все варианты услуги
+      const variants = await db.all<{ id: number }[]>(
+        `SELECT id FROM service_variants WHERE service_id = ?`,
+        serviceId
+      );
+      
+      // 🆕 Возвращаем одни и те же общие tiers для всех вариантов
+      const tiersMap = new Map<number, ServiceVolumeTierDTO[]>();
+      for (const variant of variants) {
+        tiersMap.set(variant.id, commonTiers);
       }
+      
+      return tiersMap;
     } catch (error: any) {
       console.error('Error in listAllVariantTiers:', error);
       console.error('ServiceId:', serviceId);
@@ -484,20 +432,12 @@ export class PricingServiceRepository {
       throw err;
     }
     
-    // Если передан variantId, проверяем его существование
-    if (payload.variantId !== undefined && payload.variantId !== null) {
-      const variant = await db.get(`SELECT id FROM service_variants WHERE id = ? AND service_id = ?`, payload.variantId, serviceId);
-      if (!variant) {
-        const err: any = new Error(`Variant with id ${payload.variantId} not found for service ${serviceId}`);
-        err.status = 404;
-        throw err;
-      }
-    }
-    
+    // 🆕 Tiers теперь общие для всех вариантов одной услуги
+    // Всегда создаем с variant_id = NULL, игнорируя переданный variantId
     const result = await db.run(
       `INSERT INTO service_volume_prices (service_id, variant_id, min_quantity, price_per_unit, is_active) VALUES (?, ?, ?, ?, ?)`,
       serviceId,
-      payload.variantId ?? null,
+      null, // Всегда NULL - tiers общие для всех вариантов
       Number(payload.minQuantity ?? 0),
       Number(payload.rate ?? 0),
       payload.isActive === undefined || payload.isActive ? 1 : 0,
@@ -516,12 +456,13 @@ export class PricingServiceRepository {
       return null;
     }
 
+    // 🆕 Tiers теперь общие для всех вариантов одной услуги
+    // Всегда обновляем с variant_id = NULL, игнорируя переданный variantId
     await db.run(
-      `UPDATE service_volume_prices SET min_quantity = ?, price_per_unit = ?, is_active = ?, variant_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE service_volume_prices SET min_quantity = ?, price_per_unit = ?, is_active = ?, variant_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       payload.minQuantity !== undefined ? payload.minQuantity : current.min_quantity,
       payload.rate !== undefined ? payload.rate : current.price_per_unit,
       payload.isActive !== undefined ? (payload.isActive ? 1 : 0) : current.is_active,
-      payload.variantId !== undefined ? payload.variantId : (current.variant_id ?? null),
       tierId,
     );
 
@@ -759,13 +700,14 @@ export class PricingServiceRepository {
   }
   
   /**
-   * Обновляет цену варианта для конкретного диапазона
+   * Обновляет цену для конкретного диапазона (общие tiers для всех вариантов услуги)
+   * 🆕 Tiers теперь общие для всех вариантов одной услуги
    */
   static async updateVariantPrice(variantId: number, minQuantity: number, price: number): Promise<void> {
     const db = await this.getConnection();
     await this.ensureSchema(db);
 
-    // Находим range_id по min_quantity через service_id варианта
+    // Находим service_id варианта
     const variant = await db.get<{ service_id: number }>(`
       SELECT service_id FROM service_variants WHERE id = ?
     `, variantId);
@@ -776,34 +718,25 @@ export class PricingServiceRepository {
       throw err;
     }
     
-    const range = await db.get<{ id: number }>(`
-      SELECT id FROM service_range_boundaries 
-      WHERE service_id = ? AND min_quantity = ?
+    // 🆕 Обновляем общий tier для услуги (variant_id = NULL)
+    const existing = await db.get<{ id: number }>(`
+      SELECT id FROM service_volume_prices 
+      WHERE service_id = ? AND variant_id IS NULL AND min_quantity = ?
     `, variant.service_id, minQuantity);
     
-    if (!range) {
-      const err: any = new Error(`Range boundary with min_quantity ${minQuantity} not found`);
-      err.status = 404;
-      throw err;
-    }
-    
-    // Обновляем или создаем цену
-    const existing = await db.get<{ id: number }>(`
-      SELECT id FROM service_variant_prices 
-      WHERE variant_id = ? AND range_id = ?
-    `, variantId, range.id);
-    
     if (existing) {
+      // Обновляем существующий tier
       await db.run(`
-        UPDATE service_variant_prices 
+        UPDATE service_volume_prices 
         SET price_per_unit = ?, updated_at = CURRENT_TIMESTAMP 
         WHERE id = ?
       `, price, existing.id);
     } else {
+      // Создаем новый tier (общий для всех вариантов)
       await db.run(`
-        INSERT INTO service_variant_prices (variant_id, range_id, price_per_unit, is_active)
-        VALUES (?, ?, ?, 1)
-      `, variantId, range.id, price);
+        INSERT INTO service_volume_prices (service_id, variant_id, min_quantity, price_per_unit, is_active) 
+        VALUES (?, NULL, ?, ?, 1)
+      `, variant.service_id, minQuantity, price);
     }
   }
 }

@@ -232,13 +232,24 @@ export function useLocalRangeChanges(
   }, [localVariants]);
 
   // Локальное изменение цены
+  // 🆕 Tiers теперь общие для всех вариантов одной услуги
+  // Обновляем цену для всех вариантов одновременно
   const changePrice = useCallback((variantId: number, minQty: number, newPrice: number) => {
     console.log('=== CHANGE PRICE ===', { variantId, minQty, newPrice });
+    
+    // 🆕 Обновляем цену для всех вариантов одной услуги одновременно
     setLocalVariants(prev => {
-      const updated = prev.map(variant => {
-        if (variant.id !== variantId) return variant;
+      // Находим service_id варианта (все варианты одной услуги имеют одинаковый service_id)
+      const variant = prev.find(v => v.id === variantId);
+      if (!variant) return prev;
+      
+      const serviceId = variant.serviceId;
+      
+      return prev.map(v => {
+        // Обновляем tiers только для вариантов той же услуги
+        if (v.serviceId !== serviceId) return v;
 
-        const updatedTiers = variant.tiers.map(tier => {
+        const updatedTiers = v.tiers.map(tier => {
           if (tier.minQuantity === minQty) {
             console.log('=== CHANGE PRICE === Found tier to update:', { tier, newPrice });
             return { ...tier, rate: newPrice };
@@ -247,28 +258,21 @@ export function useLocalRangeChanges(
         });
 
         console.log('=== CHANGE PRICE === Updated variant:', { 
-          variantId, 
-          oldTiers: variant.tiers, 
+          variantId: v.id, 
+          oldTiers: v.tiers, 
           newTiers: updatedTiers 
         });
-        return { ...variant, tiers: updatedTiers };
+        return { ...v, tiers: updatedTiers };
       });
-      return updated;
     });
 
     // Добавляем или обновляем изменение цены
     setPriceChanges(prev => {
-      const existingIndex = prev.findIndex(change =>
-        change.variantId === variantId && change.minQty === minQty
-      );
-
-      if (existingIndex >= 0) {
-        const newChanges = [...prev];
-        newChanges[existingIndex] = { variantId, minQty, newPrice };
-        return newChanges;
-      } else {
-        return [...prev, { variantId, minQty, newPrice }];
-      }
+      // Удаляем все старые изменения для этого minQty (т.к. tiers общие, достаточно одного изменения)
+      const filtered = prev.filter(change => change.minQty !== minQty);
+      
+      // Добавляем новое изменение
+      return [...filtered, { variantId, minQty, newPrice }];
     });
 
     setHasUnsavedChanges(true);
