@@ -228,7 +228,47 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
+  overflow: visible; /* 🆕 Изменено с hidden на visible для корректного отображения ServiceVariantsTable */
+}
+
+/* 🆕 Стили для развернутых строк с ServiceVariantsTable */
+.services-table-container td[colspan] {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 0 !important; /* Убираем padding для развернутых строк */
+  display: block !important; /* Делаем td блочным элементом для полной ширины */
+}
+
+.services-table-container td[colspan].bg-gray-50 {
+  padding: 0 !important; /* Переопределяем Tailwind padding */
+}
+
+.services-table-container td[colspan] .service-variants-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  padding: 1rem;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.services-table-container td[colspan] .service-variants-table {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.services-table-container td[colspan] .table-container {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.services-table-container td[colspan] .table-container .el-table {
+  width: 100% !important;
+  max-width: 1400px !important;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .services-table {
