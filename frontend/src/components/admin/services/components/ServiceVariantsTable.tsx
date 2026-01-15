@@ -222,14 +222,15 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   }
 
   return (
-    <div className="service-variants-table">
-      {error && (
-        <Alert type="error" className="mb-4">
-          {error}
-        </Alert>
-      )}
+    <div className="service-variants-table-wrapper">
+      <div className="service-variants-table">
+        {error && (
+          <Alert type="error" className="mb-4">
+            {error}
+          </Alert>
+        )}
 
-      <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h3 className="text-lg font-semibold">Варианты услуги: {serviceName}</h3>
           {(localChanges.hasUnsavedChanges || localChanges.rangeChanges.length > 0 || localChanges.priceChanges.length > 0 || localChanges.variantChanges.length > 0) && (
@@ -278,8 +279,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
           <p>Нет вариантов. Нажмите "Добавить тип" для создания первого варианта.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <div className="el-table el-table--fit el-table--border el-table--enable-row-hover el-table--enable-row-transition el-table--small" style={{ width: '100%' }}>
+        <div className="table-container">
+          <div className="el-table el-table--fit el-table--border el-table--enable-row-hover el-table--enable-row-transition el-table--small">
             <div className="el-table__header-wrapper">
               <table cellSpacing="0" cellPadding="0" border={0} className="el-table__header" style={{ width: '100%' }}>
                 <thead>
@@ -736,12 +737,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         </div>
       )}
 
-      <TierRangeModal
-        modal={tierModal.tierModal}
-        onClose={tierModal.closeModal}
-        onSave={handleSaveRange}
-        onBoundaryChange={(value) => tierModal.setTierModal({ ...tierModal.tierModal, boundary: value })}
-      />
+        <TierRangeModal
+          modal={tierModal.tierModal}
+          onClose={tierModal.closeModal}
+          onSave={handleSaveRange}
+          onBoundaryChange={(value) => tierModal.setTierModal({ ...tierModal.tierModal, boundary: value })}
+        />
+      </div>
     </div>
   );
 };
