@@ -512,7 +512,18 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                 type="button"
                                                 className="el-button el-button--primary el-button--mini"
                                                 onClick={() => {
-                                                  operations.updateVariantParams(variant.id, editing.editingVariantParamsValue);
+                                                  // 🆕 Проверяем, является ли вариант новым (еще не создан на сервере)
+                                                  const isNewVariant = localChanges.variantChanges.some(
+                                                    change => change.type === 'create' && change.variantId === variant.id
+                                                  );
+                                                  
+                                                  if (isNewVariant) {
+                                                    // Обновляем параметры в локальном состоянии для нового варианта
+                                                    localChanges.updateVariantParams(variant.id, editing.editingVariantParamsValue);
+                                                  } else {
+                                                    // Для существующих вариантов обновляем через operations
+                                                    operations.updateVariantParams(variant.id, editing.editingVariantParamsValue);
+                                                  }
                                                   editing.cancelEditingParams();
                                                 }}
                                               >
@@ -640,7 +651,18 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                   type="button"
                                                   className="el-button el-button--primary el-button--mini"
                                                   onClick={() => {
-                                                    operations.updateVariantParams(level2Variant.id, editing.editingVariantParamsValue);
+                                                    // 🆕 Проверяем, является ли вариант новым (еще не создан на сервере)
+                                                    const isNewVariant = localChanges.variantChanges.some(
+                                                      change => change.type === 'create' && change.variantId === level2Variant.id
+                                                    );
+                                                    
+                                                    if (isNewVariant) {
+                                                      // Обновляем параметры в локальном состоянии для нового варианта
+                                                      localChanges.updateVariantParams(level2Variant.id, editing.editingVariantParamsValue);
+                                                    } else {
+                                                      // Для существующих вариантов обновляем через operations
+                                                      operations.updateVariantParams(level2Variant.id, editing.editingVariantParamsValue);
+                                                    }
                                                     editing.cancelEditingParams();
                                                   }}
                                                 >
