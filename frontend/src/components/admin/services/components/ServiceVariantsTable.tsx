@@ -122,7 +122,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         console.log('=== SAVE CHANGES TO SERVER === Applying price changes...');
         await Promise.all(
           priceChanges.map(change => 
-            operations.changePrice(change.variantId, change.minQty, change.newPrice)
+            operations.savePriceImmediate(change.variantId, change.minQty, change.newPrice)
           )
         );
         console.log('=== SAVE CHANGES TO SERVER === Price changes applied');

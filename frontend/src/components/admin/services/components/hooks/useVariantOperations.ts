@@ -282,6 +282,20 @@ export function useVariantOperations(
     priceChangeTimeoutRef.current.set(key, timeout);
   }, [serviceId, setVariants]); // variants через ref, не добавляем в зависимости
 
+  const savePriceImmediate = useCallback(async (
+    variantId: number,
+    minQty: number,
+    newPrice: number
+  ) => {
+    try {
+      await updateVariantPriceAPI(serviceId, variantId, minQty, newPrice);
+    } catch (err) {
+      console.error('Ошибка сохранения цены варианта:', err);
+      setError('Не удалось сохранить цену варианта');
+      throw err;
+    }
+  }, [serviceId, setError]);
+
   const addRangeBoundary = useCallback(async (boundary: number) => {
     try {
       try {
@@ -628,6 +642,7 @@ export function useVariantOperations(
     updateVariantParams,
     deleteVariant,
     changePrice,
+    savePriceImmediate,
     addRangeBoundary,
     editRangeBoundary,
     removeRange,

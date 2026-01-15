@@ -244,13 +244,26 @@ export function useLocalRangeChanges(
       const updated = prev.map(variant => {
         if (variant.id !== variantId) return variant;
 
-        const updatedTiers = variant.tiers.map(tier => {
+        const hasTier = variant.tiers.some(tier => tier.minQuantity === minQty);
+        let updatedTiers = variant.tiers.map(tier => {
           if (tier.minQuantity === minQty) {
             console.log('=== CHANGE PRICE === Found tier to update:', { tier, newPrice });
             return { ...tier, rate: newPrice };
           }
           return tier;
         });
+
+        if (!hasTier) {
+          const newTier = {
+            id: 0,
+            serviceId: variant.serviceId,
+            variantId: variant.id,
+            minQuantity: minQty,
+            rate: newPrice,
+            isActive: true,
+          };
+          updatedTiers = [...updatedTiers, newTier].sort((a, b) => a.minQuantity - b.minQuantity);
+        }
 
         console.log('=== CHANGE PRICE === Updated variant:', { 
           variantId, 
