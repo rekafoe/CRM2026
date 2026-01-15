@@ -17,14 +17,14 @@
   width: 100%;
   overflow-x: auto;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .table-container .el-table {
-  width: auto;
+  width: 100%;
   min-width: 100%;
-  max-width: 1400px; /* Фиксированная максимальная ширина таблицы */
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
 }
 
 /* Закрепленный заголовок диапазонов */
@@ -168,7 +168,7 @@
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
-  table-layout: fixed; /* Фиксированная ширина столбцов для выравнивания */
+  table-layout: auto;
 }
 
 .el-table--border {
@@ -284,6 +284,46 @@
   max-width: 100%;
   display: flex; /* Используем flex для точного выравнивания */
   align-items: center; /* Выравнивание по центру вертикально */
+}
+
+.variant-name-cell .cell {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  align-items: flex-start;
+}
+
+.variant-name-cell .el-input__inner {
+  white-space: normal;
+}
+
+.variant-name-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.variant-name-header__title {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow: visible;
+}
+
+.variant-name-header__actions {
+  margin-left: 8px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.variant-name-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
 }
 
 /* Стили для Element UI input */

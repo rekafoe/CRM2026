@@ -269,8 +269,8 @@
 
 .services-table-container td[colspan] .table-container .el-table {
   width: 100% !important;
-  max-width: 1400px !important;
-  margin: 0 auto;
+  max-width: 100% !important;
+  margin: 0;
   box-sizing: border-box;
 }
 

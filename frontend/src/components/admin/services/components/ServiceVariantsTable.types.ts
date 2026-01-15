@@ -42,6 +42,8 @@ export interface VariantsByType {
 export interface ServiceVariantsTableProps {
   serviceId: number;
   serviceName: string;
+  serviceMinQuantity?: number;
+  serviceMaxQuantity?: number;
 }
 
 /**

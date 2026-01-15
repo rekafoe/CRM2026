@@ -246,7 +246,14 @@ const ServicesManagement: React.FC = () => {
   // Рендеринг развернутой строки
   const renderExpandedRow = useCallback((service: PricingService) => {
     if (servicesWithVariants.has(service.id)) {
-      return <ServiceVariantsTable serviceId={service.id} serviceName={service.name} />;
+      return (
+        <ServiceVariantsTable
+          serviceId={service.id}
+          serviceName={service.name}
+          serviceMinQuantity={service.minQuantity}
+          serviceMaxQuantity={service.maxQuantity}
+        />
+      );
     }
     return (
       <ServiceVolumeTiersPanel

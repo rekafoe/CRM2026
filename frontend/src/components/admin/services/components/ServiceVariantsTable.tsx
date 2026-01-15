@@ -29,6 +29,8 @@ import './ServiceVariantsTable.css';
 export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   serviceId,
   serviceName,
+  serviceMinQuantity,
+  serviceMaxQuantity,
 }) => {
   // Хуки для управления состоянием
   const { variants: serverVariants, loading, error, setError, reload, invalidateCache, setVariants } = useServiceVariants(serviceId);
@@ -232,8 +234,16 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         )}
 
         <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h3 className="text-lg font-semibold">Варианты услуги: {serviceName}</h3>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div>
+            <h3 className="text-lg font-semibold">Варианты услуги: {serviceName}</h3>
+            {(serviceMinQuantity !== undefined || serviceMaxQuantity !== undefined) && (
+              <div className="text-sm text-gray-500">
+                Тираж: от {serviceMinQuantity ?? 1}
+                {serviceMaxQuantity !== undefined ? ` до ${serviceMaxQuantity}` : ' (без максимума)'}
+              </div>
+            )}
+          </div>
           {(localChanges.hasUnsavedChanges || localChanges.rangeChanges.length > 0 || localChanges.priceChanges.length > 0 || localChanges.variantChanges.length > 0) && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-orange-600 font-medium">
@@ -286,11 +296,11 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
               <table cellSpacing="0" cellPadding="0" border={0} className="el-table__header" style={{ width: '100%' }}>
                 <thead>
                   <tr>
-                    <th style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
+                    <th className="variant-name-cell" style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
                       <div className="cell">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflow: 'hidden', width: '100%' }}>
-                          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={serviceName}>{serviceName}</div>
-                          <div className="active-panel" style={{ marginLeft: '8px', flexShrink: 0 }}>
+                        <div className="variant-name-header">
+                          <div className="variant-name-header__title" title={serviceName}>{serviceName}</div>
+                          <div className="active-panel variant-name-header__actions">
                             <button
                               type="button"
                               className="el-button el-button--success el-button--small"
@@ -298,7 +308,6 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                 await handleCreateVariant();
                               }}
                               title="Добавить тип"
-                              style={{ zIndex: 1000, position: 'relative' }}
                             >
                               <span style={{ fontSize: '14px' }}>↓</span>
                             </button>
@@ -386,9 +395,9 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                       <React.Fragment key={typeName}>
                         {/* Родительская строка - тип (уровень 0) */}
                         <tr className="el-table__row expanded">
-                          <td style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
+                          <td className="variant-name-cell" style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
                             <div className="cell">
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', overflow: 'hidden', width: '100%' }}>
+                              <div className="variant-name-row">
                                 <div className="el-input el-input--small" style={{ flex: 1, marginRight: '8px', minWidth: 0 }}>
                                   {editing.editingVariantName === firstVariant.id ? (
                                     <input
@@ -504,7 +513,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                             return (
                               <React.Fragment key={variant.id}>
                                 <tr className="el-table__row el-table__row--level-1">
-                                  <td style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
+                                  <td className="variant-name-cell" style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
                                     <div className="cell">
                                       <span className="el-table__indent" style={{ paddingLeft: '16px' }}></span>
                                       {hasChildren && (
@@ -643,7 +652,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                 {/* Внучатые строки - варианты уровня 2 */}
                                 {level2Variants.map((level2Variant) => (
                                   <tr key={level2Variant.id} className="el-table__row el-table__row--level-2">
-                                    <td style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
+                                    <td className="variant-name-cell" style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
                                       <div className="cell">
                                         <span className="el-table__indent" style={{ paddingLeft: '32px' }}></span>
                                         <span className="el-table__placeholder"></span>
