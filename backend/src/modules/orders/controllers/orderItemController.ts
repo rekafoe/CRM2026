@@ -24,6 +24,20 @@ export class OrderItemController {
         components?: Array<{ materialId: number; qtyPerItem: number }>
       }
       const authUser = (req as AuthenticatedRequest).user as { id: number } | undefined
+      
+      // 🆕 Детальное логирование входящих данных для отладки
+      logger.info('📥 [addItem] Входящие данные', {
+        orderId,
+        type,
+        price,
+        quantity,
+        hasParams: !!params,
+        paramsKeys: params ? Object.keys(params) : [],
+        paramsType: typeof params,
+        hasComponents: Array.isArray(components),
+        componentsCount: Array.isArray(components) ? components.length : 0,
+        bodyKeys: Object.keys(req.body || {})
+      })
 
       const db = await getDb()
       // Узнаём материалы и остатки (либо из переданных components, либо по пресету)
@@ -129,12 +143,34 @@ export class OrderItemController {
         // 🆕 Безопасная сериализация params с обработкой циклических ссылок и несериализуемых данных
         let paramsJson: string
         try {
+          // 🆕 Очищаем params от потенциально проблемных полей перед сериализацией
+          const cleanParams: any = {}
+          if (params) {
+            for (const [key, value] of Object.entries(params)) {
+              // Пропускаем функции и undefined
+              if (typeof value === 'function' || value === undefined) {
+                continue
+              }
+              // Пропускаем циклические ссылки (проверяем через try-catch при сериализации)
+              try {
+                JSON.stringify(value)
+                cleanParams[key] = value
+              } catch (e) {
+                logger.warn(`⚠️ [addItem] Пропускаем поле ${key} из-за проблем с сериализацией`, {
+                  key,
+                  valueType: typeof value,
+                  error: (e as Error).message
+                })
+              }
+            }
+          }
+          
           const paramsToSave = {
-            ...params,
+            ...cleanParams,
             components: Array.isArray(components)
               ? components.map((c) => {
                   const r = reservations.find((rr) => rr.material_id === Number(c.materialId))
-                  return { ...c, reservationId: r?.id }
+                  return { materialId: Number(c.materialId), qtyPerItem: Number(c.qtyPerItem), reservationId: r?.id }
                 })
               : undefined
           }
@@ -155,12 +191,18 @@ export class OrderItemController {
             }
             return value
           })
+          
+          logger.info('✅ [addItem] params успешно сериализованы', {
+            paramsJsonLength: paramsJson.length,
+            hasComponents: Array.isArray(paramsToSave.components),
+            componentsCount: Array.isArray(paramsToSave.components) ? paramsToSave.components.length : 0
+          })
         } catch (serializeError: any) {
-          logger.error('Ошибка сериализации params', {
+          logger.error('❌ [addItem] Ошибка сериализации params', {
             error: serializeError,
             message: serializeError?.message,
             stack: serializeError?.stack,
-            paramsKeys: Object.keys(params || {}),
+            paramsKeys: params ? Object.keys(params) : [],
             paramsType: typeof params
           })
           // Fallback: сохраняем только базовые поля
@@ -169,11 +211,19 @@ export class OrderItemController {
             components: Array.isArray(components)
               ? components.map((c) => {
                   const r = reservations.find((rr) => rr.material_id === Number(c.materialId))
-                  return { materialId: c.materialId, qtyPerItem: c.qtyPerItem, reservationId: r?.id }
+                  return { materialId: Number(c.materialId), qtyPerItem: Number(c.qtyPerItem), reservationId: r?.id }
                 })
               : undefined
           })
         }
+        
+        logger.info('💾 [addItem] Вставляем позицию в БД', {
+          orderId,
+          type,
+          price,
+          quantity: Math.max(1, Number(quantity) || 1),
+          paramsJsonLength: paramsJson.length
+        })
         
         const insertItem = await db.run(
           'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -189,12 +239,17 @@ export class OrderItemController {
           clicks
         )
         const itemId = insertItem.lastID!
+        
+        logger.info('✅ [addItem] Позиция вставлена', { itemId })
+        
         const rawItem = await db.get(
           `SELECT ${itemRowSelect} FROM items WHERE id = ?`,
           itemId
         )
 
         await db.run('COMMIT')
+        
+        logger.info('✅ [addItem] Транзакция завершена успешно', { itemId, orderId })
 
         const item = mapItemRowToItem(rawItem as any)
         res.status(201).json(item)
@@ -204,11 +259,17 @@ export class OrderItemController {
         throw e
       }
     } catch (error: any) {
-      logger.error('Ошибка добавления позиции в заказ', {
+      logger.error('❌ [addItem] Ошибка добавления позиции в заказ', {
         error,
-        stack: error.stack,
+        errorMessage: error?.message,
+        errorStack: error?.stack,
+        errorName: error?.name,
         orderId: req.params.id,
-        body: req.body
+        bodyKeys: req.body ? Object.keys(req.body) : [],
+        bodyType: req.body ? typeof req.body : 'undefined',
+        hasParams: !!(req.body as any)?.params,
+        paramsType: (req.body as any)?.params ? typeof (req.body as any).params : 'undefined',
+        paramsKeys: (req.body as any)?.params ? Object.keys((req.body as any).params) : []
       })
       
       const status = error.status || 500

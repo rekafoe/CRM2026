@@ -639,10 +639,24 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       // Удаляем selectedOperations из specifications (они не нужны в сохраненных данных)
       delete cleanSpecifications.selectedOperations;
       
+      // 🆕 Очищаем parameterSummary и formatInfo для безопасной сериализации
+      const cleanParameterSummary = Array.isArray(parameterSummary)
+        ? parameterSummary.map((p: any) => ({
+            label: String(p.label || ''),
+            value: String(p.value || ''),
+          }))
+        : [];
+      
+      const cleanFormatInfo = result.formatInfo
+        ? (typeof result.formatInfo === 'string'
+            ? result.formatInfo
+            : JSON.parse(JSON.stringify(result.formatInfo)))
+        : undefined;
+      
       const specificationsPayload = {
         ...cleanSpecifications,
-        formatInfo: result.formatInfo,
-        parameterSummary,
+        formatInfo: cleanFormatInfo,
+        parameterSummary: cleanParameterSummary,
         sheetsNeeded: computedSheets,
         piecesPerSheet: itemsPerSheet,
         layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined, // 🆕 Глубокая копия для избежания циклических ссылок
@@ -690,8 +704,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         estimatedDelivery,
         sheetsNeeded: computedSheets,
         piecesPerSheet: itemsPerSheet,
-        formatInfo: result.formatInfo,
-        parameterSummary,
+        formatInfo: cleanFormatInfo,
+        parameterSummary: cleanParameterSummary,
         productId: selectedProduct?.id,
         productName: selectedProduct?.name,
         layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined, // 🆕 Глубокая копия
