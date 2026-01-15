@@ -106,7 +106,10 @@ export class OrderItemController {
             const available = material.quantity - reserved
             
             if (available < payload.quantity) {
-              throw new Error(`Недостаточно материала "${material.name}". Доступно: ${available}, требуется: ${payload.quantity}`)
+              const error = new Error(`Недостаточно материала "${material.name}". Доступно: ${available}, требуется: ${payload.quantity}`)
+              ;(error as any).status = 400 // 🆕 Устанавливаем статус 400 (Bad Request) вместо 500
+              ;(error as any).code = 'INSUFFICIENT_MATERIAL' // 🆕 Код ошибки для фронтенда
+              throw error
             }
             
             // Создаем резерв
@@ -259,11 +262,20 @@ export class OrderItemController {
         throw e
       }
     } catch (error: any) {
+      // 🆕 Определяем статус ошибки: 400 для бизнес-ошибок (недостаток материалов), 500 для системных
+      const isBusinessError = error?.code === 'INSUFFICIENT_MATERIAL' || 
+                              error?.message?.includes('Недостаточно материала') ||
+                              error?.message?.includes('не найден')
+      const status = error.status || (isBusinessError ? 400 : 500)
+      
       logger.error('❌ [addItem] Ошибка добавления позиции в заказ', {
         error,
         errorMessage: error?.message,
         errorStack: error?.stack,
         errorName: error?.name,
+        errorCode: error?.code,
+        status,
+        isBusinessError,
         orderId: req.params.id,
         bodyKeys: req.body ? Object.keys(req.body) : [],
         bodyType: req.body ? typeof req.body : 'undefined',
@@ -272,9 +284,9 @@ export class OrderItemController {
         paramsKeys: (req.body as any)?.params ? Object.keys((req.body as any).params) : []
       })
       
-      const status = error.status || 500
       res.status(status).json({ 
         error: error.message || 'Ошибка при добавлении позиции в заказ',
+        code: error?.code || (isBusinessError ? 'BUSINESS_ERROR' : 'INTERNAL_ERROR'),
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     }

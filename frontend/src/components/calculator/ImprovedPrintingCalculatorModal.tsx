@@ -768,9 +768,23 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
           logger.info('Товар добавлен в заказ', { productName: result.productName });
         }
         onClose();
-      } catch (error) {
+      } catch (error: any) {
         logger.error('Ошибка при сохранении позиции заказа', error);
-        toast.error('Не удалось сохранить позицию заказа', (error as Error).message);
+        
+        // 🆕 Улучшенная обработка ошибок: различаем бизнес-ошибки (недостаток материалов) и системные
+        let errorMessage = 'Не удалось сохранить позицию заказа';
+        if (error?.response?.data?.error) {
+          errorMessage = error.response.data.error;
+          // Если это ошибка недостатка материалов, делаем сообщение более заметным
+          if (errorMessage.includes('Недостаточно материала') || 
+              error?.response?.data?.code === 'INSUFFICIENT_MATERIAL') {
+            errorMessage = `⚠️ ${errorMessage}\n\nПожалуйста, пополните склад или выберите другой материал.`;
+          }
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+        
+        toast.error('Не удалось сохранить позицию заказа', errorMessage);
       }
     },
     [
