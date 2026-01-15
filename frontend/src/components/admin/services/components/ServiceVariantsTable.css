@@ -108,6 +108,17 @@
   transition: opacity 0.15s ease;
 }
 
+.range-remove-btn--pending {
+  color: #d69e2e;
+  opacity: 1;
+  font-size: 10px;
+  width: 84px;
+  height: 18px;
+  white-space: nowrap;
+  background: #fff7ed;
+  border-radius: 9px;
+}
+
 .range-header-cell:hover .range-remove-btn,
 .range-header-cell:focus-within .range-remove-btn {
   opacity: 1;

@@ -337,6 +337,19 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                           localChanges.changePrice(sampleVariant.id, range.minQty, firstRangePrice);
                         });
                       }}
+                      onCopySelectedRange={() => {
+                        const sampleVariant = variants[0];
+                        if (!sampleVariant) return;
+                        const selectedIndex = hoveredRangeIndex ?? 0;
+                        const selectedRangeMinQty = commonRangesAsPriceRanges[selectedIndex]?.minQty;
+                        if (selectedRangeMinQty === undefined) return;
+                        const selectedRangePrice = sampleVariant.tiers.find(
+                          (tier) => tier.minQuantity === selectedRangeMinQty
+                        )?.rate ?? 0;
+                        commonRangesAsPriceRanges.forEach((range) => {
+                          localChanges.changePrice(sampleVariant.id, range.minQty, selectedRangePrice);
+                        });
+                      }}
                       hoveredRangeIndex={hoveredRangeIndex}
                       onRangeHover={setHoveredRangeIndex}
                       addRangeButtonRef={tierModal.addRangeButtonRef}

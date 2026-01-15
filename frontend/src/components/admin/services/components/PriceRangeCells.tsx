@@ -43,6 +43,11 @@ export interface PriceRangeCellsProps {
    * Применить цену из первого диапазона ко всем
    */
   onCopyFirstRange?: () => void;
+
+  /**
+   * Применить цену из выбранного диапазона ко всем
+   */
+  onCopySelectedRange?: () => void;
 }
 
 /**
@@ -239,6 +244,11 @@ export interface PriceRangeHeadersProps {
    * Применить цену из первого диапазона ко всем
    */
   onCopyFirstRange?: () => void;
+
+  /**
+   * Применить цену из выбранного диапазона ко всем
+   */
+  onCopySelectedRange?: () => void;
 }
 
 export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
@@ -251,8 +261,11 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
   hoveredRangeIndex = null,
   onRangeHover,
   onCopyFirstRange,
+  onCopySelectedRange,
 }) => {
   const [bulkPrice, setBulkPrice] = useState('');
+  const [pendingRemoveIndex, setPendingRemoveIndex] = useState<number | null>(null);
+  const removeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const formatRangeLabel = useCallback((range: PriceRange): string => {
     if (range.maxQty === undefined) {
       return `${range.minQty} - ∞`;
@@ -263,11 +276,21 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
     return `${range.minQty} - ${range.maxQty}`;
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (removeTimeoutRef.current) {
+        clearTimeout(removeTimeoutRef.current);
+        removeTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <>
       {commonRanges.map((range, idx) => {
         const rangeLabel = formatRangeLabel(range);
         const isHovered = hoveredRangeIndex === idx;
+        const isPendingRemove = pendingRemoveIndex === idx;
         return (
           <th
             key={idx}
@@ -286,14 +309,26 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
               {onRemoveRange && (
                 <button
                   type="button"
-                  className="el-button el-button--text el-button--mini range-remove-btn"
-                  aria-label={`Удалить диапазон ${rangeLabel}`}
+                  className={`el-button el-button--text el-button--mini range-remove-btn${isPendingRemove ? ' range-remove-btn--pending' : ''}`}
+                  aria-label={isPendingRemove ? `Подтвердить удаление диапазона ${rangeLabel}` : `Удалить диапазон ${rangeLabel}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onRemoveRange(idx);
+                    if (isPendingRemove) {
+                      setPendingRemoveIndex(null);
+                      onRemoveRange(idx);
+                      return;
+                    }
+                    setPendingRemoveIndex(idx);
+                    if (removeTimeoutRef.current) {
+                      clearTimeout(removeTimeoutRef.current);
+                    }
+                    removeTimeoutRef.current = setTimeout(() => {
+                      setPendingRemoveIndex(null);
+                      removeTimeoutRef.current = null;
+                    }, 2000);
                   }}
                 >
-                  ×
+                  {isPendingRemove ? 'Подтвердить' : '×'}
                 </button>
               )}
             </div>
@@ -336,6 +371,13 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
                 onClick={() => onCopyFirstRange?.()}
               >
                 Скопировать из 1-го
+              </button>
+              <button
+                type="button"
+                className="el-button el-button--text el-button--mini range-copy-btn"
+                onClick={() => onCopySelectedRange?.()}
+              >
+                Скопировать из выбранного
               </button>
               <span>
                 <button
