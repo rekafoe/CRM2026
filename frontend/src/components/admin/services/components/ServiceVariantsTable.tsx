@@ -591,12 +591,12 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                           className="el-button el-button--success el-button--small is-plain"
                                           onClick={async () => {
                                             try {
+                                              // 🆕 Для подтипов сохраняем только subType, без плотности (density) и других полей
                                               const newVariant = await operations.createVariant(typeName, {
-                                                ...variant.parameters,
                                                 parentVariantId: variant.id,
                                                 subType: '',
                                               });
-                                              editing.startEditingParams(newVariant.id, { ...variant.parameters, parentVariantId: variant.id, subType: '' });
+                                              editing.startEditingParams(newVariant.id, { parentVariantId: variant.id, subType: '' });
                                             } catch (err) {
                                               console.error('Ошибка создания дочерней строки (уровень 2):', err);
                                               // Ошибка уже обработана в хуке и отображена через setError
@@ -651,6 +651,12 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                   type="button"
                                                   className="el-button el-button--primary el-button--mini"
                                                   onClick={() => {
+                                                    // 🆕 Для подтипов сохраняем только subType, без плотности (density)
+                                                    const paramsToSave = {
+                                                      subType: editing.editingVariantParamsValue.subType || '',
+                                                      // Убираем density и другие поля, оставляем только subType
+                                                    };
+                                                    
                                                     // 🆕 Проверяем, является ли вариант новым (еще не создан на сервере)
                                                     const isNewVariant = localChanges.variantChanges.some(
                                                       change => change.type === 'create' && change.variantId === level2Variant.id
@@ -658,10 +664,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                     
                                                     if (isNewVariant) {
                                                       // Обновляем параметры в локальном состоянии для нового варианта
-                                                      localChanges.updateVariantParams(level2Variant.id, editing.editingVariantParamsValue);
+                                                      localChanges.updateVariantParams(level2Variant.id, paramsToSave);
                                                     } else {
                                                       // Для существующих вариантов обновляем через operations
-                                                      operations.updateVariantParams(level2Variant.id, editing.editingVariantParamsValue);
+                                                      operations.updateVariantParams(level2Variant.id, paramsToSave);
                                                     }
                                                     editing.cancelEditingParams();
                                                   }}
@@ -681,7 +687,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                 type="text"
                                                 className="el-input__inner"
                                                 value={level2Variant.parameters.subType || 'Подвариант'}
-                                                onClick={() => editing.startEditingParams(level2Variant.id, level2Variant.parameters || {})}
+                                                onClick={() => {
+                                                  // 🆕 Для подтипов передаем только subType, без плотности
+                                                  const paramsForEditing = {
+                                                    subType: level2Variant.parameters?.subType || ''
+                                                  };
+                                                  editing.startEditingParams(level2Variant.id, paramsForEditing);
+                                                }}
                                                 readOnly
                                                 style={{ cursor: 'pointer' }}
                                               />
@@ -690,14 +702,12 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         </div>
                                       </div>
                                     </td>
-                                    <PriceRangeCells
-                                      tiers={level2Variant.tiers}
-                                      commonRanges={commonRangesAsPriceRanges}
-                                      onPriceChange={(minQty, newPrice) =>
-                                        localChanges.changePrice(level2Variant.id, minQty, newPrice)
-                                      }
-                                      editable={true}
-                                    />
+                                    {/* 🆕 Для подтипов (варианты уровня 2) не показываем поля цены */}
+                                    {commonRangesAsPriceRanges.map((range) => (
+                                      <td key={range.minQty} style={{ padding: '8px', textAlign: 'center' }}>
+                                        <span style={{ color: '#999', fontSize: '12px' }}>—</span>
+                                      </td>
+                                    ))}
                                     <td style={{ width: '120px', minWidth: '120px', maxWidth: '120px', padding: 0 }}>
                                       <div className="cell">
                                         <div className="active-panel" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -708,11 +718,12 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                               console.log('Level 2 sibling button clicked');
                                               const handler = async () => {
                                                 try {
+                                                  // 🆕 Для подтипов сохраняем только subType, без плотности (density) и других полей
                                                   const newVariant = await operations.createVariant(typeName, {
-                                                    ...level2Variant.parameters,
+                                                    parentVariantId: level2Variant.parameters?.parentVariantId,
                                                     subType: '',
                                                   });
-                                                  editing.startEditingParams(newVariant.id, { ...level2Variant.parameters, subType: '' });
+                                                  editing.startEditingParams(newVariant.id, { parentVariantId: level2Variant.parameters?.parentVariantId, subType: '' });
                                                 } catch (err) {
                                                   console.error('Ошибка создания строки на том же уровне (уровень 2):', err);
                                                   // Ошибка уже обработана в хуке и отображена через setError
