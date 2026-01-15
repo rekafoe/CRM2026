@@ -82,6 +82,8 @@ interface SimplifiedSizeConfig {
   label: string;
   width_mm: number;
   height_mm: number;
+  min_qty?: number;
+  max_qty?: number;
   print_prices: Array<{
     technology_code: string;
     color_mode: 'color' | 'bw';
@@ -242,6 +244,18 @@ export class SimplifiedPricingService {
     if (!selectedSize) {
       throw new Error('Selected size not found in simplified config');
     }
+
+    const minQtyLimit = selectedSize.min_qty ?? 1;
+    const maxQtyLimit = selectedSize.max_qty;
+    if (quantity < minQtyLimit || (maxQtyLimit !== undefined && quantity > maxQtyLimit)) {
+      const err: any = new Error(
+        maxQtyLimit !== undefined
+          ? `Тираж для размера "${selectedSize.label}" должен быть от ${minQtyLimit} до ${maxQtyLimit}`
+          : `Тираж для размера "${selectedSize.label}" должен быть не меньше ${minQtyLimit}`
+      );
+      err.status = 400;
+      throw err;
+    }
     
     // 4. Рассчитываем цену печати
     let printPrice = 0;
@@ -349,12 +363,13 @@ export class SimplifiedPricingService {
       });
 
       if (uniqueServiceIds.length > 0) {
-        const services = await db.all<Array<{ id: number; name: string; operation_type: string | null }>>(
-          `SELECT id, name, operation_type FROM post_processing_services WHERE id IN (${uniqueServiceIds.map(() => '?').join(',')})`,
+        const services = await db.all<Array<{ id: number; name: string; operation_type: string | null; min_quantity?: number | null; max_quantity?: number | null }>>(
+          `SELECT id, name, operation_type, min_quantity, max_quantity FROM post_processing_services WHERE id IN (${uniqueServiceIds.map(() => '?').join(',')})`,
           uniqueServiceIds
         );
         const serviceNamesMap = new Map(services.map(s => [s.id, s.name]));
         const serviceTypesMap = new Map(services.map(s => [s.id, s.operation_type || '']));
+        const serviceLimitsMap = new Map(services.map(s => [s.id, { min: s.min_quantity ?? 1, max: s.max_quantity ?? undefined }]));
 
         // Загружаем тарифы из service_volume_prices / service_variant_prices через репозиторий
         // 🆕 Для услуг с вариантами используем тарифы варианта, иначе базовые тарифы услуги
@@ -432,6 +447,21 @@ export class SimplifiedPricingService {
           // 🆕 Используем ключ с variantId, если он есть
           const variantId = (finConfig as any).variant_id as number | undefined;
           const mapKey = variantId ? `${finConfig.service_id}:${variantId}` : String(finConfig.service_id);
+          const limits = serviceLimitsMap.get(finConfig.service_id);
+          if (limits) {
+            const minLimit = limits.min ?? 1;
+            const maxLimit = limits.max;
+            if (quantity < minLimit || (maxLimit !== undefined && quantity > maxLimit)) {
+              const serviceName = serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`;
+              const err: any = new Error(
+                maxLimit !== undefined
+                  ? `Тираж для операции "${serviceName}" должен быть от ${minLimit} до ${maxLimit}`
+                  : `Тираж для операции "${serviceName}" должен быть не меньше ${minLimit}`
+              );
+              err.status = 400;
+              throw err;
+            }
+          }
           const tiers = serviceTiersMap.get(mapKey);
           if (!tiers || tiers.length === 0) {
             logger.warn('Не найдены тарифы для услуги отделки в упрощённом калькуляторе', {

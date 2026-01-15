@@ -21,6 +21,8 @@ const toServiceResponse = (service: any) => ({
   isActive: service.isActive,
   is_active: service.isActive,
   operation_type: service.operationType ?? service.operation_type, // 🆕
+  min_quantity: service.minQuantity ?? service.min_quantity ?? null,
+  max_quantity: service.maxQuantity ?? service.max_quantity ?? null,
 })
 
 const toTierResponse = (tier: any) => ({
@@ -597,14 +599,14 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
 
 // POST /api/pricing/service-prices - создать цену услуги
 router.post('/service-prices', asyncHandler(async (req, res) => {
-  const { name, description, price_per_unit, unit, operation_type, price_unit, setup_cost, min_quantity } = req.body
+  const { name, description, price_per_unit, unit, operation_type, price_unit, setup_cost, min_quantity, max_quantity } = req.body
 
   try {
     const db = await getDb()
     const result = await db.run(`
-      INSERT INTO post_processing_services (name, description, price, unit, operation_type, price_unit, setup_cost, min_quantity, is_active, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
-    `, [name, description || '', price_per_unit, unit || 'per_item', operation_type || 'general', price_unit || 'per_item', setup_cost || 0, min_quantity || 1])
+      INSERT INTO post_processing_services (name, description, price, unit, operation_type, price_unit, setup_cost, min_quantity, max_quantity, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+    `, [name, description || '', price_per_unit, unit || 'per_item', operation_type || 'general', price_unit || 'per_item', setup_cost || 0, min_quantity || 1, max_quantity || null])
 
     res.json({
       id: result.lastID,
@@ -616,6 +618,7 @@ router.post('/service-prices', asyncHandler(async (req, res) => {
       price_unit: price_unit || 'per_item',
       setup_cost: setup_cost || 0,
       min_quantity: min_quantity || 1,
+      max_quantity: max_quantity ?? null,
       is_active: 1,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -632,6 +635,7 @@ router.post('/service-prices', asyncHandler(async (req, res) => {
       price_unit: price_unit || 'per_item',
       setup_cost: setup_cost || 0,
       min_quantity: min_quantity || 1,
+      max_quantity: max_quantity ?? null,
       is_active: 1,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -640,7 +644,7 @@ router.post('/service-prices', asyncHandler(async (req, res) => {
 }))
 
 router.post('/services', asyncHandler(async (req, res) => {
-  const { name, service_type, type, unit, price_unit, priceUnit, rate, currency, is_active, isActive } = req.body
+  const { name, service_type, type, unit, price_unit, priceUnit, rate, currency, is_active, isActive, min_quantity, max_quantity } = req.body
   const created = await ServiceManagementService.createService({
     name,
     type: (service_type ?? type) || 'generic',
@@ -649,13 +653,15 @@ router.post('/services', asyncHandler(async (req, res) => {
     rate: Number(rate ?? 0),
     currency,
     isActive: is_active !== undefined ? !!is_active : isActive,
+    minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
+    maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
   })
   res.status(201).json(toServiceResponse(created))
 }))
 
 router.put('/services/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { name, service_type, type, unit, price_unit, priceUnit, rate, is_active, isActive } = req.body
+  const { name, service_type, type, unit, price_unit, priceUnit, rate, is_active, isActive, min_quantity, max_quantity } = req.body
   const updated = await ServiceManagementService.updateService(Number(id), {
     name,
     type: service_type ?? type,
@@ -663,6 +669,8 @@ router.put('/services/:id', asyncHandler(async (req, res) => {
     priceUnit: price_unit ?? priceUnit,
     rate: rate !== undefined ? Number(rate) : undefined,
     isActive: is_active !== undefined ? !!is_active : isActive,
+    minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
+    maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
   })
 
   if (!updated) {

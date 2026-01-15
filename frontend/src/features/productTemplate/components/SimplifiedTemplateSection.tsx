@@ -361,6 +361,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
       label: newSize.label.trim(),
       width_mm: w,
       height_mm: h,
+      min_qty: 1,
+      max_qty: undefined,
       default_print: undefined,
       print_prices: [],
       allowed_material_ids: [],
@@ -687,6 +689,32 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                         className="form-input form-input--compact"
                         value={String(selected.height_mm)}
                         onChange={(e) => updateSize(selected.id, { height_mm: Number(e.target.value) || 0 })}
+                      />
+                    </FormField>
+                    <FormField label="Мин. тираж">
+                      <input
+                        className="form-input form-input--compact"
+                        type="number"
+                        min="1"
+                        value={selected.min_qty !== undefined ? String(selected.min_qty) : ''}
+                        onChange={(e) =>
+                          updateSize(selected.id, {
+                            min_qty: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                      />
+                    </FormField>
+                    <FormField label="Макс. тираж">
+                      <input
+                        className="form-input form-input--compact"
+                        type="number"
+                        min="1"
+                        value={selected.max_qty !== undefined ? String(selected.max_qty) : ''}
+                        onChange={(e) =>
+                          updateSize(selected.id, {
+                            max_qty: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
                       />
                     </FormField>
                   </div>

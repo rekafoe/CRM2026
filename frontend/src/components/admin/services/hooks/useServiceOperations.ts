@@ -40,6 +40,8 @@ export function useServiceOperations({
       isActive: boolean;
       hasVariants?: boolean;
       operationType?: string; // 🆕
+      minQuantity?: number;
+      maxQuantity?: number;
     }) => {
       try {
         if (!payload.name.trim() || !payload.unit.trim()) {
@@ -54,6 +56,8 @@ export function useServiceOperations({
           rate: Number.isFinite(payload.rate) ? payload.rate : 0,
           isActive: payload.isActive,
           operationType: payload.operationType || 'other', // 🆕
+          minQuantity: payload.minQuantity,
+          maxQuantity: payload.maxQuantity,
         });
 
         // Если услуга сложная (hasVariants = true), создаем первый вариант-тип

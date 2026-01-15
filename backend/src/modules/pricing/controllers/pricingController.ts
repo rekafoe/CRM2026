@@ -22,6 +22,8 @@ const toServiceResponse = (service: PricingServiceDTO) => ({
   currency: service.currency ?? 'BYN',
   isActive: service.isActive,
   is_active: service.isActive,
+  min_quantity: service.minQuantity ?? null,
+  max_quantity: service.maxQuantity ?? null,
 })
 
 const toTierResponse = (tier: ServiceVolumeTierDTO) => ({
@@ -79,9 +81,10 @@ export class PricingController {
       res.json({ success: true, data: result })
     } catch (error) {
       logger.error('Error in calculateProductPrice', { productId, qty, error })
-      res.status(500).json({
+      const status = typeof (error as any)?.status === 'number' ? (error as any).status : 500
+      res.status(status).json({
         success: false,
-        message: 'Ошибка расчета цены',
+        message: status === 500 ? 'Ошибка расчета цены' : (error as Error)?.message,
         error: error instanceof Error ? error.message : 'Unknown error',
       })
     }
@@ -94,7 +97,7 @@ export class PricingController {
   }
 
   static createService = async (req: Request, res: Response) => {
-    const { name, service_type, type, unit, rate, currency, is_active, isActive } = req.body
+    const { name, service_type, type, unit, rate, currency, is_active, isActive, min_quantity, max_quantity } = req.body
     const service = await ServiceManagementService.createService({
       name,
       type: (service_type ?? type) || 'generic',
@@ -102,19 +105,23 @@ export class PricingController {
       rate: Number(rate ?? 0),
       currency,
       isActive: is_active !== undefined ? !!is_active : isActive,
+      minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
+      maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
     })
     res.status(201).json(toServiceResponse(service))
   }
 
   static updateService = async (req: Request, res: Response) => {
     const { id } = req.params
-    const { name, service_type, type, unit, rate, is_active, isActive } = req.body
+    const { name, service_type, type, unit, rate, is_active, isActive, min_quantity, max_quantity } = req.body
     const updated = await ServiceManagementService.updateService(Number(id), {
       name,
       type: service_type ?? type,
       unit,
       rate: rate !== undefined ? Number(rate) : undefined,
       isActive: is_active !== undefined ? !!is_active : isActive,
+      minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
+      maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
     })
 
     if (!updated) {

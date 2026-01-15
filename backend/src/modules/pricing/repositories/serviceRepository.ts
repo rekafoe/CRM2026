@@ -56,6 +56,8 @@ type RawServiceRow = {
   price_unit?: string;
   price_per_unit: number;
   is_active: number;
+  min_quantity?: number | null;
+  max_quantity?: number | null;
 };
 
 type RawTierRow = {
@@ -99,6 +101,17 @@ export class PricingServiceRepository {
       const hasServiceType = columns.some((column: any) => column.name === 'service_type');
       if (!hasServiceType) {
         await db.run(`ALTER TABLE service_prices ADD COLUMN service_type TEXT DEFAULT 'generic'`);
+      }
+    } catch {
+      // ignore
+    }
+
+    // Обновление схемы post_processing_services (добавляем max_quantity, если отсутствует)
+    try {
+      const columns = await db.all(`PRAGMA table_info('post_processing_services')`);
+      const hasMaxQuantity = columns.some((column: any) => column.name === 'max_quantity');
+      if (!hasMaxQuantity) {
+        await db.run(`ALTER TABLE post_processing_services ADD COLUMN max_quantity INTEGER`);
       }
     } catch {
       // ignore
@@ -193,6 +206,8 @@ export class PricingServiceRepository {
       currency: DEFAULT_CURRENCY,
       isActive: !!row.is_active,
       operationType: row.operation_type, // 🆕
+      minQuantity: row.min_quantity ?? undefined,
+      maxQuantity: row.max_quantity ?? undefined,
     };
   }
 
@@ -219,7 +234,9 @@ export class PricingServiceRepository {
         unit, 
         price_unit,
         price as price_per_unit, 
-        is_active 
+        is_active,
+        min_quantity,
+        max_quantity
       FROM post_processing_services 
       ORDER BY name
     `);
@@ -237,7 +254,9 @@ export class PricingServiceRepository {
         unit, 
         price_unit,
         price as price_per_unit, 
-        is_active 
+        is_active,
+        min_quantity,
+        max_quantity
       FROM post_processing_services 
       WHERE id = ?
     `, id);
@@ -262,16 +281,25 @@ export class PricingServiceRepository {
     const isPriceUnitFromUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(rawUnit);
     const resolvedPriceUnit = rawPriceUnit || (isPriceUnitFromUnit ? rawUnit : 'per_item');
     const resolvedUnit = isPriceUnitFromUnit ? 'шт' : rawUnit;
+    const minQuantity = payload.minQuantity ?? 1;
+    const maxQuantity = payload.maxQuantity ?? null;
+    if (maxQuantity !== null && maxQuantity < minQuantity) {
+      const err: any = new Error('max_quantity не может быть меньше min_quantity');
+      err.status = 400;
+      throw err;
+    }
 
     const result = await db.run(
-      `INSERT INTO post_processing_services (name, operation_type, unit, price_unit, price, is_active) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO post_processing_services (name, operation_type, unit, price_unit, price, is_active, min_quantity, max_quantity) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       payload.name,
       operationType,
       resolvedUnit,
       resolvedPriceUnit,
       Number(payload.rate ?? 0),
       payload.isActive === undefined || payload.isActive ? 1 : 0,
+      minQuantity,
+      maxQuantity,
     );
     const created = await db.get<any>(`
       SELECT 
@@ -282,7 +310,9 @@ export class PricingServiceRepository {
         unit, 
         price_unit,
         price as price_per_unit, 
-        is_active 
+        is_active,
+        min_quantity,
+        max_quantity
       FROM post_processing_services 
       WHERE id = ?
     `, result.lastID);
@@ -322,10 +352,17 @@ export class PricingServiceRepository {
     const resolvedUnit = isPriceUnitFromUnit
       ? (current.unit ?? 'шт')
       : (payload.unit ?? current.unit);
+    const minQuantity = payload.minQuantity !== undefined ? payload.minQuantity : (current.min_quantity ?? 1);
+    const maxQuantity = payload.maxQuantity !== undefined ? payload.maxQuantity : (current.max_quantity ?? null);
+    if (maxQuantity !== null && maxQuantity < minQuantity) {
+      const err: any = new Error('max_quantity не может быть меньше min_quantity');
+      err.status = 400;
+      throw err;
+    }
 
     await db.run(
       `UPDATE post_processing_services 
-       SET name = ?, operation_type = ?, unit = ?, price_unit = ?, price = ?, is_active = ? 
+       SET name = ?, operation_type = ?, unit = ?, price_unit = ?, price = ?, is_active = ?, min_quantity = ?, max_quantity = ? 
        WHERE id = ?`,
       payload.name ?? current.name,
       operationType,
@@ -333,6 +370,8 @@ export class PricingServiceRepository {
       resolvedPriceUnit,
       payload.rate !== undefined ? payload.rate : current.price,
       payload.isActive !== undefined ? (payload.isActive ? 1 : 0) : current.is_active,
+      minQuantity,
+      maxQuantity,
       id,
     );
 
@@ -345,7 +384,9 @@ export class PricingServiceRepository {
         unit, 
         price_unit,
         price as price_per_unit, 
-        is_active 
+        is_active,
+        min_quantity,
+        max_quantity
       FROM post_processing_services 
       WHERE id = ?
     `, id);

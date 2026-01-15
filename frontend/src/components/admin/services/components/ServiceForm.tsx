@@ -10,6 +10,8 @@ export interface ServiceFormState {
   isActive: boolean;
   hasVariants: boolean; // true = сложная услуга (с вариантами), false = простая
   operationType: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
+  minQuantity: string;
+  maxQuantity: string;
 }
 
 interface ServiceFormProps {
@@ -140,6 +142,28 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
           value={value.rate}
           disabled={disabled}
           onChange={(e) => updateField('rate', e.target.value)}
+        />
+      </FormField>
+      <FormField label="Мин. тираж">
+        <input
+          type="number"
+          min="1"
+          className="px-2 py-1 border rounded w-full"
+          value={value.minQuantity}
+          disabled={disabled}
+          onChange={(e) => updateField('minQuantity', e.target.value)}
+          placeholder="1"
+        />
+      </FormField>
+      <FormField label="Макс. тираж">
+        <input
+          type="number"
+          min="1"
+          className="px-2 py-1 border rounded w-full"
+          value={value.maxQuantity}
+          disabled={disabled}
+          onChange={(e) => updateField('maxQuantity', e.target.value)}
+          placeholder="без ограничений"
         />
       </FormField>
       <label className="inline-flex items-center gap-2 text-sm text-gray-600">

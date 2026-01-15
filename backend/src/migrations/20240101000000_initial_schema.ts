@@ -181,6 +181,7 @@ const createStatements = [
     price_unit TEXT DEFAULT 'per_item',
     setup_cost REAL DEFAULT 0,
     min_quantity INTEGER DEFAULT 1,
+    max_quantity INTEGER,
     parameters TEXT,
     is_active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,

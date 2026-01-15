@@ -9,6 +9,8 @@ export interface PricingService {
   rate: number;
   isActive: boolean;
   operationType?: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
+  minQuantity?: number;
+  maxQuantity?: number;
 }
 
 export interface ServiceVolumeTier {
@@ -53,6 +55,8 @@ export interface CreatePricingServicePayload {
   rate: number;
   isActive?: boolean;
   operationType?: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
+  minQuantity?: number;
+  maxQuantity?: number;
 }
 
 export interface UpdatePricingServicePayload extends Partial<CreatePricingServicePayload> {}

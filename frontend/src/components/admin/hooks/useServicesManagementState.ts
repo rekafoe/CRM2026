@@ -74,6 +74,8 @@ const initialState: ServicesManagementState = {
     isActive: true,
     hasVariants: false,
     operationType: 'other', // 🆕
+    minQuantity: '1',
+    maxQuantity: '',
   },
   editingService: null,
   editingServiceForm: null,

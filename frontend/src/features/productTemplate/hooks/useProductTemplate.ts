@@ -29,6 +29,8 @@ export type SimplifiedSizeConfig = {
   label: string;
   width_mm: number;
   height_mm: number;
+  min_qty?: number;
+  max_qty?: number;
   default_print?: Partial<SimplifiedPrintKey>;
   print_prices: SimplifiedPrintPrice[];
   allowed_material_ids: number[];

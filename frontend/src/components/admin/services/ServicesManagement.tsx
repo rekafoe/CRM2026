@@ -30,6 +30,8 @@ const emptyServiceForm: ServiceFormState = {
   isActive: true,
   hasVariants: false,
   operationType: 'other', // 🆕
+  minQuantity: '1',
+  maxQuantity: '',
 };
 
 const serviceToFormState = (service: PricingService): ServiceFormState => ({
@@ -40,6 +42,8 @@ const serviceToFormState = (service: PricingService): ServiceFormState => ({
   isActive: service.isActive,
   hasVariants: false,
   operationType: service.operationType || 'other', // 🆕
+  minQuantity: service.minQuantity !== undefined ? String(service.minQuantity) : '1',
+  maxQuantity: service.maxQuantity !== undefined ? String(service.maxQuantity) : '',
 });
 
 const ServicesManagement: React.FC = () => {
@@ -150,6 +154,12 @@ const ServicesManagement: React.FC = () => {
       rate: Number(state.editingServiceForm.rate || 0),
       isActive: state.editingServiceForm.isActive,
       operationType: state.editingServiceForm.operationType || 'other', // 🆕
+      minQuantity: state.editingServiceForm.minQuantity
+        ? Number(state.editingServiceForm.minQuantity)
+        : undefined,
+      maxQuantity: state.editingServiceForm.maxQuantity
+        ? Number(state.editingServiceForm.maxQuantity)
+        : undefined,
     };
     await serviceOperationsRef.current.updateService(state.editingService.id, payload);
     resetEditingService();
@@ -164,6 +174,12 @@ const ServicesManagement: React.FC = () => {
       isActive: state.newServiceForm.isActive,
       hasVariants: state.newServiceForm.hasVariants,
       operationType: state.newServiceForm.operationType || 'other', // 🆕
+      minQuantity: state.newServiceForm.minQuantity
+        ? Number(state.newServiceForm.minQuantity)
+        : undefined,
+      maxQuantity: state.newServiceForm.maxQuantity
+        ? Number(state.newServiceForm.maxQuantity)
+        : undefined,
     });
     
     if (created) {

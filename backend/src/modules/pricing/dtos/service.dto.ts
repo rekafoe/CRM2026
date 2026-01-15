@@ -8,6 +8,8 @@ export interface PricingServiceDTO {
   currency?: string;
   isActive: boolean;
   operationType?: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
+  minQuantity?: number;
+  maxQuantity?: number;
 }
 
 export interface CreatePricingServiceDTO {
@@ -19,6 +21,8 @@ export interface CreatePricingServiceDTO {
   currency?: string;
   isActive?: boolean;
   operationType?: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
+  minQuantity?: number;
+  maxQuantity?: number;
 }
 
 export interface UpdatePricingServiceDTO {
@@ -30,6 +34,8 @@ export interface UpdatePricingServiceDTO {
   currency?: string;
   isActive?: boolean;
   operationType?: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
+  minQuantity?: number;
+  maxQuantity?: number;
 }
 
 export interface ServiceVolumeTierDTO {
