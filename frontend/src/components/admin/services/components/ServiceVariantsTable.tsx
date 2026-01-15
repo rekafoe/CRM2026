@@ -350,14 +350,37 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                       onChange={(e) => editing.setEditingVariantNameValue(e.target.value)}
                                       onBlur={() => {
                                         if (editing.editingVariantNameValue.trim()) {
-                                          operations.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
+                                          // 🆕 Проверяем, является ли вариант новым (еще не создан на сервере)
+                                          const isNewVariant = localChanges.variantChanges.some(
+                                            change => change.type === 'create' && change.variantId === firstVariant.id
+                                          );
+                                          
+                                          if (isNewVariant) {
+                                            // Обновляем имя в локальном состоянии для нового варианта
+                                            localChanges.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
+                                          } else {
+                                            // Для существующих вариантов обновляем через operations
+                                            operations.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
+                                          }
                                           editing.cancelEditingName();
                                         }
                                       }}
                                       onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
+                                          e.preventDefault(); // 🆕 Предотвращаем стандартное поведение
                                           if (editing.editingVariantNameValue.trim()) {
-                                            operations.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
+                                            // 🆕 Проверяем, является ли вариант новым (еще не создан на сервере)
+                                            const isNewVariant = localChanges.variantChanges.some(
+                                              change => change.type === 'create' && change.variantId === firstVariant.id
+                                            );
+                                            
+                                            if (isNewVariant) {
+                                              // Обновляем имя в локальном состоянии для нового варианта
+                                              localChanges.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
+                                            } else {
+                                              // Для существующих вариантов обновляем через operations
+                                              operations.updateVariantName(firstVariant.id, editing.editingVariantNameValue.trim());
+                                            }
                                             editing.cancelEditingName();
                                           }
                                         } else if (e.key === 'Escape') {

@@ -320,6 +320,19 @@ export function useLocalRangeChanges(
     console.log('=== DELETE VARIANT LOCALLY === hasUnsavedChanges set to true, variantId:', variantId);
   }, []);
 
+  // 🆕 Локальное обновление имени варианта (для новых вариантов, еще не созданных на сервере)
+  const updateVariantName = useCallback((variantId: number, newName: string) => {
+    setLocalVariants(prev => prev.map(v => 
+      v.id === variantId ? { ...v, variantName: newName } : v
+    ));
+    setVariantChanges(prev => prev.map(c =>
+      c.type === 'create' && c.variantId === variantId
+        ? { ...c, variantName: newName }
+        : c
+    ));
+    console.log('=== UPDATE VARIANT NAME LOCALLY ===', { variantId, newName });
+  }, []);
+
   // Сохранение всех изменений на сервер
   const saveChanges = useCallback(async () => {
     if (rangeChanges.length === 0 && priceChanges.length === 0 && variantChanges.length === 0) {
@@ -370,6 +383,7 @@ export function useLocalRangeChanges(
     changePrice,
     createVariant,
     deleteVariant,
+    updateVariantName, // 🆕
 
     // Функции для сохранения/отмены
     saveChanges,
