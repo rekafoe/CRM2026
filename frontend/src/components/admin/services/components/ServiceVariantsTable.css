@@ -27,6 +27,130 @@
   margin: 0 auto;
 }
 
+/* Закрепленный заголовок диапазонов */
+.table-container .el-table__header-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fafafa;
+}
+
+/* Ширины для колонок диапазонов */
+.range-header-cell,
+.range-cell {
+  width: clamp(96px, 8vw, 140px);
+  min-width: 96px;
+  max-width: 140px;
+  text-align: center;
+  padding: 0;
+  position: relative;
+}
+
+.range-header-cell--active,
+.range-cell--active {
+  background: #eef4ff;
+}
+
+.range-header-content,
+.range-cell-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+}
+
+.range-input-wrapper {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.range-input {
+  text-align: center;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.range-header-label {
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  display: inline-block;
+  width: 100%;
+}
+
+.range-remove-btn {
+  color: #e53e3e;
+  padding: 0;
+  min-height: auto;
+  line-height: 1;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  background: transparent;
+  border: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.range-header-cell:hover .range-remove-btn,
+.range-header-cell:focus-within .range-remove-btn {
+  opacity: 1;
+}
+
+.range-actions-cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.range-actions-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.range-copy-btn {
+  align-self: flex-start;
+  color: #409eff;
+  padding: 0;
+  line-height: 1;
+}
+
+.range-bulk-input {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.range-bulk-input .el-input__inner {
+  height: 28px;
+  line-height: 28px;
+  font-size: 12px;
+}
+
+/* Зебра для читаемости */
+.el-table__body tr:nth-child(odd) > td {
+  background-color: #fcfcfd;
+}
+
 /* Стили для Element UI таблицы */
 .el-table {
   border: 1px solid #ebeef5;
@@ -165,6 +289,7 @@
 
 .el-input__inner {
   -webkit-appearance: none;
+  appearance: none;
   background-color: #fff;
   background-image: none;
   border-radius: 4px;
@@ -215,6 +340,7 @@
   border: 1px solid #dcdfe6;
   color: #606266;
   -webkit-appearance: none;
+  appearance: none;
   text-align: center;
   box-sizing: border-box;
   outline: none;

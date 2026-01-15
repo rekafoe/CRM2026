@@ -36,6 +36,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   const tierModal = useTierModal();
   const operations = useVariantOperations(serviceId, serverVariants, setVariants, setError, reload, invalidateCache);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [hoveredRangeIndex, setHoveredRangeIndex] = React.useState<number | null>(null);
 
   // Локальное состояние для несохраненных изменений
   const saveChangesToServer = useCallback(async (rangeChanges: RangeChange[], priceChanges: PriceChange[], variantChanges: VariantChange[]) => {
@@ -318,6 +319,26 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                       onAddRange={() => {
                         tierModal.openAddModal(tierModal.addRangeButtonRef.current || undefined);
                       }}
+                      onApplyAllPrices={(price) => {
+                        const sampleVariantId = variants[0]?.id;
+                        if (!sampleVariantId) return;
+                        commonRangesAsPriceRanges.forEach((range) => {
+                          localChanges.changePrice(sampleVariantId, range.minQty, price);
+                        });
+                      }}
+                      onCopyFirstRange={() => {
+                        const sampleVariant = variants[0];
+                        const firstRangeMinQty = commonRangesAsPriceRanges[0]?.minQty;
+                        if (!sampleVariant || firstRangeMinQty === undefined) return;
+                        const firstRangePrice = sampleVariant.tiers.find(
+                          (tier) => tier.minQuantity === firstRangeMinQty
+                        )?.rate ?? 0;
+                        commonRangesAsPriceRanges.forEach((range) => {
+                          localChanges.changePrice(sampleVariant.id, range.minQty, firstRangePrice);
+                        });
+                      }}
+                      hoveredRangeIndex={hoveredRangeIndex}
+                      onRangeHover={setHoveredRangeIndex}
                       addRangeButtonRef={tierModal.addRangeButtonRef}
                     />
                     <th style={{ width: '120px', minWidth: '120px', maxWidth: '120px', padding: 0 }}>
@@ -680,6 +701,8 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         localChanges.changePrice(level2Variant.id, minQty, newPrice)
                                       }
                                       editable={true}
+                                      hoveredRangeIndex={hoveredRangeIndex}
+                                      onRangeHover={setHoveredRangeIndex}
                                     />
                                     <td style={{ width: '120px', minWidth: '120px', maxWidth: '120px', padding: 0 }}>
                                       <div className="cell">

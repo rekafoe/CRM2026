@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { FormField, Button } from '../../../components/common'
 import { getServiceVolumeTiers, getServiceVariants } from '../../../services/pricing/api'
 import type { ServiceVolumeTier, ServiceVariant } from '../../../types/pricing'
@@ -503,10 +503,9 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
               const variants = needsVariants ? (serviceVariants.get(service.id) || []) : []
               
               // 🆕 Формируем уникальные типы (1-й уровень)
-              const uniqueTypes = useMemo(() => {
-                if (variants.length === 0) return []
-                return Array.from(new Map(variants.map(v => [v.variantName, v])).values())
-              }, [variants])
+              const uniqueTypes = variants.length === 0
+                ? []
+                : Array.from(new Map(variants.map(v => [v.variantName, v])).values())
               
               // 🆕 Определяем выбранный тип и подтип из pricing
               const selectedTypeName = pricing?.variant_name || (uniqueTypes[0]?.variantName || '')
@@ -514,10 +513,10 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
               const selectedVariantId = pricing?.variant_id
               
               // 🆕 Формируем подтипы для выбранного типа (2-й уровень)
-              const subtypes = useMemo(() => {
-                if (variants.length === 0 || !selectedTypeName) return []
-                const variantsOfSelectedType = variants.filter(v => v.variantName === selectedTypeName)
-                return variantsOfSelectedType
+              const subtypes = variants.length === 0 || !selectedTypeName
+                ? []
+                : variants
+                  .filter(v => v.variantName === selectedTypeName)
                   .filter(v => v.parameters?.type || v.parameters?.density)
                   .map(v => {
                     const type = v.parameters?.type || ''
@@ -531,7 +530,6 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                       density: density
                     }
                   })
-              }, [variants, selectedTypeName])
 
               const handleServiceToggle = (checked: boolean) => {
                 if (checked) {
