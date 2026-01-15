@@ -1586,6 +1586,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                         service_id: f.service_id,
                         price_unit: f.price_unit,
                         units_per_item: f.units_per_item,
+                        // 🆕 Сохраняем информацию о подтипе для сложных операций
+                        variant_id: f.variant_id,
+                        subtype: f.subtype,
+                        variant_name: f.variant_name,
+                        density: f.density,
                       }))
                       
                       return (
@@ -1596,11 +1601,16 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
                           onUpdate={(newPricings) => {
                             // Помечаем, что пользователь взаимодействовал с услугами для этого размера
                             hasUserInteractedWithServicesRef.current.set(selected.id, true)
-                            // ✅ Сохраняем только service_id, price_unit, units_per_item - без tiers
+                            // ✅ Сохраняем service_id, price_unit, units_per_item и информацию о подтипе - без tiers
                             const finishingWithoutTiers = newPricings.map(p => ({
                               service_id: p.service_id,
                               price_unit: p.price_unit,
                               units_per_item: p.units_per_item,
+                              // 🆕 Сохраняем информацию о подтипе для сложных операций
+                              variant_id: p.variant_id,
+                              subtype: p.subtype,
+                              variant_name: p.variant_name,
+                              density: p.density,
                               // tiers не сохраняем - цены берутся из централизованной системы
                             }))
                             updateSize(selected.id, { finishing: finishingWithoutTiers })

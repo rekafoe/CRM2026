@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { FormField, Button } from '../../../components/common'
-import { getServiceVolumeTiers } from '../../../services/pricing/api'
-import type { ServiceVolumeTier } from '../../../types/pricing'
+import { getServiceVolumeTiers, getServiceVariants } from '../../../services/pricing/api'
+import type { ServiceVolumeTier, ServiceVariant } from '../../../types/pricing'
 
 // Типы для работы с диапазонами
 export type Tier = { min_qty: number; max_qty?: number; unit_price: number }
@@ -20,6 +20,11 @@ export interface ServicePricing {
   // 🆕 tiers больше не храним в шаблоне продукта - цены берутся из централизованной системы услуг
   // tiers оставлен только для обратной совместимости со старыми данными, но не используется при сохранении
   tiers?: Tier[] // Опционально, только для чтения старых данных
+  // 🆕 Поля для сложных операций с подтипами (например, ламинация)
+  variant_id?: number // ID варианта услуги (типа, например "Рулонная" или "Пакетная")
+  subtype?: string // Название подтипа (например, "глянец 32 мк")
+  variant_name?: string // Название варианта (типа, например "Рулонная")
+  density?: string // Плотность подтипа (например, "32 мк")
 }
 
 export interface ServiceWithTiers extends ServiceItem {
@@ -212,6 +217,41 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
   const addRangeButtonRef = useRef<HTMLButtonElement>(null)
   const [servicesWithTiers, setServicesWithTiers] = useState<ServiceWithTiers[]>([])
   const [loadingTiers, setLoadingTiers] = useState(false)
+  // 🆕 Состояние для вариантов услуг (для сложных операций типа ламинации)
+  const [serviceVariants, setServiceVariants] = useState<Map<number, ServiceVariant[]>>(new Map())
+  const [loadingVariants, setLoadingVariants] = useState<Set<number>>(new Set())
+
+  // 🆕 Загружаем варианты для услуг с operation_type === 'laminate'
+  useEffect(() => {
+    const loadVariants = async () => {
+      const servicesToLoad = services.filter(s => {
+        const opType = s.operation_type || ''
+        return opType === 'laminate' || s.name?.toLowerCase().includes('ламинация')
+      })
+
+      if (servicesToLoad.length === 0) return
+
+      for (const service of servicesToLoad) {
+        if (serviceVariants.has(service.id)) continue // Уже загружено
+
+        setLoadingVariants(prev => new Set(prev).add(service.id))
+        try {
+          const variants = await getServiceVariants(service.id)
+          setServiceVariants(prev => new Map(prev).set(service.id, variants))
+        } catch (error) {
+          console.error(`Ошибка загрузки вариантов для услуги ${service.id}:`, error)
+        } finally {
+          setLoadingVariants(prev => {
+            const next = new Set(prev)
+            next.delete(service.id)
+            return next
+          })
+        }
+      }
+    }
+
+    void loadVariants()
+  }, [services, serviceVariants])
 
   // Загрузка tiers для услуг
   useEffect(() => {
@@ -457,6 +497,42 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
               // ✅ Всегда используем presetTiers - tiers из pricing.tiers больше не используются
               // (оставлены только для обратной совместимости со старыми данными)
               
+              // 🆕 Проверяем, нужны ли варианты для этой услуги
+              const opType = service.operation_type || ''
+              const needsVariants = opType === 'laminate' || service.name?.toLowerCase().includes('ламинация')
+              const variants = needsVariants ? (serviceVariants.get(service.id) || []) : []
+              
+              // 🆕 Формируем уникальные типы (1-й уровень)
+              const uniqueTypes = useMemo(() => {
+                if (variants.length === 0) return []
+                return Array.from(new Map(variants.map(v => [v.variantName, v])).values())
+              }, [variants])
+              
+              // 🆕 Определяем выбранный тип и подтип из pricing
+              const selectedTypeName = pricing?.variant_name || (uniqueTypes[0]?.variantName || '')
+              const selectedSubtype = pricing?.subtype || ''
+              const selectedVariantId = pricing?.variant_id
+              
+              // 🆕 Формируем подтипы для выбранного типа (2-й уровень)
+              const subtypes = useMemo(() => {
+                if (variants.length === 0 || !selectedTypeName) return []
+                const variantsOfSelectedType = variants.filter(v => v.variantName === selectedTypeName)
+                return variantsOfSelectedType
+                  .filter(v => v.parameters?.type || v.parameters?.density)
+                  .map(v => {
+                    const type = v.parameters?.type || ''
+                    const density = v.parameters?.density || ''
+                    const subtypeLabel = type && density ? `${type} ${density}` : type || density || `Вариант ${v.id}`
+                    return {
+                      value: subtypeLabel,
+                      label: subtypeLabel,
+                      variantId: v.id,
+                      variantName: v.variantName,
+                      density: density
+                    }
+                  })
+              }, [variants, selectedTypeName])
+
               const handleServiceToggle = (checked: boolean) => {
                 if (checked) {
                   // ✅ Добавляем услугу БЕЗ tiers - цены будут браться из централизованной системы услуг
@@ -464,6 +540,13 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                     service_id: Number(service.id),
                     price_unit: service.price_unit || 'per_cut',
                     units_per_item: 1,
+                    // 🆕 Для услуг с вариантами устанавливаем значения по умолчанию
+                    ...(needsVariants && uniqueTypes.length > 0 ? {
+                      variant_id: uniqueTypes[0]?.id,
+                      variant_name: uniqueTypes[0]?.variantName,
+                      subtype: subtypes[0]?.value,
+                      density: subtypes[0]?.density
+                    } : {}),
                     // tiers не сохраняем - цены берутся из services-management
                   }
                   onUpdate([...servicePricings, newPricing])
@@ -474,34 +557,130 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                 }
               }
               
+              // 🆕 Обработчик изменения типа (1-й уровень)
+              const handleTypeChange = (newTypeName: string) => {
+                const variantsOfNewType = variants.filter(v => v.variantName === newTypeName)
+                const firstVariant = variantsOfNewType[0]
+                const firstSubtype = variantsOfNewType
+                  .filter(v => v.parameters?.type || v.parameters?.density)
+                  .map(v => {
+                    const type = v.parameters?.type || ''
+                    const density = v.parameters?.density || ''
+                    return type && density ? `${type} ${density}` : type || density || ''
+                  })[0] || ''
+                
+                const updated = servicePricings.map(p => {
+                  if (p.service_id === Number(service.id)) {
+                    return {
+                      ...p,
+                      variant_id: firstVariant?.id,
+                      variant_name: newTypeName,
+                      subtype: firstSubtype,
+                      density: firstVariant?.parameters?.density || ''
+                    }
+                  }
+                  return p
+                })
+                onUpdate(updated)
+              }
+              
+              // 🆕 Обработчик изменения подтипа (2-й уровень)
+              const handleSubtypeChange = (newSubtypeValue: string) => {
+                const selectedSubtypeData = subtypes.find(st => st.value === newSubtypeValue)
+                const updated = servicePricings.map(p => {
+                  if (p.service_id === Number(service.id)) {
+                    return {
+                      ...p,
+                      variant_id: selectedSubtypeData?.variantId || p.variant_id,
+                      subtype: newSubtypeValue,
+                      density: selectedSubtypeData?.density || ''
+                    }
+                  }
+                  return p
+                })
+                onUpdate(updated)
+              }
+              
               return (
-                <tr key={service.id} style={{ opacity: isSelected ? 1 : 0.6 }}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => handleServiceToggle(e.target.checked)}
-                        style={{ cursor: 'pointer' }}
-                      />
-                      <div className="el-select el-select--small" style={{ flex: 1 }}>
-                        <div className="el-input el-input--small el-input--suffix">
-                          <input
-                            type="text"
-                            readOnly
-                            className="el-input__inner"
-                            value={service.name}
-                            style={{ cursor: 'default' }}
-                          />
-                          <span className="el-input__suffix">
-                            <span className="el-input__suffix-inner">
-                              <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                <React.Fragment key={service.id}>
+                  <tr style={{ opacity: isSelected ? 1 : 0.6 }}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => handleServiceToggle(e.target.checked)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                        <div className="el-select el-select--small" style={{ flex: 1 }}>
+                          <div className="el-input el-input--small el-input--suffix">
+                            <input
+                              type="text"
+                              readOnly
+                              className="el-input__inner"
+                              value={service.name}
+                              style={{ cursor: 'default' }}
+                            />
+                            <span className="el-input__suffix">
+                              <span className="el-input__suffix-inner">
+                                <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                              </span>
                             </span>
-                          </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
+                      {/* 🆕 Селекторы для услуг с вариантами (ламинация) */}
+                      {isSelected && needsVariants && uniqueTypes.length > 0 && (
+                        <div style={{ marginTop: '12px', marginLeft: '26px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div>
+                            <label style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'block' }}>
+                              1. Тип:
+                            </label>
+                            <select
+                              value={selectedTypeName}
+                              onChange={(e) => handleTypeChange(e.target.value)}
+                              style={{
+                                fontSize: '12px',
+                                padding: '4px 8px',
+                                border: '1px solid #dcdfe6',
+                                borderRadius: '4px',
+                                width: '100%'
+                              }}
+                            >
+                              {uniqueTypes.map((variant) => (
+                                <option key={variant.variantName} value={variant.variantName}>
+                                  {variant.variantName}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {subtypes.length > 0 && (
+                            <div>
+                              <label style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'block' }}>
+                                2. Подтип с плотностью:
+                              </label>
+                              <select
+                                value={selectedSubtype || subtypes[0]?.value || ''}
+                                onChange={(e) => handleSubtypeChange(e.target.value)}
+                                style={{
+                                  fontSize: '12px',
+                                  padding: '4px 8px',
+                                  border: '1px solid #dcdfe6',
+                                  borderRadius: '4px',
+                                  width: '100%'
+                                }}
+                              >
+                                {subtypes.map((st) => (
+                                  <option key={st.value} value={st.value}>
+                                    {st.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
                   {commonRanges.map((t, ti) => {
                     // ✅ Всегда показываем цены из presetTiers (централизованная система услуг)
                     // tiers из pricing.tiers больше не используются для отображения
@@ -529,6 +708,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                   })}
                   {rangesEditable && <td></td>}
                 </tr>
+                </React.Fragment>
               )
             }) : (
               <tr>
