@@ -554,16 +554,14 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         </div>
                                       </div>
                                     </div>
-                                  </td>
-                                  <PriceRangeCells
-                                    tiers={variant.tiers}
-                                    commonRanges={commonRangesAsPriceRanges}
-                                    onPriceChange={(minQty, newPrice) =>
-                                      localChanges.changePrice(variant.id, minQty, newPrice)
-                                    }
-                                    editable={true}
-                                  />
-                                  <td style={{ width: '120px', minWidth: '120px', maxWidth: '120px', padding: 0 }}>
+                                    </td>
+                                    {/* 🆕 Для вариантов уровня 1 (подтипы типа "Матовая", "Глянцевая") не показываем поля цены */}
+                                    {commonRangesAsPriceRanges.map((range) => (
+                                      <td key={range.minQty} style={{ padding: '8px', textAlign: 'center' }}>
+                                        <span style={{ color: '#999', fontSize: '12px' }}>—</span>
+                                      </td>
+                                    ))}
+                                    <td style={{ width: '120px', minWidth: '120px', maxWidth: '120px', padding: 0 }}>
                                     <div className="cell">
                                       <div className="active-panel" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                         <button
@@ -702,12 +700,15 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                         </div>
                                       </div>
                                     </td>
-                                    {/* 🆕 Для подтипов (варианты уровня 2) не показываем поля цены */}
-                                    {commonRangesAsPriceRanges.map((range) => (
-                                      <td key={range.minQty} style={{ padding: '8px', textAlign: 'center' }}>
-                                        <span style={{ color: '#999', fontSize: '12px' }}>—</span>
-                                      </td>
-                                    ))}
+                                    {/* 🆕 Для вариантов уровня 2 (подтипы типа "30 мк", "100 мк") показываем поля цены */}
+                                    <PriceRangeCells
+                                      tiers={level2Variant.tiers}
+                                      commonRanges={commonRangesAsPriceRanges}
+                                      onPriceChange={(minQty, newPrice) =>
+                                        localChanges.changePrice(level2Variant.id, minQty, newPrice)
+                                      }
+                                      editable={true}
+                                    />
                                     <td style={{ width: '120px', minWidth: '120px', maxWidth: '120px', padding: 0 }}>
                                       <div className="cell">
                                         <div className="active-panel" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
