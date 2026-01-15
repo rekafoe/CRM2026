@@ -249,12 +249,31 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       };
       
       if (hasVariants) {
-        // Если есть варианты, выбираем первый вариант и первый подтип
-        const firstVariant = variants[0];
-        const firstSubtype = firstVariant?.parameters?.subtypes?.[0];
-        newOp.variantId = firstVariant.id;
-        if (firstSubtype) {
-          newOp.subtype = typeof firstSubtype === 'string' ? firstSubtype : firstSubtype.value;
+        const typeVariants = variants.filter(
+          (v) => v.parameters?.type && !v.parameters?.parentVariantId
+        );
+        if (typeVariants.length > 0) {
+          const firstType = typeVariants[0];
+          const subtypeVariants = variants.filter(
+            (v) => v.parameters?.parentVariantId === firstType.id
+          );
+          const firstSubtype = subtypeVariants[0];
+          const subtypeLabel =
+            firstSubtype?.parameters?.subType ||
+            firstSubtype?.parameters?.density ||
+            firstSubtype?.parameters?.type;
+          newOp.variantId = firstSubtype?.id ?? firstType.id;
+          if (subtypeLabel) {
+            newOp.subtype = String(subtypeLabel);
+          }
+        } else {
+          // Если нет иерархии, выбираем первый вариант и первый подтип
+          const firstVariant = variants[0];
+          const firstSubtype = firstVariant?.parameters?.subtypes?.[0];
+          newOp.variantId = firstVariant.id;
+          if (firstSubtype) {
+            newOp.subtype = typeof firstSubtype === 'string' ? firstSubtype : firstSubtype.value;
+          }
         }
       } else {
         // Старая логика: подтипы из parameters
@@ -325,7 +344,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
           const selectedData = getSelectedOperationData(operationId);
 
           return (
-            <div key={operationId} className="param-group operation-group" style={{ gridColumn: 'span 2' }}>
+            <div key={operationId} className="param-group operation-group">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: isSelected ? '12px' : 0 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1 }}>
                   <input
@@ -343,12 +362,15 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                 const allVariants = serviceVariants.get(operationId) || [];
                 const hasVariants = allVariants.length > 0;
                 
-                // Если есть варианты, группируем их по названию типа (variantName) для первого уровня
+                // Если есть варианты, группируем их по типам/подтипам
                 if (hasVariants) {
-                  // 🆕 Группируем варианты по variantName (уникальные типы)
-                  const uniqueTypes = Array.from(
-                    new Map(allVariants.map(v => [v.variantName, v])).values()
+                  const typeVariants = allVariants.filter(
+                    (v) => v.parameters?.type && !v.parameters?.parentVariantId
                   );
+                  const hasTypeHierarchy = typeVariants.length > 0;
+                  const uniqueTypes = hasTypeHierarchy
+                    ? Array.from(new Map(typeVariants.map(v => [v.parameters?.type, v])).values())
+                    : Array.from(new Map(allVariants.map(v => [v.variantName, v])).values());
                   
                   // 🆕 Находим выбранный тип по variantId или используем первый
                   const selectedVariantId = selectedData?.variantId;
@@ -357,19 +379,29 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   // Если вариант не найден, но есть выбранный subtype, пытаемся найти вариант по subtype
                   if (!selectedVariant && selectedData?.subtype) {
                     selectedVariant = allVariants.find(v => {
-                      // Проверяем по parameters.type + parameters.density
-                      const type = v.parameters?.type || '';
-                      const density = v.parameters?.density || '';
-                      const subtypeLabel = type && density ? `${type} ${density}` : type || density;
+                      const subtypeLabel =
+                        v.parameters?.subType ||
+                        v.parameters?.density ||
+                        v.parameters?.type;
                       return subtypeLabel === selectedData.subtype;
                     });
                   }
                   
+                  const selectedTypeVariant = hasTypeHierarchy
+                    ? (selectedVariant?.parameters?.parentVariantId
+                      ? allVariants.find(v => v.id === selectedVariant?.parameters?.parentVariantId)
+                      : typeVariants.find(v => v.id === selectedVariant?.id)) || typeVariants[0]
+                    : selectedVariant || uniqueTypes[0];
+
                   // 🆕 Определяем выбранный тип: из выбранного варианта или первый доступный
-                  const selectedTypeName = selectedVariant?.variantName || uniqueTypes[0]?.variantName || '';
+                  const selectedTypeName = hasTypeHierarchy
+                    ? selectedTypeVariant?.parameters?.type || selectedTypeVariant?.variantName || ''
+                    : selectedTypeVariant?.variantName || '';
                   
-                  // 🆕 Собираем все подтипы ТОЛЬКО из вариантов с выбранным типом
-                  const variantsOfSelectedType = allVariants.filter(v => v.variantName === selectedTypeName);
+                  // 🆕 Собираем все подтипы ТОЛЬКО из вариантов выбранного типа
+                  const variantsOfSelectedType = hasTypeHierarchy
+                    ? allVariants.filter(v => v.parameters?.parentVariantId === selectedTypeVariant?.id)
+                    : allVariants.filter(v => v.variantName === selectedTypeName);
                   
                   // 🆕 Детальное логирование для отладки
                   const firstVariant = variantsOfSelectedType[0];
@@ -394,24 +426,17 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                     }))
                   });
                   
-                  // 🆕 Подтипы формируются из parameters.type + parameters.density (как в ServiceVariantsTable)
-                  // ⚠️ ВАЖНО: Фильтруем ТОЛЬКО варианты с выбранным типом (selectedTypeName)
+                  // 🆕 Подтипы формируются из parameters.subType / density
                   const allSubtypes = variantsOfSelectedType
                     .filter(v => {
-                      // Дополнительная проверка: вариант должен принадлежать выбранному типу
-                      if (v.variantName !== selectedTypeName) {
-                        return false;
-                      }
-                      // И должен иметь type или density
-                      return v.parameters?.type || v.parameters?.density;
+                      return v.parameters?.subType || v.parameters?.density || v.parameters?.type;
                     })
                     .map(v => {
-                      const type = v.parameters?.type || '';
-                      const density = v.parameters?.density || '';
-                      // Формируем подтип как "type density" (например, "глянец 32 мк")
-                      const subtypeLabel = type && density 
-                        ? `${type} ${density}` 
-                        : type || density || `Вариант ${v.id}`;
+                      const subtypeLabel =
+                        v.parameters?.subType ||
+                        v.parameters?.density ||
+                        v.parameters?.type ||
+                        `Вариант ${v.id}`;
                       const subtypeValue = subtypeLabel; // Используем label как value
                       
                       return {
@@ -442,25 +467,28 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginLeft: '26px' }}>
-                      {/* 🆕 1-й уровень: Селектор типа (Рулонная, Пакетная и т.д.) */}
+                      {/* 🆕 1-й уровень: Селектор типа ламинации */}
                       <div className="param-group">
                         <label style={{ fontSize: '14px', color: '#666', fontWeight: 500, marginBottom: '6px', display: 'block' }}>
-                          1. Тип:
+                          1. Тип ламинации:
                         </label>
                         <select
                           value={selectedTypeName || uniqueTypes[0]?.variantName || ''}
                           onChange={(e) => {
                             const newTypeName = e.target.value;
-                            // 🆕 Находим варианты с новым типом и берем первый подтип из них
-                            const variantsOfNewType = allVariants.filter(v => v.variantName === newTypeName);
+                            const nextTypeVariant = hasTypeHierarchy
+                              ? typeVariants.find(v => v.parameters?.type === newTypeName) || typeVariants[0]
+                              : uniqueTypes.find(v => v.variantName === newTypeName) || uniqueTypes[0];
+                            const variantsOfNewType = hasTypeHierarchy
+                              ? allVariants.filter(v => v.parameters?.parentVariantId === nextTypeVariant?.id)
+                              : allVariants.filter(v => v.variantName === newTypeName);
                             const firstVariantOfType = variantsOfNewType[0];
-                            
-                            // Формируем первый подтип из parameters.type + parameters.density
                             let firstSubtypeValue: string | undefined;
                             if (firstVariantOfType) {
-                              const type = firstVariantOfType.parameters?.type || '';
-                              const density = firstVariantOfType.parameters?.density || '';
-                              firstSubtypeValue = type && density ? `${type} ${density}` : type || density || undefined;
+                              firstSubtypeValue =
+                                firstVariantOfType.parameters?.subType ||
+                                firstVariantOfType.parameters?.density ||
+                                firstVariantOfType.parameters?.type;
                             }
                             
                             updateSpecs({
@@ -468,7 +496,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                                 if (op.operationId === operationId) {
                                   return {
                                     ...op,
-                                    variantId: firstVariantOfType?.id, // Используем ID первого варианта этого типа
+                                    variantId: firstVariantOfType?.id ?? nextTypeVariant?.id,
                                     subtype: firstSubtypeValue || undefined,
                                   };
                                 }
@@ -485,19 +513,24 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                             width: '100%'
                           }}
                         >
-                          {uniqueTypes.map((variant) => (
-                            <option key={variant.variantName} value={variant.variantName}>
-                              {variant.variantName}
-                            </option>
-                          ))}
+                          {uniqueTypes.map((variant) => {
+                            const label = hasTypeHierarchy
+                              ? variant.parameters?.type || variant.variantName
+                              : variant.variantName;
+                            return (
+                              <option key={variant.id} value={label}>
+                                {label}
+                              </option>
+                            );
+                          })}
                         </select>
                       </div>
                       
-                      {/* 🆕 2-й уровень: Селектор подтипа с плотностью (глянец 32 мк, мат 100 мк и т.д.) */}
+                      {/* 🆕 2-й уровень: Селектор плотности */}
                       {uniqueSubtypes.length > 0 ? (
                         <div className="param-group">
                           <label style={{ fontSize: '14px', color: '#666', fontWeight: 500, marginBottom: '6px', display: 'block' }}>
-                            2. Подтип с плотностью:
+                            2. Плотность:
                           </label>
                           <select
                             value={selectedData?.subtype || uniqueSubtypes[0]?.value || ''}
