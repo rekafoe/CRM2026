@@ -31,10 +31,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   serviceName,
 }) => {
   // Хуки для управления состоянием
-  const { variants: serverVariants, loading, error, setError, reload, invalidateCache } = useServiceVariants(serviceId);
+  const { variants: serverVariants, loading, error, setError, reload, invalidateCache, setVariants } = useServiceVariants(serviceId);
   const editing = useVariantEditing();
   const tierModal = useTierModal();
-  const operations = useVariantOperations(serviceId, serverVariants, () => {}, setError, reload, invalidateCache);
+  const operations = useVariantOperations(serviceId, serverVariants, setVariants, setError, reload, invalidateCache);
   const [isSaving, setIsSaving] = React.useState(false);
 
   // Локальное состояние для несохраненных изменений
