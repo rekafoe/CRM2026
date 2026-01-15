@@ -59,7 +59,13 @@ export function useLocalRangeChanges(
 
   // Синхронизировать локальное состояние с внешним
   const syncWithExternal = useCallback((externalVariants: VariantWithTiers[]) => {
-    setLocalVariants(externalVariants);
+    // Глубоко копируем tiers, чтобы варианты не делили ссылки
+    setLocalVariants(
+      externalVariants.map((variant) => ({
+        ...variant,
+        tiers: (variant.tiers || []).map((tier) => ({ ...tier })),
+      }))
+    );
     setRangeChanges([]);
     setPriceChanges([]);
     setVariantChanges([]);
@@ -231,25 +237,14 @@ export function useLocalRangeChanges(
     console.log('=== REMOVE RANGE === hasUnsavedChanges set to true');
   }, [localVariants]);
 
-  // Локальное изменение цены
-  // 🆕 Tiers теперь общие для всех вариантов одной услуги
-  // Обновляем цену для всех вариантов одновременно
+  // Локальное изменение цены (для конкретного варианта)
   const changePrice = useCallback((variantId: number, minQty: number, newPrice: number) => {
     console.log('=== CHANGE PRICE ===', { variantId, minQty, newPrice });
-    
-    // 🆕 Обновляем цену для всех вариантов одной услуги одновременно
     setLocalVariants(prev => {
-      // Находим service_id варианта (все варианты одной услуги имеют одинаковый service_id)
-      const variant = prev.find(v => v.id === variantId);
-      if (!variant) return prev;
-      
-      const serviceId = variant.serviceId;
-      
-      return prev.map(v => {
-        // Обновляем tiers только для вариантов той же услуги
-        if (v.serviceId !== serviceId) return v;
+      const updated = prev.map(variant => {
+        if (variant.id !== variantId) return variant;
 
-        const updatedTiers = v.tiers.map(tier => {
+        const updatedTiers = variant.tiers.map(tier => {
           if (tier.minQuantity === minQty) {
             console.log('=== CHANGE PRICE === Found tier to update:', { tier, newPrice });
             return { ...tier, rate: newPrice };
@@ -258,21 +253,28 @@ export function useLocalRangeChanges(
         });
 
         console.log('=== CHANGE PRICE === Updated variant:', { 
-          variantId: v.id, 
-          oldTiers: v.tiers, 
+          variantId, 
+          oldTiers: variant.tiers, 
           newTiers: updatedTiers 
         });
-        return { ...v, tiers: updatedTiers };
+        return { ...variant, tiers: updatedTiers };
       });
+      return updated;
     });
 
     // Добавляем или обновляем изменение цены
     setPriceChanges(prev => {
-      // Удаляем все старые изменения для этого minQty (т.к. tiers общие, достаточно одного изменения)
-      const filtered = prev.filter(change => change.minQty !== minQty);
-      
-      // Добавляем новое изменение
-      return [...filtered, { variantId, minQty, newPrice }];
+      const existingIndex = prev.findIndex(change =>
+        change.variantId === variantId && change.minQty === minQty
+      );
+
+      if (existingIndex >= 0) {
+        const newChanges = [...prev];
+        newChanges[existingIndex] = { variantId, minQty, newPrice };
+        return newChanges;
+      } else {
+        return [...prev, { variantId, minQty, newPrice }];
+      }
     });
 
     setHasUnsavedChanges(true);

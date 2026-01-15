@@ -802,38 +802,42 @@ router.delete('/services/:serviceId/variants/:variantId', asyncHandler(async (re
 
 // Tiers для вариантов
 router.get('/services/:serviceId/variants/:variantId/tiers', asyncHandler(async (req, res) => {
-  const { serviceId } = req.params
+  const { serviceId, variantId } = req.params
   const serviceIdNum = Number(serviceId)
+  // 🆕 Нормализуем variantId
+  const normalizedVariantId = typeof variantId === 'string' 
+    ? parseInt(variantId.split(':')[0], 10) 
+    : Number(variantId);
   
-  if (isNaN(serviceIdNum)) {
-    res.status(400).json({ error: `Invalid serviceId: serviceId=${serviceId}` })
+  if (isNaN(serviceIdNum) || isNaN(normalizedVariantId)) {
+    res.status(400).json({ error: `Invalid serviceId or variantId: serviceId=${serviceId}, variantId=${variantId}` })
     return
   }
   
-  // 🆕 Tiers теперь общие для всех вариантов одной услуги
-  // variantId игнорируется, всегда возвращаем общие tiers (variant_id IS NULL)
-  const tiers = await ServiceManagementService.listServiceTiers(serviceIdNum)
+  const tiers = await ServiceManagementService.listServiceTiers(serviceIdNum, normalizedVariantId)
   res.json(tiers.map(toTierResponse))
 }))
 
 router.post('/services/:serviceId/variants/:variantId/tiers', asyncHandler(async (req, res) => {
-  const { serviceId } = req.params
+  const { serviceId, variantId } = req.params
   const { min_quantity, minQuantity, price_per_unit, rate, is_active, isActive } = req.body
   
   const serviceIdNum = Number(serviceId)
+  // 🆕 Нормализуем variantId
+  const normalizedVariantId = typeof variantId === 'string' 
+    ? parseInt(variantId.split(':')[0], 10) 
+    : Number(variantId);
   
-  if (isNaN(serviceIdNum)) {
-    res.status(400).json({ error: `Invalid serviceId: serviceId=${serviceId}` })
+  if (isNaN(serviceIdNum) || isNaN(normalizedVariantId)) {
+    res.status(400).json({ error: `Invalid serviceId or variantId: serviceId=${serviceId}, variantId=${variantId}` })
     return
   }
   
-  // 🆕 Tiers теперь общие для всех вариантов одной услуги
-  // variantId игнорируется, tiers создаются с variant_id = NULL
   const tier = await ServiceManagementService.createServiceTier(serviceIdNum, {
     minQuantity: Number(min_quantity ?? minQuantity ?? 0),
     rate: Number(price_per_unit ?? rate ?? 0),
     isActive: is_active !== undefined ? !!is_active : isActive,
-    // variantId больше не используется
+    variantId: normalizedVariantId,
   })
   res.status(201).json(toTierResponse(tier))
 }))

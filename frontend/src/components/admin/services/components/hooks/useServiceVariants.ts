@@ -44,16 +44,11 @@ export function useServiceVariants(serviceId: number) {
               }),
       ]);
 
-      // 🆕 Tiers теперь общие для всех вариантов одной услуги
-      // Берем tiers из любого варианта (они все одинаковые) или пустой массив
-      const commonTiers = loadedVariants.length > 0 && allTiers[loadedVariants[0].id] 
-        ? allTiers[loadedVariants[0].id] 
-        : [];
-      
-      // Сопоставляем общие tiers со всеми вариантами
+      // Сопоставляем tiers с вариантами
       const variantsWithTiers: VariantWithTiers[] = loadedVariants.map((variant: any) => ({
         ...variant,
-        tiers: commonTiers, // Все варианты используют одни и те же tiers
+        // Глубоко копируем tiers, чтобы разные варианты не шарили один и тот же массив/объекты
+        tiers: (allTiers[variant.id] || []).map((tier) => ({ ...tier })),
         loadingTiers: false,
       }));
 
