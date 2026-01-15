@@ -406,8 +406,9 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                     className="el-button el-button--success el-button--small is-plain"
                                     onClick={async () => {
                                       try {
-                                        const newVariant = localChanges.createVariant(typeName, { type: 'Новый тип', density: 'Новая плотность' });
-                                        editing.startEditingParams(newVariant.id, { type: 'Новый тип', density: 'Новая плотность' });
+                                        // 🆕 Для вариантов уровня 1 сохраняем только type, без плотности (density)
+                                        const newVariant = localChanges.createVariant(typeName, { type: 'Новый тип' });
+                                        editing.startEditingParams(newVariant.id, { type: 'Новый тип' });
                                       } catch (err) {
                                         console.error('Ошибка создания дочерней строки:', err);
                                         // Ошибка уже обработана в хуке и отображена через setError
@@ -498,20 +499,16 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                 }
                                                 style={{ flex: 1 }}
                                               />
-                                              <input
-                                                type="text"
-                                                className="el-input__inner"
-                                                placeholder="Плотность (например: 32 мкм)"
-                                                value={editing.editingVariantParamsValue.density || ''}
-                                                onChange={(e) =>
-                                                  editing.setEditingVariantParamsValue({ ...editing.editingVariantParamsValue, density: e.target.value })
-                                                }
-                                                style={{ flex: 1 }}
-                                              />
                                               <button
                                                 type="button"
                                                 className="el-button el-button--primary el-button--mini"
                                                 onClick={() => {
+                                                  // 🆕 Для вариантов уровня 1 сохраняем только type, без плотности (density)
+                                                  const paramsToSave = {
+                                                    type: editing.editingVariantParamsValue.type || '',
+                                                    // Убираем density и другие поля, оставляем только type
+                                                  };
+                                                  
                                                   // 🆕 Проверяем, является ли вариант новым (еще не создан на сервере)
                                                   const isNewVariant = localChanges.variantChanges.some(
                                                     change => change.type === 'create' && change.variantId === variant.id
@@ -519,10 +516,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                                   
                                                   if (isNewVariant) {
                                                     // Обновляем параметры в локальном состоянии для нового варианта
-                                                    localChanges.updateVariantParams(variant.id, editing.editingVariantParamsValue);
+                                                    localChanges.updateVariantParams(variant.id, paramsToSave);
                                                   } else {
                                                     // Для существующих вариантов обновляем через operations
-                                                    operations.updateVariantParams(variant.id, editing.editingVariantParamsValue);
+                                                    operations.updateVariantParams(variant.id, paramsToSave);
                                                   }
                                                   editing.cancelEditingParams();
                                                 }}
@@ -541,12 +538,14 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                             <input
                                               type="text"
                                               className="el-input__inner"
-                                              value={
-                                                variant.parameters.type && variant.parameters.density
-                                                  ? `${variant.parameters.type} ${variant.parameters.density}`
-                                                  : variant.parameters.type || variant.parameters.density || 'Вариант'
-                                              }
-                                              onClick={() => editing.startEditingParams(variant.id, variant.parameters || {})}
+                                              value={variant.parameters.type || 'Вариант'}
+                                              onClick={() => {
+                                                // 🆕 Для вариантов уровня 1 передаем только type, без плотности
+                                                const paramsForEditing = {
+                                                  type: variant.parameters?.type || ''
+                                                };
+                                                editing.startEditingParams(variant.id, paramsForEditing);
+                                              }}
                                               readOnly
                                               style={{ cursor: 'pointer' }}
                                             />
@@ -571,8 +570,9 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                             console.log('Level 1 button clicked');
                                             const handler = async () => {
                                               try {
-                                                const newVariant = await operations.createVariant(typeName, { type: 'Новый тип', density: 'Новая плотность' });
-                                                editing.startEditingParams(newVariant.id, { type: 'Новый тип', density: 'Новая плотность' });
+                                                // 🆕 Для вариантов уровня 1 сохраняем только type, без плотности (density)
+                                                const newVariant = await operations.createVariant(typeName, { type: 'Новый тип' });
+                                                editing.startEditingParams(newVariant.id, { type: 'Новый тип' });
                                               } catch (err) {
                                                 console.error('Ошибка создания строки на том же уровне (уровень 1):', err);
                                                 // Ошибка уже обработана в хуке и отображена через setError
