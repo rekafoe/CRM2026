@@ -634,13 +634,18 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         .toISOString()
         .split('T')[0];
 
+      // 🆕 Очищаем specifications от потенциально проблемных данных перед сериализацией
+      const cleanSpecifications = { ...result.specifications };
+      // Удаляем selectedOperations из specifications (они не нужны в сохраненных данных)
+      delete cleanSpecifications.selectedOperations;
+      
       const specificationsPayload = {
-        ...result.specifications,
+        ...cleanSpecifications,
         formatInfo: result.formatInfo,
         parameterSummary,
         sheetsNeeded: computedSheets,
         piecesPerSheet: itemsPerSheet,
-        layout: result.layout,
+        layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined, // 🆕 Глубокая копия для избежания циклических ссылок
         customFormat: isCustomFormat ? customFormat : undefined,
         // Сохраняем тип печати и режим цвета
         print_technology: printTechnology || undefined,
@@ -652,11 +657,32 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         ...(result.specifications.size_id ? { size_id: result.specifications.size_id } : {}),
       };
 
+      // 🆕 Очищаем данные для безопасной сериализации
+      const cleanMaterials = result.materials ? result.materials.map((m: any) => ({
+        materialId: m.materialId,
+        materialName: m.materialName,
+        quantity: m.quantity,
+        unitPrice: m.unitPrice,
+        totalCost: m.totalCost,
+        density: m.density,
+        paper_type_name: m.paper_type_name,
+      })) : [];
+      
+      const cleanServices = result.services ? result.services.map((s: any) => ({
+        operationId: s.operationId,
+        operationName: s.operationName,
+        operationType: s.operationType,
+        priceUnit: s.priceUnit,
+        unitPrice: s.unitPrice,
+        quantity: s.quantity,
+        totalCost: s.totalCost,
+      })) : [];
+      
       const paramsPayload = {
         description,
         specifications: specificationsPayload,
-        materials: result.materials,
-        services: result.services,
+        materials: cleanMaterials,
+        services: cleanServices,
         productionTime: result.productionTime,
         productType: result.specifications.productType,
         urgency: result.specifications.priceType,
@@ -668,7 +694,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         parameterSummary,
         productId: selectedProduct?.id,
         productName: selectedProduct?.name,
-        layout: result.layout,
+        layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined, // 🆕 Глубокая копия
         customFormat: isCustomFormat ? customFormat : undefined,
       };
 
