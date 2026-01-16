@@ -73,7 +73,7 @@ export const EarningsPage: React.FC = () => {
       <div className="earnings-summary">
         <div className="earnings-summary-card">
           <div className="earnings-summary-title">Итого за месяц</div>
-          <div className="earnings-summary-value">{total.toFixed(2)} ₽</div>
+          <div className="earnings-summary-value">{total.toFixed(2)} BYN</div>
         </div>
         <div className="earnings-summary-card">
           <div className="earnings-summary-title">Количество позиций</div>
@@ -105,9 +105,9 @@ export const EarningsPage: React.FC = () => {
               <td>{item.earnedDate}</td>
               <td>{item.orderNumber || `#${item.orderId}`}</td>
               <td>{item.itemName}</td>
-              <td>{Number(item.itemTotal).toFixed(2)} ₽</td>
+              <td>{Number(item.itemTotal).toFixed(2)} BYN</td>
               <td>{Number(item.percent).toFixed(2)}%</td>
-              <td>{Number(item.amount).toFixed(2)} ₽</td>
+              <td>{Number(item.amount).toFixed(2)} BYN</td>
             </tr>
           ))}
         </tbody>

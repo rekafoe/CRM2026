@@ -567,6 +567,7 @@ const ProductTemplatePage: React.FC = () => {
           name={state.meta.name}
           description={state.meta.description}
           icon={state.meta.icon}
+          operator_percent={state.meta.operator_percent}
           saving={saving}
           onChange={(patch) => dispatch({ type: 'setMeta', patch })}
           onSave={async () => {

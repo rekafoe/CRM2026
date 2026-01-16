@@ -40,7 +40,7 @@ export type SimplifiedSizeConfig = {
 export type SimplifiedConfig = { sizes: SimplifiedSizeConfig[] }
 
 export interface TemplateState {
-  meta: { name: string; description: string; icon: string }
+  meta: { name: string; description: string; icon: string; operator_percent: string }
   trim_size: { width: string; height: string }
   print_sheet: { preset: 'SRA3' | 'A3' | 'А4' | '' ; width: string; height: string }
   constraints: {
@@ -123,7 +123,7 @@ function reducer(state: TemplateState, action: Action): TemplateState {
 
 export function useProductTemplateInitial(): TemplateState {
   return {
-    meta: { name: '', description: '', icon: '' },
+    meta: { name: '', description: '', icon: '', operator_percent: '' },
     trim_size: { width: '', height: '' },
     print_sheet: { preset: '', width: '', height: '' },
     constraints: {

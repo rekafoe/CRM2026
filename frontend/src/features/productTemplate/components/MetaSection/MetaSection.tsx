@@ -5,12 +5,13 @@ interface MetaSectionProps {
   name: string;
   description: string;
   icon: string;
+  operator_percent: string;
   saving: boolean;
-  onChange: (patch: Partial<{ name: string; description: string; icon: string }>) => void;
+  onChange: (patch: Partial<{ name: string; description: string; icon: string; operator_percent: string }>) => void;
   onSave: () => Promise<void> | void;
 }
 
-const MetaSection: React.FC<MetaSectionProps> = ({ name, description, icon, saving, onChange, onSave }) => {
+const MetaSection: React.FC<MetaSectionProps> = ({ name, description, icon, operator_percent, saving, onChange, onSave }) => {
   const hasChanges = name.trim().length > 0;
 
   return (
@@ -49,6 +50,18 @@ const MetaSection: React.FC<MetaSectionProps> = ({ name, description, icon, savi
             onChange={(e) => onChange({ description: e.target.value })}
             placeholder="Опишите особенности продукта..."
             rows={4}
+          />
+        </FormField>
+
+        <FormField label="Процент оператора" help="Процент от суммы позиции заказа">
+          <input
+            className="form-input"
+            type="number"
+            min="0"
+            step="0.1"
+            value={operator_percent}
+            onChange={(e) => onChange({ operator_percent: e.target.value })}
+            placeholder="Например: 10"
           />
         </FormField>
 

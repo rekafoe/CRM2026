@@ -155,6 +155,15 @@ export default function useProductTemplatePage(productId: number | undefined): U
           dispatch({ type: 'setMeta', patch: { name: details.name || '' } })
           dispatch({ type: 'setMeta', patch: { description: details.description || '' } })
           dispatch({ type: 'setMeta', patch: { icon: details.icon || '' } })
+          dispatch({
+            type: 'setMeta',
+            patch: {
+              operator_percent:
+                (details as any)?.operator_percent !== undefined
+                  ? String((details as any)?.operator_percent)
+                  : '',
+            },
+          })
           void loadParameterPresets(details)
         } else {
           setProduct(null)
@@ -490,10 +499,17 @@ export default function useProductTemplatePage(productId: number | undefined): U
     if (!productId) return
     try {
       setSaving(true)
+      const operatorPercentValue =
+        state.meta.operator_percent !== ''
+          ? Number(state.meta.operator_percent)
+          : undefined
       await updateProduct(productId, {
         name: state.meta.name,
         description: state.meta.description,
-        icon: state.meta.icon
+        icon: state.meta.icon,
+        ...(operatorPercentValue !== undefined && Number.isFinite(operatorPercentValue)
+          ? { operator_percent: operatorPercentValue }
+          : {})
       })
       alert('Основные данные обновлены')
     } catch (error) {
@@ -502,7 +518,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
     } finally {
       setSaving(false)
     }
-  }, [productId, state.meta.name, state.meta.description, state.meta.icon])
+  }, [productId, state.meta.name, state.meta.description, state.meta.icon, state.meta.operator_percent])
 
   const refreshMaterials = useCallback(async (id: number) => {
     const fresh = await getProductMaterials(id)

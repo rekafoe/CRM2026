@@ -146,8 +146,8 @@ export const EarningsAdminPage: React.FC = () => {
           {rows.map((row) => (
             <tr key={row.userId}>
               <td>{row.name}</td>
-              <td>{Number(row.totalCurrentMonth).toFixed(2)} ₽</td>
-              <td>{Number(row.totalPreviousMonth).toFixed(2)} ₽</td>
+              <td>{Number(row.totalCurrentMonth).toFixed(2)} BYN</td>
+              <td>{Number(row.totalPreviousMonth).toFixed(2)} BYN</td>
               <td>{Number(row.hours).toFixed(1)}</td>
               <td>{row.shifts}</td>
               <td>
@@ -178,7 +178,7 @@ export const EarningsAdminPage: React.FC = () => {
               {detailUser.history.map((h) => (
                 <tr key={h.month}>
                   <td>{h.month}</td>
-                  <td>{Number(h.total).toFixed(2)} ₽</td>
+                  <td>{Number(h.total).toFixed(2)} BYN</td>
                 </tr>
               ))}
             </tbody>
