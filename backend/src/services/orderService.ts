@@ -460,16 +460,34 @@ export class OrderService {
 
     // Агрегируем возвраты по materialId
     const returns: Record<number, number> = {}
+    const hasRulesTable = !!(await db.get(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='product_material_rules'"
+    ))
+    const productMaterialsColumns = await db.all(`PRAGMA table_info('product_materials')`)
+    const hasLegacyPresetSchema = productMaterialsColumns.some((col: any) => col.name === 'presetCategory')
     for (const item of items) {
       const paramsObj = JSON.parse(item.params || '{}') as { description?: string }
-      const composition = (await db.all<{
-        materialId: number
-        qtyPerItem: number
-      }>(
-        'SELECT materialId, qtyPerItem FROM product_materials WHERE presetCategory = ? AND presetDescription = ?',
-        item.type,
-        paramsObj.description || ''
-      )) as unknown as Array<{ materialId: number; qtyPerItem: number }>
+      let composition: Array<{ materialId: number; qtyPerItem: number }> = []
+      if (hasRulesTable) {
+        composition = (await db.all<{
+          materialId: number
+          qtyPerItem: number
+        }>(
+          `SELECT material_id as materialId, qty_per_item as qtyPerItem
+           FROM product_material_rules
+           WHERE product_type = ? AND product_name = ?`,
+          [item.type, paramsObj.description || '']
+        )) as unknown as Array<{ materialId: number; qtyPerItem: number }>
+      } else if (hasLegacyPresetSchema) {
+        composition = (await db.all<{
+          materialId: number
+          qtyPerItem: number
+        }>(
+          'SELECT materialId, qtyPerItem FROM product_materials WHERE presetCategory = ? AND presetDescription = ?',
+          item.type,
+          paramsObj.description || ''
+        )) as unknown as Array<{ materialId: number; qtyPerItem: number }>
+      }
       for (const c of composition) {
         const add = Math.ceil((c.qtyPerItem || 0) * Math.max(1, Number(item.quantity) || 1)) // Округляем вверх до целого числа
         returns[c.materialId] = (returns[c.materialId] || 0) + add
