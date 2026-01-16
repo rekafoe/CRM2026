@@ -189,7 +189,13 @@ router.get('/admin', asyncHandler(async (req, res) => {
 
   const totalsCurrentMap = new Map(totalsCurrent.map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
   const totalsPrevMap = new Map(totalsPrev.map((r: any) => [Number(r.user_id), Number(r.total) || 0]))
-  const shiftsMap = new Map(shifts.map((r: any) => [Number(r.user_id), { hours: Number(r.hours) || 0, shifts: Number(r.shifts) || 0 }]))
+  const shiftsMap = new Map<number, { hours: number; shifts: number }>();
+  shifts.forEach((r: any) => {
+    shiftsMap.set(Number(r.user_id), {
+      hours: Number(r.hours) || 0,
+      shifts: Number(r.shifts) || 0,
+    });
+  });
 
   const historyKeys = buildMonthKeys(historyMonths, month)
   const historyRows = await db.all<any>(
