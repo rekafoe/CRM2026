@@ -10,6 +10,19 @@ import { EarningsService } from '../../../services/earningsService'
 import { mapPhotoOrderToOrder, mapPhotoOrderToVirtualItem } from '../../../models/mappers/telegramPhotoOrderMapper'
 
 export class OrderService {
+  private static buildDefaultReadyDate(baseDate?: string) {
+    const date = baseDate ? new Date(baseDate) : new Date()
+    if (isNaN(date.getTime())) {
+      return null
+    }
+    date.setHours(date.getHours() + 1)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  }
   private static async getStatusIdByName(db: any, name: string): Promise<number | null> {
     try {
       const row = (await db.get(
@@ -134,10 +147,23 @@ export class OrderService {
       );
       
       // 2. Добавляем товары в заказ
+      const orderCreatedAt = (order as any).created_at || (order as any).createdAt
       for (const item of orderData.items) {
+        let paramsObj: Record<string, any> = {}
+        try {
+          paramsObj = typeof item.params === 'string' ? JSON.parse(item.params) : (item.params || {})
+        } catch {
+          paramsObj = {}
+        }
+        if (!paramsObj.readyDate) {
+          const defaultReadyDate = this.buildDefaultReadyDate(orderCreatedAt)
+          if (defaultReadyDate) {
+            paramsObj.readyDate = defaultReadyDate
+          }
+        }
         await db.run(
           'INSERT INTO items (orderId, type, params, price, quantity) VALUES (?, ?, ?, ?, ?)',
-          [order.id, item.type, item.params, item.price, item.quantity]
+          [order.id, item.type, JSON.stringify(paramsObj), item.price, item.quantity]
         );
       }
       
@@ -209,10 +235,23 @@ export class OrderService {
       );
       
       // 2. Добавляем товары в заказ
+      const orderCreatedAt = (order as any).created_at || (order as any).createdAt
       for (const item of orderData.items) {
+        let paramsObj: Record<string, any> = {}
+        try {
+          paramsObj = typeof item.params === 'string' ? JSON.parse(item.params) : (item.params || {})
+        } catch {
+          paramsObj = {}
+        }
+        if (!paramsObj.readyDate) {
+          const defaultReadyDate = this.buildDefaultReadyDate(orderCreatedAt)
+          if (defaultReadyDate) {
+            paramsObj.readyDate = defaultReadyDate
+          }
+        }
         await db.run(
           'INSERT INTO items (orderId, type, params, price, quantity) VALUES (?, ?, ?, ?, ?)',
-          [order.id, item.type, item.params, item.price, item.quantity]
+          [order.id, item.type, JSON.stringify(paramsObj), item.price, item.quantity]
         );
       }
       
@@ -484,7 +523,7 @@ export class OrderService {
     const db = await getDb()
     
     // Проверяем, что заказ существует
-    const order = await db.get('SELECT id FROM orders WHERE id = ?', [orderId])
+    const order = await db.get<any>('SELECT id, created_at, createdAt FROM orders WHERE id = ?', [orderId])
     if (!order) {
       throw new Error('Заказ не найден')
     }
@@ -510,7 +549,7 @@ export class OrderService {
     } = itemData
 
     // Создаем параметры для товара
-    const params = {
+    const params: Record<string, any> = {
       description,
       specifications,
       materials,
@@ -523,6 +562,12 @@ export class OrderService {
       sheetsNeeded,
       piecesPerSheet,
       formatInfo
+    }
+    if (!params.readyDate) {
+      const defaultReadyDate = this.buildDefaultReadyDate(order.created_at || order.createdAt)
+      if (defaultReadyDate) {
+        params.readyDate = defaultReadyDate
+      }
     }
 
     // Вставляем товар в заказ
