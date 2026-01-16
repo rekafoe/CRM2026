@@ -1,9 +1,10 @@
 import React from 'react';
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { ApiResponse, ApiError, PaginatedResponse } from '../types';
+import { API_BASE_URL } from '../config/constants';
 
 // Создание экземпляра axios с базовой конфигурацией
-export const createApiClient = (baseURL: string = '/api'): AxiosInstance => {
+export const createApiClient = (baseURL: string = API_BASE_URL): AxiosInstance => {
   const client = axios.create({
     baseURL,
     timeout: 10000,
@@ -15,7 +16,7 @@ export const createApiClient = (baseURL: string = '/api'): AxiosInstance => {
   // Интерцептор для добавления токена авторизации
   client.interceptors.request.use(
     (config) => {
-      const token = localStorage.getItem('crmToken');
+      const token = localStorage.getItem('crmToken') || localStorage.getItem('api_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -41,6 +42,7 @@ export const createApiClient = (baseURL: string = '/api'): AxiosInstance => {
       if (error.response?.status === 401) {
         // Неавторизован - перенаправляем на страницу входа
         localStorage.removeItem('crmToken');
+        localStorage.removeItem('api_token');
         window.location.href = '/login';
       }
 
@@ -52,7 +54,7 @@ export const createApiClient = (baseURL: string = '/api'): AxiosInstance => {
 };
 
 // Базовый API клиент
-export const apiClient = createApiClient('');
+export const apiClient = createApiClient();
 
 // Утилиты для работы с API
 export const apiUtils = {
