@@ -13,6 +13,8 @@ interface Operation {
   parameters?: string | any; // JSON строка или объект
   linked_parameter_name?: string;
   operation_type?: string; // Тип операции (например, 'laminate')
+  min_quantity?: number;
+  max_quantity?: number;
 }
 
 interface OperationsSectionProps {
