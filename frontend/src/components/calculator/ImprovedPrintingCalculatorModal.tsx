@@ -15,7 +15,7 @@ import { DynamicFieldsSection } from './components/DynamicFieldsSection';
 import { useCalculatorUI } from './hooks/useCalculatorUI';
 import { AdvancedSettingsSection } from './components/AdvancedSettingsSection';
 import { SelectedProductCard } from './components/SelectedProductCard';
-import { DynamicProductSelector } from './components/DynamicProductSelector';
+import { DynamicProductSelector, CUSTOM_PRODUCT_ID } from './components/DynamicProductSelector';
 import { PrintingSettingsSection } from './components/PrintingSettingsSection';
 import { getProductionTimeLabel, getProductionDaysByPriceType } from './utils/time';
 import { ProductSpecs, CalculationResult, EditContextPayload } from './types/calculator.types';
@@ -53,6 +53,13 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const isEditMode = Boolean(editContext);
   const [customFormat, setCustomFormat] = useState({ width: '', height: '' });
   const [isCustomFormat, setIsCustomFormat] = useState(false);
+  const [customProductForm, setCustomProductForm] = useState({
+    name: '',
+    characteristics: '',
+    quantity: '1',
+    productionDays: '1',
+    pricePerItem: '',
+  });
 
   // Состояние калькулятора
   const [specs, setSpecs] = useState<ProductSpecs>({
@@ -87,12 +94,18 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   
   const { ui, open, close } = useCalculatorUI({ showProductSelection: !initialProductType });
   const [selectedProduct, setSelectedProduct] = useState<(Product & { resolvedProductType?: string }) | null>(null);
+  const isCustomProduct = selectedProduct?.id === CUSTOM_PRODUCT_ID;
+  const customQuantity = Math.max(0, Number(customProductForm.quantity) || 0);
+  const customPrice = Number(customProductForm.pricePerItem) || 0;
+  const customProductionDays = Math.max(0, Number(customProductForm.productionDays) || 0);
+  const isCustomValid =
+    Boolean(customProductForm.name.trim()) && customQuantity > 0 && customPrice > 0;
   
   // Схема и типы — вынесено в хук
 
   const { backendProductSchema, currentConfig, availableFormats, getDefaultFormat } = useCalculatorSchema({
     productType: specs.productType,
-    productId: selectedProduct?.id || null, // 🆕 Передаем ID выбранного продукта
+    productId: isCustomProduct ? null : (selectedProduct?.id || null), // 🆕 Передаем ID выбранного продукта
     log: logger,
     setSpecs
   });
@@ -174,7 +187,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     specs,
     selectedProduct,
     isValid,
-    enabled: userInteracted && selectedProduct?.id != null, // Автопересчет только после первого взаимодействия и выбора продукта
+    enabled: userInteracted && selectedProduct?.id != null && !isCustomProduct, // Автопересчет только после первого взаимодействия и выбора продукта
     onCalculate: calculateCost,
     debounceMs: 500,
     customFormat, // ✅ Передаем кастомный формат для отслеживания изменений
@@ -270,7 +283,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     }
     
     // Вызываем расчет только если все условия выполнены
-    if (userInteracted && selectedProduct?.id != null && isValid) {
+    if (userInteracted && selectedProduct?.id != null && isValid && !isCustomProduct) {
       // Debounce для избежания множественных вызовов
       calculationTimeoutRef.current = setTimeout(() => {
         instantCalculate();
@@ -284,7 +297,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         calculationTimeoutRef.current = null;
       }
     };
-  }, [printTechnology, printColorMode, userInteracted, selectedProduct?.id, isValid, instantCalculate]);
+  }, [printTechnology, printColorMode, userInteracted, selectedProduct?.id, isValid, instantCalculate, isCustomProduct]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -471,6 +484,22 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   // Выбор продукта из базы данных
   const handleProductSelect = useCallback((product: Product) => {
+    if (product.id === CUSTOM_PRODUCT_ID) {
+      setSelectedProduct(product as Product & { resolvedProductType?: string });
+      setSpecs(prev => ({ ...prev, productType: 'universal' }));
+      setCustomProductForm({
+        name: '',
+        characteristics: '',
+        quantity: '1',
+        productionDays: '1',
+        pricePerItem: '',
+      });
+      close('showProductSelection');
+      setUserInteracted(false);
+      logger.info('Выбран произвольный продукт');
+      return;
+    }
+
     const resolvedType = resolveProductType(product) ?? specs.productType ?? 'flyers';
     console.log('🔍 [ImprovedPrintingCalculatorModal] handleProductSelect вызван', {
       productId: product.id,
@@ -511,6 +540,115 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     setUserInteracted(false); // ✅ Сбрасываем флаг взаимодействия, чтобы автопересчет не дергался
     logger.info('Выбран продукт из базы данных', { productId: product.id, productName: product.name, resolvedType });
   }, [close, getDefaultFormat, logger, resolveProductType, setSelectedProduct, setSpecs, setUserInteracted, specs.productType]);
+
+  useEffect(() => {
+    if (!isOpen || !editContext?.item) return;
+    const params = (editContext.item as any).params || {};
+    if (!params?.customProduct) return;
+
+    setSelectedProduct({
+      id: CUSTOM_PRODUCT_ID,
+      category_id: 0,
+      name: 'Произвольный продукт',
+      description: 'Свободная форма без ограничений',
+      icon: '✍️',
+      calculator_type: 'simplified',
+      product_type: 'universal',
+      operator_percent: 10,
+      is_active: true,
+      created_at: '',
+      updated_at: '',
+      category_name: 'Произвольное',
+      category_icon: '✨',
+    } as Product & { resolvedProductType?: string });
+    setCustomProductForm({
+      name: String(params.customName || params.description || editContext.item.type || ''),
+      characteristics: String(params.characteristics || ''),
+      quantity: String(editContext.item.quantity ?? 1),
+      productionDays: String(params.productionDays ?? '1'),
+      pricePerItem: String(editContext.item.price ?? ''),
+    });
+    setSpecs(prev => ({ ...prev, productType: 'universal' }));
+  }, [editContext, isOpen, setSpecs]);
+
+  const customResult = customQuantity > 0 && customPrice > 0 ? {
+    totalCost: customPrice * customQuantity,
+    pricePerItem: customPrice,
+    specifications: { quantity: customQuantity },
+    productionTime: customProductionDays > 0 ? `${customProductionDays} дн.` : '—',
+    parameterSummary: [
+      ...(customProductForm.characteristics.trim()
+        ? [{ label: 'Характеристики', value: customProductForm.characteristics.trim() }]
+        : []),
+      ...(customProductionDays > 0
+        ? [{ label: 'Срок', value: `${customProductionDays} дн.` }]
+        : []),
+    ],
+  } : null;
+
+  const customErrors = [
+    !customProductForm.name.trim() ? 'Укажите наименование' : null,
+    customQuantity <= 0 ? 'Укажите тираж' : null,
+    customPrice <= 0 ? 'Укажите цену за штуку' : null,
+  ].filter(Boolean) as string[];
+
+  const handleAddCustomProduct = useCallback(async () => {
+    if (!isCustomValid) return;
+    const name = customProductForm.name.trim();
+    const characteristics = customProductForm.characteristics.trim();
+    const paramsPayload = {
+      customProduct: true,
+      customName: name,
+      characteristics: characteristics || undefined,
+      productionDays: customProductionDays > 0 ? customProductionDays : undefined,
+      operator_percent: 10,
+      productType: 'custom',
+      productName: name,
+    };
+
+    const apiItem = {
+      type: name || 'Произвольный продукт',
+      params: paramsPayload,
+      price: customPrice,
+      quantity: customQuantity,
+      sides: 1,
+      sheets: 0,
+      waste: 0,
+      clicks: 0,
+    };
+
+    try {
+      if (isEditMode && editContext && onSubmitExisting) {
+        await onSubmitExisting({
+          orderId: editContext.orderId,
+          itemId: editContext.item.id,
+          item: apiItem,
+        });
+        toast.success('Позиция обновлена');
+      } else {
+        await Promise.resolve(onAddToOrder(apiItem));
+        toast.success('Товар добавлен в заказ!');
+      }
+      onClose();
+    } catch (error: any) {
+      logger.error('Ошибка при сохранении произвольной позиции', error);
+      toast.error('Не удалось сохранить позицию', error?.message || 'Ошибка сохранения');
+    }
+  }, [
+    customPrice,
+    customQuantity,
+    customProductForm.characteristics,
+    customProductForm.name,
+    customProductionDays,
+    editContext,
+    isCustomValid,
+    isEditMode,
+    logger,
+    onAddToOrder,
+    onClose,
+    onSubmitExisting,
+    toast,
+  ]);
 
   // Автовыбор продукта по initialProductId (например, при редактировании заказа)
   useEffect(() => {
@@ -834,8 +972,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         <div className="calculator-content">
           <div className="calculator-main">
             {/* Ошибки валидации */}
-            {Object.keys(validationErrors).length > 0 && (
-              <div className="validation-errors" style={{ marginBottom: '20px' }}>
+            {!isCustomProduct && Object.keys(validationErrors).length > 0 && (
+              <div className="validation-errors">
                 {Object.entries(validationErrors).map(([key, message]) => (
                   <div key={key} className="validation-error">
                     {message}
@@ -843,38 +981,127 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                 ))}
               </div>
             )}
+            {isCustomProduct && customErrors.length > 0 && (
+              <div className="validation-errors">
+                {customErrors.map((message) => (
+                  <div key={message} className="validation-error">
+                    {message}
+                  </div>
+                ))}
+              </div>
+            )}
 
-            <CalculatorSections
-              specs={specs}
-              availableFormats={availableFormats}
-              validationErrors={validationErrors}
-              isCustomFormat={isCustomFormat}
-              customFormat={customFormat}
-              setIsCustomFormat={setIsCustomFormat}
-              setCustomFormat={setCustomFormat}
-              updateSpecs={updateSpecs}
-              backendProductSchema={backendProductSchema}
-              warehousePaperTypes={warehousePaperTypes}
-              availableDensities={availableDensities}
-              loadingPaperTypes={loadingPaperTypes}
-              getDefaultPaperDensity={getDefaultPaperDensity}
-              printTechnology={printTechnology}
-              printColorMode={printColorMode}
-              setPrintTechnology={setPrintTechnology}
-              setPrintColorMode={setPrintColorMode}
-              result={result}
-              selectedProduct={selectedProduct}
-              currentConfig={currentConfig}
-              onOpenProductSelector={() => open('showProductSelection')}
-            />
+            {isCustomProduct ? (
+              <div className="calculator-section-group calculator-section-unified">
+                <div className="section-group-header">
+                  <h3>✍️ Произвольный продукт</h3>
+                </div>
+                <div className="section-group-content">
+                  <SelectedProductCard
+                    productType="universal"
+                    displayName={selectedProduct?.name || 'Произвольный продукт'}
+                    onOpenSelector={() => open('showProductSelection')}
+                  />
+                  <div className="form-section custom-product-form">
+                    <div className="custom-product-grid">
+                      <label className="custom-product-field">
+                        <span className="custom-product-label">Наименование</span>
+                        <input
+                          type="text"
+                          className="custom-product-input"
+                          value={customProductForm.name}
+                          onChange={(e) => setCustomProductForm(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="Например: Табличка 30×20"
+                        />
+                      </label>
+                      <label className="custom-product-field">
+                        <span className="custom-product-label">Тираж</span>
+                        <input
+                          type="number"
+                          className="custom-product-input"
+                          value={customProductForm.quantity}
+                          min={1}
+                          onChange={(e) => setCustomProductForm(prev => ({ ...prev, quantity: e.target.value }))}
+                        />
+                      </label>
+                      <label className="custom-product-field">
+                        <span className="custom-product-label">Срок изготовления (дн.)</span>
+                        <input
+                          type="number"
+                          className="custom-product-input"
+                          value={customProductForm.productionDays}
+                          min={1}
+                          onChange={(e) => setCustomProductForm(prev => ({ ...prev, productionDays: e.target.value }))}
+                        />
+                        <span className="custom-product-hint">Можно оставить 1 день по умолчанию</span>
+                      </label>
+                      <label className="custom-product-field">
+                        <span className="custom-product-label">Цена за штуку (BYN)</span>
+                        <input
+                          type="number"
+                          className="custom-product-input"
+                          value={customProductForm.pricePerItem}
+                          min={0}
+                          step="0.01"
+                          onChange={(e) => setCustomProductForm(prev => ({ ...prev, pricePerItem: e.target.value }))}
+                          placeholder="Например: 12.50"
+                        />
+                      </label>
+                      <label className="custom-product-field custom-product-field--full">
+                        <span className="custom-product-label">Характеристики</span>
+                        <textarea
+                          className="custom-product-textarea"
+                          value={customProductForm.characteristics}
+                          onChange={(e) => setCustomProductForm(prev => ({ ...prev, characteristics: e.target.value }))}
+                          placeholder="Материал, цвет, комментарии..."
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <CalculatorSections
+                specs={specs}
+                availableFormats={availableFormats}
+                validationErrors={validationErrors}
+                isCustomFormat={isCustomFormat}
+                customFormat={customFormat}
+                setIsCustomFormat={setIsCustomFormat}
+                setCustomFormat={setCustomFormat}
+                updateSpecs={updateSpecs}
+                backendProductSchema={backendProductSchema}
+                warehousePaperTypes={warehousePaperTypes}
+                availableDensities={availableDensities}
+                loadingPaperTypes={loadingPaperTypes}
+                getDefaultPaperDensity={getDefaultPaperDensity}
+                printTechnology={printTechnology}
+                printColorMode={printColorMode}
+                setPrintTechnology={setPrintTechnology}
+                setPrintColorMode={setPrintColorMode}
+                result={result}
+                selectedProduct={selectedProduct}
+                currentConfig={currentConfig}
+                onOpenProductSelector={() => open('showProductSelection')}
+              />
+            )}
 
             {/* Результат расчета - фиксированный внизу */}
-            <ResultSection
-              result={result as any}
-              isValid={isValid}
-              onAddToOrder={() => handleAddToOrder()}
-              mode={isEditMode ? 'edit' : 'create'}
-            />
+            {isCustomProduct ? (
+              <ResultSection
+                result={customResult as any}
+                isValid={isCustomValid}
+                onAddToOrder={() => handleAddCustomProduct()}
+                mode={isEditMode ? 'edit' : 'create'}
+              />
+            ) : (
+              <ResultSection
+                result={result as any}
+                isValid={isValid}
+                onAddToOrder={() => handleAddToOrder()}
+                mode={isEditMode ? 'edit' : 'create'}
+              />
+            )}
 
           </div>
         </div>

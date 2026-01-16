@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Customer } from '../../types';
 import { getCustomers, updateOrderCustomer, createCustomer } from '../../api';
 import { useToast } from '../Toast';
+import './CustomerSelector.css';
 
 interface CustomerSelectorProps {
   orderId: number;
@@ -17,6 +18,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(currentCustomerId || null);
   const { addToast } = useToast();
@@ -25,7 +27,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   const loadCustomers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await getCustomers({ search: searchQuery || undefined });
+      const response = await getCustomers({ search: debouncedQuery || undefined });
       setCustomers(response.data);
     } catch (error: any) {
       addToast({
@@ -36,7 +38,14 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, addToast]);
+  }, [debouncedQuery, addToast]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     loadCustomers();
@@ -84,24 +93,16 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
   return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ fontSize: 12, color: '#666', display: 'block', marginBottom: 4 }}>
-        Клиент
-      </label>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+    <div className="customer-selector">
+      <label className="customer-selector__label">Клиент</label>
+      <div className="customer-selector__row">
         <select
           value={selectedCustomerId || ''}
           onChange={(e) => {
             const value = e.target.value;
             handleCustomerChange(value ? Number(value) : null);
           }}
-          style={{
-            flex: 1,
-            padding: '6px 12px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            fontSize: '14px'
-          }}
+          className="customer-selector__select"
         >
           <option value="">— Без клиента —</option>
           {customers.map(customer => (
@@ -111,37 +112,52 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
             </option>
           ))}
         </select>
-        <input
-          type="text"
-          placeholder="Поиск..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{
-            width: 150,
-            padding: '6px 12px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            fontSize: '14px'
-          }}
-        />
+        <div className="customer-selector__search">
+          <input
+            type="text"
+            placeholder="Поиск по имени, телефону, УНП..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="customer-selector__search-input"
+          />
+          {searchQuery.trim().length > 0 && (
+            <div className="customer-selector__suggestions">
+              {loading ? (
+                <div className="customer-selector__suggestion muted">Поиск...</div>
+              ) : customers.length === 0 ? (
+                <div className="customer-selector__suggestion muted">Ничего не найдено</div>
+              ) : (
+                customers.map((customer) => (
+                  <button
+                    key={customer.id}
+                    type="button"
+                    className="customer-selector__suggestion"
+                    onClick={() => {
+                      handleCustomerChange(customer.id);
+                      setSearchQuery('');
+                    }}
+                  >
+                    <span className="customer-selector__suggestion-name">
+                      {getCustomerDisplayName(customer)}
+                    </span>
+                    <span className="customer-selector__suggestion-meta">
+                      {customer.phone || customer.email || customer.tax_id || ''}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            whiteSpace: 'nowrap'
-          }}
+          className="customer-selector__create"
         >
           + Создать
         </button>
       </div>
       {selectedCustomer && (
-        <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+        <div className="customer-selector__details">
           {selectedCustomer.type === 'legal' ? (
             <>
               {selectedCustomer.company_name && <div>Компания: {selectedCustomer.company_name}</div>}
@@ -240,50 +256,20 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}
-      onClick={onClose}
-    >
+    <div className="customer-modal-overlay" onClick={onClose}>
       <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '24px',
-          maxWidth: '500px',
-          width: '90%',
-          maxHeight: '90vh',
-          overflow: 'auto'
-        }}
+        className="customer-modal"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 style={{ marginTop: 0 }}>Создать клиента</h3>
+        <h3 className="customer-modal__title">Создать клиента</h3>
         
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
-              Тип клиента
-            </label>
+          <div className="customer-modal__field">
+            <label className="customer-modal__label">Тип клиента</label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value as 'individual' | 'legal')}
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
+              className="customer-modal__input"
             >
               <option value="individual">Физическое лицо</option>
               <option value="legal">Юридическое лицо</option>
@@ -292,129 +278,116 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
 
           {type === 'individual' ? (
             <>
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Фамилия</label>
+              <div className="customer-modal__field">
+                <label className="customer-modal__label-sm">Фамилия</label>
                 <input
                   type="text"
                   value={formData.last_name}
                   onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                  style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  className="customer-modal__input"
                 />
               </div>
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Имя</label>
+              <div className="customer-modal__field">
+                <label className="customer-modal__label-sm">Имя</label>
                 <input
                   type="text"
                   value={formData.first_name}
                   onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  className="customer-modal__input"
                 />
               </div>
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Отчество</label>
+              <div className="customer-modal__field">
+                <label className="customer-modal__label-sm">Отчество</label>
                 <input
                   type="text"
                   value={formData.middle_name}
                   onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })}
-                  style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  className="customer-modal__input"
                 />
               </div>
             </>
           ) : (
             <>
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Название компании *</label>
+              <div className="customer-modal__field">
+                <label className="customer-modal__label-sm">Название компании *</label>
                 <input
                   type="text"
                   value={formData.company_name}
                   onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
                   required
-                  style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  className="customer-modal__input"
                 />
               </div>
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Юридическое название</label>
+              <div className="customer-modal__field">
+                <label className="customer-modal__label-sm">Юридическое название</label>
                 <input
                   type="text"
                   value={formData.legal_name}
                   onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
-                  style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  className="customer-modal__input"
                 />
               </div>
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>УНП</label>
+              <div className="customer-modal__field">
+                <label className="customer-modal__label-sm">УНП</label>
                 <input
                   type="text"
                   value={formData.tax_id}
                   onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
-                  style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  className="customer-modal__input"
                 />
               </div>
             </>
           )}
 
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Телефон</label>
+          <div className="customer-modal__field">
+            <label className="customer-modal__label-sm">Телефон</label>
             <input
               type="tel"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}
+              className="customer-modal__input"
             />
           </div>
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Email</label>
+          <div className="customer-modal__field">
+            <label className="customer-modal__label-sm">Email</label>
             <input
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}
+              className="customer-modal__input"
             />
           </div>
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Адрес</label>
+          <div className="customer-modal__field">
+            <label className="customer-modal__label-sm">Адрес</label>
             <input
               type="text"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px' }}
+              className="customer-modal__input"
             />
           </div>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Примечания</label>
+          <div className="customer-modal__field">
+            <label className="customer-modal__label-sm">Примечания</label>
             <textarea
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
-              style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', resize: 'vertical' }}
+              className="customer-modal__textarea"
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <div className="customer-modal__actions">
             <button
               type="button"
               onClick={onClose}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#f5f5f5',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
+              className="customer-modal__button customer-modal__button--secondary"
             >
               Отмена
             </button>
             <button
               type="submit"
               disabled={saving}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: saving ? '#ccc' : '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: saving ? 'not-allowed' : 'pointer'
-              }}
+              className="customer-modal__button customer-modal__button--primary"
             >
               {saving ? 'Создание...' : 'Создать'}
             </button>

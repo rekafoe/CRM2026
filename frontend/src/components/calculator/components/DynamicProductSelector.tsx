@@ -14,6 +14,24 @@ import { Product, ProductCategory } from '../../../services/products';
 import { useLogger } from '../../../utils/logger';
 import { useToastNotifications } from '../../Toast';
 
+export const CUSTOM_PRODUCT_ID = -1000;
+
+const customProduct: Product = {
+  id: CUSTOM_PRODUCT_ID,
+  category_id: 0,
+  name: 'Произвольный продукт',
+  description: 'Свободная форма без ограничений',
+  icon: '✍️',
+  calculator_type: 'simplified',
+  product_type: 'universal',
+  operator_percent: 10,
+  is_active: true,
+  created_at: '',
+  updated_at: '',
+  category_name: 'Произвольное',
+  category_icon: '✨',
+};
+
 interface DynamicProductSelectorProps {
   onSelectProduct: (product: Product) => void;
   onClose: () => void;
@@ -59,6 +77,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
     
     return products;
   }, [searchQuery, searchResults, selectedCategoryId, getProductsByCategoryId, products]);
+  const hasFilteredProducts = filteredProducts.length > 0;
 
   // Обработка выбора категории
   const handleCategorySelect = (categoryId: number) => {
@@ -221,42 +240,66 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
               </h3>
             </div>
 
-            {filteredProducts.length === 0 ? (
-              <div className="empty-state">
-                <p>📭 Продукты не найдены</p>
-                <p>Попробуйте изменить поисковый запрос или выбрать другую категорию</p>
+            {!hasFilteredProducts && searchQuery ? (
+              <div className="products-empty-note">
+                Другие продукты не найдены, можно выбрать произвольный продукт.
               </div>
-            ) : (
-              <div className="products-grid">
-                {Array.isArray(filteredProducts) && filteredProducts.map(product => (
-                  <div
-                    key={product.id}
-                    className={`product-card ${isProductSelected(product) ? 'selected' : ''}`}
-                    onClick={() => handleProductSelect(product)}
-                  >
-                    <div className="product-icon">
-                      {getProductIcon(product)}
-                    </div>
-                    <div className="product-info">
-                      <h4 className="product-name">{product.name}</h4>
-                      <p className="product-description">
-                        {product.description || 'Описание отсутствует'}
-                      </p>
-                      <div className="product-category">
-                        <span className="category-badge">
-                          {getProductCategoryIcon(product)} {product.category_name}
-                        </span>
-                      </div>
-                    </div>
-                    {isProductSelected(product) && (
-                      <div className="selected-indicator">
-                        ✅
-                      </div>
-                    )}
+            ) : null}
+            {!hasFilteredProducts && !searchQuery ? (
+              <div className="products-empty-note">
+                Пока нет других продуктов — можно выбрать произвольный продукт.
+              </div>
+            ) : null}
+
+            <div className="products-grid">
+              <div
+                className={`product-card custom-product-card ${isProductSelected(customProduct) ? 'selected' : ''}`}
+                onClick={() => handleProductSelect(customProduct)}
+              >
+                <div className="product-icon">{getProductIcon(customProduct)}</div>
+                <div className="product-info">
+                  <h4 className="product-name">{customProduct.name}</h4>
+                  <p className="product-description">{customProduct.description}</p>
+                  <div className="product-category">
+                    <span className="category-badge">
+                      {customProduct.category_icon} {customProduct.category_name}
+                    </span>
                   </div>
-                ))}
+                </div>
+                {isProductSelected(customProduct) && (
+                  <div className="selected-indicator">
+                    ✅
+                  </div>
+                )}
               </div>
-            )}
+              {Array.isArray(filteredProducts) && filteredProducts.map(product => (
+                <div
+                  key={product.id}
+                  className={`product-card ${isProductSelected(product) ? 'selected' : ''}`}
+                  onClick={() => handleProductSelect(product)}
+                >
+                  <div className="product-icon">
+                    {getProductIcon(product)}
+                  </div>
+                  <div className="product-info">
+                    <h4 className="product-name">{product.name}</h4>
+                    <p className="product-description">
+                      {product.description || 'Описание отсутствует'}
+                    </p>
+                    <div className="product-category">
+                      <span className="category-badge">
+                        {getProductCategoryIcon(product)} {product.category_name}
+                      </span>
+                    </div>
+                  </div>
+                  {isProductSelected(product) && (
+                    <div className="selected-indicator">
+                      ✅
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

@@ -1,6 +1,20 @@
  .customers-tabs {
    margin-top: 12px;
  }
+
+.customers-file-input {
+  display: none;
+}
+
+.customers-search-input {
+  min-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #111827);
+}
  
  .customers-table-wrapper {
    border: 1px solid var(--border-color, #e5e7eb);
@@ -54,6 +68,82 @@
    flex-wrap: wrap;
    gap: 12px;
  }
+
+.customers-legal {
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--bg-secondary, #f8f9fa);
+}
+
+.customers-legal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.customers-legal__header h5 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.customers-legal__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.customers-legal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.customers-legal__field textarea {
+  min-height: 88px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 13px;
+  resize: vertical;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #111827);
+}
+
+@media (max-width: 900px) {
+  .customers-legal__fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.customers-date-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.customers-date-filter input[type='date'] {
+  padding: 4px 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #111827);
+}
+
+.customers-doc-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
  
  .customers-summary-card {
    background: var(--bg-secondary, #f8f9fa);

@@ -10,6 +10,8 @@ export interface Customer {
   company_name?: string;
   legal_name?: string;
   tax_id?: string;
+  bank_details?: string;
+  authorized_person?: string;
   phone?: string;
   email?: string;
   address?: string;
@@ -19,6 +21,70 @@ export interface Customer {
 }
 
 export class CustomerService {
+  private static readonly CACHE_TTL_MS = 5 * 60 * 1000;
+  private static allCustomersCache: { data: Customer[]; fetchedAt: number } | null = null;
+
+  private static invalidateCustomersCache() {
+    this.allCustomersCache = null;
+  }
+
+  private static async getAllCustomersCached(): Promise<Customer[]> {
+    const now = Date.now();
+    if (this.allCustomersCache && now - this.allCustomersCache.fetchedAt < this.CACHE_TTL_MS) {
+      return this.allCustomersCache.data;
+    }
+    const db = await getDb();
+    const rows = await db.all('SELECT * FROM customers ORDER BY created_at DESC');
+    const data = rows.map(this.mapRowToCustomer);
+    this.allCustomersCache = { data, fetchedAt: now };
+    return data;
+  }
+
+  private static normalizeSearchValue(value: string): string {
+    return value
+      .toLowerCase()
+      .replace(/[^a-zа-я0-9]+/gi, ' ')
+      .trim();
+  }
+
+  private static getTrigrams(text: string): Set<string> {
+    const normalized = this.normalizeSearchValue(text);
+    if (!normalized) return new Set();
+    const padded = `  ${normalized}  `;
+    const trigrams = new Set<string>();
+    for (let i = 0; i <= padded.length - 3; i += 1) {
+      trigrams.add(padded.slice(i, i + 3));
+    }
+    return trigrams;
+  }
+
+  private static trigramSimilarity(a: string, b: string): number {
+    const aGrams = this.getTrigrams(a);
+    const bGrams = this.getTrigrams(b);
+    if (aGrams.size === 0 || bGrams.size === 0) return 0;
+    let intersection = 0;
+    aGrams.forEach((gram) => {
+      if (bGrams.has(gram)) intersection += 1;
+    });
+    const union = aGrams.size + bGrams.size - intersection;
+    return union === 0 ? 0 : intersection / union;
+  }
+
+  private static buildCustomerSearchText(customer: Customer): string {
+    return [
+      customer.first_name,
+      customer.last_name,
+      customer.middle_name,
+      customer.company_name,
+      customer.legal_name,
+      customer.tax_id,
+      customer.phone,
+      customer.email,
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+
   /**
    * Получить всех клиентов с возможностью фильтрации
    */
@@ -26,31 +92,43 @@ export class CustomerService {
     type?: 'individual' | 'legal'
     search?: string
   }): Promise<Customer[]> {
-    const db = await getDb()
-    let query = 'SELECT * FROM customers WHERE 1=1'
-    const params: any[] = []
+    const allCustomers = await this.getAllCustomersCached();
+    const typeFiltered = filters?.type
+      ? allCustomers.filter((customer) => customer.type === filters.type)
+      : allCustomers;
 
-    if (filters?.type) {
-      query += ' AND type = ?'
-      params.push(filters.type)
+    if (!filters?.search) {
+      return typeFiltered;
     }
 
-    if (filters?.search) {
-      query += ` AND (
-        first_name LIKE ? OR
-        last_name LIKE ? OR
-        company_name LIKE ? OR
-        phone LIKE ? OR
-        email LIKE ?
-      )`
-      const searchPattern = `%${filters.search}%`
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern)
+    const queryText = String(filters.search || '');
+    const normalizedQuery = this.normalizeSearchValue(queryText);
+    const directMatches = typeFiltered.filter((customer) => {
+      const haystack = this.normalizeSearchValue(
+        this.buildCustomerSearchText(customer)
+      );
+      return haystack.includes(normalizedQuery);
+    });
+
+    if (directMatches.length > 0) {
+      return directMatches;
     }
 
-    query += ' ORDER BY created_at DESC'
+    // Fallback: триграммный поиск по всем клиентам для защиты от опечаток
+    const scored = typeFiltered
+      .map((customer) => ({
+        customer,
+        score: this.trigramSimilarity(
+          this.buildCustomerSearchText(customer),
+          queryText
+        ),
+      }))
+      .filter((item) => item.score >= 0.2)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20)
+      .map((item) => item.customer);
 
-    const rows = await db.all(query, params)
-    return rows.map(this.mapRowToCustomer)
+    return scored;
   }
 
   /**
@@ -73,6 +151,8 @@ export class CustomerService {
     company_name?: string
     legal_name?: string
     tax_id?: string
+    bank_details?: string
+    authorized_person?: string
     phone?: string
     email?: string
     address?: string
@@ -96,9 +176,10 @@ export class CustomerService {
       `INSERT INTO customers (
         type, first_name, last_name, middle_name,
         company_name, legal_name, tax_id,
+        bank_details, authorized_person,
         phone, email, address, notes,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.type,
         data.first_name || null,
@@ -107,6 +188,8 @@ export class CustomerService {
         data.company_name || null,
         data.legal_name || null,
         data.tax_id || null,
+        data.bank_details || null,
+        data.authorized_person || null,
         data.phone || null,
         data.email || null,
         data.address || null,
@@ -121,6 +204,7 @@ export class CustomerService {
     if (!customer) {
       throw new Error('Не удалось создать клиента')
     }
+    this.invalidateCustomersCache();
     return customer
   }
 
@@ -137,6 +221,8 @@ export class CustomerService {
       company_name?: string
       legal_name?: string
       tax_id?: string
+      bank_details?: string
+      authorized_person?: string
       phone?: string
       email?: string
       address?: string
@@ -176,6 +262,8 @@ export class CustomerService {
         company_name = ?,
         legal_name = ?,
         tax_id = ?,
+        bank_details = ?,
+        authorized_person = ?,
         phone = ?,
         email = ?,
         address = ?,
@@ -190,6 +278,8 @@ export class CustomerService {
         data.company_name !== undefined ? data.company_name : existing.company_name,
         data.legal_name !== undefined ? data.legal_name : existing.legal_name,
         data.tax_id !== undefined ? data.tax_id : existing.tax_id,
+        data.bank_details !== undefined ? data.bank_details : existing.bank_details,
+        data.authorized_person !== undefined ? data.authorized_person : existing.authorized_person,
         data.phone !== undefined ? data.phone : existing.phone,
         data.email !== undefined ? data.email : existing.email,
         data.address !== undefined ? data.address : existing.address,
@@ -203,6 +293,7 @@ export class CustomerService {
     if (!updated) {
       throw new Error('Не удалось обновить клиента')
     }
+    this.invalidateCustomersCache();
     return updated
   }
 
@@ -226,6 +317,7 @@ export class CustomerService {
     if ((result as any).changes === 0) {
       throw new Error('Клиент не найден')
     }
+    this.invalidateCustomersCache();
   }
 
   /**
@@ -257,6 +349,8 @@ export class CustomerService {
       company_name: row.company_name || undefined,
       legal_name: row.legal_name || undefined,
       tax_id: row.tax_id || undefined,
+      bank_details: row.bank_details || undefined,
+      authorized_person: row.authorized_person || undefined,
       phone: row.phone || undefined,
       email: row.email || undefined,
       address: row.address || undefined,

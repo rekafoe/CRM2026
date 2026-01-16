@@ -22,6 +22,8 @@ export interface Customer {
   company_name?: string;
   legal_name?: string;
   tax_id?: string;
+  bank_details?: string;
+  authorized_person?: string;
   // Общие поля
   phone?: string;
   email?: string;
