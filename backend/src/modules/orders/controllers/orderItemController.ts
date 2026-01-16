@@ -261,7 +261,13 @@ export class OrderItemController {
         )
         if (orderRow?.created_date) {
           const date = String(orderRow.created_date).slice(0, 10)
-          await EarningsService.recalculateForDate(date)
+          void EarningsService.recalculateForDate(date).catch((recalcError) => {
+            logger.error('❌ [addItem] Ошибка перерасчета выручки', {
+              date,
+              error: recalcError,
+              message: (recalcError as Error)?.message
+            })
+          })
         }
 
         const item = mapItemRowToItem(rawItem as any)
