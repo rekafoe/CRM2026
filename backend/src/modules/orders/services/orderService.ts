@@ -400,6 +400,7 @@ export class OrderService {
       // Если онлайн/телеграм — не удаляем, а переводим в пул: статус 0, снимаем привязку и ставим is_cancelled=1
       if (ord && (ord.source === 'website' || ord.source === 'telegram')) {
         await db.run('UPDATE orders SET status = 0, userId = NULL, is_cancelled = 1, updatedAt = datetime("now") WHERE id = ?', [id])
+        await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
         await db.run('COMMIT')
         if (ord?.created_date) {
           const date = String(ord.created_date).slice(0, 10)
@@ -421,6 +422,8 @@ export class OrderService {
           })
         }
       }
+
+      await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
 
       // Удаляем заказ (позиции удалятся каскадно)
       await db.run('DELETE FROM orders WHERE id = ?', [id])

@@ -436,6 +436,7 @@ export class OrderService {
           'UPDATE orders SET userId = NULL, created_at = datetime("now") WHERE id = ?',
           id
         )
+        await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
         await db.run('COMMIT')
         
         console.log(`✅ Заказ ${order.number} возвращен в пул`)
@@ -525,6 +526,8 @@ export class OrderService {
           )
         }
       }
+
+      await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
 
       // Удаляем заказ (позиции удалятся каскадно)
       await db.run('DELETE FROM orders WHERE id = ?', id)
