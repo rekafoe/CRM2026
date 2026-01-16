@@ -15,6 +15,7 @@ import { useLogger } from '../../../utils/logger';
 import { useToastNotifications } from '../../Toast';
 
 export const CUSTOM_PRODUCT_ID = -1000;
+export const POSTPRINT_PRODUCT_ID = -1001;
 
 const customProduct: Product = {
   id: CUSTOM_PRODUCT_ID,
@@ -30,6 +31,22 @@ const customProduct: Product = {
   updated_at: '',
   category_name: 'Произвольное',
   category_icon: '✨',
+};
+
+const postprintProduct: Product = {
+  id: POSTPRINT_PRODUCT_ID,
+  category_id: 0,
+  name: 'Послепечатные услуги',
+  description: 'Выбор операций и количества',
+  icon: '🧰',
+  calculator_type: 'simplified',
+  product_type: 'universal',
+  operator_percent: 0,
+  is_active: true,
+  created_at: '',
+  updated_at: '',
+  category_name: 'Услуги',
+  category_icon: '🧩',
 };
 
 interface DynamicProductSelectorProps {
@@ -252,6 +269,26 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
             ) : null}
 
             <div className="products-grid">
+              <div
+                className={`product-card custom-product-card ${isProductSelected(postprintProduct) ? 'selected' : ''}`}
+                onClick={() => handleProductSelect(postprintProduct)}
+              >
+                <div className="product-icon">{getProductIcon(postprintProduct)}</div>
+                <div className="product-info">
+                  <h4 className="product-name">{postprintProduct.name}</h4>
+                  <p className="product-description">{postprintProduct.description}</p>
+                  <div className="product-category">
+                    <span className="category-badge">
+                      {postprintProduct.category_icon} {postprintProduct.category_name}
+                    </span>
+                  </div>
+                </div>
+                {isProductSelected(postprintProduct) && (
+                  <div className="selected-indicator">
+                    ✅
+                  </div>
+                )}
+              </div>
               <div
                 className={`product-card custom-product-card ${isProductSelected(customProduct) ? 'selected' : ''}`}
                 onClick={() => handleProductSelect(customProduct)}

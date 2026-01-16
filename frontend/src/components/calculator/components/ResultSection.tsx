@@ -20,6 +20,14 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   onAddToOrder,
   mode = 'create',
 }) => {
+  const formatNumber = (value?: number, suffix?: string) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return '—';
+    }
+    const formatted = value.toLocaleString();
+    return suffix ? `${formatted} ${suffix}` : formatted;
+  };
+
   // Всегда показываем секцию, даже если result null (показываем заглушку)
   if (!result) {
     return (
@@ -51,15 +59,15 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
 
   return (
     <div className="form-section result-section compact">
-      <h3>💰 Стоимость: {result.totalCost.toLocaleString()} BYN</h3>
+      <h3>💰 Стоимость: {formatNumber(result.totalCost, 'BYN')}</h3>
       <div className="result-details">
         <div className="result-item">
           <span>За штуку:</span>
-          <span>{result.pricePerItem.toLocaleString()} BYN</span>
+          <span>{formatNumber(result.pricePerItem, 'BYN')}</span>
         </div>
         <div className="result-item">
           <span>Количество:</span>
-          <span>{result.specifications.quantity.toLocaleString()} шт.</span>
+          <span>{formatNumber(result.specifications?.quantity, 'шт.')}</span>
         </div>
         {typeof result.specifications.sides !== 'undefined' && (
           <div className="result-item">

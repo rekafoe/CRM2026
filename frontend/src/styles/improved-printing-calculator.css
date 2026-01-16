@@ -1768,6 +1768,135 @@
   color: #6b7280;
 }
 
+.postprint-services-form {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.postprint-services-loading,
+.postprint-services-error,
+.postprint-services-empty {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.postprint-services-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.postprint-service-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.postprint-service-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.postprint-service-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.postprint-service-checkbox input {
+  width: 18px;
+  height: 18px;
+}
+
+.postprint-service-name {
+  font-weight: 600;
+}
+
+.postprint-service-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: end;
+}
+
+.postprint-quantity-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.postprint-quantity-row .quantity-controls {
+  max-width: 280px;
+  gap: 6px;
+}
+
+.postprint-service-left {
+  display: flex;
+  align-items: center;
+}
+
+.postprint-quantity-row .postprint-service-left {
+  justify-content: center;
+}
+
+.postprint-quantity-spacer {
+  width: 1px;
+  height: 1px;
+}
+
+.postprint-quantity-row .quantity-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.postprint-quantity-row .quantity-btn:hover {
+  background: #d1d5db;
+  transform: none;
+}
+
+.postprint-quantity-row .quantity-btn:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+}
+
+.postprint-quantity-row .quantity-input {
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: none;
+}
+
+.postprint-quantity-row .quantity-input:focus {
+  border-color: #9ca3af;
+  box-shadow: none;
+}
+
+.postprint-service-price {
+  font-size: 13px;
+  color: #4b5563;
+  white-space: nowrap;
+}
+
+.postprint-service-meta input[type='number'] {
+  width: 90px;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
 @media (max-width: 900px) {
   .custom-product-grid {
     grid-template-columns: 1fr;

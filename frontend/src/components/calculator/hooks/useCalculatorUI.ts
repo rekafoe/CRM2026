@@ -1,6 +1,6 @@
 import { useCallback, useReducer } from 'react';
 
-interface UIState {
+export interface UIState {
   showPresets: boolean;
   showProductSelection: boolean;
   showQuickTemplates: boolean;

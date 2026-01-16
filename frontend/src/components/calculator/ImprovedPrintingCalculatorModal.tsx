@@ -15,7 +15,7 @@ import { DynamicFieldsSection } from './components/DynamicFieldsSection';
 import { useCalculatorUI } from './hooks/useCalculatorUI';
 import { AdvancedSettingsSection } from './components/AdvancedSettingsSection';
 import { SelectedProductCard } from './components/SelectedProductCard';
-import { DynamicProductSelector, CUSTOM_PRODUCT_ID } from './components/DynamicProductSelector';
+import { DynamicProductSelector, CUSTOM_PRODUCT_ID, POSTPRINT_PRODUCT_ID } from './components/DynamicProductSelector';
 import { PrintingSettingsSection } from './components/PrintingSettingsSection';
 import { getProductionTimeLabel, getProductionDaysByPriceType } from './utils/time';
 import { ProductSpecs, CalculationResult, EditContextPayload } from './types/calculator.types';
@@ -25,6 +25,9 @@ import { useAutoCalculate } from './hooks/useAutoCalculate'; // 🆕 Автоп�
 import { getEnhancedProductTypes } from '../../api';
 import { buildParameterSummary, type BuildSummaryOptions } from './utils/summaryBuilder';
 import { CalculatorSections } from './components/CalculatorSections';
+import { usePostprintServices } from './hooks/usePostprintServices';
+import { useCustomProduct } from './hooks/useCustomProduct';
+import { useProductSelection } from './hooks/useProductSelection';
 
 interface ImprovedPrintingCalculatorModalProps {
   isOpen: boolean;
@@ -35,7 +38,6 @@ interface ImprovedPrintingCalculatorModalProps {
   editContext?: EditContextPayload;
   onSubmitExisting?: (payload: { orderId: number; itemId: number; item: any }) => Promise<void>;
 }
-
 
 export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculatorModalProps> = ({
   isOpen,
@@ -53,13 +55,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const isEditMode = Boolean(editContext);
   const [customFormat, setCustomFormat] = useState({ width: '', height: '' });
   const [isCustomFormat, setIsCustomFormat] = useState(false);
-  const [customProductForm, setCustomProductForm] = useState({
-    name: '',
-    characteristics: '',
-    quantity: '1',
-    productionDays: '1',
-    pricePerItem: '',
-  });
 
   // Состояние калькулятора
   const [specs, setSpecs] = useState<ProductSpecs>({
@@ -95,17 +90,58 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const { ui, open, close } = useCalculatorUI({ showProductSelection: !initialProductType });
   const [selectedProduct, setSelectedProduct] = useState<(Product & { resolvedProductType?: string }) | null>(null);
   const isCustomProduct = selectedProduct?.id === CUSTOM_PRODUCT_ID;
-  const customQuantity = Math.max(0, Number(customProductForm.quantity) || 0);
-  const customPrice = Number(customProductForm.pricePerItem) || 0;
-  const customProductionDays = Math.max(0, Number(customProductForm.productionDays) || 0);
-  const isCustomValid =
-    Boolean(customProductForm.name.trim()) && customQuantity > 0 && customPrice > 0;
+  const isPostprintProduct = selectedProduct?.id === POSTPRINT_PRODUCT_ID;
+  const {
+    customProductForm,
+    setCustomProductForm,
+    isCustomValid,
+    customResult,
+    customErrors,
+    handleAddCustomProduct,
+    resetCustomProductForm,
+  } = useCustomProduct({
+    isOpen,
+    editContext,
+    isEditMode,
+    onAddToOrder,
+    onSubmitExisting,
+    onClose,
+    setSelectedProduct,
+    setSpecs,
+    logger,
+    toast,
+  });
+  const {
+    postprintOperations,
+    postprintSelections,
+    setPostprintSelections,
+    postprintLoading,
+    postprintError,
+    postprintErrors,
+    postprintResult,
+    isPostprintValid,
+    handleAddPostprintProduct,
+    resetPostprintSelections,
+    getOperationUnitPrice,
+  } = usePostprintServices({
+    isOpen,
+    isPostprintProduct,
+    isEditMode,
+    editContext,
+    onAddToOrder,
+    onSubmitExisting,
+    onClose,
+    setSelectedProduct,
+    setSpecs,
+    logger,
+    toast,
+  });
   
   // Схема и типы — вынесено в хук
 
   const { backendProductSchema, currentConfig, availableFormats, getDefaultFormat } = useCalculatorSchema({
     productType: specs.productType,
-    productId: isCustomProduct ? null : (selectedProduct?.id || null), // 🆕 Передаем ID выбранного продукта
+    productId: isCustomProduct || isPostprintProduct ? null : (selectedProduct?.id || null), // 🆕 Передаем ID выбранного продукта
     log: logger,
     setSpecs
   });
@@ -187,7 +223,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     specs,
     selectedProduct,
     isValid,
-    enabled: userInteracted && selectedProduct?.id != null && !isCustomProduct, // Автопересчет только после первого взаимодействия и выбора продукта
+    enabled: userInteracted && selectedProduct?.id != null && !isCustomProduct && !isPostprintProduct, // Автопересчет только после первого взаимодействия и выбора продукта
     onCalculate: calculateCost,
     debounceMs: 500,
     customFormat, // ✅ Передаем кастомный формат для отслеживания изменений
@@ -469,186 +505,21 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   }, [warehousePaperTypes, specs.paperType, specs.material_id, backendProductSchema, result]);
 
 
-  // Выбор типа продукта
-  const selectProductType = useCallback((productType: string) => {
-    setSpecs(prev => ({ 
-      ...prev, 
-      productType,
-      format: getDefaultFormat(),
-      paperDensity: getDefaultPaperDensity(prev.paperType)
-    }));
-    close('showProductSelection');
-    setUserInteracted(true);
-    logger.info('Выбран тип продукта', { productType });
-  }, [close, getDefaultFormat, getDefaultPaperDensity, logger, setUserInteracted]);
-
-  // Выбор продукта из базы данных
-  const handleProductSelect = useCallback((product: Product) => {
-    if (product.id === CUSTOM_PRODUCT_ID) {
-      setSelectedProduct(product as Product & { resolvedProductType?: string });
-      setSpecs(prev => ({ ...prev, productType: 'universal' }));
-      setCustomProductForm({
-        name: '',
-        characteristics: '',
-        quantity: '1',
-        productionDays: '1',
-        pricePerItem: '',
-      });
-      close('showProductSelection');
-      setUserInteracted(false);
-      logger.info('Выбран произвольный продукт');
-      return;
-    }
-
-    const resolvedType = resolveProductType(product) ?? specs.productType ?? 'flyers';
-    console.log('🔍 [ImprovedPrintingCalculatorModal] handleProductSelect вызван', {
-      productId: product.id,
-      productName: product.name,
-      resolvedType,
-      willSetSelectedProduct: true
-    });
-    
-    // ✅ Сбрасываем все поля, зависящие от продукта, при смене продукта
-    setSelectedProduct({ ...product, resolvedProductType: resolvedType });
-    setSpecs(prev => {
-      const reset: Partial<ProductSpecs> = {
-        productType: resolvedType,
-        format: getDefaultFormat(),
-        // ✅ Сбрасываем все поля, которые зависят от продукта
-        size_id: undefined,
-        material_id: undefined,
-        paperType: undefined,
-        paperDensity: 0,
-        materialType: undefined, // Сбрасываем тип материала
-        selectedOperations: [], // Сбрасываем выбранные операции
-        // Оставляем только базовые поля, которые не зависят от продукта
-        quantity: prev.quantity || 1,
-        sides: prev.sides || 1,
-        lamination: prev.lamination || 'none',
-        priceType: prev.priceType || 'online',
-        customerType: prev.customerType || 'regular',
-        pages: prev.pages || 4,
-      };
-      return { ...prev, ...reset };
-    });
-    
-    // ✅ Сбрасываем параметры печати
-    setPrintTechnology('');
-    setPrintColorMode(null);
-    
-    close('showProductSelection');
-    setUserInteracted(false); // ✅ Сбрасываем флаг взаимодействия, чтобы автопересчет не дергался
-    logger.info('Выбран продукт из базы данных', { productId: product.id, productName: product.name, resolvedType });
-  }, [close, getDefaultFormat, logger, resolveProductType, setSelectedProduct, setSpecs, setUserInteracted, specs.productType]);
-
-  useEffect(() => {
-    if (!isOpen || !editContext?.item) return;
-    const params = (editContext.item as any).params || {};
-    if (!params?.customProduct) return;
-
-    setSelectedProduct({
-      id: CUSTOM_PRODUCT_ID,
-      category_id: 0,
-      name: 'Произвольный продукт',
-      description: 'Свободная форма без ограничений',
-      icon: '✍️',
-      calculator_type: 'simplified',
-      product_type: 'universal',
-      operator_percent: 10,
-      is_active: true,
-      created_at: '',
-      updated_at: '',
-      category_name: 'Произвольное',
-      category_icon: '✨',
-    } as Product & { resolvedProductType?: string });
-    setCustomProductForm({
-      name: String(params.customName || params.description || editContext.item.type || ''),
-      characteristics: String(params.characteristics || ''),
-      quantity: String(editContext.item.quantity ?? 1),
-      productionDays: String(params.productionDays ?? '1'),
-      pricePerItem: String(editContext.item.price ?? ''),
-    });
-    setSpecs(prev => ({ ...prev, productType: 'universal' }));
-  }, [editContext, isOpen, setSpecs]);
-
-  const customResult = customQuantity > 0 && customPrice > 0 ? {
-    totalCost: customPrice * customQuantity,
-    pricePerItem: customPrice,
-    specifications: { quantity: customQuantity },
-    productionTime: customProductionDays > 0 ? `${customProductionDays} дн.` : '—',
-    parameterSummary: [
-      ...(customProductForm.characteristics.trim()
-        ? [{ label: 'Характеристики', value: customProductForm.characteristics.trim() }]
-        : []),
-      ...(customProductionDays > 0
-        ? [{ label: 'Срок', value: `${customProductionDays} дн.` }]
-        : []),
-    ],
-  } : null;
-
-  const customErrors = [
-    !customProductForm.name.trim() ? 'Укажите наименование' : null,
-    customQuantity <= 0 ? 'Укажите тираж' : null,
-    customPrice <= 0 ? 'Укажите цену за штуку' : null,
-  ].filter(Boolean) as string[];
-
-  const handleAddCustomProduct = useCallback(async () => {
-    if (!isCustomValid) return;
-    const name = customProductForm.name.trim();
-    const characteristics = customProductForm.characteristics.trim();
-    const paramsPayload = {
-      customProduct: true,
-      customName: name,
-      characteristics: characteristics || undefined,
-      productionDays: customProductionDays > 0 ? customProductionDays : undefined,
-      operator_percent: 10,
-      productType: 'custom',
-      productName: name,
-    };
-
-    const apiItem = {
-      type: name || 'Произвольный продукт',
-      params: paramsPayload,
-      price: customPrice,
-      quantity: customQuantity,
-      sides: 1,
-      sheets: 0,
-      waste: 0,
-      clicks: 0,
-    };
-
-    try {
-      if (isEditMode && editContext && onSubmitExisting) {
-        await onSubmitExisting({
-          orderId: editContext.orderId,
-          itemId: editContext.item.id,
-          item: apiItem,
-        });
-        toast.success('Позиция обновлена');
-      } else {
-        await Promise.resolve(onAddToOrder(apiItem));
-        toast.success('Товар добавлен в заказ!');
-      }
-      onClose();
-    } catch (error: any) {
-      logger.error('Ошибка при сохранении произвольной позиции', error);
-      toast.error('Не удалось сохранить позицию', error?.message || 'Ошибка сохранения');
-    }
-  }, [
-    customPrice,
-    customQuantity,
-    customProductForm.characteristics,
-    customProductForm.name,
-    customProductionDays,
-    editContext,
-    isCustomValid,
-    isEditMode,
+  const { handleProductSelect } = useProductSelection({
+    close,
     logger,
-    onAddToOrder,
-    onClose,
-    onSubmitExisting,
-    toast,
-  ]);
+    resolveProductType,
+    getDefaultFormat,
+    specsProductType: specs.productType,
+    setSelectedProduct,
+    setSpecs,
+    setUserInteracted,
+    setPrintTechnology,
+    setPrintColorMode,
+    resetCustomProductForm,
+    resetPostprintSelections,
+  });
+
 
   // Автовыбор продукта по initialProductId (например, при редактировании заказа)
   useEffect(() => {
@@ -972,7 +843,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         <div className="calculator-content">
           <div className="calculator-main">
             {/* Ошибки валидации */}
-            {!isCustomProduct && Object.keys(validationErrors).length > 0 && (
+            {!isCustomProduct && !isPostprintProduct && Object.keys(validationErrors).length > 0 && (
               <div className="validation-errors">
                 {Object.entries(validationErrors).map(([key, message]) => (
                   <div key={key} className="validation-error">
@@ -990,7 +861,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                 ))}
               </div>
             )}
-
             {isCustomProduct ? (
               <div className="calculator-section-group calculator-section-unified">
                 <div className="section-group-header">
@@ -1060,6 +930,127 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                   </div>
                 </div>
               </div>
+            ) : isPostprintProduct ? (
+              <div className="calculator-section-group calculator-section-unified">
+                <div className="section-group-header">
+                  <h3>🧰 Послепечатные услуги</h3>
+                </div>
+                <div className="section-group-content">
+                  <SelectedProductCard
+                    productType="postprint"
+                    displayName={selectedProduct?.name || 'Послепечатные услуги'}
+                    onOpenSelector={() => open('showProductSelection')}
+                  />
+                  <div className="form-section postprint-services-form">
+                    {postprintLoading && (
+                      <div className="postprint-services-loading">
+                        Загрузка операций...
+                      </div>
+                    )}
+                    {postprintError && !postprintLoading && (
+                      <div className="postprint-services-error">
+                        {postprintError}
+                      </div>
+                    )}
+                    {!postprintLoading && !postprintError && (
+                      <div className="postprint-services-list">
+                        {postprintOperations.length === 0 ? (
+                          <div className="postprint-services-empty">
+                            Нет доступных операций
+                          </div>
+                        ) : (
+                          postprintOperations.map((operation) => {
+                            const qty = Number(postprintSelections[operation.key] || 0);
+                            const isChecked = qty > 0;
+                            const unitPrice = getOperationUnitPrice(operation, qty || 1);
+                            return (
+                              <div key={operation.key} className="postprint-service-card">
+                                <div className="postprint-service-row">
+                                  <div className="postprint-service-left">
+                                    <label className="postprint-service-checkbox">
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(event) => {
+                                          const checked = event.target.checked;
+                                          setPostprintSelections((prev) => {
+                                            const next = { ...prev };
+                                            if (!checked) {
+                                              delete next[operation.key];
+                                            } else if (!next[operation.key]) {
+                                              next[operation.key] = 1;
+                                            }
+                                            return next;
+                                          });
+                                        }}
+                                      />
+                                      <span className="postprint-service-name">{operation.name}</span>
+                                    </label>
+                                  </div>
+                                  <div className="postprint-service-meta">
+                                    <span className="postprint-service-price">
+                                      {unitPrice.toFixed(2)} BYN / {operation.priceUnit || operation.unit || 'шт'}
+                                    </span>
+                                  </div>
+                                </div>
+                                {isChecked && (
+                                  <div className="postprint-quantity-row">
+                                    <div className="postprint-service-left">
+                                      <div className="quantity-controls">
+                                        <button
+                                          type="button"
+                                          className="quantity-btn quantity-btn-minus"
+                                          onClick={() => {
+                                            const nextQty = Math.max(1, qty - 1);
+                                            setPostprintSelections((prev) => ({
+                                              ...prev,
+                                              [operation.key]: nextQty,
+                                            }));
+                                          }}
+                                        >
+                                          -
+                                        </button>
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          value={qty || 1}
+                                          placeholder="Кол-во"
+                                          className="quantity-input"
+                                          onChange={(event) => {
+                                            const value = Math.max(1, Number(event.target.value) || 1);
+                                            setPostprintSelections((prev) => ({
+                                              ...prev,
+                                              [operation.key]: value,
+                                            }));
+                                          }}
+                                        />
+                                        <button
+                                          type="button"
+                                          className="quantity-btn quantity-btn-plus"
+                                          onClick={() => {
+                                            const nextQty = Math.max(1, qty + 1);
+                                            setPostprintSelections((prev) => ({
+                                              ...prev,
+                                              [operation.key]: nextQty,
+                                            }));
+                                          }}
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <div className="postprint-quantity-spacer" aria-hidden="true" />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             ) : (
               <CalculatorSections
                 specs={specs}
@@ -1092,6 +1083,13 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                 result={customResult as any}
                 isValid={isCustomValid}
                 onAddToOrder={() => handleAddCustomProduct()}
+                mode={isEditMode ? 'edit' : 'create'}
+              />
+            ) : isPostprintProduct ? (
+              <ResultSection
+                result={postprintResult as any}
+                isValid={isPostprintValid}
+                onAddToOrder={() => handleAddPostprintProduct()}
                 mode={isEditMode ? 'edit' : 'create'}
               />
             ) : (
