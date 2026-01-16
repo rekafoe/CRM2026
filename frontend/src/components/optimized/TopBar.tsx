@@ -59,9 +59,10 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={() => navigate('/earnings')}
           title="Мои проценты"
           aria-label="Мои проценты"
-          className="app-icon-btn app-icon-btn--green"
+          className="app-icon-btn app-icon-btn--green app-icon-btn--with-label"
         >
-          💸
+          <span className="app-icon-btn__icon" aria-hidden="true">💸</span>
+          <span className="app-icon-btn__label">Мои проценты</span>
         </button>
         {isAdmin && (
           <>
