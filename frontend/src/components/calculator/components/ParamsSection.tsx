@@ -189,6 +189,9 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
               +
             </button>
           </div>
+          {validationErrors.quantity && (
+            <div className="text-sm text-red-600">{validationErrors.quantity}</div>
+          )}
         </div>
 
         {/* Стороны печати */}

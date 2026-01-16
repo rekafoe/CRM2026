@@ -128,6 +128,7 @@ router.get('/stats', asyncHandler(OrderController.getOrdersStats))
 router.post('/', asyncHandler(OrderController.createOrder))
 router.post('/with-auto-deduction', asyncHandler(OrderController.createOrderWithAutoDeduction))
 router.put('/:id/status', asyncHandler(OrderController.updateOrderStatus))
+router.put('/:id/customer', asyncHandler(OrderController.updateOrderCustomer))
 router.delete('/:id', asyncHandler(OrderController.deleteOrder))
 router.post('/:id/duplicate', asyncHandler(OrderController.duplicateOrder))
 

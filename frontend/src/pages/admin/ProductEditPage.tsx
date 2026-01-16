@@ -20,6 +20,7 @@ interface ProductDto {
   icon?: string;
   calculator_type?: string;
   product_type?: string;
+  operator_percent?: number;
   is_active?: boolean;
 }
 
@@ -31,7 +32,7 @@ const ProductEditPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'info' | 'services' | 'materials' | 'print'>('info');
   const [savingPrintSettings, setSavingPrintSettings] = useState(false);
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
-  const [form, setForm] = useState<{ name: string; description?: string; icon?: string; calculator_type?: string; product_type?: string; category_id?: number }>({ name: '' });
+  const [form, setForm] = useState<{ name: string; description?: string; icon?: string; calculator_type?: string; product_type?: string; category_id?: number; operator_percent?: string }>({ name: '' });
   const [saving, setSaving] = useState(false);
 
   const {
@@ -63,12 +64,37 @@ const ProductEditPage: React.FC = () => {
     [productServicesLinks]
   );
 
+  useEffect(() => {
+    if (!product) return;
+    setForm({
+      name: product.name || '',
+      description: product.description || '',
+      icon: product.icon || '',
+      calculator_type: (product as any)?.calculator_type || '',
+      product_type: (product as any)?.product_type || '',
+      category_id: (product as any)?.category_id,
+      operator_percent: (product as any)?.operator_percent !== undefined ? String((product as any)?.operator_percent) : '',
+    });
+  }, [product]);
+
   const handleSaveProduct = useCallback(async () => {
     if (!productId || !form.name) return;
     try {
       setSaving(true);
-      const { name, description, icon, calculator_type, product_type } = form;
-      await updateProduct(productId, { name, description, icon, calculator_type, product_type } as any);
+      const { name, description, icon, calculator_type, product_type, operator_percent } = form;
+      const operatorPercentValue = operator_percent !== undefined && operator_percent !== ''
+        ? Number(operator_percent)
+        : undefined;
+      await updateProduct(productId, {
+        name,
+        description,
+        icon,
+        calculator_type,
+        product_type,
+        ...(operatorPercentValue !== undefined && Number.isFinite(operatorPercentValue)
+          ? { operator_percent: operatorPercentValue }
+          : {}),
+      } as any);
       alert('Сохранено');
     } catch (error) {
       console.error(error);
@@ -76,7 +102,7 @@ const ProductEditPage: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [productId, form.name, form.description, form.icon, form.calculator_type, form.product_type]);
+  }, [productId, form.name, form.description, form.icon, form.calculator_type, form.product_type, form.operator_percent]);
 
   const handleFormChange = useCallback((field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));

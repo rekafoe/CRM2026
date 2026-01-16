@@ -109,6 +109,7 @@ export async function createProduct(productData: {
   icon?: string;
   calculator_type?: 'product' | 'operation' | 'simplified';
   product_type?: 'sheet_single' | 'multi_page' | 'universal' | 'sheet_item' | 'multi_page_item';
+  operator_percent?: number;
 }): Promise<{ id: number; name: string }> {
   const response = await api.post('/products', productData);
   

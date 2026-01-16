@@ -15,6 +15,7 @@ import { TelegramService } from './services/telegramService'
 import { StockMonitoringService } from './services/stockMonitoringService'
 import { AutoOrderService } from './services/autoOrderService'
 import { UserNotificationService } from './services/userNotificationService'
+import { EarningsService } from './services/earningsService'
 import { logger } from './utils/logger'
 import { AuthController } from './controllers'
 import { swaggerSpec } from './config/swagger'
@@ -150,6 +151,13 @@ async function startServer() {
     
     // Инициализация сервиса пользовательских уведомлений
     await UserNotificationService.initialize()
+
+    const earningsConfig = {
+      enabled: process.env.EARNINGS_ENABLED !== 'false',
+      intervalMinutes: parseInt(process.env.EARNINGS_INTERVAL_MINUTES || '60')
+    }
+
+    EarningsService.initialize(earningsConfig)
     
     const port = process.env.PORT || 3001
     app.listen(port, () => {
@@ -158,6 +166,7 @@ async function startServer() {
       logger.info(`Telegram notifications: ${telegramConfig.enabled ? 'enabled' : 'disabled'}`)
       logger.info(`Stock monitoring: ${process.env.STOCK_MONITORING_ENABLED !== 'false' ? 'enabled' : 'disabled'}`)
       logger.info(`Auto ordering: ${process.env.AUTO_ORDER_ENABLED === 'true' ? 'enabled' : 'disabled'}`)
+      logger.info(`Earnings recalculation: ${earningsConfig.enabled ? 'enabled' : 'disabled'} (${earningsConfig.intervalMinutes}m)`)
     })
   } catch (error) {
     logger.error('Failed to start server', { error })

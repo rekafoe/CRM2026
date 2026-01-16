@@ -544,6 +544,7 @@ router.get('/:productId/schema', async (req, res) => {
         'pps.price_unit',
         'pps.setup_cost',
         'pps.min_quantity',
+        'pps.max_quantity',
         'pps.parameters'
       ];
       
@@ -1365,7 +1366,7 @@ router.post('/setup', asyncHandler(async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { category_id, name, description, icon, calculator_type, product_type } = req.body;
+    const { category_id, name, description, icon, calculator_type, product_type, operator_percent } = req.body;
     const db = await getDb();
 
     if (!name || typeof name !== 'string' || name.trim() === '') {
@@ -1403,9 +1404,10 @@ router.post('/', async (req, res) => {
       return;
     }
 
+    const normalizedOperatorPercent = Number.isFinite(Number(operator_percent)) ? Number(operator_percent) : 0;
     const result = await db.run(`
-      INSERT INTO products (category_id, name, description, icon, calculator_type, product_type)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO products (category_id, name, description, icon, calculator_type, product_type, operator_percent)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `, [
       resolvedCategoryId,
       name.trim(),
@@ -1413,6 +1415,7 @@ router.post('/', async (req, res) => {
       icon ?? null,
       calculator_type || 'product',
       product_type || 'sheet_single',
+      normalizedOperatorPercent,
     ]);
 
     // Автоматически создаем операции на основе типа продукта
@@ -1428,7 +1431,8 @@ router.post('/', async (req, res) => {
       description,
       icon,
       calculator_type: calculator_type || 'product',
-      product_type: product_type || 'sheet_single'
+      product_type: product_type || 'sheet_single',
+      operator_percent: normalizedOperatorPercent,
     });
   } catch (error) {
     logger.error('Error creating product', error);
@@ -1443,7 +1447,7 @@ router.put('/:id', async (req, res) => {
     const db = await getDb();
     
     // Динамически формируем SET часть запроса только для переданных полей
-    const allowedFields = ['category_id', 'name', 'description', 'icon', 'is_active', 'product_type', 'calculator_type', 'setup_status', 'print_settings'];
+    const allowedFields = ['category_id', 'name', 'description', 'icon', 'is_active', 'product_type', 'calculator_type', 'setup_status', 'print_settings', 'operator_percent'];
     const setFields: string[] = [];
     const values: any[] = [];
     

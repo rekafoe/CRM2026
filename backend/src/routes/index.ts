@@ -14,6 +14,8 @@ import operationsRoutes from './operations'
 import printersRoutes from './printers'
 import reportsRoutes from './reports'
 import dailyReportsRoutes from './dailyReports'
+import earningsRoutes from './earnings'
+import shiftsRoutes from './shifts'
 import materialCategoriesRoutes from './materialCategories'
 import suppliersRoutes from './suppliers'
 import notificationsRoutes from './notifications'
@@ -37,6 +39,8 @@ router.use('/operations', operationsRoutes)
 router.use('/printers', printersRoutes)
 router.use('/reports', reportsRoutes)
 router.use('/daily-reports', dailyReportsRoutes)
+router.use('/earnings', earningsRoutes)
+router.use('/shifts', shiftsRoutes)
 router.use('/material-categories', materialCategoriesRoutes)
 router.use('/suppliers', suppliersRoutes)
 router.use('/notifications', notificationsRoutes)

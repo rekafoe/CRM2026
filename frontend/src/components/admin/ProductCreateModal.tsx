@@ -32,6 +32,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
   );
   const [calculatorType, setCalculatorType] = useState<'product' | 'operation' | 'simplified'>('product');
   const [productType, setProductType] = useState<'sheet_single' | 'multi_page' | 'universal'>('sheet_single');
+  const [operatorPercent, setOperatorPercent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +45,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
       setCategoryId(categories.length > 0 ? categories[0].id : null);
       setCalculatorType('product');
       setProductType('sheet_single');
+      setOperatorPercent('');
       setError(null);
     }
   }, [visible, categories]);
@@ -65,6 +67,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
         icon: icon.trim() || undefined,
         calculator_type: calculatorType,
         product_type: productType,
+        operator_percent: operatorPercent ? Number(operatorPercent) : undefined,
       });
 
       if (result?.id) {
@@ -88,6 +91,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
     setCategoryId(categories.length > 0 ? categories[0].id : null);
       setCalculatorType('product');
     setProductType('sheet_single');
+    setOperatorPercent('');
     setError(null);
     onClose();
   };
@@ -136,6 +140,18 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Краткое описание продукта"
             rows={3}
+          />
+        </FormField>
+
+        <FormField label="Процент оператора" help="Процент от суммы позиции заказа">
+          <input
+            className="form-input"
+            type="number"
+            min="0"
+            step="0.1"
+            value={operatorPercent}
+            onChange={(e) => setOperatorPercent(e.target.value)}
+            placeholder="Например: 10"
           />
         </FormField>
 

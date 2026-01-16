@@ -71,3 +71,14 @@
   background: #bbdefb;
   border-color: #64b5f6;
 }
+
+.app-icon-btn--green {
+  background: #e6f4ea;
+  border-color: #b7e4c7;
+  color: #2d6a4f;
+}
+
+.app-icon-btn--green:hover {
+  background: #ccead5;
+  border-color: #95d5b2;
+}

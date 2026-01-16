@@ -55,6 +55,14 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           📊
         </button>
+        <button
+          onClick={() => navigate('/earnings')}
+          title="Мои проценты"
+          aria-label="Мои проценты"
+          className="app-icon-btn app-icon-btn--green"
+        >
+          💸
+        </button>
         {isAdmin && (
           <>
             <button 

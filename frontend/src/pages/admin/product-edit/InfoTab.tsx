@@ -10,6 +10,7 @@ interface InfoTabProps {
     calculator_type?: string;
     product_type?: string;
     category_id?: number;
+    operator_percent?: string;
   };
   product: any;
   saving: boolean;
@@ -67,6 +68,17 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
         </FormField>
         <FormField label="Категория" help="ID категории (только чтение)">
           <input className="form-input" value={form.category_id ?? product?.category_id ?? ''} disabled />
+        </FormField>
+        <FormField label="Процент оператора" help="Процент от суммы позиции заказа">
+          <input
+            className="form-input"
+            type="number"
+            min="0"
+            step="0.1"
+            value={form.operator_percent ?? ''}
+            onChange={(e) => onFormChange('operator_percent', e.target.value)}
+            placeholder="Например: 10"
+          />
         </FormField>
         <FormField label="Описание" help="Краткий текст для менеджеров и клиентов">
           <textarea

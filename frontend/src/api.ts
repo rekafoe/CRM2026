@@ -373,6 +373,22 @@ export const getUsers = () => api.get<UserRef[]>('/users');
 export const createDailyReport = (data: { report_date: string; user_id?: number; orders_count?: number; total_revenue?: number }) =>
   api.post<DailyReport>('/daily-reports', data);
 
+// Earnings API
+export const getMyEarnings = (params?: { month?: string }) =>
+  api.get('/earnings/me', { params });
+export const getAdminEarnings = (params?: { month?: string; history_months?: number }) =>
+  api.get('/earnings/admin', { params });
+export const getDailyEarnings = (date: string, userId?: number) =>
+  api.get('/earnings/daily', { params: userId ? { date, user_id: userId } : { date } });
+
+// Shifts API
+export const getShifts = (params?: { user_id?: number; month?: string; date?: string }) =>
+  api.get('/shifts', { params });
+export const createShift = (data: { user_id?: number; date?: string; hours: number; comment?: string }) =>
+  api.post('/shifts', data);
+export const updateShift = (id: number, data: { hours?: number; comment?: string; date?: string }) =>
+  api.put(`/shifts/${id}`, data);
+
 export const getOrderStatuses = () => api.get<Array<{ id: number; name: string; color?: string; sort_order: number }>>('/order-statuses');
 
 // Files API

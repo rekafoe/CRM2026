@@ -708,6 +708,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         parameterSummary: cleanParameterSummary,
         productId: selectedProduct?.id,
         productName: selectedProduct?.name,
+        ...(selectedProduct?.operator_percent !== undefined
+          ? { operator_percent: Number(selectedProduct.operator_percent) }
+          : {}),
         layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined, // 🆕 Глубокая копия
         customFormat: isCustomFormat ? customFormat : undefined,
       };

@@ -35,6 +35,8 @@ export interface ItemParams {
   parameterSummary?: Array<{ key?: string; label: string; value: string }>;
   productId?: number;
   productName?: string;
+  operator_percent?: number;
+  operatorPercent?: number;
   layout?: {
     sheetsNeeded?: number;
     itemsPerSheet?: number;

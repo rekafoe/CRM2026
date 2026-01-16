@@ -207,6 +207,21 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     });
   }, [operations]);
 
+  const operationLimits = useMemo(() => {
+    const limits = new Map<number, { min: number; max?: number }>();
+    const ops = backendProductSchema?.operations;
+    if (!Array.isArray(ops)) return limits;
+    ops.forEach((op: Operation) => {
+      const opId = Number(op.operation_id || op.id);
+      if (!Number.isFinite(opId)) return;
+      const minQty = Number((op as any).min_quantity ?? 1);
+      const maxQtyRaw = (op as any).max_quantity;
+      const maxQty = maxQtyRaw !== undefined && maxQtyRaw !== null ? Number(maxQtyRaw) : undefined;
+      limits.set(opId, { min: Number.isFinite(minQty) ? minQty : 1, max: Number.isFinite(maxQty) ? maxQty : undefined });
+    });
+    return limits;
+  }, [backendProductSchema?.operations]);
+
   // Мемоизируем карту выбранных операций для быстрого доступа
   const selectedOperationsMap = useMemo(() => {
     const map = new Map<number, SelectedOperation>();
@@ -242,6 +257,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       // Добавляем операцию с дефолтными значениями
       const variants = serviceVariants.get(operationId) || [];
       const hasVariants = variants.length > 0;
+      const minQuantity = Number(operation.min_quantity ?? 1);
       
       let newOp: SelectedOperation = {
         operationId,
@@ -286,9 +302,15 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
         }
       }
       
-      updateSpecs({ selectedOperations: [...currentOps, newOp] }, true);
+      const nextUpdates: Record<string, any> = {
+        selectedOperations: [...currentOps, newOp],
+      };
+      if (Number.isFinite(minQuantity) && minQuantity > 1 && specs.quantity < minQuantity) {
+        nextUpdates.quantity = minQuantity;
+      }
+      updateSpecs(nextUpdates, true);
     }
-  }, [selectedOperations, selectedOperationsMap, operationsWithSubtypes, serviceVariants, updateSpecs]);
+  }, [selectedOperations, selectedOperationsMap, operationsWithSubtypes, serviceVariants, updateSpecs, specs.quantity]);
 
   // Обновляем подтип операции (мемоизированная версия)
   const updateOperationSubtype = useCallback((operationId: number, subtype: string) => {
@@ -342,6 +364,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
           const operationName = operation.operation_name || operation.name || 'Операция';
           const isSelected = isOperationSelected(operationId);
           const selectedData = getSelectedOperationData(operationId);
+          const limits = operationLimits.get(operationId);
 
           return (
             <div key={operationId} className="param-group operation-group">
@@ -355,6 +378,11 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   />
                   <span style={{ fontWeight: 500 }}>{operationName}</span>
                 </label>
+                {limits && (
+                  <span className="operation-limits">
+                    от {limits.min}{limits.max !== undefined ? ` до ${limits.max}` : ''}
+                  </span>
+                )}
               </div>
 
               {isSelected && (() => {

@@ -24,8 +24,9 @@ function computeErrors(params: {
   isCustomFormat: boolean;
   customFormat: { width: string; height: string };
   sizeLimits?: { min?: number; max?: number };
+  operationLimits?: { min?: number; max?: number };
 }): Record<string, string> {
-  const { specs, schemaPagesEnum, isCustomFormat, customFormat, sizeLimits } = params;
+  const { specs, schemaPagesEnum, isCustomFormat, customFormat, sizeLimits, operationLimits } = params;
   const errors: Record<string, string> = {};
 
   if (!specs.quantity || specs.quantity < 1) {
@@ -40,9 +41,12 @@ function computeErrors(params: {
     errors.pages = 'Количество страниц должно быть кратно 4';
   }
 
-  if (sizeLimits) {
-    const minQty = sizeLimits.min ?? 1;
-    const maxQty = sizeLimits.max;
+  if (sizeLimits || operationLimits) {
+    const minQty = Math.max(sizeLimits?.min ?? 1, operationLimits?.min ?? 1);
+    const maxCandidates = [sizeLimits?.max, operationLimits?.max].filter(
+      (v): v is number => v !== undefined
+    );
+    const maxQty = maxCandidates.length > 0 ? Math.min(...maxCandidates) : undefined;
     if (specs.quantity < minQty) {
       errors.quantity = `Тираж должен быть не меньше ${minQty}`;
     } else if (maxQty !== undefined && specs.quantity > maxQty) {
@@ -85,6 +89,33 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
     };
   }, [backendProductSchema]);
 
+  const getOperationLimits = useCallback((selectedOps?: Array<{ operationId?: number | string }>) => {
+    if (!Array.isArray(selectedOps) || selectedOps.length === 0) return undefined;
+    const operations = backendProductSchema?.operations;
+    if (!Array.isArray(operations)) return undefined;
+    let minRequired = 1;
+    let maxAllowed: number | undefined = undefined;
+    selectedOps.forEach((sel) => {
+      const opId = Number(sel.operationId);
+      if (!Number.isFinite(opId)) return;
+      const op = operations.find((o: any) => Number(o.operation_id ?? o.id) === opId);
+      if (!op) return;
+      const minQty = Number(op.min_quantity ?? 1);
+      if (Number.isFinite(minQty) && minQty > minRequired) {
+        minRequired = minQty;
+      }
+      const maxQtyValue = op.max_quantity !== undefined && op.max_quantity !== null ? Number(op.max_quantity) : NaN;
+      if (Number.isFinite(maxQtyValue)) {
+        if (maxAllowed === undefined) {
+          maxAllowed = maxQtyValue;
+        } else {
+          maxAllowed = Math.min(maxAllowed, maxQtyValue);
+        }
+      }
+    });
+    return { min: minRequired, max: maxAllowed };
+  }, [backendProductSchema]);
+
   const validateSpecs = useCallback(
     (nextSpecs: SpecsLike): CalculatorValidationResult => {
       const errors = computeErrors({
@@ -93,10 +124,11 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
         isCustomFormat,
         customFormat,
         sizeLimits: getSizeLimits(nextSpecs.size_id),
+        operationLimits: getOperationLimits(nextSpecs.selectedOperations),
       });
       return { errors, isValid: Object.keys(errors).length === 0 };
     },
-    [schemaPagesEnum, isCustomFormat, customFormat, getSizeLimits],
+    [schemaPagesEnum, isCustomFormat, customFormat, getSizeLimits, getOperationLimits],
   );
 
   const validationErrors = useMemo(() => {

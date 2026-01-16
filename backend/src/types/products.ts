@@ -17,6 +17,7 @@ export interface Product {
   name: string;
   description?: string;
   base_price: number;
+  operator_percent?: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;

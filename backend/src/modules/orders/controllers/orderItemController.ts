@@ -3,6 +3,7 @@ import { getDb } from '../../../config/database'
 import { AuthenticatedRequest } from '../../../middleware'
 import { Item } from '../../../models'
 import { itemRowSelect, mapItemRowToItem } from '../../../models/mappers/itemMapper'
+import { EarningsService } from '../../../services/earningsService'
 import { UnifiedWarehouseService } from '../../warehouse/services/unifiedWarehouseService'
 import { MaterialTransactionService } from '../../warehouse/services/materialTransactionService'
 import { computeClicks, ceilRequiredQuantity } from '../../../utils/printing'
@@ -254,6 +255,15 @@ export class OrderItemController {
         
         logger.info('✅ [addItem] Транзакция завершена успешно', { itemId, orderId })
 
+        const orderRow = await db.get<{ created_date?: string }>(
+          'SELECT COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
+          [orderId]
+        )
+        if (orderRow?.created_date) {
+          const date = String(orderRow.created_date).slice(0, 10)
+          await EarningsService.recalculateForDate(date)
+        }
+
         const item = mapItemRowToItem(rawItem as any)
         res.status(201).json(item)
         return
@@ -314,6 +324,14 @@ export class OrderItemController {
       if (!it) {
         // Нечего возвращать, просто 204
         await db.run('DELETE FROM items WHERE orderId = ? AND id = ?', orderId, itemId)
+        const orderRow = await db.get<{ created_date?: string }>(
+          'SELECT COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
+          [orderId]
+        )
+        if (orderRow?.created_date) {
+          const date = String(orderRow.created_date).slice(0, 10)
+          await EarningsService.recalculateForDate(date)
+        }
         res.status(204).end()
         return
       }
@@ -356,6 +374,14 @@ export class OrderItemController {
 
         await db.run('DELETE FROM items WHERE orderId = ? AND id = ?', orderId, itemId)
         await db.run('COMMIT')
+        const orderRow = await db.get<{ created_date?: string }>(
+          'SELECT COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
+          [orderId]
+        )
+        if (orderRow?.created_date) {
+          const date = String(orderRow.created_date).slice(0, 10)
+          await EarningsService.recalculateForDate(date)
+        }
         res.status(204).end()
       } catch (e) {
         await db.run('ROLLBACK')
@@ -498,6 +524,14 @@ export class OrderItemController {
         )
 
         await db.run('COMMIT')
+        const orderRow = await db.get<{ created_date?: string }>(
+          'SELECT COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
+          [orderId]
+        )
+        if (orderRow?.created_date) {
+          const date = String(orderRow.created_date).slice(0, 10)
+          await EarningsService.recalculateForDate(date)
+        }
       } catch (e) {
         await db.run('ROLLBACK')
         throw e

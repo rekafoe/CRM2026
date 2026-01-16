@@ -25,6 +25,9 @@ const LazyOrderPoolPage = React.lazy(() =>
 const LazyAdminPanelPage = React.lazy(() =>
   import('./pages/AdminPanelPage').then((m) => ({ default: m.AdminPanelPage }))
 );
+const LazyEarningsPage = React.lazy(() =>
+  import('./pages/EarningsPage').then((m) => ({ default: m.EarningsPage }))
+);
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem(APP_CONFIG.storage.token) : null;
@@ -111,6 +114,16 @@ root.render(
               <RequireAuth>
                 <React.Suspense fallback={<LoadingFallback />}>
                   <LazyAdminPanelPage />
+                </React.Suspense>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/earnings"
+            element={
+              <RequireAuth>
+                <React.Suspense fallback={<LoadingFallback />}>
+                  <LazyEarningsPage />
                 </React.Suspense>
               </RequireAuth>
             }

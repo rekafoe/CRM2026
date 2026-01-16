@@ -21,6 +21,7 @@ export interface Product {
   icon?: string;
   calculator_type?: 'product' | 'operation' | 'simplified';
   product_type?: 'sheet_single' | 'multi_page' | 'universal' | 'sheet_item' | 'multi_page_item';
+  operator_percent?: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -121,8 +122,9 @@ export interface ProductSetupPayload {
     name: string;
     description?: string;
     icon?: string;
-    calculator_type?: 'product' | 'operation';
+    calculator_type?: 'product' | 'operation' | 'simplified';
     product_type?: 'sheet_single' | 'multi_page' | 'universal' | 'sheet_item' | 'multi_page_item';
+    operator_percent?: number;
   };
   operations?: Array<{
     operation_id: number;
