@@ -112,7 +112,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     toast,
   });
   const {
-    postprintOperations,
+    postprintServices,
     postprintSelections,
     setPostprintSelections,
     postprintLoading,
@@ -954,17 +954,63 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                     )}
                     {!postprintLoading && !postprintError && (
                       <div className="postprint-services-list">
-                        {postprintOperations.length === 0 ? (
+                        {postprintServices.length === 0 ? (
                           <div className="postprint-services-empty">
                             Нет доступных операций
                           </div>
                         ) : (
-                          postprintOperations.map((operation) => {
-                            const qty = Number(postprintSelections[operation.key] || 0);
-                            const isChecked = qty > 0;
-                            const unitPrice = getOperationUnitPrice(operation, qty || 1);
+                          postprintServices.map((service) => {
+                            const serviceKey = String(service.serviceId);
+                            const serviceKeyPrefix = `${service.serviceId}:`;
+                            const selectedVariantKey = Object.keys(postprintSelections).find((key) =>
+                              key.startsWith(serviceKeyPrefix)
+                            );
+                            const selectedVariant =
+                              service.variants.find((variant) => variant.key === selectedVariantKey) ||
+                              service.variants[0];
+                            const variantTypes = service.variants.reduce<Record<string, typeof service.variants>>(
+                              (acc, variant) => {
+                                const typeLabel = String(
+                                  variant.parameters?.type || variant.label || 'Вариант'
+                                ).trim();
+                                if (!acc[typeLabel]) acc[typeLabel] = [];
+                                acc[typeLabel].push(variant);
+                                return acc;
+                              },
+                              {}
+                            );
+                            const typeOptions = Object.keys(variantTypes);
+                            const selectedType =
+                              selectedVariant?.parameters?.type ||
+                              typeOptions[0] ||
+                              '';
+                            const subtypeOptions =
+                              typeOptions.length > 0
+                                ? (variantTypes[selectedType] || variantTypes[typeOptions[0]] || [])
+                                : service.variants;
+                            const selectedSubtype =
+                              subtypeOptions.find((variant) => variant.key === selectedVariantKey) ||
+                              subtypeOptions[0];
+                            const currentKey = service.variants.length > 0 ? selectedVariant?.key : serviceKey;
+                            const qty = Number((currentKey && postprintSelections[currentKey]) || 0);
+                            const isChecked = service.variants.length > 0 ? Boolean(selectedVariantKey) : qty > 0;
+                            const priceTiers =
+                              service.variants.length > 0 ? selectedSubtype?.tiers || [] : service.tiers;
+                            const unitPrice = getOperationUnitPrice(
+                              {
+                                key: currentKey || serviceKey,
+                                serviceId: service.serviceId,
+                                variantId: selectedSubtype?.variantId,
+                                name: service.name,
+                                unit: service.unit,
+                                priceUnit: service.priceUnit,
+                                rate: service.rate,
+                                tiers: priceTiers,
+                              },
+                              qty || 1
+                            );
                             return (
-                              <div key={operation.key} className="postprint-service-card">
+                              <div key={serviceKey} className="postprint-service-card">
                                 <div className="postprint-service-row">
                                   <div className="postprint-service-left">
                                     <label className="postprint-service-checkbox">
@@ -975,24 +1021,111 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                           const checked = event.target.checked;
                                           setPostprintSelections((prev) => {
                                             const next = { ...prev };
-                                            if (!checked) {
-                                              delete next[operation.key];
-                                            } else if (!next[operation.key]) {
-                                              next[operation.key] = 1;
+                                            Object.keys(next).forEach((key) => {
+                                              if (key === serviceKey || key.startsWith(serviceKeyPrefix)) {
+                                                delete next[key];
+                                              }
+                                            });
+                                            if (checked) {
+                                              const preferredKey =
+                                                service.variants.length > 0
+                                                  ? (selectedVariant?.key || service.variants[0]?.key)
+                                                  : serviceKey;
+                                              if (preferredKey) {
+                                                next[preferredKey] = prev[preferredKey] || 1;
+                                              }
                                             }
                                             return next;
                                           });
                                         }}
                                       />
-                                      <span className="postprint-service-name">{operation.name}</span>
+                                      <span className="postprint-service-name">{service.name}</span>
                                     </label>
                                   </div>
                                   <div className="postprint-service-meta">
                                     <span className="postprint-service-price">
-                                      {unitPrice.toFixed(2)} BYN / {operation.priceUnit || operation.unit || 'шт'}
+                                      {unitPrice.toFixed(2)} BYN / {service.priceUnit || service.unit || 'шт'}
                                     </span>
                                   </div>
                                 </div>
+                                {isChecked && service.variants.length > 0 && (
+                                  <div className="postprint-variant-row">
+                                    <div className="postprint-service-left">
+                                      {typeOptions.length > 1 && (
+                                        <label className="postprint-variant-field">
+                                          <span className="postprint-variant-label">Тип ламинации</span>
+                                          <select
+                                            className="postprint-variant-select"
+                                            value={selectedType}
+                                            onChange={(event) => {
+                                              const nextType = event.target.value;
+                                              const nextVariant = (variantTypes[nextType] || [])[0];
+                                              setPostprintSelections((prev) => {
+                                                const next = { ...prev };
+                                                const prevQty = selectedVariantKey ? prev[selectedVariantKey] : 1;
+                                                Object.keys(next).forEach((key) => {
+                                                  if (key === serviceKey || key.startsWith(serviceKeyPrefix)) {
+                                                    delete next[key];
+                                                  }
+                                                });
+                                                if (nextVariant?.key) {
+                                                  next[nextVariant.key] = prevQty || 1;
+                                                }
+                                                return next;
+                                              });
+                                            }}
+                                          >
+                                            {typeOptions.map((type) => (
+                                              <option key={type} value={type}>
+                                                {type}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                      )}
+                                      {subtypeOptions.length > 1 && (
+                                        <label className="postprint-variant-field">
+                                          <span className="postprint-variant-label">Плотность</span>
+                                          <select
+                                            className="postprint-variant-select"
+                                            value={selectedSubtype?.key || ''}
+                                            onChange={(event) => {
+                                              const nextKey = event.target.value;
+                                              setPostprintSelections((prev) => {
+                                                const next = { ...prev };
+                                                const prevQty = selectedVariantKey ? prev[selectedVariantKey] : 1;
+                                                Object.keys(next).forEach((key) => {
+                                                  if (key === serviceKey || key.startsWith(serviceKeyPrefix)) {
+                                                    delete next[key];
+                                                  }
+                                                });
+                                                if (nextKey) {
+                                                  next[nextKey] = prevQty || 1;
+                                                }
+                                                return next;
+                                              });
+                                            }}
+                                          >
+                                            {subtypeOptions.map((variant) => {
+                                              const subtypeLabel = String(
+                                                variant.parameters?.subType ||
+                                                  variant.parameters?.density ||
+                                                  variant.label ||
+                                                  'Вариант'
+                                              ).trim();
+                                              return (
+                                                <option key={variant.key} value={variant.key}>
+                                                  {subtypeLabel}
+                                                </option>
+                                              );
+                                            })}
+                                          </select>
+                                        </label>
+                                      )}
+                                    </div>
+                                    <div className="postprint-quantity-spacer" aria-hidden="true" />
+                                  </div>
+                                )}
                                 {isChecked && (
                                   <div className="postprint-quantity-row">
                                     <div className="postprint-service-left">
@@ -1004,7 +1137,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                             const nextQty = Math.max(1, qty - 1);
                                             setPostprintSelections((prev) => ({
                                               ...prev,
-                                              [operation.key]: nextQty,
+                                              [currentKey || serviceKey]: nextQty,
                                             }));
                                           }}
                                         >
@@ -1020,7 +1153,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                             const value = Math.max(1, Number(event.target.value) || 1);
                                             setPostprintSelections((prev) => ({
                                               ...prev,
-                                              [operation.key]: value,
+                                              [currentKey || serviceKey]: value,
                                             }));
                                           }}
                                         />
@@ -1031,7 +1164,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                             const nextQty = Math.max(1, qty + 1);
                                             setPostprintSelections((prev) => ({
                                               ...prev,
-                                              [operation.key]: nextQty,
+                                              [currentKey || serviceKey]: nextQty,
                                             }));
                                           }}
                                         >

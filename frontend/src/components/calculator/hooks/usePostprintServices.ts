@@ -15,6 +15,24 @@ interface PostprintOperation {
   tiers: ServiceVolumeTier[];
 }
 
+interface PostprintVariantOption {
+  key: string;
+  variantId: number;
+  label: string;
+  parameters: Record<string, any>;
+  tiers: ServiceVolumeTier[];
+}
+
+interface PostprintServiceOption {
+  serviceId: number;
+  name: string;
+  unit: string;
+  priceUnit?: string;
+  rate: number;
+  tiers: ServiceVolumeTier[];
+  variants: PostprintVariantOption[];
+}
+
 interface UsePostprintServicesParams {
   isOpen: boolean;
   isPostprintProduct: boolean;
@@ -59,6 +77,7 @@ export function usePostprintServices({
   toast,
 }: UsePostprintServicesParams) {
   const [postprintOperations, setPostprintOperations] = useState<PostprintOperation[]>([]);
+  const [postprintServices, setPostprintServices] = useState<PostprintServiceOption[]>([]);
   const [postprintSelections, setPostprintSelections] = useState<Record<string, number>>({});
   const [postprintLoading, setPostprintLoading] = useState(false);
   const [postprintError, setPostprintError] = useState<string | null>(null);
@@ -107,6 +126,7 @@ export function usePostprintServices({
 
       const sourceServices = byType.length > 0 ? byType : byOperation;
       const operations: PostprintOperation[] = [];
+      const servicesList: PostprintServiceOption[] = [];
       const normalizeLabel = (value: unknown) => String(value ?? '').trim();
       const isNumericLabel = (value: string) => value.length > 0 && !Number.isNaN(Number(value));
       const getVariantLabel = (variant: { variantName?: string; parameters?: Record<string, any> }) => {
@@ -137,9 +157,25 @@ export function usePostprintServices({
           const displayableVariants = activeVariants.filter(isDisplayableVariant);
           const serviceLabel = normalizeLabel(service.name);
           const hasNumericServiceName = isNumericLabel(serviceLabel);
+          const serviceOption: PostprintServiceOption = {
+            serviceId: service.id,
+            name: service.name,
+            unit: service.unit,
+            priceUnit: service.priceUnit,
+            rate: service.rate,
+            tiers: activeTiers.filter((tier) => !tier.variantId),
+            variants: [],
+          };
           if (!hasNumericServiceName && displayableVariants.length > 0) {
             displayableVariants.forEach((variant) => {
               const variantLabel = getVariantLabel(variant) || 'Вариант';
+              serviceOption.variants.push({
+                key: `${service.id}:${variant.id}`,
+                variantId: variant.id,
+                label: variantLabel,
+                parameters: variant.parameters || {},
+                tiers: activeTiers.filter((tier) => tier.variantId === variant.id),
+              });
               operations.push({
                 key: `${service.id}:${variant.id}`,
                 serviceId: service.id,
@@ -162,15 +198,19 @@ export function usePostprintServices({
               tiers: activeTiers.filter((tier) => !tier.variantId),
             });
           }
+          servicesList.push(serviceOption);
         })
       );
       operations.sort((a, b) => a.name.localeCompare(b.name));
+      servicesList.sort((a, b) => a.name.localeCompare(b.name));
       setPostprintOperations(operations);
+      setPostprintServices(servicesList);
       loadedRef.current = true;
     } catch (error: any) {
       logger.error('Ошибка загрузки послепечатных услуг', error);
       setPostprintError(error?.message || 'Не удалось загрузить услуги');
       setPostprintOperations([]);
+      setPostprintServices([]);
       loadedRef.current = false;
     } finally {
       setPostprintLoading(false);
@@ -305,6 +345,7 @@ export function usePostprintServices({
 
   return {
     postprintOperations,
+    postprintServices,
     postprintSelections,
     setPostprintSelections,
     postprintLoading,
