@@ -4,6 +4,7 @@ import { useToastNotifications } from '../Toast';
 import { useLogger } from '../../utils/logger';
 import { getOrders } from '../../api';
 import type { Order } from '../../types';
+import './DateSwitcher.css';
 
 interface DateSwitchContainerProps {
   currentDate: string;
@@ -229,22 +230,23 @@ export const DateSwitchContainer: React.FC<DateSwitchContainerProps> = ({
   }
 
   return (
-    <div className="new-order-management-overlay">
-      <div className="date-switcher-modal">
-        <div className="new-order-management-header">
+    <div className="modal-overlay date-switcher-overlay">
+      <div className="modal modal-lg date-switcher-modal">
+        <div className="modal-header date-switcher-header">
           <h2>📅 Выбор даты</h2>
           <button
-            className="close-btn"
+            className="btn-close"
             onClick={onClose}
             disabled={isLoading}
+            aria-label="Закрыть"
           >
             ×
           </button>
         </div>
-        <div className="new-order-management-content">
+        <div className="modal-body date-switcher-body">
           {isLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <div className="text-gray-500">Загрузка заказов...</div>
+            <div className="date-switcher-loading">
+              <div className="date-switcher-loading-text">Загрузка заказов...</div>
             </div>
           ) : (
             <DateSwitcher

@@ -9,15 +9,80 @@
 .service-variants-table {
   width: 100%;
   max-width: 100%;
-  margin-top: 1rem;
+  margin-top: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.service-variants-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.service-variants-toolbar__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.service-variants-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.service-variants-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.service-variants-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.service-variants-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.service-variants-changes {
+  font-size: 12px;
+  color: #b45309;
+  font-weight: 500;
+}
+
+.service-variants-empty {
+  text-align: center;
+  padding: 24px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
 }
 
 /* Контейнер для таблицы с фиксированной шириной */
 .table-container {
   width: 100%;
   overflow-x: auto;
-  display: flex;
-  justify-content: flex-start;
+  display: block;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-primary);
+  padding: 0;
 }
 
 .table-container .el-table {
@@ -25,6 +90,18 @@
   min-width: 100%;
   max-width: 100%;
   margin: 0;
+  border: none;
+}
+
+.service-variants-grid {
+  width: 100%;
+  min-width: 100%;
+}
+
+.service-variants-grid .el-table__header,
+.service-variants-grid .el-table__body {
+  width: 100%;
+  min-width: 100%;
 }
 
 /* Закрепленный заголовок диапазонов */
@@ -32,15 +109,14 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #fafafa;
+  background: var(--bg-secondary);
 }
 
 /* Ширины для колонок диапазонов */
 .range-header-cell,
 .range-cell {
-  width: clamp(96px, 8vw, 140px);
-  min-width: 96px;
-  max-width: 140px;
+  width: auto;
+  min-width: 140px;
   text-align: center;
   padding: 0;
   position: relative;
@@ -48,7 +124,7 @@
 
 .range-header-cell--active,
 .range-cell--active {
-  background: #eef4ff;
+  background: var(--bg-secondary);
 }
 
 .range-header-content,
@@ -87,8 +163,13 @@
   width: 100%;
 }
 
+.range-header-cell .cell,
+.range-cell .cell {
+  padding: 8px 6px;
+}
+
 .range-remove-btn {
-  color: #e53e3e;
+  color: var(--danger);
   padding: 0;
   min-height: auto;
   line-height: 1;
@@ -136,11 +217,14 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .range-copy-btn {
   align-self: flex-start;
-  color: #409eff;
+  color: var(--primary);
   padding: 0;
   line-height: 1;
 }
@@ -157,14 +241,27 @@
   font-size: 12px;
 }
 
+.variant-name-col {
+  width: 200px;
+}
+
+.actions-col {
+  width: 120px;
+}
+
+.range-col {
+  min-width: 140px;
+  width: auto;
+}
+
 /* Зебра для читаемости */
 .el-table__body tr:nth-child(odd) > td {
-  background-color: #fcfcfd;
+  background-color: var(--bg-secondary);
 }
 
 /* Стили для Element UI таблицы */
 .el-table {
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--border-color);
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
@@ -180,7 +277,7 @@
 .el-table--border::before {
   content: '';
   position: absolute;
-  background-color: #ebeef5;
+  background-color: var(--border-color);
   z-index: 1;
 }
 
@@ -204,8 +301,8 @@
 
 .el-table th,
 .el-table td {
-  border-bottom: 1px solid #ebeef5;
-  border-right: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
   padding: 0; /* Убираем padding, чтобы выравнивание было точным */
   overflow: hidden; /* Предотвращаем переполнение содержимого */
   text-overflow: ellipsis; /* Обрезаем текст при переполнении */
@@ -218,8 +315,8 @@
 }
 
 .el-table th {
-  background-color: #fafafa;
-  color: #606266;
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
   font-weight: 500;
   text-align: left;
 }
@@ -229,27 +326,27 @@
 }
 
 .el-table td {
-  background-color: #fff;
+  background-color: var(--bg-primary);
 }
 
 .el-table__row:hover > td {
-  background-color: #f5f7fa;
+  background-color: var(--bg-secondary);
 }
 
 .el-table__row.expanded > td {
-  background-color: #fff;
+  background-color: var(--bg-primary);
 }
 
 .el-table__row.expanded:hover > td {
-  background-color: #f5f7fa;
+  background-color: var(--bg-secondary);
 }
 
 .el-table__row--level-0 > td {
-  background-color: #fff;
+  background-color: var(--bg-primary);
 }
 
 .el-table__row--level-0:hover > td {
-  background-color: #f5f7fa;
+  background-color: var(--bg-secondary);
 }
 
 .el-table__indent {
@@ -263,7 +360,7 @@
   line-height: 20px;
   text-align: center;
   cursor: pointer;
-  color: #909399;
+  color: var(--text-secondary);
 }
 
 .el-table__expand-icon--expanded {
@@ -276,7 +373,7 @@
 }
 
 .cell {
-  padding: 12px 10px; /* Единый padding для всех ячеек */
+  padding: 12px 16px; /* Единый padding для всех ячеек */
   word-break: break-word;
   line-height: 23px;
   overflow: hidden;
@@ -321,6 +418,16 @@
   z-index: 1;
 }
 
+.variant-actions-header {
+  width: 100%;
+  justify-content: center;
+}
+
+.variant-actions-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .variant-name-row {
   display: flex;
   justify-content: space-between;
@@ -343,12 +450,12 @@
 .el-input__inner {
   -webkit-appearance: none;
   appearance: none;
-  background-color: #fff;
+  background-color: var(--bg-primary);
   background-image: none;
-  border-radius: 4px;
-  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
   box-sizing: border-box;
-  color: #606266;
+  color: var(--text-primary);
   display: inline-block;
   font-size: inherit;
   height: 32px;
@@ -366,20 +473,21 @@
 }
 
 .el-input__inner:focus {
-  border-color: #409eff;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.1);
 }
 
 .el-input__inner:disabled {
-  background-color: #f5f7fa;
-  border-color: #e4e7ed;
-  color: #c0c4cc;
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
   cursor: not-allowed;
 }
 
 .el-input.is-disabled .el-input__inner {
-  background-color: #f5f7fa;
-  border-color: #e4e7ed;
-  color: #c0c4cc;
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
   cursor: not-allowed;
 }
 
@@ -389,9 +497,9 @@
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  background: #fff;
-  border: 1px solid #dcdfe6;
-  color: #606266;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
   -webkit-appearance: none;
   appearance: none;
   text-align: center;
@@ -402,7 +510,7 @@
   font-weight: 500;
   padding: 8px 15px;
   font-size: 14px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .el-button--mini {
@@ -430,81 +538,93 @@
 
 .el-button--primary {
   color: #fff;
-  background-color: #409eff;
-  border-color: #409eff;
+  background-color: var(--primary);
+  border-color: var(--primary);
 }
 
 .el-button--primary:hover {
-  background: #66b1ff;
-  border-color: #66b1ff;
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 
 .el-button--danger {
   color: #fff;
-  background-color: #f56c6c;
-  border-color: #f56c6c;
+  background-color: var(--danger);
+  border-color: var(--danger);
 }
 
 .el-button--danger:hover {
-  background: #f78989;
-  border-color: #f78989;
+  background: var(--danger);
+  border-color: var(--danger);
   color: #fff;
+}
+
+.service-variants-table .variant-delete-btn {
+  color: var(--danger, #e11d48) !important;
+  background: var(--bg-primary, #ffffff) !important;
+  border-color: var(--danger, #e11d48) !important;
+}
+
+.service-variants-table .variant-delete-btn:hover {
+  background: var(--danger, #e11d48) !important;
+  border-color: var(--danger, #e11d48) !important;
+  color: #fff !important;
 }
 
 .el-button--info {
-  color: #fff;
-  background-color: #909399;
-  border-color: #909399;
+  color: var(--text-secondary);
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
 }
 
 .el-button--info:hover {
-  background: #a6a9ad;
-  border-color: #a6a9ad;
-  color: #fff;
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
 }
 
 .el-button--success {
   color: #fff;
-  background-color: #67c23a;
-  border-color: #67c23a;
+  background-color: var(--success);
+  border-color: var(--success);
 }
 
 .el-button--success:hover {
-  background: #85ce61;
-  border-color: #85ce61;
+  background: var(--success);
+  border-color: var(--success);
   color: #fff;
 }
 
 .el-button--success.is-plain {
-  color: #67c23a;
-  background: #f0f9ff;
-  border-color: #b3e19d;
+  color: var(--success);
+  background: var(--bg-primary);
+  border-color: var(--success);
 }
 
 .el-button--success.is-plain:hover {
-  background: #67c23a;
-  border-color: #67c23a;
+  background: var(--success);
+  border-color: var(--success);
   color: #fff;
 }
 
 .el-button--text {
   border-color: transparent;
-  color: #409eff;
+  color: var(--primary);
   background: transparent;
   padding-left: 0;
   padding-right: 0;
 }
 
 .el-button.is-plain {
-  background: #fff;
-  border-color: #409eff;
-  color: #409eff;
+  background: var(--bg-primary);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .el-button.is-plain:hover {
-  background: #409eff;
-  border-color: #409eff;
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 
@@ -540,11 +660,11 @@
 }
 
 .el-link--default {
-  color: #606266;
+  color: var(--text-secondary);
 }
 
 .el-link--default:hover {
-  color: #409eff;
+  color: var(--primary);
 }
 
 .is-underline:hover {

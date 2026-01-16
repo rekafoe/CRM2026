@@ -64,7 +64,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
     lowStock,
     currentUser,
     setCurrentUser,
-    allUsers,
+    activeUsers,
     loadOrders,
   } = useOptimizedAppData(contextDate, contextUserId, selectedId);
 
@@ -223,7 +223,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                   onChange={handleUserIdChangeInPicker}
                 >
                   {currentUser?.role === 'admin' ? (
-                    allUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)
+                    activeUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)
                   ) : (
                     <option value={currentUser?.id}>{currentUser?.name}</option>
                   )}
@@ -270,7 +270,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 contextDate={contextDate}
                 contextUserId={contextUserId}
                 currentUser={currentUser}
-                allUsers={allUsers}
+              allUsers={activeUsers}
                 onDateChange={handleDateChange}
                 onUserIdChange={setContextUserId}
                 onStatusChange={orderHandlers.handleStatusChange}

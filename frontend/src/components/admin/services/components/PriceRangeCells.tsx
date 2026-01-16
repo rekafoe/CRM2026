@@ -216,21 +216,6 @@ export interface PriceRangeHeadersProps {
   onRemoveRange?: (rangeIndex: number) => void;
 
   /**
-   * Callback при добавлении диапазона
-   */
-  onAddRange?: () => void;
-
-  /**
-   * Ref для кнопки добавления диапазона
-   */
-  addRangeButtonRef?: React.RefObject<HTMLButtonElement>;
-
-  /**
-   * Callback для массового применения цены
-   */
-  onApplyAllPrices?: (price: number) => void;
-
-  /**
    * Индекс диапазона, на который наведен курсор
    */
   hoveredRangeIndex?: number | null;
@@ -240,30 +225,15 @@ export interface PriceRangeHeadersProps {
    */
   onRangeHover?: (index: number | null) => void;
 
-  /**
-   * Применить цену из первого диапазона ко всем
-   */
-  onCopyFirstRange?: () => void;
-
-  /**
-   * Применить цену из выбранного диапазона ко всем
-   */
-  onCopySelectedRange?: () => void;
 }
 
 export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
   commonRanges,
   onEditRange,
   onRemoveRange,
-  onAddRange,
-  addRangeButtonRef,
-  onApplyAllPrices,
   hoveredRangeIndex = null,
   onRangeHover,
-  onCopyFirstRange,
-  onCopySelectedRange,
 }) => {
-  const [bulkPrice, setBulkPrice] = useState('');
   const [pendingRemoveIndex, setPendingRemoveIndex] = useState<number | null>(null);
   const removeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const formatRangeLabel = useCallback((range: PriceRange): string => {
@@ -335,66 +305,6 @@ export const PriceRangeHeaders: React.FC<PriceRangeHeadersProps> = ({
           </th>
         );
       })}
-      {onAddRange && (
-        <th style={{ padding: 0 }}>
-          <div className="cell range-actions-cell">
-            <div className="active-panel active-panel-with-popover range-actions-panel">
-              <div className="range-bulk-input">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  inputMode="decimal"
-                  className="el-input__inner"
-                  placeholder="Цена для всех"
-                  value={bulkPrice}
-                  onChange={(e) => setBulkPrice(e.target.value)}
-                  aria-label="Цена для всех диапазонов"
-                />
-                <button
-                  type="button"
-                  className="el-button el-button--primary el-button--mini"
-                  onClick={() => {
-                    const normalized = bulkPrice.replace(',', '.');
-                    const value = parseFloat(normalized);
-                    if (!isNaN(value) && isFinite(value) && onApplyAllPrices) {
-                      onApplyAllPrices(value);
-                    }
-                  }}
-                >
-                  Применить
-                </button>
-              </div>
-              <button
-                type="button"
-                className="el-button el-button--text el-button--mini range-copy-btn"
-                onClick={() => onCopyFirstRange?.()}
-              >
-                Скопировать из 1-го
-              </button>
-              <button
-                type="button"
-                className="el-button el-button--text el-button--mini range-copy-btn"
-                onClick={() => onCopySelectedRange?.()}
-              >
-                Скопировать из выбранного
-              </button>
-              <span>
-                <button
-                  ref={addRangeButtonRef}
-                  type="button"
-                  className="el-button el-button--info el-button--mini is-plain"
-                  style={{ width: '100%', marginLeft: '0px' }}
-                  onClick={onAddRange}
-                >
-                  <i className="el-icon-plus"></i>
-                  <span>Диапазон</span>
-                </button>
-              </span>
-            </div>
-          </div>
-        </th>
-      )}
     </>
   );
 };

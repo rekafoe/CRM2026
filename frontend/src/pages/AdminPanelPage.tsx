@@ -36,6 +36,9 @@ const PricingPage = lazy(() =>
   import('./admin/PricingPage').then((m) => ({ default: m.PricingPage }))
 );
 const PrintersPage = lazy(() => import('./admin/PrintersPage'));
+const CustomersAdminPage = lazy(() =>
+  import('./admin/CustomersAdminPage').then((m) => ({ default: m.default }))
+);
 const SettingsPage = lazy(() =>
   import('./admin/SettingsPage').then((m) => ({ default: m.SettingsPage }))
 );
@@ -137,6 +140,9 @@ const AdminPanelHome: React.FC = () => {
           <button onClick={() => navigate('/adminpanel/services-management')} className="nav-btn">
             🔧 Настройка операций
           </button>
+          <button onClick={() => navigate('/adminpanel/clients')} className="nav-btn">
+            👥 Клиенты
+          </button>
           <button onClick={() => navigate('/adminpanel/users')} className="nav-btn">
             👥 Пользователи
           </button>
@@ -214,6 +220,14 @@ const AdminPanelHome: React.FC = () => {
               <span className="link-title">Уведомления</span>
               <span className="link-desc">Управление всеми уведомлениями системы</span>
             </button>
+            <button 
+              className="admin-link-card"
+              onClick={() => navigate('/adminpanel/clients')}
+            >
+              <span className="link-icon">👥</span>
+              <span className="link-title">Клиенты</span>
+              <span className="link-desc">База клиентов и история заказов</span>
+            </button>
           </div>
         </div>
 
@@ -261,6 +275,7 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/discounts" element={<PricingPage onBack={() => window.history.back()} />} />
           <Route path="/earnings" element={<EarningsAdminPage />} />
           <Route path="/printers" element={<PrintersPage />} />
+          <Route path="/clients" element={<CustomersAdminPage />} />
           
           {/* Настройки */}
           <Route path="/settings" element={<SettingsPage onBack={() => window.history.back()} />} />

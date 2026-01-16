@@ -140,9 +140,6 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                           operations.removeRange(rangeIndex);
                         }
                       }}
-                      onAddRange={() => {
-                        tierModal.openAddModal(tierModal.addRangeButtonRef.current || undefined);
-                      }}
                     />
                   </tr>
                 </thead>

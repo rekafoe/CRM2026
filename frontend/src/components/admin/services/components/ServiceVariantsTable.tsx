@@ -187,17 +187,30 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   const groupedVariants = useMemo(() => groupVariantsByType(variants), [variants]);
   const variantsIndexMap = useMemo(() => createVariantsIndexMap(variants), [variants]);
   const typeNames = useMemo(() => Object.keys(groupedVariants), [groupedVariants]);
+  const getNextTypeName = useCallback(() => {
+    const baseName = 'Новый тип';
+    if (!typeNames.includes(baseName)) {
+      return baseName;
+    }
+    let index = 2;
+    let candidate = `${baseName} ${index}`;
+    while (typeNames.includes(candidate)) {
+      index += 1;
+      candidate = `${baseName} ${index}`;
+    }
+    return candidate;
+  }, [typeNames]);
 
   // Обработчики
   const handleCreateVariant = useCallback(async () => {
     try {
-      const newVariant = localChanges.createVariant('Новый тип', {});
+      const newVariant = localChanges.createVariant(getNextTypeName(), {});
       editing.startEditingName(newVariant.id, newVariant.variantName);
     } catch (err) {
       console.error('Error creating variant locally:', err);
       setError('Не удалось создать вариант');
     }
-  }, [localChanges, editing, setError]);
+  }, [localChanges, editing, setError, getNextTypeName]);
 
   const handleSaveRange = useCallback(async () => {
     const boundary = Number(tierModal.tierModal.boundary);
@@ -227,26 +240,26 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   return (
     <div className="service-variants-table-wrapper">
       <div className="service-variants-table">
-        {error && (
-          <Alert type="error" className="mb-4">
-            {error}
-          </Alert>
-        )}
+      {error && (
+        <Alert type="error" className="mb-4">
+          {error}
+        </Alert>
+      )}
 
-        <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-4 flex-wrap">
+      <div className="service-variants-toolbar">
+        <div className="service-variants-toolbar__left">
           <div>
-            <h3 className="text-lg font-semibold">Варианты услуги: {serviceName}</h3>
+            <h3 className="service-variants-title">Варианты услуги: {serviceName}</h3>
             {(serviceMinQuantity !== undefined || serviceMaxQuantity !== undefined) && (
-              <div className="text-sm text-gray-500">
+              <div className="service-variants-subtitle">
                 Тираж: от {serviceMinQuantity ?? 1}
                 {serviceMaxQuantity !== undefined ? ` до ${serviceMaxQuantity}` : ' (без максимума)'}
               </div>
             )}
           </div>
           {(localChanges.hasUnsavedChanges || localChanges.rangeChanges.length > 0 || localChanges.priceChanges.length > 0 || localChanges.variantChanges.length > 0) && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-orange-600 font-medium">
+            <div className="service-variants-actions">
+              <span className="service-variants-changes">
                 Есть несохраненные изменения ({localChanges.variantChanges.length} вариантов, {localChanges.rangeChanges.length} диапазонов, {localChanges.priceChanges.length} цен)
               </span>
               <Button
@@ -278,40 +291,42 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
             </div>
           )}
         </div>
-        <Button variant="primary" size="sm" onClick={async () => {
-          await handleCreateVariant();
-        }}>
-          + Добавить тип
-        </Button>
+        <div className="service-variants-toolbar__right">
+          <button
+            type="button"
+            className="el-button el-button--info el-button--mini is-plain"
+            onClick={(e) => {
+              tierModal.openAddModal(e.currentTarget);
+            }}
+          >
+            <i className="el-icon-plus"></i>
+            <span>Диапазон</span>
+          </button>
+        </div>
       </div>
 
       {variants.length === 0 ? (
-        <div className="p-8 text-center text-gray-500 border border-dashed rounded">
+        <div className="service-variants-empty">
           <p>Нет вариантов. Нажмите "Добавить тип" для создания первого варианта.</p>
         </div>
       ) : (
         <div className="table-container">
-          <div className="el-table el-table--fit el-table--border el-table--enable-row-hover el-table--enable-row-transition el-table--small">
+          <div className="el-table el-table--fit el-table--border el-table--enable-row-hover el-table--enable-row-transition el-table--small service-variants-grid">
             <div className="el-table__header-wrapper">
               <table cellSpacing="0" cellPadding="0" border={0} className="el-table__header" style={{ width: '100%' }}>
+                <colgroup>
+                  <col className="variant-name-col" />
+                  {commonRangesAsPriceRanges.map((range) => (
+                    <col key={`range-${range.minQty}`} className="range-col" />
+                  ))}
+                  <col className="actions-col" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th className="variant-name-cell" style={{ width: '200px', minWidth: '200px', maxWidth: '200px', padding: 0 }}>
                       <div className="cell">
                         <div className="variant-name-header">
                           <div className="variant-name-header__title" title={serviceName}>{serviceName}</div>
-                          <div className="active-panel variant-name-header__actions">
-                            <button
-                              type="button"
-                              className="el-button el-button--success el-button--small"
-                              onClick={async () => {
-                                await handleCreateVariant();
-                              }}
-                              title="Добавить тип"
-                            >
-                              <span style={{ fontSize: '14px' }}>↓</span>
-                            </button>
-                          </div>
                         </div>
                       </div>
                     </th>
@@ -325,48 +340,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                           localChanges.removeRange(rangeIndex);
                         }
                       }}
-                      onAddRange={() => {
-                        tierModal.openAddModal(tierModal.addRangeButtonRef.current || undefined);
-                      }}
-                      onApplyAllPrices={(price) => {
-                        const sampleVariantId = variants[0]?.id;
-                        if (!sampleVariantId) return;
-                        commonRangesAsPriceRanges.forEach((range) => {
-                          localChanges.changePrice(sampleVariantId, range.minQty, price);
-                        });
-                      }}
-                      onCopyFirstRange={() => {
-                        const sampleVariant = variants[0];
-                        const firstRangeMinQty = commonRangesAsPriceRanges[0]?.minQty;
-                        if (!sampleVariant || firstRangeMinQty === undefined) return;
-                        const firstRangePrice = sampleVariant.tiers.find(
-                          (tier) => tier.minQuantity === firstRangeMinQty
-                        )?.rate ?? 0;
-                        commonRangesAsPriceRanges.forEach((range) => {
-                          localChanges.changePrice(sampleVariant.id, range.minQty, firstRangePrice);
-                        });
-                      }}
-                      onCopySelectedRange={() => {
-                        const sampleVariant = variants[0];
-                        if (!sampleVariant) return;
-                        const selectedIndex = hoveredRangeIndex ?? 0;
-                        const selectedRangeMinQty = commonRangesAsPriceRanges[selectedIndex]?.minQty;
-                        if (selectedRangeMinQty === undefined) return;
-                        const selectedRangePrice = sampleVariant.tiers.find(
-                          (tier) => tier.minQuantity === selectedRangeMinQty
-                        )?.rate ?? 0;
-                        commonRangesAsPriceRanges.forEach((range) => {
-                          localChanges.changePrice(sampleVariant.id, range.minQty, selectedRangePrice);
-                        });
-                      }}
                       hoveredRangeIndex={hoveredRangeIndex}
                       onRangeHover={setHoveredRangeIndex}
-                      addRangeButtonRef={tierModal.addRangeButtonRef}
                     />
                     <th style={{ width: '120px', minWidth: '120px', maxWidth: '120px', padding: 0 }}>
                       <div className="cell">
-                        <div className="active-panel" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                          <span style={{ fontSize: '12px', color: '#909399' }}>Действия</span>
+                        <div className="active-panel variant-actions-header">
+                          <span className="variant-actions-label">Действия</span>
                         </div>
                       </div>
                     </th>
@@ -376,6 +356,13 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
             </div>
             <div className="el-table__body-wrapper is-scrolling-none">
               <table cellSpacing="0" cellPadding="0" border={0} className="el-table__body" style={{ width: '100%' }}>
+                <colgroup>
+                  <col className="variant-name-col" />
+                  {commonRangesAsPriceRanges.map((range) => (
+                    <col key={`body-range-${range.minQty}`} className="range-col" />
+                  ))}
+                  <col className="actions-col" />
+                </colgroup>
                 <tbody>
                   {typeNames.map((typeName) => {
                     const typeGroup = groupedVariants[typeName];
@@ -437,40 +424,6 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                     />
                                   )}
                                 </div>
-                                <div className="active-panel">
-                                  <button
-                                    type="button"
-                                    className="el-button el-button--success el-button--small is-plain"
-                                    onClick={async () => {
-                                      try {
-                                        // 🆕 Для вариантов уровня 1 сохраняем только type, без плотности (density)
-                                        const newVariant = localChanges.createVariant(typeName, { type: 'Новый тип' });
-                                        editing.startEditingParams(newVariant.id, { type: 'Новый тип' });
-                                      } catch (err) {
-                                        console.error('Ошибка создания дочерней строки:', err);
-                                        // Ошибка уже обработана в хуке и отображена через setError
-                                      }
-                                    }}
-                                    title="Добавить дочернюю строку"
-                                  >
-                                    <span style={{ fontSize: '14px' }}>↘</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="el-button el-button--danger el-button--small"
-                                  onClick={async () => {
-                                    if (!confirm(`Удалить тип "${typeName}" и все его варианты?`)) {
-                                      return;
-                                    }
-                                    for (const variant of allTypeVariants) {
-                                      localChanges.deleteVariant(variant.id);
-                                    }
-                                  }}
-                                    title="Удалить тип"
-                                  >
-                                    <span style={{ fontSize: '14px' }}>×</span>
-                                  </button>
-                                </div>
                               </div>
                             </div>
                           </td>
@@ -485,10 +438,27 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                               <div className="active-panel" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                 <button
                                   type="button"
+                                  className="el-button el-button--success el-button--small is-plain"
+                                  onClick={async () => {
+                                    try {
+                                      // 🆕 Для вариантов уровня 1 сохраняем только type, без плотности (density)
+                                      const newVariant = localChanges.createVariant(typeName, { type: 'Новый тип' });
+                                      editing.startEditingParams(newVariant.id, { type: 'Новый тип' });
+                                    } catch (err) {
+                                      console.error('Ошибка создания дочерней строки:', err);
+                                      // Ошибка уже обработана в хуке и отображена через setError
+                                    }
+                                  }}
+                                  title="Добавить дочернюю строку"
+                                >
+                                  <span style={{ fontSize: '14px' }}>↘</span>
+                                </button>
+                                <button
+                                  type="button"
                                   className="el-button el-button--success el-button--small"
                                   onClick={async () => {
                                     try {
-                                      const newVariant = localChanges.createVariant('Новый тип', {});
+                                      const newVariant = localChanges.createVariant(getNextTypeName(), {});
                                       editing.startEditingName(newVariant.id, newVariant.variantName);
                                     } catch (err) {
                                       console.error('Ошибка создания варианта на том же уровне:', err);
@@ -498,6 +468,21 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
                                   title="Добавить тип на том же уровне"
                                 >
                                   <span style={{ fontSize: '14px' }}>↓</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="el-button el-button--danger el-button--small is-plain variant-delete-btn"
+                                  onClick={async () => {
+                                    if (!confirm(`Удалить тип "${typeName}" и все его варианты?`)) {
+                                      return;
+                                    }
+                                    for (const variant of allTypeVariants) {
+                                      localChanges.deleteVariant(variant.id);
+                                    }
+                                  }}
+                                  title="Удалить тип"
+                                >
+                                  <span style={{ fontSize: '14px' }}>×</span>
                                 </button>
                               </div>
                             </div>

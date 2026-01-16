@@ -224,6 +224,17 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
     return limits;
   }, [backendProductSchema?.operations]);
 
+  const clampOperationQuantity = useCallback((operationId: number, quantity: number) => {
+    const limits = operationLimits.get(operationId);
+    const minQty = limits?.min ?? 1;
+    const maxQty = limits?.max;
+    let next = Math.max(minQty, quantity);
+    if (maxQty !== undefined) {
+      next = Math.min(maxQty, next);
+    }
+    return next;
+  }, [operationLimits]);
+
   // Мемоизируем карту выбранных операций для быстрого доступа
   const selectedOperationsMap = useMemo(() => {
     const map = new Map<number, SelectedOperation>();
@@ -259,11 +270,11 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       // Добавляем операцию с дефолтными значениями
       const variants = serviceVariants.get(operationId) || [];
       const hasVariants = variants.length > 0;
-      const minQuantity = Number(operation.min_quantity ?? 1);
+      const minQuantity = Number(operationLimits.get(operationId)?.min ?? operation.min_quantity ?? 1);
       
       let newOp: SelectedOperation = {
         operationId,
-        quantity: 1,
+        quantity: clampOperationQuantity(operationId, 1),
       };
       
       if (hasVariants) {
@@ -312,7 +323,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       }
       updateSpecs(nextUpdates, true);
     }
-  }, [selectedOperations, selectedOperationsMap, operationsWithSubtypes, serviceVariants, updateSpecs, specs.quantity]);
+  }, [selectedOperations, selectedOperationsMap, operationsWithSubtypes, serviceVariants, updateSpecs, specs.quantity, clampOperationQuantity, operationLimits]);
 
   // Обновляем подтип операции (мемоизированная версия)
   const updateOperationSubtype = useCallback((operationId: number, subtype: string) => {
@@ -329,12 +340,12 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   const updateOperationQuantity = useCallback((operationId: number, quantity: number) => {
     const updated = selectedOperations.map((op: SelectedOperation) => {
       if (op.operationId === operationId) {
-        return { ...op, quantity: Math.max(1, quantity) };
+        return { ...op, quantity: clampOperationQuantity(operationId, quantity) };
       }
       return op;
     });
     updateSpecs({ selectedOperations: updated }, true);
-  }, [selectedOperations, updateSpecs]);
+  }, [selectedOperations, updateSpecs, clampOperationQuantity]);
 
   // 🆕 Логирование для отладки
   useEffect(() => {
@@ -370,15 +381,15 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
 
           return (
             <div key={operationId} className="param-group operation-group">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: isSelected ? '12px' : 0 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1 }}>
+              <div className={`operation-header ${isSelected ? 'operation-header--expanded' : ''}`}>
+                <label className="operation-label">
                   <input
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => toggleOperation(operation)}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    className="operation-checkbox"
                   />
-                  <span style={{ fontWeight: 500 }}>{operationName}</span>
+                  <span className="operation-name">{operationName}</span>
                 </label>
                 {limits && (
                   <span className="operation-limits">
@@ -496,10 +507,10 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   });
                   
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginLeft: '26px' }}>
+                    <div className="operation-fields">
                       {/* 🆕 1-й уровень: Селектор типа ламинации */}
                       <div className="param-group">
-                        <label style={{ fontSize: '14px', color: '#666', fontWeight: 500, marginBottom: '6px', display: 'block' }}>
+                        <label className="operation-field-label">
                           1. Тип ламинации:
                         </label>
                         <select
@@ -534,14 +545,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                               }),
                             }, true);
                           }}
-                          className="form-control"
-                          style={{ 
-                            fontSize: '14px',
-                            padding: '8px 12px',
-                            border: '1px solid #dcdfe6',
-                            borderRadius: '4px',
-                            width: '100%'
-                          }}
+                          className="form-control operation-select"
                         >
                           {uniqueTypes.map((variant) => {
                             const label = hasTypeHierarchy
@@ -559,7 +563,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       {/* 🆕 2-й уровень: Селектор плотности */}
                       {uniqueSubtypes.length > 0 ? (
                         <div className="param-group">
-                          <label style={{ fontSize: '14px', color: '#666', fontWeight: 500, marginBottom: '6px', display: 'block' }}>
+                          <label className="operation-field-label">
                             2. Плотность:
                           </label>
                           <select
@@ -581,14 +585,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                                 }),
                               }, true);
                             }}
-                            className="form-control"
-                            style={{ 
-                              fontSize: '14px',
-                              padding: '8px 12px',
-                              border: '1px solid #dcdfe6',
-                              borderRadius: '4px',
-                              width: '100%'
-                            }}
+                            className="form-control operation-select"
                           >
                             {uniqueSubtypes.map((st) => (
                               <option key={st.value} value={st.value}>
@@ -598,44 +595,21 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                           </select>
                         </div>
                       ) : (
-                        <div style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>
+                        <div className="operation-empty-note">
                           Подтипы не найдены для выбранного типа
                         </div>
                       )}
 
                       {/* Поле количества */}
                       <div className="param-group">
-                        <label style={{ fontSize: '14px', color: '#666' }}>Количество:</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <label className="operation-field-label">Количество:</label>
+                    <div className="quantity-controls">
                       <button
                         type="button"
                         className="quantity-btn quantity-btn-minus"
                         onClick={() => {
                           const currentQty = selectedData?.quantity || 1;
                           updateOperationQuantity(operationId, currentQty - 1);
-                        }}
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          border: '1px solid #dcdfe6',
-                          background: '#f5f7fa',
-                          color: '#606266',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '18px',
-                          fontWeight: '500',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#e4e7ed';
-                          e.currentTarget.style.borderColor = '#c0c4cc';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = '#f5f7fa';
-                          e.currentTarget.style.borderColor = '#dcdfe6';
                         }}
                       >
                         −
@@ -647,15 +621,9 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                           const value = parseInt(e.target.value) || 1;
                           updateOperationQuantity(operationId, value);
                         }}
-                        min={1}
+                        min={limits?.min ?? 1}
+                        max={limits?.max}
                         className="quantity-input"
-                        style={{
-                          flex: 1,
-                          padding: '6px 12px',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          fontSize: '14px',
-                        }}
                       />
                       <button
                         type="button"
@@ -663,29 +631,6 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         onClick={() => {
                           const currentQty = selectedData?.quantity || 1;
                           updateOperationQuantity(operationId, currentQty + 1);
-                        }}
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          border: '1px solid #dcdfe6',
-                          background: '#f5f7fa',
-                          color: '#606266',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '18px',
-                          fontWeight: '500',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#e4e7ed';
-                          e.currentTarget.style.borderColor = '#c0c4cc';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = '#f5f7fa';
-                          e.currentTarget.style.borderColor = '#dcdfe6';
                         }}
                       >
                         +
@@ -698,16 +643,15 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                 
                 // Если нет вариантов, используем старую логику с подтипами из parameters
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginLeft: '26px' }}>
+                  <div className="operation-fields">
                     {/* Селектор подтипов (если есть) */}
                     {subtypes.length > 0 && (
                       <div className="param-group">
-                        <label style={{ fontSize: '14px', color: '#666' }}>Тип операции:</label>
+                        <label className="operation-field-label">Тип операции:</label>
                         <select
                           value={selectedData?.subtype || subtypes[0].value}
                           onChange={(e) => updateOperationSubtype(operationId, e.target.value)}
-                          className="form-control"
-                          style={{ fontSize: '14px' }}
+                          className="form-control operation-select"
                         >
                           {subtypes.map((st: { value: string; label: string }) => (
                             <option key={st.value} value={st.value}>
@@ -720,37 +664,14 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
 
                     {/* Поле количества */}
                     <div className="param-group">
-                      <label style={{ fontSize: '14px', color: '#666' }}>Количество:</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <label className="operation-field-label">Количество:</label>
+                      <div className="quantity-controls">
                         <button
                           type="button"
                           className="quantity-btn quantity-btn-minus"
                           onClick={() => {
                             const currentQty = selectedData?.quantity || 1;
                             updateOperationQuantity(operationId, currentQty - 1);
-                          }}
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            border: '1px solid #dcdfe6',
-                            background: '#f5f7fa',
-                            color: '#606266',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '18px',
-                            fontWeight: '500',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#e4e7ed';
-                            e.currentTarget.style.borderColor = '#c0c4cc';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#f5f7fa';
-                            e.currentTarget.style.borderColor = '#dcdfe6';
                           }}
                         >
                           −
@@ -762,15 +683,9 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                             const value = parseInt(e.target.value) || 1;
                             updateOperationQuantity(operationId, value);
                           }}
-                          min={1}
+                          min={limits?.min ?? 1}
+                          max={limits?.max}
                           className="quantity-input"
-                          style={{
-                            flex: 1,
-                            padding: '6px 12px',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            fontSize: '14px',
-                          }}
                         />
                         <button
                           type="button"
@@ -778,29 +693,6 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                           onClick={() => {
                             const currentQty = selectedData?.quantity || 1;
                             updateOperationQuantity(operationId, currentQty + 1);
-                          }}
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            border: '1px solid #dcdfe6',
-                            background: '#f5f7fa',
-                            color: '#606266',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '18px',
-                            fontWeight: '500',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#e4e7ed';
-                            e.currentTarget.style.borderColor = '#c0c4cc';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#f5f7fa';
-                            e.currentTarget.style.borderColor = '#dcdfe6';
                           }}
                         >
                           +

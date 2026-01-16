@@ -127,7 +127,7 @@ export const saveProductMaterials = (cfg: {
   presetDescription: string;
   materials: { materialId: number; qtyPerItem: number }[];
 }) => api.post('/product-materials', cfg);
-export const getDailyReports = (params?: { user_id?: number | ''; from?: string; to?: string; current_user_id?: number }) =>
+export const getDailyReports = (params?: { user_id?: number | ''; from?: string; to?: string; current_user_id?: number; show_all?: boolean }) =>
   api.get<DailyReport[]>('/daily-reports', { params });
 
 export const getCurrentUser = () => api.get<{ id: number; name: string; role: string }>('/auth/me');

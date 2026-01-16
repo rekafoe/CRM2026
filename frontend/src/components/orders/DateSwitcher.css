@@ -1,0 +1,117 @@
+ .date-switcher-overlay {
+   z-index: 1200;
+ }
+ 
+ .date-switcher-modal {
+   width: min(840px, 92vw);
+ }
+ 
+ .date-switcher-body {
+   padding: 20px 24px;
+ }
+ 
+ .date-switcher-title {
+   margin: 0 0 16px 0;
+   font-size: 16px;
+   font-weight: 600;
+   color: var(--text-primary, #111827);
+ }
+ 
+ .date-switcher-grid {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+   gap: 10px;
+ }
+ 
+ .date-switcher-option {
+   border-radius: 10px;
+   padding: 10px 12px;
+   text-align: left;
+   border: 1px solid var(--border-color, #e5e7eb);
+   background: var(--bg-secondary, #f8f9fa);
+   transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+   cursor: pointer;
+ }
+ 
+ .date-switcher-option--active {
+   background: rgba(var(--primary-rgb), 0.12);
+   border-color: rgba(var(--primary-rgb), 0.4);
+   color: var(--primary, #2563eb);
+ }
+ 
+ .date-switcher-option--inactive:hover {
+   background: var(--bg-primary, #ffffff);
+   border-color: rgba(var(--primary-rgb), 0.35);
+ }
+ 
+ .date-switcher-option__title {
+   font-weight: 600;
+   color: inherit;
+ }
+ 
+ .date-switcher-option__meta {
+   margin-top: 4px;
+   font-size: 12px;
+   color: var(--text-muted, #6b7280);
+ }
+ 
+ .date-switcher-empty {
+   grid-column: 1 / -1;
+   text-align: center;
+   padding: 24px 16px;
+   border-radius: 10px;
+   border: 1px dashed var(--border-color, #e5e7eb);
+   color: var(--text-muted, #6b7280);
+ }
+ 
+ .date-switcher-empty__title {
+   font-size: 14px;
+   font-weight: 600;
+ }
+ 
+ .date-switcher-empty__subtitle {
+   margin-top: 6px;
+   font-size: 12px;
+ }
+ 
+ .date-switcher-footer {
+   margin-top: 16px;
+   padding-top: 12px;
+   border-top: 1px solid var(--border-color, #e5e7eb);
+   display: flex;
+   justify-content: flex-end;
+ }
+ 
+ .date-switcher-cancel {
+   padding: 8px 14px;
+   border-radius: 8px;
+   border: 1px solid var(--border-color, #e5e7eb);
+   background: var(--bg-secondary, #f8f9fa);
+   color: var(--text-secondary, #6b7280);
+   cursor: pointer;
+ }
+ 
+ .date-switcher-cancel:hover {
+   background: var(--bg-primary, #ffffff);
+   border-color: rgba(var(--primary-rgb), 0.35);
+   color: var(--text-primary, #111827);
+ }
+ 
+ .date-switcher-loading {
+   padding: 32px 0;
+   text-align: center;
+ }
+ 
+ .date-switcher-loading-text {
+   color: var(--text-muted, #6b7280);
+ }
+ 
+ @media (max-width: 640px) {
+   .date-switcher-body {
+     padding: 16px;
+   }
+ 
+   .date-switcher-grid {
+     grid-template-columns: 1fr;
+   }
+ }

@@ -66,21 +66,21 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       
       const response = await generateOrderBlankPdf(selectedOrder.id, companyPhones);
       
-      // Создаем blob и скачиваем файл
+      // Создаем blob и открываем в новой вкладке
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `order-blank-${selectedOrder.number || selectedOrder.id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      const opened = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        throw new Error('Браузер заблокировал открытие новой вкладки');
+      }
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 30000);
       
       addToast({ 
         type: 'success', 
         title: 'Успешно', 
-        message: 'PDF бланк заказа успешно создан' 
+        message: 'Бланк заказа открыт в новой вкладке' 
       });
     } catch (error: any) {
       console.error('Ошибка генерации PDF бланка:', error);

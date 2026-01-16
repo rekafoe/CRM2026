@@ -10,15 +10,21 @@ const router = Router()
 // GET /api/daily-reports — список отчётов
 router.get('/', asyncHandler(async (req, res) => {
   const authUser = (req as AuthenticatedRequest).user as { id: number; role: string } | undefined
-  const { user_id, from, to, current_user_id } = req.query as any
+  const { user_id, from, to, current_user_id, show_all, scope } = req.query as any
   const params: any[] = []
   const where: string[] = []
+  const isGlobal = scope === 'global'
+  const isShowAll = show_all === '1' || show_all === 'true'
   
   // Если указан конкретный пользователь, показываем только его отчёты (только для админа)
-  if (user_id) {
+  if (isGlobal) {
+    where.push('dr.user_id IS NULL')
+  } else if (user_id) {
     if (!authUser || authUser.role !== 'admin') { res.status(403).json({ message: 'Forbidden' }); return }
     where.push('dr.user_id = ?')
     params.push(Number(user_id))
+  } else if (isShowAll) {
+    if (!authUser || authUser.role !== 'admin') { res.status(403).json({ message: 'Forbidden' }); return }
   } else if (current_user_id) {
     // Если не указан user_id, но есть current_user_id, показываем отчёты текущего пользователя
     where.push('dr.user_id = ?')
@@ -49,24 +55,34 @@ router.get('/', asyncHandler(async (req, res) => {
 router.get('/:date', asyncHandler(async (req, res) => {
   const authUser = (req as AuthenticatedRequest).user as { id: number; role: string } | undefined
   const qUserIdRaw = (req.query as any)?.user_id
+  const isGlobal = (req.query as any)?.scope === 'global'
   const targetUserId = qUserIdRaw != null && qUserIdRaw !== '' ? Number(qUserIdRaw) : authUser?.id
-  if (!targetUserId) { res.status(400).json({ message: 'Не указан пользователь' }); return }
+  if (!isGlobal && !targetUserId) { res.status(400).json({ message: 'Не указан пользователь' }); return }
 
   // Access control: only admin can read others' reports
-  if (qUserIdRaw != null && targetUserId !== authUser?.id && authUser?.role !== 'admin') {
+  if (!isGlobal && qUserIdRaw != null && targetUserId !== authUser?.id && authUser?.role !== 'admin') {
     res.status(403).json({ message: 'Forbidden' }); return
   }
 
   const db = await getDb()
-  const row = await db.get<any>(
-    `SELECT dr.id, dr.report_date, dr.orders_count, dr.total_revenue, dr.created_at, dr.updated_at, dr.user_id, dr.snapshot_json, dr.cash_actual,
-            u.name as user_name
-       FROM daily_reports dr
-       LEFT JOIN users u ON u.id = dr.user_id
-      WHERE dr.report_date = ? AND dr.user_id = ?`,
-    req.params.date,
-    targetUserId
-  )
+  const row = isGlobal
+    ? await db.get<any>(
+        `SELECT dr.id, dr.report_date, dr.orders_count, dr.total_revenue, dr.created_at, dr.updated_at, dr.user_id, dr.snapshot_json, dr.cash_actual,
+                u.name as user_name
+           FROM daily_reports dr
+           LEFT JOIN users u ON u.id = dr.user_id
+          WHERE dr.report_date = ? AND dr.user_id IS NULL`,
+        req.params.date
+      )
+    : await db.get<any>(
+        `SELECT dr.id, dr.report_date, dr.orders_count, dr.total_revenue, dr.created_at, dr.updated_at, dr.user_id, dr.snapshot_json, dr.cash_actual,
+                u.name as user_name
+           FROM daily_reports dr
+           LEFT JOIN users u ON u.id = dr.user_id
+          WHERE dr.report_date = ? AND dr.user_id = ?`,
+        req.params.date,
+        targetUserId
+      )
   if (!row) {
     res.status(404).json({ message: 'Отчёт не найден' })
     return
@@ -97,25 +113,31 @@ router.patch('/:date', asyncHandler(async (req, res) => {
 
   // Determine target row by (date, user)
   const qUserIdRaw = (req.query as any)?.user_id
+  const isGlobal = (req.query as any)?.scope === 'global'
   const targetUserId = qUserIdRaw != null && qUserIdRaw !== '' ? Number(qUserIdRaw) : authUser?.id
-  if (!targetUserId) { res.status(400).json({ message: 'Не указан пользователь' }); return }
-  if (qUserIdRaw != null && targetUserId !== authUser?.id && authUser?.role !== 'admin') {
+  if (!isGlobal && !targetUserId) { res.status(400).json({ message: 'Не указан пользователь' }); return }
+  if (!isGlobal && qUserIdRaw != null && targetUserId !== authUser?.id && authUser?.role !== 'admin') {
     res.status(403).json({ message: 'Forbidden' }); return
   }
 
   const db = await getDb()
-  const existing = await db.get<any>(
-    'SELECT id, user_id FROM daily_reports WHERE report_date = ? AND user_id = ?',
-    req.params.date,
-    targetUserId
-  )
+  const existing = isGlobal
+    ? await db.get<any>(
+        'SELECT id, user_id FROM daily_reports WHERE report_date = ? AND user_id IS NULL',
+        req.params.date
+      )
+    : await db.get<any>(
+        'SELECT id, user_id FROM daily_reports WHERE report_date = ? AND user_id = ?',
+        req.params.date,
+        targetUserId
+      )
   if (!existing) {
     res.status(404).json({ message: 'Отчёт не найден' })
     return
   }
 
   // Allow changing owner only for admin
-  const nextUserId = user_id != null && authUser?.role === 'admin' ? user_id : targetUserId
+  const nextUserId = !isGlobal && user_id != null && authUser?.role === 'admin' ? user_id : targetUserId
 
   try {
     // Строим SET часть запроса
@@ -146,26 +168,43 @@ router.patch('/:date', asyncHandler(async (req, res) => {
     
     const setClause = setParts.join(', ')
     
-    await db.run(
-      `UPDATE daily_reports SET ${setClause} WHERE report_date = ? AND user_id = ?`,
-      ...values,
-      req.params.date,
-      targetUserId
-    )
+    if (isGlobal) {
+      await db.run(
+        `UPDATE daily_reports SET ${setClause} WHERE report_date = ? AND user_id IS NULL`,
+        ...values,
+        req.params.date
+      )
+    } else {
+      await db.run(
+        `UPDATE daily_reports SET ${setClause} WHERE report_date = ? AND user_id = ?`,
+        ...values,
+        req.params.date,
+        targetUserId
+      )
+    }
   } catch (e: any) {
     if (String(e?.message || '').includes('UNIQUE')) { res.status(409).json({ message: 'Отчёт для этого пользователя и даты уже существует' }); return }
     throw e
   }
 
-  const updated = await db.get<any>(
-    `SELECT dr.id, dr.report_date, dr.orders_count, dr.total_revenue, dr.created_at, dr.updated_at, dr.user_id, dr.snapshot_json, dr.cash_actual,
-            u.name as user_name
-       FROM daily_reports dr
-       LEFT JOIN users u ON u.id = dr.user_id
-      WHERE dr.report_date = ? AND dr.user_id = ?`,
-    req.params.date,
-    nextUserId
-  )
+  const updated = isGlobal
+    ? await db.get<any>(
+        `SELECT dr.id, dr.report_date, dr.orders_count, dr.total_revenue, dr.created_at, dr.updated_at, dr.user_id, dr.snapshot_json, dr.cash_actual,
+                u.name as user_name
+           FROM daily_reports dr
+           LEFT JOIN users u ON u.id = dr.user_id
+          WHERE dr.report_date = ? AND dr.user_id IS NULL`,
+        req.params.date
+      )
+    : await db.get<any>(
+        `SELECT dr.id, dr.report_date, dr.orders_count, dr.total_revenue, dr.created_at, dr.updated_at, dr.user_id, dr.snapshot_json, dr.cash_actual,
+                u.name as user_name
+           FROM daily_reports dr
+           LEFT JOIN users u ON u.id = dr.user_id
+          WHERE dr.report_date = ? AND dr.user_id = ?`,
+        req.params.date,
+        nextUserId
+      )
   res.json(updated)
 }))
 
@@ -173,38 +212,56 @@ router.patch('/:date', asyncHandler(async (req, res) => {
 router.get('/full/:date', asyncHandler(async (req, res) => {
   const authUser = (req as AuthenticatedRequest).user as { id: number; role: string } | undefined
   const qUserIdRaw = (req.query as any)?.user_id
+  const isGlobal = (req.query as any)?.scope === 'global'
   const targetUserId = qUserIdRaw != null && qUserIdRaw !== '' ? Number(qUserIdRaw) : authUser?.id
-  if (!targetUserId) { res.status(400).json({ message: 'Не указан пользователь' }); return }
+  if (!isGlobal && !targetUserId) { res.status(400).json({ message: 'Не указан пользователь' }); return }
 
   // Access control: only admin can read others' reports
-  if (qUserIdRaw != null && targetUserId !== authUser?.id && authUser?.role !== 'admin') {
+  if (!isGlobal && qUserIdRaw != null && targetUserId !== authUser?.id && authUser?.role !== 'admin') {
     res.status(403).json({ message: 'Forbidden' }); return
   }
 
   const db = await getDb()
-  const row = await db.get<any>(
-    `SELECT dr.id, dr.report_date, dr.orders_count, dr.total_revenue, dr.created_at, dr.updated_at, dr.user_id, dr.snapshot_json, dr.cash_actual,
-            u.name as user_name
-       FROM daily_reports dr
-       LEFT JOIN users u ON u.id = dr.user_id
-      WHERE dr.report_date = ? AND dr.user_id = ?`,
-    req.params.date,
-    targetUserId
-  )
+  const row = isGlobal
+    ? await db.get<any>(
+        `SELECT dr.id, dr.report_date, dr.orders_count, dr.total_revenue, dr.created_at, dr.updated_at, dr.user_id, dr.snapshot_json, dr.cash_actual,
+                u.name as user_name
+           FROM daily_reports dr
+           LEFT JOIN users u ON u.id = dr.user_id
+          WHERE dr.report_date = ? AND dr.user_id IS NULL`,
+        req.params.date
+      )
+    : await db.get<any>(
+        `SELECT dr.id, dr.report_date, dr.orders_count, dr.total_revenue, dr.created_at, dr.updated_at, dr.user_id, dr.snapshot_json, dr.cash_actual,
+                u.name as user_name
+           FROM daily_reports dr
+           LEFT JOIN users u ON u.id = dr.user_id
+          WHERE dr.report_date = ? AND dr.user_id = ?`,
+        req.params.date,
+        targetUserId
+      )
   if (!row) {
     res.status(404).json({ message: 'Отчёт не найден' })
     return
   }
 
   // Get orders for this date and user
-  const orders = await db.all<any>(
-    `SELECT o.id, o.number, o.status, o.createdAt, o.customerName, o.customerPhone, o.customerEmail, o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId
-     FROM orders o
-     WHERE DATE(o.createdAt) = ? AND o.userId = ?
-     ORDER BY o.id DESC`,
-    req.params.date,
-    targetUserId
-  )
+  const orders = isGlobal
+    ? await db.all<any>(
+        `SELECT o.id, o.number, o.status, o.createdAt, o.customerName, o.customerPhone, o.customerEmail, o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId
+         FROM orders o
+         WHERE DATE(o.createdAt) = ?
+         ORDER BY o.id DESC`,
+        req.params.date
+      )
+    : await db.all<any>(
+        `SELECT o.id, o.number, o.status, o.createdAt, o.customerName, o.customerPhone, o.customerEmail, o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId
+         FROM orders o
+         WHERE DATE(o.createdAt) = ? AND o.userId = ?
+         ORDER BY o.id DESC`,
+        req.params.date,
+        targetUserId
+      )
 
   // Get items for each order
   for (const order of orders) {
@@ -230,13 +287,14 @@ router.post('/full', asyncHandler(async (req, res) => {
     cash_actual?: number
     orders?: any[]
   }
+  const isGlobal = (req.query as any)?.scope === 'global'
   
   if (!report_date) { res.status(400).json({ message: 'Нужна дата YYYY-MM-DD' }); return }
   
   const targetUserId = user_id != null ? Number(user_id) : authUser?.id
-  if (!targetUserId) { res.status(400).json({ message: 'Не указан пользователь' }); return }
+  if (!isGlobal && !targetUserId) { res.status(400).json({ message: 'Не указан пользователь' }); return }
   
-  if (targetUserId !== authUser?.id && authUser?.role !== 'admin') {
+  if (!isGlobal && targetUserId !== authUser?.id && authUser?.role !== 'admin') {
     res.status(403).json({ message: 'Forbidden' }); return
   }
 
@@ -244,17 +302,46 @@ router.post('/full', asyncHandler(async (req, res) => {
   try {
     await db.run('BEGIN')
     
-    // Update or create daily report
-    await db.run(
-      `INSERT OR REPLACE INTO daily_reports (report_date, orders_count, total_revenue, user_id, cash_actual, snapshot_json)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      report_date,
-      orders_count || 0,
-      total_revenue || 0,
-      targetUserId,
-      cash_actual != null ? Number(cash_actual) : null,
-      orders ? JSON.stringify(orders) : null
-    )
+    if (isGlobal) {
+      const existing = await db.get<any>(
+        'SELECT id FROM daily_reports WHERE report_date = ? AND user_id IS NULL',
+        report_date
+      )
+      if (existing) {
+        await db.run(
+          `UPDATE daily_reports
+             SET orders_count = ?, total_revenue = ?, cash_actual = ?, snapshot_json = ?, updated_at = datetime('now')
+           WHERE report_date = ? AND user_id IS NULL`,
+          orders_count || 0,
+          total_revenue || 0,
+          cash_actual != null ? Number(cash_actual) : null,
+          orders ? JSON.stringify(orders) : null,
+          report_date
+        )
+      } else {
+        await db.run(
+          `INSERT INTO daily_reports (report_date, orders_count, total_revenue, user_id, cash_actual, snapshot_json)
+           VALUES (?, ?, ?, NULL, ?, ?)`,
+          report_date,
+          orders_count || 0,
+          total_revenue || 0,
+          cash_actual != null ? Number(cash_actual) : null,
+          orders ? JSON.stringify(orders) : null
+        )
+      }
+    } else {
+      // Update or create daily report
+      await db.run(
+        `INSERT OR REPLACE INTO daily_reports (report_date, orders_count, total_revenue, user_id, cash_actual, snapshot_json)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        report_date,
+        orders_count || 0,
+        total_revenue || 0,
+        targetUserId,
+        cash_actual != null ? Number(cash_actual) : null,
+        orders ? JSON.stringify(orders) : null
+      )
+    }
     
     await db.run('COMMIT')
     

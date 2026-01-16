@@ -324,8 +324,8 @@ export class PDFReportService {
           left: '15mm'
         },
         displayHeaderFooter: hasCustomHeaderFooter || true,
-        headerTemplate: options?.headerTemplate || defaultHeaderTemplate,
-        footerTemplate: options?.footerTemplate || defaultFooterTemplate
+        headerTemplate: options?.headerTemplate ?? defaultHeaderTemplate,
+        footerTemplate: options?.footerTemplate ?? defaultFooterTemplate
       });
 
       console.log('✅ PDF generated successfully');
@@ -357,16 +357,18 @@ export class PDFReportService {
       // Получаем заказ
       const order: any = await db.get(`
         SELECT 
-          id, 
-          number, 
-          status, 
-          created_at, 
-          customerName, 
-          customerPhone, 
-          customerEmail,
-          prepaymentAmount
+          orders.id, 
+          orders.number, 
+          orders.status, 
+          orders.created_at, 
+          orders.customerName, 
+          orders.customerPhone, 
+          orders.customerEmail,
+          orders.prepaymentAmount,
+          users.name as executedByName
         FROM orders 
-        WHERE id = ?
+        LEFT JOIN users ON users.id = orders.userId
+        WHERE orders.id = ?
       `, [orderId]);
 
       if (!order) {
@@ -456,6 +458,7 @@ export class PDFReportService {
       const debt = Math.max(0, calculatedTotalAmount - prepaymentAmount);
 
       // Генерируем HTML бланка
+      const resolvedExecutedBy = order.executedByName || executedBy || undefined;
       const html = this.generateOrderBlankHTML({
         orderNumber: order.number || `ORD-${order.id}`,
         createdDate,
@@ -573,18 +576,13 @@ export class PDFReportService {
         }),
         totalAmount: calculatedTotalAmount,
         companyPhone: companyPhones[0] || '+375 33 336 56 78',
-        executedBy: executedBy || undefined
+        executedBy: resolvedExecutedBy
       });
 
       // Конвертируем HTML в PDF
-      const companyPhone = companyPhones[0] || '+375 33 336 56 78';
       const pdfBuffer = await this.convertHTMLToPDF(html, {
         headerTemplate: '',
-        footerTemplate: `
-          <div style="font-size: 8px; text-align: center; width: 100%; color: #666; padding-top: 5px;">
-            ${companyPhone}
-          </div>
-        `
+        footerTemplate: ''
       });
       
       return pdfBuffer;
@@ -623,6 +621,33 @@ export class PDFReportService {
   }): string {
     const { orderNumber, createdDate, readyDate, customerName, customerPhone, cost, prepaymentAmount, debt, items, totalAmount, companyPhone: companyPhoneValue, executedBy } = data;
     const companyPhone = companyPhoneValue;
+    const logoSvg = `
+      <svg class="logo-svg" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 8000 3000" width="150" height="56">
+        <defs>
+          <style type="text/css">
+            <![CDATA[
+              .fil0 {fill:black}
+              .fnt2 {font-weight:900;font-size:481.04px;font-family:'Arial Black'}
+              .fnt0 {font-weight:900;font-size:1272.95px;font-family:'Arial Black'}
+              .fnt1 {font-weight:normal;font-size:1293.98px;font-family:'Caviar Dreams'}
+            ]]>
+          </style>
+        </defs>
+        <g id="Слой_x0020_1">
+          <metadata id="CorelCorpID_0Corel-Layer"/>
+          <g id="_1950664136784">
+            <g>
+              <g transform="matrix(0.852151 0 0 1 -3093.37 73.6627)">
+                <text x="4000" y="1500"  class="fil0 fnt0">PRiN</text>
+                <text x="7393.68" y="1500"  class="fil0 fnt0">Т</text>
+              </g>
+              <text x="4105.84" y="1624.65"  class="fil0 fnt1">CORE</text>
+            </g>
+            <text x="1389.95" y="2339.92"  class="fil0 fnt2">ПЕЧАТНЫЙ ЦЕНТР</text>
+          </g>
+        </g>
+      </svg>
+    `;
 
     const html = `
 <!DOCTYPE html>
@@ -660,13 +685,16 @@ export class PDFReportService {
         .tear-off-logo {
             width: 150px;
             height: 50px;
-            background: #000;
-            color: white;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
             font-size: 14px;
+        }
+        .logo-svg {
+            display: block;
+            width: 150px;
+            height: auto;
         }
         .tear-off-contact {
             flex: 1;
@@ -782,12 +810,6 @@ export class PDFReportService {
         }
         .company-info-left {
             flex: 1;
-        }
-        .company-name {
-            font-size: 16px;
-            font-weight: bold;
-            color: #000;
-            margin-bottom: 4px;
         }
         .company-details {
             font-size: 9px;
@@ -920,7 +942,7 @@ export class PDFReportService {
     <div class="tear-off-section">
         <div class="tear-off-header">
             <div style="display: flex; flex: 1;">
-                <div class="tear-off-logo">ЛОГО</div>
+                <div class="tear-off-logo">${logoSvg}</div>
                 <div class="tear-off-contact">
                     <strong>Контактная информация:</strong>
                     Телефон: ${companyPhone}<br>
@@ -957,12 +979,12 @@ export class PDFReportService {
         
         <div class="tear-off-dates">
             <div class="tear-off-date-item">
-                <div class="tear-off-date-label">Готовность:</div>
-                <div class="tear-off-date-value">${readyDate}</div>
-            </div>
-            <div class="tear-off-date-item">
                 <div class="tear-off-date-label">Заказ поступил:</div>
                 <div class="tear-off-date-value">${createdDate}</div>
+            </div>
+            <div class="tear-off-date-item">
+                <div class="tear-off-date-label">Готовность:</div>
+                <div class="tear-off-date-value">${readyDate}</div>
             </div>
             ${customerName ? `
             <div class="tear-off-date-item">
@@ -1014,13 +1036,7 @@ export class PDFReportService {
     <div class="main-section">
         <div class="company-header">
             <div class="company-info-left">
-                <div class="company-name">ПЕЧАТНЫЙ ЦЕНТР</div>
-                <div class="company-details">
-                    Телефон: ${companyPhone}<br>
-                    Адрес: г. Минск, пр-т Дзержинского, 3Б<br>
-                    (ст. метро Юбилейная Площадь, ст. м Грушевка)<br>
-                    График работы: пн-пт: 9:00 - 20:00, сб-вс: 10:00-19:00
-                </div>
+                <div class="company-name">${logoSvg}</div>
             </div>
             <div class="order-summary-right">
                 <div class="order-summary-item">
@@ -1050,12 +1066,12 @@ export class PDFReportService {
 
             <div class="order-header">
                 <div class="order-header-item">
-                    <div class="order-header-label">Готово к:</div>
-                    <div class="order-header-value">${readyDate}</div>
-                </div>
-                <div class="order-header-item">
                     <div class="order-header-label">Заказ принят:</div>
                     <div class="order-header-value">${createdDate}</div>
+                </div>
+                <div class="order-header-item">
+                    <div class="order-header-label">Готово к:</div>
+                    <div class="order-header-value">${readyDate}</div>
                 </div>
                 <div class="order-header-item">
                     <div class="order-header-label">Заказ №:</div>

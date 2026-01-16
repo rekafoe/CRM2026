@@ -46,7 +46,11 @@ const serviceToFormState = (service: PricingService): ServiceFormState => ({
   maxQuantity: service.maxQuantity !== undefined ? String(service.maxQuantity) : '',
 });
 
-const ServicesManagement: React.FC = () => {
+interface ServicesManagementProps {
+  showHeader?: boolean;
+}
+
+const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = true }) => {
   // Управление состоянием
   const {
     state,
@@ -223,7 +227,7 @@ const ServicesManagement: React.FC = () => {
 
   // Рендеринг действий для строки услуги
   const renderActions = useCallback((service: PricingService) => (
-    <div className="flex gap-2 justify-end">
+    <div className="services-table__actions">
       <Button variant="info" size="sm" onClick={() => openEditService(service)}>
         ✏️ Редактировать
       </Button>
@@ -269,14 +273,15 @@ const ServicesManagement: React.FC = () => {
 
   return (
     <div className="services-management">
-      {/* Заголовок страницы */}
-      <div className="services-header">
-        <div className="services-header__title-row">
-          <span className="services-header__icon">💰</span>
-          <h1 className="services-header__title">Управление услугами</h1>
+      {showHeader && (
+        <div className="services-header">
+          <div className="services-header__title-row">
+            <span className="services-header__icon">💰</span>
+            <h1 className="services-header__title">Управление услугами</h1>
+          </div>
+          <p className="services-header__subtitle">Создание услуг и установка базовой стоимости</p>
         </div>
-        <p className="services-header__subtitle">Создание услуг и установка базовой стоимости</p>
-      </div>
+      )}
 
       {/* Статистика */}
       <ServicesStats services={services} />

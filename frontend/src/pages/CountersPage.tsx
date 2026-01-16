@@ -48,6 +48,7 @@ export const CountersPage: React.FC = () => {
   const [newCounterValue, setNewCounterValue] = useState<string>('');
   const [cashActualValue, setCashActualValue] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [printerExpectedClicks, setPrinterExpectedClicks] = useState<Record<number, number>>({});
 
   useEffect(() => {
     loadUser();
@@ -105,7 +106,7 @@ export const CountersPage: React.FC = () => {
     
     try {
       // Получаем фактическую сумму из daily_reports
-      const reportResponse = await api.get(`/daily-reports/${selectedDate}?user_id=${user.id}`);
+      const reportResponse = await api.get(`/daily-reports/${selectedDate}?scope=global`);
       const actualCash = reportResponse.data?.cash_actual || null;
       setCashActualValue(actualCash ? actualCash.toString() : '');
 
@@ -113,11 +114,27 @@ export const CountersPage: React.FC = () => {
       const ordersResponse = await api.get('/orders');
       const ordersForDate = ordersResponse.data.filter((order: any) => {
         const orderDate = new Date(order.created_at).toISOString().split('T')[0];
-        return orderDate === selectedDate && (order.userId === user.id || order.userId === null);
+        return orderDate === selectedDate;
       });
       const calculatedCash = ordersForDate.reduce((sum: number, order: any) => {
-        return sum + (order.prepaymentAmount || 0);
+        const prepayment = Number(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
+        return prepayment > 0 ? sum + prepayment : sum;
       }, 0);
+
+      const expectedClicks: Record<number, number> = {};
+      ordersForDate.forEach((order: any) => {
+        const items = Array.isArray(order.items) ? order.items : [];
+        items.forEach((item: any) => {
+          const printerId = Number(item.printerId || item.printer_id);
+          if (!printerId) return;
+          const sheets = Number(item.sheets ?? 0);
+          const sides = Number(item.sides ?? 1);
+          const clicks = Number(item.clicks ?? 0) || (Math.max(0, sheets) * (Math.max(1, sides) * 2));
+          if (!expectedClicks[printerId]) expectedClicks[printerId] = 0;
+          expectedClicks[printerId] += clicks;
+        });
+      });
+      setPrinterExpectedClicks(expectedClicks);
 
       const difference = actualCash !== null ? actualCash - calculatedCash : 0;
 
@@ -164,7 +181,7 @@ export const CountersPage: React.FC = () => {
       // Сначала пытаемся обновить существующий отчет
       try {
         console.log('Updating cash_actual:', { date: selectedDate, userId: user.id, value });
-        await api.patch(`/daily-reports/${selectedDate}?user_id=${user.id}`, {
+        await api.patch(`/daily-reports/${selectedDate}?scope=global`, {
           cash_actual: value
         });
         console.log('Cash updated successfully');
@@ -172,9 +189,8 @@ export const CountersPage: React.FC = () => {
         // Если отчет не найден (404), создаем новый
         if (patchError.response?.status === 404) {
           console.log('Daily report not found, creating new one...');
-          await api.post('/daily-reports/full', {
+          await api.post('/daily-reports/full?scope=global', {
             report_date: selectedDate,
-            user_id: user.id,
             orders_count: 0,
             total_revenue: 0,
             cash_actual: value
@@ -197,6 +213,16 @@ export const CountersPage: React.FC = () => {
     return printerCounters.reduce((sum, printer) => {
       return sum + (printer.difference || 0);
     }, 0);
+  };
+
+  const getExpectedClicksForPrinter = (printerId: number) => {
+    return printerExpectedClicks[printerId] ?? 0;
+  };
+
+  const getPrinterDelta = (printerId: number, actualDelta: number | null | undefined) => {
+    const expected = getExpectedClicksForPrinter(printerId);
+    if (actualDelta === null || actualDelta === undefined) return null;
+    return actualDelta - expected;
   };
 
   const getCashStatus = () => {
@@ -368,7 +394,7 @@ export const CountersPage: React.FC = () => {
         <div className="counters-section">
           <div className="section-header">
             <h2>🖨️ Счётчики принтеров</h2>
-            <p>Общий счетчик A4 листов по принтерам</p>
+            <p>Сверка кликов SRA3: расчетные vs фактические</p>
           </div>
           
           <div className="printers-grid">
@@ -410,6 +436,23 @@ export const CountersPage: React.FC = () => {
                     <span className={`value-difference ${printer.difference != null ? (printer.difference >= 0 ? 'positive' : 'negative') : 'neutral'}`}>
                       {printer.difference != null ? (printer.difference >= 0 ? '+' : '') + printer.difference : '—'}
                     </span>
+                  </div>
+                  <div className="value-row">
+                    <span className="value-label">Расчётные клики:</span>
+                    <span className="value-calculated">
+                      {getExpectedClicksForPrinter(printer.id).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="value-row">
+                    <span className="value-label">Отклонение:</span>
+                    {getPrinterDelta(printer.id, printer.difference) === null ? (
+                      <span className="value-difference neutral">—</span>
+                    ) : (
+                      <span className={`value-difference ${getPrinterDelta(printer.id, printer.difference)! >= 0 ? 'positive' : 'negative'}`}>
+                        {getPrinterDelta(printer.id, printer.difference)! >= 0 ? '+' : ''}
+                        {getPrinterDelta(printer.id, printer.difference)}
+                      </span>
+                    )}
                   </div>
                 </div>
                 

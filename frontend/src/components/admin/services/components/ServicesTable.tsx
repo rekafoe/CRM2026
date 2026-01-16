@@ -79,7 +79,7 @@ const ServicesTable: React.FC<ServicesTableProps> = ({
   const renderDefaultActions = (service: PricingService) => {
     if (!hasExternalActions) return null;
     return (
-      <div className="flex gap-2 justify-end">
+      <div className="services-table__actions">
         {onEdit && (
           <Button variant="info" size="sm" onClick={() => onEdit(service)}>
             ✏️ Редактировать
@@ -108,50 +108,50 @@ const ServicesTable: React.FC<ServicesTableProps> = ({
   const actionColumnVisible = showActionsColumn && (renderActions || onEdit || onToggleActive || onDelete);
 
   return (
-    <table className="min-w-full divide-y divide-gray-200">
-      <thead className="bg-gray-50">
+    <table className="services-table">
+      <thead className="services-table__head">
         <tr>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Услуга</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Тип</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Единица</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена</th>
-          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+          <th>Услуга</th>
+          <th>Тип</th>
+          <th>Единица</th>
+          <th>Цена</th>
+          <th>Статус</th>
           {actionColumnVisible && (
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+            <th>Действия</th>
           )}
         </tr>
       </thead>
-      <tbody className="bg-white divide-y divide-gray-200">
+      <tbody className="services-table__body">
         {services.map((service) => (
           <Fragment key={service.id}>
-            <tr className="hover:bg-gray-50 transition-colors">
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{getServiceIcon(service.type)}</span>
-                  <span className="font-medium text-gray-900">{service.name}</span>
+            <tr>
+              <td>
+                <div className="services-table__service-cell">
+                  <span className="services-table__service-icon">{getServiceIcon(service.type)}</span>
+                  <span className="services-table__service-name">{service.name}</span>
                 </div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{getServiceTypeLabel(service.type)}</span>
+              <td>
+                <span className="services-table__type-badge">{getServiceTypeLabel(service.type)}</span>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className="text-sm text-gray-900">{getUnitLabel(service.unit)}</span>
+              <td>
+                <span>{getUnitLabel(service.unit)}</span>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className="font-semibold text-blue-600">{(service.rate ?? 0).toFixed(2)} BYN</span>
+              <td>
+                <span className="services-table__price">{(service.rate ?? 0).toFixed(2)} BYN</span>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td>
                 <StatusBadge status={service.isActive ? 'Активна' : 'Неактивна'} color={service.isActive ? 'success' : 'error'} size="sm" />
               </td>
               {actionColumnVisible && (
-                <td className="px-6 py-4 whitespace-nowrap text-right">
+                <td className="services-table__actions-cell">
                   {renderActionCell(service)}
                 </td>
               )}
             </tr>
             {renderExpandedRow && expandedServiceId === service.id && (
               <tr>
-                <td colSpan={actionColumnVisible ? 6 : 5} className="bg-gray-50 px-6 py-4">
+                <td colSpan={actionColumnVisible ? 6 : 5}>
                   {renderExpandedRow(service)}
                 </td>
               </tr>

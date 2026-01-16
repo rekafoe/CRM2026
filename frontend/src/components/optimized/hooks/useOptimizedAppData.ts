@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Order, OrderFile } from '../../../types';
-import { getOrders, getOrderStatuses, getCurrentUser, getUsers, getLowStock, listOrderFiles } from '../../../api';
+import { getOrders, getOrderStatuses, getCurrentUser, getUsers, getLowStock, listOrderFiles, getDailyReports } from '../../../api';
 import { APP_CONFIG } from '../../../types';
 import { useToastNotifications } from '../../Toast';
 import { useLogger } from '../../../utils/logger';
@@ -29,6 +29,7 @@ export const useOptimizedAppData = (
   const [lowStock, setLowStock] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<{ id: number; name: string; role: string } | null>(null);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
+  const [activeUsers, setActiveUsers] = useState<Array<{ id: number; name: string }>>([]);
   
   const prevValuesRef = useRef<{ 
     currentUser: { id: number; name: string; role: string } | null; 
@@ -48,6 +49,30 @@ export const useOptimizedAppData = (
       getLowStock().then(r => setLowStock(r.data as any[]));
     }
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const targetDate = contextDate.slice(0, 10);
+
+    getDailyReports({ from: targetDate, to: targetDate, show_all: true })
+      .then((res) => {
+        const byId = new Map<number, string>();
+        (res.data || []).forEach((report) => {
+          if (!report.user_id) return;
+          const name = report.user_name || `User ${report.user_id}`;
+          byId.set(report.user_id, name);
+        });
+        const list = Array.from(byId.entries()).map(([id, name]) => ({ id, name }));
+        if (list.length === 0) {
+          setActiveUsers([{ id: currentUser.id, name: currentUser.name }]);
+        } else {
+          setActiveUsers(list);
+        }
+      })
+      .catch(() => {
+        setActiveUsers([{ id: currentUser.id, name: currentUser.name }]);
+      });
+  }, [currentUser, contextDate]);
 
   // Загрузка заказов
   useEffect(() => {
@@ -210,6 +235,7 @@ export const useOptimizedAppData = (
     currentUser,
     setCurrentUser,
     allUsers,
+    activeUsers,
     contextUserId,
     setContextUserId: (id: number | null) => {
       if (currentUser && !id) {
