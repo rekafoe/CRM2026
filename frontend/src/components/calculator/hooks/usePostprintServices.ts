@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../../../services/products';
-import { getPricingServices, getServiceVariants, getServiceVolumeTiers } from '../../../services/pricing';
+import { getAllVariantTiers, getPricingServices, getServiceVariants, getServiceVolumeTiers } from '../../../services/pricing';
 import { ServiceVolumeTier } from '../../../types/pricing';
 import { POSTPRINT_PRODUCT_ID } from '../components/DynamicProductSelector';
 
@@ -13,6 +13,8 @@ interface PostprintOperation {
   priceUnit?: string;
   rate: number;
   tiers: ServiceVolumeTier[];
+  minQuantity?: number;
+  maxQuantity?: number;
 }
 
 interface PostprintVariantOption {
@@ -21,6 +23,8 @@ interface PostprintVariantOption {
   label: string;
   parameters: Record<string, any>;
   tiers: ServiceVolumeTier[];
+  minQuantity?: number;
+  maxQuantity?: number;
 }
 
 interface PostprintServiceOption {
@@ -31,6 +35,8 @@ interface PostprintServiceOption {
   rate: number;
   tiers: ServiceVolumeTier[];
   variants: PostprintVariantOption[];
+  minQuantity?: number;
+  maxQuantity?: number;
 }
 
 interface UsePostprintServicesParams {
@@ -152,9 +158,12 @@ export function usePostprintServices({
             getServiceVariants(service.id),
             getServiceVolumeTiers(service.id),
           ]);
+          const variantTiersMap = variants.length > 0 ? await getAllVariantTiers(service.id) : {};
           const activeTiers = tiers.filter((tier) => tier.isActive !== false);
           const activeVariants = variants.filter((variant) => variant.isActive !== false);
           const displayableVariants = activeVariants.filter(isDisplayableVariant);
+          const getVariantTiers = (variantId: number) =>
+            (variantTiersMap[variantId] || []).filter((tier) => tier.isActive !== false);
           const serviceLabel = normalizeLabel(service.name);
           const hasNumericServiceName = isNumericLabel(serviceLabel);
           const serviceOption: PostprintServiceOption = {
@@ -165,16 +174,21 @@ export function usePostprintServices({
             rate: service.rate,
             tiers: activeTiers.filter((tier) => !tier.variantId),
             variants: [],
+            minQuantity: service.minQuantity,
+            maxQuantity: service.maxQuantity,
           };
           if (!hasNumericServiceName && displayableVariants.length > 0) {
             displayableVariants.forEach((variant) => {
               const variantLabel = getVariantLabel(variant) || 'Вариант';
+              const variantTiers = getVariantTiers(variant.id);
               serviceOption.variants.push({
                 key: `${service.id}:${variant.id}`,
                 variantId: variant.id,
                 label: variantLabel,
                 parameters: variant.parameters || {},
-                tiers: activeTiers.filter((tier) => tier.variantId === variant.id),
+                tiers: variantTiers,
+                minQuantity: service.minQuantity,
+                maxQuantity: service.maxQuantity,
               });
               operations.push({
                 key: `${service.id}:${variant.id}`,
@@ -184,7 +198,9 @@ export function usePostprintServices({
                 unit: service.unit,
                 priceUnit: service.priceUnit,
                 rate: service.rate,
-                tiers: activeTiers.filter((tier) => tier.variantId === variant.id),
+                tiers: variantTiers,
+                minQuantity: service.minQuantity,
+                maxQuantity: service.maxQuantity,
               });
             });
           } else {
@@ -196,6 +212,8 @@ export function usePostprintServices({
               priceUnit: service.priceUnit,
               rate: service.rate,
               tiers: activeTiers.filter((tier) => !tier.variantId),
+              minQuantity: service.minQuantity,
+              maxQuantity: service.maxQuantity,
             });
           }
           servicesList.push(serviceOption);

@@ -991,11 +991,20 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                             const selectedSubtype =
                               subtypeOptions.find((variant) => variant.key === selectedVariantKey) ||
                               subtypeOptions[0];
-                            const currentKey = service.variants.length > 0 ? selectedVariant?.key : serviceKey;
+                            const currentKey = service.variants.length > 0 ? selectedSubtype?.key : serviceKey;
                             const qty = Number((currentKey && postprintSelections[currentKey]) || 0);
                             const isChecked = service.variants.length > 0 ? Boolean(selectedVariantKey) : qty > 0;
                             const priceTiers =
                               service.variants.length > 0 ? selectedSubtype?.tiers || [] : service.tiers;
+                            const minQuantity = service.minQuantity ?? 1;
+                            const maxQuantity = service.maxQuantity;
+                            const clampQuantity = (value: number) => {
+                              let next = Math.max(minQuantity, Number.isFinite(value) ? value : minQuantity);
+                              if (typeof maxQuantity === 'number' && !Number.isNaN(maxQuantity)) {
+                                next = Math.min(next, maxQuantity);
+                              }
+                              return next;
+                            };
                             const unitPrice = getOperationUnitPrice(
                               {
                                 key: currentKey || serviceKey,
@@ -1007,7 +1016,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                 rate: service.rate,
                                 tiers: priceTiers,
                               },
-                              qty || 1
+                              clampQuantity(qty || minQuantity)
                             );
                             return (
                               <div key={serviceKey} className="postprint-service-card">
@@ -1032,7 +1041,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                                   ? (selectedVariant?.key || service.variants[0]?.key)
                                                   : serviceKey;
                                               if (preferredKey) {
-                                                next[preferredKey] = prev[preferredKey] || 1;
+                                                const baseQty = prev[preferredKey] || minQuantity;
+                                                next[preferredKey] = clampQuantity(baseQty);
                                               }
                                             }
                                             return next;
@@ -1069,7 +1079,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                                   }
                                                 });
                                                 if (nextVariant?.key) {
-                                                  next[nextVariant.key] = prevQty || 1;
+                                                next[nextVariant.key] = clampQuantity(prevQty || minQuantity);
                                                 }
                                                 return next;
                                               });
@@ -1100,7 +1110,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                                   }
                                                 });
                                                 if (nextKey) {
-                                                  next[nextKey] = prevQty || 1;
+                                                next[nextKey] = clampQuantity(prevQty || minQuantity);
                                                 }
                                                 return next;
                                               });
@@ -1134,7 +1144,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                           type="button"
                                           className="quantity-btn quantity-btn-minus"
                                           onClick={() => {
-                                            const nextQty = Math.max(1, qty - 1);
+                                            const nextQty = clampQuantity(qty - 1);
                                             setPostprintSelections((prev) => ({
                                               ...prev,
                                               [currentKey || serviceKey]: nextQty,
@@ -1145,12 +1155,13 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                         </button>
                                         <input
                                           type="number"
-                                          min={1}
-                                          value={qty || 1}
+                                          min={minQuantity}
+                                          max={typeof maxQuantity === 'number' ? maxQuantity : undefined}
+                                          value={qty || minQuantity}
                                           placeholder="Кол-во"
                                           className="quantity-input"
                                           onChange={(event) => {
-                                            const value = Math.max(1, Number(event.target.value) || 1);
+                                            const value = clampQuantity(Number(event.target.value) || minQuantity);
                                             setPostprintSelections((prev) => ({
                                               ...prev,
                                               [currentKey || serviceKey]: value,
@@ -1161,7 +1172,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                           type="button"
                                           className="quantity-btn quantity-btn-plus"
                                           onClick={() => {
-                                            const nextQty = Math.max(1, qty + 1);
+                                            const nextQty = clampQuantity(qty + 1);
                                             setPostprintSelections((prev) => ({
                                               ...prev,
                                               [currentKey || serviceKey]: nextQty,

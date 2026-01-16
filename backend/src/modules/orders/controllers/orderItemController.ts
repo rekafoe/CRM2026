@@ -52,7 +52,7 @@ export class OrderItemController {
           for (const r of rows) byId[Number(r.materialId)] = { quantity: Number(r.quantity), min_quantity: r.min_quantity == null ? null : Number(r.min_quantity) }
           needed = components.map(c => ({ materialId: Number(c.materialId), qtyPerItem: Number(c.qtyPerItem), quantity: byId[Number(c.materialId)]?.quantity ?? 0, min_quantity: byId[Number(c.materialId)]?.min_quantity ?? null }))
         }
-      } else {
+      } else if (params?.description && type) {
         needed = (await db.all<{
           materialId: number
           qtyPerItem: number

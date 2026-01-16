@@ -170,11 +170,19 @@
   border-radius: 16px;
   padding: 20px;
   transition: all 0.3s ease;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
 }
 
 .selected-product-card:hover {
   border-color: #cbd5e0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.selected-product-card:focus-visible {
+  outline: 2px solid #cbd5e0;
+  outline-offset: 2px;
 }
 
 .selected-product-card .product-icon {
@@ -197,6 +205,16 @@
   font-size: 14px;
   color: #64748b;
   font-weight: 500;
+}
+
+.selected-product-change {
+  margin-left: auto;
+  font-size: 18px;
+  color: #64748b;
+}
+
+.selected-product-card:hover .selected-product-change {
+  color: #4b5563;
 }
 
 .improved-printing-calculator-overlay {

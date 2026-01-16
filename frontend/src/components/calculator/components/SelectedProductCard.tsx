@@ -12,19 +12,21 @@ export const SelectedProductCard: React.FC<Props> = ({ productType, displayName,
     <div className="form-section compact">
       <h3>📦 {displayName}</h3>
       <div className="selected-product-info">
-        <div className="selected-product-card">
+        <button
+          type="button"
+          className="selected-product-card"
+          onClick={onOpenSelector}
+          title="Изменить тип продукта"
+          aria-label={`Изменить тип продукта: ${displayName}`}
+        >
           <div className="product-icon">{getProductIcon(productType)}</div>
           <div className="product-details">
             <div className="product-type">{productType}</div>
           </div>
-          <button 
-            className="btn btn-sm btn-outline"
-            onClick={onOpenSelector}
-            title="Изменить тип продукта"
-          >
+          <span className="selected-product-change" aria-hidden="true">
             🔄
-          </button>
-        </div>
+          </span>
+        </button>
       </div>
     </div>
   );
