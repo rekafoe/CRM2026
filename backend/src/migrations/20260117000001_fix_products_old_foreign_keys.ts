@@ -14,11 +14,11 @@ const replaceCreateTableName = (sql: string, tableName: string, tempName: string
 };
 
 export async function up(db: Database): Promise<void> {
-  const tables = await db.all<TableInfo>(
+  const tables = (await db.all(
     `SELECT name, sql
      FROM sqlite_master
      WHERE type = 'table' AND sql LIKE '%products_old%'`
-  );
+  )) as TableInfo[];
 
   if (!tables.length) {
     return;
