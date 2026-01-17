@@ -336,13 +336,29 @@ export class OrderItemController {
         )
         if (orderRow?.created_date) {
           const date = String(orderRow.created_date).slice(0, 10)
-          await EarningsService.recalculateForDate(date)
+          void EarningsService.recalculateForDate(date).catch((recalcError) => {
+            logger.error('❌ [deleteItem] Ошибка перерасчета выручки', {
+              date,
+              error: recalcError,
+              message: (recalcError as Error)?.message
+            })
+          })
         }
         res.status(204).end()
         return
       }
 
-      const paramsObj = JSON.parse(it.params || '{}') as { description?: string; components?: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }> }
+      let paramsObj: { description?: string; components?: Array<{ materialId: number; qtyPerItem: number; reservationId?: number }> }
+      try {
+        paramsObj = JSON.parse(it.params || '{}')
+      } catch (parseError) {
+        logger.warn('⚠️ [deleteItem] Не удалось распарсить params, пропускаем состав', {
+          itemId,
+          orderId,
+          error: parseError,
+        })
+        paramsObj = {}
+      }
       const components = Array.isArray(paramsObj.components) ? paramsObj.components : []
 
       await db.run('BEGIN')
@@ -353,7 +369,7 @@ export class OrderItemController {
           .filter((id): id is number => typeof id === 'number' && id > 0)
         if (reservationIds.length > 0) {
           await UnifiedWarehouseService.cancelReservations(reservationIds)
-        } else {
+        } else if ((paramsObj as any).description) {
           // Старые записи без резервов — выполняем возврат на склад по составу из product_materials
           const composition = (await db.all<{
             materialId: number
@@ -386,7 +402,13 @@ export class OrderItemController {
         )
         if (orderRow?.created_date) {
           const date = String(orderRow.created_date).slice(0, 10)
-          await EarningsService.recalculateForDate(date)
+          void EarningsService.recalculateForDate(date).catch((recalcError) => {
+            logger.error('❌ [deleteItem] Ошибка перерасчета выручки', {
+              date,
+              error: recalcError,
+              message: (recalcError as Error)?.message
+            })
+          })
         }
         res.status(204).end()
       } catch (e) {
