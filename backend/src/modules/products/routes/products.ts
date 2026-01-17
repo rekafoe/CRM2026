@@ -223,12 +223,21 @@ router.get('/categories', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const db = await getDb();
-    const { activeOnly } = req.query;
+    const { activeOnly, search } = req.query;
+    const searchValue = typeof search === 'string' ? search.trim() : '';
     
     // Для админки показываем все продукты, для калькулятора - только активные
-    const whereClause = activeOnly === 'true' 
-      ? 'WHERE p.is_active = 1 AND pc.is_active = 1' 
-      : 'WHERE 1=1'; // показываем все
+    const conditions: string[] = [];
+    const params: any[] = [];
+    if (activeOnly === 'true') {
+      conditions.push('p.is_active = 1', 'pc.is_active = 1');
+    }
+    if (searchValue) {
+      conditions.push('(LOWER(p.name) LIKE ? OR LOWER(p.description) LIKE ?)');
+      const needle = `%${searchValue.toLowerCase()}%`;
+      params.push(needle, needle);
+    }
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE 1=1';
     
     const products = await db.all(`
       SELECT p.*, pc.name as category_name, pc.icon as category_icon
@@ -236,7 +245,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN product_categories pc ON p.category_id = pc.id
       ${whereClause}
       ORDER BY pc.sort_order, p.name
-    `);
+    `, params);
     res.json(products);
   } catch (error) {
     logger.error('Error fetching products', { error });
