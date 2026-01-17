@@ -82,6 +82,7 @@ const ProductEditPage: React.FC = () => {
     try {
       setSaving(true);
       const { name, description, icon, calculator_type, product_type, operator_percent } = form;
+      const resolvedCalculatorType = product_type === 'multi_page' ? 'simplified' : calculator_type;
       const operatorPercentValue = operator_percent !== undefined && operator_percent !== ''
         ? Number(operator_percent)
         : undefined;
@@ -89,7 +90,7 @@ const ProductEditPage: React.FC = () => {
         name,
         description,
         icon,
-        calculator_type,
+        calculator_type: resolvedCalculatorType,
         product_type,
         ...(operatorPercentValue !== undefined && Number.isFinite(operatorPercentValue)
           ? { operator_percent: operatorPercentValue }

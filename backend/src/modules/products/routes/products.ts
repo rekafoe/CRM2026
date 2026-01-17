@@ -81,11 +81,19 @@ async function attachOperationsFromNorms(
 ): Promise<number> {
   if (!productTypeKey) return 0;
 
+  const normsTable = await db.get(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'operation_norms'`
+  );
+  if (!normsTable) {
+    return 0;
+  }
+
   const norms = await db.all(
-    `SELECT operation, service_id, formula
-     FROM operation_norms
-     WHERE product_type = ? AND is_active = 1
-     ORDER BY id`,
+    `SELECT op.operation, op.service_id, op.formula
+     FROM operation_norms op
+     JOIN post_processing_services pps ON pps.id = op.service_id
+     WHERE op.product_type = ? AND op.is_active = 1 AND pps.is_active = 1
+     ORDER BY op.id`,
     [productTypeKey]
   );
 
@@ -523,6 +531,35 @@ router.get('/:productId/schema', async (req, res) => {
           required: true,
           enum: [formatValue]
         });
+      }
+    }
+
+    // 📄 Добавляем поле pages из simplified-конфига, если задано
+    const simplifiedPages = templateConfigData?.simplified?.pages;
+    if (Array.isArray(simplifiedPages?.options) && simplifiedPages.options.length > 0) {
+      const rawOptions = simplifiedPages.options
+        .map((value: any) => Number(value))
+        .filter((value: number) => Number.isFinite(value) && value > 0);
+      const uniqueOptions = (Array.from(new Set(rawOptions)) as number[]).sort((a: number, b: number) => a - b);
+      if (uniqueOptions.length > 0) {
+        const defaultPage = Number(simplifiedPages.default);
+        const orderedOptions =
+          Number.isFinite(defaultPage) && uniqueOptions.includes(defaultPage)
+            ? [defaultPage, ...uniqueOptions.filter((opt) => opt !== defaultPage)]
+            : uniqueOptions;
+        const pagesField = fields.find((f) => f.name === 'pages');
+        if (pagesField) {
+          pagesField.type = pagesField.type || 'number';
+          pagesField.enum = orderedOptions;
+        } else {
+          fields.push({
+            name: 'pages',
+            label: 'Страницы',
+            type: 'number',
+            required: true,
+            enum: orderedOptions,
+          });
+        }
       }
     }
     
@@ -1376,6 +1413,7 @@ router.post('/setup', asyncHandler(async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { category_id, name, description, icon, calculator_type, product_type, operator_percent } = req.body;
+    const resolvedCalculatorType = product_type === 'multi_page' ? 'simplified' : calculator_type;
     const db = await getDb();
 
     if (!name || typeof name !== 'string' || name.trim() === '') {
@@ -1414,18 +1452,28 @@ router.post('/', async (req, res) => {
     }
 
     const normalizedOperatorPercent = Number.isFinite(Number(operator_percent)) ? Number(operator_percent) : 0;
-    const result = await db.run(`
-      INSERT INTO products (category_id, name, description, icon, calculator_type, product_type, operator_percent)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [
+    const productColumns: Array<{ name: string }> = await db.all(`PRAGMA table_info('products')`);
+    const hasOperatorPercent = productColumns.some((column) => column.name === 'operator_percent');
+    const insertColumns = ['category_id', 'name', 'description', 'icon', 'calculator_type', 'product_type'];
+    const insertValues: any[] = [
       resolvedCategoryId,
       name.trim(),
       description ?? null,
       icon ?? null,
-      calculator_type || 'product',
+      resolvedCalculatorType || 'product',
       product_type || 'sheet_single',
-      normalizedOperatorPercent,
-    ]);
+    ];
+
+    if (hasOperatorPercent) {
+      insertColumns.push('operator_percent');
+      insertValues.push(normalizedOperatorPercent);
+    }
+
+    const placeholders = insertColumns.map(() => '?').join(', ');
+    const result = await db.run(
+      `INSERT INTO products (${insertColumns.join(', ')}) VALUES (${placeholders})`,
+      insertValues
+    );
 
     // Автоматически создаем операции на основе типа продукта
     if (product_type) {
@@ -1439,13 +1487,20 @@ router.post('/', async (req, res) => {
       name: name.trim(),
       description,
       icon,
-      calculator_type: calculator_type || 'product',
+      calculator_type: resolvedCalculatorType || 'product',
       product_type: product_type || 'sheet_single',
       operator_percent: normalizedOperatorPercent,
     });
-  } catch (error) {
-    logger.error('Error creating product', error);
-    res.status(500).json({ error: 'Failed to create product' });
+  } catch (error: any) {
+    logger.error('Error creating product', {
+      message: error?.message,
+      code: error?.code,
+      errno: error?.errno,
+      stack: error?.stack,
+      sql: error?.sql,
+      params: error?.params,
+    });
+    res.status(500).json({ error: error?.message || 'Failed to create product' });
   }
 });
 
@@ -1453,10 +1508,26 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    if (updates?.product_type === 'multi_page') {
+      updates.calculator_type = 'simplified';
+    }
     const db = await getDb();
     
+    const productColumns: Array<{ name: string }> = await db.all(`PRAGMA table_info('products')`);
+    const hasOperatorPercent = productColumns.some((column) => column.name === 'operator_percent');
     // Динамически формируем SET часть запроса только для переданных полей
-    const allowedFields = ['category_id', 'name', 'description', 'icon', 'is_active', 'product_type', 'calculator_type', 'setup_status', 'print_settings', 'operator_percent'];
+    const allowedFields = [
+      'category_id',
+      'name',
+      'description',
+      'icon',
+      'is_active',
+      'product_type',
+      'calculator_type',
+      'setup_status',
+      'print_settings',
+      ...(hasOperatorPercent ? ['operator_percent'] : []),
+    ];
     const setFields: string[] = [];
     const values: any[] = [];
     

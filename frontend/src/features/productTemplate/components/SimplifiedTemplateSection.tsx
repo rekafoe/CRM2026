@@ -198,6 +198,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
     [value.sizes, selectedSizeId],
   )
 
+  const pagesConfig = useMemo(() => value.pages || { options: [] as number[] }, [value.pages])
+  const updatePagesConfig = useCallback((patch: Partial<NonNullable<SimplifiedConfig['pages']>>) => {
+    onChange({ ...value, pages: { ...pagesConfig, ...patch } })
+  }, [onChange, value, pagesConfig])
+
   // Восстанавливаем флаг взаимодействия с материалами при смене размера
   useEffect(() => {
     if (!selected) return
@@ -634,6 +639,50 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
         <div className="simplified-template__header-actions">
           <Button variant="secondary" onClick={openAddSize}>Добавить размер</Button>
           <Button variant="primary" onClick={onSave} disabled={saving}>Сохранить</Button>
+        </div>
+      </div>
+
+      <div className="simplified-card">
+        <div className="simplified-card__header">
+          <div>
+            <strong>Страницы (для многостраничных изделий)</strong>
+            <div className="text-muted text-sm">Укажите варианты количества страниц, доступные в калькуляторе.</div>
+          </div>
+        </div>
+        <div className="simplified-card__content simplified-form-grid">
+          <FormField label="Варианты страниц">
+            <input
+              className="form-input"
+              value={pagesConfig.options?.join(', ') || ''}
+              onChange={(e) => {
+                const nextOptions = e.target.value
+                  .split(',')
+                  .map((item) => Number(item.trim()))
+                  .filter((num) => Number.isFinite(num) && num > 0);
+                const unique = Array.from(new Set(nextOptions)).sort((a, b) => a - b);
+                const nextDefault = pagesConfig.default && unique.includes(pagesConfig.default)
+                  ? pagesConfig.default
+                  : unique[0];
+                updatePagesConfig({ options: unique, default: nextDefault });
+              }}
+              placeholder="4, 8, 12, 16"
+            />
+          </FormField>
+          <FormField label="По умолчанию">
+            <select
+              className="form-select"
+              value={pagesConfig.default ?? ''}
+              onChange={(e) => updatePagesConfig({ default: Number(e.target.value) })}
+              disabled={!pagesConfig.options || pagesConfig.options.length === 0}
+            >
+              {pagesConfig.options && pagesConfig.options.length === 0 && (
+                <option value="">—</option>
+              )}
+              {(pagesConfig.options || []).map((pages) => (
+                <option key={pages} value={pages}>{pages} стр.</option>
+              ))}
+            </select>
+          </FormField>
         </div>
       </div>
 

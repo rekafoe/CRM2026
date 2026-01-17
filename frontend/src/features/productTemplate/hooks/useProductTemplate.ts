@@ -24,6 +24,10 @@ export type SimplifiedFinishingPrice = {
   variant_name?: string; // Название варианта (типа, например "Рулонная")
   density?: string; // Плотность подтипа (например, "32 мк")
 }
+export type SimplifiedPagesConfig = {
+  options: number[];
+  default?: number;
+}
 export type SimplifiedSizeConfig = {
   id: string;
   label: string;
@@ -37,7 +41,7 @@ export type SimplifiedSizeConfig = {
   material_prices: SimplifiedMaterialPrice[];
   finishing: SimplifiedFinishingPrice[];
 }
-export type SimplifiedConfig = { sizes: SimplifiedSizeConfig[] }
+export type SimplifiedConfig = { sizes: SimplifiedSizeConfig[]; pages?: SimplifiedPagesConfig }
 
 export interface TemplateState {
   meta: { name: string; description: string; icon: string; operator_percent: string }
@@ -134,7 +138,7 @@ export function useProductTemplateInitial(): TemplateState {
     packaging: [],
     print_run: { enabled: false, min: '', max: '' },
     price_rules: [],
-    simplified: { sizes: [] },
+    simplified: { sizes: [], pages: { options: [] } },
     test: { qty: 100, params: {}, paramsJson: '{}' }
   }
 }

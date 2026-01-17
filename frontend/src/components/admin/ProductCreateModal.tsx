@@ -50,6 +50,12 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
     }
   }, [visible, categories]);
 
+  useEffect(() => {
+    if (productType === 'multi_page') {
+      setCalculatorType('simplified');
+    }
+  }, [productType]);
+
   const handleSubmit = async () => {
     if (!name.trim()) {
       setError('Введите название продукта');
@@ -65,7 +71,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
         name: name.trim(),
         description: description.trim() || undefined,
         icon: icon.trim() || undefined,
-        calculator_type: calculatorType,
+        calculator_type: productType === 'multi_page' ? 'simplified' : calculatorType,
         product_type: productType,
         operator_percent: operatorPercent ? Number(operatorPercent) : undefined,
       });
@@ -169,11 +175,12 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
             <select
               className="form-select form-select--full"
               value={calculatorType}
-            onChange={(e) => setCalculatorType(e.target.value as 'product' | 'operation' | 'simplified')}
+              onChange={(e) => setCalculatorType(e.target.value as 'product' | 'operation' | 'simplified')}
+              disabled={productType === 'multi_page'}
             >
               <option value="product">Продуктовый</option>
               <option value="operation">Операционный</option>
-            <option value="simplified">Упрощённый</option>
+              <option value="simplified">Упрощённый</option>
             </select>
           </FormField>
         </div>
@@ -184,7 +191,9 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
             value={productType}
             onChange={(e) => setProductType(e.target.value as 'sheet_single' | 'multi_page' | 'universal')}
           >
-            {PRODUCT_TYPE_OPTIONS.map((option) => (
+            {PRODUCT_TYPE_OPTIONS.filter((option) =>
+              calculatorType === 'simplified' ? true : option.value !== 'multi_page'
+            ).map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -206,7 +215,10 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
           <Alert type="info">
             <div className="flex flex-column gap-1">
               <strong>📚 Многостраничное изделие</strong>
-              <span className="text-sm">Изделие из нескольких страниц с переплетом. Примеры: буклеты, брошюры, каталоги, журналы.</span>
+              <span className="text-sm">
+                Изделие из нескольких страниц с переплетом. Примеры: буклеты, брошюры, каталоги, журналы.
+              </span>
+              <span className="text-sm">Для многостраничных изделий используется упрощённый калькулятор.</span>
             </div>
           </Alert>
         )}

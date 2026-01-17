@@ -54,11 +54,15 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
             onChange={(e) => onFormChange('product_type', e.target.value)}
           />
         </FormField>
-        <FormField label="Тип калькулятора" help="product / operation / simplified">
+        <FormField
+          label="Тип калькулятора"
+          help={form.product_type === 'multi_page' ? 'Для многостраничных изделий используется simplified.' : 'product / operation / simplified'}
+        >
           <select
             className="form-select"
             value={form.calculator_type || ''}
             onChange={(e) => onFormChange('calculator_type', e.target.value)}
+            disabled={form.product_type === 'multi_page'}
           >
             <option value="">—</option>
             <option value="product">product</option>

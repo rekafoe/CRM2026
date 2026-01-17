@@ -257,6 +257,15 @@ export class SimplifiedPricingService {
       throw err;
     }
     
+    const pagesCount = Number((configuration as any).pages);
+    const effectivePages = Number.isFinite(pagesCount) && pagesCount > 0 ? pagesCount : 1;
+    const sidesMode = normalizedConfig.print_sides_mode || 'single';
+    const sheetsPerItem =
+      sidesMode === 'duplex' || sidesMode === 'duplex_bw_back'
+        ? Math.max(1, Math.ceil(effectivePages / 2))
+        : Math.max(1, effectivePages);
+    const effectivePrintQuantity = Math.max(1, quantity * sheetsPerItem);
+
     // 4. Рассчитываем цену печати
     let printPrice = 0;
     let printDetails: SimplifiedPricingResult['printDetails'] | undefined;
@@ -277,18 +286,25 @@ export class SimplifiedPricingService {
       });
       
       if (printPriceConfig) {
-        const tier = this.findTierForQuantity(printPriceConfig.tiers, quantity);
+        const tier = this.findTierForQuantity(printPriceConfig.tiers, effectivePrintQuantity);
         if (tier) {
           // Используем unit_price из диапазона
           const priceForTier = this.getPriceForQuantityTier(tier);
-          printPrice = priceForTier * quantity;
+          printPrice = priceForTier * effectivePrintQuantity;
           printDetails = {
             tier: { ...tier, price: priceForTier },
             priceForQuantity: printPrice,
           };
-          logger.info('Цена печати рассчитана', { priceForTier, quantity, printPrice });
+          logger.info('Цена печати рассчитана', {
+            priceForTier,
+            quantity,
+            pages: effectivePages,
+            sheetsPerItem,
+            effectivePrintQuantity,
+            printPrice,
+          });
         } else {
-          logger.warn('Не найден диапазон для печати', { quantity, tiers: printPriceConfig.tiers });
+          logger.warn('Не найден диапазон для печати', { effectivePrintQuantity, tiers: printPriceConfig.tiers });
         }
       } else {
         logger.warn('Не найдена конфигурация печати', {
@@ -315,17 +331,24 @@ export class SimplifiedPricingService {
       });
       
       if (materialPriceConfig) {
-        const tier = this.findTierForQuantity(materialPriceConfig.tiers, quantity);
+        const tier = this.findTierForQuantity(materialPriceConfig.tiers, effectivePrintQuantity);
         if (tier) {
           const priceForTier = this.getPriceForQuantityTier(tier);
-          materialPrice = priceForTier * quantity;
+          materialPrice = priceForTier * effectivePrintQuantity;
           materialDetails = {
             tier: { ...tier, price: priceForTier },
             priceForQuantity: materialPrice,
           };
-          logger.info('Цена материала рассчитана', { priceForTier, quantity, materialPrice });
+          logger.info('Цена материала рассчитана', {
+            priceForTier,
+            quantity,
+            pages: effectivePages,
+            sheetsPerItem,
+            effectivePrintQuantity,
+            materialPrice,
+          });
         } else {
-          logger.warn('Не найден диапазон для материала', { quantity, tiers: materialPriceConfig.tiers });
+          logger.warn('Не найден диапазон для материала', { effectivePrintQuantity, tiers: materialPriceConfig.tiers });
         }
       } else {
         logger.warn('Не найдена конфигурация материала', {

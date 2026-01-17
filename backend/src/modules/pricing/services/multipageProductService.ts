@@ -63,6 +63,17 @@ const defaultPricing = schema?.pricing || {
   trimPrice: 2.0
 };
 
+const normalizeLabel = (value: unknown) =>
+  String(value ?? '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const isLabelMatch = (source: string, target: string) => {
+  if (!source || !target) return false;
+  return source.includes(target) || target.includes(source);
+};
+
 export class MultipageProductService {
   /**
    * Рассчитать стоимость многостраничной продукции
@@ -105,8 +116,11 @@ export class MultipageProductService {
     const printCost = (printPrice.perPage * pages * quantity);
     const setupCost = printPrice.setup || 0;
 
-    // Стоимость переплёта
-    const bindingUnitPrice = pricing.bindingPrices[bindingType] || 0;
+    // Стоимость переплёта (берём из услуг с типом bind, если есть)
+    const bindingUnitPrice =
+      (await this.getBindingUnitPriceFromDb(bindingType, quantity)) ??
+      pricing.bindingPrices[bindingType] ??
+      0;
     const bindingCost = bindingUnitPrice * quantity;
 
     // Стоимость ламинации (по листам)
@@ -161,7 +175,7 @@ export class MultipageProductService {
       const bindingServices = await db.all(`
         SELECT name, price
         FROM post_processing_services
-        WHERE operation_type IN ('binding', 'postprint') AND is_active = 1
+        WHERE operation_type IN ('bind') AND is_active = 1
       `);
 
       if (printServices.length === 0 && bindingServices.length === 0) {
@@ -224,6 +238,65 @@ export class MultipageProductService {
       };
     } catch (error) {
       logger.error('Error getting pricing from DB', { error });
+      return null;
+    }
+  }
+
+  private static async getBindingUnitPriceFromDb(
+    bindingType: string,
+    quantity: number
+  ): Promise<number | null> {
+    try {
+      const db = await getDb();
+      const bindingField = schema?.fields?.find((f: any) => f.name === 'bindingType');
+      const bindingOption = (bindingField?.enum || []).find((opt: any) =>
+        typeof opt === 'string' ? opt === bindingType : opt.value === bindingType
+      );
+      const bindingLabel =
+        typeof bindingOption === 'string'
+          ? bindingOption
+          : bindingOption?.label ?? bindingType;
+
+      const services = await db.all<Array<{ id: number; name: string; price: number }>>(
+        `
+        SELECT id, name, price
+        FROM post_processing_services
+        WHERE operation_type IN ('bind') AND is_active = 1
+      `
+      );
+      if (!services.length) return null;
+
+      const normalizedBinding = normalizeLabel(bindingLabel);
+      const matched = services.find((service) =>
+        isLabelMatch(normalizeLabel(service.name), normalizedBinding)
+      );
+      if (!matched) return null;
+
+      const tiers = await db.all<Array<{ min_quantity: number; price_per_unit: number; is_active: number }>>(
+        `
+        SELECT min_quantity, price_per_unit, is_active
+        FROM service_volume_prices
+        WHERE service_id = ? AND is_active = 1
+        ORDER BY min_quantity ASC
+      `,
+        [matched.id]
+      );
+
+      if (tiers.length > 0) {
+        let bestTier = tiers[0];
+        for (const tier of tiers) {
+          if (tier.min_quantity <= quantity) {
+            bestTier = tier;
+          } else {
+            break;
+          }
+        }
+        return bestTier.price_per_unit;
+      }
+
+      return Number.isFinite(matched.price) ? matched.price : null;
+    } catch (error) {
+      logger.warn('Error getting binding price from DB', { error, bindingType });
       return null;
     }
   }
