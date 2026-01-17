@@ -9,27 +9,234 @@
           "name": "format",
           "type": "select",
           "label": "Формат",
-          "enum": [
-            "A4",
-            "A5"
-          ],
+          "enum": ["A4", "A5"],
           "required": true
         },
         {
           "name": "pages",
           "type": "select",
           "label": "Страницы",
-          "enum": [
-            4,
-            8,
-            12,
-            16,
-            20,
-            24
-          ],
+          "enum": [4, 8, 12, 16, 20, 24],
           "required": true
         }
       ]
+    },
+    "multipage": {
+      "key": "multipage",
+      "type": "Многостраничная продукция",
+      "description": "Универсальный конструктор многостраничных изделий",
+      "fields": [
+        {
+          "name": "pages",
+          "type": "number",
+          "label": "Страницы в файлах",
+          "min": 4,
+          "max": 500,
+          "step": 1,
+          "required": true,
+          "tooltip": "Количество страниц (минимум 4)"
+        },
+        {
+          "name": "format",
+          "type": "select",
+          "label": "Формат",
+          "enum": ["A6", "A5", "A4", "A3", "210x297 мм (A4)", "148x210 мм (A5)", "105x148 мм (A6)"],
+          "required": true,
+          "default": "A4"
+        },
+        {
+          "name": "printType",
+          "type": "select",
+          "label": "Тип печати",
+          "enum": [
+            { "value": "laser_bw", "label": "Лазерная черно-белая" },
+            { "value": "laser_color", "label": "Лазерная цветная" },
+            { "value": "digital_bw", "label": "Цифровая черно-белая" },
+            { "value": "digital_color", "label": "Цифровая цветная" },
+            { "value": "offset", "label": "Офсетная печать" }
+          ],
+          "required": true,
+          "default": "laser_bw"
+        },
+        {
+          "name": "bindingType",
+          "type": "select",
+          "label": "Тип переплета",
+          "enum": [
+            { "value": "none", "label": "Без переплета" },
+            { "value": "plastic_spring", "label": "На пружину пластик" },
+            { "value": "metal_spring", "label": "На пружину металл" },
+            { "value": "hardcover", "label": "Твердый" },
+            { "value": "simple_channel", "label": "Симпл Ченл" },
+            { "value": "c_bind", "label": "C-Bind" },
+            { "value": "staple", "label": "На скобу" },
+            { "value": "corner_staple", "label": "Переплет на скобу в уголке" },
+            { "value": "rings", "label": "На кольца" },
+            { "value": "screws", "label": "На винты" },
+            { "value": "softcover", "label": "Мягкий (КБС)" },
+            { "value": "archive", "label": "Архивный" },
+            { "value": "folder", "label": "В папку" }
+          ],
+          "required": true,
+          "default": "none"
+        },
+        {
+          "name": "paperType",
+          "type": "select",
+          "label": "Материал",
+          "enum": [
+            { "value": "office_premium", "label": "Бумага офисная премиум" },
+            { "value": "office_standard", "label": "Бумага офисная стандарт" },
+            { "value": "coated_matte", "label": "Мелованная матовая" },
+            { "value": "coated_glossy", "label": "Мелованная глянцевая" },
+            { "value": "design", "label": "Дизайнерская бумага" }
+          ],
+          "required": true,
+          "default": "office_premium"
+        },
+        {
+          "name": "paperDensity",
+          "type": "select",
+          "label": "Плотность",
+          "enum": [80, 90, 100, 120, 150, 170, 200, 250, 300],
+          "unit": "г/м²",
+          "required": true,
+          "default": 80
+        },
+        {
+          "name": "trimMargins",
+          "type": "checkbox",
+          "label": "Обрезать поля",
+          "default": false,
+          "tooltip": "Обрезка полей по краям"
+        },
+        {
+          "name": "duplex",
+          "type": "checkbox",
+          "label": "Двухсторонняя",
+          "default": false,
+          "dependsOn": {
+            "bindingType": {
+              "staple": { "default": true, "locked": false },
+              "corner_staple": { "default": true, "locked": false },
+              "softcover": { "default": true, "locked": false },
+              "hardcover": { "default": true, "locked": false }
+            }
+          },
+          "tooltip": "Печать с двух сторон листа"
+        },
+        {
+          "name": "lamination",
+          "type": "select",
+          "label": "Ламинирование страниц",
+          "enum": [
+            { "value": "none", "label": "Без ламинации" },
+            { "value": "matte", "label": "Матовая" },
+            { "value": "glossy", "label": "Глянцевая" }
+          ],
+          "default": "none",
+          "required": false
+        }
+      ],
+      "bindingRules": {
+        "staple": {
+          "maxPages": 60,
+          "duplexDefault": true,
+          "description": "Сшивка на скобу, до 60 страниц"
+        },
+        "corner_staple": {
+          "maxPages": 20,
+          "duplexDefault": true,
+          "description": "Скоба в уголке, до 20 страниц"
+        },
+        "plastic_spring": {
+          "maxPages": 500,
+          "duplexDefault": false,
+          "description": "Пластиковая пружина, до 500 листов"
+        },
+        "metal_spring": {
+          "maxPages": 130,
+          "duplexDefault": false,
+          "description": "Металлическая пружина, до 130 листов"
+        },
+        "hardcover": {
+          "minPages": 40,
+          "maxPages": 500,
+          "duplexDefault": true,
+          "description": "Твердый переплет, от 40 до 500 страниц"
+        },
+        "softcover": {
+          "minPages": 40,
+          "maxPages": 300,
+          "duplexDefault": true,
+          "description": "Мягкий переплет (КБС), от 40 до 300 страниц"
+        },
+        "simple_channel": {
+          "maxPages": 300,
+          "duplexDefault": false,
+          "description": "Симпл Ченл, до 300 листов"
+        },
+        "c_bind": {
+          "maxPages": 500,
+          "duplexDefault": false,
+          "description": "C-Bind, до 500 листов"
+        },
+        "rings": {
+          "maxPages": 500,
+          "duplexDefault": false,
+          "description": "На кольца, до 500 листов"
+        },
+        "screws": {
+          "maxPages": 500,
+          "duplexDefault": false,
+          "description": "На винты, до 500 листов"
+        },
+        "archive": {
+          "maxPages": 500,
+          "duplexDefault": false,
+          "description": "Архивный переплет"
+        },
+        "folder": {
+          "maxPages": 100,
+          "duplexDefault": false,
+          "description": "В папку, до 100 листов"
+        },
+        "none": {
+          "maxPages": 500,
+          "duplexDefault": false,
+          "description": "Без переплета"
+        }
+      },
+      "pricing": {
+        "printPrices": {
+          "laser_bw": { "perPage": 0.5, "setup": 0 },
+          "laser_color": { "perPage": 3.0, "setup": 0 },
+          "digital_bw": { "perPage": 0.4, "setup": 0 },
+          "digital_color": { "perPage": 2.5, "setup": 0 },
+          "offset": { "perPage": 0.2, "setup": 50 }
+        },
+        "bindingPrices": {
+          "none": 0,
+          "plastic_spring": 3.0,
+          "metal_spring": 5.0,
+          "hardcover": 25.0,
+          "simple_channel": 4.0,
+          "c_bind": 6.0,
+          "staple": 1.0,
+          "corner_staple": 0.5,
+          "rings": 8.0,
+          "screws": 10.0,
+          "softcover": 15.0,
+          "archive": 20.0,
+          "folder": 5.0
+        },
+        "laminationPrices": {
+          "none": 0,
+          "matte": 1.5,
+          "glossy": 1.5
+        },
+        "trimPrice": 2.0
+      }
     }
   }
 }

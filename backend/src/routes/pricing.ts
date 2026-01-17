@@ -1383,4 +1383,93 @@ router.post('/calculate', asyncHandler(async (req, res) => {
   await PricingController.calculateProductPrice(req, res)
 }))
 
+/**
+ * @swagger
+ * /api/pricing/multipage/calculate:
+ *   post:
+ *     summary: Рассчитать стоимость многостраничной продукции
+ *     tags: [Pricing]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [pages, quantity]
+ *             properties:
+ *               pages:
+ *                 type: integer
+ *                 description: Количество страниц
+ *                 example: 24
+ *               quantity:
+ *                 type: integer
+ *                 description: Тираж
+ *                 example: 10
+ *               format:
+ *                 type: string
+ *                 example: A4
+ *               printType:
+ *                 type: string
+ *                 example: laser_bw
+ *               bindingType:
+ *                 type: string
+ *                 example: staple
+ *               paperType:
+ *                 type: string
+ *                 example: office_premium
+ *               paperDensity:
+ *                 type: integer
+ *                 example: 80
+ *               duplex:
+ *                 type: boolean
+ *                 example: true
+ *               lamination:
+ *                 type: string
+ *                 example: none
+ *               trimMargins:
+ *                 type: boolean
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Результат расчета
+ */
+router.post('/multipage/calculate', asyncHandler(async (req, res) => {
+  const { MultipageProductService } = await import('../modules/pricing/services/multipageProductService')
+  const result = await MultipageProductService.calculate(req.body)
+  res.json(result)
+}))
+
+/**
+ * @swagger
+ * /api/pricing/multipage/schema:
+ *   get:
+ *     summary: Получить схему многостраничного продукта
+ *     tags: [Pricing]
+ *     responses:
+ *       200:
+ *         description: Схема конфигурации
+ */
+router.get('/multipage/schema', asyncHandler(async (req, res) => {
+  const { MultipageProductService } = await import('../modules/pricing/services/multipageProductService')
+  res.json({
+    schema: MultipageProductService.getSchema(),
+    bindingTypes: MultipageProductService.getBindingTypes()
+  })
+}))
+
+/**
+ * @swagger
+ * /api/pricing/multipage/binding-types:
+ *   get:
+ *     summary: Получить типы переплёта с ограничениями
+ *     tags: [Pricing]
+ *     responses:
+ *       200:
+ *         description: Список типов переплёта
+ */
+router.get('/multipage/binding-types', asyncHandler(async (req, res) => {
+  const { MultipageProductService } = await import('../modules/pricing/services/multipageProductService')
+  res.json(MultipageProductService.getBindingTypes())
+}))
+
 export default router
