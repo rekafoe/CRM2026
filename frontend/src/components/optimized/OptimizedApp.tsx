@@ -235,7 +235,19 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
 
           <aside className="sidebar">
             <div className="sidebar-toolbar">
-              <button className="icon-btn" title="Добавить заказ" aria-label="Добавить заказ" onClick={orderHandlers.handleCreateOrder}>＋</button>
+              <button
+                className="icon-btn"
+                title="Добавить заказ"
+                aria-label="Добавить заказ"
+                onClick={async () => {
+                  const order = await orderHandlers.handleCreateOrder();
+                  if (order?.id) {
+                    openCalculator(undefined, order.id);
+                  }
+                }}
+              >
+                ＋
+              </button>
               <button
                 className="icon-btn"
                 title="Удалить выбранный заказ"

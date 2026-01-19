@@ -33,6 +33,7 @@ export const useOrderHandlers = ({
     const uniqueOrders = orders.filter(o => o.id !== order.id);
     setOrders([order, ...uniqueOrders]);
     setSelectedId(order.id);
+    return order;
   }, [orders, contextDate, setOrders, setSelectedId]);
 
   const handleDeleteOrder = useCallback(async (orderId: number) => {
