@@ -29,7 +29,7 @@ export const OrderRepository = {
           WHEN o.source = 'website' THEN 'site-ord-' || o.id
           ELSE o.number
         END as number,
-        o.status, o.created_at, o.customerName, o.customerPhone, o.customerEmail, 
+        o.status, COALESCE(o.created_at, o.createdAt) as created_at, o.customerName, o.customerPhone, o.customerEmail, 
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
         o.source, o.customer_id
       FROM orders o
@@ -66,7 +66,7 @@ export const OrderRepository = {
             ELSE 'pending'
           END as status,
           CASE 
-            WHEN uopo.order_type = 'website' THEN o.created_at
+            WHEN uopo.order_type = 'website' THEN COALESCE(o.created_at, o.createdAt)
             WHEN uopo.order_type = 'telegram' THEN uopo.assigned_at
             ELSE uopo.assigned_at
           END as created_at,
