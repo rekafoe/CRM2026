@@ -108,20 +108,17 @@ export const CountersPage: React.FC = () => {
     
     try {
       const getCashActualForDate = async (date: string) => {
-        try {
-          const reportResponse = await api.get(`/daily-reports/${date}?scope=global`);
-          return reportResponse.data?.cash_actual ?? null;
-        } catch (error: any) {
-          const message = error instanceof Error ? error.message : String(error);
-          const isNotFound =
-            error?.response?.status === 404 ||
-            message.startsWith('404:') ||
-            message.includes('Отчёт не найден');
-          if (!isNotFound) {
-            throw error;
+        // Используем список, чтобы не ловить 404, если отчёта нет
+        const reportListResponse = await api.get('/daily-reports', {
+          params: {
+            from: date,
+            to: date,
+            show_all: true,
+            scope: 'global'
           }
-          return null;
-        }
+        });
+        const report = Array.isArray(reportListResponse.data) ? reportListResponse.data[0] : null;
+        return report?.cash_actual ?? null;
       };
 
       const actualCash = await getCashActualForDate(selectedDate);
@@ -132,14 +129,11 @@ export const CountersPage: React.FC = () => {
       const previousDateKey = previousDate.toISOString().split('T')[0];
       const previousActualCash = await getCashActualForDate(previousDateKey);
 
-      // Рассчитываем сумму из заказов за день
-      const ordersResponse = await api.get('/orders');
-      const ordersForDate = ordersResponse.data.filter((order: any) => {
-        const rawDate = order.created_at ?? order.createdAt;
-        if (!rawDate) return false;
-        const orderDate = new Date(rawDate).toISOString().split('T')[0];
-        return orderDate === selectedDate;
-      });
+      // Рассчитываем сумму из заказов за день (глобально)
+      const ordersResponse = await api.get(`/reports/daily/${selectedDate}/orders`);
+      const ordersForDate = Array.isArray(ordersResponse.data?.orders)
+        ? ordersResponse.data.orders
+        : [];
       const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
         const prepayment = Number(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
         const items = Array.isArray(order.items) ? order.items : [];

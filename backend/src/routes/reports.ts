@@ -69,6 +69,37 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
   })
 }))
 
+// GET /api/reports/daily/:date/orders — заказы и позиции за день (глобально)
+router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
+  const d = String(req.params.date || '').slice(0, 10)
+  if (!d) { res.status(400).json({ message: 'date required' }); return }
+
+  const db = await getDb()
+  const orders = await db.all<any>(
+    `SELECT o.id, o.number, o.status,
+            COALESCE(o.created_at, o.createdAt) as created_at,
+            o.customerName, o.customerPhone, o.customerEmail,
+            o.prepaymentAmount, o.prepaymentStatus, o.paymentMethod, o.userId
+       FROM orders o
+      WHERE substr(COALESCE(o.created_at, o.createdAt),1,10) = ?
+      ORDER BY o.id DESC`,
+    d
+  )
+
+  for (const order of orders) {
+    const items = await db.all<any>(
+      'SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks FROM items WHERE orderId = ?',
+      order.id
+    )
+    order.items = items.map((item: any) => ({
+      ...item,
+      params: item.params ? JSON.parse(item.params) : {}
+    }))
+  }
+
+  res.json({ date: d, orders })
+}))
+
 // GET /api/reports/analytics/products/popularity — популярность продуктов
 router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
   const { period = '30', limit = '10' } = req.query
