@@ -337,10 +337,13 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   }, [selectedOperations, updateSpecs]);
 
   // Обновляем количество операции (мемоизированная версия)
-  const updateOperationQuantity = useCallback((operationId: number, quantity: number) => {
+  const updateOperationQuantity = useCallback((operationId: number, quantity?: number) => {
     const updated = selectedOperations.map((op: SelectedOperation) => {
       if (op.operationId === operationId) {
-        return { ...op, quantity: clampOperationQuantity(operationId, quantity) };
+        if (!Number.isFinite(quantity)) {
+          return { ...op, quantity: undefined };
+        }
+        return { ...op, quantity: clampOperationQuantity(operationId, Number(quantity)) };
       }
       return op;
     });
@@ -608,7 +611,10 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         type="button"
                         className="quantity-btn quantity-btn-minus"
                         onClick={() => {
-                          const currentQty = selectedData?.quantity || 1;
+                          const minQty = limits?.min ?? 1;
+                          const currentQty = Number.isFinite(selectedData?.quantity)
+                            ? Number(selectedData?.quantity)
+                            : minQty;
                           updateOperationQuantity(operationId, currentQty - 1);
                         }}
                       >
@@ -616,10 +622,10 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                       </button>
                       <input
                         type="number"
-                        value={selectedData?.quantity || 1}
+                        value={selectedData?.quantity ?? ''}
                         onChange={(e) => {
-                          const value = parseInt(e.target.value) || 1;
-                          updateOperationQuantity(operationId, value);
+                          const raw = e.target.value;
+                          updateOperationQuantity(operationId, raw === '' ? undefined : Number(raw));
                         }}
                         min={limits?.min ?? 1}
                         max={limits?.max}
@@ -629,7 +635,10 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                         type="button"
                         className="quantity-btn quantity-btn-plus"
                         onClick={() => {
-                          const currentQty = selectedData?.quantity || 1;
+                          const minQty = limits?.min ?? 1;
+                          const currentQty = Number.isFinite(selectedData?.quantity)
+                            ? Number(selectedData?.quantity)
+                            : minQty;
                           updateOperationQuantity(operationId, currentQty + 1);
                         }}
                       >
@@ -670,18 +679,21 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                           type="button"
                           className="quantity-btn quantity-btn-minus"
                           onClick={() => {
-                            const currentQty = selectedData?.quantity || 1;
-                            updateOperationQuantity(operationId, currentQty - 1);
+                          const minQty = limits?.min ?? 1;
+                          const currentQty = Number.isFinite(selectedData?.quantity)
+                            ? Number(selectedData?.quantity)
+                            : minQty;
+                          updateOperationQuantity(operationId, currentQty - 1);
                           }}
                         >
                           −
                         </button>
                         <input
                           type="number"
-                          value={selectedData?.quantity || 1}
+                        value={selectedData?.quantity ?? ''}
                           onChange={(e) => {
-                            const value = parseInt(e.target.value) || 1;
-                            updateOperationQuantity(operationId, value);
+                          const raw = e.target.value;
+                          updateOperationQuantity(operationId, raw === '' ? undefined : Number(raw));
                           }}
                           min={limits?.min ?? 1}
                           max={limits?.max}
@@ -691,8 +703,11 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                           type="button"
                           className="quantity-btn quantity-btn-plus"
                           onClick={() => {
-                            const currentQty = selectedData?.quantity || 1;
-                            updateOperationQuantity(operationId, currentQty + 1);
+                          const minQty = limits?.min ?? 1;
+                          const currentQty = Number.isFinite(selectedData?.quantity)
+                            ? Number(selectedData?.quantity)
+                            : minQty;
+                          updateOperationQuantity(operationId, currentQty + 1);
                           }}
                         >
                           +

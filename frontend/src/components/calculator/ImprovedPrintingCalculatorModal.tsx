@@ -29,6 +29,27 @@ import { usePostprintServices } from './hooks/usePostprintServices';
 import { useCustomProduct } from './hooks/useCustomProduct';
 import { useProductSelection } from './hooks/useProductSelection';
 
+const createInitialSpecs = (initialProductType?: string): ProductSpecs => ({
+  productType: initialProductType || 'flyers',
+  format: 'A6',
+  quantity: 1,
+  sides: 1,
+  paperType: 'semi-matte' as any,
+  paperDensity: 0,
+  lamination: 'none',
+  priceType: 'online',
+  customerType: 'regular',
+  pages: 4,
+  magnetic: false,
+  cutting: false,
+  folding: false,
+  roundCorners: false,
+  urgency: 'standard',
+  vipLevel: 'bronze',
+  specialServices: [],
+  selectedOperations: [],
+});
+
 interface ImprovedPrintingCalculatorModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -57,28 +78,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const [isCustomFormat, setIsCustomFormat] = useState(false);
 
   // Состояние калькулятора
-  const [specs, setSpecs] = useState<ProductSpecs>({
-    productType: initialProductType || 'flyers',
-    format: 'A6',
-    quantity: 1,
-    sides: 1,
-    paperType: 'semi-matte' as any,
-    paperDensity: 0,
-    lamination: 'none',
-    priceType: 'online', // Всегда используем онлайн по умолчанию
-    customerType: 'regular',
-    pages: 4,
-    magnetic: false,
-    cutting: false,
-    folding: false,
-    roundCorners: false,
-    urgency: 'standard',
-    vipLevel: 'bronze',
-    specialServices: [],
-    selectedOperations: [], // 🆕 Выбранные операции с подтипами и количеством
-    // 🆕 materialType будет установлен динамически из типов бумаги со склада
-    // materialType: 'coated' // Убрано захардкоженное значение
-  });
+  const [specs, setSpecs] = useState<ProductSpecs>(() => createInitialSpecs(initialProductType));
   
   // Состояние для типа печати и режима цвета
   const [printTechnology, setPrintTechnology] = useState<string>('');
@@ -520,6 +520,49 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     resetPostprintSelections,
   });
 
+  const resetProductSelection = useCallback(() => {
+    if (isEditMode || initialProductId) {
+      return;
+    }
+    setSelectedProduct(null);
+    setSpecs(() => createInitialSpecs(initialProductType));
+    setCustomFormat({ width: '', height: '' });
+    setIsCustomFormat(false);
+    setResult(null);
+    setUserInteracted(false);
+    resetCustomProductForm();
+    resetPostprintSelections();
+    setPrintTechnology('');
+    setPrintColorMode(null);
+  }, [
+    initialProductId,
+    initialProductType,
+    isEditMode,
+    resetCustomProductForm,
+    resetPostprintSelections,
+    setResult,
+    setSelectedProduct,
+    setSpecs,
+    setCustomFormat,
+    setIsCustomFormat,
+    setUserInteracted,
+    setPrintTechnology,
+    setPrintColorMode,
+  ]);
+
+  const handleOpenProductSelector = useCallback(() => {
+    resetProductSelection();
+    open('showProductSelection');
+  }, [open, resetProductSelection]);
+
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      resetProductSelection();
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, resetProductSelection]);
+
 
   // Автовыбор продукта по initialProductId (например, при редактировании заказа)
   useEffect(() => {
@@ -870,7 +913,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                   <SelectedProductCard
                     productType="universal"
                     displayName={selectedProduct?.name || 'Произвольный продукт'}
-                    onOpenSelector={() => open('showProductSelection')}
+                    onOpenSelector={handleOpenProductSelector}
                   />
                   <div className="form-section custom-product-form">
                     <div className="custom-product-grid">
@@ -939,7 +982,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                   <SelectedProductCard
                     productType="postprint"
                     displayName={selectedProduct?.name || 'Послепечатные услуги'}
-                    onOpenSelector={() => open('showProductSelection')}
+                    onOpenSelector={handleOpenProductSelector}
                   />
                   <div className="form-section postprint-services-form">
                     {postprintLoading && (
@@ -992,7 +1035,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                               subtypeOptions.find((variant) => variant.key === selectedVariantKey) ||
                               subtypeOptions[0];
                             const currentKey = service.variants.length > 0 ? selectedSubtype?.key : serviceKey;
-                            const qty = Number((currentKey && postprintSelections[currentKey]) || 0);
+                            const rawQty = currentKey ? postprintSelections[currentKey] : undefined;
+                            const qty = Number(rawQty || 0);
                             const isChecked = service.variants.length > 0 ? Boolean(selectedVariantKey) : qty > 0;
                             const priceTiers =
                               service.variants.length > 0 ? selectedSubtype?.tiers || [] : service.tiers;
@@ -1157,15 +1201,22 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                           type="number"
                                           min={minQuantity}
                                           max={typeof maxQuantity === 'number' ? maxQuantity : undefined}
-                                          value={qty || minQuantity}
+                                          value={rawQty ?? ''}
                                           placeholder="Кол-во"
                                           className="quantity-input"
                                           onChange={(event) => {
-                                            const value = clampQuantity(Number(event.target.value) || minQuantity);
-                                            setPostprintSelections((prev) => ({
-                                              ...prev,
-                                              [currentKey || serviceKey]: value,
-                                            }));
+                                            const raw = event.target.value;
+                                            setPostprintSelections((prev) => {
+                                              const next = { ...prev };
+                                              const targetKey = currentKey || serviceKey;
+                                              if (!targetKey) return next;
+                                              if (raw === '') {
+                                                delete next[targetKey];
+                                                return next;
+                                              }
+                                              next[targetKey] = clampQuantity(Number(raw));
+                                              return next;
+                                            });
                                           }}
                                         />
                                         <button
@@ -1217,7 +1268,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                 result={result}
                 selectedProduct={selectedProduct}
                 currentConfig={currentConfig}
-                onOpenProductSelector={() => open('showProductSelection')}
+                onOpenProductSelector={handleOpenProductSelector}
               />
             )}
 

@@ -165,18 +165,26 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             {getLabel('quantity', 'Количество')}
           </label>
           <div className="quantity-controls">
+            {(() => {
+              const minQty = getMin('quantity') ?? 1;
+              const safeQty = Number.isFinite(specs.quantity) ? specs.quantity : 0;
+              return (
+                <>
             <button 
               type="button"
               className="quantity-btn quantity-btn-minus"
-              onClick={() => updateSpecs({ quantity: Math.max(1, specs.quantity - 1) })}
+                  onClick={() => updateSpecs({ quantity: Math.max(minQty, safeQty - 1) })}
             >
               −
             </button>
             <input
               type="number"
-              value={specs.quantity}
-              onChange={(e) => updateSpecs({ quantity: parseInt(e.target.value) || 1 })}
-              min={getMin('quantity') ?? 1}
+                  value={specs.quantity ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    updateSpecs({ quantity: raw === '' ? undefined : Number(raw) });
+                  }}
+                  min={minQty}
               placeholder={getPlaceholder('quantity', '')}
               className={`quantity-input ${validationErrors.quantity ? 'error' : ''}`}
               required={isRequired('quantity')}
@@ -184,10 +192,13 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             <button 
               type="button"
               className="quantity-btn quantity-btn-plus"
-              onClick={() => updateSpecs({ quantity: specs.quantity + 1 })}
+                  onClick={() => updateSpecs({ quantity: Math.max(minQty, safeQty) + 1 })}
             >
               +
             </button>
+                </>
+              );
+            })()}
           </div>
           {validationErrors.quantity && (
             <div className="text-sm text-red-600">{validationErrors.quantity}</div>
