@@ -238,7 +238,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               <option key={s.id} value={s.sort_order}>{s.name}</option>
             ))}
           </select>
-          <button onClick={onOpenCalculator}>+ Калькулятор</button>
+          <button onClick={() => onOpenCalculator()}>+ Калькулятор</button>
         </div>
       </div>
 

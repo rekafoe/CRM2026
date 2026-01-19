@@ -125,7 +125,13 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
 
   const handleOpenCalculator = useCallback(
     (productType?: string) => {
-      openCalculator(productType, selectedId ?? undefined);
+      const isSyntheticEvent =
+        productType &&
+        typeof productType === 'object' &&
+        ('nativeEvent' in productType || 'isDefaultPrevented' in productType) &&
+        ('target' in productType || 'currentTarget' in productType);
+      const resolvedType = isSyntheticEvent ? undefined : (productType as string | undefined);
+      openCalculator(resolvedType, selectedId ?? undefined);
     },
     [selectedId, openCalculator]
   );
