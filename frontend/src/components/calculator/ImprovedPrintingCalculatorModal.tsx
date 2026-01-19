@@ -616,7 +616,34 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   // Обновление спецификаций
   const updateSpecs = useCallback((updates: Partial<ProductSpecs>, instant: boolean = false) => {
-    setSpecs(prev => ({ ...prev, ...updates }));
+    const isSyntheticEvent = (value: any) =>
+      value &&
+      typeof value === 'object' &&
+      ('nativeEvent' in value || 'isDefaultPrevented' in value) &&
+      ('target' in value || 'currentTarget' in value);
+
+    if (isSyntheticEvent(updates)) {
+      logger.warn('⚠️ updateSpecs получил SyntheticEvent, пропускаем', { updates });
+      return;
+    }
+
+    const normalizedUpdates = Object.entries(updates || {}).reduce<Partial<ProductSpecs>>(
+      (acc, [key, value]) => {
+        if (isSyntheticEvent(value)) {
+          logger.warn('⚠️ updateSpecs получил SyntheticEvent в поле', { key });
+          return acc;
+        }
+        acc[key as keyof ProductSpecs] = value as any;
+        return acc;
+      },
+      {}
+    );
+
+    if (Object.keys(normalizedUpdates).length === 0) {
+      return;
+    }
+
+    setSpecs(prev => ({ ...prev, ...normalizedUpdates }));
     setUserInteracted(true); // Отмечаем, что пользователь взаимодействовал с калькулятором
     
     // ❌ УБРАНО: Мгновенный расчет здесь
