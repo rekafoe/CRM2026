@@ -133,8 +133,8 @@ export class SimplifiedPricingService {
     const db = await getDb();
     
     // 1. Получаем продукт
-    const product = await db.get<{ id: number; name: string; calculator_type: string }>(
-      `SELECT id, name, calculator_type FROM products WHERE id = ?`,
+    const product = await db.get<{ id: number; name: string; calculator_type: string; product_type?: string | null }>(
+      `SELECT id, name, calculator_type, product_type FROM products WHERE id = ?`,
       [productId]
     );
     
@@ -257,8 +257,9 @@ export class SimplifiedPricingService {
       throw err;
     }
     
+    const usePagesMultiplier = product.product_type === 'multi_page';
     const pagesCount = Number((configuration as any).pages);
-    const effectivePages = Number.isFinite(pagesCount) && pagesCount > 0 ? pagesCount : 1;
+    const effectivePages = usePagesMultiplier && Number.isFinite(pagesCount) && pagesCount > 0 ? pagesCount : 1;
     const sidesMode = normalizedConfig.print_sides_mode || 'single';
     const sheetsPerItem =
       sidesMode === 'duplex' || sidesMode === 'duplex_bw_back'

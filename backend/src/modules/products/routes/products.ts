@@ -905,9 +905,9 @@ async function syncSimplifiedOperations(db: any, productId: number, configData: 
       }
     });
     
+    const serviceIdList = Array.from(serviceIds);
     logger.info('[syncSimplifiedOperations] Синхронизация операций для упрощённого продукта', {
       productId,
-      serviceIds: Array.from(serviceIds),
       serviceIdsCount: serviceIds.size
     });
     
@@ -923,17 +923,25 @@ async function syncSimplifiedOperations(db: any, productId: number, configData: 
     const hasIsOptional = columns.some((c: any) => c.name === 'is_optional');
     const hasLinkedParam = columns.some((c: any) => c.name === 'linked_parameter_name');
     
+    // Загружаем активные операции одним запросом
+    const activeServices = serviceIdList.length > 0
+      ? await db.all(
+          `SELECT id, name FROM post_processing_services WHERE id IN (${serviceIdList.map(() => '?').join(', ')}) AND is_active = 1`,
+          serviceIdList
+        )
+      : [];
+    const activeServiceMap = new Map<number, { id: number; name: string }>(
+      activeServices.map((svc: any) => [Number(svc.id), { id: Number(svc.id), name: svc.name }])
+    );
+    
     // Добавляем новые операции
     let sequence = 1;
-    for (const serviceId of serviceIds) {
+    let insertedCount = 0;
+    let skippedInactiveCount = 0;
+    for (const serviceId of serviceIdList) {
       if (!existingOperationIds.has(serviceId)) {
-        // Проверяем, что операция активна в post_processing_services
-        const service = await db.get(
-          `SELECT id, name, is_active FROM post_processing_services WHERE id = ?`,
-          [serviceId]
-        );
-        
-        if (service && service.is_active === 1) {
+        const service = activeServiceMap.get(serviceId);
+        if (service) {
           const insertFields = ['product_id', 'operation_id', 'sequence', 'sort_order', 'is_required', 'is_default', 'price_multiplier'];
           const insertValues: any[] = [
             productId,
@@ -960,37 +968,33 @@ async function syncSimplifiedOperations(db: any, productId: number, configData: 
              VALUES (${insertFields.map(() => '?').join(', ')})`,
             insertValues
           );
-          
-          logger.info('[syncSimplifiedOperations] Добавлена операция в product_operations_link', {
-            productId,
-            operationId: serviceId,
-            operationName: service.name
-          });
+          insertedCount += 1;
         } else {
-          logger.warn('[syncSimplifiedOperations] Пропущена неактивная операция', {
-            productId,
-            operationId: serviceId
-          });
+          skippedInactiveCount += 1;
         }
       }
     }
     
     // Удаляем операции, которых больше нет в finishing
-    for (const link of existingLinks) {
-      const operationId = Number(link.operation_id);
-      if (!serviceIds.has(operationId)) {
+    const linksToDelete = existingLinks.filter((link: any) => !serviceIds.has(Number(link.operation_id)));
+    if (linksToDelete.length > 0) {
+      const deleteIds = linksToDelete.map((link: any) => link.id);
+      const chunkSize = 200;
+      for (let i = 0; i < deleteIds.length; i += chunkSize) {
+        const chunk = deleteIds.slice(i, i + chunkSize);
         await db.run(
-          `DELETE FROM product_operations_link WHERE id = ? AND product_id = ?`,
-          [link.id, productId]
+          `DELETE FROM product_operations_link WHERE product_id = ? AND id IN (${chunk.map(() => '?').join(', ')})`,
+          [productId, ...chunk]
         );
-        
-        logger.info('[syncSimplifiedOperations] Удалена операция из product_operations_link', {
-          productId,
-          linkId: link.id,
-          operationId
-        });
       }
     }
+    
+    logger.info('[syncSimplifiedOperations] Синхронизация завершена', {
+      productId,
+      insertedCount,
+      deletedCount: linksToDelete.length,
+      skippedInactiveCount
+    });
   } catch (error) {
     logger.warn('[syncSimplifiedOperations] Ошибка синхронизации операций', {
       productId,
@@ -1295,8 +1299,8 @@ router.post('/setup', asyncHandler(async (req, res) => {
       sequenceCounter = Math.max(sequenceCounter, sequence + 1);
     }
 
-    if (!operations.length && (autoOperationType || productPayload.product_type)) {
-      await attachOperationsFromNorms(db, productId, autoOperationType || productPayload.product_type);
+    if (!operations.length && autoOperationType) {
+      await attachOperationsFromNorms(db, productId, autoOperationType);
     }
 
     for (const [index, param] of (Array.isArray(parameters) ? parameters : []).entries()) {
@@ -1475,8 +1479,8 @@ router.post('/', async (req, res) => {
       insertValues
     );
 
-    // Автоматически создаем операции на основе типа продукта
-    if (product_type) {
+    // Автоматически создаем операции только при явном запросе
+    if (product_type && req.body?.auto_attach_operations) {
       const operationsAdded = await attachOperationsFromNorms(db, result.lastID!, product_type);
       logger.info('✅ Operations auto-attached to new product', { productId: result.lastID, operationsAdded });
     }

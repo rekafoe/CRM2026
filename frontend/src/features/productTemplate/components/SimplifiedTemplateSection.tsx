@@ -28,6 +28,7 @@ interface Props {
   onSave: () => void
   saving: boolean
   allMaterials: CalculatorMaterial[]
+  showPagesConfig?: boolean
 }
 
 const uid = () => `sz_${Date.now()}_${Math.random().toString(16).slice(2)}`
@@ -177,7 +178,14 @@ type TierRangeModalState = {
   anchorElement?: HTMLElement // элемент, рядом с которым показывать модалку
 }
 
-export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, onSave, saving, allMaterials }) => {
+export const SimplifiedTemplateSection: React.FC<Props> = ({
+  value,
+  onChange,
+  onSave,
+  saving,
+  allMaterials,
+  showPagesConfig = true,
+}) => {
   const [selectedSizeId, setSelectedSizeId] = useState<string | null>(value.sizes[0]?.id ?? null)
   const [paperTypes, setPaperTypes] = useState<PaperTypeRow[]>([])
   const [printTechs, setPrintTechs] = useState<PrintTechRow[]>([])
@@ -607,26 +615,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
       return
     }
 
-    // Размер новый, можно добавить услуги автоматически
-    const servicesToAdd = services.filter(s => 
-      !selected.finishing.some(f => f.service_id === Number(s.id))
-    )
-
-    if (servicesToAdd.length > 0) {
-      // ✅ Добавляем услуги БЕЗ tiers - цены будут браться из централизованной системы услуг
-      const nextFinishing = [
-        ...selected.finishing,
-        ...servicesToAdd.map(s => ({
-          service_id: Number(s.id),
-          price_unit: (s.operation_type === 'cut' || s.operation_type === 'score' || s.operation_type === 'fold') 
-            ? 'per_cut' as const 
-            : 'per_item' as const,
-          units_per_item: 1,
-          // tiers не сохраняем - цены берутся из services-management
-        }))
-      ]
-      updateSize(selected.id, { finishing: nextFinishing })
-    }
+    // По умолчанию услуги не добавляем — послепечатные включаются вручную
   }, [services, selected, getSizeRanges, updateSize])
 
   return (
@@ -642,49 +631,51 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({ value, onChange, on
         </div>
       </div>
 
-      <div className="simplified-card">
-        <div className="simplified-card__header">
-          <div>
-            <strong>Страницы (для многостраничных изделий)</strong>
-            <div className="text-muted text-sm">Укажите варианты количества страниц, доступные в калькуляторе.</div>
+      {showPagesConfig && (
+        <div className="simplified-card">
+          <div className="simplified-card__header">
+            <div>
+              <strong>Страницы (для многостраничных изделий)</strong>
+              <div className="text-muted text-sm">Укажите варианты количества страниц, доступные в калькуляторе.</div>
+            </div>
+          </div>
+          <div className="simplified-card__content simplified-form-grid">
+            <FormField label="Варианты страниц">
+              <input
+                className="form-input"
+                value={pagesConfig.options?.join(', ') || ''}
+                onChange={(e) => {
+                  const nextOptions = e.target.value
+                    .split(',')
+                    .map((item) => Number(item.trim()))
+                    .filter((num) => Number.isFinite(num) && num > 0);
+                  const unique = Array.from(new Set(nextOptions)).sort((a, b) => a - b);
+                  const nextDefault = pagesConfig.default && unique.includes(pagesConfig.default)
+                    ? pagesConfig.default
+                    : unique[0];
+                  updatePagesConfig({ options: unique, default: nextDefault });
+                }}
+                placeholder="4, 8, 12, 16"
+              />
+            </FormField>
+            <FormField label="По умолчанию">
+              <select
+                className="form-select"
+                value={pagesConfig.default ?? ''}
+                onChange={(e) => updatePagesConfig({ default: Number(e.target.value) })}
+                disabled={!pagesConfig.options || pagesConfig.options.length === 0}
+              >
+                {pagesConfig.options && pagesConfig.options.length === 0 && (
+                  <option value="">—</option>
+                )}
+                {(pagesConfig.options || []).map((pages) => (
+                  <option key={pages} value={pages}>{pages} стр.</option>
+                ))}
+              </select>
+            </FormField>
           </div>
         </div>
-        <div className="simplified-card__content simplified-form-grid">
-          <FormField label="Варианты страниц">
-            <input
-              className="form-input"
-              value={pagesConfig.options?.join(', ') || ''}
-              onChange={(e) => {
-                const nextOptions = e.target.value
-                  .split(',')
-                  .map((item) => Number(item.trim()))
-                  .filter((num) => Number.isFinite(num) && num > 0);
-                const unique = Array.from(new Set(nextOptions)).sort((a, b) => a - b);
-                const nextDefault = pagesConfig.default && unique.includes(pagesConfig.default)
-                  ? pagesConfig.default
-                  : unique[0];
-                updatePagesConfig({ options: unique, default: nextDefault });
-              }}
-              placeholder="4, 8, 12, 16"
-            />
-          </FormField>
-          <FormField label="По умолчанию">
-            <select
-              className="form-select"
-              value={pagesConfig.default ?? ''}
-              onChange={(e) => updatePagesConfig({ default: Number(e.target.value) })}
-              disabled={!pagesConfig.options || pagesConfig.options.length === 0}
-            >
-              {pagesConfig.options && pagesConfig.options.length === 0 && (
-                <option value="">—</option>
-              )}
-              {(pagesConfig.options || []).map((pages) => (
-                <option key={pages} value={pages}>{pages} стр.</option>
-              ))}
-            </select>
-          </FormField>
-        </div>
-      </div>
+      )}
 
       {value.sizes.length === 0 ? (
         <Alert type="info">Добавьте хотя бы один размер (обрезной формат), чтобы начать настройку.</Alert>

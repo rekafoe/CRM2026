@@ -82,6 +82,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
   const [parameterPresetsLoading, setParameterPresetsLoading] = useState(false)
 
   const lastLoadedProductIdRef = useRef<number | null>(null)
+  const defaultSimplifiedConfig = useMemo(() => ({ sizes: [], pages: { options: [] as number[] } }), [])
 
   const resolvePresetKey = useCallback((details: ProductWithDetails | null) => {
     if (!details) return null
@@ -148,6 +149,8 @@ export default function useProductTemplatePage(productId: number | undefined): U
     const load = async () => {
       try {
         setLoading(true)
+        setTemplateConfigId(null)
+        dispatch({ type: 'reset' })
 
         const details = await getProductDetails(productId)
         if (details) {
@@ -235,6 +238,8 @@ export default function useProductTemplatePage(productId: number | undefined): U
           // 🆕 Упрощённый калькулятор (конфиг по размерам)
           if (cfgData.simplified && typeof cfgData.simplified === 'object') {
             dispatch({ type: 'setSimplified', value: cfgData.simplified as any })
+          } else {
+            dispatch({ type: 'setSimplified', value: defaultSimplifiedConfig })
           }
 
           if (constraints.print_sheet) {
@@ -258,6 +263,9 @@ export default function useProductTemplatePage(productId: number | undefined): U
                 : []
             dispatch({ type: 'setOverrides', patch: { includeIds, allowedPaperTypes } })
           }
+        }
+        if (!templateConfig) {
+          dispatch({ type: 'setSimplified', value: defaultSimplifiedConfig })
         }
 
         setMaterials(productMaterials || [])
@@ -310,21 +318,27 @@ export default function useProductTemplatePage(productId: number | undefined): U
     void load()
   }, [productId, dispatch, loadParameterPresets])
 
-  const buildConfigData = useCallback(() => ({
-    trim_size: {
-      width: Number(state.trim_size.width) || state.trim_size.width,
-      height: Number(state.trim_size.height) || state.trim_size.height
-    },
-    finishing: state.finishing,
-    packaging: state.packaging,
-    print_run: {
-      enabled: state.print_run.enabled,
-      min: state.print_run.min || undefined,
-      max: state.print_run.max || undefined
-    },
-    price_rules: state.price_rules,
-    simplified: state.simplified
-  }), [state.trim_size.width, state.trim_size.height, state.finishing, state.packaging, state.print_run.enabled, state.print_run.min, state.print_run.max, state.price_rules, state.simplified])
+  const buildConfigData = useCallback(() => {
+    const isMultiPageProduct = (product as any)?.product_type === 'multi_page'
+    const simplifiedConfig = isMultiPageProduct
+      ? state.simplified
+      : (({ pages, ...rest }) => rest)(state.simplified)
+    return {
+      trim_size: {
+        width: Number(state.trim_size.width) || state.trim_size.width,
+        height: Number(state.trim_size.height) || state.trim_size.height
+      },
+      finishing: state.finishing,
+      packaging: state.packaging,
+      print_run: {
+        enabled: state.print_run.enabled,
+        min: state.print_run.min || undefined,
+        max: state.print_run.max || undefined
+      },
+      price_rules: state.price_rules,
+      simplified: simplifiedConfig
+    }
+  }, [product, state.trim_size.width, state.trim_size.height, state.finishing, state.packaging, state.print_run.enabled, state.print_run.min, state.print_run.max, state.price_rules, state.simplified])
 
   const buildConstraints = useCallback(() => ({
     print_sheet: state.print_sheet.preset

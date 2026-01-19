@@ -270,6 +270,7 @@ const ProductTemplatePage: React.FC = () => {
                 onSave={() => void persistTemplateConfig('Шаблон упрощённого калькулятора сохранён')}
                 saving={saving}
                 allMaterials={allMaterials as any}
+                showPagesConfig={product?.product_type === 'multi_page'}
               />
             )}
           </section>

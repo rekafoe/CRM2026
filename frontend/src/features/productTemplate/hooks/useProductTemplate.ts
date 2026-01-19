@@ -70,6 +70,7 @@ export interface TemplateState {
 
 type Action =
   | { type: 'setTrim'; field: 'width' | 'height'; value: string }
+  | { type: 'reset' }
   | { type: 'setMeta'; patch: Partial<TemplateState['meta']> }
   | { type: 'setFinishing'; value: Array<{ name: string }> }
   | { type: 'setPackaging'; value: Array<{ name: string }> }
@@ -88,6 +89,8 @@ type Action =
 
 function reducer(state: TemplateState, action: Action): TemplateState {
   switch (action.type) {
+    case 'reset':
+      return useProductTemplateInitial()
     case 'setTrim':
       return { ...state, trim_size: { ...state.trim_size, [action.field]: action.value } }
     case 'setMeta':
