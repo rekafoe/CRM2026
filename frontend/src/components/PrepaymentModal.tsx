@@ -30,8 +30,15 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'offline' | 'telegram'>(currentPaymentMethod || 'online');
   const [isLoading, setIsLoading] = useState(false);
 
+  const normalizeAmount = (value: string): number => {
+    if (value.trim() === '') return 0;
+    const normalized = value.replace(',', '.');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   // Вычисляем amountNum для использования в JSX
-  const amountNum = Number(amount) || 0;
+  const amountNum = normalizeAmount(amount);
 
   // Обновляем поля при изменении пропсов
   React.useEffect(() => {

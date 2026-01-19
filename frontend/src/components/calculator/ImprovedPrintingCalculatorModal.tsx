@@ -175,6 +175,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     getDefaultPaperDensity,
     updatePrices
   } = useCalculatorMaterials({ specs, setSpecs, log: logger as any, toast });
+  const safeWarehousePaperTypes = Array.isArray(warehousePaperTypes) ? warehousePaperTypes : [];
 
 
   // Валидация вынесена в хук
@@ -210,7 +211,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     resolveProductType,
     getProductionTime,
     buildParameterSummary,
-    warehousePaperTypes,
+    warehousePaperTypes: safeWarehousePaperTypes,
     productTypeLabels,
     printTechnology,
     printColorMode,
@@ -381,8 +382,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     if (!isOpen || editContext?.item) return; // Пропускаем при редактировании
     
     // Устанавливаем первый тип бумаги, если не выбран
-    if (warehousePaperTypes.length > 0 && !specs.paperType) {
-      const firstPaperType = warehousePaperTypes[0];
+    if (safeWarehousePaperTypes.length > 0 && !specs.paperType) {
+      const firstPaperType = safeWarehousePaperTypes[0];
       setSpecs(prev => ({
         ...prev,
         paperType: firstPaperType.name as any,
@@ -406,13 +407,13 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       priceType: 'online', // Всегда используем онлайн по умолчанию
       customerType: 'regular', // Всегда используем обычный тип клиента по умолчанию
     }));
-  }, [isOpen, warehousePaperTypes, specs.paperType, specs.format, availableFormats, getDefaultPaperDensity, editContext]);
+  }, [isOpen, safeWarehousePaperTypes, specs.paperType, specs.format, availableFormats, getDefaultPaperDensity, editContext]);
 
   // 🆕 Устанавливаем materialType на основе выбранного материала или paperType
   // materialType = тип бумаги со склада (вторая вкладка "Типы бумаги")
   useEffect(() => {
     console.log('🔍 [ImprovedPrintingCalculatorModal] useEffect для materialType', {
-      warehousePaperTypesLength: warehousePaperTypes.length,
+      warehousePaperTypesLength: safeWarehousePaperTypes.length,
       material_id: specs.material_id,
       isSimplified: backendProductSchema?.template?.simplified,
       hasResult: !!result,
@@ -420,7 +421,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       currentMaterialType: specs.materialType
     });
     
-    if (warehousePaperTypes.length === 0) {
+    if (safeWarehousePaperTypes.length === 0) {
       console.log('⚠️ [ImprovedPrintingCalculatorModal] warehousePaperTypes пустой, выходим');
       return;
     }
@@ -443,12 +444,12 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
             material_id: specs.material_id,
             selectedMaterial,
             paper_type_name: paperTypeName,
-            warehousePaperTypes: warehousePaperTypes.map(pt => ({ name: pt.name, display_name: pt.display_name }))
+            warehousePaperTypes: safeWarehousePaperTypes.map(pt => ({ name: pt.name, display_name: pt.display_name }))
           });
           
           if (paperTypeName) {
             // Ищем тип бумаги по display_name (например, "Офисная")
-            const paperType = warehousePaperTypes.find(pt => pt.display_name === paperTypeName);
+            const paperType = safeWarehousePaperTypes.find(pt => pt.display_name === paperTypeName);
             if (paperType) {
               console.log('✅ [ImprovedPrintingCalculatorModal] Найден тип бумаги для materialType', {
                 paperTypeName,
@@ -469,7 +470,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
             } else {
               console.warn('⚠️ [ImprovedPrintingCalculatorModal] Тип бумаги не найден по display_name', {
                 paperTypeName,
-                availableDisplayNames: warehousePaperTypes.map(pt => pt.display_name)
+                availableDisplayNames: safeWarehousePaperTypes.map(pt => pt.display_name)
               });
             }
           } else {
@@ -489,7 +490,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     // Для обычных продуктов: materialType берётся из выбранного paperType
     if (specs.paperType && !(specs.material_id && backendProductSchema?.template?.simplified)) {
       // Находим тип бумаги со склада, который соответствует выбранному paperType
-      const selectedPaperType = warehousePaperTypes.find(pt => pt.name === specs.paperType);
+      const selectedPaperType = safeWarehousePaperTypes.find(pt => pt.name === specs.paperType);
       if (selectedPaperType) {
         // materialType должен быть равен name типа бумаги со склада
         // Это и есть "тип материала" - тип бумаги из второй вкладки склада

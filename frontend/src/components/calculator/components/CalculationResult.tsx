@@ -38,6 +38,7 @@ export const CalculationResultComponent: React.FC<CalculationResultProps> = ({
   onAddToOrder
 }) => {
   if (!result) return null;
+  const materials = Array.isArray(result.materials) ? result.materials : [];
 
   return (
     <div className="calculation-result">
@@ -66,10 +67,10 @@ export const CalculationResultComponent: React.FC<CalculationResultProps> = ({
       </div>
 
       {/* Материалы */}
-      {result.materials.length > 0 && (
+      {materials.length > 0 && (
         <div className="materials-list">
           <h4>Материалы:</h4>
-          {result.materials.map((material, index) => (
+          {materials.map((material, index) => (
             <div key={index} className="material-item">
               <span>{material.material}</span>
               <span>{material.quantity} {material.unit}</span>

@@ -357,14 +357,7 @@ export class PDFReportService {
       // Получаем заказ
       const order: any = await db.get(`
         SELECT 
-          orders.id, 
-          orders.number, 
-          orders.status, 
-          orders.created_at, 
-          orders.customerName, 
-          orders.customerPhone, 
-          orders.customerEmail,
-          orders.prepaymentAmount,
+          orders.*,
           users.name as executedByName
         FROM orders 
         LEFT JOIN users ON users.id = orders.userId
@@ -409,8 +402,9 @@ export class PDFReportService {
       // Форматируем даты
       let createdDate = '';
       try {
-        if (order.created_at) {
-          const date = new Date(order.created_at);
+        const createdRaw = order.created_at ?? order.createdAt;
+        if (createdRaw) {
+          const date = new Date(createdRaw);
           if (!isNaN(date.getTime())) {
             createdDate = date.toLocaleDateString('ru-RU', { 
               day: '2-digit', 
@@ -454,7 +448,11 @@ export class PDFReportService {
         : 0;
 
       // Вычисляем предоплату и долг
-      const prepaymentAmount = Number(order.prepaymentAmount) || 0;
+      const rawPrepayment = order.prepaymentAmount ?? order.prepayment_amount ?? order.prepaymentamount ?? 0;
+      const normalizedPrepayment = typeof rawPrepayment === 'string'
+        ? Number(rawPrepayment.replace(',', '.'))
+        : Number(rawPrepayment);
+      const prepaymentAmount = Number.isFinite(normalizedPrepayment) ? normalizedPrepayment : 0;
       const debt = Math.max(0, calculatedTotalAmount - prepaymentAmount);
 
       // Генерируем HTML бланка
