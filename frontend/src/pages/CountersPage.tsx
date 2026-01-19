@@ -27,6 +27,12 @@ interface CashData {
   previousActual?: number | null;
 }
 
+interface CashContribution {
+  user_id: number;
+  user_name?: string;
+  cash_actual?: number | null;
+}
+
 interface User {
   id: number;
   name: string;
@@ -51,6 +57,8 @@ export const CountersPage: React.FC = () => {
   const [cashActualValue, setCashActualValue] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [printerExpectedClicks, setPrinterExpectedClicks] = useState<Record<number, number>>({});
+  const [cashContributions, setCashContributions] = useState<CashContribution[]>([]);
+  const [cashContributionsTotal, setCashContributionsTotal] = useState<number>(0);
 
   useEffect(() => {
     loadUser();
@@ -129,6 +137,36 @@ export const CountersPage: React.FC = () => {
       const previousDateKey = previousDate.toISOString().split('T')[0];
       const previousActualCash = await getCashActualForDate(previousDateKey);
 
+      // Вклады по пользователям за дату (если доступны)
+      try {
+        const userReportsResponse = await api.get('/daily-reports', {
+          params: {
+            from: selectedDate,
+            to: selectedDate,
+            show_all: true
+          }
+        });
+        const reports = Array.isArray(userReportsResponse.data) ? userReportsResponse.data : [];
+        const userReports = reports.filter((report: any) => report.user_id);
+        const normalized: CashContribution[] = userReports.map((report: any) => ({
+          user_id: Number(report.user_id),
+          user_name: report.user_name,
+          cash_actual: report.cash_actual ?? null
+        }));
+        const total = normalized.reduce((sum, report) => {
+          return sum + Number(report.cash_actual || 0);
+        }, 0);
+        setCashContributions(normalized);
+        setCashContributionsTotal(total);
+      } catch (userReportsError: any) {
+        if (userReportsError?.response?.status === 403) {
+          setCashContributions([]);
+          setCashContributionsTotal(0);
+        } else {
+          throw userReportsError;
+        }
+      }
+
       // Рассчитываем сумму из заказов за день (глобально)
       const ordersResponse = await api.get(`/reports/daily/${selectedDate}/orders`);
       const ordersForDate = Array.isArray(ordersResponse.data?.orders)
@@ -180,6 +218,8 @@ export const CountersPage: React.FC = () => {
         dailyRevenue: 0,
         previousActual: null
       });
+      setCashContributions([]);
+      setCashContributionsTotal(0);
     }
   };
 
@@ -432,6 +472,32 @@ export const CountersPage: React.FC = () => {
               <div className={`cash-difference ${getCashStatus()}`}>
                 {cashData.difference >= 0 ? '+' : ''}{cashData.difference.toFixed(2)} BYN
               </div>
+            </div>
+
+            <div className="cash-contributions">
+              <div className="cash-contributions-header">Вклады в кассу (по пользователям):</div>
+              {cashContributions.length === 0 ? (
+                <div className="cash-contributions-empty">Нет данных за выбранную дату</div>
+              ) : (
+                <>
+                  <div className="cash-contributions-list">
+                    {cashContributions.map((report) => (
+                      <div key={report.user_id} className="cash-contribution-row">
+                        <span className="cash-contribution-user">
+                          {report.user_name || `Пользователь #${report.user_id}`}
+                        </span>
+                        <span className="cash-contribution-amount">
+                          {Number(report.cash_actual || 0).toFixed(2)} BYN
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="cash-contribution-total">
+                    <span>Итого за день:</span>
+                    <span>{cashContributionsTotal.toFixed(2)} BYN</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

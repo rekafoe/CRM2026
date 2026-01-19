@@ -286,7 +286,25 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   const db = await getDb()
   const order = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
-  const amount = Number((req.body as any)?.amount ?? order.prepaymentAmount ?? 0)
+  const rawAmount = (req.body as any)?.amount
+  const wantsClear = rawAmount === 0 || rawAmount === '0' || rawAmount === '' || rawAmount === null
+  if (wantsClear) {
+    await db.run(
+      `UPDATE orders
+         SET prepaymentAmount = NULL,
+             prepaymentStatus = NULL,
+             paymentUrl = NULL,
+             paymentId = NULL,
+             paymentMethod = NULL
+       WHERE id = ?`,
+      id
+    )
+    const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
+    res.json(updated)
+    return
+  }
+
+  const amount = Number(rawAmount ?? order.prepaymentAmount ?? 0)
   const paymentMethod = (req.body as any)?.paymentMethod ?? 'online'
   if (!amount || amount <= 0) { res.status(400).json({ message: 'Сумма предоплаты не задана' }); return }
   
