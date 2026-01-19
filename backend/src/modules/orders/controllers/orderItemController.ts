@@ -243,6 +243,31 @@ export class OrderItemController {
           clicks
         )
         const itemId = insertItem.lastID!
+
+        // 🆕 По умолчанию считаем заказ оплаченным, если предоплата ещё не была задана
+        const paymentRow = await db.get<{
+          prepaymentAmount?: number | null
+          prepaymentStatus?: string | null
+          paymentMethod?: string | null
+        }>('SELECT prepaymentAmount, prepaymentStatus, paymentMethod FROM orders WHERE id = ?', [orderId])
+        const totalsRow = await db.get<{ total_amount: number }>(
+          'SELECT COALESCE(SUM(price * quantity), 0) as total_amount FROM items WHERE orderId = ?',
+          [orderId]
+        )
+        const totalAmount = Number(totalsRow?.total_amount || 0)
+        const prepaymentAmount = Number(paymentRow?.prepaymentAmount || 0)
+        const prepaymentStatus = paymentRow?.prepaymentStatus
+        const paymentMethod = paymentRow?.paymentMethod
+        const allowAutoPay = paymentMethod !== null && paymentMethod !== undefined
+        const hasPrepayment = prepaymentAmount > 0 || (prepaymentStatus && prepaymentStatus.length > 0)
+        if (allowAutoPay && !hasPrepayment && totalAmount > 0) {
+          await db.run(
+            `UPDATE orders
+             SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', paymentUrl = NULL, paymentId = NULL
+             WHERE id = ?`,
+            [totalAmount, orderId]
+          )
+        }
         
         logger.info('✅ [addItem] Позиция вставлена', { itemId })
         

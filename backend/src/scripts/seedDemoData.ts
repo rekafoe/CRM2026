@@ -237,6 +237,17 @@ async function seedMaterials(db: Database): Promise<void> {
   const paperRow = await db.get<{ id: number }>('SELECT id FROM materials WHERE name = ?', 'Бумага мелованная 130 г/м², SRA3')
   const paper130Id = paperRow?.id
   if (paper130Id) {
+    const productMaterialsColumns = await db.all<Array<{ name: string }>>(
+      `PRAGMA table_info(product_materials)`
+    )
+    const hasPresetCategory = Array.isArray(productMaterialsColumns)
+      ? productMaterialsColumns.some((col) => col.name === 'presetCategory')
+      : false
+    if (!hasPresetCategory) {
+      console.log('ℹ️ product_materials использует новую структуру, пресеты не связываем')
+      return
+    }
+
     const flyers = [
       { desc: 'Листовки A6, 4+0', qtyPerItem: 1 / 8 },
       { desc: 'Листовки A5, 4+0', qtyPerItem: 1 / 4 },

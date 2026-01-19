@@ -6,8 +6,14 @@ const router = Router();
 // Получение пула заказов
 router.get('/pool', OrderManagementController.getOrderPool);
 
+// Поиск заказа по номеру/ID
+router.get('/search', OrderManagementController.searchOrder);
+
 // Назначение заказа пользователю
 router.post('/assign', OrderManagementController.assignOrder);
+
+// Выдача заказа / закрытие долга
+router.post('/issue', OrderManagementController.issueOrder);
 
 // Завершение заказа
 router.post('/complete', OrderManagementController.completeOrder);

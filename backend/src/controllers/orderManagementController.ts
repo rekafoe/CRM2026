@@ -102,6 +102,75 @@ export class OrderManagementController {
   }
 
   /**
+   * Поиск заказа по номеру/ID
+   */
+  static async searchOrder(req: Request, res: Response) {
+    try {
+      const query = String((req.query.query ?? req.query.q ?? '') as string).trim();
+      if (!query) {
+        return res.status(400).json({
+          success: false,
+          message: 'Не указан поисковый запрос'
+        });
+      }
+
+      const order = await OrderManagementService.searchOrder(query);
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Заказ не найден'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: order
+      });
+    } catch (error) {
+      console.error('❌ Error searching order:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Ошибка при поиске заказа'
+      });
+    }
+  }
+
+  /**
+   * Выдача заказа / закрытие долга
+   */
+  static async issueOrder(req: Request, res: Response) {
+    try {
+      const { orderId, orderType } = req.body;
+      if (!orderId || !orderType) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID заказа и тип обязательны'
+        });
+      }
+
+      const order = await OrderManagementService.issueOrder(Number(orderId), String(orderType));
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Заказ не найден'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: order,
+        message: 'Заказ выдан и закрыт'
+      });
+    } catch (error) {
+      console.error('❌ Error issuing order:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Ошибка при выдаче заказа'
+      });
+    }
+  }
+
+  /**
    * Получение деталей заказа
    */
   static async getOrderDetails(req: Request, res: Response) {

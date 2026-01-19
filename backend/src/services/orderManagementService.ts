@@ -10,6 +10,9 @@ export interface UnifiedOrder {
   customerName?: string;
   customerContact?: string;
   totalAmount: number;
+  prepaymentAmount?: number;
+  prepaymentStatus?: string | null;
+  paymentMethod?: string | null;
   createdAt: string;
   assignedTo?: number;
   assignedToName?: string;
@@ -52,26 +55,32 @@ export class OrderManagementService {
         ORDER BY created_at DESC
       `);
 
-      // Получаем заказы с сайта (если есть таблица orders)
+      // Получаем заказы из CRM/сайта
       let websiteOrders: any[] = [];
       try {
         websiteOrders = await db.all(`
           SELECT 
             id,
-            'website' as type,
+            CASE 
+              WHEN source = 'website' THEN 'website'
+              ELSE 'manual'
+            END as type,
             status,
             customerName as customer_name,
             customerPhone as customer_contact,
-            0 as total_amount,
-            createdAt as created_at,
+            COALESCE((SELECT SUM(price * quantity) FROM items WHERE orderId = orders.id), 0) as total_amount,
+            prepaymentAmount as prepayment_amount,
+            prepaymentStatus as prepayment_status,
+            paymentMethod as payment_method,
+            COALESCE(createdAt, created_at) as created_at,
             '' as notes,
             CASE 
               WHEN source = 'website' THEN 'site-ord-' || id
               ELSE number
             END as order_number
           FROM orders 
-          WHERE status = 1
-          ORDER BY createdAt DESC
+          WHERE status != 7
+          ORDER BY COALESCE(createdAt, created_at) DESC
         `);
       } catch (error) {
         console.log('📝 Website orders table not found, skipping...');
@@ -112,6 +121,9 @@ export class OrderManagementService {
           customerName: order.customer_name,
           customerContact: order.customer_contact,
           totalAmount: order.total_amount,
+          prepaymentAmount: order.prepayment_amount ?? order.prepaymentAmount ?? undefined,
+          prepaymentStatus: order.prepayment_status ?? order.prepaymentStatus ?? undefined,
+          paymentMethod: order.payment_method ?? order.paymentMethod ?? undefined,
           createdAt: order.created_at,
           notes: order.notes,
           orderNumber: order.order_number,
@@ -247,6 +259,271 @@ export class OrderManagementService {
     } catch (error) {
       console.error('❌ Error completing order:', error);
       return false;
+    }
+  }
+
+  /**
+   * Поиск заказа по номеру/ID (CRM/website/telegram)
+   */
+  static async searchOrder(query: string): Promise<UnifiedOrder | null> {
+    try {
+      const db = await getDb();
+      const rawQuery = String(query || '').trim();
+      if (!rawQuery) return null;
+
+      const normalized = rawQuery.replace(/^#/, '');
+      const isNumeric = /^\d+$/.test(normalized);
+      const numericId = isNumeric ? Number(normalized) : null;
+      const tgMatch = normalized.match(/^tg-ord-(\d+)$/i);
+      const siteMatch = normalized.match(/^site-ord-(\d+)$/i);
+
+      const fetchOrderById = async (id: number) =>
+        db.get(
+          `
+          SELECT 
+            id,
+            CASE 
+              WHEN source = 'website' THEN 'website'
+              ELSE 'manual'
+            END as type,
+            status,
+            customerName as customer_name,
+            customerPhone as customer_contact,
+            COALESCE((SELECT SUM(price * quantity) FROM items WHERE orderId = orders.id), 0) as total_amount,
+            prepaymentAmount as prepayment_amount,
+            prepaymentStatus as prepayment_status,
+            paymentMethod as payment_method,
+            COALESCE(createdAt, created_at) as created_at,
+            '' as notes,
+            CASE 
+              WHEN source = 'website' THEN 'site-ord-' || id
+              ELSE number
+            END as order_number
+          FROM orders 
+          WHERE id = ?
+        `,
+          [id],
+        );
+
+      const fetchOrderByNumber = async (number: string) =>
+        db.get(
+          `
+          SELECT 
+            id,
+            CASE 
+              WHEN source = 'website' THEN 'website'
+              ELSE 'manual'
+            END as type,
+            status,
+            customerName as customer_name,
+            customerPhone as customer_contact,
+            COALESCE((SELECT SUM(price * quantity) FROM items WHERE orderId = orders.id), 0) as total_amount,
+            prepaymentAmount as prepayment_amount,
+            prepaymentStatus as prepayment_status,
+            paymentMethod as payment_method,
+            COALESCE(createdAt, created_at) as created_at,
+            '' as notes,
+            CASE 
+              WHEN source = 'website' THEN 'site-ord-' || id
+              ELSE number
+            END as order_number
+          FROM orders 
+          WHERE number = ?
+        `,
+          [number],
+        );
+
+      const fetchTelegramById = async (id: number) =>
+        db.get(
+          `
+          SELECT 
+            id,
+            'telegram' as type,
+            status,
+            first_name as customer_name,
+            chat_id as customer_contact,
+            total_price as total_amount,
+            created_at,
+            notes,
+            'tg-ord-' || id as order_number
+          FROM photo_orders 
+          WHERE id = ?
+        `,
+          [id],
+        );
+
+      let order: any = null;
+      if (tgMatch) {
+        order = await fetchTelegramById(Number(tgMatch[1]));
+      } else if (siteMatch) {
+        order = await fetchOrderById(Number(siteMatch[1]));
+      } else {
+        order = await fetchOrderByNumber(normalized);
+        if (!order && numericId) {
+          order = await fetchOrderById(numericId);
+        }
+        if (!order && numericId) {
+          order = await fetchTelegramById(numericId);
+        }
+        if (!order && normalized.length >= 3) {
+          order = await db.get(
+            `
+            SELECT 
+              id,
+              CASE 
+                WHEN source = 'website' THEN 'website'
+                ELSE 'manual'
+              END as type,
+              status,
+              customerName as customer_name,
+              customerPhone as customer_contact,
+              COALESCE((SELECT SUM(price * quantity) FROM items WHERE orderId = orders.id), 0) as total_amount,
+              prepaymentAmount as prepayment_amount,
+              prepaymentStatus as prepayment_status,
+              paymentMethod as payment_method,
+              COALESCE(createdAt, created_at) as created_at,
+              '' as notes,
+              CASE 
+                WHEN source = 'website' THEN 'site-ord-' || id
+                ELSE number
+              END as order_number
+            FROM orders 
+            WHERE number LIKE ?
+          `,
+            [`%${normalized}%`],
+          );
+        }
+      }
+
+      if (!order) return null;
+
+      const assignment = await db.get(
+        `
+        SELECT order_id, order_type, page_id, uop.user_name as assigned_to_name
+        FROM user_order_page_orders uopo
+        JOIN user_order_pages uop ON uopo.page_id = uop.id
+        WHERE uopo.order_id = ? AND uopo.order_type = ? AND uopo.status != 'completed'
+      `,
+        [order.id, order.type],
+      );
+
+      return {
+        id: order.id,
+        type: order.type,
+        status: order.status,
+        customerName: order.customer_name,
+        customerContact: order.customer_contact,
+        totalAmount: order.total_amount,
+        prepaymentAmount: order.prepayment_amount ?? order.prepaymentAmount ?? undefined,
+        prepaymentStatus: order.prepayment_status ?? order.prepaymentStatus ?? undefined,
+        paymentMethod: order.payment_method ?? order.paymentMethod ?? undefined,
+        createdAt: order.created_at,
+        notes: order.notes,
+        orderNumber: order.order_number,
+        assignedTo: assignment?.page_id,
+        assignedToName: assignment?.assigned_to_name,
+      };
+    } catch (error) {
+      console.error('❌ Error searching order:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Выдача заказа/закрытие долга с переводом в статус 7
+   */
+  static async issueOrder(orderId: number, orderType: string): Promise<UnifiedOrder | null> {
+    try {
+      const db = await getDb();
+      await db.run('BEGIN');
+      try {
+        if (orderType === 'telegram') {
+          await db.run(
+            `
+            UPDATE photo_orders 
+            SET status = 7, updated_at = datetime('now')
+            WHERE id = ?
+          `,
+            [orderId],
+          );
+        } else {
+          const order = await db.get<any>(
+            `
+            SELECT id, source, prepaymentAmount, prepaymentStatus, paymentMethod
+            FROM orders WHERE id = ?
+          `,
+            [orderId],
+          );
+          if (!order) {
+            await db.run('ROLLBACK');
+            return null;
+          }
+
+          const totals = await db.get<{ total_amount: number }>(
+            'SELECT COALESCE(SUM(price * quantity), 0) as total_amount FROM items WHERE orderId = ?',
+            [orderId],
+          );
+          const totalAmount = Number(totals?.total_amount || 0);
+          const prepaymentAmount = Number(order.prepaymentAmount || 0);
+
+          if (totalAmount > 0 && prepaymentAmount < totalAmount) {
+            await db.run(
+              `
+              UPDATE orders
+              SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline'
+              WHERE id = ?
+            `,
+              [totalAmount, orderId],
+            );
+          }
+
+          await db.run(
+            `
+            UPDATE orders
+            SET status = 7, updated_at = datetime('now')
+            WHERE id = ?
+          `,
+            [orderId],
+          );
+        }
+
+        await db.run(
+          `
+          UPDATE user_order_page_orders 
+          SET status = 'completed', completed_at = datetime('now')
+          WHERE order_id = ? AND order_type = ?
+        `,
+          [orderId, orderType],
+        );
+
+        const pageOrder = await db.get(
+          `
+          SELECT page_id FROM user_order_page_orders 
+          WHERE order_id = ? AND order_type = ?
+        `,
+          [orderId, orderType],
+        );
+
+        if (pageOrder) {
+          await UserOrderPageService.updatePageStats(pageOrder.page_id);
+        }
+
+        await db.run('COMMIT');
+      } catch (error) {
+        await db.run('ROLLBACK');
+        throw error;
+      }
+
+      const searchKey =
+        orderType === 'telegram'
+          ? `tg-ord-${orderId}`
+          : orderType === 'website'
+            ? `site-ord-${orderId}`
+            : String(orderId);
+      return await OrderManagementService.searchOrder(searchKey);
+    } catch (error) {
+      console.error('❌ Error issuing order:', error);
+      return null;
     }
   }
 

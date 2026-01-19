@@ -8,6 +8,9 @@ interface UnifiedOrder {
   customerName?: string;
   customerContact?: string;
   totalAmount: number;
+  prepaymentAmount?: number;
+  prepaymentStatus?: string | null;
+  paymentMethod?: string | null;
   created_at: string;
   assignedTo?: number;
   assignedToName?: string;
@@ -40,6 +43,11 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [assigningOrder, setAssigningOrder] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResult, setSearchResult] = useState<UnifiedOrder | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [issuingOrder, setIssuingOrder] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -50,6 +58,7 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
   const loadOrderPool = async () => {
     try {
       setLoading(true);
+      setSearchError(null);
       const response = await api.get('/order-management/pool');
       if (response.data.success) {
         setOrderPool(response.data.data);
@@ -61,6 +70,52 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
       setError('Ошибка при загрузке пула заказов');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSearchOrder = async () => {
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResult(null);
+      setSearchError(null);
+      return;
+    }
+    try {
+      setSearching(true);
+      setSearchError(null);
+      const response = await api.get(`/order-management/search?query=${encodeURIComponent(query)}`);
+      if (response.data?.success) {
+        setSearchResult(response.data.data);
+      } else {
+        setSearchResult(null);
+        setSearchError(response.data?.message || 'Заказ не найден');
+      }
+    } catch (error: any) {
+      setSearchResult(null);
+      setSearchError(error.response?.data?.message || 'Ошибка поиска заказа');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const issueOrder = async (order: UnifiedOrder) => {
+    try {
+      setIssuingOrder(true);
+      setSearchError(null);
+      const response = await api.post('/order-management/issue', {
+        orderId: order.id,
+        orderType: order.type
+      });
+      if (response.data?.success) {
+        setSearchResult(response.data.data);
+        await loadOrderPool();
+      } else {
+        setSearchError(response.data?.message || 'Не удалось выдать заказ');
+      }
+    } catch (error: any) {
+      setSearchError(error.response?.data?.message || 'Ошибка выдачи заказа');
+    } finally {
+      setIssuingOrder(false);
     }
   };
 
@@ -112,8 +167,13 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
     return new Date(dateString).toLocaleString('ru-RU');
   };
 
-  const formatAmount = (amount: number) => {
-    return `${(amount / 100).toFixed(0)} Br`;
+  const formatAmount = (amount: number, type?: UnifiedOrder['type']) => {
+    const normalized = type === 'telegram' ? amount / 100 : amount;
+    return `${Number(normalized || 0).toFixed(2)} BYN`;
+  };
+
+  const isOrderIssued = (order: UnifiedOrder) => {
+    return String(order.status) === '7';
   };
 
   if (loading) {
@@ -159,6 +219,99 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
         </button>
       </div>
 
+      {/* Поиск заказа */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900">Поиск заказа</h3>
+        </div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                handleSearchOrder();
+              }
+            }}
+            placeholder="Номер заказа (например, 123, tg-ord-45, site-ord-12)"
+            className="w-full md:flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={handleSearchOrder}
+            disabled={searching}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {searching ? '⏳ Поиск...' : '🔍 Найти'}
+          </button>
+        </div>
+        {searchError && (
+          <div className="text-sm text-red-600">{searchError}</div>
+        )}
+        {searchResult && (
+          <div className="border border-gray-200 rounded-lg p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-3 mb-2">
+                  <span className="text-sm font-medium text-gray-900">
+                    {searchResult.orderNumber || `#${searchResult.id}`}
+                  </span>
+                  <span className="text-sm text-gray-600">
+                    {getOrderTypeLabel(searchResult.type)}
+                  </span>
+                  <span className="text-sm text-gray-600">
+                    {getStatusLabel(searchResult.status)}
+                  </span>
+                </div>
+                <div className="text-sm text-gray-600 mb-1">
+                  <strong>Клиент:</strong> {searchResult.customerName || 'Не указан'}
+                </div>
+                <div className="text-sm text-gray-600 mb-1">
+                  <strong>Контакты:</strong> {searchResult.customerContact || 'Не указаны'}
+                </div>
+                <div className="text-sm text-gray-600 mb-1">
+                  <strong>Сумма:</strong> {formatAmount(searchResult.totalAmount, searchResult.type)}
+                </div>
+                {searchResult.type !== 'telegram' && (
+                  <>
+                    <div className="text-sm text-gray-600 mb-1">
+                      <strong>Предоплата:</strong>{' '}
+                      {formatAmount(searchResult.prepaymentAmount || 0, searchResult.type)}
+                      {searchResult.prepaymentStatus
+                        ? ` (${searchResult.prepaymentStatus === 'paid' ? 'оплачено' : 'ожидает'})`
+                        : ''}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      <strong>Долг:</strong>{' '}
+                      {formatAmount(
+                        Math.max(0, (searchResult.totalAmount || 0) - (searchResult.prepaymentAmount || 0)),
+                        searchResult.type
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => issueOrder(searchResult)}
+                  disabled={issuingOrder || isOrderIssued(searchResult)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isOrderIssued(searchResult)
+                    ? '✅ Заказ уже выдан'
+                    : issuingOrder
+                      ? '⏳ Обработка...'
+                      : searchResult.type !== 'telegram' &&
+                        (searchResult.totalAmount || 0) > (searchResult.prepaymentAmount || 0)
+                          ? '💰 Закрыть долг и выдать'
+                          : '✅ Выдать заказ'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Не назначенные заказы */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
@@ -193,7 +346,7 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
                         <strong>Контакты:</strong> {order.customerContact || 'Не указаны'}
                       </div>
                       <div className="text-sm text-gray-600 mb-1">
-                        <strong>Сумма:</strong> {formatAmount(order.totalAmount)}
+                        <strong>Сумма:</strong> {formatAmount(order.totalAmount, order.type)}
                       </div>
                       <div className="text-sm text-gray-600">
                         <strong>Создан:</strong> {formatDate(order.created_at)}
@@ -250,7 +403,7 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
                         <strong>Ответственный:</strong> {order.assignedToName || 'Не назначен'}
                       </div>
                       <div className="text-sm text-gray-600 mb-1">
-                        <strong>Сумма:</strong> {formatAmount(order.totalAmount)}
+                        <strong>Сумма:</strong> {formatAmount(order.totalAmount, order.type)}
                       </div>
                       <div className="text-sm text-gray-600">
                         <strong>Создан:</strong> {formatDate(order.created_at)}
