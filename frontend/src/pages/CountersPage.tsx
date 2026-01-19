@@ -23,6 +23,8 @@ interface CashData {
   actual: number | null;
   calculated: number;
   difference: number;
+  dailyRevenue?: number;
+  previousActual?: number | null;
 }
 
 interface User {
@@ -105,10 +107,30 @@ export const CountersPage: React.FC = () => {
     if (!user) return;
     
     try {
-      // Получаем фактическую сумму из daily_reports
-      const reportResponse = await api.get(`/daily-reports/${selectedDate}?scope=global`);
-      const actualCash = reportResponse.data?.cash_actual || null;
+      const getCashActualForDate = async (date: string) => {
+        try {
+          const reportResponse = await api.get(`/daily-reports/${date}?scope=global`);
+          return reportResponse.data?.cash_actual ?? null;
+        } catch (error: any) {
+          const message = error instanceof Error ? error.message : String(error);
+          const isNotFound =
+            error?.response?.status === 404 ||
+            message.startsWith('404:') ||
+            message.includes('Отчёт не найден');
+          if (!isNotFound) {
+            throw error;
+          }
+          return null;
+        }
+      };
+
+      const actualCash = await getCashActualForDate(selectedDate);
       setCashActualValue(actualCash ? actualCash.toString() : '');
+
+      const previousDate = new Date(selectedDate);
+      previousDate.setDate(previousDate.getDate() - 1);
+      const previousDateKey = previousDate.toISOString().split('T')[0];
+      const previousActualCash = await getCashActualForDate(previousDateKey);
 
       // Рассчитываем сумму из заказов за день
       const ordersResponse = await api.get('/orders');
@@ -118,7 +140,7 @@ export const CountersPage: React.FC = () => {
         const orderDate = new Date(rawDate).toISOString().split('T')[0];
         return orderDate === selectedDate;
       });
-      const calculatedCash = ordersForDate.reduce((sum: number, order: any) => {
+      const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
         const prepayment = Number(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
         const items = Array.isArray(order.items) ? order.items : [];
         const itemsTotal = items.reduce((acc: number, item: any) => {
@@ -128,6 +150,7 @@ export const CountersPage: React.FC = () => {
         }, 0);
         return sum + (prepayment > 0 ? prepayment : itemsTotal);
       }, 0);
+      const calculatedCash = Number(previousActualCash || 0) + dailyRevenue;
 
       const expectedClicks: Record<number, number> = {};
       ordersForDate.forEach((order: any) => {
@@ -149,7 +172,9 @@ export const CountersPage: React.FC = () => {
       setCashData({
         actual: actualCash,
         calculated: calculatedCash,
-        difference
+        difference,
+        dailyRevenue,
+        previousActual: previousActualCash
       });
 
     } catch (error: any) {
@@ -157,7 +182,9 @@ export const CountersPage: React.FC = () => {
       setCashData({
         actual: null,
         calculated: 0,
-        difference: 0
+        difference: 0,
+        dailyRevenue: 0,
+        previousActual: null
       });
     }
   };
@@ -227,10 +254,15 @@ export const CountersPage: React.FC = () => {
     return printerExpectedClicks[printerId] ?? 0;
   };
 
-  const getPrinterDelta = (printerId: number, actualDelta: number | null | undefined) => {
-    const expected = getExpectedClicksForPrinter(printerId);
-    if (actualDelta === null || actualDelta === undefined) return null;
-    return actualDelta - expected;
+  const getExpectedPrinterCounter = (printerId: number, prevValue: number | null | undefined) => {
+    const base = Number(prevValue ?? 0);
+    return base + getExpectedClicksForPrinter(printerId);
+  };
+
+  const getPrinterDelta = (printerId: number, currentValue: number | null | undefined, prevValue: number | null | undefined) => {
+    if (currentValue === null || currentValue === undefined) return null;
+    const expectedCounter = getExpectedPrinterCounter(printerId, prevValue);
+    return currentValue - expectedCounter;
   };
 
   const getCashStatus = () => {
@@ -385,7 +417,19 @@ export const CountersPage: React.FC = () => {
             </div>
             
             <div className="cash-row">
-              <div className="cash-label">Расчетная сумма (из CRM):</div>
+              <div className="cash-label">Счётчик за вчера (факт):</div>
+              <div className="cash-value">
+                {cashData.previousActual != null ? cashData.previousActual.toFixed(2) : '—'} BYN
+              </div>
+            </div>
+
+            <div className="cash-row">
+              <div className="cash-label">Выручка за день (CRM):</div>
+              <div className="cash-value">{(cashData.dailyRevenue ?? 0).toFixed(2)} BYN</div>
+            </div>
+
+            <div className="cash-row">
+              <div className="cash-label">Расчётный счётчик (CRM):</div>
               <div className="cash-value">{cashData.calculated.toFixed(2)} BYN</div>
             </div>
             
@@ -446,19 +490,25 @@ export const CountersPage: React.FC = () => {
                     </span>
                   </div>
                   <div className="value-row">
-                    <span className="value-label">Расчётные клики:</span>
+                    <span className="value-label">Клики за день (CRM):</span>
                     <span className="value-calculated">
                       {getExpectedClicksForPrinter(printer.id).toLocaleString()}
                     </span>
                   </div>
                   <div className="value-row">
+                    <span className="value-label">Расчётный счётчик:</span>
+                    <span className="value-calculated">
+                      {getExpectedPrinterCounter(printer.id, printer.prev_value).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="value-row">
                     <span className="value-label">Отклонение:</span>
-                    {getPrinterDelta(printer.id, printer.difference) === null ? (
+                    {getPrinterDelta(printer.id, printer.value, printer.prev_value) === null ? (
                       <span className="value-difference neutral">—</span>
                     ) : (
-                      <span className={`value-difference ${getPrinterDelta(printer.id, printer.difference)! >= 0 ? 'positive' : 'negative'}`}>
-                        {getPrinterDelta(printer.id, printer.difference)! >= 0 ? '+' : ''}
-                        {getPrinterDelta(printer.id, printer.difference)}
+                      <span className={`value-difference ${getPrinterDelta(printer.id, printer.value, printer.prev_value)! >= 0 ? 'positive' : 'negative'}`}>
+                        {getPrinterDelta(printer.id, printer.value, printer.prev_value)! >= 0 ? '+' : ''}
+                        {getPrinterDelta(printer.id, printer.value, printer.prev_value)}
                       </span>
                     )}
                   </div>
