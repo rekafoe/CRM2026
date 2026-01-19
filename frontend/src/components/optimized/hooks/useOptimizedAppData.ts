@@ -110,8 +110,9 @@ export const useOptimizedAppData = (
       
       const filtered = res.data
         .filter(o => {
-          if (!o.created_at) return false;
-          const orderDate = new Date(o.created_at).toISOString().slice(0, 10);
+          const rawDate = (o as any).created_at ?? (o as any).createdAt;
+          if (!rawDate) return false;
+          const orderDate = extractDate(rawDate);
           return orderDate === targetDate;
         })
         .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid));
@@ -122,8 +123,20 @@ export const useOptimizedAppData = (
       
       setOrders(prevOrders => {
         // Проверяем, действительно ли изменились заказы
-        if (prevOrders.length === uniqueOrders.length && 
-            prevOrders.every((o, i) => o.id === uniqueOrders[i]?.id)) {
+        if (
+          prevOrders.length === uniqueOrders.length &&
+          prevOrders.every((o, i) => {
+            const next = uniqueOrders[i];
+            if (!next) return false;
+            return (
+              o.id === next.id &&
+              (o.items?.length || 0) === (next.items?.length || 0) &&
+              Number(o.prepaymentAmount || 0) === Number(next.prepaymentAmount || 0) &&
+              (o.prepaymentStatus || '') === (next.prepaymentStatus || '') &&
+              (o.paymentMethod || '') === (next.paymentMethod || '')
+            );
+          })
+        ) {
           return prevOrders;
         }
         return uniqueOrders;
@@ -181,8 +194,9 @@ export const useOptimizedAppData = (
       getOrders().then((res) => {
         const filtered = res.data
           .filter(o => {
-            if (!o.created_at) return false;
-            const orderDate = extractDate(o.created_at);
+            const rawDate = (o as any).created_at ?? (o as any).createdAt;
+            if (!rawDate) return false;
+            const orderDate = extractDate(rawDate);
             return orderDate === targetDate;
           })
           .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid));
@@ -198,14 +212,18 @@ export const useOptimizedAppData = (
           }
           
           // Проверяем, действительно ли изменились заказы
-          // Сравниваем не только ID, но и количество items
+          // Сравниваем ID, количество items и статус предоплаты
           if (prevOrders.length === uniqueOrders.length && 
               prevOrders.every((o, i) => {
                 const newOrder = uniqueOrders[i];
                 if (!newOrder) return false;
-                // Сравниваем ID и количество items
-                return o.id === newOrder.id && 
-                       (o.items?.length || 0) === (newOrder.items?.length || 0);
+                return (
+                  o.id === newOrder.id && 
+                  (o.items?.length || 0) === (newOrder.items?.length || 0) &&
+                  Number(o.prepaymentAmount || 0) === Number(newOrder.prepaymentAmount || 0) &&
+                  (o.prepaymentStatus || '') === (newOrder.prepaymentStatus || '') &&
+                  (o.paymentMethod || '') === (newOrder.paymentMethod || '')
+                );
               })) {
             return prevOrders;
           }

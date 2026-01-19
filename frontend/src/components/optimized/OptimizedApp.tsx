@@ -357,7 +357,10 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
             try {
               const normalizedMethod = paymentMethod === 'telegram' ? 'online' : paymentMethod;
               const res = await createPrepaymentLink(selectedOrder.id, amount, normalizedMethod);
-              await loadOrders();
+              if (res?.data) {
+                setOrders((prev) => prev.map((order) => (order.id === res.data.id ? res.data : order)));
+              }
+              await loadOrders(undefined, true);
               setPrepayAmount(String(amount));
               const isEditing = selectedOrder.prepaymentAmount && selectedOrder.prepaymentAmount > 0;
               const actionText = isEditing ? 'изменена' : 'создана';
