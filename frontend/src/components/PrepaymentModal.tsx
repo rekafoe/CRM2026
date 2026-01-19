@@ -25,7 +25,11 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
 }) => {
   if (!isOpen) return null;
   
-  const [amount, setAmount] = useState<string>(currentAmount.toString());
+  const formatAmount = (value: number | null | undefined): string => {
+    if (value == null || Number.isNaN(value)) return '';
+    return String(value);
+  };
+  const [amount, setAmount] = useState<string>(formatAmount(currentAmount));
   const [email, setEmail] = useState<string>(currentEmail);
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'offline' | 'telegram'>(currentPaymentMethod || 'online');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +46,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
 
   // Обновляем поля при изменении пропсов
   React.useEffect(() => {
-    setAmount(currentAmount.toString());
+    setAmount(formatAmount(currentAmount));
     setEmail(currentEmail);
     setPaymentMethod(currentPaymentMethod);
   }, [currentAmount, currentEmail, currentPaymentMethod]);
