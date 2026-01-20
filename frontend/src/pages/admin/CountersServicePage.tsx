@@ -27,6 +27,12 @@ export const CountersServicePage: React.FC = () => {
   const [cashContributions, setCashContributions] = useState<CashContribution[]>([]);
   const [cashTotal, setCashTotal] = useState(0);
   const [users, setUsers] = useState<Array<{ id: number; name: string }>>([]);
+  const previousDateLabel = useMemo(() => {
+    const base = new Date(selectedDate);
+    if (Number.isNaN(base.getTime())) return 'вчера';
+    base.setDate(base.getDate() - 1);
+    return base.toISOString().split('T')[0];
+  }, [selectedDate]);
 
   useEffect(() => {
     getUsers()
@@ -130,8 +136,8 @@ export const CountersServicePage: React.FC = () => {
               <thead>
                 <tr>
                   <th>Принтер</th>
-                  <th>Пред. день</th>
-                  <th>След. день</th>
+                  <th>Счётчик вчера ({previousDateLabel})</th>
+                  <th>Счётчик сегодня ({selectedDate})</th>
                   <th>Разница</th>
                 </tr>
               </thead>
