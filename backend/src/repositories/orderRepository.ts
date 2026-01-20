@@ -22,7 +22,7 @@ export const OrderRepository = {
 
   async listUserOrders(userId: number): Promise<Order[]> {
     const db = await getDb()
-    const orders = await db.all<Order>(
+    const orders = await db.all<any>(
       `SELECT 
         o.id, 
         CASE 
@@ -31,14 +31,46 @@ export const OrderRepository = {
         END as number,
         o.status, COALESCE(o.created_at, o.createdAt) as created_at, o.customerName, o.customerPhone, o.customerEmail, 
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
-        o.source, o.customer_id
+        o.source, o.customer_id,
+        c.id as customer__id,
+        c.first_name as customer__first_name,
+        c.last_name as customer__last_name,
+        c.middle_name as customer__middle_name,
+        c.company_name as customer__company_name,
+        c.legal_name as customer__legal_name,
+        c.authorized_person as customer__authorized_person,
+        c.phone as customer__phone,
+        c.email as customer__email
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
       WHERE o.userId = ? OR o.userId IS NULL 
       ORDER BY o.id DESC`,
       userId
     )
-    return orders as unknown as Order[]
+    // Преобразуем плоские поля customer__ в объект customer
+    return orders.map((row: any) => {
+      const { 
+        customer__id, customer__first_name, customer__last_name, customer__middle_name,
+        customer__company_name, customer__legal_name, customer__authorized_person,
+        customer__phone, customer__email,
+        ...order 
+      } = row
+      
+      if (customer__id) {
+        order.customer = {
+          id: customer__id,
+          first_name: customer__first_name,
+          last_name: customer__last_name,
+          middle_name: customer__middle_name,
+          company_name: customer__company_name,
+          legal_name: customer__legal_name,
+          authorized_person: customer__authorized_person,
+          phone: customer__phone,
+          email: customer__email
+        }
+      }
+      return order
+    }) as unknown as Order[]
   },
 
   async listAssignedOrdersForUser(userId: number): Promise<any[]> {
