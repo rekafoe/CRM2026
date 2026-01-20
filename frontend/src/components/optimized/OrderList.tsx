@@ -1,4 +1,4 @@
-﻿import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { Order } from '../../types';
 import { parseNumberFlexible } from '../../utils/numberInput';
 import { useOrderStatusClasses } from './hooks/useOrderStatusClasses';
@@ -56,6 +56,7 @@ const OrderItem = memo<{
     onSelect(order.id);
   }, [order.id, onSelect]);
 
+  // Возвращает имя клиента или null если не указан
   const customerLabel = useMemo(() => {
     if (order.customer) {
       const company =
@@ -74,7 +75,7 @@ const OrderItem = memo<{
         return parts.join(' ');
       }
     }
-    return order.customerName || 'Клиент не указан';
+    return order.customerName || null;
   }, [order.customer, order.customerName]);
 
   const totalAmount = useMemo(() => {
@@ -99,10 +100,13 @@ const OrderItem = memo<{
     >
       <div className="order-item__header">
         <span className="order-item__number">{order.number}</span>
+        <span className="order-item__amount">{totalAmount.toFixed(2)} BYN</span>
       </div>
-      <div className="order-item__details-line">
-        Клиент: {customerLabel} • Итого: {totalAmount.toFixed(2)} BYN
-      </div>
+      {customerLabel && (
+        <div className="order-item__customer">
+          {customerLabel}
+        </div>
+      )}
       <OrderItemStatus
         statusInfo={statusInfo}
         status={statusValue}
