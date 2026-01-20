@@ -238,12 +238,19 @@ router.get('/', async (req, res) => {
     const conditions: string[] = [];
     const params: any[] = [];
     if (activeOnly === 'true') {
-      conditions.push('p.is_active = 1', 'pc.is_active = 1');
+      conditions.push('p.is_active = 1');
+      // При поиске не блокируем продукты из неактивных категорий
+      if (!searchValue) {
+        conditions.push('pc.is_active = 1');
+      }
     }
     if (searchValue) {
+      // Используем LOWER() для регистронезависимого поиска кириллицы
+      // SQLite LIKE регистронезависим только для ASCII, но не для unicode/кириллицы
+      const lowerSearch = searchValue.toLowerCase();
       conditions.push('(LOWER(p.name) LIKE ? OR LOWER(p.description) LIKE ?)');
-      const needle = `%${searchValue.toLowerCase()}%`;
-      params.push(needle, needle);
+      const searchPattern = `%${lowerSearch}%`;
+      params.push(searchPattern, searchPattern);
     }
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE 1=1';
     
