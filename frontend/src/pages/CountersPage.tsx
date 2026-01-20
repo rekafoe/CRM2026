@@ -61,6 +61,12 @@ export const CountersPage: React.FC = () => {
   const [cashContributions, setCashContributions] = useState<CashContribution[]>([]);
   const [cashContributionsTotal, setCashContributionsTotal] = useState<number>(0);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
+  const previousDateLabel = React.useMemo(() => {
+    const base = new Date(selectedDate);
+    if (Number.isNaN(base.getTime())) return 'вчера';
+    base.setDate(base.getDate() - 1);
+    return base.toISOString().split('T')[0];
+  }, [selectedDate]);
 
   useEffect(() => {
     loadUser();
@@ -552,14 +558,14 @@ export const CountersPage: React.FC = () => {
                 
                 <div className="printer-values">
                   <div className="value-row">
-                    <span className="value-label">Предыдущий:</span>
+                    <span className="value-label">Вчера ({previousDateLabel}):</span>
                     <span className="value-previous">
                       {printer.prev_value !== null ? printer.prev_value.toLocaleString() : '—'}
                     </span>
                   </div>
                   
                   <div className="value-row">
-                    <span className="value-label">Текущий:</span>
+                    <span className="value-label">Сегодня ({selectedDate}):</span>
                     <span className="value-current">
                       {printer.value !== null ? printer.value.toLocaleString() : '—'}
                     </span>
