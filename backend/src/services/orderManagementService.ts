@@ -467,12 +467,26 @@ export class OrderManagementService {
           const prepaymentAmount = Number(order.prepaymentAmount || 0);
 
           if (totalAmount > 0 && prepaymentAmount < totalAmount) {
-            await db.run(
-              `
+            let hasPrepaymentUpdatedAt = false
+            try {
+              const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
+              hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+            } catch {
+              hasPrepaymentUpdatedAt = false
+            }
+            const updateSql = hasPrepaymentUpdatedAt
+              ? `
               UPDATE orders
               SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now'), updated_at = datetime('now')
               WHERE id = ?
-            `,
+            `
+              : `
+              UPDATE orders
+              SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', updated_at = datetime('now')
+              WHERE id = ?
+            `
+            await db.run(
+              updateSql,
               [totalAmount, orderId],
             );
           }

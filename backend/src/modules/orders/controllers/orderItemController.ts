@@ -261,12 +261,21 @@ export class OrderItemController {
         const allowAutoPay = paymentMethod !== null && paymentMethod !== undefined
         const hasPrepayment = prepaymentAmount > 0 || (prepaymentStatus && prepaymentStatus.length > 0)
         if (allowAutoPay && !hasPrepayment && totalAmount > 0) {
-          await db.run(
-            `UPDATE orders
-             SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', paymentUrl = NULL, paymentId = NULL, prepaymentUpdatedAt = datetime('now'), updated_at = datetime('now')
-             WHERE id = ?`,
-            [totalAmount, orderId]
-          )
+          let hasPrepaymentUpdatedAt = false
+          try {
+            const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
+            hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+          } catch {
+            hasPrepaymentUpdatedAt = false
+          }
+          const updateSql = hasPrepaymentUpdatedAt
+            ? `UPDATE orders
+               SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', paymentUrl = NULL, paymentId = NULL, prepaymentUpdatedAt = datetime('now'), updated_at = datetime('now')
+               WHERE id = ?`
+            : `UPDATE orders
+               SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', paymentUrl = NULL, paymentId = NULL, updated_at = datetime('now')
+               WHERE id = ?`
+          await db.run(updateSql, [totalAmount, orderId])
         }
         
         logger.info('✅ [addItem] Позиция вставлена', { itemId })

@@ -83,21 +83,43 @@ export class OrderService {
     } catch {}
 
     const initialPrepay = Number(prepaymentAmount || 0)
-    const insertRes = await db.run(
-      'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentUpdatedAt, userId, source, customer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        defaultStatusId, // FK -> order_statuses.id (обычно "Новый")
-        createdAt,
-        customerName || null,
-        customerPhone || null,
-        customerEmail || null,
-        initialPrepay,
-        initialPrepay > 0 ? createdAt : null,
-        userId ?? null,
-        source || 'crm',
-        customerId || null
-      ]
-    )
+    let hasPrepaymentUpdatedAt = false
+    try {
+      const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
+      hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+    } catch {
+      hasPrepaymentUpdatedAt = false
+    }
+    const insertRes = hasPrepaymentUpdatedAt
+      ? await db.run(
+          'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentUpdatedAt, userId, source, customer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            defaultStatusId, // FK -> order_statuses.id (обычно "Новый")
+            createdAt,
+            customerName || null,
+            customerPhone || null,
+            customerEmail || null,
+            initialPrepay,
+            initialPrepay > 0 ? createdAt : null,
+            userId ?? null,
+            source || 'crm',
+            customerId || null
+          ]
+        )
+      : await db.run(
+          'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source, customer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            defaultStatusId,
+            createdAt,
+            customerName || null,
+            customerPhone || null,
+            customerEmail || null,
+            initialPrepay,
+            userId ?? null,
+            source || 'crm',
+            customerId || null
+          ]
+        )
     const id = (insertRes as any).lastID!
     const number = `ORD-${String(id).padStart(4, '0')}`
     await db.run('UPDATE orders SET number = ? WHERE id = ?', [number, id])

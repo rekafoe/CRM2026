@@ -286,21 +286,35 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   const db = await getDb()
   const order = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
+  let hasPrepaymentUpdatedAt = false
+  try {
+    const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
+    hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+  } catch {
+    hasPrepaymentUpdatedAt = false
+  }
   const rawAmount = (req.body as any)?.amount
   const wantsClear = rawAmount === 0 || rawAmount === '0' || rawAmount === '' || rawAmount === null
   if (wantsClear) {
-    await db.run(
-      `UPDATE orders
-         SET prepaymentAmount = NULL,
-             prepaymentStatus = NULL,
-             paymentUrl = NULL,
-             paymentId = NULL,
-             paymentMethod = NULL,
-             prepaymentUpdatedAt = datetime('now'),
-             updated_at = datetime('now')
-       WHERE id = ?`,
-      id
-    )
+    const clearSql = hasPrepaymentUpdatedAt
+      ? `UPDATE orders
+           SET prepaymentAmount = NULL,
+               prepaymentStatus = NULL,
+               paymentUrl = NULL,
+               paymentId = NULL,
+               paymentMethod = NULL,
+               prepaymentUpdatedAt = datetime('now'),
+               updated_at = datetime('now')
+         WHERE id = ?`
+      : `UPDATE orders
+           SET prepaymentAmount = NULL,
+               prepaymentStatus = NULL,
+               paymentUrl = NULL,
+               paymentId = NULL,
+               paymentMethod = NULL,
+               updated_at = datetime('now')
+         WHERE id = ?`
+    await db.run(clearSql, id)
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
     res.json(updated)
     return
@@ -315,8 +329,10 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   const paymentUrl = paymentMethod === 'online' ? `https://checkout.bepaid.by/redirect/${paymentId}` : null
   const prepaymentStatus = paymentMethod === 'offline' ? 'paid' : 'pending'
   
-  await db.run('UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?', 
-    amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, id)
+  const updateSql = hasPrepaymentUpdatedAt
+    ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?'
+    : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?'
+  await db.run(updateSql, amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, id)
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   res.json(updated)
 }))
