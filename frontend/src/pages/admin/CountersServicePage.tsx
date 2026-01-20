@@ -59,6 +59,9 @@ export const CountersServicePage: React.FC = () => {
         const userNameById = new Map<number, string>(
           users.map((u) => [Number(u.id), u.name])
         );
+        const idNameById = new Map<number, string>(
+          users.map((u) => [Number(u.id), `ID ${u.id}`])
+        );
         const contributionsByUser = new Map<number, number>();
         const total = ordersForDate.reduce((sum: number, order: any) => {
           const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
@@ -73,7 +76,7 @@ export const CountersServicePage: React.FC = () => {
 
         const contributions = Array.from(contributionsByUser.entries()).map(([user_id, amount]) => ({
           user_id,
-          user_name: userNameById.get(user_id) || `ID ${user_id}`,
+          user_name: userNameById.get(user_id) || idNameById.get(user_id),
           amount,
         }));
         setCashContributions(contributions);
