@@ -305,8 +305,13 @@ export class OrderManagementService {
           [id],
         );
 
-      const fetchOrderByNumber = async (number: string) =>
-        db.get(
+      const fetchOrderByNumber = async (number: string) => {
+        // Убираем ведущие нули для поиска без них
+        const withoutLeadingZeros = number.replace(/^0+/, '') || '0';
+        // Если введено число, также ищем с ведущими нулями
+        const paddedNumber = number.padStart(4, '0');
+        
+        return db.get(
           `
           SELECT 
             id,
@@ -328,10 +333,14 @@ export class OrderManagementService {
               ELSE number
             END as order_number
           FROM orders 
-          WHERE number = ?
+          WHERE number = ? 
+             OR number = ? 
+             OR number = ?
+             OR CAST(REPLACE(number, '-', '') AS INTEGER) = ?
         `,
-          [number],
+          [number, withoutLeadingZeros, paddedNumber, parseInt(withoutLeadingZeros) || 0],
         );
+      };
 
       const fetchTelegramById = async (id: number) =>
         db.get(

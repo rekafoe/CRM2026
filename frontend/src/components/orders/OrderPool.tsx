@@ -234,9 +234,14 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 handleSearchOrder();
+              } else if (event.key === 'Escape') {
+                setSearchQuery('');
+                setSearchResult(null);
+                setSearchError(null);
+                (event.target as HTMLInputElement).blur();
               }
             }}
-            placeholder="Номер заказа (например, 123, tg-ord-45, site-ord-12)"
+            placeholder="Номер заказа (например, 123, 0186, tg-ord-45)"
             className="w-full md:flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button

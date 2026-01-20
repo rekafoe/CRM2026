@@ -13,11 +13,13 @@ export const useOrderStatusClasses = (
     const statusName = statusInfo?.name?.toLowerCase() || '';
     let statusClass = '';
 
-    if (statusName.includes('ожидан') || statusName.includes('pending')) {
+    if (statusName.includes('нов') || statusName.includes('new')) {
+      statusClass = 'new';
+    } else if (statusName.includes('ожидан') || statusName.includes('pending')) {
       statusClass = 'pending';
     } else if (statusName.includes('рабо') || statusName.includes('progress')) {
       statusClass = 'in-progress';
-    } else if (statusName.includes('заверш') || statusName.includes('completed')) {
+    } else if (statusName.includes('заверш') || statusName.includes('completed') || statusName.includes('готов')) {
       statusClass = 'completed';
     } else if (statusName.includes('отмен') || statusName.includes('cancelled')) {
       statusClass = 'cancelled';
