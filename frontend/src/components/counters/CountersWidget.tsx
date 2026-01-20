@@ -196,22 +196,20 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
                       </span>
                     )}
                   </div>
-                  {isAdmin && (
-                    <input
-                      type="number"
-                      className="counter-input"
-                      placeholder="Новый счетчик"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          const value = parseInt((e.target as HTMLInputElement).value);
-                          if (!isNaN(value)) {
-                            updatePrinterCounter(printer.id, value);
-                            (e.target as HTMLInputElement).value = '';
-                          }
+                  <input
+                    type="number"
+                    className="counter-input"
+                    placeholder="Новый счетчик"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        const value = parseInt((e.target as HTMLInputElement).value);
+                        if (!isNaN(value)) {
+                          updatePrinterCounter(printer.id, value);
+                          (e.target as HTMLInputElement).value = '';
                         }
-                      }}
-                    />
-                  )}
+                      }
+                    }}
+                  />
                 </div>
               ))}
             </div>

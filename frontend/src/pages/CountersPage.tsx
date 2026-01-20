@@ -545,15 +545,13 @@ export const CountersPage: React.FC = () => {
                     <h3>{printer.name}</h3>
                     <span className="printer-code">({printer.code})</span>
                   </div>
-                  {user.role === 'admin' && (
-                    <button
-                      className="edit-btn"
-                      onClick={() => handlePrinterEdit(printer.id)}
-                      disabled={saving}
-                    >
-                      ✏️
-                    </button>
-                  )}
+                  <button
+                    className="edit-btn"
+                    onClick={() => handlePrinterEdit(printer.id)}
+                    disabled={saving}
+                  >
+                    ✏️
+                  </button>
                 </div>
                 
                 <div className="printer-values">

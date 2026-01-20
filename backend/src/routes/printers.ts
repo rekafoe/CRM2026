@@ -240,10 +240,10 @@ router.get('/counters', asyncHandler(async (req, res) => {
   res.json(rows)
 }))
 
-// POST /api/printers/:id/counters — добавить счётчик принтера
+// POST /api/printers/:id/counters — добавить счётчик принтера (доступно всем авторизованным пользователям)
 router.post('/:id/counters', asyncHandler(async (req, res) => {
   const user = (req as AuthenticatedRequest).user as { id: number; role: string } | undefined
-  if (!user || user.role !== 'admin') { res.status(403).json({ message: 'Forbidden' }); return }
+  if (!user) { res.status(401).json({ message: 'Unauthorized' }); return }
   const id = Number(req.params.id)
   const { counter_date, value } = req.body as { counter_date: string; value: number }
   const db = await getDb()

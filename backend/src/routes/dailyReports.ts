@@ -22,7 +22,8 @@ router.get('/', asyncHandler(async (req, res) => {
     where.push('dr.user_id = ?')
     params.push(Number(user_id))
   } else if (isShowAll) {
-    if (!authUser || authUser.role !== 'admin') { res.status(403).json({ message: 'Forbidden' }); return }
+    // Разрешаем всем авторизованным пользователям видеть вклады в кассу
+    if (!authUser) { res.status(401).json({ message: 'Unauthorized' }); return }
   } else if (current_user_id) {
     // Если не указан user_id, но есть current_user_id, показываем отчёты текущего пользователя
     where.push('dr.user_id = ?')
