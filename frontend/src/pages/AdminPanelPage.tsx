@@ -36,6 +36,7 @@ const PricingPage = lazy(() =>
   import('./admin/PricingPage').then((m) => ({ default: m.PricingPage }))
 );
 const PrintersPage = lazy(() => import('./admin/PrintersPage'));
+const CountersServicePage = lazy(() => import('./admin/CountersServicePage'));
 const CustomersAdminPage = lazy(() =>
   import('./admin/CustomersAdminPage').then((m) => ({ default: m.default }))
 );
@@ -138,6 +139,9 @@ const AdminPanelHome: React.FC = () => {
           <button onClick={() => navigate('/adminpanel/printers')} className="nav-btn">
             🖨️ Принтеры
           </button>
+          <button onClick={() => navigate('/adminpanel/counters')} className="nav-btn">
+            🧾 Счётчики
+          </button>
           <button onClick={() => navigate('/adminpanel/services-management')} className="nav-btn">
             🔧 Настройка операций
           </button>
@@ -221,6 +225,14 @@ const AdminPanelHome: React.FC = () => {
               <span className="link-title">Уведомления</span>
               <span className="link-desc">Управление всеми уведомлениями системы</span>
             </button>
+            <button
+              className="admin-link-card"
+              onClick={() => navigate('/adminpanel/counters')}
+            >
+              <span className="link-icon">🧾</span>
+              <span className="link-title">Счётчики</span>
+              <span className="link-desc">Касса и принтеры по дням</span>
+            </button>
             <button 
               className="admin-link-card"
               onClick={() => navigate('/adminpanel/clients')}
@@ -276,6 +288,7 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/discounts" element={<PricingPage onBack={() => window.history.back()} />} />
           <Route path="/earnings" element={<EarningsAdminPage />} />
           <Route path="/printers" element={<PrintersPage />} />
+          <Route path="/counters" element={<CountersServicePage />} />
           <Route path="/clients" element={<CustomersAdminPage />} />
           
           {/* Настройки */}
