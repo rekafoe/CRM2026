@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { getCurrentUser } from '../api';
+import { getCurrentUser, getUsers } from '../api';
 import { parseNumberFlexible } from '../utils/numberInput';
 import './CountersPage.css';
 
@@ -60,6 +60,7 @@ export const CountersPage: React.FC = () => {
   const [printerExpectedClicks, setPrinterExpectedClicks] = useState<Record<number, number>>({});
   const [cashContributions, setCashContributions] = useState<CashContribution[]>([]);
   const [cashContributionsTotal, setCashContributionsTotal] = useState<number>(0);
+  const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
 
   useEffect(() => {
     loadUser();
@@ -70,6 +71,12 @@ export const CountersPage: React.FC = () => {
       loadCounters();
     }
   }, [user, selectedDate]);
+
+  useEffect(() => {
+    getUsers()
+      .then((res) => setAllUsers(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setAllUsers([]));
+  }, []);
 
   const loadUser = async () => {
     try {
@@ -138,7 +145,40 @@ export const CountersPage: React.FC = () => {
       const previousDateKey = previousDate.toISOString().split('T')[0];
       const previousActualCash = await getCashActualForDate(previousDateKey);
 
+      // Заказы за дату (для расчётов и вкладов)
+      const ordersResponse = await api.get(`/reports/daily/${selectedDate}/orders`);
+      const ordersForDate = Array.isArray(ordersResponse.data?.orders)
+        ? ordersResponse.data.orders
+        : [];
+      const userNameById = new Map<number, string>(
+        allUsers.map((u) => [Number(u.id), u.name])
+      );
+      const contributionsByUser = new Map<number, number>();
+      const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
+        const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
+        const items = Array.isArray(order.items) ? order.items : [];
+        const itemsTotal = items.reduce((acc: number, item: any) => {
+          const price = parseNumberFlexible(item.price ?? 0);
+          const qty = parseNumberFlexible(item.quantity ?? 1);
+          return acc + price * qty;
+        }, 0);
+        const orderAmount = prepayment > 0 ? prepayment : itemsTotal;
+        const rawUserId = order.userId ?? order.user_id ?? null;
+        const userId = rawUserId != null ? Number(rawUserId) : null;
+        if (userId && !Number.isNaN(userId)) {
+          contributionsByUser.set(userId, (contributionsByUser.get(userId) || 0) + orderAmount);
+        }
+        return sum + orderAmount;
+      }, 0);
+      const computedContributions: CashContribution[] = Array.from(contributionsByUser.entries())
+        .map(([user_id, amount]) => ({
+          user_id,
+          user_name: userNameById.get(user_id) || `ID ${user_id}`,
+          cash_actual: amount
+        }));
+
       // Вклады по пользователям за дату (если доступны)
+      let contributionsToShow = computedContributions;
       try {
         const userReportsResponse = await api.get('/daily-reports', {
           params: {
@@ -154,35 +194,22 @@ export const CountersPage: React.FC = () => {
           user_name: report.user_name,
           cash_actual: report.cash_actual ?? null
         }));
-        const total = normalized.reduce((sum, report) => {
-          return sum + Number(report.cash_actual || 0);
-        }, 0);
-        setCashContributions(normalized);
-        setCashContributionsTotal(total);
+        const hasActuals = normalized.some((r) => Number(r.cash_actual || 0) > 0);
+        if (hasActuals || computedContributions.length === 0) {
+          contributionsToShow = normalized;
+        }
       } catch (userReportsError: any) {
-        if (userReportsError?.response?.status === 403) {
-          setCashContributions([]);
-          setCashContributionsTotal(0);
-        } else {
+        if (userReportsError?.response?.status !== 403) {
           throw userReportsError;
         }
       }
 
-      // Рассчитываем сумму из заказов за день (глобально)
-      const ordersResponse = await api.get(`/reports/daily/${selectedDate}/orders`);
-      const ordersForDate = Array.isArray(ordersResponse.data?.orders)
-        ? ordersResponse.data.orders
-        : [];
-      const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
-        const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
-        const items = Array.isArray(order.items) ? order.items : [];
-        const itemsTotal = items.reduce((acc: number, item: any) => {
-          const price = parseNumberFlexible(item.price ?? 0);
-          const qty = parseNumberFlexible(item.quantity ?? 1);
-          return acc + price * qty;
-        }, 0);
-        return sum + (prepayment > 0 ? prepayment : itemsTotal);
+      const total = contributionsToShow.reduce((sum, report) => {
+        return sum + Number(report.cash_actual || 0);
       }, 0);
+      setCashContributions(contributionsToShow);
+      setCashContributionsTotal(total);
+
       const calculatedCash = Number(previousActualCash || 0) + dailyRevenue;
 
       const expectedClicks: Record<number, number> = {};
