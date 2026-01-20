@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { getCurrentUser } from '../api';
+import { parseNumberFlexible } from '../utils/numberInput';
 import './CountersPage.css';
 
 interface Printer {
@@ -173,11 +174,11 @@ export const CountersPage: React.FC = () => {
         ? ordersResponse.data.orders
         : [];
       const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
-        const prepayment = Number(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
+        const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
         const items = Array.isArray(order.items) ? order.items : [];
         const itemsTotal = items.reduce((acc: number, item: any) => {
-          const price = Number(item.price ?? 0);
-          const qty = Number(item.quantity ?? 1);
+          const price = parseNumberFlexible(item.price ?? 0);
+          const qty = parseNumberFlexible(item.quantity ?? 1);
           return acc + price * qty;
         }, 0);
         return sum + (prepayment > 0 ? prepayment : itemsTotal);

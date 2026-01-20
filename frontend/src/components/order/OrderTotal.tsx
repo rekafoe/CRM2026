@@ -1,4 +1,5 @@
 import React from 'react';
+import { parseNumberFlexible } from '../../utils/numberInput';
 
 export interface OrderItem {
   id: number;
@@ -38,9 +39,9 @@ export const OrderTotal: React.FC<OrderTotalProps> = ({
   // Здесь мы просто СУММИРУЕМ (аналог SQL SUM(price * quantity))
   const subtotal = React.useMemo(() => {
     return items.reduce((sum, item) => {
-      const price = Number(item.price) || 0;
-      const qty = Number(item.quantity ?? 1) || 0;
-      const service = Number(item.serviceCost ?? 0) || 0;
+      const price = parseNumberFlexible(item.price);
+      const qty = parseNumberFlexible(item.quantity ?? 1);
+      const service = parseNumberFlexible(item.serviceCost);
       return sum + price * qty + service;
     }, 0);
   }, [items]);
@@ -48,8 +49,8 @@ export const OrderTotal: React.FC<OrderTotalProps> = ({
   // ⚠️ ВНИМАНИЕ: discount и taxRate применяются на фронте!
   // В текущей реализации всегда передается 0, но если понадобится применять скидки/налоги,
   // они должны рассчитываться на БЭКЕНДЕ и сохраняться в БД (order.discount, order.tax)
-  const disc = Number(discount) || 0;
-  const rate = Number(taxRate) || 0;
+  const disc = parseNumberFlexible(discount);
+  const rate = parseNumberFlexible(taxRate);
 
   const tax = React.useMemo(() => (subtotal - disc) * rate, [
     subtotal,
@@ -58,7 +59,7 @@ export const OrderTotal: React.FC<OrderTotalProps> = ({
   ]);
 
   const total = subtotal - disc + tax;
-  const prepayment = Number(prepaymentAmount) || 0;
+  const prepayment = parseNumberFlexible(prepaymentAmount);
   const debt = total - prepayment;
   const isPaid = prepaymentStatus === 'paid';
 

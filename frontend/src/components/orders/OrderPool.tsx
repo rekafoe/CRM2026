@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
+import { parseNumberFlexible } from '../../utils/numberInput';
 
 interface UnifiedOrder {
   id: number;
@@ -167,9 +168,10 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
     return new Date(dateString).toLocaleString('ru-RU');
   };
 
-  const formatAmount = (amount: number, type?: UnifiedOrder['type']) => {
-    const normalized = type === 'telegram' ? amount / 100 : amount;
-    return `${Number(normalized || 0).toFixed(2)} BYN`;
+  const formatAmount = (amount: number | string, type?: UnifiedOrder['type']) => {
+    const parsed = parseNumberFlexible(amount);
+    const normalized = type === 'telegram' ? parsed / 100 : parsed;
+    return `${parseNumberFlexible(normalized).toFixed(2)} BYN`;
   };
 
   const isOrderIssued = (order: UnifiedOrder) => {
