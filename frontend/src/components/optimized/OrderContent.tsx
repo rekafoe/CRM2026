@@ -13,13 +13,14 @@ export const OrderContent: React.FC<OrderContentProps> = ({
   onLoadOrders,
   onEditOrderItem,
 }) => {
+  const items = order.items ?? [];
   return (
     <div className="detail-body">
-      {order.items.length === 0 && (
+      {items.length === 0 && (
         <div className="item">Пока нет позиций</div>
       )}
 
-      {order.items.map((item) => (
+      {items.map((item) => (
         <MemoizedOrderItem
           key={item.id}
           item={item}

@@ -89,7 +89,7 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
     
     // Проверяем, что предоплата не больше общей суммы заказа
     if (order && prepaymentAmount > 0) {
-      const totalOrderAmount = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const totalOrderAmount = (order.items ?? []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
       if (prepaymentAmount > totalOrderAmount) {
         newErrors.prepaymentAmount = `Предоплата не может быть больше общей суммы заказа (${totalOrderAmount.toLocaleString()} BYN)`;
       }
@@ -316,7 +316,7 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
                   
                   <div className="info-item">
                     <label>Количество позиций:</label>
-                    <span>{order.items.length}</span>
+                    <span>{order.items?.length ?? 0}</span>
                   </div>
                   
                   <div className="info-item">

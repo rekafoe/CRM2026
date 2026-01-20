@@ -47,6 +47,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
 }) => {
   const { addToast } = useToast();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const items = selectedOrder.items ?? [];
   
   const handleStatusChange = useCallback(async (newStatus: number) => {
     try {
@@ -250,11 +251,11 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       />
 
       <div className="detail-body">
-        {selectedOrder.items.length === 0 && (
+        {items.length === 0 && (
           <div className="item">Пока нет позиций</div>
         )}
 
-        {selectedOrder.items.map((it) => (
+        {items.map((it) => (
           <MemoizedOrderItem 
             key={it.id} 
             item={it} 
@@ -267,7 +268,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       </div>
 
       <OrderTotal
-        items={selectedOrder.items.map((it) => ({
+        items={items.map((it) => ({
           id: it.id,
           type: it.type,
           price: it.price,

@@ -629,7 +629,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                   </div>
                   
                   <div className="order-items">
-                    {order.items.length} позиций
+                    {order.items?.length ?? 0} позиций
                   </div>
                 </div>
               );
