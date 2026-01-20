@@ -45,8 +45,9 @@
 /* Статус элемента заказа */
 .order-list .order-item__status {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
   margin-top: 6px;
 }
 
@@ -84,12 +85,11 @@
 
 /* Прогресс-бар */
 .order-list .status-bar {
-  width: 100%;
-  height: 4px;
+  flex: 1;
+  height: 6px;
   background: #e5e7eb;
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
-  flex: none;
 }
 
 .order-list .status-bar__fill {
