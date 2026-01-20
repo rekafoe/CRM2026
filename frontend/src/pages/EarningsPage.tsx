@@ -44,9 +44,52 @@ export const EarningsPage: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  const itemsByDate = useMemo(() => {
-    return items.slice().sort((a, b) => b.earnedDate.localeCompare(a.earnedDate));
+  // Группировка по дням
+  const { groupedByDate, todayTotal } = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const sorted = items.slice().sort((a, b) => b.earnedDate.localeCompare(a.earnedDate));
+    
+    // Группируем по дате
+    const groups: Record<string, { items: EarningsItem[]; total: number }> = {};
+    let todaySum = 0;
+    
+    for (const item of sorted) {
+      const date = item.earnedDate.slice(0, 10);
+      if (!groups[date]) {
+        groups[date] = { items: [], total: 0 };
+      }
+      groups[date].items.push(item);
+      groups[date].total += Number(item.amount) || 0;
+      
+      if (date === today) {
+        todaySum += Number(item.amount) || 0;
+      }
+    }
+    
+    return {
+      groupedByDate: Object.entries(groups).sort(([a], [b]) => b.localeCompare(a)),
+      todayTotal: todaySum
+    };
   }, [items]);
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (dateStr === today.toISOString().slice(0, 10)) {
+      return 'Сегодня';
+    }
+    if (dateStr === yesterday.toISOString().slice(0, 10)) {
+      return 'Вчера';
+    }
+    return date.toLocaleDateString('ru-RU', { 
+      weekday: 'short', 
+      day: 'numeric', 
+      month: 'short' 
+    });
+  };
 
   return (
     <AdminPageLayout
@@ -71,6 +114,10 @@ export const EarningsPage: React.FC = () => {
       </div>
 
       <div className="earnings-summary">
+        <div className="earnings-summary-card earnings-summary-card--today">
+          <div className="earnings-summary-title">💰 Сегодня</div>
+          <div className="earnings-summary-value">{todayTotal.toFixed(2)} BYN</div>
+        </div>
         <div className="earnings-summary-card">
           <div className="earnings-summary-title">Итого за месяц</div>
           <div className="earnings-summary-value">{total.toFixed(2)} BYN</div>
@@ -81,37 +128,44 @@ export const EarningsPage: React.FC = () => {
         </div>
       </div>
 
-      <table className="earnings-table">
-        <thead>
-          <tr>
-            <th>Дата</th>
-            <th>Заказ</th>
-            <th>Позиция</th>
-            <th>Сумма позиции</th>
-            <th>%</th>
-            <th>Начислено</th>
-          </tr>
-        </thead>
-        <tbody>
-          {itemsByDate.length === 0 && (
-            <tr>
-              <td colSpan={6} className="earnings-muted">
-                Нет начислений за выбранный месяц
-              </td>
-            </tr>
-          )}
-          {itemsByDate.map((item) => (
-            <tr key={`${item.itemId}-${item.earnedDate}`}>
-              <td>{item.earnedDate}</td>
-              <td>{item.orderNumber || `#${item.orderId}`}</td>
-              <td>{item.itemName}</td>
-              <td>{Number(item.itemTotal).toFixed(2)} BYN</td>
-              <td>{Number(item.percent).toFixed(2)}%</td>
-              <td>{Number(item.amount).toFixed(2)} BYN</td>
-            </tr>
+      {groupedByDate.length === 0 ? (
+        <div className="earnings-empty">
+          <div className="earnings-muted">Нет начислений за выбранный месяц</div>
+        </div>
+      ) : (
+        <div className="earnings-days">
+          {groupedByDate.map(([date, { items: dayItems, total: dayTotal }]) => (
+            <div key={date} className="earnings-day-group">
+              <div className="earnings-day-header">
+                <span className="earnings-day-title">{formatDate(date)}</span>
+                <span className="earnings-day-total">{dayTotal.toFixed(2)} BYN</span>
+              </div>
+              <table className="earnings-table">
+                <thead>
+                  <tr>
+                    <th>Заказ</th>
+                    <th>Позиция</th>
+                    <th>Сумма позиции</th>
+                    <th>%</th>
+                    <th>Начислено</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dayItems.map((item) => (
+                    <tr key={`${item.itemId}-${item.earnedDate}`}>
+                      <td>{item.orderNumber || `#${item.orderId}`}</td>
+                      <td>{item.itemName}</td>
+                      <td>{Number(item.itemTotal).toFixed(2)} BYN</td>
+                      <td>{Number(item.percent).toFixed(2)}%</td>
+                      <td className="earnings-amount">{Number(item.amount).toFixed(2)} BYN</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
     </AdminPageLayout>
   );
 };

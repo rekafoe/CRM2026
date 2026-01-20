@@ -238,6 +238,73 @@
    background: #f8f9fa;
  }
 
+/* Карточка "Сегодня" */
+.earnings-summary-card--today {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border-color: #4caf50;
+}
+
+.earnings-summary-card--today .earnings-summary-value {
+  color: #2e7d32;
+}
+
+/* Группировка по дням */
+.earnings-days {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.earnings-day-group {
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.earnings-day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-secondary, #f8f9fa);
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.earnings-day-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary, #111827);
+}
+
+.earnings-day-total {
+  font-weight: 600;
+  font-size: 14px;
+  color: #2e7d32;
+  background: #e8f5e9;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.earnings-day-group .earnings-table {
+  margin: 0;
+}
+
+.earnings-day-group .earnings-table th {
+  background: transparent;
+  font-size: 12px;
+}
+
+.earnings-amount {
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.earnings-empty {
+  padding: 40px 20px;
+  text-align: center;
+}
+
 @media (max-width: 900px) {
   .earnings-summary--row {
     flex-wrap: wrap;

@@ -429,6 +429,44 @@ export class OrderItemController {
         }
 
         await db.run('DELETE FROM items WHERE orderId = ? AND id = ?', orderId, itemId)
+        
+        // 🆕 Пересчитываем предоплату после удаления позиции
+        const paymentRow = await db.get<{
+          prepaymentAmount?: number | null
+          prepaymentStatus?: string | null
+          paymentMethod?: string | null
+        }>('SELECT prepaymentAmount, prepaymentStatus, paymentMethod FROM orders WHERE id = ?', [orderId])
+        
+        const totalsRow = await db.get<{ total_amount: number }>(
+          'SELECT COALESCE(SUM(price * quantity), 0) as total_amount FROM items WHERE orderId = ?',
+          [orderId]
+        )
+        const newTotalAmount = Number(totalsRow?.total_amount || 0)
+        const currentPrepayment = Number(paymentRow?.prepaymentAmount || 0)
+        const paymentMethod = paymentRow?.paymentMethod
+        
+        // Если оплата offline и предоплата была равна прежней сумме — обновляем на новую сумму
+        if (paymentMethod === 'offline' && currentPrepayment > newTotalAmount) {
+          let hasPrepaymentUpdatedAt = false
+          try {
+            const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
+            hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+          } catch {
+            hasPrepaymentUpdatedAt = false
+          }
+          
+          const updateSql = hasPrepaymentUpdatedAt
+            ? `UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime('now'), updated_at = datetime('now') WHERE id = ?`
+            : `UPDATE orders SET prepaymentAmount = ?, updated_at = datetime('now') WHERE id = ?`
+          
+          await db.run(updateSql, [newTotalAmount, orderId])
+          logger.info('💰 [deleteItem] Предоплата пересчитана', {
+            orderId,
+            oldPrepayment: currentPrepayment,
+            newPrepayment: newTotalAmount
+          })
+        }
+        
         await db.run('COMMIT')
         const orderRow = await db.get<{ created_date?: string }>(
           'SELECT COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
