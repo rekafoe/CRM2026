@@ -31,7 +31,7 @@ import { APP_CONFIG } from '../../types';
 import type { OrderFile } from '../../types';
 
 import { MemoizedOrderItem } from './MemoizedOrderItem';
-import { MemoizedOrderList } from './MemoizedOrderList';
+import { OrderList } from './OrderList';
 import { useOptimizedAppData } from './hooks/useOptimizedAppData';
 import { useModalState } from './hooks/useModalState';
 import { useOrderHandlers } from './hooks/useOrderHandlers';
@@ -272,7 +272,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
             
         <h2>Заказы</h2>
             
-            <MemoizedOrderList
+            <OrderList
               orders={orders}
               selectedId={selectedId}
               statuses={statuses}

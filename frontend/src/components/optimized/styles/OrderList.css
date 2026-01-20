@@ -1,3 +1,87 @@
+/* Order list status visuals */
+:root {
+  --status-color-default: #1976d2;
+  --status-color-pending: #ff9800;
+  --status-color-in-progress: #2196f3;
+  --status-color-completed: #4caf50;
+  --status-color-cancelled: #f44336;
+}
+
+.order-item__status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: white;
+  text-align: center;
+  min-width: 80px;
+  background-color: var(--status-color-default);
+}
+
+.status-pill--pending {
+  background-color: var(--status-color-pending);
+}
+
+.status-pill--in-progress {
+  background-color: var(--status-color-in-progress);
+}
+
+.status-pill--completed {
+  background-color: var(--status-color-completed);
+}
+
+.status-pill--cancelled {
+  background-color: var(--status-color-cancelled);
+}
+
+.status-bar {
+  width: 100%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.status-bar__fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  background-color: var(--status-color-default);
+}
+
+.status-bar__fill--pending {
+  background-color: var(--status-color-pending);
+}
+
+.status-bar__fill--in-progress {
+  background-color: var(--status-color-in-progress);
+}
+
+.status-bar__fill--completed {
+  background-color: var(--status-color-completed);
+}
+
+.status-bar__fill--cancelled {
+  background-color: var(--status-color-cancelled);
+}
+
+@media (max-width: 768px) {
+  .status-pill {
+    font-size: 10px;
+    padding: 3px 6px;
+    min-width: 70px;
+  }
+}
 /* ========================================
    СТИЛИ ДЛЯ КОМПОНЕНТА ORDERLIST
    ======================================== */
@@ -16,7 +100,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .order-item__number {
@@ -33,11 +117,53 @@
   border-radius: 4px;
 }
 
+/* Короткая строка с клиентом и итогом */
+.order-item__details-line {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #4a5568;
+  line-height: 1.3;
+}
+
 /* Статус элемента заказа */
 .order-item__status {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-top: 6px;
+}
+
+/* Детали выбранного заказа */
+.order-item__details {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #edf0f2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #4a5568;
+}
+
+.order-item__detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-item__detail-label {
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.order-item__detail-value {
+  text-align: right;
+  color: #4a5568;
+}
+
+.order-item__detail-value--amount {
+  font-weight: 600;
+  color: #1a202c;
 }
 
 /* Статус-пилл */
@@ -112,15 +238,15 @@
     align-items: flex-start;
     gap: 4px;
   }
-  
+
   .order-item__number {
     font-size: 13px;
   }
-  
+
   .order-item__id {
     font-size: 11px;
   }
-  
+
   .status-pill {
     font-size: 10px;
     padding: 3px 6px;

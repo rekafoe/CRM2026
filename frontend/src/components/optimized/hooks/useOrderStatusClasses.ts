@@ -5,15 +5,14 @@ interface StatusInfo {
   color?: string;
 }
 
-/**
- * Хук для определения CSS классов статуса заказа
- */
-export const useOrderStatusClasses = (statusInfo: StatusInfo | undefined, status: number) => {
+export const useOrderStatusClasses = (
+  statusInfo: StatusInfo | undefined,
+  status: number
+) => {
   return useMemo(() => {
-    // Определяем класс статуса на основе названия
     const statusName = statusInfo?.name?.toLowerCase() || '';
-    
     let statusClass = '';
+
     if (statusName.includes('ожидан') || statusName.includes('pending')) {
       statusClass = 'pending';
     } else if (statusName.includes('рабо') || statusName.includes('progress')) {
@@ -27,7 +26,8 @@ export const useOrderStatusClasses = (statusInfo: StatusInfo | undefined, status
     return {
       pillClass: statusClass ? `status-pill--${statusClass}` : '',
       barClass: statusClass ? `status-bar__fill--${statusClass}` : '',
-      color: statusInfo?.color || '#1976d2'
+      color: statusInfo?.color || '#1976d2',
+      status
     };
   }, [statusInfo, status]);
 };

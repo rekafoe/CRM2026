@@ -1,43 +1,38 @@
-import React, { memo, useCallback, useMemo } from 'react';
+﻿import React, { memo, useCallback, useMemo } from 'react';
 import { Order } from '../../types';
+import { parseNumberFlexible } from '../../utils/numberInput';
 import { useOrderStatusClasses } from './hooks/useOrderStatusClasses';
 import './styles/OrderList.css';
+
+interface StatusInfo {
+  id: number;
+  name: string;
+  color?: string;
+  sort_order: number;
+}
 
 interface OrderListProps {
   orders: Order[];
   selectedId: number | null;
-  statuses: Array<{ id: number; name: string; color?: string; sort_order: number }>;
+  statuses: StatusInfo[];
   onSelect: (id: number) => void;
 }
 
-// Компонент для заголовка элемента заказа
-const OrderItemHeader = memo<{
-  orderNumber: string;
-  orderId: number;
-}>(({ orderNumber, orderId }) => (
-  <div className="order-item__header">
-    <span className="order-item__number">{orderNumber}</span>
-    <span className="order-item__id">ID: {orderId}</span>
-  </div>
-));
-
-OrderItemHeader.displayName = 'OrderItemHeader';
-
 // Компонент для статуса элемента заказа
 const OrderItemStatus = memo<{
-  statusInfo: { name: string; color?: string } | undefined;
+  statusInfo: StatusInfo | undefined;
   status: number;
   progress: number;
 }>(({ statusInfo, status, progress }) => {
   const { pillClass, barClass } = useOrderStatusClasses(statusInfo, status);
-  
+
   return (
     <div className="order-item__status">
       <span className={`status-pill ${pillClass}`}>
         {statusInfo?.name || `Статус ${status}`}
       </span>
       <div className="status-bar">
-        <div 
+        <div
           className={`status-bar__fill ${barClass}`}
           style={{ width: `${progress}%` }}
         />
@@ -50,29 +45,68 @@ OrderItemStatus.displayName = 'OrderItemStatus';
 
 // Компонент для отдельного элемента заказа
 const OrderItem = memo<{
-  order: Order & { statusInfo?: any; progress: number };
-  selectedId: number | null;
+  order: Order;
+  isActive: boolean;
+  statusInfo: StatusInfo | undefined;
+  statusValue: number;
+  progress: number;
   onSelect: (id: number) => void;
-}>(({ order, selectedId, onSelect }) => {
+}>(({ order, isActive, statusInfo, statusValue, progress, onSelect }) => {
   const handleClick = useCallback(() => {
     onSelect(order.id);
   }, [order.id, onSelect]);
 
-  const isActive = order.id === selectedId;
+  const customerLabel = useMemo(() => {
+    if (order.customer) {
+      const company =
+        order.customer.company_name ||
+        order.customer.legal_name ||
+        order.customer.authorized_person;
+      if (company) {
+        return company;
+      }
+      const parts = [
+        order.customer.last_name,
+        order.customer.first_name,
+        order.customer.middle_name,
+      ].filter(Boolean);
+      if (parts.length > 0) {
+        return parts.join(' ');
+      }
+    }
+    return order.customerName || 'Клиент не указан';
+  }, [order.customer, order.customerName]);
+
+  const totalAmount = useMemo(() => {
+    const stored = parseNumberFlexible(
+      (order as any).totalAmount ?? (order as any).total_amount ?? 0
+    );
+    if (stored > 0) {
+      return stored;
+    }
+    const items = Array.isArray(order.items) ? order.items : [];
+    return items.reduce((sum, item) => {
+      const price = parseNumberFlexible(item.price ?? 0);
+      const qty = parseNumberFlexible(item.quantity ?? 1);
+      return sum + price * qty;
+    }, 0);
+  }, [order]);
 
   return (
     <li
       className={`order-item order-list__item ${isActive ? 'active' : ''}`}
       onClick={handleClick}
     >
-      <OrderItemHeader 
-        orderNumber={order.number} 
-        orderId={order.id} 
-      />
+      <div className="order-item__header">
+        <span className="order-item__number">{order.number}</span>
+      </div>
+      <div className="order-item__details-line">
+        Клиент: {customerLabel} • Итого: {totalAmount.toFixed(2)} BYN
+      </div>
       <OrderItemStatus
-        statusInfo={order.statusInfo}
-        status={order.status}
-        progress={order.progress}
+        statusInfo={statusInfo}
+        status={statusValue}
+        progress={progress}
       />
     </li>
   );
@@ -81,43 +115,72 @@ const OrderItem = memo<{
 OrderItem.displayName = 'OrderItem';
 
 // Основной компонент списка заказов
-export const OrderList = memo<OrderListProps>(({ 
-  orders, 
-  selectedId, 
-  statuses, 
-  onSelect 
+export const OrderList = memo<OrderListProps>(({
+  orders,
+  selectedId,
+  statuses,
+  onSelect
 }) => {
   const handleSelect = useCallback((id: number) => {
     onSelect(id);
   }, [onSelect]);
 
-  // Мемоизируем отфильтрованные заказы с дедупликацией
-  const filteredOrders = useMemo(() => {
-    // Убираем дубликаты по ID
-    const uniqueOrders = orders.filter((order, index, self) => 
-      index === self.findIndex(o => o.id === order.id)
-    );
-    
+  // Дедупликация через Map (O(n) вместо O(n²))
+  const uniqueOrders = useMemo(() => {
+    const seen = new Map<number, Order>();
+    for (const order of orders) {
+      if (!seen.has(order.id)) {
+        seen.set(order.id, order);
+      }
+    }
+    return Array.from(seen.values());
+  }, [orders]);
+
+  // Предрасчёт статусов в Map для O(1) lookup
+  const { statusById, maxSort } = useMemo(() => {
+    const statusMap = new Map<number, StatusInfo>();
+    let highest = 1;
+    for (const status of statuses) {
+      statusMap.set(status.id, status);
+      if (status.sort_order > highest) {
+        highest = status.sort_order;
+      }
+    }
+    return { statusById: statusMap, maxSort: Math.max(1, highest) };
+  }, [statuses]);
+
+  // Мемоизированные метаданные заказов
+  const orderMeta = useMemo(() => {
     return uniqueOrders.map((order) => {
-      const status = statuses.find(s => s.id === order.status);
-      const maxSort = Math.max(1, ...statuses.map(s => s.sort_order));
-      const progress = Math.max(0, Math.min(100, Math.round(((order.status - 1) / Math.max(1, (maxSort - 1))) * 100)));
-      
+      const statusValue = typeof order.status === 'number' ? order.status : 0;
+      const statusInfo = statusById.get(statusValue);
+      const progress = Math.max(
+        0,
+        Math.min(
+          100,
+          Math.round(((statusValue - 1) / Math.max(1, maxSort - 1)) * 100)
+        )
+      );
+
       return {
-        ...order,
-        statusInfo: status,
+        order,
+        statusInfo,
+        statusValue,
         progress
       };
     });
-  }, [orders, statuses]);
+  }, [uniqueOrders, statusById, maxSort]);
 
   return (
     <ul className="order-list">
-      {filteredOrders.map((order) => (
+      {orderMeta.map(({ order, statusInfo, statusValue, progress }) => (
         <OrderItem
           key={order.id}
           order={order}
-          selectedId={selectedId}
+          isActive={order.id === selectedId}
+          statusInfo={statusInfo}
+          statusValue={statusValue}
+          progress={progress}
           onSelect={handleSelect}
         />
       ))}
