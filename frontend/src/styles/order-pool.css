@@ -43,6 +43,56 @@
   gap: 8px;
 }
 
+.filters-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filters-quick .quick-btn {
+  padding: 6px 10px;
+  border: 1px solid #d0d0d0;
+  border-radius: 999px;
+  background: #f7f7f7;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filters-quick .quick-btn:hover {
+  background: #ededed;
+}
+
+.filters-quick .quick-btn.active {
+  background: #e3f2fd;
+  border-color: #90caf9;
+  color: #1565c0;
+  font-weight: 600;
+}
+
+.pool-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.pool-stat {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.pool-stat strong {
+  color: #111827;
+}
+
 .filters input,
 .filters select {
   padding: 8px 12px;
@@ -96,6 +146,16 @@
   color: #495057;
   border-bottom: 1px solid #dee2e6;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.order-list-table .sticky-col {
+  position: sticky;
+  left: 0;
+  background: inherit;
+  z-index: 2;
 }
 
 .order-list-table td {
@@ -103,6 +163,74 @@
   border-bottom: 1px solid #f1f3f4;
   font-size: 13px;
   vertical-align: middle;
+}
+
+.order-list-table--compact th,
+.order-list-table--compact td {
+  padding: 8px 6px;
+  font-size: 12px;
+}
+
+.order-list-table th.numeric,
+.order-list-table td.numeric {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.order-list-table tr:nth-child(even) {
+  background: #fcfcfc;
+}
+
+.order-debt--due {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.order-debt--paid {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.prepayment-amount.paid {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.prepayment-amount.pending {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.prepayment-status.paid {
+  color: #15803d;
+}
+
+.prepayment-status.pending {
+  color: #b45309;
+}
+
+.order-list-load-more {
+  padding: 12px 16px 16px;
+}
+
+.load-more-btn {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #d0d0d0;
+  background: #f7f7f7;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.load-more-btn:hover {
+  background: #ededed;
+}
+
+.order-assignee,
+.order-payment-method,
+.order-debt {
+  color: #333;
 }
 
 .order-list-table tr {

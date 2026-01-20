@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order } from '../types';
 import { getOrders, updateOrderStatus, reassignOrderByNumber, cancelOnlineOrder, getUsers } from '../api';
+import { parseNumberFlexible } from '../utils/numberInput';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { OrderHeader } from '../components/optimized/OrderHeader';
 import { OrderContent } from '../components/optimized/OrderContent';
@@ -18,6 +19,161 @@ interface OrderPoolPageProps {
   currentUserName: string;
 }
 
+type FilterState = {
+  source: 'all' | 'crm' | 'website' | 'telegram';
+  cancelled: 'all' | 'cancelled' | 'not_cancelled';
+  assigned: 'all' | 'assigned' | 'not_assigned';
+  searchInput: string;
+  searchTerm: string;
+  quickFilter: 'debt' | 'prepay' | null;
+  sortBy: 'created_at' | 'number' | 'totalAmount';
+  sortDirection: 'asc' | 'desc';
+  visibleCount: number;
+};
+
+type FilterAction =
+  | { type: 'setSource'; value: FilterState['source'] }
+  | { type: 'setCancelled'; value: FilterState['cancelled'] }
+  | { type: 'setAssigned'; value: FilterState['assigned'] }
+  | { type: 'setSearchInput'; value: string }
+  | { type: 'setSearchTerm'; value: string }
+  | { type: 'setQuickFilter'; value: FilterState['quickFilter'] }
+  | { type: 'setSortBy'; value: FilterState['sortBy'] }
+  | { type: 'toggleSortDirection' }
+  | { type: 'resetFilters' }
+  | { type: 'resetVisible' }
+  | { type: 'increaseVisible'; step?: number };
+
+const initialFilters: FilterState = {
+  source: 'all',
+  cancelled: 'all',
+  assigned: 'not_assigned',
+  searchInput: '',
+  searchTerm: '',
+  quickFilter: null,
+  sortBy: 'created_at',
+  sortDirection: 'desc',
+  visibleCount: 100,
+};
+
+function filtersReducer(state: FilterState, action: FilterAction): FilterState {
+  switch (action.type) {
+    case 'setSource':
+      return { ...state, source: action.value };
+    case 'setCancelled':
+      return { ...state, cancelled: action.value };
+    case 'setAssigned':
+      return { ...state, assigned: action.value };
+    case 'setSearchInput':
+      return { ...state, searchInput: action.value };
+    case 'setSearchTerm':
+      return { ...state, searchTerm: action.value };
+    case 'setQuickFilter':
+      return { ...state, quickFilter: action.value };
+    case 'setSortBy':
+      return { ...state, sortBy: action.value };
+    case 'toggleSortDirection':
+      return { ...state, sortDirection: state.sortDirection === 'asc' ? 'desc' : 'asc' };
+    case 'resetFilters':
+      return { ...state, source: 'all', cancelled: 'all', assigned: 'all', searchInput: '', searchTerm: '', quickFilter: null };
+    case 'resetVisible':
+      return { ...state, visibleCount: 100 };
+    case 'increaseVisible':
+      return { ...state, visibleCount: state.visibleCount + (action.step ?? 100) };
+    default:
+      return state;
+  }
+}
+
+const OrderRow = React.memo<{
+  order: Order;
+  isSelected: boolean;
+  onSelect: (order: Order) => void;
+  getSourceLabel: (source?: string) => string;
+  getAssigneeLabel: (order: Order) => string;
+  getPaymentMethodLabel: (method?: string | null) => string;
+  getOrderPrepayment: (order: Order) => number;
+  getOrderDebt: (order: Order) => number;
+  getOrderTotal: (order: Order) => number;
+}>(
+  ({
+    order,
+    isSelected,
+    onSelect,
+    getSourceLabel,
+    getAssigneeLabel,
+    getPaymentMethodLabel,
+    getOrderPrepayment,
+    getOrderDebt,
+    getOrderTotal,
+  }) => (
+    <tr
+      className={`${isSelected ? 'selected' : ''} ${order.userId ? 'assigned' : ''}`}
+      onClick={() => onSelect(order)}
+    >
+      <td className="sticky-col">
+        <div className="order-number">{order.number}</div>
+      </td>
+      <td>
+        <div className="order-date">{new Date(order.created_at).toLocaleDateString()}</div>
+      </td>
+      <td>
+        <div className="order-customer" title={order.customerName || 'Не указан'}>
+          {order.customerName || 'Не указан'}
+        </div>
+      </td>
+      <td>
+        <div className="order-phone" title={order.customerPhone || 'Не указан'}>
+          {order.customerPhone || '—'}
+        </div>
+      </td>
+      <td>
+        <div className="order-badges">
+          {order.source && <StatusBadge status={getSourceLabel(order.source)} color="info" size="sm" />}
+        </div>
+      </td>
+      <td>
+        <div className="order-assignee">{getAssigneeLabel(order)}</div>
+      </td>
+      <td className="order-status">
+        {order.userId ? (
+          <span className="assigned-badge">✓ Назначен</span>
+        ) : order.is_cancelled === 1 ? (
+          <StatusBadge status="Отменён" color="error" size="sm" />
+        ) : (
+          <span style={{ color: '#666' }}>В пуле</span>
+        )}
+      </td>
+      <td>
+        <div className="order-payment-method">{getPaymentMethodLabel(order.paymentMethod)}</div>
+      </td>
+      <td className="numeric">
+        <div className="order-prepayment">
+          {getOrderPrepayment(order) > 0 ? (
+            <span className={`prepayment-amount ${order.prepaymentStatus === 'paid' ? 'paid' : 'pending'}`}>
+              {getOrderPrepayment(order).toFixed(2)} BYN
+              <br />
+              <small className={`prepayment-status ${order.prepaymentStatus === 'paid' ? 'paid' : 'pending'}`}>
+                {order.prepaymentStatus === 'paid' ? 'Оплачено' : 'Ожидает'}
+              </small>
+            </span>
+          ) : (
+            <span style={{ color: '#999' }}>—</span>
+          )}
+        </div>
+      </td>
+      <td className="numeric">
+        <div className={`order-debt ${getOrderDebt(order) > 0 ? 'order-debt--due' : 'order-debt--paid'}`}>
+          {getOrderDebt(order).toFixed(2)} BYN
+        </div>
+      </td>
+      <td className="numeric">
+        <div className="order-total">{getOrderTotal(order).toFixed(2)} BYN</div>
+      </td>
+    </tr>
+  )
+);
+
 export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, currentUserName }) => {
   const navigate = useNavigate();
   const toast = useToastNotifications();
@@ -32,19 +188,50 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
   const [showPrepaymentDetailsModal, setShowPrepaymentDetailsModal] = useState(false);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
-  const [filterSource, setFilterSource] = useState<'all' | 'crm' | 'website' | 'telegram'>('all');
-  const [filterCancelled, setFilterCancelled] = useState<'all' | 'cancelled' | 'not_cancelled'>('all');
-  const [filterAssigned, setFilterAssigned] = useState<'all' | 'assigned' | 'not_assigned'>('not_assigned');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'created_at' | 'number' | 'totalAmount'>('created_at');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [filters, dispatchFilters] = useReducer(filtersReducer, initialFilters);
   const selectedItems = selectedOrder?.items ?? [];
+  const userNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    allUsers.forEach((u) => map.set(Number(u.id), u.name));
+    return map;
+  }, [allUsers]);
+
+  const orderMetrics = useMemo(() => {
+    const map = new Map<number, { total: number; prepayment: number; debt: number }>();
+    orders.forEach((order) => {
+      const items = Array.isArray(order.items) ? order.items : [];
+      const computed = items.reduce((sum, item) => {
+        const price = parseNumberFlexible(item.price ?? 0);
+        const qty = parseNumberFlexible(item.quantity ?? 1);
+        return sum + price * qty;
+      }, 0);
+      const stored = parseNumberFlexible((order as any).totalAmount ?? (order as any).total_amount ?? 0);
+      const total = stored > 0 ? stored : computed;
+      const prepayment = parseNumberFlexible(order.prepaymentAmount ?? 0);
+      const debt = Math.max(0, total - prepayment);
+      map.set(order.id, { total, prepayment, debt });
+    });
+    return map;
+  }, [orders]);
+
+  const getOrderTotal = useCallback((order: Order) => {
+    return orderMetrics.get(order.id)?.total ?? 0;
+  }, [orderMetrics]);
+
+  const getOrderPrepayment = useCallback((order: Order) => {
+    return orderMetrics.get(order.id)?.prepayment ?? 0;
+  }, [orderMetrics]);
+
+  const getOrderDebt = useCallback((order: Order) => {
+    return orderMetrics.get(order.id)?.debt ?? 0;
+  }, [orderMetrics]);
 
   const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
       const res = await getOrders();
       setOrders(res.data);
+      setError(null);
     } catch (err) {
       logger.error('Failed to load orders for pool', err);
       setError('Не удалось загрузить заказы.');
@@ -55,73 +242,102 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
 
   useEffect(() => {
     if (isInitialized) return;
-
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const res = await getOrders();
-        setOrders(res.data);
-        setIsInitialized(true);
-      } catch (err) {
-        logger.error('Failed to load orders for pool', err);
-        setError('Не удалось загрузить заказы.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
+    loadOrders().then(() => setIsInitialized(true));
     getUsers().then(res => setAllUsers(res.data)).catch(err => logger.error('Failed to load users', err));
-  }, [isInitialized, logger]);
+  }, [isInitialized, loadOrders, logger]);
+
+  useEffect(() => {
+    const t = setTimeout(() => dispatchFilters({ type: 'setSearchTerm', value: filters.searchInput.trim() }), 200);
+    return () => clearTimeout(t);
+  }, [filters.searchInput]);
+
+  useEffect(() => {
+    dispatchFilters({ type: 'resetVisible' });
+  }, [filters.source, filters.cancelled, filters.assigned, filters.searchTerm, filters.quickFilter, filters.sortBy, filters.sortDirection]);
 
   const filteredOrders = useMemo(() => {
     let filtered = orders.filter(o => Number(o.status) === 0);
 
-    if (filterSource !== 'all') {
-      filtered = filtered.filter(o => o.source === filterSource);
+    if (filters.source !== 'all') {
+      filtered = filtered.filter(o => o.source === filters.source);
     }
 
-    if (filterCancelled !== 'all') {
-      filtered = filtered.filter(o => (o.is_cancelled === 1) === (filterCancelled === 'cancelled'));
+    if (filters.cancelled !== 'all') {
+      filtered = filtered.filter(o => (o.is_cancelled === 1) === (filters.cancelled === 'cancelled'));
     }
 
-    if (filterAssigned !== 'all') {
-      filtered = filtered.filter(o => (o.userId !== null) === (filterAssigned === 'assigned'));
+    if (filters.assigned !== 'all') {
+      filtered = filtered.filter(o => (o.userId != null) === (filters.assigned === 'assigned'));
     }
 
-    if (searchTerm) {
-      const lowerSearchTerm = searchTerm.toLowerCase();
+    if (filters.searchTerm) {
+      const lowerSearchTerm = filters.searchTerm.toLowerCase();
       filtered = filtered.filter(o =>
         o.number?.toLowerCase().includes(lowerSearchTerm) ||
         o.customerName?.toLowerCase().includes(lowerSearchTerm) ||
         o.customerPhone?.toLowerCase().includes(lowerSearchTerm) ||
         o.customerEmail?.toLowerCase().includes(lowerSearchTerm) ||
-        o.items.some(item => item.type.toLowerCase().includes(lowerSearchTerm) || item.params.description?.toLowerCase().includes(lowerSearchTerm))
+        (o.items ?? []).some(item =>
+          item.type.toLowerCase().includes(lowerSearchTerm) ||
+          item.params.description?.toLowerCase().includes(lowerSearchTerm)
+        )
       );
+    }
+
+    if (filters.quickFilter === 'debt') {
+      filtered = filtered.filter((o) => getOrderDebt(o) > 0);
+    } else if (filters.quickFilter === 'prepay') {
+      filtered = filtered.filter((o) => getOrderPrepayment(o) > 0);
     }
 
     filtered.sort((a, b) => {
       let valA: any;
       let valB: any;
 
-      if (sortBy === 'created_at') {
+      if (filters.sortBy === 'created_at') {
         valA = new Date(a.created_at).getTime();
         valB = new Date(b.created_at).getTime();
-      } else if (sortBy === 'number') {
+      } else if (filters.sortBy === 'number') {
         valA = a.number || '';
         valB = b.number || '';
-      } else if (sortBy === 'totalAmount') {
-        valA = a.totalAmount || 0;
-        valB = b.totalAmount || 0;
+      } else if (filters.sortBy === 'totalAmount') {
+        valA = getOrderTotal(a);
+        valB = getOrderTotal(b);
       }
 
-      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+      if (valA < valB) return filters.sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return filters.sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
 
     return filtered;
-  }, [orders, filterSource, filterCancelled, searchTerm, sortBy, sortDirection]);
+  }, [
+    orders,
+    filters.source,
+    filters.cancelled,
+    filters.assigned,
+    filters.searchTerm,
+    filters.quickFilter,
+    filters.sortBy,
+    filters.sortDirection,
+    getOrderTotal,
+    getOrderDebt,
+    getOrderPrepayment,
+  ]);
+
+  const poolStats = useMemo(() => {
+    const assigned = filteredOrders.filter((o) => o.userId != null).length;
+    const cancelled = filteredOrders.filter((o) => o.is_cancelled === 1).length;
+    const withDebt = filteredOrders.filter((o) => getOrderDebt(o) > 0).length;
+    const withPrepay = filteredOrders.filter((o) => getOrderPrepayment(o) > 0).length;
+    return { assigned, cancelled, withDebt, withPrepay };
+  }, [filteredOrders, getOrderDebt, getOrderPrepayment]);
+
+  const visibleOrders = useMemo(
+    () => filteredOrders.slice(0, filters.visibleCount),
+    [filteredOrders, filters.visibleCount]
+  );
+  const hasMoreOrders = visibleOrders.length < filteredOrders.length;
 
   const handleAssignToMe = useCallback(async (orderNumber: string) => {
     try {
@@ -167,6 +383,20 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     }
   };
 
+  const getAssigneeLabel = (order: Order) => {
+    const userId = order.userId ?? null;
+    if (!userId) return '—';
+    return userNameById.get(Number(userId)) || `ID ${userId}`;
+  };
+
+  const getPaymentMethodLabel = (method?: string | null) => {
+    if (!method) return '—';
+    if (method === 'online') return 'Онлайн';
+    if (method === 'offline') return 'Оффлайн';
+    if (method === 'telegram') return 'Telegram';
+    return method;
+  };
+
   if (loading) return <div className="loading-overlay">Загрузка...</div>;
   if (error) return <div className="error-message">{error}</div>;
 
@@ -177,122 +407,148 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         <h2>Пул заказов ({filteredOrders.length})</h2>
 
         <div className="filters">
+          <div className="filters-quick">
+            <button
+              className={`quick-btn ${filters.assigned === 'not_assigned' ? 'active' : ''}`}
+              onClick={() => dispatchFilters({ type: 'setAssigned', value: 'not_assigned' })}
+            >
+              Только в пуле
+            </button>
+            <button
+              className={`quick-btn ${filters.assigned === 'assigned' ? 'active' : ''}`}
+              onClick={() => dispatchFilters({ type: 'setAssigned', value: 'assigned' })}
+            >
+              Назначенные
+            </button>
+            <button
+              className={`quick-btn ${filters.cancelled === 'cancelled' ? 'active' : ''}`}
+              onClick={() => dispatchFilters({ type: 'setCancelled', value: 'cancelled' })}
+            >
+              Отменённые
+            </button>
+            <button
+              className={`quick-btn ${filters.quickFilter === 'debt' ? 'active' : ''}`}
+              onClick={() => dispatchFilters({ type: 'setQuickFilter', value: 'debt' })}
+              title="Только с долгом"
+            >
+              С долгом
+            </button>
+            <button
+              className={`quick-btn ${filters.quickFilter === 'prepay' ? 'active' : ''}`}
+              onClick={() => dispatchFilters({ type: 'setQuickFilter', value: 'prepay' })}
+              title="Только с предоплатой"
+            >
+              С предоплатой
+            </button>
+            <button
+              className="quick-btn"
+              onClick={() => {
+                dispatchFilters({ type: 'resetFilters' });
+              }}
+            >
+              Сбросить
+            </button>
+          </div>
           <input
             type="text"
             placeholder="Поиск по заказам..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={filters.searchInput}
+            onChange={(e) => dispatchFilters({ type: 'setSearchInput', value: e.target.value })}
           />
-          <select value={filterSource} onChange={(e) => setFilterSource(e.target.value as any)}>
+          <select value={filters.source} onChange={(e) => dispatchFilters({ type: 'setSource', value: e.target.value as any })}>
             <option value="all">Все источники</option>
             <option value="crm">CRM</option>
             <option value="website">Онлайн</option>
             <option value="telegram">Telegram</option>
           </select>
-          <select value={filterCancelled} onChange={(e) => setFilterCancelled(e.target.value as any)}>
+          <select value={filters.cancelled} onChange={(e) => dispatchFilters({ type: 'setCancelled', value: e.target.value as any })}>
             <option value="all">Все</option>
             <option value="cancelled">Отменённые</option>
             <option value="not_cancelled">Не отменённые</option>
           </select>
-          <select value={filterAssigned} onChange={(e) => setFilterAssigned(e.target.value as any)}>
+          <select value={filters.assigned} onChange={(e) => dispatchFilters({ type: 'setAssigned', value: e.target.value as any })}>
             <option value="all">Все</option>
             <option value="assigned">Назначенные</option>
             <option value="not_assigned">Неназначенные</option>
           </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+          <select value={filters.sortBy} onChange={(e) => dispatchFilters({ type: 'setSortBy', value: e.target.value as any })}>
             <option value="created_at">По дате</option>
             <option value="number">По номеру</option>
             <option value="totalAmount">По сумме</option>
           </select>
-          <button onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}>
-            {sortDirection === 'asc' ? '↑' : '↓'}
+          <button onClick={() => dispatchFilters({ type: 'toggleSortDirection' })}>
+            {filters.sortDirection === 'asc' ? '↑' : '↓'}
           </button>
+        </div>
+
+        <div className="pool-stats">
+          <div className="pool-stat">
+            <span>Назначенные</span>
+            <strong>{poolStats.assigned}</strong>
+          </div>
+          <div className="pool-stat">
+            <span>Отменённые</span>
+            <strong>{poolStats.cancelled}</strong>
+          </div>
+          <div className="pool-stat">
+            <span>С долгом</span>
+            <strong>{poolStats.withDebt}</strong>
+          </div>
+          <div className="pool-stat">
+            <span>С предоплатой</span>
+            <strong>{poolStats.withPrepay}</strong>
+          </div>
         </div>
 
         <div className="order-list">
           {filteredOrders.length === 0 ? (
             <p>Нет заказов в пуле, соответствующих фильтрам.</p>
           ) : (
-            <table className="order-list-table">
+            <table className="order-list-table order-list-table--compact">
               <thead>
                 <tr>
                   <th>Номер</th>
                   <th>Дата</th>
                   <th>Клиент</th>
                   <th>Телефон</th>
-                  <th>Email</th>
                   <th>Источник</th>
+                  <th>Ответственный</th>
                   <th>Статус</th>
-                  <th>Предоплата</th>
-                  <th>Сумма</th>
+                  <th>Оплата</th>
+                  <th className="numeric">Предоплата</th>
+                  <th className="numeric">Долг</th>
+                  <th className="numeric">Сумма</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map(order => (
-                  <tr
+                {visibleOrders.map(order => (
+                  <OrderRow
                     key={order.id}
-                    className={`${selectedOrder?.id === order.id ? 'selected' : ''} ${order.userId ? 'assigned' : ''}`}
-                    onClick={() => setSelectedOrder(order)}
-                  >
-                    <td>
-                      <div className="order-number">{order.number}</div>
-                    </td>
-                    <td>
-                      <div className="order-date">{new Date(order.created_at).toLocaleDateString()}</div>
-                    </td>
-                    <td>
-                      <div className="order-customer" title={order.customerName || 'Не указан'}>
-                        {order.customerName || 'Не указан'}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="order-phone" title={order.customerPhone || 'Не указан'}>
-                        {order.customerPhone || '—'}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="order-email" title={order.customerEmail || 'Не указан'}>
-                        {order.customerEmail || '—'}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="order-badges">
-                        {order.source && <StatusBadge status={getSourceLabel(order.source)} color="info" size="sm" />}
-                      </div>
-                    </td>
-                    <td className="order-status">
-                      {order.userId ? (
-                        <span className="assigned-badge">✓ Назначен</span>
-                      ) : order.is_cancelled === 1 ? (
-                        <StatusBadge status="Отменён" color="error" size="sm" />
-                      ) : (
-                        <span style={{ color: '#666' }}>В пуле</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="order-prepayment">
-                        {order.prepaymentAmount ? (
-                          <span className={`prepayment-amount ${order.prepaymentStatus === 'paid' ? 'paid' : 'pending'}`}>
-                            {order.prepaymentAmount.toFixed(2)} BYN
-                            <br />
-                            <small className={`prepayment-status ${order.prepaymentStatus === 'paid' ? 'paid' : 'pending'}`}>
-                              {order.prepaymentStatus === 'paid' ? 'Оплачено' : 'Ожидает'}
-                            </small>
-                          </span>
-                        ) : (
-                          <span style={{ color: '#999' }}>—</span>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="order-total">{order.totalAmount?.toFixed(2) || '0.00'} BYN</div>
-                    </td>
-                  </tr>
+                    order={order}
+                    isSelected={selectedOrder?.id === order.id}
+                    onSelect={setSelectedOrder}
+                    getSourceLabel={getSourceLabel}
+                    getAssigneeLabel={getAssigneeLabel}
+                    getPaymentMethodLabel={getPaymentMethodLabel}
+                    getOrderPrepayment={getOrderPrepayment}
+                    getOrderDebt={getOrderDebt}
+                    getOrderTotal={getOrderTotal}
+                  />
                 ))}
               </tbody>
             </table>
           )}
         </div>
+        {hasMoreOrders && (
+          <div className="order-list-load-more">
+            <button
+              className="load-more-btn"
+              onClick={() => dispatchFilters({ type: 'increaseVisible', step: 100 })}
+            >
+              Показать ещё
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="order-pool-detail">
