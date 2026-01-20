@@ -75,14 +75,25 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
   if (!d) { res.status(400).json({ message: 'date required' }); return }
 
   const db = await getDb()
+  let hasPrepaymentUpdatedAt = false
+  try {
+    const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
+    hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+  } catch {
+    hasPrepaymentUpdatedAt = false
+  }
+  const dateExpr = hasPrepaymentUpdatedAt
+    ? "COALESCE(o.prepaymentUpdatedAt, o.created_at, o.createdAt)"
+    : "COALESCE(o.created_at, o.createdAt)"
+  const prepaymentUpdatedAtSelect = hasPrepaymentUpdatedAt ? 'o.prepaymentUpdatedAt' : 'NULL as prepaymentUpdatedAt'
   const orders = await db.all<any>(
     `SELECT o.id, o.number, o.status,
             COALESCE(o.created_at, o.createdAt) as created_at,
-            o.prepaymentUpdatedAt,
+            ${prepaymentUpdatedAtSelect},
             o.customerName, o.customerPhone, o.customerEmail,
             o.prepaymentAmount, o.prepaymentStatus, o.paymentMethod, o.userId
        FROM orders o
-      WHERE substr(COALESCE(o.prepaymentUpdatedAt, o.created_at, o.createdAt),1,10) = ?
+      WHERE substr(${dateExpr},1,10) = ?
       ORDER BY o.id DESC`,
     d
   )
