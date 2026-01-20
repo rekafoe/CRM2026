@@ -345,7 +345,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
                     <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#333' }}>
                       Позиции заказа:
                     </h4>
-                    {order.items.map(item => (
+                    {(order.items ?? []).map(item => (
                       <OrderItem
                         key={item.id}
                         item={item}

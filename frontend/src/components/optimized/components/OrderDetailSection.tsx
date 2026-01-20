@@ -47,6 +47,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
 }) => {
   const { addToast } = useToast();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
   const items = selectedOrder.items ?? [];
   
   const handleStatusChange = useCallback(async (newStatus: number) => {

@@ -322,7 +322,9 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
                   <div className="info-item">
                     <label>Общая сумма:</label>
                     <span className="amount">
-                      {order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString()} BYN
+                      {(order.items ?? [])
+                        .reduce((sum, item) => sum + (item.price * item.quantity), 0)
+                        .toLocaleString()} BYN
                     </span>
                   </div>
                 </div>

@@ -18,6 +18,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
 }) => {
   const [editingCreatedDate, setEditingCreatedDate] = useState(false);
   const [editingReadyDate, setEditingReadyDate] = useState(false);
+  const items = order.items ?? [];
 
   // Получаем дату создания заказа
   const orderCreatedDate = useMemo(() => {
@@ -30,7 +31,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
 
   // Получаем максимальную дату готовности из всех позиций
   const orderReadyDate = useMemo(() => {
-    const readyDates = order.items
+    const readyDates = items
       .map(item => (item.params as any)?.readyDate)
       .filter(Boolean)
       .map(dateStr => new Date(dateStr).getTime())
@@ -48,7 +49,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
 
     // Если нет дат готовности в позициях, используем дату создания + 1 час
     return getDefaultReadyDate(orderCreatedDate);
-  }, [order.items, orderCreatedDate]);
+  }, [items, orderCreatedDate]);
 
   const [createdDate, setCreatedDate] = useState<string>(orderCreatedDate);
   const [readyDate, setReadyDate] = useState<string>(orderReadyDate);
@@ -70,7 +71,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
     // Обновляем дату создания заказа во всех позициях
     try {
       // Обновляем дату создания во всех позициях заказа
-      const updatePromises = order.items.map(item => {
+      const updatePromises = items.map(item => {
         const updatedParams = {
           ...item.params,
           createdDate: newCreatedDate,
@@ -87,7 +88,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
     } catch (error) {
       onError('Ошибка при сохранении даты создания');
     }
-  }, [order.id, onUpdate, onSuccess, onError]);
+  }, [order.id, items, onUpdate, onSuccess, onError]);
 
   const handleReadyDateChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newReadyDate = e.target.value;
@@ -96,7 +97,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
 
     // Обновляем дату готовности во всех позициях заказа
     try {
-      const updatePromises = order.items.map(item => {
+      const updatePromises = items.map(item => {
         const updatedParams = {
           ...item.params,
           readyDate: newReadyDate
@@ -112,7 +113,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
     } catch (error) {
       onError('Ошибка при сохранении даты готовности');
     }
-  }, [order.items, onUpdate, onSuccess, onError]);
+  }, [items, onUpdate, onSuccess, onError]);
 
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 8 }}>

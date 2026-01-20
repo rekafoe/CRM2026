@@ -38,6 +38,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'created_at' | 'number' | 'totalAmount'>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const selectedItems = selectedOrder?.items ?? [];
 
   const loadOrders = useCallback(async () => {
     try {
@@ -318,7 +319,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             </div>
             <OrderContent order={selectedOrder} onLoadOrders={loadOrders} />
             <OrderTotal
-              items={selectedOrder.items.map(item => ({
+              items={selectedItems.map(item => ({
                 id: item.id,
                 type: item.type,
                 price: item.price,

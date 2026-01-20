@@ -64,6 +64,7 @@ export const DetailSection: React.FC<DetailSectionProps> = ({
       </section>
     );
   }
+  const items = selectedOrder.items ?? [];
 
   return (
     <section className="detail">
@@ -105,7 +106,7 @@ export const DetailSection: React.FC<DetailSectionProps> = ({
       />
 
       <OrderTotal
-        items={selectedOrder.items.map((item) => ({
+        items={items.map((item) => ({
           id: item.id,
           type: item.type,
           price: item.price,
