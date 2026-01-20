@@ -43,7 +43,7 @@
 }
 
 /* Статус элемента заказа */
-.order-item__status {
+.order-list .order-item__status {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -83,15 +83,16 @@
 }
 
 /* Прогресс-бар */
-.status-bar {
+.order-list .status-bar {
   width: 100%;
   height: 4px;
   background: #e5e7eb;
   border-radius: 2px;
   overflow: hidden;
+  flex: none;
 }
 
-.status-bar__fill {
+.order-list .status-bar__fill {
   height: 100%;
   border-radius: 2px;
   transition: width 0.3s ease;
@@ -99,19 +100,19 @@
 }
 
 /* Модификаторы прогресс-баров */
-.status-bar__fill--pending {
+.order-list .status-bar__fill--pending {
   background-color: var(--status-color-pending);
 }
 
-.status-bar__fill--in-progress {
+.order-list .status-bar__fill--in-progress {
   background-color: var(--status-color-in-progress);
 }
 
-.status-bar__fill--completed {
+.order-list .status-bar__fill--completed {
   background-color: var(--status-color-completed);
 }
 
-.status-bar__fill--cancelled {
+.order-list .status-bar__fill--cancelled {
   background-color: var(--status-color-cancelled);
 }
 
