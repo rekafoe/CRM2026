@@ -263,7 +263,7 @@ export class OrderItemController {
         if (allowAutoPay && !hasPrepayment && totalAmount > 0) {
           await db.run(
             `UPDATE orders
-             SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', paymentUrl = NULL, paymentId = NULL
+             SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', paymentUrl = NULL, paymentId = NULL, prepaymentUpdatedAt = datetime('now'), updated_at = datetime('now')
              WHERE id = ?`,
             [totalAmount, orderId]
           )

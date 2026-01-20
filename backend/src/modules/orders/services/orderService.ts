@@ -82,15 +82,17 @@ export class OrderService {
       }
     } catch {}
 
+    const initialPrepay = Number(prepaymentAmount || 0)
     const insertRes = await db.run(
-      'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source, customer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentUpdatedAt, userId, source, customer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         defaultStatusId, // FK -> order_statuses.id (обычно "Новый")
         createdAt,
         customerName || null,
         customerPhone || null,
         customerEmail || null,
-        Number(prepaymentAmount || 0),
+        initialPrepay,
+        initialPrepay > 0 ? createdAt : null,
         userId ?? null,
         source || 'crm',
         customerId || null

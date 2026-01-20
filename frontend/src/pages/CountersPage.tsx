@@ -156,13 +156,7 @@ export const CountersPage: React.FC = () => {
       const contributionsByUser = new Map<number, number>();
       const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
         const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
-        const items = Array.isArray(order.items) ? order.items : [];
-        const itemsTotal = items.reduce((acc: number, item: any) => {
-          const price = parseNumberFlexible(item.price ?? 0);
-          const qty = parseNumberFlexible(item.quantity ?? 1);
-          return acc + price * qty;
-        }, 0);
-        const orderAmount = prepayment > 0 ? prepayment : itemsTotal;
+        const orderAmount = prepayment > 0 ? prepayment : 0;
         const rawUserId = order.userId ?? order.user_id ?? null;
         const userId = rawUserId != null ? Number(rawUserId) : null;
         if (userId && !Number.isNaN(userId)) {

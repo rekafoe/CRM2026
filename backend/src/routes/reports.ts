@@ -78,10 +78,11 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
   const orders = await db.all<any>(
     `SELECT o.id, o.number, o.status,
             COALESCE(o.created_at, o.createdAt) as created_at,
+            o.prepaymentUpdatedAt,
             o.customerName, o.customerPhone, o.customerEmail,
             o.prepaymentAmount, o.prepaymentStatus, o.paymentMethod, o.userId
        FROM orders o
-      WHERE substr(COALESCE(o.created_at, o.createdAt),1,10) = ?
+      WHERE substr(COALESCE(o.prepaymentUpdatedAt, o.created_at, o.createdAt),1,10) = ?
       ORDER BY o.id DESC`,
     d
   )

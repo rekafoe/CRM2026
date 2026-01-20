@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS orders (
   customerEmail TEXT,
   prepaymentAmount REAL DEFAULT 0,
   prepaymentStatus TEXT,
+  prepaymentUpdatedAt TEXT,
   paymentUrl TEXT,
   paymentId TEXT,
   paymentMethod TEXT DEFAULT 'online',

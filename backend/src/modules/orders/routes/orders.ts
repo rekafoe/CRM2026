@@ -132,14 +132,14 @@ router.post('/:id/prepay', prepayRateLimit, asyncHandler(async (req: Request, re
   
   if (amount === 0) {
     // Удаляем предоплату
-    await db.run('UPDATE orders SET prepaymentAmount = 0, prepaymentStatus = NULL, paymentUrl = NULL, paymentId = NULL, paymentMethod = NULL WHERE id = ?', id)
+    await db.run('UPDATE orders SET prepaymentAmount = 0, prepaymentStatus = NULL, paymentUrl = NULL, paymentId = NULL, paymentMethod = NULL, prepaymentUpdatedAt = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?', id)
   } else {
     // Создаем/обновляем предоплату
     const paymentId = `BEP-${Date.now()}-${id}`
     const paymentUrl = paymentMethod === 'online' ? `https://checkout.bepaid.by/redirect/${paymentId}` : null
     const prepaymentStatus = paymentMethod === 'offline' ? 'paid' : 'pending'
     
-    await db.run('UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ? WHERE id = ?', 
+    await db.run('UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?', 
       amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, id)
   }
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)

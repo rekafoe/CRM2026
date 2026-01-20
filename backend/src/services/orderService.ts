@@ -206,14 +206,16 @@ export class OrderService {
   static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string) {
     const createdAt = date ? `${date}T12:00:00.000Z` : getCurrentTimestamp()
     const db = await getDb()
+    const initialPrepay = Number(prepaymentAmount || 0)
     const insertRes = await db.run(
-      'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentUpdatedAt, userId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       1,
       createdAt,
       customerName || null,
       customerPhone || null,
       customerEmail || null,
-      Number(prepaymentAmount || 0),
+      initialPrepay,
+      initialPrepay > 0 ? createdAt : null,
       userId ?? null
     )
     const id = insertRes.lastID!

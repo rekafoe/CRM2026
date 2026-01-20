@@ -470,7 +470,7 @@ export class OrderManagementService {
             await db.run(
               `
               UPDATE orders
-              SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline'
+              SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now'), updated_at = datetime('now')
               WHERE id = ?
             `,
               [totalAmount, orderId],

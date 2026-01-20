@@ -295,7 +295,9 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
              prepaymentStatus = NULL,
              paymentUrl = NULL,
              paymentId = NULL,
-             paymentMethod = NULL
+             paymentMethod = NULL,
+             prepaymentUpdatedAt = datetime('now'),
+             updated_at = datetime('now')
        WHERE id = ?`,
       id
     )
@@ -313,7 +315,7 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   const paymentUrl = paymentMethod === 'online' ? `https://checkout.bepaid.by/redirect/${paymentId}` : null
   const prepaymentStatus = paymentMethod === 'offline' ? 'paid' : 'pending'
   
-  await db.run('UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ? WHERE id = ?', 
+  await db.run('UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?', 
     amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, id)
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   res.json(updated)
