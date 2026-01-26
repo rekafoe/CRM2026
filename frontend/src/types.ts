@@ -130,6 +130,49 @@ export interface MaterialRow {
   unit: string;
   quantity: number;
 }
+
+// Document Templates
+export interface DocumentTemplate {
+  id: number;
+  name: string;
+  type: 'contract' | 'act' | 'invoice';
+  file_path: string;
+  created_at: string;
+  updated_at: string;
+  is_default: boolean;
+}
+
+export interface TemplateData {
+  customerName?: string;
+  companyName?: string;
+  legalName?: string;
+  legalAddress?: string;
+  taxId?: string;
+  bankDetails?: string;
+  authorizedPerson?: string;
+  contractNumber?: string;
+  contractDate?: string;
+  orders?: Array<{
+    number: string;
+    date: string;
+    amount: number;
+    status: string;
+  }>;
+  // Детализированные позиции для актов и счетов
+  orderItems?: Array<{
+    number: number; // Порядковый номер в таблице
+    name: string; // Наименование работы/услуги
+    unit: string; // Единица измерения (шт, м², лист и т.д.)
+    quantity: number; // Количество
+    price: number; // Цена за единицу
+    amount: number; // Сумма (quantity * price)
+    vatRate?: string; // Ставка НДС (например, "Без НДС" или "20%")
+    vatAmount?: number; // Сумма НДС
+    totalWithVat?: number; // Всего с НДС
+  }>;
+  totalAmount?: number;
+  [key: string]: any;
+}
 // frontend/src/types.ts
 export interface DailyReport {
   id: number;
