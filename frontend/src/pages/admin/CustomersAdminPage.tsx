@@ -2,8 +2,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { Alert, Button } from '../../components/common';
-import { createCustomer, getCustomers, getOrders, updateCustomer } from '../../api';
-import { Customer, Order } from '../../types';
+import { 
+  createCustomer, 
+  getCustomers, 
+  getOrders, 
+  updateCustomer,
+  generateDocumentByType,
+  getDocumentTemplatesByType
+} from '../../api';
+import { Customer, Order, TemplateData } from '../../types';
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
 import * as XLSX from 'xlsx';
 import '../../components/admin/PricingManagement.css';
@@ -53,6 +60,7 @@ const CustomersAdminPage: React.FC = () => {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<{ total: number; created: number; skipped: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [generatingDocument, setGeneratingDocument] = useState<string | null>(null);
 
   const loadCustomers = useCallback(async () => {
     try {
@@ -211,118 +219,510 @@ const CustomersAdminPage: React.FC = () => {
     []
   );
 
-  const handleExportAct = useCallback(() => {
+  const handleExportAct = useCallback(async () => {
     if (!selectedCustomer) return;
-    const rows = [
-      ['№', 'Дата', 'Заказ', 'Сумма', 'Статус'],
-      ...buildOrdersTableRows(filteredOrders),
-    ];
-    const total = filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
-    rows.push(['', '', 'Итого', total.toFixed(2), '']);
+    
+    try {
+      setGeneratingDocument('act');
+      
+      // Собираем все позиции из всех заказов
+      const allOrderItems: Array<{
+        number: number;
+        name: string;
+        unit: string;
+        quantity: number;
+        price: number;
+        amount: number;
+        vatRate?: string;
+        vatAmount?: number;
+        totalWithVat?: number;
+      }> = [];
+      
+      let itemNumber = 1;
+      console.log(`[Frontend] Начинаем сбор позиций из ${filteredOrders.length} заказов`);
+      
+      // Проверяем, есть ли items в заказах
+      let totalItemsFound = 0;
+      for (const order of filteredOrders) {
+        const orderItems = (order as any).items || [];
+        totalItemsFound += orderItems.length;
+        if (orderItems.length === 0) {
+          console.warn(`[Frontend] Заказ ${order.id} (${order.number}) не содержит позиций!`, {
+            hasItems: !!order.items,
+            itemsArray: Array.isArray(order.items),
+            itemsLength: order.items?.length || 0
+          });
+        }
+      }
+      
+      console.log(`[Frontend] Всего найдено позиций: ${totalItemsFound} из ${filteredOrders.length} заказов`);
+      
+      // Функция для формирования краткого названия товара для акта
+      const buildSimplifiedItemName = (item: any): string => {
+        // Проверяем, является ли это произвольным продуктом
+        const isCustomProduct = item.params?.customProduct === true;
+        
+        if (isCustomProduct) {
+          // Для произвольных продуктов просто возвращаем название
+          return item.type || 
+                 item.params?.customName || 
+                 item.params?.productName || 
+                 item.params?.description || 
+                 'Произвольный продукт';
+        }
+        
+        // Для готовых продуктов возвращаем только название услуги/продукта
+        // Без всех характеристик (материал, формат печати и т.д.)
+        return item.type || 
+               item.params?.productName || 
+               item.params?.name ||
+               item.params?.description ||
+               'Услуга';
+      };
+      
+      for (const order of filteredOrders) {
+        const orderItems = (order as any).items || [];
+        for (const item of orderItems) {
+          // Формируем упрощенное наименование
+          const itemName = buildSimplifiedItemName(item);
+          
+          // Определяем единицу измерения
+          let unit = 'шт';
+          if (item.params?.unit) {
+            unit = item.params.unit;
+          } else if (item.type === 'print' || item.type === 'postprint') {
+            unit = 'шт';
+          }
+          
+          const quantity = Number(item.quantity) || 1;
+          const price = Number(item.price) || 0;
+          const amount = Math.round(price * quantity * 100) / 100; // Округляем до копеек
+          
+          // Для НДС можно добавить логику позже
+          const vatRate = 'Без НДС';
+          const vatAmount = 0;
+          const totalWithVat = amount;
+          
+          allOrderItems.push({
+            number: itemNumber++,
+            name: itemName,
+            unit: unit,
+            quantity: quantity,
+            price: Math.round(price * 100) / 100, // Округляем до копеек
+            amount: amount,
+            vatRate: vatRate,
+            vatAmount: vatAmount,
+            totalWithVat: totalWithVat,
+          });
+        }
+      }
+      
+      console.log(`[Frontend] Собрано всего позиций для акта: ${allOrderItems.length}`, {
+        items: allOrderItems.slice(0, 3).map(item => ({ 
+          number: item.number,
+          name: item.name, 
+          quantity: item.quantity, 
+          amount: item.amount 
+        })),
+        totalAmount: allOrderItems.reduce((sum, item) => sum + item.amount, 0),
+        totalQuantity: allOrderItems.reduce((sum, item) => sum + item.quantity, 0)
+      });
+      
+      // Пытаемся использовать шаблон
+      try {
+        const templateData: TemplateData = {
+          customerName: selectedCustomer.company_name || selectedCustomer.legal_name || getCustomerDisplayName(selectedCustomer),
+          companyName: selectedCustomer.company_name || '',
+          legalName: selectedCustomer.legal_name || '',
+          legalAddress: selectedCustomer.address || '—',
+          taxId: selectedCustomer.tax_id || '—',
+          bankDetails: selectedCustomer.bank_details || '—',
+          authorizedPerson: selectedCustomer.authorized_person || '—',
+          orders: filteredOrders.map((order, index) => ({
+            number: order.number || `#${order.id}`,
+            date: formatDateValue(order.created_at || (order as any).created_at),
+            amount: getOrderTotal(order),
+            status: String(order.status ?? '—'),
+          })),
+          orderItems: allOrderItems, // Детализированные позиции для таблицы
+          totalAmount: filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
+          totalQuantity: allOrderItems.reduce((sum, item) => sum + item.quantity, 0), // Общее количество позиций
+        };
+        
+        console.log(`[Frontend] Отправляем данные в шаблон:`, {
+          orderItemsCount: allOrderItems.length,
+          totalQuantity: templateData.totalQuantity,
+          totalAmount: templateData.totalAmount,
+          firstItem: allOrderItems[0],
+          orderItemsArray: Array.isArray(templateData.orderItems),
+          orderItemsType: typeof templateData.orderItems
+        });
+        
+        const response = await generateDocumentByType('act', templateData);
+        const blob = new Blob([response.data], { 
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Извлекаем имя файла из заголовка Content-Disposition
+        let filename = `ACT-${formatDateForFile(new Date())}-${selectedCustomer.id}.xlsx`; // Fallback
+        const contentDisposition = response.headers['content-disposition'];
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (filenameMatch && filenameMatch[1]) {
+            filename = filenameMatch[1].replace(/['"]/g, '');
+            // Декодируем URL-encoded имя файла
+            try {
+              filename = decodeURIComponent(filename);
+            } catch (e) {
+              // Если не удалось декодировать, используем как есть
+            }
+          }
+        }
+        
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        return;
+      } catch (templateError: any) {
+        // Если шаблон не найден, используем старый способ
+        const errorMessage = templateError?.response?.data?.message || templateError?.message || '';
+        if (errorMessage.includes('404') || errorMessage.includes('не найден') || errorMessage.includes('Шаблон')) {
+          console.log('Шаблон не найден, используем стандартную генерацию:', errorMessage);
+        } else {
+          // Показываем полную ошибку для отладки
+          console.error('Ошибка генерации документа:', templateError);
+          setError(`Ошибка генерации акта: ${errorMessage || 'Неизвестная ошибка'}`);
+          return;
+        }
+      }
+      
+      // Стандартная генерация без шаблона
+      const rows = [
+        ['№', 'Дата', 'Заказ', 'Сумма', 'Статус'],
+        ...buildOrdersTableRows(filteredOrders),
+      ];
+      const total = filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
+      rows.push(['', '', 'Итого', total.toFixed(2), '']);
 
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Акт');
-    const fileName = `ACT-${formatDateForFile(new Date())}-${selectedCustomer.id}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+      const worksheet = XLSX.utils.aoa_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Акт');
+      const fileName = `ACT-${formatDateForFile(new Date())}-${selectedCustomer.id}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    } catch (error: any) {
+      setError(error?.message || 'Не удалось создать акт');
+    } finally {
+      setGeneratingDocument(null);
+    }
   }, [buildOrdersTableRows, filteredOrders, selectedCustomer]);
 
-  const handleExportInvoice = useCallback(() => {
+  const handleExportInvoice = useCallback(async () => {
     if (!selectedCustomer) return;
-    const rows = [
-      ['№', 'Дата', 'Заказ', 'Сумма', 'Статус'],
-      ...buildOrdersTableRows(filteredOrders),
-    ];
-    const total = filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
-    rows.push(['', '', 'Итого', total.toFixed(2), '']);
+    
+    try {
+      setGeneratingDocument('invoice');
+      
+      // Собираем все позиции из всех заказов (аналогично акту)
+      const allOrderItems: Array<{
+        number: number;
+        name: string;
+        unit: string;
+        quantity: number;
+        price: number;
+        amount: number;
+        vatRate?: string;
+        vatAmount?: number;
+        totalWithVat?: number;
+      }> = [];
+      
+      // Функция для формирования краткого названия товара для счёта
+      const buildSimplifiedItemName = (item: any): string => {
+        // Проверяем, является ли это произвольным продуктом
+        const isCustomProduct = item.params?.customProduct === true;
+        
+        if (isCustomProduct) {
+          // Для произвольных продуктов просто возвращаем название
+          return item.type || 
+                 item.params?.customName || 
+                 item.params?.productName || 
+                 item.params?.description || 
+                 'Произвольный продукт';
+        }
+        
+        // Для готовых продуктов возвращаем только название услуги/продукта
+        // Без всех характеристик (материал, формат печати и т.д.)
+        return item.type || 
+               item.params?.productName || 
+               item.params?.name ||
+               item.params?.description ||
+               'Услуга';
+      };
+      
+      let itemNumber = 1;
+      for (const order of filteredOrders) {
+        const orderItems = (order as any).items || [];
+        for (const item of orderItems) {
+          // Используем упрощенное название
+          const itemName = buildSimplifiedItemName(item);
+          
+          let unit = 'шт';
+          if (item.params?.unit) {
+            unit = item.params.unit;
+          }
+          
+          const quantity = Number(item.quantity) || 1;
+          const price = Number(item.price) || 0;
+          const amount = Math.round(price * quantity * 100) / 100;
+          
+          allOrderItems.push({
+            number: itemNumber++,
+            name: itemName,
+            unit: unit,
+            quantity: quantity,
+            price: Math.round(price * 100) / 100,
+            amount: amount,
+            vatRate: 'Без НДС',
+            vatAmount: 0,
+            totalWithVat: amount,
+          });
+        }
+      }
+      
+      // Пытаемся использовать шаблон
+      try {
+        const templateData: TemplateData = {
+          customerName: selectedCustomer.company_name || selectedCustomer.legal_name || getCustomerDisplayName(selectedCustomer),
+          companyName: selectedCustomer.company_name || '',
+          legalName: selectedCustomer.legal_name || '',
+          legalAddress: selectedCustomer.address || '—',
+          taxId: selectedCustomer.tax_id || '—',
+          bankDetails: selectedCustomer.bank_details || '—',
+          authorizedPerson: selectedCustomer.authorized_person || '—',
+          orders: filteredOrders.map((order, index) => ({
+            number: order.number || `#${order.id}`,
+            date: formatDateValue(order.created_at || (order as any).created_at),
+            amount: getOrderTotal(order),
+            status: String(order.status ?? '—'),
+          })),
+          orderItems: allOrderItems, // Детализированные позиции для таблицы
+          totalAmount: filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
+          totalQuantity: allOrderItems.reduce((sum, item) => sum + item.quantity, 0), // Общее количество позиций
+        };
+        
+        const response = await generateDocumentByType('invoice', templateData);
+        const blob = new Blob([response.data], { 
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Извлекаем имя файла из заголовка Content-Disposition
+        let filename = `INVOICE-${formatDateForFile(new Date())}-${selectedCustomer.id}.xlsx`; // Fallback
+        const contentDisposition = response.headers['content-disposition'];
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (filenameMatch && filenameMatch[1]) {
+            filename = filenameMatch[1].replace(/['"]/g, '');
+            try {
+              filename = decodeURIComponent(filename);
+            } catch (e) {
+              // Если не удалось декодировать, используем как есть
+            }
+          }
+        }
+        
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        return;
+      } catch (templateError: any) {
+        // Если шаблон не найден, используем старый способ
+        if (templateError.message?.includes('404') || templateError.message?.includes('не найден')) {
+          console.log('Шаблон не найден, используем стандартную генерацию');
+        } else {
+          throw templateError;
+        }
+      }
+      
+      // Стандартная генерация без шаблона
+      const rows = [
+        ['№', 'Дата', 'Заказ', 'Сумма', 'Статус'],
+        ...buildOrdersTableRows(filteredOrders),
+      ];
+      const total = filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
+      rows.push(['', '', 'Итого', total.toFixed(2), '']);
 
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Счёт');
-    const fileName = `INVOICE-${formatDateForFile(new Date())}-${selectedCustomer.id}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+      const worksheet = XLSX.utils.aoa_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Счёт');
+      const fileName = `INVOICE-${formatDateForFile(new Date())}-${selectedCustomer.id}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    } catch (error: any) {
+      setError(error?.message || 'Не удалось создать счёт');
+    } finally {
+      setGeneratingDocument(null);
+    }
   }, [buildOrdersTableRows, filteredOrders, selectedCustomer]);
 
   const handleExportContract = useCallback(async () => {
     if (!selectedCustomer) return;
-    const title = `ДОГОВОР № CONTRACT-${formatDateForFile(new Date())}-${selectedCustomer.id}`;
-    const customerName = selectedCustomer.company_name || selectedCustomer.legal_name || getCustomerDisplayName(selectedCustomer);
-    const bankDetails = selectedCustomer.bank_details || '—';
-    const authorizedPerson = selectedCustomer.authorized_person || '—';
-    const legalAddress = selectedCustomer.address || '—';
+    
+    try {
+      setGeneratingDocument('contract');
+      
+      const contractNumber = `CONTRACT-${formatDateForFile(new Date())}-${selectedCustomer.id}`;
+      const customerName = selectedCustomer.company_name || selectedCustomer.legal_name || getCustomerDisplayName(selectedCustomer);
+      
+      // Пытаемся использовать шаблон
+      try {
+        const templateData: TemplateData = {
+          customerName,
+          companyName: selectedCustomer.company_name || '',
+          legalName: selectedCustomer.legal_name || '',
+          legalAddress: selectedCustomer.address || '—',
+          taxId: selectedCustomer.tax_id || '—',
+          bankDetails: selectedCustomer.bank_details || '—',
+          authorizedPerson: selectedCustomer.authorized_person || '—',
+          contractNumber,
+          contractDate: new Date().toLocaleDateString('ru-RU'),
+          orders: filteredOrders.map((order, index) => ({
+            number: order.number || `#${order.id}`,
+            date: formatDateValue(order.created_at || (order as any).created_at),
+            amount: getOrderTotal(order),
+            status: String(order.status ?? '—'),
+          })),
+          totalAmount: filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
+        };
+        
+        const response = await generateDocumentByType('contract', templateData);
+        const blob = new Blob([response.data], { 
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Извлекаем имя файла из заголовка Content-Disposition
+        let filename = `${contractNumber}.docx`; // Fallback
+        const contentDisposition = response.headers['content-disposition'];
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (filenameMatch && filenameMatch[1]) {
+            filename = filenameMatch[1].replace(/['"]/g, '');
+            try {
+              filename = decodeURIComponent(filename);
+            } catch (e) {
+              // Если не удалось декодировать, используем как есть
+            }
+          }
+        }
+        
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        return;
+      } catch (templateError: any) {
+        // Если шаблон не найден, используем старый способ
+        if (templateError.message?.includes('404') || templateError.message?.includes('не найден')) {
+          console.log('Шаблон не найден, используем стандартную генерацию');
+        } else {
+          throw templateError;
+        }
+      }
+      
+      // Стандартная генерация без шаблона
+      const title = `ДОГОВОР № ${contractNumber}`;
+      const bankDetails = selectedCustomer.bank_details || '—';
+      const authorizedPerson = selectedCustomer.authorized_person || '—';
+      const legalAddress = selectedCustomer.address || '—';
 
-    const tableRows = [
-      new TableRow({
-        children: ['№', 'Дата', 'Заказ', 'Сумма', 'Статус'].map((text) =>
-          new TableCell({
-            width: { size: 20, type: WidthType.PERCENTAGE },
-            children: [new Paragraph({ children: [new TextRun({ text, bold: true })] })],
-          })
+      const tableRows = [
+        new TableRow({
+          children: ['№', 'Дата', 'Заказ', 'Сумма', 'Статус'].map((text) =>
+            new TableCell({
+              width: { size: 20, type: WidthType.PERCENTAGE },
+              children: [new Paragraph({ children: [new TextRun({ text, bold: true })] })],
+            })
+          ),
+        }),
+        ...buildOrdersTableRows(filteredOrders).map(
+          (cells) =>
+            new TableRow({
+              children: cells.map((value) => new TableCell({ children: [new Paragraph(value)] })),
+            })
         ),
-      }),
-      ...buildOrdersTableRows(filteredOrders).map(
-        (cells) =>
-          new TableRow({
-            children: cells.map((value) => new TableCell({ children: [new Paragraph(value)] })),
-          })
-      ),
-    ];
+      ];
 
-    const doc = new Document({
-      sections: [
-        {
-          children: [
-            new Paragraph({ text: title, spacing: { after: 300 } }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: 'Клиент: ', bold: true }),
-                new TextRun({ text: customerName }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: 'Юр. адрес: ', bold: true }),
-                new TextRun({ text: legalAddress }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: 'УНП: ', bold: true }),
-                new TextRun({ text: selectedCustomer.tax_id || '—' }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: 'Расчётный счёт и банк: ', bold: true }),
-                new TextRun({ text: bankDetails }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: 'Уполномоченное лицо: ', bold: true }),
-                new TextRun({ text: authorizedPerson }),
-              ],
-            }),
-            new Paragraph({ text: ' ', spacing: { after: 200 } }),
-            new Paragraph({ text: 'Заказы в периоде', spacing: { after: 100 } }),
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              rows: tableRows,
-            }),
-          ],
-        },
-      ],
-    });
+      const doc = new Document({
+        sections: [
+          {
+            children: [
+              new Paragraph({ text: title, spacing: { after: 300 } }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'Клиент: ', bold: true }),
+                  new TextRun({ text: customerName }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'Юр. адрес: ', bold: true }),
+                  new TextRun({ text: legalAddress }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'УНП: ', bold: true }),
+                  new TextRun({ text: selectedCustomer.tax_id || '—' }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'Расчётный счёт и банк: ', bold: true }),
+                  new TextRun({ text: bankDetails }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'Уполномоченное лицо: ', bold: true }),
+                  new TextRun({ text: authorizedPerson }),
+                ],
+              }),
+              new Paragraph({ text: ' ', spacing: { after: 200 } }),
+              new Paragraph({ text: 'Заказы в периоде', spacing: { after: 100 } }),
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: tableRows,
+              }),
+            ],
+          },
+        ],
+      });
 
-    const blob = await Packer.toBlob(doc);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `CONTRACT-${formatDateForFile(new Date())}-${selectedCustomer.id}.docx`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${contractNumber}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      setError(error?.message || 'Не удалось создать договор');
+    } finally {
+      setGeneratingDocument(null);
+    }
   }, [buildOrdersTableRows, filteredOrders, selectedCustomer]);
 
   const normalizeHeader = (value: unknown) =>
@@ -356,6 +756,16 @@ const CustomersAdminPage: React.FC = () => {
     комментарий: 'notes',
     тип: 'type',
     type: 'type',
+    уполномоченноелицо: 'authorized_person',
+    уполномоченное_лицо: 'authorized_person',
+    authorized_person: 'authorized_person',
+    authorizedperson: 'authorized_person',
+    расчетныйсчет: 'bank_details',
+    расчетный_счет: 'bank_details',
+    банковскиереквизиты: 'bank_details',
+    банковские_реквизиты: 'bank_details',
+    bank_details: 'bank_details',
+    bankdetails: 'bank_details',
   };
 
   const resolveCustomerType = (value?: string, taxId?: string): Customer['type'] => {
@@ -399,6 +809,8 @@ const CustomersAdminPage: React.FC = () => {
       Компания: customer.company_name || '',
       'Юр. название': customer.legal_name || '',
       УНП: customer.tax_id || '',
+      'Уполномоченное лицо': customer.authorized_person || '',
+      'Расчётный счёт': customer.bank_details || '',
       Телефон: customer.phone || '',
       Email: customer.email || '',
       Адрес: customer.address || '',
@@ -446,6 +858,8 @@ const CustomersAdminPage: React.FC = () => {
           company_name: normalizedRow.company_name || '',
           legal_name: normalizedRow.legal_name || '',
           tax_id: taxId || '',
+          authorized_person: normalizedRow.authorized_person || '',
+          bank_details: normalizedRow.bank_details || '',
           phone: normalizedRow.phone || '',
           email: normalizedRow.email || '',
           address: normalizedRow.address || '',
@@ -628,14 +1042,29 @@ const CustomersAdminPage: React.FC = () => {
                 </div>
                 {selectedCustomer.type === 'legal' && (
                   <div className="customers-doc-actions">
-                    <Button variant="secondary" size="sm" onClick={handleExportContract} disabled={ordersLoading}>
-                      Договор Word
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={handleExportContract} 
+                      disabled={ordersLoading || generatingDocument === 'contract'}
+                    >
+                      {generatingDocument === 'contract' ? 'Генерация...' : 'Договор Word'}
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={handleExportAct} disabled={ordersLoading}>
-                      Акт Excel
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={handleExportAct} 
+                      disabled={ordersLoading || generatingDocument === 'act'}
+                    >
+                      {generatingDocument === 'act' ? 'Генерация...' : 'Акт Excel'}
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={handleExportInvoice} disabled={ordersLoading}>
-                      Счёт Excel
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={handleExportInvoice} 
+                      disabled={ordersLoading || generatingDocument === 'invoice'}
+                    >
+                      {generatingDocument === 'invoice' ? 'Генерация...' : 'Счёт Excel'}
                     </Button>
                   </div>
                 )}

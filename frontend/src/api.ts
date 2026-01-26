@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { calculatePrice as unifiedCalculatePrice } from './services/pricing';
-import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer } from './types';
+import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer, DocumentTemplate, TemplateData } from './types';
 import { API_BASE_URL } from './config/constants';
 
 const api = axios.create({ baseURL: API_BASE_URL });
@@ -642,3 +642,45 @@ export const updateCustomer = (id: number, customer: Partial<Omit<Customer, 'id'
   api.put<Customer>(`/customers/${id}`, customer);
 export const deleteCustomer = (id: number) => 
   api.delete(`/customers/${id}`);
+
+// Document Templates API
+export const getDocumentTemplates = () => 
+  api.get<DocumentTemplate[]>('/document-templates');
+export const getDocumentTemplatesByType = (type: 'contract' | 'act' | 'invoice') => 
+  api.get<DocumentTemplate[]>(`/document-templates/type/${type}`);
+export const getDocumentTemplate = (id: number) => 
+  api.get<DocumentTemplate>(`/document-templates/${id}`);
+export const uploadDocumentTemplate = (formData: FormData) => 
+  api.post<DocumentTemplate>('/document-templates', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+export const setDefaultTemplate = (id: number) => 
+  api.patch<DocumentTemplate>(`/document-templates/${id}/set-default`);
+export const deleteDocumentTemplate = (id: number) => 
+  api.delete(`/document-templates/${id}`);
+export const downloadDocumentTemplate = (id: number) => 
+  api.get(`/document-templates/${id}/download`, { responseType: 'blob' });
+export const generateDocumentFromTemplate = (id: number, data: TemplateData) => 
+  api.post(`/document-templates/${id}/generate`, data, { responseType: 'blob' });
+export const generateDocumentByType = (type: 'contract' | 'act' | 'invoice', data: TemplateData) => 
+  api.post(`/document-templates/generate/${type}`, data, { responseType: 'blob' });
+
+// Анализ шаблона и маппинг полей
+export interface TemplateAnalysis {
+  placeholders: string[];
+  type: 'docx' | 'xlsx' | 'xls';
+}
+
+export interface FieldMapping {
+  id?: number;
+  templateField: string;
+  systemField: string;
+  fieldLabel?: string;
+}
+
+export const analyzeTemplate = (id: number) => 
+  api.get<TemplateAnalysis>(`/document-templates/${id}/analyze`);
+export const getTemplateFieldMapping = (id: number) => 
+  api.get<FieldMapping[]>(`/document-templates/${id}/mapping`);
+export const saveTemplateFieldMapping = (id: number, mappings: FieldMapping[]) => 
+  api.post<FieldMapping[]>(`/document-templates/${id}/mapping`, { mappings });
