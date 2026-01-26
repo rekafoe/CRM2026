@@ -1,3 +1,4 @@
+/// <reference path="../types.d.ts" />
 import fs from 'fs';
 import path from 'path';
 import Docxtemplater from 'docxtemplater';

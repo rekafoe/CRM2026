@@ -17,9 +17,16 @@ declare module 'docxtemplater' {
 }
 
 declare module 'pizzip' {
+  interface PizZipFile {
+    dir: boolean;
+    asText(): string;
+    asBinary(): string;
+  }
+
   class PizZip {
     constructor(content: string | Buffer, options?: any);
     generate(options: { type: string; compression?: string }): Buffer;
+    files: { [key: string]: PizZipFile };
   }
 
   export = PizZip;
@@ -39,6 +46,8 @@ declare module 'exceljs' {
     getCell(address: string): Cell;
     mergeCells(range: string): void;
     columns: Array<{ width?: number }>;
+    eachRow(callback: (row: Row, rowNumber: number) => void): void;
+    insertRows(rowNumber: number, rows: any[], options?: any): void;
     model?: {
       merges?: Array<string | { s: { r: number; c: number }; e: { r: number; c: number } }>;
     };
@@ -54,6 +63,12 @@ declare module 'exceljs' {
   interface Cell {
     value: any;
     style: Partial<CellStyle>;
+    address: string;
+    numFmt?: string;
+    border?: Partial<Border>;
+    fill?: Partial<Fill>;
+    font?: Partial<Font>;
+    alignment?: Partial<Alignment>;
   }
 
   interface CellStyle {
@@ -61,6 +76,7 @@ declare module 'exceljs' {
     fill?: Partial<Fill>;
     font?: Partial<Font>;
     alignment?: Partial<Alignment>;
+    numFmt?: string;
   }
 
   interface Border {
@@ -95,7 +111,9 @@ declare module 'exceljs' {
   class WorkbookClass {
     constructor();
     addWorksheet(name: string): Worksheet;
+    worksheets: Worksheet[];
     xlsx: {
+      readFile(path: string): Promise<WorkbookClass>;
       writeBuffer(options?: { useStyles?: boolean; useSharedStrings?: boolean }): Promise<Buffer>;
       writeFile(path: string): Promise<void>;
     };
