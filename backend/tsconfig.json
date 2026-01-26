@@ -13,6 +13,6 @@
     "checkJs": false,
     "resolveJsonModule": true
   },
-  "include": ["src", "migrations", "../shared"],
+  "include": ["src/**/*", "src/types.d.ts", "migrations", "../shared"],
   "exclude": ["node_modules", "dist"]
 }
