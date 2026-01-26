@@ -365,22 +365,24 @@ const DocumentTemplatesPage: React.FC = () => {
                               </td>
                               <td>
                                 <div className="templates-actions">
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => handleDownload(template)}
-                                    title="Скачать шаблон"
-                                  >
-                                    Скачать
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => handleConfigureMapping(template)}
-                                    title="Настройка полей опциональна - система автоматически сопоставляет стандартные поля"
-                                  >
-                                    Настроить поля (опционально)
-                                  </Button>
+                                  <div title="Скачать шаблон">
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => handleDownload(template)}
+                                    >
+                                      Скачать
+                                    </Button>
+                                  </div>
+                                  <div title="Настройка полей опциональна - система автоматически сопоставляет стандартные поля">
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => handleConfigureMapping(template)}
+                                    >
+                                      Настроить поля (опционально)
+                                    </Button>
+                                  </div>
                                   {!template.is_default && (
                                     <Button
                                       variant="secondary"
@@ -428,12 +430,14 @@ const DocumentTemplatesPage: React.FC = () => {
           <div style={{ padding: '20px', textAlign: 'center' }}>Анализ шаблона...</div>
         ) : analysis ? (
           <div style={{ padding: '20px' }}>
-            <Alert type="info" style={{ marginBottom: '20px' }}>
-              Найдено {analysis.placeholders.length} полей в шаблоне. Сопоставьте каждое поле шаблона с полем системы.
-              <br />
-              <strong>Примечание:</strong> Если в шаблоне есть поле для общей суммы, но нет массива заказов, 
-              система автоматически вычислит totalAmount из массива orders (если он сопоставлен).
-            </Alert>
+            <div style={{ marginBottom: '20px' }}>
+              <Alert type="info">
+                Найдено {analysis.placeholders.length} полей в шаблоне. Сопоставьте каждое поле шаблона с полем системы.
+                <br />
+                <strong>Примечание:</strong> Если в шаблоне есть поле для общей суммы, но нет массива заказов, 
+                система автоматически вычислит totalAmount из массива orders (если он сопоставлен).
+              </Alert>
+            </div>
             
             <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
