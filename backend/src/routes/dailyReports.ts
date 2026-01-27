@@ -130,60 +130,90 @@ router.patch('/:date', asyncHandler(async (req, res) => {
         req.params.date,
         targetUserId
       )
-  if (!existing) {
-    res.status(404).json({ message: 'Отчёт не найден' })
-    return
-  }
-
+  
   // Allow changing owner only for admin
   const nextUserId = !isGlobal && user_id != null && authUser?.role === 'admin' ? user_id : targetUserId
 
-  try {
-    // Строим SET часть запроса
-    const setParts: string[] = []
-    const values: any[] = []
-    
-    if (orders_count != null) {
-      setParts.push('orders_count = ?')
-      values.push(orders_count)
-    }
-    
-    if (total_revenue != null) {
-      setParts.push('total_revenue = ?')
-      values.push(total_revenue)
-    }
-    
-    if (cash_actual != null) {
-      setParts.push('cash_actual = ?')
-      values.push(Number(cash_actual))
-    }
-    
-    if (nextUserId !== targetUserId) {
-      setParts.push('user_id = ?')
-      values.push(nextUserId)
-    }
-    
-    setParts.push("updated_at = datetime('now')")
-    
-    const setClause = setParts.join(', ')
+  // Если отчёт не найден, создаём его автоматически
+  if (!existing) {
+    // Определяем значения для создания отчёта
+    const newOrdersCount = orders_count != null ? orders_count : 0
+    const newTotalRevenue = total_revenue != null ? total_revenue : 0
+    const newCashActual = cash_actual != null ? Number(cash_actual) : null
     
     if (isGlobal) {
+      // Создаём глобальный отчёт (user_id = NULL)
       await db.run(
-        `UPDATE daily_reports SET ${setClause} WHERE report_date = ? AND user_id IS NULL`,
-        ...values,
-        req.params.date
+        `INSERT INTO daily_reports (report_date, orders_count, total_revenue, user_id, cash_actual, updated_at)
+         VALUES (?, ?, ?, NULL, ?, datetime('now'))`,
+        req.params.date,
+        newOrdersCount,
+        newTotalRevenue,
+        newCashActual
       )
     } else {
+      // Создаём отчёт для пользователя
       await db.run(
-        `UPDATE daily_reports SET ${setClause} WHERE report_date = ? AND user_id = ?`,
-        ...values,
+        `INSERT INTO daily_reports (report_date, orders_count, total_revenue, user_id, cash_actual, updated_at)
+         VALUES (?, ?, ?, ?, ?, datetime('now'))`,
         req.params.date,
-        targetUserId
+        newOrdersCount,
+        newTotalRevenue,
+        nextUserId,
+        newCashActual
       )
     }
-  } catch (e: any) {
-    if (String(e?.message || '').includes('UNIQUE')) { res.status(409).json({ message: 'Отчёт для этого пользователя и даты уже существует' }); return }
-    throw e
+  } else {
+    // Отчёт существует, обновляем его
+    try {
+      // Строим SET часть запроса
+      const setParts: string[] = []
+      const values: any[] = []
+      
+      if (orders_count != null) {
+        setParts.push('orders_count = ?')
+        values.push(orders_count)
+      }
+      
+      if (total_revenue != null) {
+        setParts.push('total_revenue = ?')
+        values.push(total_revenue)
+      }
+      
+      if (cash_actual != null) {
+        setParts.push('cash_actual = ?')
+        values.push(Number(cash_actual))
+      }
+      
+      if (nextUserId !== targetUserId) {
+        setParts.push('user_id = ?')
+        values.push(nextUserId)
+      }
+      
+      // Обновляем только если есть что обновлять
+      if (setParts.length > 0) {
+        setParts.push("updated_at = datetime('now')")
+        const setClause = setParts.join(', ')
+        
+        if (isGlobal) {
+          await db.run(
+            `UPDATE daily_reports SET ${setClause} WHERE report_date = ? AND user_id IS NULL`,
+            ...values,
+            req.params.date
+          )
+        } else {
+          await db.run(
+            `UPDATE daily_reports SET ${setClause} WHERE report_date = ? AND user_id = ?`,
+            ...values,
+            req.params.date,
+            targetUserId
+          )
+        }
+      }
+    } catch (e: any) {
+      if (String(e?.message || '').includes('UNIQUE')) { res.status(409).json({ message: 'Отчёт для этого пользователя и даты уже существует' }); return }
+      throw e
+    }
   }
 
   const updated = isGlobal
