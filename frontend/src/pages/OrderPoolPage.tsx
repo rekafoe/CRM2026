@@ -230,8 +230,14 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     try {
       setLoading(true);
       const res = await getOrders();
-      setOrders(res.data);
+      const list = res.data as Order[];
+      setOrders(list);
       setError(null);
+      setSelectedOrder((prev) => {
+        if (!prev) return prev;
+        const next = list.find((o) => o.id === prev!.id);
+        return next ?? prev;
+      });
     } catch (err) {
       logger.error('Failed to load orders for pool', err);
       setError('Не удалось загрузить заказы.');
@@ -577,34 +583,42 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               onShowFilesModal={() => setShowFilesModal(true)}
               onShowPrepaymentModal={() => setShowPrepaymentModal(true)}
             />
-            {Number(selectedOrder.status) === 0 && (
-              <div className="order-detail-responsible">
-                <label>
-                  Ответственный:
-                  <select
-                    value={selectedOrder.userId ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '') return;
-                      const uid = Number(v);
-                      if (uid === selectedOrder.userId) return;
-                      handleReassignTo(selectedOrder.number!, uid);
-                    }}
-                  >
-                    <option value="">— Не назначен</option>
-                    {allUsers.map((u) => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
-                </label>
-                {!selectedOrder.userId && (
-                  <button type="button" className="btn-assign-me" onClick={() => handleAssignToMe(selectedOrder.number!)}>
-                    Назначить мне
-                  </button>
-                )}
-              </div>
-            )}
+            <div className="order-detail-responsible">
+              <label>
+                Ответственный:
+                <select
+                  value={selectedOrder.userId ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '') return;
+                    const uid = Number(v);
+                    if (uid === selectedOrder.userId) return;
+                    handleReassignTo(selectedOrder.number!, uid);
+                  }}
+                >
+                  <option value="">— Не назначен</option>
+                  {allUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </label>
+              {!selectedOrder.userId && Number(selectedOrder.status) === 0 && (
+                <button type="button" className="btn-assign-me" onClick={() => handleAssignToMe(selectedOrder.number!)}>
+                  Назначить мне
+                </button>
+              )}
+              {selectedOrder.userId && Number(selectedOrder.userId) !== currentUserId && (
+                <button type="button" className="btn-take-self" onClick={() => handleAssignToMe(selectedOrder.number!)}>
+                  Забрать себе
+                </button>
+              )}
+            </div>
             <div className="order-detail-actions">
+              {getOrderDebt(selectedOrder) > 0 && (
+                <button className="btn-close-debt" onClick={() => setShowPrepaymentModal(true)}>
+                  💰 Закрыть долг
+                </button>
+              )}
               {Number(selectedOrder.status) === 0 && (
                 <button onClick={() => handleProcessOrder(selectedOrder.id)}>Внести предоплату</button>
               )}

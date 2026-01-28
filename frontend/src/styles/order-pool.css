@@ -358,6 +358,15 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.order-detail-actions .btn-close-debt {
+  background: #28a745;
+  color: white;
+}
+
+.order-detail-actions .btn-close-debt:hover {
+  background: #218838;
+}
+
 .order-detail-responsible {
   display: flex;
   align-items: center;
@@ -401,6 +410,21 @@
 
 .order-detail-responsible .btn-assign-me:hover {
   background: #45a049;
+}
+
+.order-detail-responsible .btn-take-self {
+  padding: 8px 14px;
+  background: #fd7e14;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.order-detail-responsible .btn-take-self:hover {
+  background: #e96b00;
 }
 
 .order-detail-actions {
