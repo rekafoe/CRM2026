@@ -122,8 +122,8 @@ export const useOptimizedAppData = (
             if (!rawDate) return false;
             return extractDate(rawDate) === targetDate;
           })
-          .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid))
-          .filter(o => Number((o as any).status) !== 4);
+          .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid));
+        // Выданные (status 4) не скрываем — заказ создателя не пропадает, если его выдал коллега.
       }
       const uniqueOrders = list.filter((order, index, self) => 
         index === self.findIndex(o => o.id === order.id)
@@ -207,8 +207,7 @@ export const useOptimizedAppData = (
               if (!rawDate) return false;
               return extractDate(rawDate) === targetDate;
             })
-            .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid))
-            .filter(o => Number((o as any).status) !== 4);
+            .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid));
         }
         const uniqueOrders = list.filter((order, index, self) => 
           index === self.findIndex(o => o.id === order.id)

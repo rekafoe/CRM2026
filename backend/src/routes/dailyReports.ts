@@ -292,26 +292,38 @@ router.get('/full/:date', asyncHandler(async (req, res) => {
     return
   }
 
-  // Get orders for this date and user
+  // Заказы за дату: созданные в этот день ИЛИ выданные в этот день (владелец). Чтобы заказ не пропадал из отчёта создателя при выдаче коллегой.
+  const d = String(req.params.date || '').slice(0, 10)
   const orders = isGlobal
     ? await db.all<any>(
         `SELECT o.id, o.number, o.status, o.createdAt, o.customerName, o.customerPhone, o.customerEmail, o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId
          FROM orders o
-         WHERE DATE(o.createdAt) = ?
+         WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
+            OR (o.status = 4 AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?)
          ORDER BY o.id DESC`,
-        req.params.date
+        d,
+        d
       )
     : await db.all<any>(
         `SELECT o.id, o.number, o.status, o.createdAt, o.customerName, o.customerPhone, o.customerEmail, o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId
          FROM orders o
-         WHERE DATE(o.createdAt) = ? AND o.userId = ?
+         WHERE (substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ? AND o.userId = ?)
+            OR (o.status = 4 AND o.userId = ? AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?)
          ORDER BY o.id DESC`,
-        req.params.date,
-        targetUserId
+        d,
+        targetUserId,
+        targetUserId,
+        d
       )
 
-  // Get items for each order
-  for (const order of orders) {
+  const seen = new Set<number>()
+  const uniqueOrders = orders.filter((o: any) => {
+    if (seen.has(o.id)) return false
+    seen.add(o.id)
+    return true
+  })
+
+  for (const order of uniqueOrders) {
     const items = await db.all<any>(
       'SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks FROM items WHERE orderId = ?',
       order.id
@@ -322,7 +334,7 @@ router.get('/full/:date', asyncHandler(async (req, res) => {
     }))
   }
 
-  row.orders = orders
+  row.orders = uniqueOrders
   res.json(row)
 }))
 
