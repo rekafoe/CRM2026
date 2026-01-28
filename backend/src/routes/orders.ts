@@ -331,8 +331,11 @@ router.post('/:orderId/files/:fileId/approve', asyncHandler(async (req, res) => 
 }))
 
 // Выдать заказ: 100% остатка → предоплата, debt_closed_events, статус 4. Учёт в отчёте и счётчиках принтеров по дате выдачи.
+// Заказ не переносится выдавшему: сдельная остаётся у создателя; «долги закрыты» учитываются у выдавшего.
 router.post('/:id/issue', asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
+  const authUser = (req as any).user as { id: number } | undefined
+  const issuerId = authUser?.id ?? null
   const db = await getDb()
   const order = await db.get<any>('SELECT id, prepaymentAmount, discount_percent FROM orders WHERE id = ?', id)
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
@@ -355,12 +358,24 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   if (remainder > 0) {
     const today = new Date().toISOString().slice(0, 10)
     try {
-      await db.run(
-        'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
-        id,
-        today,
-        remainder
-      )
+      let hasIssuedBy = false
+      try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }
+      if (hasIssuedBy) {
+        await db.run(
+          'INSERT INTO debt_closed_events (order_id, closed_date, amount, issued_by_user_id) VALUES (?, ?, ?, ?)',
+          id,
+          today,
+          remainder,
+          issuerId
+        )
+      } else {
+        await db.run(
+          'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
+          id,
+          today,
+          remainder
+        )
+      }
     } catch (e) {
       console.warn('[issue] debt_closed_events insert failed:', (e as Error)?.message)
     }

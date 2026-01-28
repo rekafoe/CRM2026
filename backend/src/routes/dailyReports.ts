@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { AuthenticatedRequest } from '../middleware'
+import { hasColumn } from '../utils/tableSchemaCache'
 
 const router = Router()
 
@@ -86,7 +87,24 @@ router.get('/:date', asyncHandler(async (req, res) => {
     res.status(404).json({ message: 'Отчёт не найден' })
     return
   }
-  res.json(row)
+  let debtClosedIssuedByMe = 0
+  if (!isGlobal && targetUserId) {
+    try {
+      const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id')
+      if (hasIssuedBy) {
+        const d = String(req.params.date || '').slice(0, 10)
+        const r = await db.get<{ s: number }>(
+          'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ? AND issued_by_user_id = ?',
+          d,
+          targetUserId
+        )
+        debtClosedIssuedByMe = Number(r?.s ?? 0)
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  res.json({ ...row, debt_closed_issued_by_me: debtClosedIssuedByMe })
 }))
 
 // PATCH /api/daily/:date — обновить отчёт

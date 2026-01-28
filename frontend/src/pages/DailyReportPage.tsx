@@ -198,6 +198,14 @@ export const DailyReportPage: React.FC = () => {
               Выручка:{' '}
               {report.total_revenue.toLocaleString('ru-RU')} BYN
             </p>
+            {(report.debt_closed_issued_by_me ?? 0) > 0 && (
+              <p style={{ color: '#28a745' }}>
+                {selectedUserId === currentUser?.id
+                  ? 'Долги закрыты вами в этот день'
+                  : 'Долги закрыты пользователем в этот день'}
+                : +{report.debt_closed_issued_by_me!.toLocaleString('ru-RU')} BYN
+              </p>
+            )}
             <div style={{ margin: '8px 0', padding: 12, border: '1px dashed #ddd', borderRadius: 6 }}>
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div>

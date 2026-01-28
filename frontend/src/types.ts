@@ -186,6 +186,8 @@ export interface DailyReport {
   user_id?: number;
   user_name?: string | null;
   cash_actual?: number;
+  /** Долги, закрытые этим пользователем в день отчёта (выдал заказ). Сдельная — у создателя заказа. */
+  debt_closed_issued_by_me?: number;
   // Полная информация о заказах в отчёте
   orders?: Order[];
   // Метаданные отчёта
