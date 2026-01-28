@@ -261,45 +261,50 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     dispatchFilters({ type: 'resetVisible' });
   }, [filters.source, filters.cancelled, filters.assigned, filters.searchTerm, filters.quickFilter, filters.sortBy, filters.sortDirection]);
 
-  const filteredOrders = useMemo(() => {
-    // Показываем ожидающие (0) и оформленные с долгом (1) — чтобы можно было искать и закрывать долг
-    let filtered = orders.filter(o => {
-      const s = Number(o.status);
-      if (s === 0) return true;
-      if (s === 1) return getOrderDebt(o) > 0;
-      return false;
+  const matchesSearch = useCallback((o: Order, term: string) => {
+    const lower = term.toLowerCase();
+    if (String(o.id ?? '').includes(lower)) return true;
+    if (o.number?.toLowerCase().includes(lower)) return true;
+    if (o.customerName?.toLowerCase().includes(lower)) return true;
+    if (o.customerPhone?.toLowerCase().includes(lower)) return true;
+    if (o.customerEmail?.toLowerCase().includes(lower)) return true;
+    const desc = (o.items ?? []).some((item) => {
+      const t = String(item.type ?? '').toLowerCase();
+      const d = String((item.params as any)?.description ?? '').toLowerCase();
+      return t.includes(lower) || d.includes(lower);
     });
+    if (desc) return true;
+    return false;
+  }, []);
 
-    if (filters.source !== 'all') {
-      filtered = filtered.filter(o => o.source === filters.source);
-    }
-
-    if (filters.cancelled !== 'all') {
-      filtered = filtered.filter(o => (o.is_cancelled === 1) === (filters.cancelled === 'cancelled'));
-    }
-
-    if (filters.assigned !== 'all') {
-      filtered = filtered.filter(o => (o.userId != null) === (filters.assigned === 'assigned'));
-    }
-
-    if (filters.searchTerm) {
-      const lowerSearchTerm = filters.searchTerm.toLowerCase();
-      filtered = filtered.filter(o =>
-        o.number?.toLowerCase().includes(lowerSearchTerm) ||
-        o.customerName?.toLowerCase().includes(lowerSearchTerm) ||
-        o.customerPhone?.toLowerCase().includes(lowerSearchTerm) ||
-        o.customerEmail?.toLowerCase().includes(lowerSearchTerm) ||
-        (o.items ?? []).some(item =>
-          item.type.toLowerCase().includes(lowerSearchTerm) ||
-          item.params.description?.toLowerCase().includes(lowerSearchTerm)
-        )
-      );
-    }
-
-    if (filters.quickFilter === 'debt') {
-      filtered = filtered.filter((o) => getOrderDebt(o) > 0);
-    } else if (filters.quickFilter === 'prepay') {
-      filtered = filtered.filter((o) => getOrderPrepayment(o) > 0);
+  const filteredOrders = useMemo(() => {
+    const hasSearch = Boolean(filters.searchTerm?.trim());
+    // Без поиска: только ожидающие (0) и оформленные с долгом (1). С поиском — по всем заказам, только поиск.
+    let filtered: Order[];
+    if (hasSearch) {
+      const term = filters.searchTerm!.trim();
+      filtered = orders.filter((o) => matchesSearch(o, term));
+    } else {
+      filtered = orders.filter((o) => {
+        const s = Number(o.status);
+        if (s === 0) return true;
+        if (s === 1) return getOrderDebt(o) > 0;
+        return false;
+      });
+      if (filters.source !== 'all') {
+        filtered = filtered.filter((o) => o.source === filters.source);
+      }
+      if (filters.cancelled !== 'all') {
+        filtered = filtered.filter((o) => (o.is_cancelled === 1) === (filters.cancelled === 'cancelled'));
+      }
+      if (filters.assigned !== 'all') {
+        filtered = filtered.filter((o) => (o.userId != null) === (filters.assigned === 'assigned'));
+      }
+      if (filters.quickFilter === 'debt') {
+        filtered = filtered.filter((o) => getOrderDebt(o) > 0);
+      } else if (filters.quickFilter === 'prepay') {
+        filtered = filtered.filter((o) => getOrderPrepayment(o) > 0);
+      }
     }
 
     filtered.sort((a, b) => {
@@ -335,6 +340,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     getOrderTotal,
     getOrderDebt,
     getOrderPrepayment,
+    matchesSearch,
   ]);
 
   const poolStats = useMemo(() => {

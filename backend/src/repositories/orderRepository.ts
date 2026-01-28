@@ -125,6 +125,35 @@ export const OrderRepository = {
       userId,
       d
     )
+    return OrderRepository.mapOrdersWithCustomer(orders)
+  },
+
+  /** Все заказы, выданные в указанную дату (без фильтра по userId). */
+  async listAllOrdersIssuedOn(dateYmd: string): Promise<Order[]> {
+    const db = await getDb()
+    const d = dateYmd.slice(0, 10)
+    const orders = await db.all<any>(
+      `SELECT 
+        o.id, 
+        CASE WHEN o.source = 'website' THEN 'site-ord-' || o.id ELSE o.number END as number,
+        o.status, COALESCE(o.created_at, o.createdAt) as created_at, o.customerName, o.customerPhone, o.customerEmail, 
+        o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
+        o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
+        c.id as customer__id, c.first_name as customer__first_name, c.last_name as customer__last_name,
+        c.middle_name as customer__middle_name, c.company_name as customer__company_name,
+        c.legal_name as customer__legal_name, c.authorized_person as customer__authorized_person,
+        c.phone as customer__phone, c.email as customer__email
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.status = 4
+        AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?
+      ORDER BY o.id DESC`,
+      d
+    )
+    return OrderRepository.mapOrdersWithCustomer(orders)
+  },
+
+  mapOrdersWithCustomer(orders: any[]): Order[] {
     return orders.map((row: any) => {
       const {
         customer__id, customer__first_name, customer__last_name, customer__middle_name,

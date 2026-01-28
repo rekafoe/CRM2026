@@ -80,6 +80,16 @@ export class OrderService {
   /** Заказы пользователя, выданные в указанную дату (вкладка «Выданные заказы») */
   static async getOrdersIssuedOn(userId: number, dateYmd: string) {
     const orders = (await OrderRepository.listUserOrdersIssuedOn(userId, dateYmd)) as Order[]
+    return OrderService.attachItemsToOrders(orders)
+  }
+
+  /** Все заказы, выданные в указанную дату (все пользователи видят все) */
+  static async getOrdersIssuedOnAll(dateYmd: string) {
+    const orders = (await OrderRepository.listAllOrdersIssuedOn(dateYmd)) as Order[]
+    return OrderService.attachItemsToOrders(orders)
+  }
+
+  private static async attachItemsToOrders(orders: Order[]) {
     for (const order of orders) {
       const isTelegramOrder = order.paymentMethod === 'telegram'
       if (isTelegramOrder) {

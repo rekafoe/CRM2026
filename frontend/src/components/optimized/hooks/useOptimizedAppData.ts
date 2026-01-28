@@ -78,7 +78,7 @@ export const useOptimizedAppData = (
       });
   }, [currentUser, contextDate]);
 
-  // Загрузка заказов (Заказы / Выданные заказы)
+  // Загрузка заказов (Заказы / Выданные заказы) — только свои заказы; Order Pool отдельно запрашивает all
   useEffect(() => {
     if (!currentUser) return;
     

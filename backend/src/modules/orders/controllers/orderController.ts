@@ -12,12 +12,15 @@ export class OrderController {
         return
       }
       const issuedOn = (req as any).query?.issued_on as string | undefined
+      const all = (req as any).query?.all === '1' || (req as any).query?.all === true
       if (issuedOn && /^\d{4}-\d{2}-\d{2}$/.test(issuedOn.slice(0, 10))) {
-        const orders = await OrderService.getOrdersIssuedOn(authUser.id, issuedOn)
+        const orders = all
+          ? await OrderService.getOrdersIssuedOnAll(issuedOn)
+          : await OrderService.getOrdersIssuedOn(authUser.id, issuedOn)
         res.json(orders)
         return
       }
-      const all = (req as any).query?.all === '1' || (req as any).query?.all === true
+      // all=1: страница Order Pool — все пользователи (не только админ) видят заказы всех
       const orders = all
         ? await OrderService.getAllOrdersForPool()
         : await OrderService.getAllOrders(authUser.id)
