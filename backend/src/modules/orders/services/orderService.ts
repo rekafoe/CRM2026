@@ -52,11 +52,13 @@ export class OrderService {
   // DB row types (internal)
   // use shared mapper
   static async getAllOrders(userId: number) {
-    const db = await getDb()
     const orders = await OrderRepository.listUserOrders(userId)
-    const assignedOrders = await OrderRepository.listAssignedOrdersForUser(userId)
-    
-    // Объединяем заказы
+    let assignedOrders: Order[] = []
+    try {
+      assignedOrders = (await OrderRepository.listAssignedOrdersForUser(userId)) as Order[]
+    } catch (e) {
+      // user_order_page_orders / user_order_pages могут отсутствовать
+    }
     const allOrders = [...orders, ...assignedOrders] as Order[]
     
     for (const order of allOrders) {
@@ -73,6 +75,36 @@ export class OrderService {
     }
     
     return allOrders
+  }
+
+  /** Заказы пользователя, выданные в указанную дату (вкладка «Выданные заказы») */
+  static async getOrdersIssuedOn(userId: number, dateYmd: string) {
+    const orders = (await OrderRepository.listUserOrdersIssuedOn(userId, dateYmd)) as Order[]
+    for (const order of orders) {
+      const isTelegramOrder = order.paymentMethod === 'telegram'
+      if (isTelegramOrder) {
+        const telegramOrder = await OrderRepository.getPhotoOrderById(order.id)
+        order.items = telegramOrder ? [mapPhotoOrderToVirtualItem(telegramOrder)] : []
+      } else {
+        order.items = await OrderRepository.getItemsByOrderId(order.id)
+      }
+    }
+    return orders
+  }
+
+  /** Все заказы без фильтра по пользователю (для пула заказов) */
+  static async getAllOrdersForPool() {
+    const orders = (await OrderRepository.listAllOrders()) as Order[]
+    for (const order of orders) {
+      const isTelegramOrder = order.paymentMethod === 'telegram'
+      if (isTelegramOrder) {
+        const telegramOrder = await OrderRepository.getPhotoOrderById(order.id)
+        order.items = telegramOrder ? [mapPhotoOrderToVirtualItem(telegramOrder)] : []
+      } else {
+        order.items = await OrderRepository.getItemsByOrderId(order.id)
+      }
+    }
+    return orders
   }
 
   static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm', customerId?: number) {

@@ -15,10 +15,13 @@ const extractDate = (dateString: string | null | undefined): string | null => {
   return date.toISOString().split('T')[0];
 };
 
+export type OrdersListTab = 'orders' | 'issued';
+
 export const useOptimizedAppData = (
   contextDate: string,
   contextUserId: number | null,
-  selectedId: number | null
+  selectedId: number | null,
+  ordersListTab: OrdersListTab = 'orders'
 ) => {
   const toast = useToastNotifications();
   const logger = useLogger('OptimizedApp');
@@ -34,8 +37,9 @@ export const useOptimizedAppData = (
   const prevValuesRef = useRef<{ 
     currentUser: { id: number; name: string; role: string } | null; 
     contextUserId: number | null; 
-    contextDate: string | null 
-  }>({ currentUser: null, contextUserId: null, contextDate: null });
+    contextDate: string | null;
+    ordersListTab: OrdersListTab;
+  }>({ currentUser: null, contextUserId: null, contextDate: null, ordersListTab: 'orders' });
   
   const loadingRef = useRef(false);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -74,7 +78,7 @@ export const useOptimizedAppData = (
       });
   }, [currentUser, contextDate]);
 
-  // Загрузка заказов
+  // Загрузка заказов (Заказы / Выданные заказы)
   useEffect(() => {
     if (!currentUser) return;
     
@@ -85,44 +89,47 @@ export const useOptimizedAppData = (
     const hasChanged = 
       prevValues.currentUser?.id !== currentUser.id ||
       prevValues.contextUserId !== contextUserId ||
-      prevValues.contextDate !== contextDate;
+      prevValues.contextDate !== contextDate ||
+      prevValues.ordersListTab !== ordersListTab;
     
     if (!hasChanged) {
       return;
     }
     
-    // Проверяем, не загружается ли уже
-    if (loadingRef.current) {
-      return;
-    }
+    if (loadingRef.current) return;
     
     prevValuesRef.current = { 
       currentUser: currentUser, 
       contextUserId: contextUserId, 
-      contextDate: contextDate 
+      contextDate: contextDate,
+      ordersListTab 
     };
     
     loadingRef.current = true;
     let cancelled = false;
     
-    getOrders().then((res) => {
+    const fetchOrders = ordersListTab === 'issued'
+      ? getOrders({ issued_on: targetDate })
+      : getOrders();
+    
+    fetchOrders.then((res) => {
       if (cancelled) return;
-      
-      const filtered = res.data
-        .filter(o => {
-          const rawDate = (o as any).created_at ?? (o as any).createdAt;
-          if (!rawDate) return false;
-          const orderDate = extractDate(rawDate);
-          return orderDate === targetDate;
-        })
-        .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid));
-      
-      const uniqueOrders = filtered.filter((order, index, self) => 
+      let list = res.data;
+      if (ordersListTab === 'orders') {
+        list = list
+          .filter(o => {
+            const rawDate = (o as any).created_at ?? (o as any).createdAt;
+            if (!rawDate) return false;
+            return extractDate(rawDate) === targetDate;
+          })
+          .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid))
+          .filter(o => Number((o as any).status) !== 4);
+      }
+      const uniqueOrders = list.filter((order, index, self) => 
         index === self.findIndex(o => o.id === order.id)
       );
       
       setOrders(prevOrders => {
-        // Проверяем, действительно ли изменились заказы
         if (
           prevOrders.length === uniqueOrders.length &&
           prevOrders.every((o, i) => {
@@ -146,16 +153,14 @@ export const useOptimizedAppData = (
       logger.error('Failed to load orders', error);
       toast.error('Ошибка загрузки заказов', error.message);
     }).finally(() => {
-      if (!cancelled) {
-        loadingRef.current = false;
-      }
+      if (!cancelled) loadingRef.current = false;
     });
     
     return () => {
       cancelled = true;
       loadingRef.current = false;
     };
-  }, [currentUser?.id, contextUserId, contextDate]);
+  }, [currentUser?.id, contextUserId, contextDate, ordersListTab]);
 
   // Загрузка файлов заказа
   useEffect(() => {
@@ -182,7 +187,6 @@ export const useOptimizedAppData = (
   }, [selectedId]);
 
   const loadOrders = useCallback((date?: string, force: boolean = false) => {
-    // Очищаем предыдущий таймаут дебаунса
     if (loadTimeoutRef.current) {
       clearTimeout(loadTimeoutRef.current);
     }
@@ -190,29 +194,28 @@ export const useOptimizedAppData = (
     const executeLoad = () => {
       const targetDate = (date || contextDate).slice(0, 10);
       const uid = contextUserId ?? currentUser?.id ?? null;
+      const fetchOrders = ordersListTab === 'issued'
+        ? getOrders({ issued_on: targetDate })
+        : getOrders();
       
-      getOrders().then((res) => {
-        const filtered = res.data
-          .filter(o => {
-            const rawDate = (o as any).created_at ?? (o as any).createdAt;
-            if (!rawDate) return false;
-            const orderDate = extractDate(rawDate);
-            return orderDate === targetDate;
-          })
-          .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid));
-        
-        const uniqueOrders = filtered.filter((order, index, self) => 
+      fetchOrders.then((res) => {
+        let list = res.data;
+        if (ordersListTab === 'orders') {
+          list = list
+            .filter(o => {
+              const rawDate = (o as any).created_at ?? (o as any).createdAt;
+              if (!rawDate) return false;
+              return extractDate(rawDate) === targetDate;
+            })
+            .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid))
+            .filter(o => Number((o as any).status) !== 4);
+        }
+        const uniqueOrders = list.filter((order, index, self) => 
           index === self.findIndex(o => o.id === order.id)
         );
         
         setOrders(prevOrders => {
-          // Если принудительное обновление, всегда обновляем
-          if (force) {
-            return uniqueOrders;
-          }
-          
-          // Проверяем, действительно ли изменились заказы
-          // Сравниваем ID, количество items и статус предоплаты
+          if (force) return uniqueOrders;
           if (prevOrders.length === uniqueOrders.length && 
               prevOrders.every((o, i) => {
                 const newOrder = uniqueOrders[i];
@@ -235,14 +238,12 @@ export const useOptimizedAppData = (
       });
     };
     
-    // Если принудительное обновление, выполняем сразу
     if (force) {
       executeLoad();
     } else {
-      // Дебаунс для частых вызовов (300ms)
       loadTimeoutRef.current = setTimeout(executeLoad, 300);
     }
-  }, [contextDate, contextUserId, currentUser?.id, logger, toast]);
+  }, [contextDate, contextUserId, currentUser?.id, ordersListTab, logger, toast]);
 
   return {
     orders,

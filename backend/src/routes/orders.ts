@@ -330,7 +330,47 @@ router.post('/:orderId/files/:fileId/approve', asyncHandler(async (req, res) => 
   res.json(row)
 }))
 
-// Prepayment routes
+// Выдать заказ: 100% остатка → предоплата, debt_closed_events, статус 4. Учёт в отчёте и счётчиках принтеров по дате выдачи.
+router.post('/:id/issue', asyncHandler(async (req, res) => {
+  const id = Number(req.params.id)
+  const db = await getDb()
+  const order = await db.get<any>('SELECT id, prepaymentAmount, discount_percent FROM orders WHERE id = ?', id)
+  if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
+  const items = await db.all<any>('SELECT price, quantity FROM items WHERE orderId = ?', id)
+  const subtotal = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0)
+  const discount = Number(order.discount_percent) || 0
+  const total = Math.round((1 - discount / 100) * subtotal * 100) / 100
+  const prepay = Number(order.prepaymentAmount ?? 0)
+  const remainder = Math.round((total - prepay) * 100) / 100
+
+  let hasPrepaymentUpdatedAt = false
+  try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt') } catch { /* ignore */ }
+
+  const paymentId = `ISSUE-${Date.now()}-${id}`
+  const updateSql = hasPrepaymentUpdatedAt
+    ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = datetime(\'now\'), updated_at = datetime(\'now\'), status = 4 WHERE id = ?'
+    : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = datetime(\'now\'), status = 4 WHERE id = ?'
+  await db.run(updateSql, total, paymentId, id)
+
+  if (remainder > 0) {
+    const today = new Date().toISOString().slice(0, 10)
+    try {
+      await db.run(
+        'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
+        id,
+        today,
+        remainder
+      )
+    } catch (e) {
+      console.warn('[issue] debt_closed_events insert failed:', (e as Error)?.message)
+    }
+  }
+
+  const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
+  res.json(updated)
+}))
+
+// Prepayment routes — любой авторизованный пользователь может вносить предоплату / закрывать долг по любому заказу (в т.ч. коллег)
 router.post('/:id/prepay', asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
   const db = await getDb()
@@ -373,37 +413,21 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   const paymentMethod = (req.body as any)?.paymentMethod ?? 'online'
   if (!amount || amount <= 0) { res.status(400).json({ message: 'Сумма предоплаты не задана' }); return }
 
-  const oldPrepayment = Number(order.prepaymentAmount ?? 0)
-  const delta = Math.round((amount - oldPrepayment) * 100) / 100
-
   // BePaid integration stub: normally create payment via API and get redirect url
   const paymentId = `BEP-${Date.now()}-${id}`
   const paymentUrl = paymentMethod === 'online' ? `https://checkout.bepaid.by/redirect/${paymentId}` : null
   const prepaymentStatus = paymentMethod === 'offline' ? 'paid' : 'pending'
 
+  const assignToMe = (req.body as any)?.assignToMe === true || (req.body as any)?.assignToMe === 'true'
+  const authUser = (req as any).user as { id: number } | undefined
+  if (assignToMe && authUser?.id) {
+    await db.run('UPDATE orders SET userId = ?, updated_at = datetime(\'now\') WHERE id = ?', authUser.id, id)
+  }
+
   const updateSql = hasPrepaymentUpdatedAt
     ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?'
     : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?'
   await db.run(updateSql, amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, id)
-
-  if (paymentMethod === 'offline' && delta > 0) {
-    const today = new Date().toISOString().slice(0, 10)
-    try {
-      await db.run(
-        'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
-        id,
-        today,
-        delta
-      )
-    } catch (e) {
-      console.warn('[prepay] debt_closed_events insert failed:', (e as Error)?.message)
-    }
-    // При закрытии долга переводим заказ в статус «Выдан» (4) с любого текущего статуса
-    await db.run(
-      "UPDATE orders SET status = 4, updated_at = datetime('now') WHERE id = ?",
-      id
-    )
-  }
 
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   res.json(updated)

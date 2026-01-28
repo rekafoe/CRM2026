@@ -1,4 +1,5 @@
 import { getDb } from '../config/database'
+import { hasColumn } from '../utils/tableSchemaCache'
 import { itemRowSelect, mapItemRowToItem, ItemRow } from '../models/mappers/itemMapper'
 import { Item } from '../models/Item'
 import { Order } from '../models/Order'
@@ -95,6 +96,109 @@ export const OrderRepository = {
           authorized_person: customer__authorized_person,
           phone: customer__phone,
           email: customer__email
+        }
+      }
+      return order
+    }) as unknown as Order[]
+  },
+
+  /** Заказы пользователя, выданные в указанную дату (status = 4, дата по updated_at). */
+  async listUserOrdersIssuedOn(userId: number, dateYmd: string): Promise<Order[]> {
+    const db = await getDb()
+    const d = dateYmd.slice(0, 10)
+    const orders = await db.all<any>(
+      `SELECT 
+        o.id, 
+        CASE WHEN o.source = 'website' THEN 'site-ord-' || o.id ELSE o.number END as number,
+        o.status, COALESCE(o.created_at, o.createdAt) as created_at, o.customerName, o.customerPhone, o.customerEmail, 
+        o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
+        o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
+        c.id as customer__id, c.first_name as customer__first_name, c.last_name as customer__last_name,
+        c.middle_name as customer__middle_name, c.company_name as customer__company_name,
+        c.legal_name as customer__legal_name, c.authorized_person as customer__authorized_person,
+        c.phone as customer__phone, c.email as customer__email
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE (o.userId = ? OR o.userId IS NULL) AND o.status = 4
+        AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?
+      ORDER BY o.id DESC`,
+      userId,
+      d
+    )
+    return orders.map((row: any) => {
+      const {
+        customer__id, customer__first_name, customer__last_name, customer__middle_name,
+        customer__company_name, customer__legal_name, customer__authorized_person,
+        customer__phone, customer__email,
+        ...order
+      } = row
+      if (customer__id) {
+        order.customer = {
+          id: customer__id,
+          first_name: customer__first_name,
+          last_name: customer__last_name,
+          middle_name: customer__middle_name,
+          company_name: customer__company_name,
+          legal_name: customer__legal_name,
+          authorized_person: customer__authorized_person,
+          phone: customer__phone,
+          email: customer__email
+        }
+      }
+      return order
+    }) as unknown as Order[]
+  },
+
+  /** Все заказы (для пула): без фильтра по userId */
+  async listAllOrders(): Promise<Order[]> {
+    const db = await getDb()
+    let hasIsCancelled = false
+    try {
+      hasIsCancelled = await hasColumn('orders', 'is_cancelled')
+    } catch { /* ignore */ }
+    const isCancelledSel = hasIsCancelled ? 'o.is_cancelled' : '0 as is_cancelled'
+    const orders = await db.all<any>(
+      `SELECT 
+        o.id, 
+        CASE 
+          WHEN o.source = 'website' THEN 'site-ord-' || o.id
+          ELSE o.number
+        END as number,
+        o.status, COALESCE(o.created_at, o.createdAt) as created_at, o.customerName, o.customerPhone, o.customerEmail, 
+        o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
+        o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
+        ${isCancelledSel},
+        c.id as customer__id,
+        c.first_name as customer__first_name,
+        c.last_name as customer__last_name,
+        c.middle_name as customer__middle_name,
+        c.company_name as customer__company_name,
+        c.legal_name as customer__legal_name,
+        c.authorized_person as customer__authorized_person,
+        c.phone as customer__phone,
+        c.email as customer__email
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      ORDER BY o.id DESC`
+    )
+    return orders.map((row: any) => {
+      const {
+        customer__id, customer__first_name, customer__last_name, customer__middle_name,
+        customer__company_name, customer__legal_name, customer__authorized_person,
+        customer__phone, customer__email,
+        ...order
+      } = row
+      if (customer__id) {
+        order.customer = {
+          id: customer__id,
+          first_name: customer__first_name,
+          last_name: customer__last_name,
+          middle_name: customer__middle_name,
+          company_name: customer__company_name,
+          legal_name: customer__legal_name,
+          authorized_person: customer__authorized_person,
+          phone: customer__phone,
+          email: customer__email,
         }
       }
       return order

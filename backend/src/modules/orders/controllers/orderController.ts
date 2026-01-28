@@ -7,18 +7,27 @@ export class OrderController {
   static async getAllOrders(req: Request, res: Response) {
     try {
       const authUser = (req as any).user as { id: number; role: string } | undefined
-      if (!authUser?.id) { 
+      if (!authUser?.id) {
         res.status(401).json({ message: 'Unauthorized' })
-        return 
+        return
       }
-      
-      const orders = await OrderService.getAllOrders(authUser.id)
+      const issuedOn = (req as any).query?.issued_on as string | undefined
+      if (issuedOn && /^\d{4}-\d{2}-\d{2}$/.test(issuedOn.slice(0, 10))) {
+        const orders = await OrderService.getOrdersIssuedOn(authUser.id, issuedOn)
+        res.json(orders)
+        return
+      }
+      const all = (req as any).query?.all === '1' || (req as any).query?.all === true
+      const orders = all
+        ? await OrderService.getAllOrdersForPool()
+        : await OrderService.getAllOrders(authUser.id)
       res.json(orders)
     } catch (error: any) {
-      logger.error('Error in /api/orders', error)
+      const msg = error?.message ?? String(error)
+      logger.error('Error in /api/orders', { error: msg, stack: error?.stack })
       res.status(500).json({ 
         error: 'Failed to load orders', 
-        details: error instanceof Error ? error.message : String(error) 
+        details: msg 
       })
     }
   }

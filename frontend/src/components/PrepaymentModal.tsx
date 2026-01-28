@@ -9,7 +9,7 @@ interface PrepaymentModalProps {
   currentPaymentMethod?: 'online' | 'offline' | 'telegram';
   currentEmail?: string;
   totalOrderAmount?: number; // Общая сумма заказа для валидации
-  onPrepaymentCreated: (amount: number, email: string, paymentMethod: 'online' | 'offline' | 'telegram') => void;
+  onPrepaymentCreated: (amount: number, email: string, paymentMethod: 'online' | 'offline' | 'telegram', assignToMe?: boolean) => void;
 }
 
 export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
@@ -32,6 +32,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
   const [amount, setAmount] = useState<string>(formatAmount(currentAmount));
   const [email, setEmail] = useState<string>(currentEmail);
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'offline' | 'telegram'>(currentPaymentMethod || 'online');
+  const [assignToMe, setAssignToMe] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const normalizeAmount = (value: string): number => {
@@ -68,8 +69,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
 
     setIsLoading(true);
     try {
-      // Здесь будет вызов API для создания предоплаты
-      onPrepaymentCreated(amountNum, email, paymentMethod);
+      await Promise.resolve(onPrepaymentCreated(amountNum, email, paymentMethod, assignToMe));
       onClose();
     } catch (error) {
       alert('Ошибка при создании предоплаты');
@@ -211,6 +211,18 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
                 💡 Для оффлайн предоплаты email не требуется - оплата получена в кассе
               </div>
             )}
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={assignToMe}
+                onChange={(e) => setAssignToMe(e.target.checked)}
+                style={{ marginRight: '8px' }}
+              />
+              <span>Назначить заказ себе</span>
+            </label>
           </div>
 
           <div style={{ 

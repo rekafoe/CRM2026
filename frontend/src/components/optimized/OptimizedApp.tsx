@@ -26,13 +26,13 @@ import { OrderPool } from "../orders/OrderPool";
 import { UserOrderPage } from "../orders/UserOrderPage";
 import { TopBar } from "./TopBar";
 import { DateSwitchContainer } from "../orders/DateSwitchContainer";
-import { setAuthToken, getOrderStatuses, listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, createPrepaymentLink, getLowStock, getCurrentUser, getUsers, getDailyReportByDate, createDailyReport } from '../../api';
+import { setAuthToken, getOrderStatuses, listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, createPrepaymentLink, issueOrder, getLowStock, getCurrentUser, getUsers, getDailyReportByDate, createDailyReport } from '../../api';
 import { APP_CONFIG } from '../../types';
 import type { OrderFile } from '../../types';
 
 import { MemoizedOrderItem } from './MemoizedOrderItem';
 import { OrderList } from './OrderList';
-import { useOptimizedAppData } from './hooks/useOptimizedAppData';
+import { useOptimizedAppData, type OrdersListTab } from './hooks/useOptimizedAppData';
 import { useModalState } from './hooks/useModalState';
 import { useOrderHandlers } from './hooks/useOrderHandlers';
 import { OrderDetailSection } from './components/OrderDetailSection';
@@ -50,6 +50,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   const [contextDate, setContextDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [contextUserId, setContextUserId] = useState<number | null>(null);
   const [orderManagementTab, setOrderManagementTab] = useState<'pool' | 'page'>('pool');
+  const [ordersListTab, setOrdersListTab] = useState<OrdersListTab>('orders');
 
   // Хуки для уведомлений и логирования
   const toast = useToastNotifications();
@@ -66,7 +67,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
     setCurrentUser,
     activeUsers,
     loadOrders,
-  } = useOptimizedAppData(contextDate, contextUserId, selectedId);
+  } = useOptimizedAppData(contextDate, contextUserId, selectedId, ordersListTab);
 
   // Хук для состояния модальных окон
   const modalState = useModalState();
@@ -144,6 +145,16 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   // Мемоизированные колбэки для модальных окон
   const handleShowFilesModal = useCallback(() => setShowFilesModal(true), [setShowFilesModal]);
   const handleShowPrepaymentModal = useCallback(() => setShowPrepaymentModal(true), [setShowPrepaymentModal]);
+  const handleIssueOrder = useCallback(async (orderId: number) => {
+    try {
+      await issueOrder(orderId);
+      await loadOrders(undefined, true);
+      toast.success('Заказ выдан', 'Долг закрыт, заказ переведён в «Выдан»');
+    } catch (e: any) {
+      logger.error('Issue order failed', e);
+      toast.error('Ошибка', e?.message ?? 'Не удалось выдать заказ');
+    }
+  }, [loadOrders, toast, logger]);
 
   // Мемоизированные обёртки для API функций
   const handleGetDailyReportByDate = useCallback(async (date: string) => {
@@ -270,13 +281,28 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
               >🗑️</button>
             </div>
             
-        <h2>Заказы</h2>
-            
+        <div className="orders-list-tabs">
+              <button
+                type="button"
+                className={ordersListTab === 'orders' ? 'active' : ''}
+                onClick={() => setOrdersListTab('orders')}
+              >
+                Заказы
+              </button>
+              <button
+                type="button"
+                className={ordersListTab === 'issued' ? 'active' : ''}
+                onClick={() => setOrdersListTab('issued')}
+              >
+                Выданные заказы
+              </button>
+            </div>
             <OrderList
               orders={orders}
               selectedId={selectedId}
               statuses={statuses}
               onSelect={setSelectedId}
+              ordersListTab={ordersListTab}
             />
           </aside>
 
@@ -295,6 +321,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 onLoadOrders={loadOrders}
                 onShowFilesModal={handleShowFilesModal}
                 onShowPrepaymentModal={handleShowPrepaymentModal}
+                onIssueOrder={handleIssueOrder}
                 onOpenCalculator={handleOpenCalculator}
                 onEditOrderItem={handleOpenCalculatorForEdit}
                 onGetDailyReportByDate={handleGetDailyReportByDate}
@@ -353,10 +380,16 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
           currentAmount={selectedOrder.prepaymentAmount}
           currentPaymentMethod={selectedOrder.paymentMethod === 'telegram' ? 'online' : selectedOrder.paymentMethod}
           currentEmail={selectedOrder.customerEmail || ''}
-          onPrepaymentCreated={async (amount, email, paymentMethod) => {
+          totalOrderAmount={(() => {
+            const items = selectedOrder.items ?? [];
+            const st = items.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
+            const pct = Number((selectedOrder as any).discount_percent) || 0;
+            return Math.round((1 - pct / 100) * st * 100) / 100;
+          })()}
+          onPrepaymentCreated={async (amount, email, paymentMethod, assignToMe) => {
             try {
               const normalizedMethod = paymentMethod === 'telegram' ? 'online' : paymentMethod;
-              const res = await createPrepaymentLink(selectedOrder.id, amount, normalizedMethod);
+              const res = await createPrepaymentLink(selectedOrder.id, amount, normalizedMethod, assignToMe);
               if (res?.data) {
                 setOrders((prev) => prev.map((order) => (order.id === res.data.id ? res.data : order)));
               }
@@ -364,24 +397,16 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
               setPrepayAmount(String(amount));
               const isEditing = selectedOrder.prepaymentAmount && selectedOrder.prepaymentAmount > 0;
               const actionText = isEditing ? 'изменена' : 'создана';
-              
               if (amount === 0) {
                 toast.info('Предоплата убрана с заказа');
               } else if (paymentMethod === 'online') {
-                toast.success(
-                  `Онлайн предоплата ${actionText}`,
-                  `Сумма: ${amount} BYN. Ссылка отправлена на ${email}`
-                );
+                toast.success(`Онлайн предоплата ${actionText}`, `Сумма: ${amount} BYN. Ссылка отправлена на ${email}`);
               } else {
-                toast.success(
-                  `Оффлайн предоплата ${actionText}`,
-                  `Сумма: ${amount} BYN. Оплата отмечена как полученная в кассе`
-                );
+                toast.success(`Оффлайн предоплата ${actionText}`, `Сумма: ${amount} BYN. Оплата отмечена как полученная в кассе`);
               }
             } catch (error) {
               logger.error('Failed to create prepayment', error);
-              const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-              toast.error('Ошибка создания предоплаты', errorMessage);
+              toast.error('Ошибка создания предоплаты', error instanceof Error ? error.message : 'Неизвестная ошибка');
             }
           }}
         />

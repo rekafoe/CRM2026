@@ -2,6 +2,7 @@ import React, { memo, useCallback, useMemo } from 'react';
 import { Order } from '../../types';
 import { parseNumberFlexible } from '../../utils/numberInput';
 import { useOrderStatusClasses } from './hooks/useOrderStatusClasses';
+import type { OrdersListTab } from './hooks/useOptimizedAppData';
 import './styles/OrderList.css';
 
 interface StatusInfo {
@@ -16,6 +17,7 @@ interface OrderListProps {
   selectedId: number | null;
   statuses: StatusInfo[];
   onSelect: (id: number) => void;
+  ordersListTab?: OrdersListTab;
 }
 
 // Компонент для статуса элемента заказа
@@ -51,7 +53,9 @@ const OrderItem = memo<{
   statusValue: number;
   progress: number;
   onSelect: (id: number) => void;
-}>(({ order, isActive, statusInfo, statusValue, progress, onSelect }) => {
+  showDebt?: boolean;
+  debt?: number;
+}>(({ order, isActive, statusInfo, statusValue, progress, onSelect, showDebt, debt }) => {
   const handleClick = useCallback(() => {
     onSelect(order.id);
   }, [order.id, onSelect]);
@@ -107,6 +111,11 @@ const OrderItem = memo<{
           {customerLabel}
         </div>
       )}
+      {showDebt && debt != null && debt > 0 && (
+        <div className="order-item__debt" style={{ fontSize: 11, color: '#c62828', marginTop: 2 }}>
+          Долг: {debt.toFixed(2)} BYN
+        </div>
+      )}
       <OrderItemStatus
         statusInfo={statusInfo}
         status={statusValue}
@@ -123,61 +132,63 @@ export const OrderList = memo<OrderListProps>(({
   orders,
   selectedId,
   statuses,
-  onSelect
+  onSelect,
+  ordersListTab = 'orders'
 }) => {
   const handleSelect = useCallback((id: number) => {
     onSelect(id);
   }, [onSelect]);
 
-  // Дедупликация через Map (O(n) вместо O(n²))
   const uniqueOrders = useMemo(() => {
     const seen = new Map<number, Order>();
     for (const order of orders) {
-      if (!seen.has(order.id)) {
-        seen.set(order.id, order);
-      }
+      if (!seen.has(order.id)) seen.set(order.id, order);
     }
     return Array.from(seen.values());
   }, [orders]);
 
-  // Предрасчёт статусов в Map для O(1) lookup
   const { statusById, maxSort } = useMemo(() => {
     const statusMap = new Map<number, StatusInfo>();
     let highest = 1;
     for (const status of statuses) {
       statusMap.set(status.id, status);
-      if (status.sort_order > highest) {
-        highest = status.sort_order;
-      }
+      if (status.sort_order > highest) highest = status.sort_order;
     }
     return { statusById: statusMap, maxSort: Math.max(1, highest) };
   }, [statuses]);
 
-  // Мемоизированные метаданные заказов
   const orderMeta = useMemo(() => {
     return uniqueOrders.map((order) => {
       const statusValue = typeof order.status === 'number' ? order.status : 0;
       const statusInfo = statusById.get(statusValue);
       const progress = Math.max(
         0,
-        Math.min(
-          100,
-          Math.round(((statusValue - 1) / Math.max(1, maxSort - 1)) * 100)
-        )
+        Math.min(100, Math.round(((statusValue - 1) / Math.max(1, maxSort - 1)) * 100))
       );
-
+      const items = Array.isArray(order.items) ? order.items : [];
+      const subtotal = items.reduce(
+        (s, i) => s + parseNumberFlexible(i.price ?? 0) * parseNumberFlexible(i.quantity ?? 1),
+        0
+      );
+      const discount = parseNumberFlexible((order as any).discount_percent ?? 0);
+      const total = Math.round((1 - discount / 100) * subtotal * 100) / 100;
+      const prepay = parseNumberFlexible((order as any).prepaymentAmount ?? 0);
+      const debt = Math.max(0, Math.round((total - prepay) * 100) / 100);
       return {
         order,
         statusInfo,
         statusValue,
-        progress
+        progress,
+        debt
       };
     });
   }, [uniqueOrders, statusById, maxSort]);
 
+  const showDebt = ordersListTab === 'orders';
+
   return (
     <ul className="order-list">
-      {orderMeta.map(({ order, statusInfo, statusValue, progress }) => (
+      {orderMeta.map(({ order, statusInfo, statusValue, progress, debt }) => (
         <OrderItem
           key={order.id}
           order={order}
@@ -186,6 +197,8 @@ export const OrderList = memo<OrderListProps>(({
           statusValue={statusValue}
           progress={progress}
           onSelect={handleSelect}
+          showDebt={showDebt}
+          debt={debt}
         />
       ))}
     </ul>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order } from '../types';
-import { getOrders, updateOrderStatus, reassignOrderByNumber, cancelOnlineOrder, getUsers } from '../api';
+import { getOrders, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder } from '../api';
 import { parseNumberFlexible } from '../utils/numberInput';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { OrderHeader } from '../components/optimized/OrderHeader';
@@ -229,7 +229,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await getOrders();
+      const res = await getOrders({ all: true });
       const list = res.data as Order[];
       setOrders(list);
       setError(null);
@@ -374,17 +374,16 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     }
   }, [allUsers, loadOrders, toast, logger]);
 
-  const handleProcessOrder = useCallback(async (orderId: number) => {
+  const handleIssueOrder = useCallback(async (orderId: number) => {
     try {
-      await updateOrderStatus(orderId, 1); // Переводим в статус "Оформлен"
-      toast.success('Заказ оформлен!', `Заказ ${orderId} переведен в статус "Оформлен".`);
+      await issueOrder(orderId);
+      toast.success('Заказ выдан', 'Долг закрыт, заказ переведён в «Выдан»');
       loadOrders();
-      navigate('/'); // Переходим на основную страницу после оформления
-    } catch (err) {
-      logger.error('Failed to process order', err);
-      toast.error('Ошибка оформления', (err as Error).message);
+    } catch (err: any) {
+      logger.error('Issue order failed', err);
+      toast.error('Ошибка', err?.message ?? 'Не удалось выдать заказ');
     }
-  }, [loadOrders, navigate, toast, logger]);
+  }, [loadOrders, toast, logger]);
 
   const handleCancelOnline = useCallback(async (orderId: number) => {
     try {
@@ -396,6 +395,23 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       toast.error('Ошибка отмены', (err as Error).message);
     }
   }, [loadOrders, toast, logger]);
+
+  const handlePrepaymentCreated = useCallback(
+    async (amount: number, _email: string, paymentMethod: 'online' | 'offline' | 'telegram', assignToMe?: boolean) => {
+      if (!selectedOrder) return;
+      try {
+        const method = paymentMethod === 'telegram' ? 'online' : paymentMethod;
+        await createPrepaymentLink(selectedOrder.id, amount, method, assignToMe);
+        await loadOrders();
+        toast.success('Успешно', 'Предоплата обновлена');
+      } catch (err: any) {
+        logger.error('Prepayment failed', err);
+        toast.error('Ошибка', err?.message ?? 'Не удалось обновить предоплату');
+        throw err;
+      }
+    },
+    [selectedOrder, loadOrders, toast, logger]
+  );
 
   const getSourceLabel = (source?: string) => {
     switch (source) {
@@ -614,13 +630,11 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               )}
             </div>
             <div className="order-detail-actions">
+              <button onClick={() => setShowPrepaymentModal(true)}>💳 Внести предоплату</button>
               {getOrderDebt(selectedOrder) > 0 && (
-                <button className="btn-close-debt" onClick={() => setShowPrepaymentModal(true)}>
-                  💰 Закрыть долг
+                <button className="btn-close-debt" onClick={() => handleIssueOrder(selectedOrder.id)}>
+                  ✅ Выдать заказ
                 </button>
-              )}
-              {Number(selectedOrder.status) === 0 && (
-                <button onClick={() => handleProcessOrder(selectedOrder.id)}>Внести предоплату</button>
               )}
               {selectedOrder.source && (selectedOrder.source === 'website' || selectedOrder.source === 'telegram') && (
                 <button onClick={() => handleCancelOnline(selectedOrder.id)}>Отменить онлайн</button>
@@ -667,7 +681,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           currentAmount={selectedOrder.prepaymentAmount}
           currentPaymentMethod={selectedOrder.paymentMethod}
           currentEmail={selectedOrder.customerEmail || ''}
-          onPrepaymentCreated={loadOrders}
+          totalOrderAmount={getOrderTotal(selectedOrder)}
+          onPrepaymentCreated={handlePrepaymentCreated}
         />
       )}
       {showPrepaymentDetailsModal && selectedOrder && (

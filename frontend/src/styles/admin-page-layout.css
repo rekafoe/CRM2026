@@ -107,3 +107,26 @@
 .admin-page-layout.calculator-page {
   background: #f8f9fa;
 }
+
+/* Вкладки списка заказов: Заказы | Выданные заказы */
+.orders-list-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.orders-list-tabs button {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  background: #f5f5f5;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.orders-list-tabs button:hover {
+  background: #eee;
+}
+.orders-list-tabs button.active {
+  background: #1976d2;
+  color: white;
+  border-color: #1976d2;
+}

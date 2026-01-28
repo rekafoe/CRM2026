@@ -22,6 +22,7 @@ interface OrderDetailSectionProps {
   onLoadOrders: () => void;
   onShowFilesModal: () => void;
   onShowPrepaymentModal: () => void;
+  onIssueOrder?: (orderId: number) => Promise<void>;
   onOpenCalculator: () => void;
   onEditOrderItem: (orderId: number, item: any) => void;
   onGetDailyReportByDate: (date: string) => Promise<any>;
@@ -41,6 +42,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   onLoadOrders,
   onShowFilesModal,
   onShowPrepaymentModal,
+  onIssueOrder,
   onOpenCalculator,
   onEditOrderItem,
   onGetDailyReportByDate,
@@ -65,6 +67,9 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   }, [items]);
   const discountPercent = selectedOrder.discount_percent ?? 0;
   const discountAmount = Math.round(subtotal * (discountPercent / 100) * 100) / 100;
+  const total = Math.round((subtotal - discountAmount) * 100) / 100;
+  const prepay = parseNumberFlexible(selectedOrder.prepaymentAmount ?? 0);
+  const debt = Math.max(0, Math.round((total - prepay) * 100) / 100);
 
   useEffect(() => {
     if (!receiptMenuOpen) return;
@@ -227,10 +232,30 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                   alignItems: 'center',
                   gap: '4px'
                 }}
-                title="Предоплата"
+                title="Внести предоплату"
               >
-                💳 Предоплата
+                💳 Внести предоплату
               </button>
+              {onIssueOrder && debt > 0 && (
+                <button 
+                  onClick={() => onIssueOrder(selectedOrder.id)}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: '#17a2b8',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Выдать заказ (100% остатка, долг закрыт)"
+                >
+                  ✅ Выдать заказ
+                </button>
+              )}
               <button 
                 onClick={handleGenerateBlank}
                 disabled={isGeneratingPdf}

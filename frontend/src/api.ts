@@ -54,7 +54,12 @@ export function setAuthToken(token?: string) {
   }
 }
 
-export const getOrders = () => api.get<Order[]>('/orders');
+export const getOrders = (params?: { all?: boolean; issued_on?: string }) => {
+  const p: Record<string, string> = {};
+  if (params?.all) p.all = '1';
+  if (params?.issued_on) p.issued_on = params.issued_on.slice(0, 10);
+  return api.get<Order[]>('/orders', { params: Object.keys(p).length ? p : undefined });
+};
 export const createOrder = (date?: string) => api.post<Order>('/orders', { date });
 export const updateOrderStatus = (id: number, status: number) =>
   api.put<Order>(`/orders/${id}/status`, { status });
@@ -70,6 +75,10 @@ export const reassignOrderByNumber = (number: string, userId: number) =>
 
 export const cancelOnlineOrder = (id: number) =>
   api.post(`/orders/${id}/cancel-online`, {});
+
+/** Выдать заказ: 100% остатка → предоплата, debt_closed, статус 4 */
+export const issueOrder = (id: number) =>
+  api.post<Order>(`/orders/${id}/issue`, {});
 
 export const addOrderItem = (id: number, item: Omit<Item, 'id'>) =>
   api.post<Item>(`/orders/${id}/items`, item);
@@ -405,8 +414,13 @@ export const deleteOrderFile = (orderId: number, fileId: number) => api.delete(`
 export const approveOrderFile = (orderId: number, fileId: number) => api.post<OrderFile>(`/orders/${orderId}/files/${fileId}/approve`, {});
 
 // Payments / Prepayment
-export const createPrepaymentLink = (orderId: number, amount?: number, paymentMethod: 'online' | 'offline' = 'online') => 
-  api.post<Order>(`/orders/${orderId}/prepay`, { amount, paymentMethod });
+export const createPrepaymentLink = (
+  orderId: number,
+  amount?: number,
+  paymentMethod: 'online' | 'offline' = 'online',
+  assignToMe?: boolean
+) =>
+  api.post<Order>(`/orders/${orderId}/prepay`, { amount, paymentMethod, assignToMe });
 
 // Генерация PDF бланка заказа
 export const generateOrderBlankPdf = (orderId: number, companyPhones?: string[]) => {
