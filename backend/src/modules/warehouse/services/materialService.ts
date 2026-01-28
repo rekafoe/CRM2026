@@ -1,4 +1,5 @@
 import { getDb } from '../../../config/database'
+import { getTableColumns } from '../../../utils/tableSchemaCache'
 import { Material } from '../../../models'
 import { WarehouseTransactionService } from './warehouseTransactionService'
 import { logger } from '../../../utils/logger'
@@ -222,11 +223,9 @@ export class MaterialService {
       }
       
       if (material.id) {
-        // Проверяем, существуют ли поля paper_type_id и density
-        const tableInfo = await db.all("PRAGMA table_info(materials)");
-        const hasExtraFields = tableInfo.some((col: any) => col.name === 'paper_type_id') && 
-                               tableInfo.some((col: any) => col.name === 'density');
-        const hasFinish = tableInfo.some((col: any) => col.name === 'finish');
+        const cols = await getTableColumns('materials');
+        const hasExtraFields = cols.has('paper_type_id') && cols.has('density');
+        const hasFinish = cols.has('finish');
         
         // Получаем min_quantity из min_quantity (совместимость с фронтендом)
         const minQuantity = (material as any).min_quantity ?? material.min_quantity ?? null;
@@ -278,18 +277,14 @@ export class MaterialService {
         }
       } else {
         logger.debug('Создаем новый материал (material.id не указан)');
-        // Проверяем, существуют ли поля paper_type_id и density
-        const tableInfo = await db.all("PRAGMA table_info(materials)");
-        const hasExtraFields = tableInfo.some((col: any) => col.name === 'paper_type_id') && 
-                               tableInfo.some((col: any) => col.name === 'density');
-        const hasFinish = tableInfo.some((col: any) => col.name === 'finish');
-        
-        // Проверяем, есть ли поле description
-        const hasDescription = tableInfo.some((col: any) => col.name === 'description');
-        const hasMaxStock = tableInfo.some((col: any) => col.name === 'max_stock_level');
+        const cols = await getTableColumns('materials');
+        const hasExtraFields = cols.has('paper_type_id') && cols.has('density');
+        const hasFinish = cols.has('finish');
+        const hasDescription = cols.has('description');
+        const hasMaxStock = cols.has('max_stock_level');
         
         logger.debug('Поля в таблице materials', { 
-          fields: tableInfo.map((col: any) => col.name),
+          fields: Array.from(cols),
           hasExtraFields,
           hasDescription,
           hasMaxStock
@@ -469,12 +464,10 @@ export class MaterialService {
       
       // Определяем цену: приоритет у sheet_price_single, затем price
       const price = material.sheet_price_single ?? (material as any).price ?? null;
-      
-      // Проверяем, существуют ли поля paper_type_id и density
-      const tableInfo = await db.all("PRAGMA table_info(materials)");
-      const hasExtraFields = tableInfo.some((col: any) => col.name === 'paper_type_id') && 
-                             tableInfo.some((col: any) => col.name === 'density');
-      
+
+      const cols = await getTableColumns('materials');
+      const hasExtraFields = cols.has('paper_type_id') && cols.has('density');
+
       // Получаем min_quantity из min_quantity (совместимость с фронтендом)
       const minQuantity = (material as any).min_quantity ?? material.min_quantity ?? null;
       

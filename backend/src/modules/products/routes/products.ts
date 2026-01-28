@@ -8,6 +8,8 @@ import { ProductServiceLinkService } from '../services/serviceLinkService';
 import { ProductServiceLinkDTO } from '../dtos/serviceLink.dto';
 import { ParameterPresetService } from '../services/parameterPresetService';
 import { logger } from '../../../utils/logger';
+import { getTableColumns, hasColumn } from '../../../utils/tableSchemaCache';
+import { getCachedData, invalidateCache, invalidateCacheByPattern } from '../../../utils/dataCache';
 import productSetupRouter from './productSetup';
 
 type TemplateConfigRow = {
@@ -210,15 +212,21 @@ router.get('/categories', async (req, res) => {
     logger.debug('Fetching product categories');
     const db = await getDb();
     const { activeOnly } = req.query;
+    const cacheKey = `product_categories_${activeOnly === 'true' ? 'active' : 'all'}`;
     
-    // Для админки показываем все категории, для калькулятора - только активные
-    const whereClause = activeOnly === 'true' ? 'WHERE is_active = 1' : 'WHERE 1=1';
+    const categories = await getCachedData(
+      cacheKey,
+      async () => {
+        const whereClause = activeOnly === 'true' ? 'WHERE is_active = 1' : 'WHERE 1=1';
+        return await db.all(`
+          SELECT * FROM product_categories 
+          ${whereClause}
+          ORDER BY sort_order, name
+        `);
+      },
+      10 * 60 * 1000 // 10 минут для категорий
+    );
     
-    const categories = await db.all(`
-      SELECT * FROM product_categories 
-      ${whereClause}
-      ORDER BY sort_order, name
-    `);
     logger.debug('Found categories', { count: categories.length });
     res.json(categories);
   } catch (error) {
@@ -573,10 +581,10 @@ router.get('/:productId/schema', async (req, res) => {
     // 🔧 Получаем операции продукта из product_operations_link
     let productOperations: any[] = [];
     try {
-      const columns: any[] = await db.all('PRAGMA table_info(product_operations_link)');
-      const hasIsOptional = columns.some(c => c.name === 'is_optional');
-      const hasLinkedParam = columns.some(c => c.name === 'linked_parameter_name');
-      
+      const cols = await getTableColumns('product_operations_link');
+      const hasIsOptional = cols.has('is_optional');
+      const hasLinkedParam = cols.has('linked_parameter_name');
+
       const selectFields = [
         'pol.id as link_id',
         'pol.sequence',
@@ -924,12 +932,11 @@ async function syncSimplifiedOperations(db: any, productId: number, configData: 
       [productId]
     );
     const existingOperationIds = new Set(existingLinks.map((link: any) => Number(link.operation_id)));
-    
-    // Проверяем структуру таблицы
-    const columns: any[] = await db.all('PRAGMA table_info(product_operations_link)');
-    const hasIsOptional = columns.some((c: any) => c.name === 'is_optional');
-    const hasLinkedParam = columns.some((c: any) => c.name === 'linked_parameter_name');
-    
+
+    const cols = await getTableColumns('product_operations_link');
+    const hasIsOptional = cols.has('is_optional');
+    const hasLinkedParam = cols.has('linked_parameter_name');
+
     // Загружаем активные операции одним запросом
     const activeServices = serviceIdList.length > 0
       ? await db.all(
@@ -1206,6 +1213,7 @@ router.post('/categories', async (req, res) => {
       VALUES (?, ?, ?, ?)
     `, [name, icon, description, sort_order || 0]);
     
+    invalidateCacheByPattern('product_categories')
     res.json({ id: result.lastID, name, icon, description, sort_order });
   } catch (error) {
     logger.error('Error creating product category', error);
@@ -1225,6 +1233,7 @@ router.put('/categories/:id', async (req, res) => {
       WHERE id = ?
     `, [name, icon, description, sort_order, is_active, id]);
     
+    invalidateCacheByPattern('product_categories')
     res.json({ success: true });
   } catch (error) {
     logger.error('Error updating product category', error);
@@ -1265,10 +1274,9 @@ router.post('/setup', asyncHandler(async (req, res) => {
 
     const productId = productInsert.lastID as number;
 
-    // Проверяем структуру таблицы для безопасного INSERT
-    const columns: any[] = await db.all('PRAGMA table_info(product_operations_link)');
-    const hasIsOptional = columns.some((c: any) => c.name === 'is_optional');
-    const hasLinkedParam = columns.some((c: any) => c.name === 'linked_parameter_name');
+    const cols = await getTableColumns('product_operations_link');
+    const hasIsOptional = cols.has('is_optional');
+    const hasLinkedParam = cols.has('linked_parameter_name');
 
     let sequenceCounter = 1;
     for (const op of Array.isArray(operations) ? operations : []) {
@@ -1454,6 +1462,7 @@ router.post('/', async (req, res) => {
           ['Без категории', '📦', 'Системная категория по умолчанию']
         );
         resolvedCategoryId = insert.lastID ?? null;
+        invalidateCacheByPattern('product_categories')
       }
     }
 
@@ -1463,8 +1472,7 @@ router.post('/', async (req, res) => {
     }
 
     const normalizedOperatorPercent = Number.isFinite(Number(operator_percent)) ? Number(operator_percent) : 0;
-    const productColumns: Array<{ name: string }> = await db.all(`PRAGMA table_info('products')`);
-    const hasOperatorPercent = productColumns.some((column) => column.name === 'operator_percent');
+    const hasOperatorPercent = await hasColumn('products', 'operator_percent');
     const insertColumns = ['category_id', 'name', 'description', 'icon', 'calculator_type', 'product_type'];
     const insertValues: any[] = [
       resolvedCategoryId,
@@ -1523,9 +1531,8 @@ router.put('/:id', async (req, res) => {
       updates.calculator_type = 'simplified';
     }
     const db = await getDb();
-    
-    const productColumns: Array<{ name: string }> = await db.all(`PRAGMA table_info('products')`);
-    const hasOperatorPercent = productColumns.some((column) => column.name === 'operator_percent');
+
+    const hasOperatorPercent = await hasColumn('products', 'operator_percent');
     // Динамически формируем SET часть запроса только для переданных полей
     const allowedFields = [
       'category_id',

@@ -4,6 +4,7 @@ import { OrderController, OrderItemController } from '../controllers'
 import { asyncHandler } from '../../../middleware'
 import { upload } from '../../../config/upload'
 import { getDb } from '../../../config/database'
+import { hasColumn } from '../../../utils/tableSchemaCache'
 
 const router = Router()
 
@@ -127,8 +128,7 @@ router.post('/:id/prepay', prepayRateLimit, asyncHandler(async (req: Request, re
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
   let hasPrepaymentUpdatedAt = false
   try {
-    const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
-    hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+    hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
   } catch {
     hasPrepaymentUpdatedAt = false
   }

@@ -12,6 +12,7 @@ export interface ServiceFormState {
   operationType: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
   minQuantity: string;
   maxQuantity: string;
+  operatorPercent: string; // Процент от суммы позиции заказа, который идёт в ЗП
 }
 
 interface ServiceFormProps {
@@ -164,6 +165,19 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
           disabled={disabled}
           onChange={(e) => updateField('maxQuantity', e.target.value)}
           placeholder="без ограничений"
+        />
+      </FormField>
+      <FormField label="Процент оператора (%)" help="Процент от суммы позиции заказа, который идёт в ЗП оператора">
+        <input
+          type="number"
+          step="0.1"
+          min="0"
+          max="100"
+          className="px-2 py-1 border rounded w-full"
+          value={value.operatorPercent || ''}
+          disabled={disabled}
+          onChange={(e) => updateField('operatorPercent', e.target.value)}
+          placeholder="0"
         />
       </FormField>
       <label className="inline-flex items-center gap-2 text-sm text-gray-600">

@@ -8,6 +8,7 @@
  */
 
 import { getDb } from '../../../db';
+import { getTableColumns } from '../../../utils/tableSchemaCache';
 import { LayoutCalculationService, ProductSize, LayoutResult } from './layoutCalculationService';
 import { logger } from '../../../utils/logger';
 import { PrintPriceService } from './printPriceService';
@@ -451,11 +452,10 @@ export class FlexiblePricingService {
   private static async getProductOperations(productId: number, configuration: any): Promise<any[]> {
     const db = await getDb();
     
-    // Проверяем структуру таблицы для безопасности
-    const columns: any[] = await db.all('PRAGMA table_info(product_operations_link)');
-    const hasIsOptional = columns.some(c => c.name === 'is_optional');
-    const hasLinkedParam = columns.some(c => c.name === 'linked_parameter_name');
-    
+    const cols = await getTableColumns('product_operations_link');
+    const hasIsOptional = cols.has('is_optional');
+    const hasLinkedParam = cols.has('linked_parameter_name');
+
     // Получаем все операции продукта с безопасным SELECT
     const operations = await db.all(`
       SELECT 

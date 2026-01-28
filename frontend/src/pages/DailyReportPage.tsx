@@ -265,6 +265,14 @@ export const DailyReportPage: React.FC = () => {
                       {(summary.debt?.total_debt||0).toLocaleString('ru-RU')} BYN
                     </span>
                   </div>
+                  {(summary.debt_closed_today ?? 0) > 0 && (
+                    <div className="order-total__line">
+                      <span>Долги закрыты в этот день</span>
+                      <span style={{ color: '#28a745' }}>
+                        +{(summary.debt_closed_today ?? 0).toLocaleString('ru-RU')} BYN
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

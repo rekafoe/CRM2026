@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
+import { hasColumn } from '../utils/tableSchemaCache'
 import { AuthenticatedRequest } from '../middleware'
 
 const router = Router()
@@ -220,11 +221,8 @@ router.delete('/:code', asyncHandler(async (req, res) => {
   const existing = await db.get<any>('SELECT code FROM print_technologies WHERE code = ?', code)
   if (!existing) { res.status(404).json({ message: 'Print technology not found' }); return }
 
-  // Отвязываем принтеры, если колонка существует (на старой схеме может не быть)
   try {
-    const printerCols = await db.all<Array<{ name: string }>>(`PRAGMA table_info(printers)`)
-    const hasTechCol = printerCols.some(c => c.name === 'technology_code')
-    if (hasTechCol) {
+    if (await hasColumn('printers', 'technology_code')) {
       await db.run(`UPDATE printers SET technology_code = NULL WHERE technology_code = ?`, code)
     }
   } catch {}

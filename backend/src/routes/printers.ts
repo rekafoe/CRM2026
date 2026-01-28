@@ -2,14 +2,9 @@ import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { AuthenticatedRequest } from '../middleware'
+import { getTableColumns } from '../utils/tableSchemaCache'
 
 const router = Router()
-
-async function getTableColumns(tableName: string): Promise<Set<string>> {
-  const db = await getDb()
-  const rows = await db.all<Array<{ name: string }>>(`PRAGMA table_info(${tableName})`)
-  return new Set(rows.map(r => r.name))
-}
 
 function buildPrintersSelect(cols: Set<string>) {
   const hasTechnologyCode = cols.has('technology_code')

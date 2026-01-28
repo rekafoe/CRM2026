@@ -20,6 +20,34 @@ export const OrderRepository = {
     }
   },
 
+  /**
+   * Загружает items для нескольких заказов одним запросом (устранение N+1).
+   * Возвращает Map<orderId, Item[]>.
+   */
+  async getItemsByOrderIds(orderIds: number[]): Promise<Map<number, Item[]>> {
+    const map = new Map<number, Item[]>()
+    if (orderIds.length === 0) return map
+
+    const db = await getDb()
+    try {
+      const placeholders = orderIds.map(() => '?').join(',')
+      const rows = await db.all<ItemRow>(
+        `SELECT ${itemRowSelect} FROM items WHERE orderId IN (${placeholders})`,
+        ...orderIds
+      )
+      for (const row of Array.isArray(rows) ? rows : []) {
+        const item = mapItemRowToItem(row)
+        const list = map.get(row.orderId) ?? []
+        list.push(item)
+        map.set(row.orderId, list)
+      }
+      return map
+    } catch (e: any) {
+      console.warn('[OrderRepository] getItemsByOrderIds failed:', e?.message || e)
+      return map
+    }
+  },
+
   async listUserOrders(userId: number): Promise<Order[]> {
     const db = await getDb()
     const orders = await db.all<any>(
@@ -31,7 +59,7 @@ export const OrderRepository = {
         END as number,
         o.status, COALESCE(o.created_at, o.createdAt) as created_at, o.customerName, o.customerPhone, o.customerEmail, 
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
-        o.source, o.customer_id,
+        o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
         c.id as customer__id,
         c.first_name as customer__first_name,
         c.last_name as customer__last_name,

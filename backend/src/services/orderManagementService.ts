@@ -1,4 +1,5 @@
 import { getDb } from '../db';
+import { hasColumn } from '../utils/tableSchemaCache';
 import { PhotoOrderService } from './photoOrderService';
 import { UserOrderPageService } from './userOrderPageService';
 import { NotificationService } from './notificationService';
@@ -478,8 +479,7 @@ export class OrderManagementService {
           if (totalAmount > 0 && prepaymentAmount < totalAmount) {
             let hasPrepaymentUpdatedAt = false
             try {
-              const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
-              hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+              hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
             } catch {
               hasPrepaymentUpdatedAt = false
             }

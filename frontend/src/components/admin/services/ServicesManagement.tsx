@@ -32,6 +32,7 @@ const emptyServiceForm: ServiceFormState = {
   operationType: 'other', // 🆕
   minQuantity: '1',
   maxQuantity: '',
+  operatorPercent: '',
 };
 
 const serviceToFormState = (service: PricingService): ServiceFormState => ({
@@ -44,6 +45,7 @@ const serviceToFormState = (service: PricingService): ServiceFormState => ({
   operationType: service.operationType || 'other', // 🆕
   minQuantity: service.minQuantity !== undefined ? String(service.minQuantity) : '1',
   maxQuantity: service.maxQuantity !== undefined ? String(service.maxQuantity) : '',
+  operatorPercent: (service as any).operator_percent !== undefined ? String((service as any).operator_percent) : '',
 });
 
 interface ServicesManagementProps {
@@ -164,6 +166,9 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       maxQuantity: state.editingServiceForm.maxQuantity
         ? Number(state.editingServiceForm.maxQuantity)
         : undefined,
+      operator_percent: state.editingServiceForm.operatorPercent
+        ? Number(state.editingServiceForm.operatorPercent)
+        : undefined,
     };
     await serviceOperationsRef.current.updateService(state.editingService.id, payload);
     resetEditingService();
@@ -183,6 +188,9 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         : undefined,
       maxQuantity: state.newServiceForm.maxQuantity
         ? Number(state.newServiceForm.maxQuantity)
+        : undefined,
+      operator_percent: state.newServiceForm.operatorPercent
+        ? Number(state.newServiceForm.operatorPercent)
         : undefined,
     });
     

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
+import { hasColumn, invalidateTableSchemaCache } from '../utils/tableSchemaCache'
 import { ServiceManagementService } from '../modules/pricing/services/serviceManagementService'
 import { PricingServiceRepository } from '../modules/pricing/repositories/serviceRepository'
 
@@ -401,15 +402,23 @@ async function ensureMarkupDefaults(db: any): Promise<void> {
   `)
 
   // Если таблица уже существовала (старая схема) — нужные колонки могли отсутствовать.
-  // Пример: markup_settings без description => SQLITE_ERROR: no column named description
   try {
-    const cols = await db.all(`PRAGMA table_info(markup_settings)`) as Array<{ name?: string }>
-    const has = (name: string) => Array.isArray(cols) && cols.some(c => c?.name === name)
-
-    if (!has('description')) await db.exec(`ALTER TABLE markup_settings ADD COLUMN description TEXT`)
-    if (!has('is_active')) await db.exec(`ALTER TABLE markup_settings ADD COLUMN is_active INTEGER DEFAULT 1`)
-    if (!has('created_at')) await db.exec(`ALTER TABLE markup_settings ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP`)
-    if (!has('updated_at')) await db.exec(`ALTER TABLE markup_settings ADD COLUMN updated_at TEXT DEFAULT CURRENT_TIMESTAMP`)
+    if (!(await hasColumn('markup_settings', 'description'))) {
+      await db.exec(`ALTER TABLE markup_settings ADD COLUMN description TEXT`)
+      invalidateTableSchemaCache('markup_settings')
+    }
+    if (!(await hasColumn('markup_settings', 'is_active'))) {
+      await db.exec(`ALTER TABLE markup_settings ADD COLUMN is_active INTEGER DEFAULT 1`)
+      invalidateTableSchemaCache('markup_settings')
+    }
+    if (!(await hasColumn('markup_settings', 'created_at'))) {
+      await db.exec(`ALTER TABLE markup_settings ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP`)
+      invalidateTableSchemaCache('markup_settings')
+    }
+    if (!(await hasColumn('markup_settings', 'updated_at'))) {
+      await db.exec(`ALTER TABLE markup_settings ADD COLUMN updated_at TEXT DEFAULT CURRENT_TIMESTAMP`)
+      invalidateTableSchemaCache('markup_settings')
+    }
   } catch {
     // no-op
   }

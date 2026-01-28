@@ -1,5 +1,6 @@
 import { getDb } from '../config/database';
 import { logger } from '../utils/logger';
+import { hasColumn } from '../utils/tableSchemaCache';
 
 export interface EarningsSchedulerConfig {
   enabled: boolean;
@@ -90,12 +91,29 @@ export class EarningsService {
     }
 
     const productIds = new Set<number>();
+    const operationIds = new Set<number>();
+    
     rows.forEach((row) => {
       try {
         const parsed = JSON.parse(row.params || '{}');
         const productId = Number(parsed?.productId);
         if (Number.isFinite(productId)) {
           productIds.add(productId);
+        }
+        
+        // Проверяем операции в params
+        if (parsed?.services && Array.isArray(parsed.services)) {
+          parsed.services.forEach((service: any) => {
+            const opId = Number(service?.operationId);
+            if (Number.isFinite(opId)) {
+              operationIds.add(opId);
+            }
+          });
+        }
+        // Также проверяем прямой operationId (для послепечатных услуг)
+        const opId = Number(parsed?.operationId);
+        if (Number.isFinite(opId)) {
+          operationIds.add(opId);
         }
       } catch {
         // ignore invalid json
@@ -113,6 +131,24 @@ export class EarningsService {
       productRows.forEach((row) => {
         productPercentMap.set(Number(row.id), Number(row.operator_percent) || 0);
       });
+    }
+
+    // Получаем проценты из операций
+    const operationPercentMap = new Map<number, number>();
+    if (operationIds.size > 0) {
+      const ids = Array.from(operationIds);
+      const placeholders = ids.map(() => '?').join(',');
+      const hasOperatorPercent = await hasColumn('post_processing_services', 'operator_percent');
+
+      if (hasOperatorPercent) {
+        const operationRows = await db.all<Array<{ id: number; operator_percent: number }>>(
+          `SELECT id, operator_percent FROM post_processing_services WHERE id IN (${placeholders})`,
+          ids
+        );
+        operationRows.forEach((row) => {
+          operationPercentMap.set(Number(row.id), Number(row.operator_percent) || 0);
+        });
+      }
     }
 
     await db.run('BEGIN');
@@ -134,9 +170,27 @@ export class EarningsService {
         let percent = Number.isFinite(rawPercent) ? rawPercent : 0;
 
         if (percent === 0) {
-          const productId = Number(params?.productId);
-          if (Number.isFinite(productId)) {
-            percent = productPercentMap.get(productId) ?? 0;
+          // Сначала проверяем операции (для послепечатных услуг)
+          if (params?.services && Array.isArray(params.services) && params.services.length > 0) {
+            // Берем процент из первой операции (или можно суммировать, если нужно)
+            const firstOpId = Number(params.services[0]?.operationId);
+            if (Number.isFinite(firstOpId)) {
+              percent = operationPercentMap.get(firstOpId) ?? 0;
+            }
+          }
+          // Также проверяем прямой operationId
+          if (percent === 0) {
+            const opId = Number(params?.operationId);
+            if (Number.isFinite(opId)) {
+              percent = operationPercentMap.get(opId) ?? 0;
+            }
+          }
+          // Если процент всё ещё 0, проверяем продукт
+          if (percent === 0) {
+            const productId = Number(params?.productId);
+            if (Number.isFinite(productId)) {
+              percent = productPercentMap.get(productId) ?? 0;
+            }
           }
         }
 

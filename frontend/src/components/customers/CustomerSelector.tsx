@@ -162,6 +162,8 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
             <>
               {selectedCustomer.company_name && <div>Компания: {selectedCustomer.company_name}</div>}
               {selectedCustomer.tax_id && <div>УНП: {selectedCustomer.tax_id}</div>}
+              {selectedCustomer.authorized_person && <div>Уполномоченное лицо: {selectedCustomer.authorized_person}</div>}
+              {selectedCustomer.bank_details && <div>Расчётный счёт: {selectedCustomer.bank_details}</div>}
             </>
           ) : (
             <>
@@ -203,6 +205,8 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
     company_name: '',
     legal_name: '',
     tax_id: '',
+    authorized_person: '',
+    bank_details: '',
     phone: '',
     email: '',
     address: '',
@@ -243,6 +247,21 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
         title: 'Успешно',
         message: 'Клиент создан'
       });
+      // Сбрасываем форму после успешного создания
+      setFormData({
+        first_name: '',
+        last_name: '',
+        middle_name: '',
+        company_name: '',
+        legal_name: '',
+        tax_id: '',
+        authorized_person: '',
+        bank_details: '',
+        phone: '',
+        email: '',
+        address: '',
+        notes: ''
+      });
       onCreated(response.data);
     } catch (error: any) {
       addToast({
@@ -268,7 +287,28 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
             <label className="customer-modal__label">Тип клиента</label>
             <select
               value={type}
-              onChange={(e) => setType(e.target.value as 'individual' | 'legal')}
+              onChange={(e) => {
+                const newType = e.target.value as 'individual' | 'legal';
+                setType(newType);
+                // Сбрасываем поля, специфичные для другого типа
+                if (newType === 'individual') {
+                  setFormData(prev => ({
+                    ...prev,
+                    company_name: '',
+                    legal_name: '',
+                    tax_id: '',
+                    authorized_person: '',
+                    bank_details: '',
+                  }));
+                } else {
+                  setFormData(prev => ({
+                    ...prev,
+                    first_name: '',
+                    last_name: '',
+                    middle_name: '',
+                  }));
+                }
+              }}
               className="customer-modal__input"
             >
               <option value="individual">Физическое лицо</option>
@@ -334,6 +374,26 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCr
                   value={formData.tax_id}
                   onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
                   className="customer-modal__input"
+                />
+              </div>
+              <div className="customer-modal__field">
+                <label className="customer-modal__label-sm">Уполномоченное лицо</label>
+                <input
+                  type="text"
+                  value={formData.authorized_person}
+                  onChange={(e) => setFormData({ ...formData, authorized_person: e.target.value })}
+                  placeholder="ФИО уполномоченного лица"
+                  className="customer-modal__input"
+                />
+              </div>
+              <div className="customer-modal__field">
+                <label className="customer-modal__label-sm">Расчётный счёт</label>
+                <textarea
+                  value={formData.bank_details}
+                  onChange={(e) => setFormData({ ...formData, bank_details: e.target.value })}
+                  placeholder="р/с, банк, БИК и т.д."
+                  rows={3}
+                  className="customer-modal__textarea"
                 />
               </div>
             </>

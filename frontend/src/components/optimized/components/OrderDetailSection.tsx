@@ -1,11 +1,12 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Order } from '../../../types';
 import { ProgressBar } from '../../order/ProgressBar';
 import { OrderTotal } from '../../order/OrderTotal';
 import { MemoizedOrderItem } from '../MemoizedOrderItem';
 import { OrderDates } from '../../order/OrderDates';
 import { useToast } from '../../Toast';
-import { generateOrderBlankPdf } from '../../../api';
+import { generateOrderBlankPdf, generateCommodityReceiptPdf, generateCommodityReceiptBlankPdf, updateOrderDiscount } from '../../../api';
+import { parseNumberFlexible } from '../../../utils/numberInput';
 import { CustomerSelector } from '../../customers/CustomerSelector';
 
 interface OrderDetailSectionProps {
@@ -47,8 +48,45 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
 }) => {
   const { addToast } = useToast();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
+  const [receiptMenuOpen, setReceiptMenuOpen] = useState(false);
+  const receiptMenuRef = useRef<HTMLDivElement>(null);
+  const [discountMenuOpen, setDiscountMenuOpen] = useState(false);
+  const discountMenuRef = useRef<HTMLDivElement>(null);
 
   const items = selectedOrder.items ?? [];
+  const subtotal = React.useMemo(() => {
+    return items.reduce((sum, it) => {
+      const p = parseNumberFlexible(it.price);
+      const q = parseNumberFlexible(it.quantity ?? 1);
+      const s = parseNumberFlexible((it as any).serviceCost);
+      return sum + p * q + s;
+    }, 0);
+  }, [items]);
+  const discountPercent = selectedOrder.discount_percent ?? 0;
+  const discountAmount = Math.round(subtotal * (discountPercent / 100) * 100) / 100;
+
+  useEffect(() => {
+    if (!receiptMenuOpen) return;
+    const onOutside = (e: MouseEvent) => {
+      if (receiptMenuRef.current && !receiptMenuRef.current.contains(e.target as Node)) {
+        setReceiptMenuOpen(false);
+      }
+    };
+    document.addEventListener('click', onOutside, true);
+    return () => document.removeEventListener('click', onOutside, true);
+  }, [receiptMenuOpen]);
+
+  useEffect(() => {
+    if (!discountMenuOpen) return;
+    const onOutside = (e: MouseEvent) => {
+      if (discountMenuRef.current && !discountMenuRef.current.contains(e.target as Node)) {
+        setDiscountMenuOpen(false);
+      }
+    };
+    document.addEventListener('click', onOutside, true);
+    return () => document.removeEventListener('click', onOutside, true);
+  }, [discountMenuOpen]);
   
   const handleStatusChange = useCallback(async (newStatus: number) => {
     try {
@@ -95,6 +133,60 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       setIsGeneratingPdf(false);
     }
   }, [selectedOrder.id, selectedOrder.number, addToast]);
+
+  const openPdfInNewTab = useCallback((data: BlobPart, filename: string) => {
+    const blob = new Blob([data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const opened = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!opened) throw new Error('Браузер заблокировал открытие новой вкладки');
+    setTimeout(() => window.URL.revokeObjectURL(url), 30000);
+  }, []);
+
+  const handleGenerateReceipt = useCallback(async () => {
+    try {
+      setIsGeneratingReceipt(true);
+      setReceiptMenuOpen(false);
+      const response = await generateCommodityReceiptPdf(selectedOrder.id);
+      openPdfInNewTab(response.data, `commodity-receipt-${selectedOrder.id}.pdf`);
+      addToast({ type: 'success', title: 'Успешно', message: 'Товарный чек открыт в новой вкладке' });
+    } catch (error: any) {
+      console.error('Ошибка генерации товарного чека:', error);
+      addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось создать товарный чек' });
+    } finally {
+      setIsGeneratingReceipt(false);
+    }
+  }, [selectedOrder.id, addToast, openPdfInNewTab]);
+
+  const handleGenerateReceiptBlank = useCallback(async () => {
+    try {
+      setIsGeneratingReceipt(true);
+      setReceiptMenuOpen(false);
+      const response = await generateCommodityReceiptBlankPdf();
+      openPdfInNewTab(response.data, 'commodity-receipt-blank.pdf');
+      addToast({ type: 'success', title: 'Успешно', message: 'Бланк товарного чека открыт в новой вкладке' });
+    } catch (error: any) {
+      console.error('Ошибка генерации бланка товарного чека:', error);
+      addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось создать бланк товарного чека' });
+    } finally {
+      setIsGeneratingReceipt(false);
+    }
+  }, [addToast, openPdfInNewTab]);
+
+  const DISCOUNT_OPTIONS = [0, 5, 10, 15, 20, 25] as const;
+  const handleSetDiscount = useCallback(async (percent: number) => {
+    try {
+      setDiscountMenuOpen(false);
+      await updateOrderDiscount(selectedOrder.id, percent);
+      onLoadOrders();
+      addToast({
+        type: 'success',
+        title: 'Успешно',
+        message: percent === 0 ? 'Скидка снята' : `Скидка ${percent}% применена`,
+      });
+    } catch (error: any) {
+      addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось применить скидку' });
+    }
+  }, [selectedOrder.id, onLoadOrders, addToast]);
 
   return (
     <>
@@ -159,6 +251,148 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               >
                 {isGeneratingPdf ? '⏳ Генерация...' : '📄 Бланк'}
               </button>
+              <div ref={receiptMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isGeneratingReceipt) setReceiptMenuOpen((v) => !v);
+                  }}
+                  disabled={isGeneratingReceipt}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: isGeneratingReceipt ? '#ccc' : '#17a2b8',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: isGeneratingReceipt ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    opacity: isGeneratingReceipt ? 0.6 : 1
+                  }}
+                  title="Товарный чек: по заказу или бланк"
+                >
+                  {isGeneratingReceipt ? '⏳ Генерация...' : '🧾 Товарный чек ▼'}
+                </button>
+                {receiptMenuOpen && !isGeneratingReceipt && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: 4,
+                      background: '#fff',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      zIndex: 1000,
+                      minWidth: '140px'
+                    }}
+                    role="menu"
+                  >
+                    <button
+                      type="button"
+                      onClick={handleGenerateReceipt}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        border: 'none',
+                        background: 'none',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                      role="menuitem"
+                    >
+                      По заказу
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleGenerateReceiptBlank}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        border: 'none',
+                        background: 'none',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        borderTop: '1px solid #eee'
+                      }}
+                      role="menuitem"
+                    >
+                      Бланк
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div ref={discountMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDiscountMenuOpen((v) => !v);
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: discountPercent > 0 ? '#6f42c1' : '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Скидка на итог заказа"
+                >
+                  {discountPercent > 0 ? `🏷️ Скидка ${discountPercent}% ▼` : '🏷️ Скидка ▼'}
+                </button>
+                {discountMenuOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: 4,
+                      background: '#fff',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      zIndex: 1000,
+                      minWidth: '120px'
+                    }}
+                    role="menu"
+                  >
+                    {DISCOUNT_OPTIONS.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => handleSetDiscount(p)}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          padding: '8px 12px',
+                          textAlign: 'left',
+                          border: 'none',
+                          background: p === discountPercent ? '#e7e7ff' : 'none',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          borderTop: p === 0 ? 'none' : '1px solid #eee'
+                        }}
+                        role="menuitem"
+                      >
+                        {p === 0 ? 'Без скидки' : `${p}%`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
@@ -275,7 +509,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
           price: it.price,
           quantity: it.quantity ?? 1,
         }))}
-        discount={0}
+        discount={discountAmount}
         taxRate={0}
         prepaymentAmount={selectedOrder.prepaymentAmount}
         prepaymentStatus={selectedOrder.prepaymentStatus}

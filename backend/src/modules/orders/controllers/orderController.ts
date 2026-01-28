@@ -140,6 +140,21 @@ export class OrderController {
     }
   }
 
+  static async updateOrderDiscount(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id)
+      const { discount_percent } = req.body as { discount_percent: number }
+      if (isNaN(id)) {
+        res.status(400).json({ error: 'Неверный ID заказа' })
+        return
+      }
+      const updated = await OrderService.updateOrderDiscount(id, discount_percent)
+      res.json(updated)
+    } catch (error: any) {
+      res.status(500).json({ error: error.message })
+    }
+  }
+
   static async deleteOrder(req: Request, res: Response) {
     try {
       const id = Number(req.params.id)

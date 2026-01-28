@@ -2,31 +2,38 @@ import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { AuthenticatedRequest } from '../middleware'
+import { getCachedData, invalidateCache } from '../utils/dataCache'
 
 const router = Router()
 
 // GET /api/presets — список категорий с их товарами и допами
 router.get('/', asyncHandler(async (req, res) => {
-  const db = await getDb()
-  const categories = (await db.all<any>(
-    'SELECT id, category, color FROM preset_categories ORDER BY category'
-  )) as unknown as Array<{ id: number; category: string; color: string }>
-  const items = (await db.all<any>(
-    'SELECT id, category_id, description, price FROM preset_items'
-  )) as unknown as Array<{ id: number; category_id: number; description: string; price: number }>
-  const extras = (await db.all<any>(
-    'SELECT id, category_id, name, price, type, unit FROM preset_extras'
-  )) as unknown as Array<{ id: number; category_id: number; name: string; price: number; type: string; unit: string | null }>
-  const result = categories.map((c) => ({
-    category: c.category,
-    color: c.color,
-    items: items
-      .filter((i) => i.category_id === c.id)
-      .map((i) => ({ description: i.description, price: i.price })),
-    extras: extras
-      .filter((e) => e.category_id === c.id)
-      .map((e) => ({ name: e.name, price: e.price, type: e.type as any, unit: e.unit || undefined }))
-  }))
+  const result = await getCachedData(
+    'presets_all',
+    async () => {
+      const db = await getDb()
+      const categories = (await db.all<any>(
+        'SELECT id, category, color FROM preset_categories ORDER BY category'
+      )) as unknown as Array<{ id: number; category: string; color: string }>
+      const items = (await db.all<any>(
+        'SELECT id, category_id, description, price FROM preset_items'
+      )) as unknown as Array<{ id: number; category_id: number; description: string; price: number }>
+      const extras = (await db.all<any>(
+        'SELECT id, category_id, name, price, type, unit FROM preset_extras'
+      )) as unknown as Array<{ id: number; category_id: number; name: string; price: number; type: string; unit: string | null }>
+      return categories.map((c) => ({
+        category: c.category,
+        color: c.color,
+        items: items
+          .filter((i) => i.category_id === c.id)
+          .map((i) => ({ description: i.description, price: i.price })),
+        extras: extras
+          .filter((e) => e.category_id === c.id)
+          .map((e) => ({ name: e.name, price: e.price, type: e.type as any, unit: e.unit || undefined }))
+      }))
+    },
+    10 * 60 * 1000 // 10 минут
+  )
   res.json(result)
 }))
 
@@ -73,6 +80,7 @@ router.post('/materials', asyncHandler(async (req, res) => {
       m.qtyPerItem
     )
   }
+  invalidateCache('presets_all')
   res.status(204).end()
 }))
 

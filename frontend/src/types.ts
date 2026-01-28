@@ -81,6 +81,8 @@ export interface Order {
   // Payment information
   prepaymentAmount?: number;
   prepaymentStatus?: string;
+  /** Скидка на заказ (%): 0, 5, 10, 15, 20, 25 */
+  discount_percent?: number;
   paymentUrl?: string;
   paymentId?: string;
   paymentMethod?: PaymentMethod;

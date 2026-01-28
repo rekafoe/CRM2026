@@ -57,6 +57,7 @@ export interface CreatePricingServicePayload {
   operationType?: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
   minQuantity?: number;
   maxQuantity?: number;
+  operator_percent?: number;
 }
 
 export interface UpdatePricingServicePayload extends Partial<CreatePricingServicePayload> {}

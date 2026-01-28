@@ -1,5 +1,6 @@
 import { getDb } from '../config/database'
 import { getCurrentTimestamp } from '../utils'
+import { hasColumn } from '../utils/tableSchemaCache'
 import { Order, Item } from '../models'
 import { UnifiedWarehouseService } from './unifiedWarehouseService'
 import { AutoMaterialDeductionService } from './autoMaterialDeductionService'
@@ -209,8 +210,7 @@ export class OrderService {
     const initialPrepay = Number(prepaymentAmount || 0)
     let hasPrepaymentUpdatedAt = false
     try {
-      const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
-      hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+      hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
     } catch {
       hasPrepaymentUpdatedAt = false
     }
@@ -523,8 +523,7 @@ export class OrderService {
     const hasRulesTable = !!(await db.get(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='product_material_rules'"
     ))
-    const productMaterialsColumns = await db.all(`PRAGMA table_info('product_materials')`)
-    const hasLegacyPresetSchema = productMaterialsColumns.some((col: any) => col.name === 'presetCategory')
+    const hasLegacyPresetSchema = await hasColumn('product_materials', 'presetCategory')
     for (const item of items) {
       const paramsObj = JSON.parse(item.params || '{}') as { description?: string }
       let composition: Array<{ materialId: number; qtyPerItem: number }> = []

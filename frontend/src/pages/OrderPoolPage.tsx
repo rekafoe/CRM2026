@@ -200,13 +200,13 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     const map = new Map<number, { total: number; prepayment: number; debt: number }>();
     orders.forEach((order) => {
       const items = Array.isArray(order.items) ? order.items : [];
-      const computed = items.reduce((sum, item) => {
+      const subtotal = items.reduce((sum, item) => {
         const price = parseNumberFlexible(item.price ?? 0);
         const qty = parseNumberFlexible(item.quantity ?? 1);
         return sum + price * qty;
       }, 0);
-      const stored = parseNumberFlexible((order as any).totalAmount ?? (order as any).total_amount ?? 0);
-      const total = stored > 0 ? stored : computed;
+      const pct = (order as any).discount_percent ?? 0;
+      const total = Math.round(subtotal * (1 - pct / 100) * 100) / 100;
       const prepayment = parseNumberFlexible(order.prepaymentAmount ?? 0);
       const debt = Math.max(0, total - prepayment);
       map.set(order.id, { total, prepayment, debt });
@@ -256,7 +256,13 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   }, [filters.source, filters.cancelled, filters.assigned, filters.searchTerm, filters.quickFilter, filters.sortBy, filters.sortDirection]);
 
   const filteredOrders = useMemo(() => {
-    let filtered = orders.filter(o => Number(o.status) === 0);
+    // Показываем ожидающие (0) и оформленные с долгом (1) — чтобы можно было искать и закрывать долг
+    let filtered = orders.filter(o => {
+      const s = Number(o.status);
+      if (s === 0) return true;
+      if (s === 1) return getOrderDebt(o) > 0;
+      return false;
+    });
 
     if (filters.source !== 'all') {
       filtered = filtered.filter(o => o.source === filters.source);
@@ -344,12 +350,23 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       await reassignOrderByNumber(orderNumber, currentUserId);
       toast.success('Заказ назначен вам!', `Заказ ${orderNumber} успешно назначен.`);
       loadOrders();
-      navigate('/'); // Переходим на основную страницу после назначения
     } catch (err) {
       logger.error('Failed to assign order', err);
       toast.error('Ошибка назначения', (err as Error).message);
     }
-  }, [currentUserId, loadOrders, navigate, toast, logger]);
+  }, [currentUserId, loadOrders, toast, logger]);
+
+  const handleReassignTo = useCallback(async (orderNumber: string, userId: number) => {
+    try {
+      await reassignOrderByNumber(orderNumber, userId);
+      const name = allUsers.find((u) => u.id === userId)?.name ?? 'оператору';
+      toast.success('Заказ переназначен', `Заказ ${orderNumber} назначен ${name}.`);
+      loadOrders();
+    } catch (err) {
+      logger.error('Failed to reassign order', err);
+      toast.error('Ошибка переназначения', (err as Error).message);
+    }
+  }, [allUsers, loadOrders, toast, logger]);
 
   const handleProcessOrder = useCallback(async (orderId: number) => {
     try {
@@ -411,8 +428,9 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             <button
               className={`quick-btn ${filters.assigned === 'not_assigned' ? 'active' : ''}`}
               onClick={() => dispatchFilters({ type: 'setAssigned', value: 'not_assigned' })}
+              title="Без ответственного"
             >
-              Только в пуле
+              Неназначенные
             </button>
             <button
               className={`quick-btn ${filters.assigned === 'assigned' ? 'active' : ''}`}
@@ -559,16 +577,37 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               onShowFilesModal={() => setShowFilesModal(true)}
               onShowPrepaymentModal={() => setShowPrepaymentModal(true)}
             />
+            {Number(selectedOrder.status) === 0 && (
+              <div className="order-detail-responsible">
+                <label>
+                  Ответственный:
+                  <select
+                    value={selectedOrder.userId ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') return;
+                      const uid = Number(v);
+                      if (uid === selectedOrder.userId) return;
+                      handleReassignTo(selectedOrder.number!, uid);
+                    }}
+                  >
+                    <option value="">— Не назначен</option>
+                    {allUsers.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                </label>
+                {!selectedOrder.userId && (
+                  <button type="button" className="btn-assign-me" onClick={() => handleAssignToMe(selectedOrder.number!)}>
+                    Назначить мне
+                  </button>
+                )}
+              </div>
+            )}
             <div className="order-detail-actions">
-              {!selectedOrder.userId && (
-                <button onClick={() => handleAssignToMe(selectedOrder.number!)}>Назначить мне</button>
+              {Number(selectedOrder.status) === 0 && (
+                <button onClick={() => handleProcessOrder(selectedOrder.id)}>Внести предоплату</button>
               )}
-              {selectedOrder.userId && (
-                <button disabled style={{ background: '#6c757d', cursor: 'not-allowed' }}>
-                  Назначен пользователю
-                </button>
-              )}
-              <button onClick={() => handleProcessOrder(selectedOrder.id)}>Оформить</button>
               {selectedOrder.source && (selectedOrder.source === 'website' || selectedOrder.source === 'telegram') && (
                 <button onClick={() => handleCancelOnline(selectedOrder.id)}>Отменить онлайн</button>
               )}
@@ -581,7 +620,11 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                 price: item.price,
                 quantity: item.quantity ?? 1,
               }))}
-              discount={0}
+              discount={(() => {
+                const st = selectedItems.reduce((s, it) => s + parseNumberFlexible(it.price) * parseNumberFlexible(it.quantity ?? 1), 0);
+                const pct = selectedOrder.discount_percent ?? 0;
+                return Math.round(st * (pct / 100) * 100) / 100;
+              })()}
               taxRate={0}
               prepaymentAmount={selectedOrder.prepaymentAmount}
               prepaymentStatus={selectedOrder.prepaymentStatus}

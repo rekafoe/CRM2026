@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
+import { hasColumn } from '../utils/tableSchemaCache'
 
 const router = Router()
 
@@ -45,15 +46,35 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
       ORDER BY spent DESC
       LIMIT 5`, d
   )
-  // Расчёт долга клиентов
+  // Расчёт долга клиентов (итог из items с учётом скидки)
   const debtInfo = await db.get<any>(
-    `SELECT 
-        COALESCE(SUM(o.total), 0) as total_orders_amount,
-        COALESCE(SUM(o.prepaymentAmount), 0) as total_prepayment_amount,
-        COALESCE(SUM(o.total) - SUM(o.prepaymentAmount), 0) as total_debt
-     FROM orders o 
-     WHERE substr(o.createdAt,1,10) = ?`, d
+    `WITH order_totals AS (
+       SELECT o.id,
+         (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(i.price * i.quantity), 0) AS ord_total,
+         COALESCE(o.prepaymentAmount, 0) AS prepay
+       FROM orders o
+       LEFT JOIN items i ON i.orderId = o.id
+       WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
+       GROUP BY o.id
+     )
+     SELECT 
+       COALESCE(SUM(ord_total), 0) AS total_orders_amount,
+       COALESCE(SUM(prepay), 0) AS total_prepayment_amount,
+       COALESCE(SUM(ord_total) - SUM(prepay), 0) AS total_debt
+     FROM order_totals`,
+    d
   )
+
+  let debtClosedToday = 0
+  try {
+    const row = await db.get<{ s: number }>(
+      'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ?',
+      d
+    )
+    debtClosedToday = Number(row?.s ?? 0)
+  } catch {
+    /* таблица может отсутствовать до миграции */
+  }
 
   res.json({
     date: d,
@@ -65,6 +86,7 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
     total_waste: Number(sums?.total_waste || 0),
     prepayment: prepay,
     debt: debtInfo,
+    debt_closed_today: debtClosedToday,
     materials_spent_top: materials
   })
 }))
@@ -77,8 +99,7 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
   const db = await getDb()
   let hasPrepaymentUpdatedAt = false
   try {
-    const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
-    hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+    hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
   } catch {
     hasPrepaymentUpdatedAt = false
   }

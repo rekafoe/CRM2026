@@ -1,5 +1,7 @@
 import { getDb } from '../../../config/database'
 import { getCurrentTimestamp } from '../../../utils/date'
+import { hasColumn } from '../../../utils/tableSchemaCache'
+import { getCachedData } from '../../../utils/dataCache'
 import { Order } from '../../../models/Order'
 import { UnifiedWarehouseService } from '../../warehouse/services/unifiedWarehouseService'
 import { MaterialTransactionService } from '../../warehouse/services/materialTransactionService'
@@ -23,13 +25,25 @@ export class OrderService {
     const minutes = String(date.getMinutes()).padStart(2, '0')
     return `${year}-${month}-${day}T${hours}:${minutes}`
   }
+  private static async getAllStatuses(): Promise<Array<{ id: number; name: string }>> {
+    return getCachedData<Array<{ id: number; name: string }>>(
+      'order_statuses_all',
+      async () => {
+        const db = await getDb()
+        const rows = await db.all<{ id: number; name: string }>(
+          'SELECT id, name FROM order_statuses ORDER BY sort_order, id'
+        )
+        return Array.isArray(rows) ? rows : []
+      },
+      30 * 60 * 1000 // 30 минут (статусы меняются очень редко)
+    )
+  }
+
   private static async getStatusIdByName(db: any, name: string): Promise<number | null> {
     try {
-      const row = (await db.get(
-        'SELECT id FROM order_statuses WHERE name = ? LIMIT 1',
-        [name]
-      )) as { id?: number } | undefined
-      return row?.id != null ? Number(row.id) : null
+      const statuses = await this.getAllStatuses()
+      const status = statuses.find(s => s.name === name)
+      return status?.id ?? null
     } catch {
       return null
     }
@@ -77,16 +91,17 @@ export class OrderService {
       } else if (legacyNewId != null) {
         defaultStatusId = legacyNewId
       } else {
-      const statusRow = await db.get<{ id: number }>('SELECT id FROM order_statuses ORDER BY sort_order ASC, id ASC LIMIT 1')
-      if (statusRow?.id) defaultStatusId = Number(statusRow.id)
+        const statuses = await this.getAllStatuses()
+        if (statuses.length > 0) {
+          defaultStatusId = statuses[0].id
+        }
       }
     } catch {}
 
     const initialPrepay = Number(prepaymentAmount || 0)
     let hasPrepaymentUpdatedAt = false
     try {
-      const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
-      hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+      hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
     } catch {
       hasPrepaymentUpdatedAt = false
     }
@@ -336,6 +351,61 @@ export class OrderService {
     return { ...(updated as any as Order), items: [] }
   }
 
+  /** Допустимые значения скидки: 0, 5, 10, 15, 20, 25 (%) */
+  private static readonly ALLOWED_DISCOUNT_PERCENTS = new Set([0, 5, 10, 15, 20, 25]);
+
+  /**
+   * Обновить скидку на заказ (процент от итоговой суммы).
+   * Если оплата offline и предоплата была «в синке» с итогом — пересчитываем предоплату под новый итог.
+   */
+  static async updateOrderDiscount(id: number, discountPercent: number): Promise<Order> {
+    const db = await getDb()
+    const order = await db.get<{ id: number; prepaymentAmount?: number | null; paymentMethod?: string | null; discount_percent?: number | null }>(
+      'SELECT id, prepaymentAmount, paymentMethod, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id = ?',
+      [id]
+    )
+    if (!order) {
+      throw new Error('Заказ не найден')
+    }
+    const p = Number(discountPercent)
+    if (!Number.isFinite(p) || !OrderService.ALLOWED_DISCOUNT_PERCENTS.has(p)) {
+      throw new Error('Скидка должна быть 0, 5, 10, 15, 20 или 25%')
+    }
+    const oldPct = Number(order.discount_percent || 0) / 100
+    const newPct = p / 100
+    const tot = await db.get<{ total_amount: number }>(
+      'SELECT COALESCE(SUM(price * quantity), 0) as total_amount FROM items WHERE orderId = ?',
+      [id]
+    )
+    const subtotal = Number(tot?.total_amount || 0)
+    const oldTotal = Math.round(subtotal * (1 - oldPct) * 100) / 100
+    const newTotal = Math.round(subtotal * (1 - newPct) * 100) / 100
+    const prepaymentAmount = Number(order.prepaymentAmount || 0)
+    const eps = 0.005
+    const inSync = Math.abs(prepaymentAmount - oldTotal) < eps
+
+    await db.run(
+      'UPDATE orders SET discount_percent = ?, updated_at = datetime("now") WHERE id = ?',
+      [p, id]
+    )
+
+    if (order.paymentMethod === 'offline' && inSync && newTotal >= 0) {
+      let hasPrepaymentUpdatedAt = false
+      try {
+        hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
+      } catch {
+        hasPrepaymentUpdatedAt = false
+      }
+      const updateSql = hasPrepaymentUpdatedAt
+        ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime("now"), updated_at = datetime("now") WHERE id = ?'
+        : 'UPDATE orders SET prepaymentAmount = ?, updated_at = datetime("now") WHERE id = ?'
+      await db.run(updateSql, newTotal, id)
+    }
+
+    const updated = await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id])
+    return { ...(updated as any as Order), items: [] }
+  }
+
   static async updateOrderStatus(id: number, status: number) {
     const db = await getDb()
     
@@ -422,8 +492,7 @@ export class OrderService {
     const hasRulesTable = !!(await db.get(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='product_material_rules'"
     ))
-    const productMaterialsColumns = await db.all(`PRAGMA table_info('product_materials')`)
-    const hasLegacyPresetSchema = productMaterialsColumns.some((col: any) => col.name === 'presetCategory')
+    const hasLegacyPresetSchema = await hasColumn('product_materials', 'presetCategory')
     for (const item of items) {
       const paramsObj = JSON.parse(item.params || '{}') as { description?: string }
       let composition: Array<{ materialId: number; qtyPerItem: number }> = []
@@ -631,8 +700,10 @@ export class OrderService {
     offset?: number;
   }) {
     const orders = await OrderRepository.searchOrders(userId, searchParams)
+    const orderIds = (orders as Order[]).map((o) => o.id)
+    const itemsByOrderId = await OrderRepository.getItemsByOrderIds(orderIds)
     for (const order of orders as Order[]) {
-      order.items = await OrderRepository.getItemsByOrderId(order.id)
+      order.items = itemsByOrderId.get(order.id) ?? []
     }
     return orders
   }

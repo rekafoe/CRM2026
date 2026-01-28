@@ -1,13 +1,19 @@
 import { getDb } from '../config/database'
 import { MaterialCategory } from '../models'
+import { getCachedData, invalidateCache } from '../utils/dataCache'
 
 export class MaterialCategoryService {
   static async getAllCategories() {
-    const db = await getDb()
-    const categories = await db.all<MaterialCategory>(
-      'SELECT id, name, description, color, created_at FROM material_categories ORDER BY name'
+    return getCachedData(
+      'material_categories_all',
+      async () => {
+        const db = await getDb()
+        return await db.all<MaterialCategory>(
+          'SELECT id, name, description, color, created_at FROM material_categories ORDER BY name'
+        )
+      },
+      10 * 60 * 1000 // 10 минут
     )
-    return categories
   }
 
   static async getCategoryById(id: number) {
@@ -33,6 +39,7 @@ export class MaterialCategoryService {
         'SELECT id, name, description, color, created_at FROM material_categories WHERE id = ?',
         result.lastID
       )
+      invalidateCache('material_categories_all')
       return newCategory
     } catch (e: any) {
       if (e && typeof e.message === 'string' && e.message.includes('UNIQUE constraint failed')) {
@@ -80,6 +87,7 @@ export class MaterialCategoryService {
         'SELECT id, name, description, color, created_at FROM material_categories WHERE id = ?',
         id
       )
+      invalidateCache('material_categories_all')
       return updatedCategory
     } catch (e: any) {
       if (e && typeof e.message === 'string' && e.message.includes('UNIQUE constraint failed')) {
@@ -107,6 +115,7 @@ export class MaterialCategoryService {
     }
     
     await db.run('DELETE FROM material_categories WHERE id = ?', id)
+    invalidateCache('material_categories_all')
   }
 
   static async getCategoryStats() {

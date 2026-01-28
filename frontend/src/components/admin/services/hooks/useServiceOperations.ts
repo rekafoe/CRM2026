@@ -42,6 +42,7 @@ export function useServiceOperations({
       operationType?: string; // 🆕
       minQuantity?: number;
       maxQuantity?: number;
+      operator_percent?: number;
     }) => {
       try {
         if (!payload.name.trim() || !payload.unit.trim()) {
@@ -58,6 +59,7 @@ export function useServiceOperations({
           operationType: payload.operationType || 'other', // 🆕
           minQuantity: payload.minQuantity,
           maxQuantity: payload.maxQuantity,
+          operator_percent: payload.operator_percent,
         });
 
         // Если услуга сложная (hasVariants = true), создаем первый вариант-тип

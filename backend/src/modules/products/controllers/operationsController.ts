@@ -5,6 +5,7 @@
 import { Request, Response } from 'express';
 import { getDb } from '../../../db';
 import { logger } from '../../../utils/logger';
+import { hasColumn, getTableColumns } from '../../../utils/tableSchemaCache';
 
 export class OperationsController {
   /**
@@ -108,7 +109,8 @@ export class OperationsController {
         setup_cost,
         min_quantity,
         parameters,
-        is_active
+        is_active,
+        operator_percent
       } = req.body;
 
       // Валидация
@@ -121,24 +123,45 @@ export class OperationsController {
       }
 
       const parametersJson = parameters ? JSON.stringify(parameters) : null;
-
-      const result = await db.run(`
-        INSERT INTO post_processing_services (
-          name, description, price, unit, 
-          operation_type, price_unit, setup_cost, min_quantity, parameters, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        name,
-        description || null,
-        price,
-        unit || 'шт',
-        operation_type,
-        price_unit,
-        setup_cost || 0,
-        min_quantity || 1,
-        parametersJson,
-        is_active !== undefined ? (is_active ? 1 : 0) : 1
-      ]);
+      const hasOperatorPercent = await hasColumn('post_processing_services', 'operator_percent');
+      const normalizedOperatorPercent = operator_percent !== undefined ? Number(operator_percent) : 0;
+      
+      const result = hasOperatorPercent 
+        ? await db.run(`
+            INSERT INTO post_processing_services (
+              name, description, price, unit, 
+              operation_type, price_unit, setup_cost, min_quantity, parameters, is_active, operator_percent
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            name,
+            description || null,
+            price,
+            unit || 'шт',
+            operation_type,
+            price_unit,
+            setup_cost || 0,
+            min_quantity || 1,
+            parametersJson,
+            is_active !== undefined ? (is_active ? 1 : 0) : 1,
+            normalizedOperatorPercent
+          ])
+        : await db.run(`
+            INSERT INTO post_processing_services (
+              name, description, price, unit, 
+              operation_type, price_unit, setup_cost, min_quantity, parameters, is_active
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            name,
+            description || null,
+            price,
+            unit || 'шт',
+            operation_type,
+            price_unit,
+            setup_cost || 0,
+            min_quantity || 1,
+            parametersJson,
+            is_active !== undefined ? (is_active ? 1 : 0) : 1
+          ]);
 
       logger.info('Операция создана', { operationId: result.lastID, name });
 
@@ -176,7 +199,8 @@ export class OperationsController {
         setup_cost,
         min_quantity,
         parameters,
-        is_active
+        is_active,
+        operator_percent
       } = req.body;
 
       const operation = await db.get('SELECT * FROM post_processing_services WHERE id = ?', [id]);
@@ -189,33 +213,66 @@ export class OperationsController {
       }
 
       const parametersJson = parameters ? JSON.stringify(parameters) : null;
+      const hasOperatorPercent = await hasColumn('post_processing_services', 'operator_percent');
+      const normalizedOperatorPercent = operator_percent !== undefined ? Number(operator_percent) : (operation.operator_percent ?? 0);
 
-      await db.run(`
-        UPDATE post_processing_services SET
-          name = ?,
-          description = ?,
-          price = ?,
-          unit = ?,
-          operation_type = ?,
-          price_unit = ?,
-          setup_cost = ?,
-          min_quantity = ?,
-          parameters = ?,
-          is_active = ?
-        WHERE id = ?
-      `, [
-        name !== undefined ? name : operation.name,
-        description !== undefined ? description : operation.description,
-        price !== undefined ? price : operation.price,
-        unit !== undefined ? unit : operation.unit,
-        operation_type !== undefined ? operation_type : operation.operation_type,
-        price_unit !== undefined ? price_unit : operation.price_unit,
-        setup_cost !== undefined ? setup_cost : operation.setup_cost,
-        min_quantity !== undefined ? min_quantity : operation.min_quantity,
-        parametersJson !== undefined ? parametersJson : operation.parameters,
-        is_active !== undefined ? (is_active ? 1 : 0) : operation.is_active,
-        id
-      ]);
+      if (hasOperatorPercent) {
+        await db.run(`
+          UPDATE post_processing_services SET
+            name = ?,
+            description = ?,
+            price = ?,
+            unit = ?,
+            operation_type = ?,
+            price_unit = ?,
+            setup_cost = ?,
+            min_quantity = ?,
+            parameters = ?,
+            is_active = ?,
+            operator_percent = ?
+          WHERE id = ?
+        `, [
+          name !== undefined ? name : operation.name,
+          description !== undefined ? description : operation.description,
+          price !== undefined ? price : operation.price,
+          unit !== undefined ? unit : operation.unit,
+          operation_type !== undefined ? operation_type : operation.operation_type,
+          price_unit !== undefined ? price_unit : operation.price_unit,
+          setup_cost !== undefined ? setup_cost : operation.setup_cost,
+          min_quantity !== undefined ? min_quantity : operation.min_quantity,
+          parametersJson !== undefined ? parametersJson : operation.parameters,
+          is_active !== undefined ? (is_active ? 1 : 0) : operation.is_active,
+          normalizedOperatorPercent,
+          id
+        ]);
+      } else {
+        await db.run(`
+          UPDATE post_processing_services SET
+            name = ?,
+            description = ?,
+            price = ?,
+            unit = ?,
+            operation_type = ?,
+            price_unit = ?,
+            setup_cost = ?,
+            min_quantity = ?,
+            parameters = ?,
+            is_active = ?
+          WHERE id = ?
+        `, [
+          name !== undefined ? name : operation.name,
+          description !== undefined ? description : operation.description,
+          price !== undefined ? price : operation.price,
+          unit !== undefined ? unit : operation.unit,
+          operation_type !== undefined ? operation_type : operation.operation_type,
+          price_unit !== undefined ? price_unit : operation.price_unit,
+          setup_cost !== undefined ? setup_cost : operation.setup_cost,
+          min_quantity !== undefined ? min_quantity : operation.min_quantity,
+          parametersJson !== undefined ? parametersJson : operation.parameters,
+          is_active !== undefined ? (is_active ? 1 : 0) : operation.is_active,
+          id
+        ]);
+      }
 
       logger.info('Операция обновлена', { operationId: id, name: name || operation.name });
 
@@ -256,11 +313,10 @@ export class OperationsController {
         return;
       }
 
-      // Проверяем структуру таблицы
-      const columns: any[] = await db.all('PRAGMA table_info(product_operations_link)');
-      const hasLinkedParam = columns.some((c: any) => c.name === 'linked_parameter_name');
-      const hasConditions = columns.some((c: any) => c.name === 'conditions');
-      const hasUpdatedAt = columns.some((c: any) => c.name === 'updated_at');
+      const cols = await getTableColumns('product_operations_link');
+      const hasLinkedParam = cols.has('linked_parameter_name');
+      const hasConditions = cols.has('conditions');
+      const hasUpdatedAt = cols.has('updated_at');
 
       // Подготавливаем данные для обновления
       const updates: string[] = [];
@@ -365,10 +421,9 @@ export class OperationsController {
       const db = await getDb();
       const { productId } = req.params;
 
-      // Проверяем структуру таблицы
-      const columns: any[] = await db.all('PRAGMA table_info(product_operations_link)');
-      const hasIsOptional = columns.some(c => c.name === 'is_optional');
-      const hasLinkedParam = columns.some(c => c.name === 'linked_parameter_name');
+      const cols = await getTableColumns('product_operations_link');
+      const hasIsOptional = cols.has('is_optional');
+      const hasLinkedParam = cols.has('linked_parameter_name');
 
       // Формируем SELECT динамически
       const selectFields = [
@@ -483,10 +538,9 @@ export class OperationsController {
 
       const conditionsJson = conditions ? JSON.stringify(conditions) : null;
 
-      // Проверяем структуру таблицы
-      const columns: any[] = await db.all('PRAGMA table_info(product_operations_link)');
-      const hasIsOptional = columns.some(c => c.name === 'is_optional');
-      const hasLinkedParam = columns.some(c => c.name === 'linked_parameter_name');
+      const cols = await getTableColumns('product_operations_link');
+      const hasIsOptional = cols.has('is_optional');
+      const hasLinkedParam = cols.has('linked_parameter_name');
 
       // Формируем INSERT динамически
       const insertFields = ['product_id', 'operation_id', 'sequence', 'is_required', 'is_default', 'price_multiplier', 'conditions'];
@@ -552,10 +606,9 @@ export class OperationsController {
         return;
       }
 
-      // Проверяем структуру таблицы
-      const columns: any[] = await db.all('PRAGMA table_info(product_operations_link)');
-      const hasIsOptional = columns.some(c => c.name === 'is_optional');
-      const hasLinkedParam = columns.some(c => c.name === 'linked_parameter_name');
+      const cols = await getTableColumns('product_operations_link');
+      const hasIsOptional = cols.has('is_optional');
+      const hasLinkedParam = cols.has('linked_parameter_name');
 
       await db.run('BEGIN');
 

@@ -1134,6 +1134,273 @@ export class PDFReportService {
     return html;
   }
 
+  /** Реквизиты организации для товарного чека (env или значения по умолчанию) */
+  private static getCompanyForReceipt(): { name: string; unp: string } {
+    return {
+      name: process.env.COMPANY_NAME || 'ООО "Светлан Эстетикс"',
+      unp: process.env.COMPANY_UNP || '193679900'
+    };
+  }
+
+  /** Сумма прописью для товарного чека: "(X) белорусских рублей Y копеек" */
+  private static amountInWordsBel(num: number): string {
+    const ones = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
+    const onesF = ['', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
+    const tens = ['', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'];
+    const teens = ['десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
+    const hundreds = ['', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'];
+
+    const rub = Math.floor(num);
+    const kop = Math.round((num - rub) * 100);
+
+    const three = (n: number, fem: boolean) => {
+      if (n === 0) return '';
+      const o = fem ? onesF : ones;
+      let r = '';
+      if (n >= 100) r += hundreds[Math.floor(n / 100)] + ' ';
+      const rem = n % 100;
+      if (rem >= 20) r += tens[Math.floor(rem / 10)] + ' ' + o[rem % 10] + ' ';
+      else if (rem >= 10) r += teens[rem - 10] + ' ';
+      else if (rem > 0) r += o[rem] + ' ';
+      return r.trim();
+    };
+
+    let w = '';
+    if (rub >= 1_000_000) {
+      const m = Math.floor(rub / 1_000_000);
+      w += three(m, false) + ' ';
+      const ld = m % 10, l2 = m % 100;
+      w += (l2 >= 11 && l2 <= 19) ? 'миллионов ' : (ld === 1 ? 'миллион ' : ld >= 2 && ld <= 4 ? 'миллиона ' : 'миллионов ');
+    }
+    const th = Math.floor((rub % 1_000_000) / 1000);
+    if (th > 0) {
+      w += three(th, true) + ' ';
+      const ld = th % 10, l2 = th % 100;
+      w += (l2 >= 11 && l2 <= 19) ? 'тысяч ' : (ld === 1 ? 'тысяча ' : ld >= 2 && ld <= 4 ? 'тысячи ' : 'тысяч ');
+    }
+    const u = rub % 1000;
+    w += (u > 0 || rub === 0) ? three(u, false) + ' ' : '';
+    w = w.trim().replace(/\s+/g, ' ');
+
+    let kopStr = '';
+    if (kop > 0) {
+      kopStr = String(kop);
+      if (kop === 1) kopStr += ' копейка';
+      else if (kop >= 2 && kop <= 4) kopStr += ' копейки';
+      else kopStr += ' копеек';
+    } else {
+      kopStr = '00 копеек';
+    }
+    return w ? `(${w}) белорусских рублей ${kopStr}` : kopStr;
+  }
+
+  /**
+   * Генерация PDF товарного чека по заказу (заполненный)
+   */
+  static async generateCommodityReceipt(
+    orderId: number,
+    executedBy?: string
+  ): Promise<Buffer> {
+    try {
+      console.log(`📄 Generating commodity receipt for order ${orderId}...`);
+      const db = await getDb();
+
+      const order: any = await db.get(`
+        SELECT orders.*, users.name as executedByName
+        FROM orders
+        LEFT JOIN users ON users.id = orders.userId
+        WHERE orders.id = ?
+      `, [orderId]);
+      if (!order) throw new Error(`Заказ с ID ${orderId} не найден`);
+
+      const items = await db.all(`
+        SELECT id, type, quantity, price, params
+        FROM items
+        WHERE orderId = ?
+        ORDER BY id
+      `, [orderId]) as any[];
+
+      const createdRaw = order.created_at ?? order.createdAt;
+      let orderDate = '';
+      if (createdRaw) {
+        const d = new Date(createdRaw);
+        if (!isNaN(d.getTime())) {
+          const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+          orderDate = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} г.`;
+        }
+      }
+      if (!orderDate) {
+        const d = new Date();
+        const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+        orderDate = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} г.`;
+      }
+
+      const receiptNumber = String(order.number || orderId);
+      const orderNumber = String(order.number || orderId);
+      const totalAmount = (items || []).reduce((s: number, it: any) => {
+        const q = Number(it.quantity) || 1;
+        const p = Number(it.price) || 0;
+        return s + q * p;
+      }, 0);
+
+      const rows = (items || []).map((it: any, idx: number) => {
+        const q = Number(it.quantity) || 1;
+        const p = Number(it.price) || 0;
+        const sum = Math.round(q * p * 100) / 100;
+        let name = (it.type || 'Товар').trim();
+        try {
+          const params = typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
+          const ps = params.parameterSummary;
+          if (ps && Array.isArray(ps)) {
+            const parts = ps.map((x: any) => `${x.label || x.key || ''}: ${x.value || ''}`).filter(Boolean);
+            if (parts.length) name += '. ' + parts.join(', ');
+          }
+        } catch (_) { /* ignore */ }
+        return { num: idx + 1, name, quantity: q, price: p, sum };
+      });
+
+      const company = this.getCompanyForReceipt();
+      const manager = order.executedByName || executedBy || '';
+
+      const html = this.generateCommodityReceiptHTML({
+        receiptNumber,
+        orderNumber,
+        orderDate,
+        companyName: company.name,
+        unp: company.unp,
+        rows,
+        totalAmount,
+        amountInWords: this.amountInWordsBel(totalAmount),
+        manager,
+        isBlank: false
+      });
+
+      const pdfBuffer = await this.convertHTMLToPDF(html, { headerTemplate: '', footerTemplate: '' });
+      return pdfBuffer;
+    } catch (error: any) {
+      console.error('❌ Error generating commodity receipt:', error);
+      throw new Error(`Ошибка генерации товарного чека: ${error?.message || 'Неизвестная ошибка'}`);
+    }
+  }
+
+  /**
+   * Генерация PDF бланка товарного чека (пустая форма)
+   */
+  static async generateCommodityReceiptBlank(): Promise<Buffer> {
+    try {
+      console.log(`📄 Generating commodity receipt blank...`);
+      const company = this.getCompanyForReceipt();
+      const html = this.generateCommodityReceiptHTML({
+        receiptNumber: '______',
+        orderNumber: '______',
+        orderDate: '________________',
+        companyName: company.name,
+        unp: company.unp,
+        rows: [],
+        totalAmount: 0,
+        amountInWords: '',
+        manager: '',
+        isBlank: true
+      });
+      const pdfBuffer = await this.convertHTMLToPDF(html, { headerTemplate: '', footerTemplate: '' });
+      return pdfBuffer;
+    } catch (error: any) {
+      console.error('❌ Error generating commodity receipt blank:', error);
+      throw new Error(`Ошибка генерации бланка товарного чека: ${error?.message || 'Неизвестная ошибка'}`);
+    }
+  }
+
+  private static generateCommodityReceiptHTML(data: {
+    receiptNumber: string;
+    orderNumber: string;
+    orderDate: string;
+    companyName: string;
+    unp: string;
+    rows: Array<{ num: number; name: string; quantity: number; price: number; sum: number }>;
+    totalAmount: number;
+    amountInWords: string;
+    manager: string;
+    isBlank: boolean;
+  }): string {
+    const fmt = (n: number) => n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const { receiptNumber, orderNumber, orderDate, companyName, unp, rows, totalAmount, amountInWords, manager, isBlank } = data;
+
+    const tableRows = isBlank
+      ? `
+        <tr><td>1</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>2</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>3</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>4</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>5</td><td></td><td></td><td></td><td></td></tr>
+      `
+      : rows.map((r) => `
+        <tr>
+          <td>${r.num}</td>
+          <td>${this.escapeHtml(r.name)}</td>
+          <td>${r.quantity} шт.</td>
+          <td>${fmt(r.price)}</td>
+          <td>${fmt(r.sum)}</td>
+        </tr>
+      `).join('');
+
+    const totalStr = isBlank ? '' : fmt(totalAmount);
+    const itemsCount = rows.length;
+    const summaryLine = isBlank
+      ? 'Всего наименований ______, на сумму ________________ бел. руб. _________________________________________'
+      : `Всего наименований ${itemsCount}, на сумму ${fmt(totalAmount)} бел. руб. ${amountInWords}`;
+
+    const html = `
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Товарный чек ${isBlank ? '(бланк)' : receiptNumber}</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #333; margin: 16px; line-height: 1.35; }
+    .header { margin-bottom: 10px; }
+    .title { font-size: 13px; font-weight: bold; margin-bottom: 6px; }
+    .org { margin-bottom: 2px; }
+    .unp { margin-bottom: 8px; color: #555; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    th, td { border: 1px solid #333; padding: 4px 6px; text-align: left; }
+    th { background: #eee; font-weight: bold; }
+    td:nth-child(1) { width: 28px; text-align: center; }
+    td:nth-child(3) { width: 80px; text-align: right; }
+    td:nth-child(4), td:nth-child(5) { text-align: right; width: 70px; }
+    .total { font-weight: bold; margin: 6px 0; }
+    .summary { margin: 8px 0; }
+    .manager { margin-top: 12px; }
+    .sign { margin-top: 24px; font-size: 10px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">Товарный чек № ${receiptNumber} к заказу № ${orderNumber} от ${orderDate}</div>
+    <div class="org">Организация ${this.escapeHtml(companyName)}</div>
+    <div class="unp">УНП ${unp}</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>№</th>
+        <th>Товар</th>
+        <th>Количество</th>
+        <th>Цена</th>
+        <th>Сумма</th>
+      </tr>
+    </thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+  <div class="total">Итого: ${totalStr}</div>
+  <div class="summary">${summaryLine}</div>
+  <div class="manager">${manager ? `Менеджер: ${this.escapeHtml(manager)}` : 'Менеджер: ________________'}</div>
+  <div class="sign">(подпись)</div>
+</body>
+</html>`;
+    return html;
+  }
+
   /**
    * Экранирование HTML
    */
@@ -1148,6 +1415,391 @@ export class PDFReportService {
     return text.replace(/[&<>"']/g, (m) => map[m]);
   }
 
+
+  /**
+   * Генерация товарного чека
+   */
+  static async generateReceipt(
+    orderId: number,
+    receiptNumber?: number
+  ): Promise<Buffer> {
+    try {
+      console.log(`📄 Generating receipt for order ${orderId}...`);
+      
+      const db = await getDb();
+      
+      // Получаем заказ
+      const order: any = await db.get(`
+        SELECT 
+          orders.*,
+          users.name as managerName
+        FROM orders 
+        LEFT JOIN users ON users.id = orders.userId
+        WHERE orders.id = ?
+      `, [orderId]);
+
+      if (!order) {
+        throw new Error(`Заказ с ID ${orderId} не найден`);
+      }
+
+      // Получаем позиции заказа
+      const items = await db.all(`
+        SELECT 
+          id,
+          type,
+          quantity,
+          price,
+          params
+        FROM items
+        WHERE orderId = ?
+        ORDER BY id
+      `, [orderId]);
+
+      // Вычисляем общую сумму
+      const totalAmount = Array.isArray(items) && items.length > 0
+        ? items.reduce((sum: number, item: any) => {
+            const itemPrice = Number(item.price) || 0;
+            const itemQuantity = Number(item.quantity) || 1;
+            return sum + (itemPrice * itemQuantity);
+          }, 0)
+        : 0;
+
+      // Форматируем дату
+      let createdDate = '';
+      try {
+        const createdRaw = order.created_at ?? order.createdAt;
+        if (createdRaw) {
+          const date = new Date(createdRaw);
+          if (!isNaN(date.getTime())) {
+            const day = date.getDate();
+            const month = date.toLocaleDateString('ru-RU', { month: 'long' });
+            const year = date.getFullYear();
+            createdDate = `${day} ${month.charAt(0).toUpperCase() + month.slice(1)} ${year} г.`;
+          }
+        }
+      } catch (e) {
+        console.error('Error formatting created date:', e);
+      }
+      if (!createdDate) {
+        const date = new Date();
+        const day = date.getDate();
+        const month = date.toLocaleDateString('ru-RU', { month: 'long' });
+        const year = date.getFullYear();
+        createdDate = `${day} ${month.charAt(0).toUpperCase() + month.slice(1)} ${year} г.`;
+      }
+
+      // Генерируем номер чека (если не передан, используем ID заказа)
+      const receiptNum = receiptNumber || orderId;
+
+      // Формируем список товаров с упрощенными названиями
+      const receiptItems = (Array.isArray(items) ? items : []).map((item, index) => {
+        let params: any = {};
+        try {
+          if (item.params) {
+            params = typeof item.params === 'string' ? JSON.parse(item.params) : (item.params || {});
+          }
+        } catch (e) {
+          params = {};
+        }
+        
+        // Упрощенное название товара (как в примере)
+        let itemName = item.type || 'Товар';
+        
+        // Если есть productName в params, используем его
+        if (params.productName) {
+          itemName = params.productName;
+        } else if (params.description) {
+          // Берем только основную часть описания
+          itemName = params.description.split('.')[0] || itemName;
+        }
+        
+        return {
+          number: index + 1,
+          name: itemName,
+          quantity: Number(item.quantity) || 1,
+          price: Number(item.price) || 0,
+          amount: (Number(item.quantity) || 1) * (Number(item.price) || 0)
+        };
+      });
+
+      // Генерируем HTML товарного чека
+      const managerName = order.managerName || 'Менеджер';
+      const html = this.generateReceiptHTML({
+        receiptNumber: receiptNum,
+        orderNumber: order.number || `ORD-${order.id}`,
+        orderDate: createdDate,
+        items: receiptItems,
+        totalAmount: totalAmount,
+        managerName: managerName
+      });
+
+      // Конвертируем HTML в PDF
+      const pdfBuffer = await this.convertHTMLToPDF(html, {
+        headerTemplate: '',
+        footerTemplate: ''
+      });
+      
+      return pdfBuffer;
+    } catch (error: any) {
+      console.error('❌ Error generating receipt:', error);
+      console.error('Error details:', {
+        orderId,
+        message: error?.message,
+        stack: error?.stack
+      });
+      throw new Error(`Ошибка генерации товарного чека: ${error?.message || 'Неизвестная ошибка'}`);
+    }
+  }
+
+  /**
+   * Генерация HTML товарного чека
+   */
+  private static generateReceiptHTML(data: {
+    receiptNumber: number;
+    orderNumber: string;
+    orderDate: string;
+    items: Array<{
+      number: number;
+      name: string;
+      quantity: number;
+      price: number;
+      amount: number;
+    }>;
+    totalAmount: number;
+    managerName: string;
+  }): string {
+    const { receiptNumber, orderNumber, orderDate, items, totalAmount, managerName } = data;
+    
+    // Функция для преобразования числа в пропись
+    const numberToWords = (num: number): string => {
+      const ones = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
+      const onesFeminine = ['', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
+      const tens = ['', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'];
+      const teens = ['десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
+      const hundreds = ['', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'];
+      
+      if (num === 0) return 'ноль';
+      
+      const rubles = Math.floor(num);
+      const kopecks = Math.round((num - rubles) * 100);
+      
+      const convertThreeDigits = (n: number, feminine: boolean = false): string => {
+        if (n === 0) return '';
+        
+        const h = Math.floor(n / 100);
+        const t = Math.floor((n % 100) / 10);
+        const o = n % 10;
+        
+        let result = '';
+        if (h > 0) result += hundreds[h] + ' ';
+        if (t === 1) {
+          result += teens[o] + ' ';
+        } else {
+          if (t > 1) result += tens[t] + ' ';
+          if (o > 0) result += (feminine ? onesFeminine[o] : ones[o]) + ' ';
+        }
+        return result.trim();
+      };
+      
+      let rublesText = convertThreeDigits(rubles, true);
+      if (rublesText) {
+        // Склонение рублей
+        const lastDigit = rubles % 10;
+        const lastTwoDigits = rubles % 100;
+        let rubleWord = 'рублей';
+        if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
+          rubleWord = 'рублей';
+        } else if (lastDigit === 1) {
+          rubleWord = 'рубль';
+        } else if (lastDigit >= 2 && lastDigit <= 4) {
+          rubleWord = 'рубля';
+        }
+        rublesText += ' ' + rubleWord;
+      } else {
+        rublesText = 'ноль рублей';
+      }
+      
+      // Копейки
+      let kopecksText = '';
+      if (kopecks > 0) {
+        const kopecksWords = convertThreeDigits(kopecks, true);
+        const lastDigit = kopecks % 10;
+        const lastTwoDigits = kopecks % 100;
+        let kopekWord = 'копеек';
+        if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
+          kopekWord = 'копеек';
+        } else if (lastDigit === 1) {
+          kopekWord = 'копейка';
+        } else if (lastDigit >= 2 && lastDigit <= 4) {
+          kopekWord = 'копейки';
+        }
+        kopecksText = kopecksWords + ' ' + kopekWord;
+      } else {
+        kopecksText = '00 копеек';
+      }
+      
+      return rublesText + ' ' + kopecksText;
+    };
+
+    const totalInWords = numberToWords(totalAmount);
+    const itemsCount = items.length;
+    
+    const html = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Товарный чек №${receiptNumber}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Times New Roman', serif;
+            font-size: 12pt;
+            line-height: 1.4;
+            padding: 20px;
+            color: #000;
+        }
+        .receipt {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .header h1 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .company-info {
+            text-align: left;
+            margin-bottom: 15px;
+        }
+        .company-info div {
+            margin-bottom: 3px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        table th, table td {
+            border: 1px solid #000;
+            padding: 5px;
+            text-align: left;
+        }
+        table th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+            text-align: center;
+        }
+        table td {
+            font-size: 11pt;
+        }
+        .number-col {
+            width: 5%;
+            text-align: center;
+        }
+        .name-col {
+            width: 45%;
+        }
+        .quantity-col {
+            width: 15%;
+            text-align: center;
+        }
+        .price-col {
+            width: 15%;
+            text-align: right;
+        }
+        .amount-col {
+            width: 20%;
+            text-align: right;
+        }
+        .total {
+            text-align: right;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .summary {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        .manager {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .manager-name {
+            font-weight: bold;
+        }
+        .signature {
+            margin-top: 30px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt">
+        <div class="header">
+            <h1>Товарный чек № ${receiptNumber} к заказу № ${orderNumber} от ${orderDate}</h1>
+        </div>
+        
+        <div class="company-info">
+            <div>Организация ООО "Светлан Эстетикс"</div>
+            <div>УНП 193679900</div>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th class="number-col">№</th>
+                    <th class="name-col">Товар</th>
+                    <th class="quantity-col">Количество</th>
+                    <th class="price-col">Цена</th>
+                    <th class="amount-col">Сумма</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map(item => `
+                    <tr>
+                        <td class="number-col">${item.number}</td>
+                        <td class="name-col">${this.escapeHtml(item.name)}</td>
+                        <td class="quantity-col">${item.quantity} шт.</td>
+                        <td class="price-col">${item.price.toFixed(2)}</td>
+                        <td class="amount-col">${item.amount.toFixed(2)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        
+        <div class="total">
+            Итого: ${totalAmount.toFixed(2)}
+        </div>
+        
+        <div class="summary">
+            Всего наименований ${itemsCount}, на сумму ${totalAmount.toFixed(2)} бел. руб. (${totalInWords})
+        </div>
+        
+        <div class="manager">
+            <div>
+                <div class="manager-name">Менеджер: ${this.escapeHtml(managerName)}</div>
+            </div>
+            <div class="signature">
+                (подпись)
+            </div>
+        </div>
+    </div>
+</body>
+</html>`;
+
+    return html;
+  }
 
   /**
    * Сохранение отчета в файл

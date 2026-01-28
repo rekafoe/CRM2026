@@ -1,5 +1,6 @@
 import { Database } from 'sqlite';
 import { getDb } from '../../../db';
+import { hasColumn, invalidateTableSchemaCache } from '../../../utils/tableSchemaCache';
 import {
   CreatePricingServiceDTO,
   PricingServiceDTO,
@@ -95,23 +96,19 @@ export class PricingServiceRepository {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Обновление схемы для существующих БД (добавляем column, если отсутствует)
     try {
-      const columns = await db.all(`PRAGMA table_info('service_prices')`);
-      const hasServiceType = columns.some((column: any) => column.name === 'service_type');
-      if (!hasServiceType) {
+      if (!(await hasColumn('service_prices', 'service_type'))) {
         await db.run(`ALTER TABLE service_prices ADD COLUMN service_type TEXT DEFAULT 'generic'`);
+        invalidateTableSchemaCache('service_prices');
       }
     } catch {
       // ignore
     }
 
-    // Обновление схемы post_processing_services (добавляем max_quantity, если отсутствует)
     try {
-      const columns = await db.all(`PRAGMA table_info('post_processing_services')`);
-      const hasMaxQuantity = columns.some((column: any) => column.name === 'max_quantity');
-      if (!hasMaxQuantity) {
+      if (!(await hasColumn('post_processing_services', 'max_quantity'))) {
         await db.run(`ALTER TABLE post_processing_services ADD COLUMN max_quantity INTEGER`);
+        invalidateTableSchemaCache('post_processing_services');
       }
     } catch {
       // ignore
@@ -130,12 +127,10 @@ export class PricingServiceRepository {
       FOREIGN KEY(service_id) REFERENCES post_processing_services(id) ON DELETE CASCADE
     )`);
 
-    // Добавляем variant_id в service_volume_prices, если его нет
     try {
-      const columns = await db.all(`PRAGMA table_info('service_volume_prices')`);
-      const hasVariantId = columns.some((column: any) => column.name === 'variant_id');
-      if (!hasVariantId) {
+      if (!(await hasColumn('service_volume_prices', 'variant_id'))) {
         await db.run(`ALTER TABLE service_volume_prices ADD COLUMN variant_id INTEGER REFERENCES service_variants(id) ON DELETE CASCADE`);
+        invalidateTableSchemaCache('service_volume_prices');
       }
     } catch {
       // ignore

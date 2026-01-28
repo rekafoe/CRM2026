@@ -60,6 +60,9 @@ export const updateOrderStatus = (id: number, status: number) =>
   api.put<Order>(`/orders/${id}/status`, { status });
 export const updateOrderCustomer = (id: number, customer_id: number | null) =>
   api.put<Order>(`/orders/${id}/customer`, { customer_id });
+/** Скидка на заказ: 0, 5, 10, 15, 20, 25 (%) */
+export const updateOrderDiscount = (orderId: number, discount_percent: number) =>
+  api.put<Order>(`/orders/${orderId}/discount`, { discount_percent });
 
 // Order Pool helpers
 export const reassignOrderByNumber = (number: string, userId: number) =>
@@ -415,6 +418,14 @@ export const generateOrderBlankPdf = (orderId: number, companyPhones?: string[])
     responseType: 'blob' // Важно для получения бинарных данных
   });
 };
+
+// Генерация PDF товарного чека (по заказу, формат как в образце)
+export const generateCommodityReceiptPdf = (orderId: number) =>
+  api.get(`/orders/${orderId}/commodity-receipt-pdf`, { responseType: 'blob' });
+
+// Генерация PDF бланка товарного чека (пустая форма)
+export const generateCommodityReceiptBlankPdf = () =>
+  api.get('/orders/commodity-receipt-blank-pdf', { responseType: 'blob' });
 
 // Pricing API
 // Back-compat wrapper: route to unified pricing service

@@ -76,6 +76,7 @@ const initialState: ServicesManagementState = {
     operationType: 'other', // 🆕
     minQuantity: '1',
     maxQuantity: '',
+    operatorPercent: '',
   },
   editingService: null,
   editingServiceForm: null,

@@ -5,6 +5,7 @@ import { asyncHandler, authenticate } from '../middleware'
 import { upload } from '../config/upload'
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
+import { hasColumn } from '../utils/tableSchemaCache'
 
 const router = Router()
 
@@ -129,6 +130,7 @@ router.post('/', asyncHandler(OrderController.createOrder))
 router.post('/with-auto-deduction', asyncHandler(OrderController.createOrderWithAutoDeduction))
 router.put('/:id/status', asyncHandler(OrderController.updateOrderStatus))
 router.put('/:id/customer', asyncHandler(OrderController.updateOrderCustomer))
+router.put('/:id/discount', asyncHandler(OrderController.updateOrderDiscount))
 router.delete('/:id', asyncHandler(OrderController.deleteOrder))
 router.post('/:id/duplicate', asyncHandler(OrderController.duplicateOrder))
 
@@ -138,6 +140,24 @@ router.post('/bulk/delete', asyncHandler(OrderController.bulkDeleteOrders))
 
 // Export
 router.get('/export', asyncHandler(OrderController.exportOrders))
+
+// PDF бланк товарного чека (пустая форма, без заказа)
+router.get('/commodity-receipt-blank-pdf', asyncHandler(async (_req, res) => {
+  try {
+    const pdfBuffer = await PDFReportService.generateCommodityReceiptBlank();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="commodity-receipt-blank.pdf"');
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    console.error('❌ Error generating commodity receipt blank PDF:', error);
+    res.status(500).json({
+      message: 'Ошибка генерации бланка товарного чека',
+      error: error?.message || 'Неизвестная ошибка',
+      details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+    });
+  }
+}))
 
 // PDF бланк заказа
 router.get('/:id/blank-pdf', asyncHandler(async (req, res) => {
@@ -170,6 +190,36 @@ router.get('/:id/blank-pdf', asyncHandler(async (req, res) => {
     console.error('Error stack:', error?.stack);
     res.status(500).json({ 
       message: 'Ошибка генерации PDF бланка заказа',
+      error: error?.message || 'Неизвестная ошибка',
+      details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+    });
+  }
+}))
+
+// PDF товарный чек (по образцу: орг., УНП, таблица, сумма прописью)
+router.get('/:id/commodity-receipt-pdf', asyncHandler(async (req, res) => {
+  try {
+    const orderId = Number(req.params.id);
+
+    if (!orderId || isNaN(orderId)) {
+      res.status(400).json({ message: 'Неверный ID заказа' });
+      return;
+    }
+
+    const user = (req as any).user as { name?: string; email?: string } | undefined;
+    const executedBy = user?.name || user?.email || undefined;
+
+    const pdfBuffer = await PDFReportService.generateCommodityReceipt(orderId, executedBy);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="commodity-receipt-${orderId}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    console.error('❌ Error generating commodity receipt PDF:', error);
+    res.status(500).json({
+      message: 'Ошибка генерации товарного чека',
       error: error?.message || 'Неизвестная ошибка',
       details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
     });
@@ -288,8 +338,7 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
   let hasPrepaymentUpdatedAt = false
   try {
-    const columns = await db.all<{ name: string }>("PRAGMA table_info('orders')")
-    hasPrepaymentUpdatedAt = Array.isArray(columns) && columns.some((col) => col.name === 'prepaymentUpdatedAt')
+    hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
   } catch {
     hasPrepaymentUpdatedAt = false
   }
@@ -323,16 +372,39 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   const amount = Number(rawAmount ?? order.prepaymentAmount ?? 0)
   const paymentMethod = (req.body as any)?.paymentMethod ?? 'online'
   if (!amount || amount <= 0) { res.status(400).json({ message: 'Сумма предоплаты не задана' }); return }
-  
+
+  const oldPrepayment = Number(order.prepaymentAmount ?? 0)
+  const delta = Math.round((amount - oldPrepayment) * 100) / 100
+
   // BePaid integration stub: normally create payment via API and get redirect url
   const paymentId = `BEP-${Date.now()}-${id}`
   const paymentUrl = paymentMethod === 'online' ? `https://checkout.bepaid.by/redirect/${paymentId}` : null
   const prepaymentStatus = paymentMethod === 'offline' ? 'paid' : 'pending'
-  
+
   const updateSql = hasPrepaymentUpdatedAt
     ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?'
     : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?'
   await db.run(updateSql, amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, id)
+
+  if (paymentMethod === 'offline' && delta > 0) {
+    const today = new Date().toISOString().slice(0, 10)
+    try {
+      await db.run(
+        'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
+        id,
+        today,
+        delta
+      )
+    } catch (e) {
+      console.warn('[prepay] debt_closed_events insert failed:', (e as Error)?.message)
+    }
+    // При закрытии долга переводим заказ в статус «Выдан» (4) с любого текущего статуса
+    await db.run(
+      "UPDATE orders SET status = 4, updated_at = datetime('now') WHERE id = ?",
+      id
+    )
+  }
+
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   res.json(updated)
 }))
