@@ -355,30 +355,29 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
     : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = datetime(\'now\'), status = 4 WHERE id = ?'
   await db.run(updateSql, total, paymentId, id)
 
-  if (remainder > 0) {
-    const today = new Date().toISOString().slice(0, 10)
-    try {
-      let hasIssuedBy = false
-      try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }
-      if (hasIssuedBy) {
-        await db.run(
-          'INSERT INTO debt_closed_events (order_id, closed_date, amount, issued_by_user_id) VALUES (?, ?, ?, ?)',
-          id,
-          today,
-          remainder,
-          issuerId
-        )
-      } else {
-        await db.run(
-          'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
-          id,
-          today,
-          remainder
-        )
-      }
-    } catch (e) {
-      console.warn('[issue] debt_closed_events insert failed:', (e as Error)?.message)
+  // Всегда пишем debt_closed_events при выдаче (в т.ч. remainder=0), чтобы выдавший видел заказ во вкладке «Выданные заказы».
+  const today = new Date().toISOString().slice(0, 10)
+  try {
+    let hasIssuedBy = false
+    try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }
+    if (hasIssuedBy) {
+      await db.run(
+        'INSERT INTO debt_closed_events (order_id, closed_date, amount, issued_by_user_id) VALUES (?, ?, ?, ?)',
+        id,
+        today,
+        remainder,
+        issuerId
+      )
+    } else {
+      await db.run(
+        'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
+        id,
+        today,
+        remainder
+      )
     }
+  } catch (e) {
+    console.warn('[issue] debt_closed_events insert failed:', (e as Error)?.message)
   }
 
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)

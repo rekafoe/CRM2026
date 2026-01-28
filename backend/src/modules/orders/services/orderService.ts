@@ -77,9 +77,9 @@ export class OrderService {
     return allOrders
   }
 
-  /** Заказы пользователя, выданные в указанную дату (вкладка «Выданные заказы») */
+  /** Заказы: владельческие + выданные этим юзером в дату (вкладка «Выданные заказы»). issued_by_me — флаг. */
   static async getOrdersIssuedOn(userId: number, dateYmd: string) {
-    const orders = (await OrderRepository.listUserOrdersIssuedOn(userId, dateYmd)) as Order[]
+    const orders = (await OrderRepository.listOrdersIssuedOnIncludingIssuedBy(userId, dateYmd)) as Order[]
     return OrderService.attachItemsToOrders(orders)
   }
 

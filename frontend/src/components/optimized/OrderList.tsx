@@ -55,7 +55,9 @@ const OrderItem = memo<{
   onSelect: (id: number) => void;
   showDebt?: boolean;
   debt?: number;
-}>(({ order, isActive, statusInfo, statusValue, progress, onSelect, showDebt, debt }) => {
+  showIssuedByMe?: boolean;
+  issuedByMe?: boolean | number;
+}>(({ order, isActive, statusInfo, statusValue, progress, onSelect, showDebt, debt, showIssuedByMe, issuedByMe }) => {
   const handleClick = useCallback(() => {
     onSelect(order.id);
   }, [order.id, onSelect]);
@@ -114,6 +116,11 @@ const OrderItem = memo<{
       {showDebt && debt != null && debt > 0 && (
         <div className="order-item__debt" style={{ fontSize: 11, color: '#c62828', marginTop: 2 }}>
           Долг: {debt.toFixed(2)} BYN
+        </div>
+      )}
+      {showIssuedByMe && (issuedByMe === true || issuedByMe === 1) && (
+        <div className="order-item__issued-by-me" style={{ fontSize: 11, color: '#2e7d32', marginTop: 2 }}>
+          Выдали вы
         </div>
       )}
       <OrderItemStatus
@@ -185,6 +192,7 @@ export const OrderList = memo<OrderListProps>(({
   }, [uniqueOrders, statusById, maxSort]);
 
   const showDebt = ordersListTab === 'orders';
+  const showIssuedByMe = ordersListTab === 'issued';
 
   return (
     <ul className="order-list">
@@ -199,6 +207,8 @@ export const OrderList = memo<OrderListProps>(({
           onSelect={handleSelect}
           showDebt={showDebt}
           debt={debt}
+          showIssuedByMe={showIssuedByMe}
+          issuedByMe={(order as any).issued_by_me}
         />
       ))}
     </ul>

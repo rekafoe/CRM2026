@@ -96,6 +96,8 @@ export interface Order {
   actualCompletion?: string;
   // Soft cancel marker for online orders
   is_cancelled?: number;
+  /** True в «Выданные заказы»: заказ выдал текущий пользователь (debt_closed_events.issued_by). */
+  issued_by_me?: boolean | number;
 }
 
 export interface PresetExtra {

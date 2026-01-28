@@ -199,6 +199,9 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
             <h2 style={{ margin: 0 }}>{selectedOrder.number}</h2>
+            {(selectedOrder.issued_by_me === true || selectedOrder.issued_by_me === 1) && (
+              <span style={{ fontSize: 12, color: '#2e7d32', fontWeight: 600 }}>Выдали вы</span>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button 
                 onClick={onShowFilesModal}
