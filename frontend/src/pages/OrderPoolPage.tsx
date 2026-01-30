@@ -56,6 +56,23 @@ const initialFilters: FilterState = {
   visibleCount: 100,
 };
 
+function getSourceLabel(source?: string): string {
+  switch (source) {
+    case 'website': return 'Онлайн';
+    case 'telegram': return 'Telegram';
+    case 'crm': return 'CRM';
+    default: return 'Неизвестно';
+  }
+}
+
+function getPaymentMethodLabel(method?: string | null): string {
+  if (!method) return '—';
+  if (method === 'online') return 'Онлайн';
+  if (method === 'offline') return 'Оффлайн';
+  if (method === 'telegram') return 'Telegram';
+  return method;
+}
+
 function filtersReducer(state: FilterState, action: FilterAction): FilterState {
   switch (action.type) {
     case 'setSource':
@@ -226,6 +243,22 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     return orderMetrics.get(order.id)?.debt ?? 0;
   }, [orderMetrics]);
 
+  const getAssigneeLabel = useCallback(
+    (order: Order) => {
+      const userId = order.userId ?? null;
+      if (!userId) return '—';
+      return userNameById.get(Number(userId)) || `ID ${userId}`;
+    },
+    [userNameById]
+  );
+
+  const updateOrderInList = useCallback((orderId: number, patch: Partial<Order>) => {
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, ...patch } : o)));
+    setSelectedOrder((prev) =>
+      prev?.id === orderId ? (prev ? { ...prev, ...patch } : null) : prev
+    );
+  }, []);
+
   const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
@@ -357,50 +390,77 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   );
   const hasMoreOrders = visibleOrders.length < filteredOrders.length;
 
-  const handleAssignToMe = useCallback(async (orderNumber: string) => {
-    try {
-      await reassignOrderByNumber(orderNumber, currentUserId);
-      toast.success('Заказ назначен вам!', `Заказ ${orderNumber} успешно назначен.`);
-      loadOrders();
-    } catch (err) {
-      logger.error('Failed to assign order', err);
-      toast.error('Ошибка назначения', (err as Error).message);
-    }
-  }, [currentUserId, loadOrders, toast, logger]);
+  const handleAssignToMe = useCallback(
+    async (orderNumber: string) => {
+      try {
+        await reassignOrderByNumber(orderNumber, currentUserId);
+        toast.success('Заказ назначен вам!', `Заказ ${orderNumber} успешно назначен.`);
+        setOrders((prev) => {
+          const ord = prev.find((o) => o.number === orderNumber);
+          if (!ord) return prev;
+          return prev.map((o) => (o.id === ord.id ? { ...o, userId: currentUserId } : o));
+        });
+        setSelectedOrder((prev) => {
+          if (!prev || prev.number !== orderNumber) return prev;
+          return { ...prev, userId: currentUserId };
+        });
+      } catch (err) {
+        logger.error('Failed to assign order', err);
+        toast.error('Ошибка назначения', (err as Error).message);
+      }
+    },
+    [currentUserId, toast, logger]
+  );
 
-  const handleReassignTo = useCallback(async (orderNumber: string, userId: number) => {
-    try {
-      await reassignOrderByNumber(orderNumber, userId);
-      const name = allUsers.find((u) => u.id === userId)?.name ?? 'оператору';
-      toast.success('Заказ переназначен', `Заказ ${orderNumber} назначен ${name}.`);
-      loadOrders();
-    } catch (err) {
-      logger.error('Failed to reassign order', err);
-      toast.error('Ошибка переназначения', (err as Error).message);
-    }
-  }, [allUsers, loadOrders, toast, logger]);
+  const handleReassignTo = useCallback(
+    async (orderNumber: string, userId: number) => {
+      try {
+        await reassignOrderByNumber(orderNumber, userId);
+        const name = allUsers.find((u) => u.id === userId)?.name ?? 'оператору';
+        toast.success('Заказ переназначен', `Заказ ${orderNumber} назначен ${name}.`);
+        const ord = orders.find((o) => o.number === orderNumber);
+        if (ord) updateOrderInList(ord.id, { userId });
+      } catch (err) {
+        logger.error('Failed to reassign order', err);
+        toast.error('Ошибка переназначения', (err as Error).message);
+      }
+    },
+    [allUsers, orders, toast, logger, updateOrderInList]
+  );
 
-  const handleIssueOrder = useCallback(async (orderId: number) => {
-    try {
-      await issueOrder(orderId);
-      toast.success('Заказ выдан', 'Долг закрыт, заказ переведён в «Выдан»');
-      loadOrders();
-    } catch (err: any) {
-      logger.error('Issue order failed', err);
-      toast.error('Ошибка', err?.message ?? 'Не удалось выдать заказ');
-    }
-  }, [loadOrders, toast, logger]);
+  const handleIssueOrder = useCallback(
+    async (orderId: number) => {
+      try {
+        await issueOrder(orderId);
+        toast.success('Заказ выдан', 'Долг закрыт, заказ переведён в «Выдан»');
+        const total = orderMetrics.get(orderId)?.total ?? 0;
+        updateOrderInList(orderId, {
+          status: 4 as any,
+          prepaymentAmount: total,
+          prepaymentStatus: 'paid',
+          paymentMethod: 'offline',
+        });
+      } catch (err: any) {
+        logger.error('Issue order failed', err);
+        toast.error('Ошибка', err?.message ?? 'Не удалось выдать заказ');
+      }
+    },
+    [orderMetrics, toast, logger, updateOrderInList]
+  );
 
-  const handleCancelOnline = useCallback(async (orderId: number) => {
-    try {
-      await cancelOnlineOrder(orderId);
-      toast.success('Заказ отменен!', `Онлайн-заказ ${orderId} отменен и перемещен в пул.`);
-      loadOrders();
-    } catch (err) {
-      logger.error('Failed to cancel online order', err);
-      toast.error('Ошибка отмены', (err as Error).message);
-    }
-  }, [loadOrders, toast, logger]);
+  const handleCancelOnline = useCallback(
+    async (orderId: number) => {
+      try {
+        await cancelOnlineOrder(orderId);
+        toast.success('Заказ отменен!', `Онлайн-заказ ${orderId} отменен и перемещен в пул.`);
+        updateOrderInList(orderId, { is_cancelled: 1 });
+      } catch (err) {
+        logger.error('Failed to cancel online order', err);
+        toast.error('Ошибка отмены', (err as Error).message);
+      }
+    },
+    [toast, logger, updateOrderInList]
+  );
 
   const handlePrepaymentCreated = useCallback(
     async (amount: number, _email: string, paymentMethod: 'online' | 'offline' | 'telegram', assignToMe?: boolean) => {
@@ -408,39 +468,22 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       try {
         const method = paymentMethod === 'telegram' ? 'online' : paymentMethod;
         await createPrepaymentLink(selectedOrder.id, amount, method, assignToMe);
-        await loadOrders();
         toast.success('Успешно', 'Предоплата обновлена');
+        const patch: Partial<Order> = {
+          prepaymentAmount: amount,
+          paymentMethod: method,
+          prepaymentStatus: method === 'online' ? 'pending' : 'paid',
+        };
+        if (assignToMe) patch.userId = currentUserId;
+        updateOrderInList(selectedOrder.id, patch);
       } catch (err: any) {
         logger.error('Prepayment failed', err);
         toast.error('Ошибка', err?.message ?? 'Не удалось обновить предоплату');
         throw err;
       }
     },
-    [selectedOrder, loadOrders, toast, logger]
+    [selectedOrder, currentUserId, toast, logger, updateOrderInList]
   );
-
-  const getSourceLabel = (source?: string) => {
-    switch (source) {
-      case 'website': return 'Онлайн';
-      case 'telegram': return 'Telegram';
-      case 'crm': return 'CRM';
-      default: return 'Неизвестно';
-    }
-  };
-
-  const getAssigneeLabel = (order: Order) => {
-    const userId = order.userId ?? null;
-    if (!userId) return '—';
-    return userNameById.get(Number(userId)) || `ID ${userId}`;
-  };
-
-  const getPaymentMethodLabel = (method?: string | null) => {
-    if (!method) return '—';
-    if (method === 'online') return 'Онлайн';
-    if (method === 'offline') return 'Оффлайн';
-    if (method === 'telegram') return 'Telegram';
-    return method;
-  };
 
   if (loading) return <div className="loading-overlay">Загрузка...</div>;
   if (error) return <div className="error-message">{error}</div>;

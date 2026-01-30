@@ -102,7 +102,7 @@ export const OrderRepository = {
     }) as unknown as Order[]
   },
 
-  /** Заказы пользователя, выданные в указанную дату (status = 4, дата по updated_at). */
+  /** Заказы пользователя, выданные в указанную дату (status = 4). Дата выдачи — только debt_closed_events.closed_date. */
   async listUserOrdersIssuedOn(userId: number, dateYmd: string): Promise<Order[]> {
     const db = await getDb()
     const d = dateYmd.slice(0, 10)
@@ -120,7 +120,7 @@ export const OrderRepository = {
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
       WHERE (o.userId = ? OR o.userId IS NULL) AND o.status = 4
-        AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?
+        AND EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ?)
       ORDER BY o.id DESC`,
       userId,
       d
@@ -162,7 +162,7 @@ export const OrderRepository = {
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
       WHERE o.status = 4
-        AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?
+        AND EXISTS (SELECT 1 FROM debt_closed_events d3 WHERE d3.order_id = o.id AND d3.closed_date = ?)
         AND (
           (o.userId = ? OR o.userId IS NULL)
           OR EXISTS (
@@ -174,14 +174,12 @@ export const OrderRepository = {
       d,
       userId,
       d,
-      userId,
-      d,
       userId
     )
     return OrderRepository.mapOrdersWithCustomer(orders)
   },
 
-  /** Все заказы, выданные в указанную дату (без фильтра по userId). */
+  /** Все заказы, выданные в указанную дату (без фильтра по userId). Дата выдачи — только debt_closed_events.closed_date. */
   async listAllOrdersIssuedOn(dateYmd: string): Promise<Order[]> {
     const db = await getDb()
     const d = dateYmd.slice(0, 10)
@@ -199,10 +197,9 @@ export const OrderRepository = {
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
       WHERE o.status = 4
-        AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?
+        AND EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ?)
       ORDER BY o.id DESC`,
       d
-    )
     return OrderRepository.mapOrdersWithCustomer(orders)
   },
 

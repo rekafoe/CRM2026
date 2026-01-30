@@ -350,13 +350,16 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt') } catch { /* ignore */ }
 
   const paymentId = `ISSUE-${Date.now()}-${id}`
+  // datetime('now','localtime') — чтобы заказ попадал в «Выданные заказы» за текущий день (SQLite datetime('now') = UTC).
   const updateSql = hasPrepaymentUpdatedAt
-    ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = datetime(\'now\'), updated_at = datetime(\'now\'), status = 4 WHERE id = ?'
-    : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = datetime(\'now\'), status = 4 WHERE id = ?'
+    ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = datetime(\'now\',\'localtime\'), updated_at = datetime(\'now\',\'localtime\'), status = 4 WHERE id = ?'
+    : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = datetime(\'now\',\'localtime\'), status = 4 WHERE id = ?'
   await db.run(updateSql, total, paymentId, id)
 
   // Всегда пишем debt_closed_events при выдаче (в т.ч. remainder=0), чтобы выдавший видел заказ во вкладке «Выданные заказы».
-  const today = new Date().toISOString().slice(0, 10)
+  // Дата выдачи — локальная дата сервера (toISOString() даёт UTC и сдвигает день).
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   try {
     let hasIssuedBy = false
     try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }
