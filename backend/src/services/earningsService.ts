@@ -178,42 +178,43 @@ export class EarningsService {
           params = {};
         }
 
-        const rawPercent =
-          Number(params?.operator_percent ?? params?.operatorPercent ?? NaN);
-        let percent = Number.isFinite(rawPercent) ? rawPercent : 0;
-
+        // Всегда подтягиваем актуальные проценты из БД; params — только fallback
+        let percent = 0;
+        // 1. Операции (params.services)
+        if (params?.services && Array.isArray(params.services) && params.services.length > 0) {
+          const firstOpId = Number(params.services[0]?.operationId);
+          if (Number.isFinite(firstOpId)) {
+            percent = operationPercentMap.get(firstOpId) ?? 0;
+          }
+        }
+        // 2. Послепечатные услуги (postprintOperations)
+        if (percent === 0 && params?.postprintOperations && Array.isArray(params.postprintOperations) && params.postprintOperations.length > 0) {
+          for (const op of params.postprintOperations) {
+            const sid = Number(op?.serviceId ?? op?.id);
+            if (!Number.isFinite(sid)) continue;
+            const p = operationPercentMap.get(sid) ?? 0;
+            percent = p;
+            if (p > 0) break;
+          }
+        }
+        // 3. Прямой operationId
         if (percent === 0) {
-          // Сначала проверяем операции (для послепечатных услуг)
-          if (params?.services && Array.isArray(params.services) && params.services.length > 0) {
-            const firstOpId = Number(params.services[0]?.operationId);
-            if (Number.isFinite(firstOpId)) {
-              percent = operationPercentMap.get(firstOpId) ?? 0;
-            }
+          const opId = Number(params?.operationId);
+          if (Number.isFinite(opId)) {
+            percent = operationPercentMap.get(opId) ?? 0;
           }
-          // Послепечатные услуги (отдельная позиция): postprintOperations[].serviceId или .id
-          if (percent === 0 && params?.postprintOperations && Array.isArray(params.postprintOperations) && params.postprintOperations.length > 0) {
-            for (const op of params.postprintOperations) {
-              const sid = Number(op?.serviceId ?? op?.id);
-              if (!Number.isFinite(sid)) continue;
-              const p = operationPercentMap.get(sid) ?? 0;
-              percent = p;
-              if (p > 0) break;
-            }
+        }
+        // 4. Продукт
+        if (percent === 0) {
+          const productId = Number(params?.productId);
+          if (Number.isFinite(productId)) {
+            percent = productPercentMap.get(productId) ?? 0;
           }
-          // Также проверяем прямой operationId
-          if (percent === 0) {
-            const opId = Number(params?.operationId);
-            if (Number.isFinite(opId)) {
-              percent = operationPercentMap.get(opId) ?? 0;
-            }
-          }
-          // Если процент всё ещё 0, проверяем продукт
-          if (percent === 0) {
-            const productId = Number(params?.productId);
-            if (Number.isFinite(productId)) {
-              percent = productPercentMap.get(productId) ?? 0;
-            }
-          }
+        }
+        // 5. Fallback: сохранённый в params (устаревший, но лучше чем 0)
+        if (percent === 0) {
+          const rawPercent = Number(params?.operator_percent ?? params?.operatorPercent ?? NaN);
+          if (Number.isFinite(rawPercent)) percent = rawPercent;
         }
 
         const itemTotal = (Number(row.price) || 0) * (Number(row.quantity) || 0);
