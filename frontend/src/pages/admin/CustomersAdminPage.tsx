@@ -111,7 +111,8 @@ const CustomersAdminPage: React.FC = () => {
   const loadOrdersForCustomer = useCallback(async (customer: Customer) => {
     try {
       setOrdersLoading(true);
-      const res = await getOrders();
+      // Запрашиваем все заказы (all: true), чтобы видеть заказы клиента от любых пользователей — иначе при генерации акта/счёта orderItems пустые
+      const res = await getOrders({ all: true });
       const list = Array.isArray(res.data) ? res.data : [];
       const filtered = list.filter((order) => {
         const anyOrder = order as any;
