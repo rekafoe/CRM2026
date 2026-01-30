@@ -40,6 +40,7 @@ const ProductEditPage: React.FC = () => {
     unauthorized,
     product,
     materials,
+    reloadData,
   } = useProductEditData(productId);
 
   const {
@@ -96,6 +97,7 @@ const ProductEditPage: React.FC = () => {
           ? { operator_percent: operatorPercentValue }
           : {}),
       } as any);
+      await reloadData();
       alert('Сохранено');
     } catch (error) {
       console.error(error);
@@ -103,7 +105,7 @@ const ProductEditPage: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [productId, form.name, form.description, form.icon, form.calculator_type, form.product_type, form.operator_percent]);
+  }, [productId, form.name, form.description, form.icon, form.calculator_type, form.product_type, form.operator_percent, reloadData]);
 
   const handleFormChange = useCallback((field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
