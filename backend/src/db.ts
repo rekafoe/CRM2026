@@ -4,6 +4,7 @@ import sqlite3 from 'sqlite3'
 import { open, Database } from 'sqlite'
 import path from 'path'
 import fs from 'fs'
+import { invalidateTableSchemaCache } from './utils/tableSchemaCache'
 
 function resolveDatabasePath(): string {
   const raw = (process.env.DB_FILE || '').trim()
@@ -148,6 +149,7 @@ async function runMigrations(db: Database): Promise<void> {
         console.log(`⚠️ Migration failed: ${migrationFile}`, error)
       }
     }
+    invalidateTableSchemaCache()
     console.log('✅ Migrations completed')
   } catch (error) {
     console.log('⚠️ Failed to apply migrations', error)

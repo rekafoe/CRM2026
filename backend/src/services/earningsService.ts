@@ -142,21 +142,25 @@ export class EarningsService {
       });
     }
 
-    // Получаем проценты из операций
+    // Получаем проценты из операций (всегда подтягиваем operator_percent из БД)
     const operationPercentMap = new Map<number, number>();
     if (operationIds.size > 0) {
       const ids = Array.from(operationIds);
       const placeholders = ids.map(() => '?').join(',');
-      const hasOperatorPercent = await hasColumn('post_processing_services', 'operator_percent');
-
-      if (hasOperatorPercent) {
-        const operationRows = await db.all<Array<{ id: number; operator_percent: number }>>(
+      try {
+        const operationRows = await db.all<Array<{ id: number; operator_percent?: number | null }>>(
           `SELECT id, operator_percent FROM post_processing_services WHERE id IN (${placeholders})`,
           ids
         );
         operationRows.forEach((row) => {
-          operationPercentMap.set(Number(row.id), Number(row.operator_percent) || 0);
+          const pct = row.operator_percent != null && Number.isFinite(Number(row.operator_percent))
+            ? Number(row.operator_percent)
+            : 0;
+          operationPercentMap.set(Number(row.id), pct);
         });
+      } catch (err) {
+        const hasOperatorPercent = await hasColumn('post_processing_services', 'operator_percent');
+        if (hasOperatorPercent) throw err;
       }
     }
 
@@ -186,11 +190,14 @@ export class EarningsService {
               percent = operationPercentMap.get(firstOpId) ?? 0;
             }
           }
-          // Послепечатные услуги (отдельная позиция): postprintOperations[].serviceId
+          // Послепечатные услуги (отдельная позиция): postprintOperations[].serviceId или .id
           if (percent === 0 && params?.postprintOperations && Array.isArray(params.postprintOperations) && params.postprintOperations.length > 0) {
-            const firstSid = Number(params.postprintOperations[0]?.serviceId);
-            if (Number.isFinite(firstSid)) {
-              percent = operationPercentMap.get(firstSid) ?? 0;
+            for (const op of params.postprintOperations) {
+              const sid = Number(op?.serviceId ?? op?.id);
+              if (!Number.isFinite(sid)) continue;
+              const p = operationPercentMap.get(sid) ?? 0;
+              percent = p;
+              if (p > 0) break;
             }
           }
           // Также проверяем прямой operationId

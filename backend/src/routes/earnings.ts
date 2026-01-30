@@ -69,6 +69,7 @@ router.get('/me', asyncHandler(async (req, res) => {
       params = {}
     }
     return {
+      id: row.id,
       orderId: row.order_id,
       orderNumber: row.order_number,
       itemId: row.order_item_id,
