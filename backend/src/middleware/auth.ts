@@ -57,7 +57,11 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     /^\/api\/warehouse-reports/
   ]
 
-  const isOpenPath = openPaths.some(r => r.test(req.path))
+  // Пересчёт ЗП: всегда пропускаем запрос в обработчик (авторизация там: admin или secret)
+  const isRecalcPath = req.path.endsWith('/earnings/recalculate') || req.path === '/earnings/recalculate'
+
+  const isOpenPath = isRecalcPath
+    || openPaths.some(r => r.test(req.path))
     || (req.path === '/api/materials' && req.method === 'GET')
     || (req.path.startsWith('/api/paper-types') && req.method === 'GET')
     || ((req.path === '/api/material-categories' || req.path === '/api/material-categories/stats') && req.method === 'GET')
@@ -100,9 +104,9 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   const db = await getDb()
   const user = await db.get<{ id: number; role: string }>('SELECT id, role FROM users WHERE api_token = ?', token)
   
-  if (!user) { 
+  if (!user) {
     res.status(401).json({ message: 'Unauthorized' })
-    return 
+    return
   }
   
   ;(req as AuthenticatedRequest).user = user

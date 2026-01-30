@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler, AuthenticatedRequest } from '../middleware'
 import { getDb } from '../config/database'
+import { EarningsService } from '../services/earningsService'
 
 const router = Router()
 
@@ -232,6 +233,62 @@ router.get('/admin', asyncHandler(async (req, res) => {
   })
 
   res.json({ month, previousMonth: prevMonth, historyMonths, users: result })
+}))
+
+/**
+ * POST/GET /api/earnings/recalculate — пересчёт ЗП по всем датам заказов.
+ * Доступ: admin ИЛИ ?secret=RECALC_EARNINGS_SECRET (если задана в env).
+ * Параметры: from, to (YYYY-MM-DD) — ограничить диапазон дат.
+ */
+router.all('/recalculate', asyncHandler(async (req, res) => {
+  const secret = process.env.RECALC_EARNINGS_SECRET
+  const authHeader = req.headers['authorization'] || ''
+  const bearerToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : undefined
+  const providedSecret = (req.query as any)?.secret || req.headers['x-recalculation-secret'] || bearerToken
+
+  const isAuthorizedBySecret = !!secret && !!providedSecret && secret === providedSecret
+  const authUser = (req as AuthenticatedRequest).user
+  const isAdmin = authUser && (authUser as { role?: string }).role === 'admin'
+
+  if (!isAuthorizedBySecret && !isAdmin) {
+    res.status(403).json({ message: 'Forbidden: требуется admin или secret' })
+    return
+  }
+
+  const from = (req.query as any)?.from
+  const to = (req.query as any)?.to
+
+  const db = await getDb()
+  const rows = (await db.all(
+    `SELECT DISTINCT substr(COALESCE(createdAt, created_at), 1, 10) as d
+     FROM orders
+     WHERE COALESCE(createdAt, created_at) IS NOT NULL
+       AND substr(COALESCE(createdAt, created_at), 1, 10) != ''
+     ORDER BY d`
+  )) as Array<{ d: string }>
+
+  let dates = (rows || []).map((r) => r.d).filter(Boolean)
+  if (from) dates = dates.filter((d) => d >= from)
+  if (to) dates = dates.filter((d) => d <= to)
+
+  const start = Date.now()
+  let errors = 0
+
+  for (const date of dates) {
+    try {
+      await EarningsService.recalculateForDate(date)
+    } catch (err) {
+      errors++
+    }
+  }
+
+  const elapsed = ((Date.now() - start) / 1000).toFixed(1)
+  res.json({
+    ok: errors === 0,
+    datesProcessed: dates.length,
+    errors,
+    elapsedSeconds: parseFloat(elapsed),
+  })
 }))
 
 export default router
