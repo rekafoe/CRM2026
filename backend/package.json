@@ -10,7 +10,8 @@
     "migrate": "node dist/scripts/migrate.js",
     "migrate:dev": "ts-node src/scripts/migrate.ts",
     "generate:act-template": "ts-node scripts/generateActTemplate.ts",
-    "delete:old-act-templates": "ts-node scripts/deleteOldActTemplates.ts"
+    "delete:old-act-templates": "ts-node scripts/deleteOldActTemplates.ts",
+    "recalculate:earnings": "ts-node -r dotenv/config scripts/recalculateEarnings.ts"
   },
   "dependencies": {
     "@sentry/node": "^7.119.0",
