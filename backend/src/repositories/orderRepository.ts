@@ -200,6 +200,7 @@ export const OrderRepository = {
         AND EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ?)
       ORDER BY o.id DESC`,
       d
+    )
     return OrderRepository.mapOrdersWithCustomer(orders)
   },
 
