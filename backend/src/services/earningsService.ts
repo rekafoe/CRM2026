@@ -110,6 +110,15 @@ export class EarningsService {
             }
           });
         }
+        // Послепечатные услуги (отдельная позиция): postprintOperations[].serviceId
+        if (parsed?.postprintOperations && Array.isArray(parsed.postprintOperations)) {
+          parsed.postprintOperations.forEach((op: any) => {
+            const sid = Number(op?.serviceId);
+            if (Number.isFinite(sid)) {
+              operationIds.add(sid);
+            }
+          });
+        }
         // Также проверяем прямой operationId (для послепечатных услуг)
         const opId = Number(parsed?.operationId);
         if (Number.isFinite(opId)) {
@@ -172,10 +181,16 @@ export class EarningsService {
         if (percent === 0) {
           // Сначала проверяем операции (для послепечатных услуг)
           if (params?.services && Array.isArray(params.services) && params.services.length > 0) {
-            // Берем процент из первой операции (или можно суммировать, если нужно)
             const firstOpId = Number(params.services[0]?.operationId);
             if (Number.isFinite(firstOpId)) {
               percent = operationPercentMap.get(firstOpId) ?? 0;
+            }
+          }
+          // Послепечатные услуги (отдельная позиция): postprintOperations[].serviceId
+          if (percent === 0 && params?.postprintOperations && Array.isArray(params.postprintOperations) && params.postprintOperations.length > 0) {
+            const firstSid = Number(params.postprintOperations[0]?.serviceId);
+            if (Number.isFinite(firstSid)) {
+              percent = operationPercentMap.get(firstSid) ?? 0;
             }
           }
           // Также проверяем прямой operationId

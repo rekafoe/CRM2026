@@ -52,13 +52,14 @@ type RawServiceRow = {
   id: number;
   service_name: string;
   service_type?: string;
-  operation_type?: string; // 🆕
+  operation_type?: string;
   unit: string;
   price_unit?: string;
   price_per_unit: number;
   is_active: number;
   min_quantity?: number | null;
   max_quantity?: number | null;
+  operator_percent?: number | null;
 };
 
 type RawTierRow = {
@@ -200,9 +201,10 @@ export class PricingServiceRepository {
       rate: Number(row.price_per_unit ?? 0),
       currency: DEFAULT_CURRENCY,
       isActive: !!row.is_active,
-      operationType: row.operation_type, // 🆕
+      operationType: row.operation_type,
       minQuantity: row.min_quantity ?? undefined,
       maxQuantity: row.max_quantity ?? undefined,
+      operator_percent: row.operator_percent !== undefined && row.operator_percent !== null ? Number(row.operator_percent) : undefined,
     };
   }
 
@@ -220,6 +222,9 @@ export class PricingServiceRepository {
   static async listServices(): Promise<PricingServiceDTO[]> {
     const db = await this.getConnection();
     // ИЗМЕНЕНО: Берем из post_processing_services вместо service_prices
+    let hasOpPercent = false;
+    try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
+    const opPercentSel = hasOpPercent ? ', operator_percent' : '';
     const rows = await db.all<any[]>(`
       SELECT 
         id, 
@@ -231,7 +236,7 @@ export class PricingServiceRepository {
         price as price_per_unit, 
         is_active,
         min_quantity,
-        max_quantity
+        max_quantity${opPercentSel}
       FROM post_processing_services 
       ORDER BY name
     `);
@@ -241,6 +246,9 @@ export class PricingServiceRepository {
   static async getServiceById(id: number): Promise<PricingServiceDTO | null> {
     const db = await this.getConnection();
     // ИЗМЕНЕНО: Читаем из post_processing_services
+    let hasOpPercent = false;
+    try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
+    const opPercentSel = hasOpPercent ? ', operator_percent' : '';
     const row = await db.get<any>(`
       SELECT 
         id, 
@@ -251,7 +259,7 @@ export class PricingServiceRepository {
         price as price_per_unit, 
         is_active,
         min_quantity,
-        max_quantity
+        max_quantity${opPercentSel}
       FROM post_processing_services 
       WHERE id = ?
     `, id);
@@ -284,9 +292,15 @@ export class PricingServiceRepository {
       throw err;
     }
 
-    const result = await db.run(
-      `INSERT INTO post_processing_services (name, operation_type, unit, price_unit, price, is_active, min_quantity, max_quantity) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    let hasOpPercent = false;
+    try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
+    const opPercentVal = (payload as any).operator_percent;
+    const includeOpPercent = hasOpPercent && opPercentVal !== undefined && opPercentVal !== null && Number.isFinite(Number(opPercentVal));
+    const insertCols = includeOpPercent
+      ? '(name, operation_type, unit, price_unit, price, is_active, min_quantity, max_quantity, operator_percent)'
+      : '(name, operation_type, unit, price_unit, price, is_active, min_quantity, max_quantity)';
+    const insertVals = includeOpPercent ? '?, ?, ?, ?, ?, ?, ?, ?, ?' : '?, ?, ?, ?, ?, ?, ?, ?';
+    const insertParams: any[] = [
       payload.name,
       operationType,
       resolvedUnit,
@@ -295,7 +309,13 @@ export class PricingServiceRepository {
       payload.isActive === undefined || payload.isActive ? 1 : 0,
       minQuantity,
       maxQuantity,
+    ];
+    if (includeOpPercent) insertParams.push(Number(opPercentVal));
+    const result = await db.run(
+      `INSERT INTO post_processing_services ${insertCols} VALUES (${insertVals})`,
+      ...insertParams
     );
+    const opPercentSel = hasOpPercent ? ', operator_percent' : '';
     const created = await db.get<any>(`
       SELECT 
         id, 
@@ -307,7 +327,7 @@ export class PricingServiceRepository {
         price as price_per_unit, 
         is_active,
         min_quantity,
-        max_quantity
+        max_quantity${opPercentSel}
       FROM post_processing_services 
       WHERE id = ?
     `, result.lastID);
@@ -355,10 +375,12 @@ export class PricingServiceRepository {
       throw err;
     }
 
-    await db.run(
-      `UPDATE post_processing_services 
-       SET name = ?, operation_type = ?, unit = ?, price_unit = ?, price = ?, is_active = ?, min_quantity = ?, max_quantity = ? 
-       WHERE id = ?`,
+    let hasOpPercent = false;
+    try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
+    const opPercentUpdate = hasOpPercent && (payload as any).operator_percent !== undefined
+      ? ', operator_percent = ?'
+      : '';
+    const updateParams: any[] = [
       payload.name ?? current.name,
       operationType,
       resolvedUnit,
@@ -367,9 +389,17 @@ export class PricingServiceRepository {
       payload.isActive !== undefined ? (payload.isActive ? 1 : 0) : current.is_active,
       minQuantity,
       maxQuantity,
-      id,
+    ];
+    if (opPercentUpdate) updateParams.push(Number((payload as any).operator_percent));
+    updateParams.push(id);
+    await db.run(
+      `UPDATE post_processing_services 
+       SET name = ?, operation_type = ?, unit = ?, price_unit = ?, price = ?, is_active = ?, min_quantity = ?, max_quantity = ?${opPercentUpdate}
+       WHERE id = ?`,
+      ...updateParams
     );
 
+    const opPercentSel = hasOpPercent ? ', operator_percent' : '';
     const updated = await db.get<any>(`
       SELECT 
         id, 
@@ -381,7 +411,7 @@ export class PricingServiceRepository {
         price as price_per_unit, 
         is_active,
         min_quantity,
-        max_quantity
+        max_quantity${opPercentSel}
       FROM post_processing_services 
       WHERE id = ?
     `, id);

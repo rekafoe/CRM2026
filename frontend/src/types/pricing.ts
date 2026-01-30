@@ -8,9 +8,10 @@ export interface PricingService {
   priceUnit?: string;
   rate: number;
   isActive: boolean;
-  operationType?: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
+  operationType?: string;
   minQuantity?: number;
   maxQuantity?: number;
+  operator_percent?: number;
 }
 
 export interface ServiceVolumeTier {

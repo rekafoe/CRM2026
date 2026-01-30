@@ -21,9 +21,10 @@ const toServiceResponse = (service: any) => ({
   currency: service.currency ?? 'BYN',
   isActive: service.isActive,
   is_active: service.isActive,
-  operation_type: service.operationType ?? service.operation_type, // 🆕
+  operation_type: service.operationType ?? service.operation_type,
   min_quantity: service.minQuantity ?? service.min_quantity ?? null,
   max_quantity: service.maxQuantity ?? service.max_quantity ?? null,
+  operator_percent: service.operator_percent ?? service.operatorPercent ?? null,
 })
 
 const toTierResponse = (tier: any) => ({
@@ -653,7 +654,7 @@ router.post('/service-prices', asyncHandler(async (req, res) => {
 }))
 
 router.post('/services', asyncHandler(async (req, res) => {
-  const { name, service_type, type, unit, price_unit, priceUnit, rate, currency, is_active, isActive, min_quantity, max_quantity } = req.body
+  const { name, service_type, type, unit, price_unit, priceUnit, rate, currency, is_active, isActive, min_quantity, max_quantity, operator_percent } = req.body
   const created = await ServiceManagementService.createService({
     name,
     type: (service_type ?? type) || 'generic',
@@ -664,13 +665,14 @@ router.post('/services', asyncHandler(async (req, res) => {
     isActive: is_active !== undefined ? !!is_active : isActive,
     minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
     maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
+    operator_percent: operator_percent !== undefined && operator_percent !== '' ? Number(operator_percent) : undefined,
   })
   res.status(201).json(toServiceResponse(created))
 }))
 
 router.put('/services/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { name, service_type, type, unit, price_unit, priceUnit, rate, is_active, isActive, min_quantity, max_quantity } = req.body
+  const { name, service_type, type, unit, price_unit, priceUnit, rate, is_active, isActive, min_quantity, max_quantity, operator_percent } = req.body
   const updated = await ServiceManagementService.updateService(Number(id), {
     name,
     type: service_type ?? type,
@@ -680,6 +682,7 @@ router.put('/services/:id', asyncHandler(async (req, res) => {
     isActive: is_active !== undefined ? !!is_active : isActive,
     minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
     maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
+    operator_percent: operator_percent !== undefined ? (operator_percent === '' || operator_percent === null ? undefined : Number(operator_percent)) : undefined,
   })
 
   if (!updated) {

@@ -38,9 +38,10 @@ const mapService = (svc: any): PricingService => ({
   priceUnit: svc.price_unit ?? svc.priceUnit,
   rate: Number(svc.price_per_unit ?? svc.rate ?? 0),
   isActive: svc.is_active !== undefined ? !!svc.is_active : true,
-  operationType: svc.operation_type ?? svc.operationType, // 🆕
+  operationType: svc.operation_type ?? svc.operationType,
   minQuantity: svc.min_quantity ?? svc.minQuantity ?? undefined,
   maxQuantity: svc.max_quantity ?? svc.maxQuantity ?? undefined,
+  operator_percent: svc.operator_percent ?? svc.operatorPercent ?? undefined,
 });
 
 const mapTier = (tier: any): ServiceVolumeTier => ({
@@ -71,9 +72,10 @@ export async function createPricingService(payload: CreatePricingServicePayload)
     price_unit: resolvedPriceUnit,
     rate: payload.rate,
     is_active: payload.isActive ?? true,
-    operation_type: payload.operationType || 'other', // 🆕
+    operation_type: payload.operationType || 'other',
     ...(payload.minQuantity !== undefined ? { min_quantity: payload.minQuantity } : {}),
     ...(payload.maxQuantity !== undefined ? { max_quantity: payload.maxQuantity } : {}),
+    ...(payload.operator_percent !== undefined && Number.isFinite(Number(payload.operator_percent)) ? { operator_percent: Number(payload.operator_percent) } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);
@@ -91,9 +93,10 @@ export async function updatePricingService(id: number, payload: UpdatePricingSer
     price_unit: resolvedPriceUnit,
     rate: payload.rate,
     is_active: payload.isActive,
-    ...(payload.operationType !== undefined ? { operation_type: payload.operationType } : {}), // 🆕
+    ...(payload.operationType !== undefined ? { operation_type: payload.operationType } : {}),
     ...(payload.minQuantity !== undefined ? { min_quantity: payload.minQuantity } : {}),
     ...(payload.maxQuantity !== undefined ? { max_quantity: payload.maxQuantity } : {}),
+    ...(payload.operator_percent !== undefined ? { operator_percent: Number(payload.operator_percent) } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);

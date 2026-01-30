@@ -337,7 +337,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   }, [selectedOperations, updateSpecs]);
 
   // Обновляем количество операции (мемоизированная версия)
-  const updateOperationQuantity = useCallback((operationId: number, quantity?: number) => {
+    const updateOperationQuantity = useCallback((operationId: number, quantity?: number) => {
     const updated = selectedOperations.map((op: SelectedOperation) => {
       if (op.operationId === operationId) {
         if (!Number.isFinite(quantity)) {

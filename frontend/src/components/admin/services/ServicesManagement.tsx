@@ -166,8 +166,8 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       maxQuantity: state.editingServiceForm.maxQuantity
         ? Number(state.editingServiceForm.maxQuantity)
         : undefined,
-      operator_percent: state.editingServiceForm.operatorPercent
-        ? Number(state.editingServiceForm.operatorPercent)
+      operator_percent: state.editingServiceForm.operatorPercent !== ''
+        ? Number(state.editingServiceForm.operatorPercent) || 0
         : undefined,
     };
     await serviceOperationsRef.current.updateService(state.editingService.id, payload);
@@ -189,8 +189,8 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       maxQuantity: state.newServiceForm.maxQuantity
         ? Number(state.newServiceForm.maxQuantity)
         : undefined,
-      operator_percent: state.newServiceForm.operatorPercent
-        ? Number(state.newServiceForm.operatorPercent)
+      operator_percent: state.newServiceForm.operatorPercent !== ''
+        ? Number(state.newServiceForm.operatorPercent) || 0
         : undefined,
     });
     
