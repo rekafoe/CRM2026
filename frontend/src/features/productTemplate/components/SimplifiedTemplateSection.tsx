@@ -848,7 +848,27 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                       const commonRanges = getSizeRanges(selected)
                       const colorRows = selected.print_prices.filter(p => p.color_mode === 'color')
                       const bwRows = selected.print_prices.filter(p => p.color_mode === 'bw')
-                      
+                      const removeSidesMode = (sidesMode: 'single' | 'duplex') => {
+                        const remaining = selected.print_prices.filter(p => p.sides_mode !== sidesMode)
+                        if (remaining.length === 0) return
+                        updateSize(selected.id, { print_prices: remaining })
+                      }
+                      const hasSingle = selected.print_prices.some(p => p.sides_mode === 'single')
+                      const hasDuplex = selected.print_prices.some(p => p.sides_mode === 'duplex')
+                      const selectedTech = selected.default_print?.technology_code
+                        ? printTechs.find(t => t.code === selected.default_print?.technology_code)
+                        : null
+                      const supportsDuplex = selectedTech?.supports_duplex === 1 || selectedTech?.supports_duplex === true
+                      const addSidesMode = (sidesMode: 'single' | 'duplex') => {
+                        const existing = selected.print_prices
+                        const newEntries = existing.map(p => ({
+                          technology_code: p.technology_code,
+                          color_mode: p.color_mode,
+                          sides_mode: sidesMode as 'single' | 'duplex',
+                          tiers: (p.tiers || defaultTiers()).map(t => ({ ...t, unit_price: 0 }))
+                        }))
+                        updateSize(selected.id, { print_prices: [...existing, ...newEntries] })
+                      }
                       return (
                               <div className="simplified-tiers-table">
                                 <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
@@ -953,24 +973,38 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                       p.color_mode === row.color_mode &&
                                       p.sides_mode === row.sides_mode
                                     )
+                                    const canRemoveSingle = selected.print_prices.some(p => p.sides_mode === 'duplex')
                                     return (
                                       <tr className="simplified-table__child-row">
                                         <td className="simplified-table__child-cell">
-                                          <div className="el-select el-select--small" style={{ width: '100%' }}>
-                                            <div className="el-input el-input--small el-input--suffix">
-                                              <input
-                                                type="text"
-                                                readOnly
-                                                className="el-input__inner"
-                                                value="односторонняя"
-                                                style={{ cursor: 'default' }}
-                                              />
-                                              <span className="el-input__suffix">
-                                                <span className="el-input__suffix-inner">
-                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <div className="el-select el-select--small" style={{ flex: 1 }}>
+                                              <div className="el-input el-input--small el-input--suffix">
+                                                <input
+                                                  type="text"
+                                                  readOnly
+                                                  className="el-input__inner"
+                                                  value="односторонняя"
+                                                  style={{ cursor: 'default' }}
+                                                />
+                                                <span className="el-input__suffix">
+                                                  <span className="el-input__suffix-inner">
+                                                    <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                  </span>
                                                 </span>
-                                              </span>
+                                              </div>
                                             </div>
+                                            {canRemoveSingle && (
+                                              <button
+                                                type="button"
+                                                className="el-button el-button--text el-button--mini"
+                                                style={{ color: 'var(--danger, #f56c6c)', flexShrink: 0 }}
+                                                title="Убрать одностороннюю печать для этого продукта"
+                                                onClick={() => removeSidesMode('single')}
+                                              >
+                                                ×
+                                              </button>
+                                            )}
                                           </div>
                                         </td>
                                         {commonRanges.map((t, ti) => {
@@ -1013,25 +1047,39 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                       p.color_mode === row.color_mode &&
                                       p.sides_mode === row.sides_mode
                                     )
+                                    const canRemoveDuplex = selected.print_prices.some(p => p.sides_mode === 'single')
                                     return (
                                       <tr className="simplified-table__child-row">
                                         <td className="simplified-table__child-cell">
-                                          <div className="el-select el-select--small" style={{ width: '100%' }}>
-                                            <div className="el-input el-input--small el-input--suffix">
-                                              <input
-                                                type="text"
-                                                readOnly
-                                                className="el-input__inner"
-                                                value="двухсторонняя"
-                                                style={{ cursor: 'default' }}
-                                              />
-                                              <span className="el-input__suffix">
-                                                <span className="el-input__suffix-inner">
-                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <div className="el-select el-select--small" style={{ flex: 1 }}>
+                                              <div className="el-input el-input--small el-input--suffix">
+                                                <input
+                                                  type="text"
+                                                  readOnly
+                                                  className="el-input__inner"
+                                                  value="двухсторонняя"
+                                                  style={{ cursor: 'default' }}
+                                                />
+                                                <span className="el-input__suffix">
+                                                  <span className="el-input__suffix-inner">
+                                                    <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                  </span>
                                                 </span>
-                                              </span>
-                              </div>
-                          </div>
+                                              </div>
+                                            </div>
+                                            {canRemoveDuplex && (
+                                              <button
+                                                type="button"
+                                                className="el-button el-button--text el-button--mini"
+                                                style={{ color: 'var(--danger, #f56c6c)', flexShrink: 0 }}
+                                                title="Убрать двухстороннюю печать для этого продукта"
+                                                onClick={() => removeSidesMode('duplex')}
+                                              >
+                                                ×
+                                              </button>
+                                            )}
+                                          </div>
                                         </td>
                                         {commonRanges.map((t, ti) => {
                                           const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
@@ -1104,25 +1152,39 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                       p.color_mode === row.color_mode &&
                                       p.sides_mode === row.sides_mode
                                     )
+                                    const canRemoveSingleBw = selected.print_prices.some(p => p.sides_mode === 'duplex')
                                     return (
                                       <tr className="simplified-table__child-row">
                                         <td className="simplified-table__child-cell">
-                                          <div className="el-select el-select--small" style={{ width: '100%' }}>
-                                            <div className="el-input el-input--small el-input--suffix">
-                                              <input
-                                                type="text"
-                                                readOnly
-                                                className="el-input__inner"
-                                                value="односторонняя"
-                                                style={{ cursor: 'default' }}
-                                              />
-                                              <span className="el-input__suffix">
-                                                <span className="el-input__suffix-inner">
-                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <div className="el-select el-select--small" style={{ flex: 1 }}>
+                                              <div className="el-input el-input--small el-input--suffix">
+                                                <input
+                                                  type="text"
+                                                  readOnly
+                                                  className="el-input__inner"
+                                                  value="односторонняя"
+                                                  style={{ cursor: 'default' }}
+                                                />
+                                                <span className="el-input__suffix">
+                                                  <span className="el-input__suffix-inner">
+                                                    <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                  </span>
                                                 </span>
-                                              </span>
-                    </div>
-                  </div>
+                                              </div>
+                                            </div>
+                                            {canRemoveSingleBw && (
+                                              <button
+                                                type="button"
+                                                className="el-button el-button--text el-button--mini"
+                                                style={{ color: 'var(--danger, #f56c6c)', flexShrink: 0 }}
+                                                title="Убрать одностороннюю печать для этого продукта"
+                                                onClick={() => removeSidesMode('single')}
+                                              >
+                                                ×
+                                              </button>
+                                            )}
+                                          </div>
                                         </td>
                                         {commonRanges.map((t, ti) => {
                                           const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
@@ -1164,24 +1226,38 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                       p.color_mode === row.color_mode &&
                                       p.sides_mode === row.sides_mode
                                     )
-                            return (
+                                    const canRemoveDuplexBw = selected.print_prices.some(p => p.sides_mode === 'single')
+                                    return (
                                       <tr className="simplified-table__child-row">
                                         <td className="simplified-table__child-cell">
-                                          <div className="el-select el-select--small" style={{ width: '100%' }}>
-                                            <div className="el-input el-input--small el-input--suffix">
-                                <input
-                                                type="text"
-                                                readOnly
-                                                className="el-input__inner"
-                                                value="двухсторонняя"
-                                                style={{ cursor: 'default' }}
-                                              />
-                                              <span className="el-input__suffix">
-                                                <span className="el-input__suffix-inner">
-                                                  <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                </span>
-                                              </span>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <div className="el-select el-select--small" style={{ flex: 1 }}>
+                                              <div className="el-input el-input--small el-input--suffix">
+                                                <input
+                                                  type="text"
+                                                  readOnly
+                                                  className="el-input__inner"
+                                                  value="двухсторонняя"
+                                                  style={{ cursor: 'default' }}
+                                                />
+                                                <span className="el-input__suffix">
+                                                  <span className="el-input__suffix-inner">
+                                                    <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
+                                                  </span>
+                                                </span>
+                                              </div>
                                             </div>
+                                            {canRemoveDuplexBw && (
+                                              <button
+                                                type="button"
+                                                className="el-button el-button--text el-button--mini"
+                                                style={{ color: 'var(--danger, #f56c6c)', flexShrink: 0 }}
+                                                title="Убрать двухстороннюю печать для этого продукта"
+                                                onClick={() => removeSidesMode('duplex')}
+                                              >
+                                                ×
+                                              </button>
+                                            )}
                                           </div>
                                         </td>
                                         {commonRanges.map((t, ti) => {
@@ -1219,6 +1295,36 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                               )}
                             </tbody>
                           </table>
+                          {(hasSingle && !hasDuplex && supportsDuplex) || (!hasSingle && hasDuplex) ? (
+                            <div className="simplified-tiers-table__add-sides" style={{ marginTop: 10, fontSize: 13, color: '#606266' }}>
+                              {hasSingle && !hasDuplex && supportsDuplex && (
+                                <>
+                                  Сейчас только односторонняя печать.{' '}
+                                  <button
+                                    type="button"
+                                    className="el-button el-button--text el-button--mini"
+                                    style={{ color: 'var(--primary, #409eff)' }}
+                                    onClick={() => addSidesMode('duplex')}
+                                  >
+                                    Добавить двухстороннюю
+                                  </button>
+                                </>
+                              )}
+                              {!hasSingle && hasDuplex && (
+                                <>
+                                  Сейчас только двухсторонняя печать.{' '}
+                                  <button
+                                    type="button"
+                                    className="el-button el-button--text el-button--mini"
+                                    style={{ color: 'var(--primary, #409eff)' }}
+                                    onClick={() => addSidesMode('single')}
+                                  >
+                                    Добавить одностороннюю
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                       )
                     })()}

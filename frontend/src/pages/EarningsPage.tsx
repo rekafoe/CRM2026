@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { AdminPageLayout } from '../components/admin/AdminPageLayout';
 import { Alert, Button, FormField } from '../components/common';
 import { getMyEarnings } from '../api';
@@ -72,6 +73,43 @@ export const EarningsPage: React.FC = () => {
     };
   }, [items]);
 
+  // Статистика выработки: заказов и общая стоимость за день/месяц
+  const outputStats = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const todayItems = items.filter((i) => i.earnedDate.slice(0, 10) === today);
+    const todayOrderIds = new Set(todayItems.map((i) => i.orderId));
+    const todayOrdersCount = todayOrderIds.size;
+    const todayOrderValue = todayItems.reduce((s, i) => s + (Number(i.itemTotal) || 0), 0);
+    const monthOrderIds = new Set(items.map((i) => i.orderId));
+    const monthOrdersCount = monthOrderIds.size;
+    const monthOrderValue = items.reduce((s, i) => s + (Number(i.itemTotal) || 0), 0);
+    return {
+      todayOrdersCount,
+      todayOrderValue,
+      monthOrdersCount,
+      monthOrderValue,
+    };
+  }, [items]);
+
+  const handleExportExcel = useCallback(() => {
+    const rows = items
+      .slice()
+      .sort((a, b) => b.earnedDate.localeCompare(a.earnedDate))
+      .map((item) => ({
+        Дата: item.earnedDate.slice(0, 10),
+        Заказ: item.orderNumber || `#${item.orderId}`,
+        Позиция: item.itemName,
+        'Сумма позиции': Number(item.itemTotal),
+        '%': Number(item.percent),
+        Начислено: Number(item.amount),
+      }));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Проценты');
+    const fileName = `мои-проценты-${month}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  }, [items, month]);
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const today = new Date();
@@ -97,34 +135,54 @@ export const EarningsPage: React.FC = () => {
       icon="💸"
       onBack={() => navigate('/')}
       className="earnings-page"
+      headerExtra={
+        <>
+          <FormField label="Месяц">
+            <input
+              type="month"
+              className="form-input"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
+          </FormField>
+          <Button variant="secondary" onClick={loadData} disabled={loading}>
+            {loading ? 'Обновление…' : 'Обновить'}
+          </Button>
+          <Button variant="secondary" onClick={handleExportExcel} disabled={items.length === 0}>
+            Экспорт в Excel
+          </Button>
+        </>
+      }
     >
       {error && <Alert type="error">{error}</Alert>}
-      <div className="earnings-filters">
-        <FormField label="Месяц">
-          <input
-            type="month"
-            className="form-input"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-          />
-        </FormField>
-        <Button variant="secondary" onClick={loadData} disabled={loading}>
-          {loading ? 'Обновление…' : 'Обновить'}
-        </Button>
-      </div>
-
-      <div className="earnings-summary">
-        <div className="earnings-summary-card earnings-summary-card--today">
-          <div className="earnings-summary-title">💰 Сегодня</div>
-          <div className="earnings-summary-value">{todayTotal.toFixed(2)} BYN</div>
+      <div className="earnings-summary earnings-summary--row">
+        <div className="earnings-summary-group">
+          <div className="earnings-summary-card earnings-summary-card--today">
+            <div className="earnings-summary-title">💰 Сегодня</div>
+            <div className="earnings-summary-value">{todayTotal.toFixed(2)} BYN</div>
+          </div>
+          <div className="earnings-summary-card">
+            <div className="earnings-summary-title">Итого за месяц</div>
+            <div className="earnings-summary-value">{total.toFixed(2)} BYN</div>
+          </div>
+          <div className="earnings-summary-card">
+            <div className="earnings-summary-title">Количество позиций</div>
+            <div className="earnings-summary-value">{items.length}</div>
+          </div>
         </div>
-        <div className="earnings-summary-card">
-          <div className="earnings-summary-title">Итого за месяц</div>
-          <div className="earnings-summary-value">{total.toFixed(2)} BYN</div>
-        </div>
-        <div className="earnings-summary-card">
-          <div className="earnings-summary-title">Количество позиций</div>
-          <div className="earnings-summary-value">{items.length}</div>
+        <div className="earnings-summary-group earnings-summary-group--right">
+          <div className="earnings-summary-card">
+            <div className="earnings-summary-title">Выработка за день</div>
+            <div className="earnings-summary-value">
+              {outputStats.todayOrdersCount} заказов · {outputStats.todayOrderValue.toFixed(2)} BYN
+            </div>
+          </div>
+          <div className="earnings-summary-card">
+            <div className="earnings-summary-title">Выработка за месяц</div>
+            <div className="earnings-summary-value">
+              {outputStats.monthOrderValue.toFixed(2)} BYN
+            </div>
+          </div>
         </div>
       </div>
 
@@ -141,6 +199,13 @@ export const EarningsPage: React.FC = () => {
                 <span className="earnings-day-total">{dayTotal.toFixed(2)} BYN</span>
               </div>
               <table className="earnings-table">
+                <colgroup>
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '38%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '20%' }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Заказ</th>

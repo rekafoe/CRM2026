@@ -913,7 +913,7 @@ const CustomersAdminPage: React.FC = () => {
   }, [handleImport]);
 
   return (
-    <AdminPageLayout title="Клиенты CRM" icon="👥" onBack={() => navigate('/adminpanel')}>
+    <AdminPageLayout title="Клиенты CRM" icon="👥" onBack={() => navigate('/adminpanel')} className="customers-page">
       {error && <Alert type="error">{error}</Alert>}
       {importError && <Alert type="error">{importError}</Alert>}
       {importSummary && (
@@ -1019,165 +1019,184 @@ const CustomersAdminPage: React.FC = () => {
         </div>
       </div>
 
-      {selectedCustomer && (
-        <div className="pricing-section">
-          <div className="data-card">
-            <div className="card-header">
-              <div className="card-title">
-                <h4>Сводка клиента</h4>
-              </div>
-              <div className="card-actions">
-                <div className="customers-date-filter">
-                  <input
-                    type="date"
-                    value={ordersFrom}
-                    onChange={(event) => setOrdersFrom(event.target.value)}
-                  />
-                  <span>—</span>
-                  <input
-                    type="date"
-                    value={ordersTo}
-                    onChange={(event) => setOrdersTo(event.target.value)}
-                  />
-                </div>
-                {selectedCustomer.type === 'legal' && (
-                  <div className="customers-doc-actions">
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      onClick={handleExportContract} 
-                      disabled={ordersLoading || generatingDocument === 'contract'}
-                    >
-                      {generatingDocument === 'contract' ? 'Генерация...' : 'Договор Word'}
-                    </Button>
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      onClick={handleExportAct} 
-                      disabled={ordersLoading || generatingDocument === 'act'}
-                    >
-                      {generatingDocument === 'act' ? 'Генерация...' : 'Акт Excel'}
-                    </Button>
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      onClick={handleExportInvoice} 
-                      disabled={ordersLoading || generatingDocument === 'invoice'}
-                    >
-                      {generatingDocument === 'invoice' ? 'Генерация...' : 'Счёт Excel'}
-                    </Button>
-                  </div>
-                )}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowOrders((prev) => !prev)}
-                  disabled={ordersLoading}
+      {/* Слайдер с информацией о выбранном клиенте */}
+      <>
+        {selectedCustomer && (
+          <div
+            className="customers-slider-backdrop"
+            onClick={() => setSelectedCustomer(null)}
+          />
+        )}
+        <div className={`customers-slider ${selectedCustomer ? 'customers-slider--open' : ''}`}>
+          {selectedCustomer && (
+            <>
+              <div className="customers-slider__header">
+                <h4 className="customers-slider__title">
+                  {getCustomerDisplayName(selectedCustomer)}
+                </h4>
+                <button
+                  type="button"
+                  className="customers-slider__close"
+                  onClick={() => setSelectedCustomer(null)}
+                  aria-label="Закрыть"
                 >
-                  {showOrders ? 'Скрыть заказы' : 'Показать заказы'}
-                </Button>
+                  ✕
+                </button>
               </div>
-            </div>
-            <div className="card-content">
-              {selectedCustomer.type === 'legal' && (
-                <div className="customers-legal">
-                  <div className="customers-legal__header">
-                    <h5>Реквизиты юр. лица</h5>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleSaveLegalDetails}
-                      disabled={savingLegal}
-                    >
-                      {savingLegal ? 'Сохранение…' : 'Сохранить'}
-                    </Button>
+              <div className="customers-slider__body">
+                <div className="customers-slider__toolbar">
+                  <div className="customers-date-filter">
+                    <input
+                      type="date"
+                      value={ordersFrom}
+                      onChange={(e) => setOrdersFrom(e.target.value)}
+                    />
+                    <span>—</span>
+                    <input
+                      type="date"
+                      value={ordersTo}
+                      onChange={(e) => setOrdersTo(e.target.value)}
+                    />
                   </div>
-                  <div className="customers-legal__fields">
-                    <label className="customers-legal__field">
-                      <span>Расчётный счёт и банк</span>
-                      <textarea
-                        value={legalForm.bank_details}
-                        onChange={(event) =>
-                          setLegalForm((prev) => ({ ...prev, bank_details: event.target.value }))
-                        }
-                        placeholder="IBAN, банк, БИК, адрес"
-                      />
-                    </label>
-                    <label className="customers-legal__field">
-                      <span>Уполномоченное лицо</span>
-                      <textarea
-                        value={legalForm.authorized_person}
-                        onChange={(event) =>
-                          setLegalForm((prev) => ({ ...prev, authorized_person: event.target.value }))
-                        }
-                        placeholder="Действует на основании договора, устава и пр."
-                      />
-                    </label>
-                  </div>
-                </div>
-              )}
-              <div className="customers-summary">
-                <div className="customers-summary-card">
-                  <div className="customers-summary-title">Средний чек</div>
-                  <div className="customers-summary-value">
-                    {customerMetrics.ordersCount > 0 ? `${customerMetrics.averageCheck.toFixed(2)} BYN` : '—'}
-                  </div>
-                </div>
-                <div className="customers-summary-card">
-                  <div className="customers-summary-title">Периодичность заказов</div>
-                  <div className="customers-summary-value">
-                    {customerMetrics.averageIntervalDays === null
-                      ? '—'
-                      : `${customerMetrics.averageIntervalDays.toFixed(1)} дн.`}
-                  </div>
-                </div>
-                <div className="customers-summary-card">
-                  <div className="customers-summary-title">Всего заказов</div>
-                  <div className="customers-summary-value">{customerMetrics.ordersCount}</div>
-                </div>
-              </div>
-
-              {showOrders && (
-                <div className="customers-orders">
-                  {ordersLoading ? (
-                    <div className="customers-muted">Загрузка заказов...</div>
-                  ) : (
-                    <div className="customers-table-wrapper">
-                      <table className="customers-table">
-                        <thead>
-                          <tr>
-                            <th>Заказ</th>
-                            <th>Дата</th>
-                            <th>Сумма</th>
-                            <th>Статус</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredOrders.length === 0 && (
-                            <tr>
-                              <td colSpan={4} className="customers-muted">
-                                Нет заказов у этого клиента
-                              </td>
-                            </tr>
-                          )}
-                          {filteredOrders.map((order) => (
-                            <tr key={order.id}>
-                              <td>{order.number || `#${order.id}`}</td>
-                              <td>{new Date(order.created_at || (order as any).created_at || '').toLocaleDateString('ru-RU')}</td>
-                              <td>{getOrderTotal(order).toFixed(2)} BYN</td>
-                              <td>{order.status ?? '—'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  {selectedCustomer.type === 'legal' && (
+                    <div className="customers-doc-actions">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleExportContract}
+                        disabled={ordersLoading || generatingDocument === 'contract'}
+                      >
+                        {generatingDocument === 'contract' ? 'Генерация...' : 'Договор Word'}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleExportAct}
+                        disabled={ordersLoading || generatingDocument === 'act'}
+                      >
+                        {generatingDocument === 'act' ? 'Генерация...' : 'Акт Excel'}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleExportInvoice}
+                        disabled={ordersLoading || generatingDocument === 'invoice'}
+                      >
+                        {generatingDocument === 'invoice' ? 'Генерация...' : 'Счёт Excel'}
+                      </Button>
                     </div>
                   )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowOrders((prev) => !prev)}
+                    disabled={ordersLoading}
+                  >
+                    {showOrders ? 'Скрыть заказы' : 'Показать заказы'}
+                  </Button>
                 </div>
-              )}
-            </div>
-          </div>
+
+                {selectedCustomer.type === 'legal' && (
+                  <div className="customers-legal">
+                    <div className="customers-legal__header">
+                      <h5>Реквизиты юр. лица</h5>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleSaveLegalDetails}
+                        disabled={savingLegal}
+                      >
+                        {savingLegal ? 'Сохранение…' : 'Сохранить'}
+                      </Button>
+                    </div>
+                    <div className="customers-legal__fields">
+                      <label className="customers-legal__field">
+                        <span>Расчётный счёт и банк</span>
+                        <textarea
+                          value={legalForm.bank_details}
+                          onChange={(e) =>
+                            setLegalForm((prev) => ({ ...prev, bank_details: e.target.value }))
+                          }
+                          placeholder="IBAN, банк, БИК, адрес"
+                        />
+                      </label>
+                      <label className="customers-legal__field">
+                        <span>Уполномоченное лицо</span>
+                        <textarea
+                          value={legalForm.authorized_person}
+                          onChange={(e) =>
+                            setLegalForm((prev) => ({ ...prev, authorized_person: e.target.value }))
+                          }
+                          placeholder="Действует на основании договора, устава и пр."
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                <div className="customers-summary">
+                  <div className="customers-summary-card">
+                    <div className="customers-summary-title">Средний чек</div>
+                    <div className="customers-summary-value">
+                      {customerMetrics.ordersCount > 0 ? `${customerMetrics.averageCheck.toFixed(2)} BYN` : '—'}
+                    </div>
+                  </div>
+                  <div className="customers-summary-card">
+                    <div className="customers-summary-title">Периодичность заказов</div>
+                    <div className="customers-summary-value">
+                      {customerMetrics.averageIntervalDays === null
+                        ? '—'
+                        : `${customerMetrics.averageIntervalDays.toFixed(1)} дн.`}
+                    </div>
+                  </div>
+                  <div className="customers-summary-card">
+                    <div className="customers-summary-title">Всего заказов</div>
+                    <div className="customers-summary-value">{customerMetrics.ordersCount}</div>
+                  </div>
+                </div>
+
+                {showOrders && (
+                  <div className="customers-orders">
+                    {ordersLoading ? (
+                      <div className="customers-muted">Загрузка заказов...</div>
+                    ) : (
+                      <div className="customers-table-wrapper">
+                        <table className="customers-table">
+                          <thead>
+                            <tr>
+                              <th>Заказ</th>
+                              <th>Дата</th>
+                              <th>Сумма</th>
+                              <th>Статус</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredOrders.length === 0 && (
+                              <tr>
+                                <td colSpan={4} className="customers-muted">
+                                  Нет заказов у этого клиента
+                                </td>
+                              </tr>
+                            )}
+                            {filteredOrders.map((order) => (
+                              <tr key={order.id}>
+                                <td>{order.number || `#${order.id}`}</td>
+                                <td>{new Date(order.created_at || (order as any).created_at || '').toLocaleDateString('ru-RU')}</td>
+                                <td>{getOrderTotal(order).toFixed(2)} BYN</td>
+                                <td>{order.status ?? '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </>
     </AdminPageLayout>
   );
 };

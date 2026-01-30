@@ -651,24 +651,18 @@ export class DocumentTemplateService {
             const targetRowNumber = templateRowNumber! + index;
             const row = worksheet.getRow(targetRowNumber);
             
-            // Маппинг столбцов: A=1, B=2, C=3 (но B-C объединены), D=4, E=5, F=6, G=7, H=8, I=9, J=10
-            // Поля: number, name (B-C объединены), unit, quantity, price, amount, vatRate, vatAmount, totalWithVat
-            // ВАЖНО: templateCells собирается по colNum от 1 до 10, поэтому:
-            // templateCells[0] = A (colNum 1)
-            // templateCells[1] = B (colNum 2, объединено с C)
-            // templateCells[2] = C (colNum 3, но это та же ячейка что и B из-за объединения)
-            // templateCells[3] = D (colNum 4)
-            // и т.д.
+            // Маппинг столбцов по шаблону: A=№, B=Наименование, C=ед.изм., D=кол-во, E=цена, F=сумма, G=ставка НДС, H=сумма НДС, I=всего с НДС
+            // templateCells[0]=A, [1]=B, … [8]=I
             const columnMapping: { [key: number]: { field: string; templateCellIndex: number } } = {
-              1: { field: 'number', templateCellIndex: 0 },      // A: number (templateCells[0])
-              2: { field: 'name', templateCellIndex: 1 },        // B: name (templateCells[1], объединено с C)
-              4: { field: 'unit', templateCellIndex: 3 },        // D: unit (templateCells[3])
-              5: { field: 'quantity', templateCellIndex: 4 },    // E: quantity (templateCells[4])
-              6: { field: 'price', templateCellIndex: 5 },       // F: price (templateCells[5])
-              7: { field: 'amount', templateCellIndex: 6 },      // G: amount (templateCells[6])
-              8: { field: 'vatRate', templateCellIndex: 7 },     // H: vatRate (templateCells[7], статичный "Без НДС")
-              9: { field: 'vatAmount', templateCellIndex: 8 },   // I: vatAmount (templateCells[8], статичный "-")
-              10: { field: 'totalWithVat', templateCellIndex: 9 } // J: totalWithVat (templateCells[9])
+              1: { field: 'number', templateCellIndex: 0 },      // A: номер услуги
+              2: { field: 'name', templateCellIndex: 1 },        // B: наименование услуги
+              3: { field: 'unit', templateCellIndex: 2 },         // C: ед. изм.
+              4: { field: 'quantity', templateCellIndex: 3 },    // D: кол-во
+              5: { field: 'price', templateCellIndex: 4 },       // E: цена, руб. коп.
+              6: { field: 'amount', templateCellIndex: 5 },       // F: сумма, руб. коп.
+              7: { field: 'vatRate', templateCellIndex: 6 },      // G: ставка НДС
+              8: { field: 'vatAmount', templateCellIndex: 7 },    // H: сумма НДС
+              9: { field: 'totalWithVat', templateCellIndex: 8 }  // I: всего с НДС
             };
             
             // Заполняем каждый столбец
@@ -686,12 +680,6 @@ export class DocumentTemplateService {
                   itemValue: (item as any)[mapping.field],
                   templateCellIndex: mapping.templateCellIndex
                 });
-              }
-              
-              // Пропускаем столбец C, так как он объединен с B в шаблоне
-              // insertRows автоматически скопирует объединение из шаблонной строки
-              if (colNum === 3) {
-                return; // Пропускаем заполнение столбца C
               }
               
               // Если в шаблоне есть плейсхолдер, заменяем его
@@ -721,9 +709,9 @@ export class DocumentTemplateService {
                 }
               }
               
-              // Дополнительная проверка: если это столбец J (totalWithVat) и значение пустое,
+              // Дополнительная проверка: если это столбец I (totalWithVat) и значение пустое,
               // но в item есть totalWithVat, используем его
-              if (colNum === 10 && (!cellValue || cellValue === '') && (item as any).totalWithVat !== undefined) {
+              if (colNum === 9 && (!cellValue || cellValue === '') && (item as any).totalWithVat !== undefined) {
                 cellValue = sanitizeValue((item as any).totalWithVat);
                 console.log(`[DocumentTemplate] Восстановлено значение totalWithVat для строки ${targetRowNumber}:`, cellValue);
               }
@@ -732,8 +720,8 @@ export class DocumentTemplateService {
               try {
                 const sanitizedValue = sanitizeValue(cellValue);
                 
-                // Логируем для отладки столбца totalWithVat (столбец J, индекс 9)
-                if (index < 2 && colNum === 10) {
+                // Логируем для отладки столбца totalWithVat (столбец I)
+                if (index < 2 && colNum === 9) {
                   console.log(`[DocumentTemplate] Заполнение ячейки ${targetRowNumber}:${colNum} (totalWithVat):`, {
                     templateValue: templateCell?.value,
                     itemTotalWithVat: (item as any).totalWithVat,

@@ -40,7 +40,11 @@ interface User {
   role: string;
 }
 
-export const CountersPage: React.FC = () => {
+interface CountersPageProps {
+  isModal?: boolean;
+}
+
+export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,6 +133,19 @@ export const CountersPage: React.FC = () => {
     if (!user) return;
     
     try {
+      // Чтобы имена пользователей всегда были доступны (в т.ч. при первом открытии модалки)
+      let usersForNames = allUsers;
+      if (usersForNames.length === 0) {
+        try {
+          const res = await getUsers();
+          usersForNames = Array.isArray(res.data) ? res.data : [];
+          if (usersForNames.length > 0) setAllUsers(usersForNames);
+        } catch (_) { /* ignore */ }
+      }
+      const userNameById = new Map<number, string>(
+        usersForNames.map((u: { id: number; name: string }) => [Number(u.id), u.name])
+      );
+
       const getCashActualForDate = async (date: string) => {
         // Используем список, чтобы не ловить 404, если отчёта нет
         const reportListResponse = await api.get('/daily-reports', {
@@ -156,9 +173,6 @@ export const CountersPage: React.FC = () => {
       const ordersForDate = Array.isArray(ordersResponse.data?.orders)
         ? ordersResponse.data.orders
         : [];
-      const userNameById = new Map<number, string>(
-        allUsers.map((u) => [Number(u.id), u.name])
-      );
       const contributionsByUser = new Map<number, number>();
       const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
         const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
@@ -189,11 +203,15 @@ export const CountersPage: React.FC = () => {
         });
         const reports = Array.isArray(userReportsResponse.data) ? userReportsResponse.data : [];
         const userReports = reports.filter((report: any) => report.user_id);
-        const normalized: CashContribution[] = userReports.map((report: any) => ({
-          user_id: Number(report.user_id),
-          user_name: report.user_name,
-          cash_actual: report.cash_actual ?? null
-        }));
+        const normalized: CashContribution[] = userReports.map((report: any) => {
+          const uid = Number(report.user_id);
+          const name = report.user_name || userNameById.get(uid) || `Пользователь #${uid}`;
+          return {
+            user_id: uid,
+            user_name: name,
+            cash_actual: report.cash_actual ?? null
+          };
+        });
         const hasActuals = normalized.some((r) => Number(r.cash_actual || 0) > 0);
         if (hasActuals || computedContributions.length === 0) {
           contributionsToShow = normalized;
@@ -412,20 +430,24 @@ export const CountersPage: React.FC = () => {
   }
 
   return (
-    <div className="counters-page">
+    <div className={`counters-page ${isModal ? 'counters-page--modal' : ''}`}>
       <div className="counters-header">
         <div className="header-content">
-          <button 
-            onClick={() => navigate('/')} 
-            className="back-btn"
-            title="Вернуться на главную"
-          >
-            ← Назад
-          </button>
-          <div className="header-text">
-            <h1>📊 Счётчики принтеров и кассы</h1>
-            <p>Контроль счетчиков принтеров и сверка кассы</p>
-          </div>
+          {!isModal && (
+            <button 
+              onClick={() => navigate('/')} 
+              className="back-btn"
+              title="Вернуться на главную"
+            >
+              ← Назад
+            </button>
+          )}
+          {!isModal && (
+            <div className="header-text">
+              <h1>📊 Счётчики принтеров и кассы</h1>
+              <p>Контроль счетчиков принтеров и сверка кассы</p>
+            </div>
+          )}
         </div>
         
         <div className="date-selector">

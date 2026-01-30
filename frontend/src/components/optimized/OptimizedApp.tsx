@@ -559,6 +559,51 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
           background: #d32f2f;
           transform: scale(1.1);
         }
+
+        /* Модалка счётчиков принтеров и кассы — визуальные улучшения */
+        .counters-modal-overlay {
+          background: rgba(0, 0, 0, 0.45);
+          backdrop-filter: blur(4px);
+          padding: 24px;
+        }
+        
+        .counters-modal-overlay .new-order-management-container {
+          border-radius: 16px;
+          box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04);
+          max-width: 900px;
+          height: auto;
+          max-height: 90vh;
+        }
+        
+        .counters-modal-overlay .new-order-management-header {
+          padding: 20px 28px;
+          background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+          border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .counters-modal-overlay .new-order-management-header h2 {
+          font-size: 18px;
+          font-weight: 600;
+          color: #1e293b;
+          letter-spacing: -0.01em;
+        }
+        
+        .counters-modal-overlay .close-btn {
+          background: #f44336;
+          color: white;
+          border: none;
+          font-size: 18px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .counters-modal-overlay .close-btn:hover {
+          background: #d32f2f;
+          transform: scale(1.1);
+        }
+        
+        .counters-modal-overlay .new-order-management-content {
+          background: #fafbfc;
+        }
         
         /* Компактное модальное окно для выбора даты */
         .date-switcher-modal {
@@ -640,19 +685,21 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
 
       {/* Страница счетчиков */}
       {showCountersPage && (
-        <div className="new-order-management-overlay">
+        <div className="new-order-management-overlay counters-modal-overlay">
           <div className="new-order-management-container">
             <div className="new-order-management-header">
               <h2>📊 Счётчики принтеров и кассы</h2>
               <button 
                 className="close-btn"
                 onClick={() => setShowCountersPage(false)}
+                type="button"
+                aria-label="Закрыть"
               >
                 ✕
               </button>
             </div>
             <div className="new-order-management-content">
-              <CountersPage />
+              <CountersPage isModal />
             </div>
           </div>
         </div>

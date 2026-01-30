@@ -7,6 +7,38 @@
   overflow: hidden;
 }
 
+/* Режим внутри модалки — нейтральный фон, компактный хедер */
+.counters-page--modal {
+  background: transparent;
+  min-height: 0;
+}
+
+.counters-page--modal .counters-header {
+  margin: 0;
+  padding: 16px 24px;
+  border-radius: 0;
+  box-shadow: none;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.counters-page--modal .counters-header .header-content {
+  flex: 1;
+}
+
+.counters-page--modal .counters-content {
+  padding: 20px 24px 24px;
+}
+
+.counters-page--modal .counters-section {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.counters-page--modal .counters-error-banner {
+  margin: 0 24px 16px;
+}
+
 .counters-loading {
   display: flex;
   flex-direction: column;
