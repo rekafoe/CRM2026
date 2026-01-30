@@ -451,7 +451,7 @@ export class OrderManagementService {
           await db.run(
             `
             UPDATE photo_orders 
-            SET status = 7, updated_at = datetime('now')
+            SET status = 7, updated_at = datetime('now','localtime')
             WHERE id = ?
           `,
             [orderId],
@@ -483,15 +483,16 @@ export class OrderManagementService {
             } catch {
               hasPrepaymentUpdatedAt = false
             }
+            // datetime('now','localtime') — чтобы предоплата при выдаче попадала в кассу текущего дня (datetime('now') в SQLite — UTC)
             const updateSql = hasPrepaymentUpdatedAt
               ? `
               UPDATE orders
-              SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now'), updated_at = datetime('now')
+              SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime')
               WHERE id = ?
             `
               : `
               UPDATE orders
-              SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', updated_at = datetime('now')
+              SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', updated_at = datetime('now','localtime')
               WHERE id = ?
             `
             await db.run(
@@ -503,7 +504,7 @@ export class OrderManagementService {
           await db.run(
             `
             UPDATE orders
-            SET status = 7, updated_at = datetime('now')
+            SET status = 7, updated_at = datetime('now','localtime')
             WHERE id = ?
           `,
             [orderId],
@@ -513,7 +514,7 @@ export class OrderManagementService {
         await db.run(
           `
           UPDATE user_order_page_orders 
-          SET status = 'completed', completed_at = datetime('now')
+          SET status = 'completed', completed_at = datetime('now','localtime')
           WHERE order_id = ? AND order_type = ?
         `,
           [orderId, orderType],
