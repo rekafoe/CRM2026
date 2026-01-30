@@ -54,6 +54,22 @@ const CustomersAdminPage: React.FC = () => {
   const [ordersTo, setOrdersTo] = useState('');
   const [legalForm, setLegalForm] = useState({ bank_details: '', authorized_person: '' });
   const [savingLegal, setSavingLegal] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    first_name: string;
+    last_name: string;
+    middle_name: string;
+    company_name: string;
+    legal_name: string;
+    tax_id: string;
+    phone: string;
+    email: string;
+    address: string;
+    notes: string;
+  }>({
+    first_name: '', last_name: '', middle_name: '', company_name: '', legal_name: '', tax_id: '',
+    phone: '', email: '', address: '', notes: '',
+  });
+  const [savingCustomer, setSavingCustomer] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [importing, setImporting] = useState(false);
@@ -105,6 +121,28 @@ const CustomersAdminPage: React.FC = () => {
     setLegalForm({
       bank_details: selectedCustomer.bank_details || '',
       authorized_person: selectedCustomer.authorized_person || '',
+    });
+  }, [selectedCustomer]);
+
+  useEffect(() => {
+    if (!selectedCustomer) {
+      setEditForm({
+        first_name: '', last_name: '', middle_name: '', company_name: '', legal_name: '', tax_id: '',
+        phone: '', email: '', address: '', notes: '',
+      });
+      return;
+    }
+    setEditForm({
+      first_name: selectedCustomer.first_name ?? '',
+      last_name: selectedCustomer.last_name ?? '',
+      middle_name: selectedCustomer.middle_name ?? '',
+      company_name: selectedCustomer.company_name ?? '',
+      legal_name: selectedCustomer.legal_name ?? '',
+      tax_id: selectedCustomer.tax_id ?? '',
+      phone: selectedCustomer.phone ?? '',
+      email: selectedCustomer.email ?? '',
+      address: selectedCustomer.address ?? '',
+      notes: selectedCustomer.notes ?? '',
     });
   }, [selectedCustomer]);
 
@@ -207,6 +245,36 @@ const CustomersAdminPage: React.FC = () => {
       setSavingLegal(false);
     }
   }, [legalForm, loadCustomers, selectedCustomer]);
+
+  const handleSaveCustomerDetails = useCallback(async () => {
+    if (!selectedCustomer) return;
+    try {
+      setSavingCustomer(true);
+      setError(null);
+      const payload: Parameters<typeof updateCustomer>[1] = {
+        phone: editForm.phone.trim() || undefined,
+        email: editForm.email.trim() || undefined,
+        address: editForm.address.trim() || undefined,
+        notes: editForm.notes.trim() || undefined,
+      };
+      if (selectedCustomer.type === 'individual') {
+        payload.first_name = editForm.first_name.trim();
+        payload.last_name = editForm.last_name.trim();
+        payload.middle_name = editForm.middle_name.trim() || undefined;
+      } else {
+        payload.company_name = editForm.company_name.trim();
+        payload.legal_name = editForm.legal_name.trim() || undefined;
+        payload.tax_id = editForm.tax_id.trim() || undefined;
+      }
+      const { data } = await updateCustomer(selectedCustomer.id, payload);
+      if (data) setSelectedCustomer(data);
+      await loadCustomers();
+    } catch (err: any) {
+      setError(err?.message || 'Не удалось сохранить данные клиента');
+    } finally {
+      setSavingCustomer(false);
+    }
+  }, [editForm, loadCustomers, selectedCustomer]);
 
   const buildOrdersTableRows = useCallback(
     (list: Order[]) =>
@@ -1094,6 +1162,117 @@ const CustomersAdminPage: React.FC = () => {
                     disabled={ordersLoading}
                   >
                     {showOrders ? 'Скрыть заказы' : 'Показать заказы'}
+                  </Button>
+                </div>
+
+                <div className="customers-edit-section">
+                  <h5 className="customers-edit-section__title">Данные клиента</h5>
+                  <div className="customers-edit-section__fields">
+                    {selectedCustomer.type === 'individual' ? (
+                      <>
+                        <label className="customers-edit-field">
+                          <span>Фамилия</span>
+                          <input
+                            type="text"
+                            value={editForm.last_name}
+                            onChange={(e) => setEditForm((prev) => ({ ...prev, last_name: e.target.value }))}
+                            placeholder="Фамилия"
+                          />
+                        </label>
+                        <label className="customers-edit-field">
+                          <span>Имя</span>
+                          <input
+                            type="text"
+                            value={editForm.first_name}
+                            onChange={(e) => setEditForm((prev) => ({ ...prev, first_name: e.target.value }))}
+                            placeholder="Имя"
+                          />
+                        </label>
+                        <label className="customers-edit-field">
+                          <span>Отчество</span>
+                          <input
+                            type="text"
+                            value={editForm.middle_name}
+                            onChange={(e) => setEditForm((prev) => ({ ...prev, middle_name: e.target.value }))}
+                            placeholder="Отчество"
+                          />
+                        </label>
+                      </>
+                    ) : (
+                      <>
+                        <label className="customers-edit-field">
+                          <span>Название компании</span>
+                          <input
+                            type="text"
+                            value={editForm.company_name}
+                            onChange={(e) => setEditForm((prev) => ({ ...prev, company_name: e.target.value }))}
+                            placeholder="Краткое название"
+                          />
+                        </label>
+                        <label className="customers-edit-field">
+                          <span>Юр. название</span>
+                          <input
+                            type="text"
+                            value={editForm.legal_name}
+                            onChange={(e) => setEditForm((prev) => ({ ...prev, legal_name: e.target.value }))}
+                            placeholder="Полное юридическое название"
+                          />
+                        </label>
+                        <label className="customers-edit-field">
+                          <span>УНП</span>
+                          <input
+                            type="text"
+                            value={editForm.tax_id}
+                            onChange={(e) => setEditForm((prev) => ({ ...prev, tax_id: e.target.value }))}
+                            placeholder="УНП"
+                          />
+                        </label>
+                      </>
+                    )}
+                    <label className="customers-edit-field">
+                      <span>Телефон</span>
+                      <input
+                        type="text"
+                        value={editForm.phone}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
+                        placeholder="+375 ..."
+                      />
+                    </label>
+                    <label className="customers-edit-field">
+                      <span>Email</span>
+                      <input
+                        type="email"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))}
+                        placeholder="email@example.com"
+                      />
+                    </label>
+                    <label className="customers-edit-field">
+                      <span>Адрес</span>
+                      <input
+                        type="text"
+                        value={editForm.address}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, address: e.target.value }))}
+                        placeholder="Адрес"
+                      />
+                    </label>
+                    <label className="customers-edit-field">
+                      <span>Примечание</span>
+                      <input
+                        type="text"
+                        value={editForm.notes}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                        placeholder="Заметки"
+                      />
+                    </label>
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSaveCustomerDetails}
+                    disabled={savingCustomer}
+                  >
+                    {savingCustomer ? 'Сохранение…' : 'Сохранить данные'}
                   </Button>
                 </div>
 

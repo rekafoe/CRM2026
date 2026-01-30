@@ -245,7 +245,7 @@ cellA23.font = { size: 11 };
 
 // Строка 24: Всего к оплате
 const cellA24 = worksheet.getCell('A24');
-cellA24.value = 'Всего к оплате на сумму с НДС: ${totalAmountinWords}';
+cellA24.value = 'Всего к оплате на сумму с НДС: ${totalAmountInWords}';
 cellA24.alignment = { horizontal: 'left', vertical: 'middle' };
 cellA24.font = { size: 11 };
 
@@ -310,7 +310,7 @@ workbook.xlsx.writeFile(outputPath)
     console.log('    * ${amount} - Сумма');
     console.log('    * ${totalWithVat} - Всего с НДС');
     console.log('  - ${totalAmount} - Общая сумма');
-    console.log('  - ${totalAmountinWords} - Сумма прописью');
+    console.log('  - ${totalAmountInWords} - Сумма прописью');
   })
   .catch((error) => {
     console.error('❌ Ошибка при создании шаблона:', error);

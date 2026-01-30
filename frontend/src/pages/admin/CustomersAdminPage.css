@@ -225,6 +225,61 @@
   }
 }
 
+/* Блок редактирования данных клиента */
+.customers-edit-section {
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  padding: 16px;
+  background: var(--bg-secondary, #f8fafc);
+}
+
+.customers-edit-section__title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.customers-edit-section__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin-bottom: 12px;
+}
+
+.customers-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.customers-edit-field span {
+  font-weight: 500;
+}
+
+.customers-edit-field input {
+  padding: 8px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #111827);
+}
+
+.customers-edit-field input:focus {
+  outline: none;
+  border-color: var(--primary, #2563eb);
+}
+
+@media (max-width: 600px) {
+  .customers-edit-section__fields {
+    grid-template-columns: 1fr;
+  }
+}
+
 .customers-date-filter {
   display: flex;
   align-items: center;

@@ -139,6 +139,27 @@ export class DocumentTemplateService {
     
     return template;
   }
+
+  /**
+   * Разрешить путь к файлу шаблона.
+   * На проде после деплоя файлы из dist/templates теряются; если задан DOCUMENT_TEMPLATES_DIR
+   * (volume с шаблонами), ищем файл там по имени (path.basename).
+   */
+  static resolveTemplateFilePath(template: DocumentTemplate): string {
+    const envDir = process.env.DOCUMENT_TEMPLATES_DIR;
+    const basename = path.basename(template.file_path);
+    const originalResolved = path.isAbsolute(template.file_path)
+      ? template.file_path
+      : path.resolve(__dirname, '../../', template.file_path);
+
+    if (envDir) {
+      const pathInEnvDir = path.join(envDir, basename);
+      if (fs.existsSync(pathInEnvDir)) {
+        return pathInEnvDir;
+      }
+    }
+    return originalResolved;
+  }
   
   /**
    * Получить шаблон по умолчанию для типа
@@ -461,6 +482,8 @@ export class DocumentTemplateService {
       };
       
       templateData.totalAmountInWords = numberToWords(totalAmount || 0);
+      // Алиас для шаблонов, где опечатка: totalAmountinWords (с маленькой "i")
+      templateData.totalAmountinWords = templateData.totalAmountInWords;
       
       // Добавляем все дополнительные поля из data
       Object.keys(data).forEach(key => {
@@ -1351,10 +1374,8 @@ export class DocumentTemplateService {
       totalAmount: mappedData.totalAmount
     });
     
-    // Проверяем, что путь к шаблону абсолютный и файл существует
-    const templatePath = path.isAbsolute(template.file_path) 
-      ? template.file_path 
-      : path.resolve(__dirname, '../../', template.file_path);
+    // Путь к файлу: учитываем DOCUMENT_TEMPLATES_DIR (для прод, когда шаблоны в volume)
+    const templatePath = DocumentTemplateService.resolveTemplateFilePath(template);
     
     if (!fs.existsSync(templatePath)) {
       throw new Error(`Файл шаблона не найден: ${templatePath} (исходный путь: ${template.file_path})`);

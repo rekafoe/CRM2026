@@ -79,13 +79,15 @@ router.post('/', upload.single('template'), asyncHandler(async (req: Request, re
     return;
   }
   
-  // Перемещаем файл в директорию шаблонов
-  const templatesDir = path.resolve(__dirname, '../templates');
+  // Директория шаблонов: DOCUMENT_TEMPLATES_DIR на проде (volume), иначе рядом с приложением
+  const templatesDir = process.env.DOCUMENT_TEMPLATES_DIR
+    ? path.resolve(process.env.DOCUMENT_TEMPLATES_DIR)
+    : path.resolve(__dirname, '../templates');
   if (!fs.existsSync(templatesDir)) {
     fs.mkdirSync(templatesDir, { recursive: true });
   }
   
-  const finalPath = path.resolve(templatesDir, `${type}-${Date.now()}${ext}`);
+  const finalPath = path.join(templatesDir, `${type}-${Date.now()}${ext}`);
   fs.renameSync(file.path, finalPath);
   
   console.log(`[DocumentTemplate] Файл шаблона перемещен: ${file.path} -> ${finalPath}`);
@@ -219,14 +221,15 @@ router.post('/generate/:type', asyncHandler(async (req: Request, res: Response) 
       return;
     }
     
-    // Проверяем, что файл шаблона существует
-    if (!fs.existsSync(template.file_path)) {
-      console.error(`[DocumentTemplate] Файл шаблона не найден: ${template.file_path}`);
-      res.status(404).json({ message: `Файл шаблона "${template.name}" не найден. Возможно, файл был удален. Загрузите шаблон заново.` });
+    // Путь с учётом DOCUMENT_TEMPLATES_DIR (на проде — volume с шаблонами)
+    const resolvedPath = DocumentTemplateService.resolveTemplateFilePath(template);
+    if (!fs.existsSync(resolvedPath)) {
+      console.error(`[DocumentTemplate] Файл шаблона не найден: ${resolvedPath} (в БД: ${template.file_path})`);
+      res.status(404).json({ message: `Файл шаблона "${template.name}" не найден. На проде задайте DOCUMENT_TEMPLATES_DIR и положите туда файл ${path.basename(template.file_path)} или загрузите шаблон заново.` });
       return;
     }
     
-    console.log(`[DocumentTemplate] Генерация документа типа "${type}" с шаблоном ID ${template.id}: ${template.name}, путь: ${template.file_path}`);
+    console.log(`[DocumentTemplate] Генерация документа типа "${type}" с шаблоном ID ${template.id}: ${template.name}, путь: ${resolvedPath}`);
     
     const data: TemplateData = req.body;
     
