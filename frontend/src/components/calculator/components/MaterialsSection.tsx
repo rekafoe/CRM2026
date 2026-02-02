@@ -252,6 +252,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     }
   }, [isSimplifiedProduct, specs.size_id, specs.material_id, allowedMaterialsForSize, allMaterials, warehousePaperTypes, updateSpecs]);
 
+  // Продукт без материалов (нет paperType в схеме и не упрощённый с размерами/материалами) — не показываем секцию
+  const usesMaterials = hasField('paperType') || isSimplifiedProduct;
+  if (!usesMaterials) {
+    return null;
+  }
+
   return (
     <div className="form-section compact">
       <h3>📄 Материалы</h3>

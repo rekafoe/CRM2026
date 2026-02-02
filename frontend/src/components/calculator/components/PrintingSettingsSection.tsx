@@ -263,6 +263,11 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     );
   }
 
+  // Продукт без печати — не показываем секцию (пустой селект «Тип печати *» не нужен)
+  if (allowedPrintTechnologies.length === 0) {
+    return null;
+  }
+
   return (
     <div className="form-section compact" style={{ padding: 0, border: 'none', background: 'transparent' }}>
       <div className="materials-grid compact">

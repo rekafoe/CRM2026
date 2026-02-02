@@ -381,8 +381,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   useEffect(() => {
     if (!isOpen || editContext?.item) return; // Пропускаем при редактировании
     
-    // Устанавливаем первый тип бумаги, если не выбран
-    if (safeWarehousePaperTypes.length > 0 && !specs.paperType) {
+    // Устанавливаем первый тип бумаги только если продукт использует материалы (есть поле paperType в схеме)
+    const productUsesPaper = backendProductSchema?.fields?.some((f: any) => f.name === 'paperType');
+    if (productUsesPaper && safeWarehousePaperTypes.length > 0 && !specs.paperType) {
       const firstPaperType = safeWarehousePaperTypes[0];
       setSpecs(prev => ({
         ...prev,
@@ -407,7 +408,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       priceType: 'online', // Всегда используем онлайн по умолчанию
       customerType: 'regular', // Всегда используем обычный тип клиента по умолчанию
     }));
-  }, [isOpen, safeWarehousePaperTypes, specs.paperType, specs.format, availableFormats, getDefaultPaperDensity, editContext]);
+  }, [isOpen, safeWarehousePaperTypes, specs.paperType, specs.format, availableFormats, getDefaultPaperDensity, editContext, backendProductSchema]);
 
   // 🆕 Устанавливаем materialType на основе выбранного материала или paperType
   // materialType = тип бумаги со склада (вторая вкладка "Типы бумаги")

@@ -40,7 +40,12 @@ const formatDateValue = (value?: string) => {
 
 const formatDateForFile = (date: Date) => date.toISOString().slice(0, 10).replace(/-/g, '');
 
-const CustomersAdminPage: React.FC = () => {
+interface CustomersAdminPageProps {
+  /** Куда вести кнопка «Назад»: по умолчанию /adminpanel, на странице /clients — / */
+  backTo?: string;
+}
+
+const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/adminpanel' }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<CustomerTab>('individual');
   const [loading, setLoading] = useState(false);
@@ -234,10 +239,11 @@ const CustomersAdminPage: React.FC = () => {
     if (!selectedCustomer || selectedCustomer.type !== 'legal') return;
     try {
       setSavingLegal(true);
-      await updateCustomer(selectedCustomer.id, {
+      const { data } = await updateCustomer(selectedCustomer.id, {
         bank_details: legalForm.bank_details.trim(),
         authorized_person: legalForm.authorized_person.trim(),
       });
+      if (data) setSelectedCustomer(data);
       await loadCustomers();
     } catch (err: any) {
       setError(err?.message || 'Не удалось сохранить реквизиты');
@@ -405,17 +411,17 @@ const CustomersAdminPage: React.FC = () => {
           legalName: selectedCustomer.legal_name || '',
           legalAddress: selectedCustomer.address || '—',
           taxId: selectedCustomer.tax_id || '—',
-          bankDetails: selectedCustomer.bank_details || '—',
-          authorizedPerson: selectedCustomer.authorized_person || '—',
+          bankDetails: selectedCustomer.type === 'legal' ? (legalForm.bank_details.trim() || selectedCustomer.bank_details || '—') : (selectedCustomer.bank_details || '—'),
+          authorizedPerson: selectedCustomer.type === 'legal' ? (legalForm.authorized_person.trim() || selectedCustomer.authorized_person || '—') : (selectedCustomer.authorized_person || '—'),
           orders: filteredOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
             amount: getOrderTotal(order),
             status: String(order.status ?? '—'),
           })),
-          orderItems: allOrderItems, // Детализированные позиции для таблицы
+          orderItems: allOrderItems,
           totalAmount: filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
-          totalQuantity: allOrderItems.reduce((sum, item) => sum + item.quantity, 0), // Общее количество позиций
+          totalQuantity: allOrderItems.reduce((sum, item) => sum + item.quantity, 0),
         };
         
         console.log(`[Frontend] Отправляем данные в шаблон:`, {
@@ -488,7 +494,7 @@ const CustomersAdminPage: React.FC = () => {
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, filteredOrders, selectedCustomer]);
+  }, [buildOrdersTableRows, filteredOrders, legalForm, selectedCustomer]);
 
   const handleExportInvoice = useCallback(async () => {
     if (!selectedCustomer) return;
@@ -570,17 +576,17 @@ const CustomersAdminPage: React.FC = () => {
           legalName: selectedCustomer.legal_name || '',
           legalAddress: selectedCustomer.address || '—',
           taxId: selectedCustomer.tax_id || '—',
-          bankDetails: selectedCustomer.bank_details || '—',
-          authorizedPerson: selectedCustomer.authorized_person || '—',
+          bankDetails: selectedCustomer.type === 'legal' ? (legalForm.bank_details.trim() || selectedCustomer.bank_details || '—') : (selectedCustomer.bank_details || '—'),
+          authorizedPerson: selectedCustomer.type === 'legal' ? (legalForm.authorized_person.trim() || selectedCustomer.authorized_person || '—') : (selectedCustomer.authorized_person || '—'),
           orders: filteredOrders.map((order, index) => ({
             number: order.number || `#${order.id}`,
             date: formatDateValue(order.created_at || (order as any).created_at),
             amount: getOrderTotal(order),
             status: String(order.status ?? '—'),
           })),
-          orderItems: allOrderItems, // Детализированные позиции для таблицы
+          orderItems: allOrderItems,
           totalAmount: filteredOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
-          totalQuantity: allOrderItems.reduce((sum, item) => sum + item.quantity, 0), // Общее количество позиций
+          totalQuantity: allOrderItems.reduce((sum, item) => sum + item.quantity, 0),
         };
         
         const response = await generateDocumentByType('invoice', templateData);
@@ -639,7 +645,7 @@ const CustomersAdminPage: React.FC = () => {
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, filteredOrders, selectedCustomer]);
+  }, [buildOrdersTableRows, filteredOrders, legalForm, selectedCustomer]);
 
   const handleExportContract = useCallback(async () => {
     if (!selectedCustomer) return;
@@ -658,8 +664,8 @@ const CustomersAdminPage: React.FC = () => {
           legalName: selectedCustomer.legal_name || '',
           legalAddress: selectedCustomer.address || '—',
           taxId: selectedCustomer.tax_id || '—',
-          bankDetails: selectedCustomer.bank_details || '—',
-          authorizedPerson: selectedCustomer.authorized_person || '—',
+          bankDetails: selectedCustomer.type === 'legal' ? (legalForm.bank_details.trim() || selectedCustomer.bank_details || '—') : (selectedCustomer.bank_details || '—'),
+          authorizedPerson: selectedCustomer.type === 'legal' ? (legalForm.authorized_person.trim() || selectedCustomer.authorized_person || '—') : (selectedCustomer.authorized_person || '—'),
           contractNumber,
           contractDate: new Date().toLocaleDateString('ru-RU'),
           orders: filteredOrders.map((order, index) => ({
@@ -711,8 +717,8 @@ const CustomersAdminPage: React.FC = () => {
       
       // Стандартная генерация без шаблона
       const title = `ДОГОВОР № ${contractNumber}`;
-      const bankDetails = selectedCustomer.bank_details || '—';
-      const authorizedPerson = selectedCustomer.authorized_person || '—';
+      const bankDetails = selectedCustomer.type === 'legal' ? (legalForm.bank_details.trim() || selectedCustomer.bank_details || '—') : (selectedCustomer.bank_details || '—');
+      const authorizedPerson = selectedCustomer.type === 'legal' ? (legalForm.authorized_person.trim() || selectedCustomer.authorized_person || '—') : (selectedCustomer.authorized_person || '—');
       const legalAddress = selectedCustomer.address || '—';
 
       const tableRows = [
@@ -792,7 +798,7 @@ const CustomersAdminPage: React.FC = () => {
     } finally {
       setGeneratingDocument(null);
     }
-  }, [buildOrdersTableRows, filteredOrders, selectedCustomer]);
+  }, [buildOrdersTableRows, filteredOrders, legalForm, selectedCustomer]);
 
   const normalizeHeader = (value: unknown) =>
     String(value || '')
@@ -982,7 +988,7 @@ const CustomersAdminPage: React.FC = () => {
   }, [handleImport]);
 
   return (
-    <AdminPageLayout title="Клиенты CRM" icon="👥" onBack={() => navigate('/adminpanel')} className="customers-page">
+    <AdminPageLayout title="Клиенты CRM" icon="👥" onBack={() => navigate(backTo)} className="customers-page">
       {error && <Alert type="error">{error}</Alert>}
       {importError && <Alert type="error">{importError}</Alert>}
       {importSummary && (

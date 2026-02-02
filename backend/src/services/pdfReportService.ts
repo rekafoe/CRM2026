@@ -1195,6 +1195,54 @@ export class PDFReportService {
   }
 
   /**
+   * Краткое название позиции для товарного чека: название продукта, стороны печати, материал и плотность в одном блоке (напр. "Визитки. 2-стор., офисная 80 г").
+   */
+  private static getCommodityReceiptItemName(it: any): string {
+    let productName = (it.type || 'Товар').trim();
+    let sidesStr = '';
+    let materialDensityStr = '';
+    try {
+      const params = typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
+      if (params.productName) productName = String(params.productName).trim();
+
+      const specs = params.specifications || {};
+      const ps: Array<{ label?: string; key?: string; value?: string }> = Array.isArray(params.parameterSummary) ? params.parameterSummary : [];
+
+      const sides = specs.sides ?? (typeof specs.sides === 'number' ? specs.sides : undefined);
+      if (sides === 1) sidesStr = '1-стор.';
+      else if (sides === 2) sidesStr = '2-стор.';
+      if (!sidesStr && ps.length) {
+        const sidesEntry = ps.find((x: any) => /сторон|печать|sides/i.test(String(x.label || x.key || '')));
+        if (sidesEntry?.value) sidesStr = String(sidesEntry.value).toLowerCase().includes('двух') || String(sidesEntry.value).includes('2') ? '2-стор.' : '1-стор.';
+      }
+
+      const paperTypeEntry = ps.find((x: any) => /тип\s*бумаги|paperType|бумага/i.test(String(x.label || x.key || '')));
+      const densityEntry = ps.find((x: any) => /плотность|density|г\/м/i.test(String(x.label || x.key || '')));
+      const paperTypeVal = paperTypeEntry?.value ? String(paperTypeEntry.value).trim() : '';
+      let densityVal = densityEntry?.value ? String(densityEntry.value).trim() : '';
+      if (!paperTypeVal && !densityVal) {
+        if (specs.paperType || specs.paperDensity) {
+          const pt = specs.paperType ? String(specs.paperType) : '';
+          const den = specs.paperDensity ? String(specs.paperDensity) : '';
+          if (pt) materialDensityStr = pt.toLowerCase();
+          if (den) materialDensityStr += (materialDensityStr ? ' ' : '') + den.replace(/\s*г\/м².*/i, '').trim() + ' г';
+        }
+      } else {
+        if (densityVal) {
+          densityVal = densityVal.replace(/\s*г\/м².*/i, '').trim();
+          if (densityVal && !/\d/.test(densityVal)) densityVal = '';
+          else if (densityVal && !/г\s*$/i.test(densityVal)) densityVal = densityVal + ' г';
+        }
+        materialDensityStr = [paperTypeVal.toLowerCase(), densityVal].filter(Boolean).join(' ');
+      }
+    } catch (_) { /* ignore */ }
+
+    const extra = [sidesStr, materialDensityStr].filter(Boolean);
+    if (extra.length) return `${productName}. ${extra.join(', ')}`;
+    return productName;
+  }
+
+  /**
    * Генерация PDF товарного чека по заказу (заполненный)
    */
   static async generateCommodityReceipt(
@@ -1247,15 +1295,7 @@ export class PDFReportService {
         const q = Number(it.quantity) || 1;
         const p = Number(it.price) || 0;
         const sum = Math.round(q * p * 100) / 100;
-        let name = (it.type || 'Товар').trim();
-        try {
-          const params = typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
-          const ps = params.parameterSummary;
-          if (ps && Array.isArray(ps)) {
-            const parts = ps.map((x: any) => `${x.label || x.key || ''}: ${x.value || ''}`).filter(Boolean);
-            if (parts.length) name += '. ' + parts.join(', ');
-          }
-        } catch (_) { /* ignore */ }
+        const name = this.getCommodityReceiptItemName(it);
         return { num: idx + 1, name, quantity: q, price: p, sum };
       });
 
