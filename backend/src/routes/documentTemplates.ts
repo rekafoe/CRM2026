@@ -91,9 +91,14 @@ router.post('/', upload.single('template'), asyncHandler(async (req: Request, re
   }
   
   const finalPath = path.join(templatesDir, `${type}-${Date.now()}${ext}`);
-  fs.renameSync(file.path, finalPath);
-  
-  console.log(`[DocumentTemplate] Файл шаблона перемещен: ${file.path} -> ${finalPath}`);
+  // Копируем и удаляем исходник: rename() даёт EXDEV при переносе между разными FS (uploads → volume /data)
+  fs.copyFileSync(file.path, finalPath);
+  try {
+    fs.unlinkSync(file.path);
+  } catch (unlinkErr: any) {
+    console.warn('[DocumentTemplate] Не удалось удалить временный файл после копирования:', unlinkErr?.message);
+  }
+  console.log(`[DocumentTemplate] Файл шаблона сохранён: ${file.path} -> ${finalPath}`);
   console.log(`[DocumentTemplate] Абсолютный путь к шаблону: ${path.resolve(finalPath)}`);
   
   const template = await DocumentTemplateService.saveTemplate(
