@@ -417,7 +417,8 @@ router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) =>
   `, [...matDateParams, ...matDateParams])
   } catch (err) {
     console.error('Materials ABC query failed:', err)
-    return res.json(emptyMaterialsResponse(period))
+    res.json(emptyMaterialsResponse(period))
+    return
   }
 
   const totalCost = materialsConsumption.reduce((sum, m) => sum + m.total_cost, 0)
