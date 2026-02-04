@@ -144,6 +144,22 @@ export const getDailyReports = (params?: { user_id?: number | ''; from?: string;
 
 export const getCurrentUser = () => api.get<{ id: number; name: string; role: string }>('/auth/me');
 
+// === ДЕПАРТАМЕНТЫ ===
+export interface Department {
+  id: number;
+  name: string;
+  description?: string | null;
+  sort_order?: number;
+  created_at?: string;
+}
+
+export const getDepartments = () => api.get<Department[]>('/departments');
+export const createDepartment = (data: { name: string; description?: string; sort_order?: number }) =>
+  api.post<Department>('/departments', data);
+export const updateDepartment = (id: number, data: { name?: string; description?: string; sort_order?: number }) =>
+  api.put<Department>(`/departments/${id}`, data);
+export const deleteDepartment = (id: number) => api.delete(`/departments/${id}`);
+
 // === УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ===
 export interface User {
   id: number;
@@ -152,12 +168,14 @@ export interface User {
   role: string;
   created_at: string;
   has_api_token?: boolean;
+  department_id?: number | null;
+  department_name?: string | null;
 }
 
 export const getAllUsers = () => api.get<User[]>('/users/all');
-export const createUser = (user: { name: string; email: string; password: string; role: string }) =>
+export const createUser = (user: { name: string; email: string; password: string; role: string; department_id?: number | null }) =>
   api.post<User>('/users', user);
-export const updateUser = (id: number, user: { name: string; email: string; role: string }) =>
+export const updateUser = (id: number, user: { name: string; email: string; role: string; department_id?: number | null }) =>
   api.put(`/users/${id}`, user);
 export const deleteUser = (id: number) => api.delete(`/users/${id}`);
 export const resetUserToken = (id: number) => api.post<{ api_token: string }>(`/users/${id}/reset-token`);
@@ -172,8 +190,11 @@ export const getFullDailyReport = (reportDate: string, userId?: number) =>
 export const saveFullDailyReport = (report: DailyReport) =>
   api.post<DailyReport>('/daily-reports/full', report);
 
+// Параметры периода аналитики: либо period (дни), либо date_from + date_to (YYYY-MM-DD)
+export type AnalyticsPeriodParams = { period?: string; date_from?: string; date_to?: string };
+
 // === АНАЛИТИКА ПРОДУКТОВ ===
-export const getProductPopularityAnalytics = (params?: { period?: string; limit?: string }) =>
+export const getProductPopularityAnalytics = (params?: AnalyticsPeriodParams & { limit?: string }) =>
   api.get<{
     period: { days: number; startDate: string };
     productPopularity: Array<{
@@ -204,7 +225,7 @@ export const getProductPopularityAnalytics = (params?: { period?: string; limit?
   }>('/reports/analytics/products/popularity', { params });
 
 // === ФИНАНСОВАЯ АНАЛИТИКА ===
-export const getFinancialProfitabilityAnalytics = (params?: { period?: string }) =>
+export const getFinancialProfitabilityAnalytics = (params?: AnalyticsPeriodParams) =>
   api.get<{
     period: { days: number; startDate: string };
     productProfitability: Array<{
@@ -233,7 +254,7 @@ export const getFinancialProfitabilityAnalytics = (params?: { period?: string })
   }>('/reports/analytics/financial/profitability', { params });
 
 // === АНАЛИТИКА СТАТУСОВ ЗАКАЗОВ ===
-export const getOrderStatusFunnelAnalytics = (params?: { period?: string }) =>
+export const getOrderStatusFunnelAnalytics = (params?: AnalyticsPeriodParams) =>
   api.get<{
     period: { days: number; startDate: string };
     statusFunnel: Array<{
@@ -262,7 +283,7 @@ export const getOrderStatusFunnelAnalytics = (params?: { period?: string }) =>
   }>('/reports/analytics/orders/status-funnel', { params });
 
 // === АНАЛИТИКА ЭФФЕКТИВНОСТИ МЕНЕДЖЕРОВ ===
-export const getManagerEfficiencyAnalytics = (params?: { period?: string }) =>
+export const getManagerEfficiencyAnalytics = (params?: AnalyticsPeriodParams & { department_id?: number }) =>
   api.get<{
     period: { days: number; startDate: string };
     managerEfficiency: Array<{
@@ -295,7 +316,7 @@ export const getManagerEfficiencyAnalytics = (params?: { period?: string }) =>
   }>('/reports/analytics/managers/efficiency', { params });
 
 // === ABC-АНАЛИЗ МАТЕРИАЛОВ ===
-export const getMaterialsABCAnalytics = (params?: { period?: string }) =>
+export const getMaterialsABCAnalytics = (params?: AnalyticsPeriodParams) =>
   api.get<{
     period: { days: number; startDate: string };
     abcAnalysis: Array<{
@@ -329,7 +350,7 @@ export const getMaterialsABCAnalytics = (params?: { period?: string }) =>
   }>('/reports/analytics/materials/abc-analysis', { params });
 
 // === ВРЕМЕННАЯ АНАЛИТИКА ===
-export const getTimePeakHoursAnalytics = (params?: { period?: string }) =>
+export const getTimePeakHoursAnalytics = (params?: AnalyticsPeriodParams) =>
   api.get<{
     period: { days: number; startDate: string };
     hourlyAnalysis: Array<{
@@ -388,7 +409,7 @@ export const createDailyReport = (data: { report_date: string; user_id?: number;
 // Earnings API
 export const getMyEarnings = (params?: { month?: string }) =>
   api.get('/earnings/me', { params });
-export const getAdminEarnings = (params?: { month?: string; history_months?: number }) =>
+export const getAdminEarnings = (params?: { month?: string; history_months?: number; department_id?: number }) =>
   api.get('/earnings/admin', { params });
 export const getDailyEarnings = (date: string, userId?: number) =>
   api.get('/earnings/daily', { params: userId ? { date, user_id: userId } : { date } });

@@ -1,7 +1,7 @@
 // Компонент управления пользователями
 
 import React, { useState, useEffect } from 'react';
-import { User, getAllUsers, createUser, updateUser, deleteUser, resetUserToken, getCurrentUser, setAuthToken } from '../../api';
+import { User, Department, getAllUsers, getDepartments, createUser, updateUser, deleteUser, resetUserToken, getCurrentUser, setAuthToken } from '../../api';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { Alert } from '../../components/common';
 import './UserManagement.css';
@@ -12,6 +12,8 @@ interface UserManagementProps {
 
 export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentFilter, setDepartmentFilter] = useState<number | ''>('');
   const [isLoading, setIsLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -21,8 +23,18 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
 
   useEffect(() => {
     loadUsers();
+    loadDepartments();
     void loadCurrentUser();
   }, []);
+
+  const loadDepartments = async () => {
+    try {
+      const response = await getDepartments();
+      setDepartments(response.data ?? []);
+    } catch {
+      setDepartments([]);
+    }
+  };
 
   const loadCurrentUser = async () => {
     try {
@@ -47,7 +59,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     }
   };
 
-  const handleCreateUser = async (userData: { name: string; email: string; password: string; role: string }) => {
+  const filteredUsers = departmentFilter === ''
+    ? users
+    : users.filter(u => u.department_id === departmentFilter);
+
+  const handleCreateUser = async (userData: { name: string; email: string; password: string; role: string; department_id?: number | null }) => {
     try {
       setErrorMessage(null);
       await createUser(userData);
@@ -59,7 +75,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     }
   };
 
-  const handleUpdateUser = async (userId: number, userData: { name: string; email: string; role: string }) => {
+  const handleUpdateUser = async (userId: number, userData: { name: string; email: string; role: string; department_id?: number | null }) => {
     try {
       setErrorMessage(null);
       await updateUser(userId, userData);
@@ -187,20 +203,31 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       {/* Список пользователей */}
       <div className="users-list">
         <div className="users-list-header">
-          Пользователи ({users.length})
+          <span>Пользователи ({filteredUsers.length})</span>
+          <select
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value === '' ? '' : Number(e.target.value))}
+            className="user-form-select"
+            style={{ marginLeft: 'auto', minWidth: '160px' }}
+          >
+            <option value="">Все департаменты</option>
+            {departments.map(d => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
         </div>
 
         {isLoading ? (
           <div className="users-loading">
             Загрузка пользователей...
           </div>
-        ) : users.length === 0 ? (
+        ) : filteredUsers.length === 0 ? (
           <div className="users-empty">
-            Нет пользователей
+            {users.length === 0 ? 'Нет пользователей' : 'Нет пользователей в выбранном департаменте'}
           </div>
         ) : (
           <div className="users-scroll-container">
-            {users.map(user => (
+            {filteredUsers.map(user => (
               <div
                 key={user.id}
                 className="user-item"
@@ -213,6 +240,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                     <div className={`user-role-badge user-role-badge-${user.role}`}>
                       {getRoleLabel(user.role)}
                     </div>
+                    {user.department_name && (
+                      <span className="user-department-badge" title="Департамент">
+                        {user.department_name}
+                      </span>
+                    )}
                     {user.has_api_token && (
                       <div className="user-api-badge">
                         API ✓
@@ -222,6 +254,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                   <div className="user-details">
                     <span>📧 {user.email}</span>
                     <span>📅 {new Date(user.created_at).toLocaleDateString('ru-RU')}</span>
+                    {!user.department_name && user.department_id == null && (
+                      <span title="Без департамента">—</span>
+                    )}
                   </div>
                 </div>
                 <div className="user-actions">
@@ -254,6 +289,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       {showCreateModal && (
         <UserFormModal
           title="Создать пользователя"
+          departments={departments}
           onSubmit={handleCreateUser}
           onClose={() => setShowCreateModal(false)}
         />
@@ -263,10 +299,12 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       {editingUser && (
         <UserFormModal
           title="Редактировать пользователя"
+          departments={departments}
           initialData={{
             name: editingUser.name,
             email: editingUser.email,
-            role: editingUser.role
+            role: editingUser.role,
+            department_id: editingUser.department_id ?? undefined
           }}
           onSubmit={(data) => handleUpdateUser(editingUser.id, data)}
           onClose={() => setEditingUser(null)}
@@ -323,13 +361,15 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
 // Компонент формы пользователя
 interface UserFormModalProps {
   title: string;
-  initialData?: { name: string; email: string; role: string };
+  departments: Department[];
+  initialData?: { name: string; email: string; role: string; department_id?: number | null };
   onSubmit: (data: any) => void;
   onClose: () => void;
 }
 
 const UserFormModal: React.FC<UserFormModalProps> = ({
   title,
+  departments,
   initialData,
   onSubmit,
   onClose
@@ -338,12 +378,15 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
     name: initialData?.name || '',
     email: initialData?.email || '',
     password: '',
-    role: initialData?.role || 'user'
+    role: initialData?.role || 'user',
+    department_id: initialData?.department_id ?? '' as number | ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    const payload: any = { ...formData };
+    payload.department_id = formData.department_id === '' ? null : Number(formData.department_id);
+    onSubmit(payload);
   };
 
   return (
@@ -411,6 +454,21 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
               <option value="user">Пользователь</option>
               <option value="manager">Менеджер</option>
               <option value="admin">Администратор</option>
+            </select>
+          </div>
+          <div className="user-form-group">
+            <label className="user-form-label">
+              Департамент:
+            </label>
+            <select
+              value={formData.department_id === '' ? '' : formData.department_id}
+              onChange={(e) => setFormData({ ...formData, department_id: e.target.value === '' ? '' : Number(e.target.value) })}
+              className="user-form-select"
+            >
+              <option value="">Без департамента</option>
+              {departments.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
             </select>
           </div>
           <div className="user-form-actions">

@@ -738,6 +738,7 @@ export class OrderService {
     maxAmount?: number;
     hasPrepayment?: boolean;
     paymentMethod?: string;
+    department_id?: number;
     limit?: number;
     offset?: number;
   }) {

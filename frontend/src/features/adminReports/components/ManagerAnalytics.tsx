@@ -50,7 +50,9 @@ export const ManagerAnalytics: React.FC<ManagerAnalyticsProps> = ({ data }) => {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--accent-primary)' }}>
-                    {manager.total_revenue?.toLocaleString('ru-RU')} BYN
+                    {manager.total_revenue != null && Number(manager.total_revenue) > 0
+                      ? `${Number(manager.total_revenue).toLocaleString('ru-RU')} BYN`
+                      : '0 BYN'}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                     {manager.total_orders} заказов
@@ -77,7 +79,9 @@ export const ManagerAnalytics: React.FC<ManagerAnalyticsProps> = ({ data }) => {
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--accent-primary)' }}>
-                    {manager.avg_order_value?.toFixed(0)} BYN
+                    {manager.avg_order_value != null && Number.isFinite(manager.avg_order_value)
+                      ? `${Number(manager.avg_order_value).toFixed(0)} BYN`
+                      : '—'}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                     Средний чек
@@ -85,7 +89,9 @@ export const ManagerAnalytics: React.FC<ManagerAnalyticsProps> = ({ data }) => {
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
-                    {manager.avg_processing_hours?.toFixed(1)} ч
+                    {manager.avg_processing_hours != null && Number.isFinite(manager.avg_processing_hours)
+                      ? `${Number(manager.avg_processing_hours).toFixed(1)} ч`
+                      : '—'}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                     Время обработки

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { Alert, Button, FormField, Modal } from '../../components/common';
-import { getAdminEarnings, getShifts, updateShift, createShift } from '../../api';
+import { getAdminEarnings, getShifts, updateShift, createShift, getDepartments, type Department } from '../../api';
 import '../EarningsPage.css';
 import '../../components/admin/PricingManagement.css';
 
@@ -33,6 +33,8 @@ export const EarningsAdminPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<AdminUserRow[]>([]);
   const [historyMonths, setHistoryMonths] = useState(3);
+  const [departmentId, setDepartmentId] = useState<number | ''>('');
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [activeTab, setActiveTab] = useState<'summary' | 'analytics'>('summary');
   const [analyticsUserId, setAnalyticsUserId] = useState<number | null>(null);
   const [detailUser, setDetailUser] = useState<AdminUserRow | null>(null);
@@ -46,14 +48,20 @@ export const EarningsAdminPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await getAdminEarnings({ month, history_months: historyMonths });
+      const params: { month?: string; history_months?: number; department_id?: number } = { month, history_months: historyMonths };
+      if (departmentId !== '' && Number.isFinite(departmentId)) params.department_id = departmentId;
+      const res = await getAdminEarnings(params);
       setRows(Array.isArray(res.data?.users) ? res.data.users : []);
     } catch (e: any) {
       setError(e?.response?.data?.message || 'Не удалось загрузить проценты сотрудников');
     } finally {
       setLoading(false);
     }
-  }, [month, historyMonths]);
+  }, [month, historyMonths, departmentId]);
+
+  useEffect(() => {
+    getDepartments().then(r => setDepartments(r.data ?? [])).catch(() => setDepartments([]));
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -173,6 +181,18 @@ export const EarningsAdminPage: React.FC = () => {
                   value={historyMonths}
                   onChange={(e) => setHistoryMonths(Number(e.target.value) || 3)}
                 />
+              </FormField>
+              <FormField label="Департамент">
+                <select
+                  className="form-control"
+                  value={departmentId === '' ? '' : departmentId}
+                  onChange={(e) => setDepartmentId(e.target.value === '' ? '' : Number(e.target.value))}
+                >
+                  <option value="">Все департаменты</option>
+                  {departments.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
               </FormField>
             </div>
           </div>

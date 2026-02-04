@@ -19,48 +19,52 @@ import {
   AnalyticsTab
 } from '../types';
 
+export type PeriodParams = { period: number; dateFrom?: string; dateTo?: string };
+
+function buildParams({ period, dateFrom, dateTo }: PeriodParams): { period?: string; date_from?: string; date_to?: string } {
+  if (dateFrom && dateTo) return { date_from: dateFrom, date_to: dateTo };
+  return { period: period.toString() };
+}
+
 export class AnalyticsService {
-  // === ПРОДУКТЫ ===
-  static async getProductAnalytics(period: number): Promise<ProductAnalyticsData> {
-    const response = await getProductPopularityAnalytics({ period: period.toString() });
+  static async getProductAnalytics(params: PeriodParams): Promise<ProductAnalyticsData> {
+    const response = await getProductPopularityAnalytics(buildParams(params));
     return response.data;
   }
 
-  // === ФИНАНСЫ ===
-  static async getFinancialAnalytics(period: number): Promise<FinancialAnalyticsData> {
-    const response = await getFinancialProfitabilityAnalytics({ period: period.toString() });
+  static async getFinancialAnalytics(params: PeriodParams): Promise<FinancialAnalyticsData> {
+    const response = await getFinancialProfitabilityAnalytics(buildParams(params));
     return response.data;
   }
 
-  // === СТАТУСЫ ЗАКАЗОВ ===
-  static async getOrderStatusAnalytics(period: number): Promise<OrderStatusAnalyticsData> {
-    const response = await getOrderStatusFunnelAnalytics({ period: period.toString() });
+  static async getOrderStatusAnalytics(params: PeriodParams): Promise<OrderStatusAnalyticsData> {
+    const response = await getOrderStatusFunnelAnalytics(buildParams(params));
     return response.data;
   }
 
-  // === МЕНЕДЖЕРЫ ===
-  static async getManagerAnalytics(period: number): Promise<ManagerAnalyticsData> {
-    const response = await getManagerEfficiencyAnalytics({ period: period.toString() });
+  static async getManagerAnalytics(params: PeriodParams, departmentId?: number): Promise<ManagerAnalyticsData> {
+    const apiParams = { ...buildParams(params), department_id: departmentId };
+    const response = await getManagerEfficiencyAnalytics(apiParams);
     return response.data;
   }
 
-  // === МАТЕРИАЛЫ ===
-  static async getMaterialsAnalytics(period: number): Promise<MaterialsAnalyticsData> {
-    // Для материалов используем больший период (3x)
-    const response = await getMaterialsABCAnalytics({ period: (period * 3).toString() });
+  static async getMaterialsAnalytics(params: PeriodParams): Promise<MaterialsAnalyticsData> {
+    const p = params.dateFrom && params.dateTo
+      ? params
+      : { period: params.period * 3, dateFrom: params.dateFrom, dateTo: params.dateTo };
+    const response = await getMaterialsABCAnalytics(buildParams(p));
     return response.data;
   }
 
-  // === ВРЕМЯ ===
-  static async getTimeAnalytics(period: number): Promise<TimeAnalyticsData> {
-    const response = await getTimePeakHoursAnalytics({ period: period.toString() });
+  static async getTimeAnalytics(params: PeriodParams): Promise<TimeAnalyticsData> {
+    const response = await getTimePeakHoursAnalytics(buildParams(params));
     return response.data;
   }
 
-  // === КОМПЛЕКСНАЯ ЗАГРУЗКА ===
   static async loadAnalyticsForTab(
     tab: AnalyticsTab,
-    period: number
+    params: PeriodParams,
+    departmentId?: number
   ): Promise<{
     productData?: ProductAnalyticsData;
     financialData?: FinancialAnalyticsData;
@@ -70,31 +74,24 @@ export class AnalyticsService {
     timeData?: TimeAnalyticsData;
   }> {
     const results: any = {};
-
-    // Всегда загружаем базовую аналитику
     const [productData, financialData, orderStatusData] = await Promise.all([
-      this.getProductAnalytics(period),
-      this.getFinancialAnalytics(period),
-      this.getOrderStatusAnalytics(period)
+      this.getProductAnalytics(params),
+      this.getFinancialAnalytics(params),
+      this.getOrderStatusAnalytics(params)
     ]);
-
     results.productData = productData;
     results.financialData = financialData;
     results.orderStatusData = orderStatusData;
 
-    // Загружаем дополнительные данные в зависимости от вкладки
     if (tab === 'managers' || tab === 'overview') {
-      results.managerData = await this.getManagerAnalytics(period);
+      results.managerData = await this.getManagerAnalytics(params, departmentId);
     }
-
     if (tab === 'materials' || tab === 'overview') {
-      results.materialsData = await this.getMaterialsAnalytics(period);
+      results.materialsData = await this.getMaterialsAnalytics(params);
     }
-
     if (tab === 'time' || tab === 'overview') {
-      results.timeData = await this.getTimeAnalytics(period);
+      results.timeData = await this.getTimeAnalytics(params);
     }
-
     return results;
   }
 }

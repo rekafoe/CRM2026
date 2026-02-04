@@ -395,6 +395,7 @@ export const OrderRepository = {
       maxAmount?: number;
       hasPrepayment?: boolean;
       paymentMethod?: string;
+      department_id?: number;
       limit?: number;
       offset?: number;
     }
@@ -403,6 +404,11 @@ export const OrderRepository = {
 
     let whereConditions = ['(o.userId = ? OR o.userId IS NULL)']
     const params: any[] = [userId]
+
+    if (searchParams.department_id != null && Number.isFinite(searchParams.department_id)) {
+      whereConditions.push('o.userId IN (SELECT id FROM users WHERE department_id = ?)')
+      params.push(searchParams.department_id)
+    }
 
     if (searchParams.query) {
       whereConditions.push(`(

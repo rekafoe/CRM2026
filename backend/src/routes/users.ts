@@ -16,17 +16,20 @@ router.get('/', asyncHandler(async (req, res) => {
 router.get('/all', asyncHandler(async (req, res) => {
   const db = await getDb()
   const users = await db.all<any>(`
-    SELECT id, name, email, role, created_at,
-           LENGTH(api_token) > 0 as has_api_token
-    FROM users
-    ORDER BY name
+    SELECT u.id, u.name, u.email, u.role, u.created_at,
+           LENGTH(u.api_token) > 0 as has_api_token,
+           u.department_id,
+           d.name as department_name
+    FROM users u
+    LEFT JOIN departments d ON d.id = u.department_id
+    ORDER BY u.name
   `)
   res.json(users)
 }))
 
 // POST /api/users — создать пользователя
 router.post('/', asyncHandler(async (req, res) => {
-  const { name, email, password, role } = req.body
+  const { name, email, password, role, department_id } = req.body
   const db = await getDb()
 
   // Проверяем, существует ли пользователь с таким email
@@ -42,24 +45,25 @@ router.post('/', asyncHandler(async (req, res) => {
   // Генерируем API токен
   const apiToken = require('crypto').randomBytes(32).toString('hex')
 
-  // Создаем пользователя
+  const deptId = department_id != null && department_id !== '' ? Number(department_id) : null
   const result = await db.run(`
-    INSERT INTO users (name, email, password_hash, role, api_token, created_at)
-    VALUES (?, ?, ?, ?, ?, datetime('now'))
-  `, [name, email, hashedPassword, role || 'user', apiToken])
+    INSERT INTO users (name, email, password_hash, role, api_token, department_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+  `, [name, email, hashedPassword, role || 'user', apiToken, Number.isFinite(deptId) ? deptId : null])
 
   res.json({
     id: result.lastID,
     name,
     email,
-    role: role || 'user'
+    role: role || 'user',
+    department_id: Number.isFinite(deptId) ? deptId : null
   })
 }))
 
 // PUT /api/users/:id — обновить пользователя
 router.put('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { name, email, role } = req.body
+  const { name, email, role, department_id } = req.body
   const db = await getDb()
 
   // Проверяем, существует ли другой пользователь с таким email
@@ -69,11 +73,12 @@ router.put('/:id', asyncHandler(async (req, res) => {
     return
   }
 
+  const deptId = department_id != null && department_id !== '' ? Number(department_id) : null
   await db.run(`
     UPDATE users
-    SET name = ?, email = ?, role = ?
+    SET name = ?, email = ?, role = ?, department_id = ?
     WHERE id = ?
-  `, [name, email, role, id])
+  `, [name, email, role, Number.isFinite(deptId) ? deptId : null, id])
 
   res.json({ message: 'Пользователь обновлен' })
 }))

@@ -24,6 +24,7 @@ import quickTemplatesRoutes from './quickTemplates'
 import { customerRoutes } from '../modules/customers'
 import orderManagementRoutes from './orderManagement'
 import documentTemplatesRoutes from './documentTemplates'
+import departmentsRoutes from './departments'
 
 const router = Router()
 
@@ -51,6 +52,7 @@ router.use('/quick-templates', quickTemplatesRoutes)
 router.use('/customers', customerRoutes)
 router.use('/order-management', orderManagementRoutes)
 router.use('/document-templates', documentTemplatesRoutes)
+router.use('/departments', departmentsRoutes)
 
 console.log('Routes setup complete')
 

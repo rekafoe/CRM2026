@@ -1,7 +1,7 @@
 // Кастомный хук для управления аналитикой
 
-import { useState, useCallback } from 'react';
-import { AnalyticsService } from '../services/analyticsService';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { AnalyticsService, type PeriodParams } from '../services/analyticsService';
 import {
   AnalyticsState,
   AnalyticsTab,
@@ -13,6 +13,19 @@ import {
   TimeAnalyticsData
 } from '../types';
 
+/** Первый и последний день текущего календарного месяца в формате YYYY-MM-DD */
+function getCurrentMonthRange(): { from: string; to: string } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const from = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const to = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  return { from, to };
+}
+
+const defaultMonth = getCurrentMonthRange();
+
 const initialState: AnalyticsState = {
   productData: null,
   financialData: null,
@@ -22,18 +35,35 @@ const initialState: AnalyticsState = {
   timeData: null,
   isLoading: false,
   period: 30,
-  activeTab: 'overview'
+  dateFrom: defaultMonth.from,
+  dateTo: defaultMonth.to,
+  activeTab: 'overview',
+  departmentId: undefined
 };
 
 export const useAnalytics = () => {
   const [state, setState] = useState<AnalyticsState>(initialState);
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
-  const loadAnalytics = useCallback(async (tab: AnalyticsTab = state.activeTab, period: number = state.period) => {
+  const periodParams: PeriodParams = {
+    period: state.period,
+    dateFrom: state.dateFrom || undefined,
+    dateTo: state.dateTo || undefined
+  };
+
+  const loadAnalytics = useCallback(async (
+    tab?: AnalyticsTab,
+    params?: PeriodParams,
+    departmentId?: number
+  ) => {
+    const s = stateRef.current;
+    const t = tab ?? s.activeTab;
+    const p = params ?? { period: s.period, dateFrom: s.dateFrom, dateTo: s.dateTo };
+    const d = departmentId ?? s.departmentId;
     setState(prev => ({ ...prev, isLoading: true }));
-
     try {
-      const data = await AnalyticsService.loadAnalyticsForTab(tab, period);
-
+      const data = await AnalyticsService.loadAnalyticsForTab(t, p, d);
       setState(prev => ({
         ...prev,
         productData: data.productData || prev.productData,
@@ -43,15 +73,18 @@ export const useAnalytics = () => {
         materialsData: data.materialsData || prev.materialsData,
         timeData: data.timeData || prev.timeData,
         isLoading: false,
-        activeTab: tab,
-        period
+        activeTab: t,
+        period: p.period,
+        dateFrom: p.dateFrom,
+        dateTo: p.dateTo,
+        departmentId: d
       }));
     } catch (error) {
       console.error('Error loading analytics:', error);
       setState(prev => ({ ...prev, isLoading: false }));
       throw error;
     }
-  }, [state.activeTab, state.period]);
+  }, []);
 
   const setActiveTab = useCallback((tab: AnalyticsTab) => {
     setState(prev => ({ ...prev, activeTab: tab }));
@@ -61,18 +94,27 @@ export const useAnalytics = () => {
     setState(prev => ({ ...prev, period }));
   }, []);
 
+  const setDateRange = useCallback((dateFrom: string | undefined, dateTo: string | undefined) => {
+    setState(prev => ({ ...prev, dateFrom, dateTo }));
+  }, []);
+
+  const setDepartmentId = useCallback((departmentId: number | undefined) => {
+    setState(prev => ({ ...prev, departmentId }));
+  }, []);
+
   const refreshAnalytics = useCallback(() => {
-    return loadAnalytics(state.activeTab, state.period);
-  }, [loadAnalytics, state.activeTab, state.period]);
+    const s = stateRef.current;
+    return loadAnalytics(s.activeTab, { period: s.period, dateFrom: s.dateFrom, dateTo: s.dateTo }, s.departmentId);
+  }, [loadAnalytics]);
 
   return {
-    // Состояние
     ...state,
-
-    // Действия
+    periodParams,
     loadAnalytics,
     setActiveTab,
     setPeriod,
+    setDateRange,
+    setDepartmentId,
     refreshAnalytics,
 
     // Геттеры для удобства

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Order } from '../../types';
+import { getDepartments, type Department } from '../../api';
 import { useLogger } from '../../utils/logger';
 import { useToastNotifications } from '../Toast';
 import { LoadingSpinner } from '../LoadingSpinner';
@@ -24,6 +25,7 @@ interface SearchFilters {
   maxAmount: string;
   hasPrepayment: boolean | '';
   paymentMethod: string;
+  department_id: number | '';
 }
 
 interface OrdersStats {
@@ -58,6 +60,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [itemsPerPage] = useState(20);
+  const [departments, setDepartments] = useState<Department[]>([]);
   
   // Фильтры поиска
   const [filters, setFilters] = useState<SearchFilters>({
@@ -71,7 +74,8 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
     minAmount: '',
     maxAmount: '',
     hasPrepayment: '',
-    paymentMethod: ''
+    paymentMethod: '',
+    department_id: ''
   });
   
   // Статусы заказов
@@ -170,7 +174,8 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
       minAmount: '',
       maxAmount: '',
       hasPrepayment: '',
-      paymentMethod: ''
+      paymentMethod: '',
+      department_id: ''
     });
     setCurrentPage(1);
   }, []);
@@ -307,6 +312,11 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
     }
   }, [filters, logger, toast]);
 
+  // Загрузка департаментов
+  useEffect(() => {
+    getDepartments().then(r => setDepartments(r.data ?? [])).catch(() => setDepartments([]));
+  }, []);
+
   // Загрузка данных при монтировании
   useEffect(() => {
     if (currentUser?.id) {
@@ -432,6 +442,20 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                 <option value="">Все статусы</option>
                 {orderStatuses.map(status => (
                   <option key={status.id} value={status.id}>{status.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="filter-group">
+              <label>Департамент:</label>
+              <select
+                value={filters.department_id === '' ? '' : filters.department_id}
+                onChange={(e) => setFilters(prev => ({ ...prev, department_id: e.target.value === '' ? '' : Number(e.target.value) }))}
+                className="form-control"
+              >
+                <option value="">Все департаменты</option>
+                {departments.map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>
             </div>

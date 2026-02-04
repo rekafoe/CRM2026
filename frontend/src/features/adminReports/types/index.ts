@@ -239,5 +239,8 @@ export interface AnalyticsState {
   timeData: TimeAnalyticsData | null;
   isLoading: boolean;
   period: number;
+  dateFrom?: string;
+  dateTo?: string;
   activeTab: AnalyticsTab;
+  departmentId?: number;
 }

@@ -108,10 +108,22 @@
 }
 
 .users-list-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   background-color: var(--bg-secondary);
   padding: 16px;
   border-bottom: 1px solid var(--border-color);
   font-weight: bold;
+}
+
+.user-department-badge {
+  padding: 4px 8px;
+  background-color: var(--bg-tertiary, #e8e8e8);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  font-size: 12px;
 }
 
 .users-empty {

@@ -157,9 +157,13 @@ router.get('/admin', asyncHandler(async (req, res) => {
   const month = getMonthKey((req.query as any)?.month)
   const historyMonths = Math.max(1, Math.min(6, Number((req.query as any)?.history_months) || 3))
   const prevMonth = getPreviousMonthKey(month)
+  const departmentId = (req.query as any)?.department_id != null ? parseInt(String((req.query as any).department_id), 10) : undefined
 
   const db = await getDb()
-  const users = await db.all<any>('SELECT id, name, role, is_active FROM users ORDER BY name')
+  let users = await db.all<any>('SELECT id, name, role, is_active, department_id FROM users ORDER BY name')
+  if (Number.isFinite(departmentId)) {
+    users = users.filter((u: any) => u.department_id === departmentId)
+  }
 
   const totalsCurrent = await db.all<any>(
     `

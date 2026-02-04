@@ -43,17 +43,19 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={() => navigate('/order-pool')}
           title="Пул заказов" 
           aria-label="Пул заказов" 
-          className="app-icon-btn app-icon-btn--blue"
+          className="app-icon-btn app-icon-btn--blue app-icon-btn--with-label"
         >
-          📋
+          <span className="app-icon-btn__icon" aria-hidden="true">📋</span>
+          <span className="app-icon-btn__label">Пул заказов</span>
         </button>
         <button 
           onClick={onShowCountersPage}
           title="Счётчики принтеров и кассы" 
           aria-label="Счётчики принтеров и кассы" 
-          className="app-icon-btn app-icon-btn--purple"
+          className="app-icon-btn app-icon-btn--purple app-icon-btn--with-label"
         >
-          📊
+          <span className="app-icon-btn__icon" aria-hidden="true">📊</span>
+          <span className="app-icon-btn__label">Счётчики</span>
         </button>
         <button
           onClick={() => navigate('/earnings')}
@@ -77,11 +79,12 @@ export const TopBar: React.FC<TopBarProps> = ({
           <>
             <button 
               onClick={() => window.location.href = '/adminpanel/reports'}
-              title="Ежедневные отчёты" 
-              aria-label="Ежедневные отчёты" 
-              className="app-icon-btn"
+              title="Аналитика и отчёты" 
+              aria-label="Аналитика и отчёты" 
+              className="app-icon-btn app-icon-btn--with-label"
             >
-              📊
+              <span className="app-icon-btn__icon" aria-hidden="true">📈</span>
+              <span className="app-icon-btn__label">Отчёты</span>
             </button>
             <button 
               onClick={() => window.location.href = '/adminpanel'}

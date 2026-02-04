@@ -10,12 +10,21 @@ PRAGMA foreign_keys = ON;
 -- ПОЛЬЗОВАТЕЛИ И АВТОРИЗАЦИЯ
 -- ============================================
 
+CREATE TABLE IF NOT EXISTS departments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  description TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE,
   email TEXT,
   phone TEXT,
   role TEXT,
+  department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
   api_token TEXT UNIQUE,
   password_hash TEXT,
   created_at TEXT DEFAULT (datetime('now'))

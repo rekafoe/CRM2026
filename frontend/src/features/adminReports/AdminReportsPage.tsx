@@ -1,6 +1,6 @@
 // Основной компонент страницы аналитики отчетов
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAnalytics } from './hooks/useAnalytics';
 import { ProductAnalytics } from './components/ProductAnalytics';
 import { FinancialAnalytics } from './components/FinancialAnalytics';
@@ -9,6 +9,7 @@ import { ManagerAnalytics } from './components/ManagerAnalytics';
 import { MaterialsAnalytics } from './components/MaterialsAnalytics';
 import { TimeAnalytics } from './components/TimeAnalytics';
 import { AnalyticsTab } from './types';
+import { getDepartments, type Department } from '../../api';
 
 import './AdminReportsPage.css';
 
@@ -26,14 +27,26 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
     timeData,
     isLoading,
     period,
+    dateFrom,
+    dateTo,
+    periodParams,
     activeTab,
+    departmentId,
     loadAnalytics,
     setActiveTab,
     setPeriod,
+    setDateRange,
+    setDepartmentId,
     refreshAnalytics,
     hasData,
     totalStats
   } = useAnalytics();
+
+  const [departments, setDepartments] = useState<Department[]>([]);
+
+  useEffect(() => {
+    getDepartments().then(r => setDepartments(r.data ?? [])).catch(() => setDepartments([]));
+  }, []);
 
   useEffect(() => {
     loadAnalytics();
@@ -41,12 +54,31 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
 
   const handleTabChange = (tab: AnalyticsTab) => {
     setActiveTab(tab);
-    loadAnalytics(tab, period);
+    loadAnalytics(tab, periodParams, departmentId);
   };
 
   const handlePeriodChange = (newPeriod: number) => {
     setPeriod(newPeriod);
-    loadAnalytics(activeTab, newPeriod);
+    setDateRange(undefined, undefined);
+    loadAnalytics(activeTab, { period: newPeriod }, departmentId);
+  };
+
+  const handleDepartmentChange = (newDeptId: number | '') => {
+    const id = newDeptId === '' ? undefined : newDeptId;
+    setDepartmentId(id);
+    loadAnalytics(activeTab, periodParams, id);
+  };
+
+  const handleDateRangeChange = (from: string, to: string) => {
+    setDateRange(from || undefined, to || undefined);
+    if (from && to) {
+      loadAnalytics(activeTab, { period, dateFrom: from, dateTo: to }, departmentId);
+    }
+  };
+
+  const clearDateRange = () => {
+    setDateRange(undefined, undefined);
+    loadAnalytics(activeTab, { period }, departmentId);
   };
 
   return (
@@ -162,11 +194,11 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
           </div>
         </div>
 
-        {/* Выбор периода для аналитики */}
+        {/* Выбор периода и департамента для аналитики */}
         <div className="reports-filters" style={{ marginBottom: '20px' }}>
           <div>
             <label className="reports-filter-label">
-              Период анализа (дни):
+              Период (дни):
             </label>
             <select
               value={period}
@@ -178,6 +210,54 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               <option value={30}>30 дней</option>
               <option value={60}>60 дней</option>
               <option value={90}>90 дней</option>
+            </select>
+          </div>
+          <div>
+            <label className="reports-filter-label">
+              Диапазон дат:
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <input
+                type="date"
+                value={dateFrom ?? ''}
+                onChange={(e) => handleDateRangeChange(e.target.value, dateTo ?? '')}
+                className="reports-filter-input"
+                style={{ minWidth: '140px' }}
+              />
+              <span style={{ color: 'var(--text-secondary)' }}>—</span>
+              <input
+                type="date"
+                value={dateTo ?? ''}
+                onChange={(e) => handleDateRangeChange(dateFrom ?? '', e.target.value)}
+                className="reports-filter-input"
+                style={{ minWidth: '140px' }}
+              />
+              {(dateFrom || dateTo) && (
+                <button
+                  type="button"
+                  onClick={clearDateRange}
+                  className="reports-filter-input"
+                  style={{ padding: '8px 12px', cursor: 'pointer' }}
+                  title="Сбросить диапазон"
+                >
+                  Сбросить
+                </button>
+              )}
+            </div>
+          </div>
+          <div>
+            <label className="reports-filter-label">
+              Департамент (менеджеры):
+            </label>
+            <select
+              value={departmentId ?? ''}
+              onChange={(e) => handleDepartmentChange(e.target.value === '' ? '' : Number(e.target.value))}
+              className="reports-filter-input"
+            >
+              <option value="">Все департаменты</option>
+              {departments.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
             </select>
           </div>
           <div>

@@ -5,6 +5,42 @@ import { hasColumn } from '../utils/tableSchemaCache'
 
 const router = Router()
 
+/** Парсит period (дни) или date_from/date_to в диапазон для аналитики */
+function getAnalyticsDateRange(query: Record<string, unknown>): {
+  startDate: Date
+  endDate: Date | null
+  dateParams: string[]
+  dateFilter: (alias: string) => string
+} {
+  const dateFrom = query.date_from ? String(query.date_from).trim().slice(0, 10) : null
+  const dateTo = query.date_to ? String(query.date_to).trim().slice(0, 10) : null
+  if (dateFrom && dateTo) {
+    const startDate = new Date(dateFrom + 'T00:00:00.000Z')
+    const endDate = new Date(dateTo + 'T23:59:59.999Z')
+    return {
+      startDate,
+      endDate,
+      dateParams: [startDate.toISOString(), endDate.toISOString()],
+      dateFilter: (alias: string) => {
+        const p = alias ? `${alias}.createdAt` : 'createdAt'
+        return `${p} >= ? AND ${p} <= ?`
+      }
+    }
+  }
+  const days = parseInt(String(query.period ?? '30'), 10) || 30
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - days)
+  return {
+    startDate,
+    endDate: null,
+    dateParams: [startDate.toISOString()],
+    dateFilter: (alias: string) => {
+      const p = alias ? `${alias}.createdAt` : 'createdAt'
+      return `${p} >= ?`
+    }
+  }
+}
+
 // GET /api/reports/daily/:date/summary — дневная сводка
 router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
   const d = String(req.params.date || '').slice(0, 10)
@@ -135,90 +171,53 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
 
 // GET /api/reports/analytics/products/popularity — популярность продуктов
 router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
-  const { period = '30', limit = '10' } = req.query
-  const days = parseInt(period as string) || 30
+  const { limit = '10' } = req.query
   const limitNum = parseInt(limit as string) || 10
+  const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const days = endDate
+    ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000)
+    : parseInt(String(req.query.period || '30'), 10) || 30
 
   const db = await getDb()
-  const startDate = new Date()
-  startDate.setDate(startDate.getDate() - days)
 
-  // Популярность продуктов по количеству заказов
-  const productPopularity = await db.all<any>(`
-    SELECT
-      i.type as product_type,
-      COUNT(DISTINCT o.id) as order_count,
-      SUM(i.quantity) as total_quantity,
-      SUM(i.price * i.quantity) as total_revenue,
-      AVG(i.price) as avg_price,
-      MAX(o.createdAt) as last_order_date
-    FROM items i
-    JOIN orders o ON o.id = i.orderId
-    WHERE o.createdAt >= ?
-    GROUP BY i.type
-    ORDER BY total_revenue DESC
-    LIMIT ?
-  `, [startDate.toISOString(), limitNum])
+  const productPopularity = await db.all<any>(
+    `SELECT i.type as product_type, COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity,
+      SUM(i.price * i.quantity) as total_revenue, AVG(i.price) as avg_price, MAX(o.createdAt) as last_order_date
+     FROM items i JOIN orders o ON o.id = i.orderId
+     WHERE ${dateFilter('o')}
+     GROUP BY i.type ORDER BY total_revenue DESC LIMIT ?`,
+    [...dateParams, limitNum]
+  )
 
-  // Популярность по категориям продуктов
-  const categoryStats = await db.all<any>(`
-    SELECT
-      CASE
-        WHEN LOWER(i.type) LIKE '%визит%' THEN 'Визитки'
+  const categoryStats = await db.all<any>(
+    `SELECT CASE WHEN LOWER(i.type) LIKE '%визит%' THEN 'Визитки'
         WHEN LOWER(i.type) LIKE '%листов%' OR LOWER(i.type) LIKE '%flyer%' THEN 'Листовки'
         WHEN LOWER(i.type) LIKE '%буклет%' OR LOWER(i.type) LIKE '%каталог%' THEN 'Буклеты/Каталоги'
         WHEN LOWER(i.type) LIKE '%плакат%' OR LOWER(i.type) LIKE '%poster%' THEN 'Плакаты'
-        WHEN LOWER(i.type) LIKE '%календар%' THEN 'Календари'
-        ELSE 'Другое'
-      END as category,
-      COUNT(DISTINCT o.id) as order_count,
-      SUM(i.quantity) as total_quantity,
-      SUM(i.price * i.quantity) as total_revenue
-    FROM items i
-    JOIN orders o ON o.id = i.orderId
-    WHERE o.createdAt >= ?
-    GROUP BY
-      CASE
-        WHEN LOWER(i.type) LIKE '%визит%' THEN 'Визитки'
-        WHEN LOWER(i.type) LIKE '%листов%' OR LOWER(i.type) LIKE '%flyer%' THEN 'Листовки'
-        WHEN LOWER(i.type) LIKE '%буклет%' OR LOWER(i.type) LIKE '%каталог%' THEN 'Буклеты/Каталоги'
-        WHEN LOWER(i.type) LIKE '%плакат%' OR LOWER(i.type) LIKE '%poster%' THEN 'Плакаты'
-        WHEN LOWER(i.type) LIKE '%календар%' THEN 'Календари'
-        ELSE 'Другое'
-      END
-    ORDER BY total_revenue DESC
-  `, [startDate.toISOString()])
+        WHEN LOWER(i.type) LIKE '%календар%' THEN 'Календари' ELSE 'Другое' END as category,
+      COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity, SUM(i.price * i.quantity) as total_revenue
+     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')}
+     GROUP BY category ORDER BY total_revenue DESC`,
+    dateParams
+  )
 
-  // Тренд популярности продуктов за период
-  const productTrends = await db.all<any>(`
-    SELECT
-      DATE(o.createdAt) as date,
-      i.type as product_type,
-      COUNT(DISTINCT o.id) as daily_orders,
+  const productTrends = await db.all<any>(
+    `SELECT DATE(o.createdAt) as date, i.type as product_type, COUNT(DISTINCT o.id) as daily_orders,
       SUM(i.price * i.quantity) as daily_revenue
-    FROM items i
-    JOIN orders o ON o.id = i.orderId
-    WHERE o.createdAt >= ?
-    GROUP BY DATE(o.createdAt), i.type
-    ORDER BY date DESC, daily_revenue DESC
-  `, [startDate.toISOString()])
+     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')}
+     GROUP BY DATE(o.createdAt), i.type ORDER BY date DESC, daily_revenue DESC`,
+    dateParams
+  )
 
-  // Средний чек по продуктам
-  const averageOrderValue = await db.all<any>(`
-    SELECT
-      i.type as product_type,
-      AVG(i.price * i.quantity) as avg_order_value,
-      COUNT(DISTINCT o.id) as orders_with_product
-    FROM items i
-    JOIN orders o ON o.id = i.orderId
-    WHERE o.createdAt >= ?
-    GROUP BY i.type
-    HAVING orders_with_product >= 3
-    ORDER BY avg_order_value DESC
-  `, [startDate.toISOString()])
+  const averageOrderValue = await db.all<any>(
+    `SELECT i.type as product_type, AVG(i.price * i.quantity) as avg_order_value, COUNT(DISTINCT o.id) as orders_with_product
+     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')}
+     GROUP BY i.type HAVING orders_with_product >= 3 ORDER BY avg_order_value DESC`,
+    dateParams
+  )
 
   res.json({
-    period: { days, startDate: startDate.toISOString() },
+    period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
     productPopularity,
     categoryStats,
     productTrends,
@@ -228,56 +227,39 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
 
 // GET /api/reports/analytics/financial/profitability — финансовая аналитика
 router.get('/analytics/financial/profitability', asyncHandler(async (req, res) => {
-  const { period = '30' } = req.query
-  const days = parseInt(period as string) || 30
-
+  const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
   const db = await getDb()
-  const startDate = new Date()
-  startDate.setDate(startDate.getDate() - days)
 
-  // Анализ прибыли по продуктам (упрощенная модель)
   const productProfitability = await db.all<any>(`
-    SELECT
-      i.type as product_type,
-      SUM(i.price * i.quantity) as total_revenue,
-      COUNT(DISTINCT o.id) as order_count,
-      AVG(i.price * i.quantity) as avg_order_value,
-      SUM(i.quantity) as total_items
-    FROM items i
-    JOIN orders o ON o.id = i.orderId
-    WHERE o.createdAt >= ?
-    GROUP BY i.type
-    ORDER BY total_revenue DESC
-  `, [startDate.toISOString()])
+    SELECT i.type as product_type, SUM(i.price * i.quantity) as total_revenue, COUNT(DISTINCT o.id) as order_count,
+      AVG(i.price * i.quantity) as avg_order_value, SUM(i.quantity) as total_items
+    FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')}
+    GROUP BY i.type ORDER BY total_revenue DESC
+  `, dateParams)
 
-  // Анализ платежей
   const paymentAnalysis = await db.get<any>(`
-    SELECT
-      COUNT(CASE WHEN paymentMethod = 'online' THEN 1 END) as online_orders,
+    SELECT COUNT(CASE WHEN paymentMethod = 'online' THEN 1 END) as online_orders,
       COUNT(CASE WHEN paymentMethod = 'offline' THEN 1 END) as offline_orders,
       COUNT(CASE WHEN paymentMethod = 'telegram' THEN 1 END) as telegram_orders,
       SUM(CASE WHEN paymentMethod = 'online' AND prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as online_revenue,
       SUM(CASE WHEN paymentMethod = 'offline' AND prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as offline_revenue,
       SUM(CASE WHEN paymentMethod = 'telegram' AND prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as telegram_revenue,
       AVG(CASE WHEN prepaymentStatus IN ('paid','successful') THEN prepaymentAmount END) as avg_payment_amount
-    FROM orders
-    WHERE createdAt >= ?
-  `, [startDate.toISOString()])
+    FROM orders WHERE ${dateFilter('')}
+  `, dateParams)
 
-  // Анализ предоплаты
   const prepaymentAnalysis = await db.get<any>(`
-    SELECT
-      COUNT(CASE WHEN prepaymentStatus IN ('paid','successful') THEN 1 END) as paid_prepayments,
+    SELECT COUNT(CASE WHEN prepaymentStatus IN ('paid','successful') THEN 1 END) as paid_prepayments,
       COUNT(CASE WHEN prepaymentStatus NOT IN ('paid','successful') THEN 1 END) as pending_prepayments,
       SUM(CASE WHEN prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as total_paid_prepayment,
       SUM(CASE WHEN prepaymentStatus NOT IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as total_pending_prepayment,
       AVG(CASE WHEN prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as avg_paid_prepayment
-    FROM orders
-    WHERE createdAt >= ? AND prepaymentAmount > 0
-  `, [startDate.toISOString()])
+    FROM orders WHERE ${dateFilter('')} AND prepaymentAmount > 0
+  `, dateParams)
 
   res.json({
-    period: { days, startDate: startDate.toISOString() },
+    period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
     productProfitability,
     paymentAnalysis,
     prepaymentAnalysis
@@ -286,70 +268,38 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
 
 // GET /api/reports/analytics/orders/status-funnel — анализ статусов заказов
 router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
-  const { period = '30' } = req.query
-  const days = parseInt(period as string) || 30
-
+  const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
   const db = await getDb()
-  const startDate = new Date()
-  startDate.setDate(startDate.getDate() - days)
 
-  // Воронка статусов заказов
   const statusFunnel = await db.all<any>(`
-    SELECT
-      CASE
-        WHEN status = 0 THEN 'Создан'
-        WHEN status = 1 THEN 'Подтвержден'
-        WHEN status = 2 THEN 'В работе'
-        WHEN status = 3 THEN 'Готов'
-        WHEN status = 4 THEN 'Выдан'
-        WHEN status = 5 THEN 'Отменен'
-        ELSE 'Неизвестный'
-      END as status_name,
-      status,
-      COUNT(*) as count,
-      SUM(COALESCE(prepaymentAmount, 0)) as total_amount,
-      AVG(COALESCE(prepaymentAmount, 0)) as avg_amount
-    FROM orders
-    WHERE createdAt >= ?
-    GROUP BY status, status_name
-    ORDER BY status
-  `, [startDate.toISOString()])
+    SELECT CASE WHEN status = 0 THEN 'Создан' WHEN status = 1 THEN 'Подтвержден' WHEN status = 2 THEN 'В работе'
+      WHEN status = 3 THEN 'Готов' WHEN status = 4 THEN 'Выдан' WHEN status = 5 THEN 'Отменен' ELSE 'Неизвестный' END as status_name,
+      status, COUNT(*) as count, SUM(COALESCE(prepaymentAmount, 0)) as total_amount, AVG(COALESCE(prepaymentAmount, 0)) as avg_amount
+    FROM orders WHERE ${dateFilter('')}
+    GROUP BY status, status_name ORDER BY status
+  `, dateParams)
 
-  // Конверсия между статусами
   const statusConversion = await db.all<any>(`
-    SELECT
-      DATE(createdAt) as date,
-      COUNT(CASE WHEN status >= 1 THEN 1 END) as confirmed_orders,
-      COUNT(CASE WHEN status >= 2 THEN 1 END) as in_progress_orders,
-      COUNT(CASE WHEN status >= 3 THEN 1 END) as ready_orders,
-      COUNT(CASE WHEN status >= 4 THEN 1 END) as completed_orders,
-      COUNT(*) as total_created
-    FROM orders
-    WHERE createdAt >= ?
-    GROUP BY DATE(createdAt)
-    ORDER BY date DESC
-  `, [startDate.toISOString()])
+    SELECT DATE(createdAt) as date, COUNT(CASE WHEN status >= 1 THEN 1 END) as confirmed_orders,
+      COUNT(CASE WHEN status >= 2 THEN 1 END) as in_progress_orders, COUNT(CASE WHEN status >= 3 THEN 1 END) as ready_orders,
+      COUNT(CASE WHEN status >= 4 THEN 1 END) as completed_orders, COUNT(*) as total_created
+    FROM orders WHERE ${dateFilter('')}
+    GROUP BY DATE(createdAt) ORDER BY date DESC
+  `, dateParams)
 
-  // Среднее время выполнения заказов
   const avgProcessingTime = await db.all<any>(`
-    SELECT
-      AVG(JULIANDAY(updatedAt) - JULIANDAY(createdAt)) * 24 as avg_hours_to_complete,
-      COUNT(*) as completed_orders
-    FROM orders
-    WHERE status = 4 AND createdAt >= ? AND updatedAt > createdAt
-  `, [startDate.toISOString()])
+    SELECT AVG(JULIANDAY(updatedAt) - JULIANDAY(createdAt)) * 24 as avg_hours_to_complete, COUNT(*) as completed_orders
+    FROM orders WHERE status = 4 AND ${dateFilter('')} AND updatedAt > createdAt
+  `, dateParams)
 
-  // Причины отмен заказов (если есть поле для причин)
   const cancellationReasons = await db.all<any>(`
-    SELECT
-      COUNT(*) as cancelled_count,
-      SUM(COALESCE(prepaymentAmount, 0)) as cancelled_amount
-    FROM orders
-    WHERE status = 5 AND createdAt >= ?
-  `, [startDate.toISOString()])
+    SELECT COUNT(*) as cancelled_count, SUM(COALESCE(prepaymentAmount, 0)) as cancelled_amount
+    FROM orders WHERE status = 5 AND ${dateFilter('')}
+  `, dateParams)
 
   res.json({
-    period: { days, startDate: startDate.toISOString() },
+    period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
     statusFunnel,
     statusConversion,
     avgProcessingTime: avgProcessingTime[0],
@@ -358,72 +308,62 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
 }))
 
 // GET /api/reports/analytics/managers/efficiency — эффективность менеджеров
+// «Выполнено» = статусы 3,4,6 (Готов, Выдан, Завершён); отмена = статус 5 или is_cancelled=1
 router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
-  const { period = '30' } = req.query
-  const days = parseInt(period as string) || 30
+  const { department_id: deptIdParam } = req.query
+  const departmentId = deptIdParam != null ? parseInt(String(deptIdParam), 10) : undefined
+  const { startDate, endDate, dateParams } = getAnalyticsDateRange(req.query)
+  const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
 
   const db = await getDb()
-  const startDate = new Date()
-  startDate.setDate(startDate.getDate() - days)
+  const deptCondition = Number.isFinite(departmentId) ? ' AND u.department_id = ? ' : ''
+  const deptParam = Number.isFinite(departmentId) ? [departmentId] : []
+  const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
+  const cancelledCondition = hasIsCancelled ? '(o.status = 5 OR COALESCE(o.is_cancelled, 0) = 1)' : 'o.status = 5'
+  const oCreated = 'COALESCE(o.createdAt, o.created_at)'
+  const oUpdated = 'COALESCE(o.updatedAt, o.updated_at)'
+  const oCreatedRange = endDate ? `${oCreated} >= ? AND ${oCreated} <= ?` : `${oCreated} >= ?`
 
-  // Эффективность менеджеров
-  const managerEfficiency = await db.all<any>(`
-    SELECT
-      u.id as user_id,
-      u.name as user_name,
-      COUNT(o.id) as total_orders,
-      COUNT(CASE WHEN o.status = 4 THEN 1 END) as completed_orders,
-      COUNT(CASE WHEN o.status = 5 THEN 1 END) as cancelled_orders,
-      SUM(CASE WHEN o.status = 4 THEN COALESCE(o.prepaymentAmount, 0) ELSE 0 END) as total_revenue,
-      AVG(CASE WHEN o.status = 4 THEN COALESCE(o.prepaymentAmount, 0) ELSE NULL END) as avg_order_value,
-      AVG(CASE WHEN o.status = 4 AND o.updatedAt > o.createdAt THEN JULIANDAY(o.updatedAt) - JULIANDAY(o.createdAt) ELSE NULL END) * 24 as avg_processing_hours,
-      COUNT(DISTINCT DATE(o.createdAt)) as active_days,
-      MAX(o.createdAt) as last_order_date
+  const managerEfficiency = await db.all<any>(
+    `SELECT u.id as user_id, u.name as user_name, COUNT(o.id) as total_orders,
+      COUNT(CASE WHEN o.status IN (3, 4, 6) THEN 1 END) as completed_orders,
+      COUNT(CASE WHEN ${cancelledCondition} THEN 1 END) as cancelled_orders,
+      SUM(CASE WHEN o.status IN (3, 4, 6) THEN COALESCE(o.prepaymentAmount, 0) ELSE 0 END) as total_revenue,
+      AVG(CASE WHEN o.status IN (3, 4, 6) THEN COALESCE(o.prepaymentAmount, 0) ELSE NULL END) as avg_order_value,
+      AVG(CASE WHEN o.status IN (3, 4, 6) AND ${oUpdated} > ${oCreated} THEN JULIANDAY(${oUpdated}) - JULIANDAY(${oCreated}) ELSE NULL END) * 24 as avg_processing_hours,
+      COUNT(DISTINCT DATE(${oCreated})) as active_days, MAX(${oCreated}) as last_order_date
     FROM users u
-    LEFT JOIN orders o ON o.userId = u.id AND o.createdAt >= ?
-    WHERE u.role IN ('admin', 'manager', 'user')
-    GROUP BY u.id, u.name
-    HAVING total_orders > 0
-    ORDER BY total_revenue DESC
-  `, [startDate.toISOString()])
+    LEFT JOIN orders o ON o.userId = u.id AND ${oCreatedRange}
+    WHERE u.role IN ('admin', 'manager', 'user') ${deptCondition}
+    GROUP BY u.id, u.name HAVING total_orders > 0 ORDER BY total_revenue DESC`,
+    [...dateParams, ...deptParam]
+  )
 
-  // Детальная статистика по дням для топ-менеджеров
   const topManagerIds = managerEfficiency.slice(0, 3).map(m => m.user_id)
-  const managerDailyStats = await db.all<any>(`
-    SELECT
-      o.userId as user_id,
-      DATE(o.createdAt) as date,
-      COUNT(o.id) as daily_orders,
-      SUM(CASE WHEN o.status = 4 THEN COALESCE(o.prepaymentAmount, 0) ELSE 0 END) as daily_revenue,
-      COUNT(CASE WHEN o.status = 4 THEN 1 END) as daily_completed
-    FROM orders o
-    WHERE o.createdAt >= ? AND o.userId IN (${topManagerIds.map(() => '?').join(',')})
-    GROUP BY o.userId, DATE(o.createdAt)
-    ORDER BY date DESC
-  `, [startDate.toISOString(), ...topManagerIds])
+  const managerDailyStats = topManagerIds.length
+    ? await db.all<any>(`
+    SELECT o.userId as user_id, DATE(${oCreated}) as date, COUNT(o.id) as daily_orders,
+      SUM(CASE WHEN o.status IN (3, 4, 6) THEN COALESCE(o.prepaymentAmount, 0) ELSE 0 END) as daily_revenue,
+      COUNT(CASE WHEN o.status IN (3, 4, 6) THEN 1 END) as daily_completed
+    FROM orders o WHERE ${oCreatedRange} AND o.userId IN (${topManagerIds.map(() => '?').join(',')})
+    GROUP BY o.userId, DATE(${oCreated}) ORDER BY date DESC
+  `, [...dateParams, ...topManagerIds])
+    : []
 
-  // Конверсия по менеджерам
-  const managerConversion = await db.all<any>(`
-    SELECT
-      u.id as user_id,
-      u.name as user_name,
+  const managerConversion = await db.all<any>(
+    `SELECT u.id as user_id, u.name as user_name,
       COUNT(CASE WHEN o.status >= 1 THEN 1 END) as confirmed_orders,
-      COUNT(CASE WHEN o.status >= 4 THEN 1 END) as completed_orders,
-      COUNT(o.id) as total_orders,
-      ROUND(
-        CAST(COUNT(CASE WHEN o.status >= 4 THEN 1 END) AS FLOAT) /
-        NULLIF(COUNT(CASE WHEN o.status >= 1 THEN 1 END), 0) * 100, 1
-      ) as conversion_rate
-    FROM users u
-    LEFT JOIN orders o ON o.userId = u.id AND o.createdAt >= ?
-    WHERE u.role IN ('admin', 'manager', 'user')
-    GROUP BY u.id, u.name
-    HAVING total_orders > 0
-    ORDER BY conversion_rate DESC
-  `, [startDate.toISOString()])
+      COUNT(CASE WHEN o.status >= 4 THEN 1 END) as completed_orders, COUNT(o.id) as total_orders,
+      ROUND(CAST(COUNT(CASE WHEN o.status >= 4 THEN 1 END) AS FLOAT) / NULLIF(COUNT(CASE WHEN o.status >= 1 THEN 1 END), 0) * 100, 1) as conversion_rate
+    FROM users u LEFT JOIN orders o ON o.userId = u.id AND ${oCreatedRange}
+    WHERE u.role IN ('admin', 'manager', 'user') ${deptCondition}
+    GROUP BY u.id, u.name HAVING total_orders > 0 ORDER BY conversion_rate DESC`,
+    [...dateParams, ...deptParam]
+  )
 
   res.json({
-    period: { days, startDate: startDate.toISOString() },
+    period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
+    department_id: Number.isFinite(departmentId) ? departmentId : null,
     managerEfficiency,
     managerDailyStats,
     managerConversion
@@ -431,40 +371,39 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
 }))
 
 // GET /api/reports/analytics/materials/abc-analysis — ABC-анализ материалов
+// material_moves.created_at может быть в формате SQLite (YYYY-MM-DD HH:MM:SS), сравниваем по дате через substr
 router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) => {
-  const { period = '90' } = req.query
-  const days = parseInt(period as string) || 90
+  const { startDate, endDate } = getAnalyticsDateRange(req.query)
+  const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '90'), 10) || 90
+  const startStr = startDate.toISOString().slice(0, 10)
+  const endStr = endDate ? endDate.toISOString().slice(0, 10) : null
+  const matDateRange = endStr
+    ? 'substr(mm.created_at, 1, 10) >= ? AND substr(mm.created_at, 1, 10) <= ?'
+    : 'substr(mm.created_at, 1, 10) >= ?'
+  const matDateParams = endStr ? [startStr, endStr] : [startStr]
 
   const db = await getDb()
-  const startDate = new Date()
-  startDate.setDate(startDate.getDate() - days)
 
-  // ABC-анализ материалов по стоимости потребления
   const materialsConsumption = await db.all<any>(`
-    SELECT
-      m.id as material_id,
-      m.name as material_name,
-      mc.name as category_name,
+    SELECT m.id as material_id, m.name as material_name, mc.name as category_name,
       SUM(CASE WHEN mm.delta < 0 THEN -mm.delta ELSE 0 END) as total_consumed,
       SUM(CASE WHEN mm.delta < 0 THEN -mm.delta * COALESCE(mm.price, 0) ELSE 0 END) as total_cost,
-      COUNT(DISTINCT DATE(mm.created_at)) as usage_days,
-      MAX(mm.created_at) as last_usage,
+      COUNT(DISTINCT substr(mm.created_at, 1, 10)) as usage_days, MAX(mm.created_at) as last_usage,
       AVG(CASE WHEN mm.delta < 0 THEN -mm.delta ELSE NULL END) as avg_daily_consumption
     FROM materials m
     LEFT JOIN material_categories mc ON mc.id = m.category_id
-    LEFT JOIN material_moves mm ON mm.material_id = m.id AND mm.created_at >= ?
-    WHERE mm.created_at >= ?
-    GROUP BY m.id, m.name, mc.name
-    HAVING total_consumed > 0
-    ORDER BY total_cost DESC
-  `, [startDate.toISOString(), startDate.toISOString()])
+    LEFT JOIN material_moves mm ON mm.material_id = m.id AND ${matDateRange}
+    WHERE ${matDateRange}
+    GROUP BY m.id, m.name, mc.name HAVING total_consumed > 0 ORDER BY total_cost DESC
+  `, [...matDateParams, ...matDateParams])
 
-  // Классификация ABC
   const totalCost = materialsConsumption.reduce((sum, m) => sum + m.total_cost, 0)
+  const safeTotal = totalCost > 0 ? totalCost : 1
+
   let cumulativeCost = 0
   const abcAnalysis = materialsConsumption.map(material => {
     cumulativeCost += material.total_cost
-    const cumulativePercentage = (cumulativeCost / totalCost) * 100
+    const cumulativePercentage = (cumulativeCost / safeTotal) * 100
 
     let abc_class, abc_description
     if (cumulativePercentage <= 80) {
@@ -487,7 +426,6 @@ router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) =>
     }
   })
 
-  // Статистика по категориям ABC
   const abcStats = {
     A: abcAnalysis.filter(m => m.abc_class === 'A'),
     B: abcAnalysis.filter(m => m.abc_class === 'B'),
@@ -498,39 +436,34 @@ router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) =>
     A: {
       count: abcStats.A.length,
       total_cost: abcStats.A.reduce((sum, m) => sum + m.total_cost, 0),
-      percentage: abcStats.A.length > 0 ? (abcStats.A.reduce((sum, m) => sum + m.total_cost, 0) / totalCost * 100) : 0
+      percentage: abcStats.A.length > 0 ? (abcStats.A.reduce((sum, m) => sum + m.total_cost, 0) / safeTotal * 100) : 0
     },
     B: {
       count: abcStats.B.length,
       total_cost: abcStats.B.reduce((sum, m) => sum + m.total_cost, 0),
-      percentage: abcStats.B.length > 0 ? (abcStats.B.reduce((sum, m) => sum + m.total_cost, 0) / totalCost * 100) : 0
+      percentage: abcStats.B.length > 0 ? (abcStats.B.reduce((sum, m) => sum + m.total_cost, 0) / safeTotal * 100) : 0
     },
     C: {
       count: abcStats.C.length,
       total_cost: abcStats.C.reduce((sum, m) => sum + m.total_cost, 0),
-      percentage: abcStats.C.length > 0 ? (abcStats.C.reduce((sum, m) => sum + m.total_cost, 0) / totalCost * 100) : 0
+      percentage: abcStats.C.length > 0 ? (abcStats.C.reduce((sum, m) => sum + m.total_cost, 0) / safeTotal * 100) : 0
     }
   }
 
-  // Анализ потребления по категориям
   const categoryAnalysis = await db.all<any>(`
-    SELECT
-      mc.name as category_name,
-      COUNT(DISTINCT m.id) as materials_count,
+    SELECT mc.name as category_name, COUNT(DISTINCT m.id) as materials_count,
       SUM(CASE WHEN mm.delta < 0 THEN -mm.delta ELSE 0 END) as total_consumed,
       SUM(CASE WHEN mm.delta < 0 THEN -mm.delta * COALESCE(mm.price, 0) ELSE 0 END) as total_cost,
       AVG(CASE WHEN mm.delta < 0 THEN -mm.delta ELSE NULL END) as avg_consumption
     FROM material_categories mc
     LEFT JOIN materials m ON m.category_id = mc.id
-    LEFT JOIN material_moves mm ON mm.material_id = m.id AND mm.created_at >= ?
-    WHERE mm.created_at >= ?
-    GROUP BY mc.id, mc.name
-    HAVING total_consumed > 0
-    ORDER BY total_cost DESC
-  `, [startDate.toISOString(), startDate.toISOString()])
+    LEFT JOIN material_moves mm ON mm.material_id = m.id AND ${matDateRange}
+    WHERE ${matDateRange}
+    GROUP BY mc.id, mc.name HAVING total_consumed > 0 ORDER BY total_cost DESC
+  `, [...matDateParams, ...matDateParams])
 
   res.json({
-    period: { days, startDate: startDate.toISOString() },
+    period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
     abcAnalysis,
     abcSummary,
     categoryAnalysis,
@@ -541,97 +474,53 @@ router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) =>
 
 // GET /api/reports/analytics/time/peak-hours — временная аналитика
 router.get('/analytics/time/peak-hours', asyncHandler(async (req, res) => {
-  const { period = '30' } = req.query
-  const days = parseInt(period as string) || 30
-
+  const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
   const db = await getDb()
-  const startDate = new Date()
-  startDate.setDate(startDate.getDate() - days)
 
-  // Анализ по часам
   const hourlyAnalysis = await db.all<any>(`
-    SELECT
-      strftime('%H', o.createdAt) as hour,
-      COUNT(o.id) as orders_count,
+    SELECT strftime('%H', o.createdAt) as hour, COUNT(o.id) as orders_count,
       SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue,
       AVG(COALESCE(o.prepaymentAmount, 0)) as avg_order_value,
       COUNT(DISTINCT DATE(o.createdAt)) as active_days
-    FROM orders o
-    WHERE o.createdAt >= ?
-    GROUP BY strftime('%H', o.createdAt)
-    ORDER BY hour
-  `, [startDate.toISOString()])
+    FROM orders o WHERE ${dateFilter('o')}
+    GROUP BY strftime('%H', o.createdAt) ORDER BY hour
+  `, dateParams)
 
-  // Анализ по дням недели и часам
   const weekdayHourlyAnalysis = await db.all<any>(`
-    SELECT
-      CASE strftime('%w', o.createdAt)
-        WHEN '0' THEN 'Воскресенье'
-        WHEN '1' THEN 'Понедельник'
-        WHEN '2' THEN 'Вторник'
-        WHEN '3' THEN 'Среда'
-        WHEN '4' THEN 'Четверг'
-        WHEN '5' THEN 'Пятница'
-        WHEN '6' THEN 'Суббота'
-      END as weekday,
-      strftime('%H', o.createdAt) as hour,
-      COUNT(o.id) as orders_count,
-      SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue
-    FROM orders o
-    WHERE o.createdAt >= ?
-    GROUP BY strftime('%w', o.createdAt), strftime('%H', o.createdAt), weekday
-    ORDER BY strftime('%w', o.createdAt), hour
-  `, [startDate.toISOString()])
+    SELECT CASE strftime('%w', o.createdAt) WHEN '0' THEN 'Воскресенье' WHEN '1' THEN 'Понедельник'
+      WHEN '2' THEN 'Вторник' WHEN '3' THEN 'Среда' WHEN '4' THEN 'Четверг' WHEN '5' THEN 'Пятница' WHEN '6' THEN 'Суббота' END as weekday,
+      strftime('%H', o.createdAt) as hour, COUNT(o.id) as orders_count, SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue
+    FROM orders o WHERE ${dateFilter('o')}
+    GROUP BY strftime('%w', o.createdAt), strftime('%H', o.createdAt), weekday ORDER BY strftime('%w', o.createdAt), hour
+  `, dateParams)
 
-  // Пиковые периоды
   const peakPeriods = {
     peakHour: hourlyAnalysis.reduce((max, hour) =>
       hour.orders_count > max.orders_count ? hour : max, hourlyAnalysis[0] || { hour: '0', orders_count: 0 }),
     peakWeekday: await db.get<any>(`
-      SELECT
-        CASE strftime('%w', o.createdAt)
-          WHEN '0' THEN 'Воскресенье'
-          WHEN '1' THEN 'Понедельник'
-          WHEN '2' THEN 'Вторник'
-          WHEN '3' THEN 'Среда'
-          WHEN '4' THEN 'Четверг'
-          WHEN '5' THEN 'Пятница'
-          WHEN '6' THEN 'Суббота'
-        END as weekday,
-        COUNT(o.id) as orders_count,
-        SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue
-      FROM orders o
-      WHERE o.createdAt >= ?
-      GROUP BY strftime('%w', o.createdAt), weekday
-      ORDER BY orders_count DESC
-      LIMIT 1
-    `, [startDate.toISOString()]),
+      SELECT CASE strftime('%w', o.createdAt) WHEN '0' THEN 'Воскресенье' WHEN '1' THEN 'Понедельник' WHEN '2' THEN 'Вторник'
+        WHEN '3' THEN 'Среда' WHEN '4' THEN 'Четверг' WHEN '5' THEN 'Пятница' WHEN '6' THEN 'Суббота' END as weekday,
+        COUNT(o.id) as orders_count, SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue
+      FROM orders o WHERE ${dateFilter('o')}
+      GROUP BY strftime('%w', o.createdAt), weekday ORDER BY orders_count DESC LIMIT 1
+    `, dateParams),
     busiestTimeSlot: await db.get<any>(`
-      SELECT
-        strftime('%H', o.createdAt) as hour,
-        COUNT(o.id) as orders_count
-      FROM orders o
-      WHERE o.createdAt >= ?
-      GROUP BY strftime('%H', o.createdAt)
-      ORDER BY orders_count DESC
-      LIMIT 1
-    `, [startDate.toISOString()])
+      SELECT strftime('%H', o.createdAt) as hour, COUNT(o.id) as orders_count
+      FROM orders o WHERE ${dateFilter('o')}
+      GROUP BY strftime('%H', o.createdAt) ORDER BY orders_count DESC LIMIT 1
+    `, dateParams)
   }
 
-  // Тренды по времени суток
   const timeOfDayTrends = {
-    morning: hourlyAnalysis.filter(h => parseInt(h.hour) >= 6 && parseInt(h.hour) < 12)
-      .reduce((sum, h) => sum + h.orders_count, 0),
-    afternoon: hourlyAnalysis.filter(h => parseInt(h.hour) >= 12 && parseInt(h.hour) < 18)
-      .reduce((sum, h) => sum + h.orders_count, 0),
-    evening: hourlyAnalysis.filter(h => parseInt(h.hour) >= 18 && parseInt(h.hour) < 24)
-      .reduce((sum, h) => sum + h.orders_count, 0),
-    night: hourlyAnalysis.filter(h => parseInt(h.hour) >= 0 && parseInt(h.hour) < 6)
-      .reduce((sum, h) => sum + h.orders_count, 0)
+    morning: hourlyAnalysis.filter(h => parseInt(h.hour) >= 6 && parseInt(h.hour) < 12).reduce((sum, h) => sum + h.orders_count, 0),
+    afternoon: hourlyAnalysis.filter(h => parseInt(h.hour) >= 12 && parseInt(h.hour) < 18).reduce((sum, h) => sum + h.orders_count, 0),
+    evening: hourlyAnalysis.filter(h => parseInt(h.hour) >= 18 && parseInt(h.hour) < 24).reduce((sum, h) => sum + h.orders_count, 0),
+    night: hourlyAnalysis.filter(h => parseInt(h.hour) >= 0 && parseInt(h.hour) < 6).reduce((sum, h) => sum + h.orders_count, 0)
   }
 
   res.json({
-    period: { days, startDate: startDate.toISOString() },
+    period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
     hourlyAnalysis,
     weekdayHourlyAnalysis,
     peakPeriods,

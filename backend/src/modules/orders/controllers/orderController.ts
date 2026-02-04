@@ -216,7 +216,12 @@ export class OrderController {
         return 
       }
       
-      const searchParams = req.query
+      const q = req.query as Record<string, string | undefined>
+      const departmentId = q.department_id != null ? parseInt(q.department_id, 10) : undefined
+      const searchParams = {
+        ...q,
+        department_id: Number.isFinite(departmentId) ? departmentId : undefined
+      }
       const orders = await OrderService.searchOrders(authUser.id, searchParams)
       res.json(orders)
     } catch (error: any) {

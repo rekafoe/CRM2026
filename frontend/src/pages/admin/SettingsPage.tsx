@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
-import { UserManagement } from '../../features/userManagement';
+import { UserManagement, DepartmentManagement } from '../../features/userManagement';
 
 interface SettingsPageProps {
   onBack: () => void;
@@ -8,10 +8,17 @@ interface SettingsPageProps {
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
   const [showUserManagement, setShowUserManagement] = useState(false);
+  const [showDepartmentManagement, setShowDepartmentManagement] = useState(false);
 
   if (showUserManagement) {
     return (
       <UserManagement onBack={() => setShowUserManagement(false)} />
+    );
+  }
+
+  if (showDepartmentManagement) {
+    return (
+      <DepartmentManagement onBack={() => setShowDepartmentManagement(false)} />
     );
   }
 
@@ -34,6 +41,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
             <h3>💾 Резервные копии</h3>
             <p>Управление бэкапами данных</p>
             <button className="btn btn-primary">Открыть</button>
+          </div>
+
+          <div className="setting-card">
+            <h3>🏢 Департаменты</h3>
+            <p>Создание и редактирование департаментов для распределения пользователей</p>
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowDepartmentManagement(true)}
+            >
+              Открыть
+            </button>
           </div>
 
           <div className="setting-card">
