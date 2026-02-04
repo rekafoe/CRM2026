@@ -59,11 +59,12 @@ app.get('/api-docs.json', (req, res) => {
 // Не передаём swaggerSpec в setup(), чтобы UI загружал спецификацию с /api-docs.json,
 // где подставляется server URL из запроса — иначе «Try it out» идёт на /api-docs/... и возвращает HTML
 try {
+  // swaggerUrl — откуда UI загружает spec (в библиотеке используется именно он, не swaggerOptions.url)
   const swaggerUiOptions = {
+    swaggerUrl: '/api-docs.json',
     customCss: '.swagger-ui .topbar { display: none }',
     customSiteTitle: 'CRM API Documentation',
     swaggerOptions: {
-      url: '/api-docs.json',
       persistAuthorization: true,
     },
   }
