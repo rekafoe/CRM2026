@@ -19,10 +19,15 @@ const options: swaggerJsdoc.Options = {
         url: `http://localhost:${config.port}`,
         description: 'Development server',
       },
-      {
-        url: process.env.PUBLIC_API_URL || process.env.RAILWAY_STATIC_URL || 'https://crm2026-production.up.railway.app',
-        description: 'Production server (Railway)',
-      },
+      (() => {
+        // Базовый URL API (без /api-docs), чтобы «Try it out» в Swagger шёл к API, а не к странице документации
+        const raw =
+          process.env.PUBLIC_API_URL ||
+          process.env.RAILWAY_STATIC_URL ||
+          'https://crm2026-production.up.railway.app'
+        const url = raw.replace(/\/api-docs\/?$/, '') || raw
+        return { url, description: 'Production server (Railway)' }
+      })(),
     ],
     components: {
       securitySchemes: {
