@@ -30,7 +30,7 @@ dotenv.config()
 
 const app = express()
 
-// Middleware
+// Middleware: CORS — несколько origin через запятую в CORS_ORIGIN (напр. CRM фронт + printcore.by)
 app.use(cors({ origin: config.corsOrigin }))
 
 // Swagger JSON endpoint (ДО compressionMiddleware)
@@ -160,6 +160,12 @@ async function startServer() {
     EarningsService.initialize(earningsConfig)
     
     const port = process.env.PORT || 3001
+    const documentTemplatesDir = process.env.DOCUMENT_TEMPLATES_DIR
+    if (documentTemplatesDir) {
+      logger.info(`Document templates: using persistent dir (DOCUMENT_TEMPLATES_DIR) = ${require('path').resolve(documentTemplatesDir)}`)
+    } else {
+      logger.warn('Document templates: DOCUMENT_TEMPLATES_DIR not set — uploaded templates will be lost on redeploy. Set DOCUMENT_TEMPLATES_DIR to a volume path (e.g. /data/document-templates) on Railway.')
+    }
     app.listen(port, () => {
       logger.info(`Server running on port ${port}`)
       logger.info(`Uploads directory: ${uploadsDir}`)

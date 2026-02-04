@@ -1,6 +1,19 @@
+function parseCorsOrigin(): string | string[] {
+  const raw = process.env.CORS_ORIGIN;
+  if (!raw) {
+    return process.env.NODE_ENV === 'production'
+      ? 'https://your-domain.com'
+      : 'http://localhost:5173';
+  }
+  if (raw.includes(',')) {
+    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  return raw.trim();
+}
+
 export const config = {
   port: Number(process.env.PORT || 3001),
-  corsOrigin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:5173'),
+  corsOrigin: parseCorsOrigin(),
   nodeEnv: process.env.NODE_ENV || 'development',
   showErrorStack: process.env.SHOW_ERROR_STACK !== 'false' && process.env.NODE_ENV !== 'production',
   sentryDsn: process.env.SENTRY_DSN,

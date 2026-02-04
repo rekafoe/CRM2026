@@ -79,10 +79,13 @@ router.post('/', upload.single('template'), asyncHandler(async (req: Request, re
     return;
   }
   
-  // Директория шаблонов: DOCUMENT_TEMPLATES_DIR на проде (volume), иначе рядом с приложением
+  // Директория шаблонов: DOCUMENT_TEMPLATES_DIR на проде (volume), иначе рядом с приложением (теряется при редеплое)
   const templatesDir = process.env.DOCUMENT_TEMPLATES_DIR
     ? path.resolve(process.env.DOCUMENT_TEMPLATES_DIR)
     : path.resolve(__dirname, '../templates');
+  if (!process.env.DOCUMENT_TEMPLATES_DIR) {
+    console.warn('[DocumentTemplate] DOCUMENT_TEMPLATES_DIR не задан — шаблон сохраняется во временную папку и будет потерян при следующем редеплое. Настройте volume и переменную окружения на Railway.');
+  }
   if (!fs.existsSync(templatesDir)) {
     fs.mkdirSync(templatesDir, { recursive: true });
   }

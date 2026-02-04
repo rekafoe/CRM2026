@@ -206,6 +206,35 @@ router.get('/parameter-presets', asyncHandler(async (req, res) => {
   res.json(presets);
 }));
 
+/**
+ * @swagger
+ * /api/products/categories:
+ *   get:
+ *     summary: Список категорий продуктов
+ *     description: Возвращает категории продуктов. Для калькулятора можно передать activeOnly=true.
+ *     tags: [Products]
+ *     parameters:
+ *       - in: query
+ *         name: activeOnly
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: Только активные категории
+ *     responses:
+ *       200:
+ *         description: Массив категорий продуктов
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: integer }
+ *                   name: { type: string }
+ *                   sort_order: { type: integer }
+ *                   is_active: { type: integer }
+ */
 // Получить все категории продуктов (для админки - показываем все)
 router.get('/categories', async (req, res) => {
   try {
@@ -235,6 +264,35 @@ router.get('/categories', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/products:
+ *   get:
+ *     summary: Список продуктов
+ *     description: Возвращает все продукты (или только активные при activeOnly=true). Для внешних систем (printcore.by) и калькулятора.
+ *     tags: [Products]
+ *     parameters:
+ *       - in: query
+ *         name: activeOnly
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: Только активные продукты (для калькулятора)
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Поиск по названию и описанию
+ *     responses:
+ *       200:
+ *         description: Массив продуктов с полями id, name, category_id, template, config_data и т.д.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ */
 // Получить все продукты (для админки - показываем все, для калькулятора - фильтруем)
 router.get('/', async (req, res) => {
   try {
@@ -276,6 +334,30 @@ router.get('/', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/products/category/{categoryId}:
+ *   get:
+ *     summary: Продукты по категории
+ *     description: Возвращает продукты выбранной категории.
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: categoryId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: activeOnly
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *     responses:
+ *       200:
+ *         description: Массив продуктов категории
+ *       500:
+ *         description: Ошибка сервера
+ */
 // Получить продукты по категории
 router.get('/category/:categoryId', async (req, res) => {
   try {
@@ -302,6 +384,29 @@ router.get('/category/:categoryId', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/products/{productId}/schema:
+ *   get:
+ *     summary: Схема продукта (JSON для калькулятора)
+ *     description: Возвращает полную схему продукта — поля, ограничения, типы бумаги, цены печати. Используется калькулятором и внешними системами (printcore.by) для расчёта и отображения опций.
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Объект schema (template, constraints, fields, simplified и т.д.)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       404:
+ *         description: Продукт не найден
+ */
 // Получить детальную информацию о продукте с параметрами
 // Новый эндпоинт для получения schema продукта (для калькулятора)
 router.get('/:productId/schema', async (req, res) => {
@@ -769,6 +874,29 @@ router.get('/:productId/schema', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/products/{productId}:
+ *   get:
+ *     summary: Продукт по ID
+ *     description: Возвращает продукт с параметрами, постобработкой и скидками. Полная информация для админки и внешних систем.
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Объект продукта (id, name, parameters, post_processing_services и т.д.)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       404:
+ *         description: Продукт не найден
+ */
 router.get('/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
