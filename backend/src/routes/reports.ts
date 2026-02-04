@@ -309,20 +309,26 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
 
 // GET /api/reports/analytics/managers/efficiency — эффективность менеджеров
 // «Выполнено» = статусы 3,4,6 (Готов, Выдан, Завершён); отмена = статус 5 или is_cancelled=1
+// Сравнение по дате через substr: в БД created_at может быть YYYY-MM-DD HH:MM:SS, иначе часть заказов теряется
 router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
   const { department_id: deptIdParam } = req.query
   const departmentId = deptIdParam != null ? parseInt(String(deptIdParam), 10) : undefined
-  const { startDate, endDate, dateParams } = getAnalyticsDateRange(req.query)
+  const { startDate, endDate } = getAnalyticsDateRange(req.query)
   const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
+
+  const startStr = startDate.toISOString().slice(0, 10)
+  const endStr = endDate ? endDate.toISOString().slice(0, 10) : null
+  const oCreated = 'COALESCE(o.createdAt, o.created_at)'
+  const oDate = `substr(${oCreated}, 1, 10)`
+  const oCreatedRange = endStr ? `${oDate} >= ? AND ${oDate} <= ?` : `${oDate} >= ?`
+  const managerDateParams = endStr ? [startStr, endStr] : [startStr]
 
   const db = await getDb()
   const deptCondition = Number.isFinite(departmentId) ? ' AND u.department_id = ? ' : ''
   const deptParam = Number.isFinite(departmentId) ? [departmentId] : []
   const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
   const cancelledCondition = hasIsCancelled ? '(o.status = 5 OR COALESCE(o.is_cancelled, 0) = 1)' : 'o.status = 5'
-  const oCreated = 'COALESCE(o.createdAt, o.created_at)'
   const oUpdated = 'COALESCE(o.updatedAt, o.updated_at)'
-  const oCreatedRange = endDate ? `${oCreated} >= ? AND ${oCreated} <= ?` : `${oCreated} >= ?`
 
   const managerEfficiency = await db.all<any>(
     `SELECT u.id as user_id, u.name as user_name, COUNT(o.id) as total_orders,
@@ -331,23 +337,23 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
       SUM(CASE WHEN o.status IN (3, 4, 6) THEN COALESCE(o.prepaymentAmount, 0) ELSE 0 END) as total_revenue,
       AVG(CASE WHEN o.status IN (3, 4, 6) THEN COALESCE(o.prepaymentAmount, 0) ELSE NULL END) as avg_order_value,
       AVG(CASE WHEN o.status IN (3, 4, 6) AND ${oUpdated} > ${oCreated} THEN JULIANDAY(${oUpdated}) - JULIANDAY(${oCreated}) ELSE NULL END) * 24 as avg_processing_hours,
-      COUNT(DISTINCT DATE(${oCreated})) as active_days, MAX(${oCreated}) as last_order_date
+      COUNT(DISTINCT ${oDate}) as active_days, MAX(${oCreated}) as last_order_date
     FROM users u
     LEFT JOIN orders o ON o.userId = u.id AND ${oCreatedRange}
     WHERE u.role IN ('admin', 'manager', 'user') ${deptCondition}
     GROUP BY u.id, u.name HAVING total_orders > 0 ORDER BY total_revenue DESC`,
-    [...dateParams, ...deptParam]
+    [...managerDateParams, ...deptParam]
   )
 
   const topManagerIds = managerEfficiency.slice(0, 3).map(m => m.user_id)
   const managerDailyStats = topManagerIds.length
     ? await db.all<any>(`
-    SELECT o.userId as user_id, DATE(${oCreated}) as date, COUNT(o.id) as daily_orders,
+    SELECT o.userId as user_id, ${oDate} as date, COUNT(o.id) as daily_orders,
       SUM(CASE WHEN o.status IN (3, 4, 6) THEN COALESCE(o.prepaymentAmount, 0) ELSE 0 END) as daily_revenue,
       COUNT(CASE WHEN o.status IN (3, 4, 6) THEN 1 END) as daily_completed
     FROM orders o WHERE ${oCreatedRange} AND o.userId IN (${topManagerIds.map(() => '?').join(',')})
-    GROUP BY o.userId, DATE(${oCreated}) ORDER BY date DESC
-  `, [...dateParams, ...topManagerIds])
+    GROUP BY o.userId, ${oDate} ORDER BY date DESC
+  `, [...managerDateParams, ...topManagerIds])
     : []
 
   const managerConversion = await db.all<any>(
@@ -358,7 +364,7 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
     FROM users u LEFT JOIN orders o ON o.userId = u.id AND ${oCreatedRange}
     WHERE u.role IN ('admin', 'manager', 'user') ${deptCondition}
     GROUP BY u.id, u.name HAVING total_orders > 0 ORDER BY conversion_rate DESC`,
-    [...dateParams, ...deptParam]
+    [...managerDateParams, ...deptParam]
   )
 
   res.json({
@@ -370,11 +376,22 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
   })
 }))
 
+// Пустая структура ответа ABC-аналитики материалов (при ошибке или отсутствии данных)
+const emptyMaterialsResponse = (period: { days: number; startDate: string; endDate?: string }) => ({
+  period,
+  abcAnalysis: [] as any[],
+  abcSummary: { A: { count: 0, total_cost: 0, percentage: 0 }, B: { count: 0, total_cost: 0, percentage: 0 }, C: { count: 0, total_cost: 0, percentage: 0 } },
+  categoryAnalysis: [] as any[],
+  totalMaterials: 0,
+  totalCost: 0
+})
+
 // GET /api/reports/analytics/materials/abc-analysis — ABC-анализ материалов
 // material_moves.created_at может быть в формате SQLite (YYYY-MM-DD HH:MM:SS), сравниваем по дате через substr
 router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) => {
   const { startDate, endDate } = getAnalyticsDateRange(req.query)
   const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '90'), 10) || 90
+  const period = { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined }
   const startStr = startDate.toISOString().slice(0, 10)
   const endStr = endDate ? endDate.toISOString().slice(0, 10) : null
   const matDateRange = endStr
@@ -384,7 +401,9 @@ router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) =>
 
   const db = await getDb()
 
-  const materialsConsumption = await db.all<any>(`
+  let materialsConsumption: any[]
+  try {
+    materialsConsumption = await db.all<any>(`
     SELECT m.id as material_id, m.name as material_name, mc.name as category_name,
       SUM(CASE WHEN mm.delta < 0 THEN -mm.delta ELSE 0 END) as total_consumed,
       SUM(CASE WHEN mm.delta < 0 THEN -mm.delta * COALESCE(mm.price, 0) ELSE 0 END) as total_cost,
@@ -396,6 +415,10 @@ router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) =>
     WHERE ${matDateRange}
     GROUP BY m.id, m.name, mc.name HAVING total_consumed > 0 ORDER BY total_cost DESC
   `, [...matDateParams, ...matDateParams])
+  } catch (err) {
+    console.error('Materials ABC query failed:', err)
+    return res.json(emptyMaterialsResponse(period))
+  }
 
   const totalCost = materialsConsumption.reduce((sum, m) => sum + m.total_cost, 0)
   const safeTotal = totalCost > 0 ? totalCost : 1
@@ -463,7 +486,7 @@ router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) =>
   `, [...matDateParams, ...matDateParams])
 
   res.json({
-    period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
+    period,
     abcAnalysis,
     abcSummary,
     categoryAnalysis,

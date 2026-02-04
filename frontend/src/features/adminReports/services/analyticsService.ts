@@ -84,13 +84,25 @@ export class AnalyticsService {
     results.orderStatusData = orderStatusData;
 
     if (tab === 'managers' || tab === 'overview') {
-      results.managerData = await this.getManagerAnalytics(params, departmentId);
+      try {
+        results.managerData = await this.getManagerAnalytics(params, departmentId);
+      } catch (e) {
+        console.error('Manager analytics load failed:', e);
+      }
     }
     if (tab === 'materials' || tab === 'overview') {
-      results.materialsData = await this.getMaterialsAnalytics(params);
+      try {
+        results.materialsData = await this.getMaterialsAnalytics(params);
+      } catch (e) {
+        console.error('Materials analytics load failed:', e);
+      }
     }
     if (tab === 'time' || tab === 'overview') {
-      results.timeData = await this.getTimeAnalytics(params);
+      try {
+        results.timeData = await this.getTimeAnalytics(params);
+      } catch (e) {
+        console.error('Time analytics load failed:', e);
+      }
     }
     return results;
   }

@@ -296,8 +296,26 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               <ManagerAnalytics data={managerData} />
             )}
 
-            {activeTab === 'materials' && materialsData && (
-              <MaterialsAnalytics data={materialsData} />
+            {activeTab === 'materials' && (
+              materialsData ? (
+                <MaterialsAnalytics data={materialsData} />
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                  {isLoading ? 'Загрузка данных по материалам...' : (
+                    <>
+                      Не удалось загрузить отчёт по материалам.
+                      <br />
+                      <button
+                        type="button"
+                        onClick={refreshAnalytics}
+                        style={{ marginTop: 12, padding: '8px 16px', cursor: 'pointer' }}
+                      >
+                        Повторить загрузку
+                      </button>
+                    </>
+                  )}
+                </div>
+              )
             )}
 
             {activeTab === 'time' && timeData && (

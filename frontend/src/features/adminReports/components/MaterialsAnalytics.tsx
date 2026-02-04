@@ -10,6 +10,21 @@ interface MaterialsAnalyticsProps {
 
 export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) => {
   const abcClasses = ['A', 'B', 'C'] as const satisfies ReadonlyArray<keyof ABCSummary>;
+  const abcSummary = data.abcSummary ?? { A: { count: 0, total_cost: 0, percentage: 0 }, B: { count: 0, total_cost: 0, percentage: 0 }, C: { count: 0, total_cost: 0, percentage: 0 } };
+  const abcAnalysis = data.abcAnalysis ?? [];
+  const categoryAnalysis = data.categoryAnalysis ?? [];
+  const hasData = (data.totalMaterials ?? 0) > 0;
+
+  if (!hasData) {
+    return (
+      <div className="reports-chart" style={{ marginBottom: '20px' }}>
+        <h4 className="reports-chart-title">📦 ABC-анализ материалов (по стоимости)</h4>
+        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+          Нет движений материалов за выбранный период. Измените период или диапазон дат.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -22,7 +37,7 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
         {/* Сводка ABC */}
         <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
-            {Object.entries(data.abcSummary).map(([className, stats]) => (
+            {Object.entries(abcSummary).map(([className, stats]) => (
               <div key={className} style={{
                 padding: '16px',
                 backgroundColor: className === 'A' ? 'var(--accent-light)' :
@@ -32,14 +47,14 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
                 textAlign: 'center'
               }}>
                 <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--accent-primary)' }}>
-                  {stats.percentage.toFixed(1)}%
+                  {Number(stats?.percentage ?? 0).toFixed(1)}%
                 </div>
                 <div style={{ fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '4px' }}>
                   Класс {className}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  {stats.count} материалов<br/>
-                  {stats.total_cost.toLocaleString('ru-RU')} BYN
+                  {stats?.count ?? 0} материалов<br/>
+                  {Number(stats?.total_cost ?? 0).toLocaleString('ru-RU')} BYN
                 </div>
               </div>
             ))}
@@ -56,11 +71,11 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
               border: '1px solid var(--border-color)'
             }}>
               <h5 style={{ margin: '0 0 12px 0', color: 'var(--text-primary)' }}>
-                Класс {className} - {data.abcSummary[className].percentage >= 80 ? 'Высокозначимые' :
-                                      data.abcSummary[className].percentage >= 15 ? 'Среднеззначимые' : 'Низкозначимые'} материалы
+                Класс {className} - {(abcSummary[className as keyof ABCSummary]?.percentage ?? 0) >= 80 ? 'Высокозначимые' :
+                                      (abcSummary[className as keyof ABCSummary]?.percentage ?? 0) >= 15 ? 'Среднеззначимые' : 'Низкозначимые'} материалы
               </h5>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {data.abcAnalysis
+                {abcAnalysis
                   .filter((m) => m.abc_class === className)
                   .slice(0, 3)
                   .map((material) => (
@@ -75,7 +90,7 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
                         {material.material_name}
                       </div>
                       <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                        {material.total_cost.toLocaleString('ru-RU')} BYN • {material.total_consumed.toFixed(1)} ед.
+                        {Number(material.total_cost ?? 0).toLocaleString('ru-RU')} BYN • {Number(material.total_consumed ?? 0).toFixed(1)} ед.
                       </div>
                     </div>
                   ))}
@@ -91,8 +106,8 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
           📂 Анализ по категориям материалов
         </h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-          {data.categoryAnalysis.slice(0, 6).map((category) => (
-            <div key={category.category_name} style={{
+          {categoryAnalysis.slice(0, 6).map((category, idx) => (
+            <div key={category.category_name ?? `cat-${idx}`} style={{
               padding: '12px',
               backgroundColor: 'var(--bg-secondary)',
               borderRadius: '6px',
@@ -103,11 +118,11 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
                 {category.materials_count}
               </div>
               <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '4px' }}>
-                {category.category_name}
+                {category.category_name ?? 'Без категории'}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                {category.total_cost.toLocaleString('ru-RU')} BYN<br/>
-                {category.total_consumed.toFixed(0)} ед.
+                {Number(category.total_cost ?? 0).toLocaleString('ru-RU')} BYN<br/>
+                {Number(category.total_consumed ?? 0).toFixed(0)} ед.
               </div>
             </div>
           ))}
