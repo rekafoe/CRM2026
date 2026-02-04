@@ -30,14 +30,27 @@ dotenv.config()
 
 const app = express()
 
+// За прокси (Railway и др.) req.protocol должен быть https
+app.set('trust proxy', 1)
+
 // Middleware: CORS — несколько origin через запятую в CORS_ORIGIN (напр. CRM фронт + printcore.by)
 app.use(cors({ origin: config.corsOrigin }))
 
 // Swagger JSON endpoint (ДО compressionMiddleware)
+// Отдаём спецификацию с server URL из запроса, чтобы «Try it out» шёл к API, а не к /api-docs/
 app.get('/api-docs.json', (req, res) => {
   try {
+    const baseUrl = `${req.protocol}://${req.get('host') || ''}`.replace(/\/api-docs\/?$/, '')
+    const spec = {
+      ...swaggerSpec,
+      servers: [
+        { url: baseUrl, description: 'This server (API root)' },
+        ...(swaggerSpec.servers || []).filter((s: any) => s.url && !s.url.includes('/api-docs')),
+      ],
+    }
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
-    res.json(swaggerSpec)
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    res.json(spec)
   } catch (error: any) {
     logger.error('Ошибка при отправке Swagger JSON', { error: error.message })
     res.status(500).json({ error: 'Ошибка загрузки Swagger документации' })
