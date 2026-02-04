@@ -40,13 +40,11 @@ app.use(cors({ origin: config.corsOrigin }))
 // Отдаём спецификацию с server URL из запроса, чтобы «Try it out» шёл к API, а не к /api-docs/
 app.get('/api-docs.json', (req, res) => {
   try {
-    const baseUrl = `${req.protocol}://${req.get('host') || ''}`.replace(/\/api-docs\/?$/, '')
+    // Только один server с корнем API (без /api-docs), чтобы «Try it out» шёл к API
+    const baseUrl = `${req.protocol}://${req.get('host') || ''}`.replace(/\/api-docs\/?$/, '').replace(/\/$/, '')
     const spec = {
       ...swaggerSpec,
-      servers: [
-        { url: baseUrl, description: 'This server (API root)' },
-        ...(swaggerSpec.servers || []).filter((s: any) => s.url && !s.url.includes('/api-docs')),
-      ],
+      servers: [{ url: baseUrl, description: 'API (this server)' }],
     }
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
@@ -58,6 +56,8 @@ app.get('/api-docs.json', (req, res) => {
 })
 
 // Swagger UI (ДО compressionMiddleware, чтобы избежать проблем с заголовками)
+// Не передаём swaggerSpec в setup(), чтобы UI загружал спецификацию с /api-docs.json,
+// где подставляется server URL из запроса — иначе «Try it out» идёт на /api-docs/... и возвращает HTML
 try {
   const swaggerUiOptions = {
     customCss: '.swagger-ui .topbar { display: none }',
@@ -68,13 +68,9 @@ try {
     },
   }
   
-  // Стандартный способ: массив middleware
-  // swaggerUi.serve обрабатывает статические файлы (CSS, JS, и т.д.)
-  // swaggerUi.setup обрабатывает главную HTML страницу
   app.use(
     '/api-docs',
     (req, res, next) => {
-      // Устанавливаем заголовки для предотвращения кэширования HTML
       if (req.path === '/api-docs' || req.path === '/api-docs/') {
         res.setHeader('Content-Type', 'text/html; charset=utf-8')
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
@@ -84,7 +80,7 @@ try {
       next()
     },
     swaggerUi.serve,
-    swaggerUi.setup(swaggerSpec, swaggerUiOptions)
+    swaggerUi.setup(null as any, swaggerUiOptions)
   )
   
   logger.info('Swagger UI настроен на /api-docs')
