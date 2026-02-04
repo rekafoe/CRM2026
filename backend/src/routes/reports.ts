@@ -308,8 +308,7 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
 }))
 
 // GET /api/reports/analytics/managers/efficiency — эффективность менеджеров
-// «Выполнено» = статусы 3,4,6 (Готов, Выдан, Завершён); отмена = статус 5 или is_cancelled=1
-// Сравнение по дате через substr: в БД created_at может быть YYYY-MM-DD HH:MM:SS, иначе часть заказов теряется
+// Без ограничений по статусам: выручка, средний чек, «Выполнено» и время — по всем заказам. Отмена = статус 5 или is_cancelled=1
 router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
   const { department_id: deptIdParam } = req.query
   const departmentId = deptIdParam != null ? parseInt(String(deptIdParam), 10) : undefined
@@ -332,11 +331,11 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
 
   const managerEfficiency = await db.all<any>(
     `SELECT u.id as user_id, u.name as user_name, COUNT(o.id) as total_orders,
-      COUNT(CASE WHEN o.status IN (3, 4, 6) THEN 1 END) as completed_orders,
+      COUNT(o.id) as completed_orders,
       COUNT(CASE WHEN ${cancelledCondition} THEN 1 END) as cancelled_orders,
-      SUM(CASE WHEN o.status IN (3, 4, 6) THEN COALESCE(o.prepaymentAmount, 0) ELSE 0 END) as total_revenue,
-      AVG(CASE WHEN o.status IN (3, 4, 6) THEN COALESCE(o.prepaymentAmount, 0) ELSE NULL END) as avg_order_value,
-      AVG(CASE WHEN o.status IN (3, 4, 6) AND ${oUpdated} > ${oCreated} THEN JULIANDAY(${oUpdated}) - JULIANDAY(${oCreated}) ELSE NULL END) * 24 as avg_processing_hours,
+      SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue,
+      AVG(COALESCE(o.prepaymentAmount, 0)) as avg_order_value,
+      AVG(CASE WHEN ${oUpdated} > ${oCreated} THEN JULIANDAY(${oUpdated}) - JULIANDAY(${oCreated}) ELSE NULL END) * 24 as avg_processing_hours,
       COUNT(DISTINCT ${oDate}) as active_days, MAX(${oCreated}) as last_order_date
     FROM users u
     LEFT JOIN orders o ON o.userId = u.id AND ${oCreatedRange}
@@ -349,21 +348,22 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
   const managerDailyStats = topManagerIds.length
     ? await db.all<any>(`
     SELECT o.userId as user_id, ${oDate} as date, COUNT(o.id) as daily_orders,
-      SUM(CASE WHEN o.status IN (3, 4, 6) THEN COALESCE(o.prepaymentAmount, 0) ELSE 0 END) as daily_revenue,
-      COUNT(CASE WHEN o.status IN (3, 4, 6) THEN 1 END) as daily_completed
+      SUM(COALESCE(o.prepaymentAmount, 0)) as daily_revenue,
+      COUNT(o.id) as daily_completed
     FROM orders o WHERE ${oCreatedRange} AND o.userId IN (${topManagerIds.map(() => '?').join(',')})
     GROUP BY o.userId, ${oDate} ORDER BY date DESC
   `, [...managerDateParams, ...topManagerIds])
     : []
 
+  // Без ограничений по статусам: подтверждённые и выполненные = все заказы
   const managerConversion = await db.all<any>(
     `SELECT u.id as user_id, u.name as user_name,
-      COUNT(CASE WHEN o.status >= 1 THEN 1 END) as confirmed_orders,
-      COUNT(CASE WHEN o.status >= 4 THEN 1 END) as completed_orders, COUNT(o.id) as total_orders,
-      ROUND(CAST(COUNT(CASE WHEN o.status >= 4 THEN 1 END) AS FLOAT) / NULLIF(COUNT(CASE WHEN o.status >= 1 THEN 1 END), 0) * 100, 1) as conversion_rate
+      COUNT(o.id) as confirmed_orders,
+      COUNT(o.id) as completed_orders, COUNT(o.id) as total_orders,
+      100.0 as conversion_rate
     FROM users u LEFT JOIN orders o ON o.userId = u.id AND ${oCreatedRange}
     WHERE u.role IN ('admin', 'manager', 'user') ${deptCondition}
-    GROUP BY u.id, u.name HAVING total_orders > 0 ORDER BY conversion_rate DESC`,
+    GROUP BY u.id, u.name HAVING total_orders > 0 ORDER BY total_orders DESC`,
     [...managerDateParams, ...deptParam]
   )
 
