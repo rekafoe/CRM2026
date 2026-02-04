@@ -221,6 +221,7 @@ export interface TimeOfDayTrends {
 
 export interface TimeAnalyticsData {
   period: AnalyticsPeriod;
+  workHours?: { start: number; end: number };
   hourlyAnalysis: HourlyAnalysis[];
   weekdayHourlyAnalysis: WeekdayHourlyAnalysis[];
   peakPeriods: PeakPeriods;

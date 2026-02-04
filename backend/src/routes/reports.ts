@@ -496,55 +496,84 @@ router.get('/analytics/materials/abc-analysis', asyncHandler(async (req, res) =>
   })
 }))
 
-// GET /api/reports/analytics/time/peak-hours — временная аналитика
+// Рабочие часы: 9:00–20:00. Часы из ISO/SQLite: substr(createdAt, 12, 2)
+const WORK_HOUR_START = 9
+const WORK_HOUR_END = 20
+function workHoursCondition(alias: string): string {
+  const col = alias ? `${alias}.createdAt` : 'createdAt'
+  const created = `COALESCE(${col}, ${alias ? `${alias}.created_at` : 'created_at'})`
+  return `CAST(SUBSTR(${created}, 12, 2) AS INTEGER) BETWEEN ${WORK_HOUR_START} AND ${WORK_HOUR_END}`
+}
+
+// GET /api/reports/analytics/time/peak-hours — временная аналитика только по рабочим часам 9–20
 router.get('/analytics/time/peak-hours', asyncHandler(async (req, res) => {
   const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
   const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
   const db = await getDb()
+  const dateAndWorkHours = `${dateFilter('o')} AND ${workHoursCondition('o')}`
 
-  const hourlyAnalysis = await db.all<any>(`
-    SELECT strftime('%H', o.createdAt) as hour, COUNT(o.id) as orders_count,
+  const hourlyRaw = await db.all<any>(`
+    SELECT CAST(SUBSTR(COALESCE(o.createdAt, o.created_at), 12, 2) AS INTEGER) as hour, COUNT(o.id) as orders_count,
       SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue,
       AVG(COALESCE(o.prepaymentAmount, 0)) as avg_order_value,
-      COUNT(DISTINCT DATE(o.createdAt)) as active_days
-    FROM orders o WHERE ${dateFilter('o')}
-    GROUP BY strftime('%H', o.createdAt) ORDER BY hour
+      COUNT(DISTINCT substr(COALESCE(o.createdAt, o.created_at), 1, 10)) as active_days
+    FROM orders o WHERE ${dateAndWorkHours}
+    GROUP BY hour ORDER BY hour
   `, dateParams)
 
-  const weekdayHourlyAnalysis = await db.all<any>(`
-    SELECT CASE strftime('%w', o.createdAt) WHEN '0' THEN 'Воскресенье' WHEN '1' THEN 'Понедельник'
+  // Градация по часам 9–20: заполняем все часы, отсутствующие = 0
+  const hourMap = new Map<number, { hour: string; orders_count: number; total_revenue: number; avg_order_value: number | null; active_days: number }>()
+  for (let h = WORK_HOUR_START; h <= WORK_HOUR_END; h++) {
+    hourMap.set(h, { hour: String(h).padStart(2, '0'), orders_count: 0, total_revenue: 0, avg_order_value: null, active_days: 0 })
+  }
+  for (const row of hourlyRaw) {
+    const h = Number(row.hour)
+    if (h >= WORK_HOUR_START && h <= WORK_HOUR_END) {
+      hourMap.set(h, {
+        hour: String(h).padStart(2, '0'),
+        orders_count: row.orders_count,
+        total_revenue: row.total_revenue,
+        avg_order_value: row.avg_order_value,
+        active_days: row.active_days
+      })
+    }
+  }
+  const hourlyAnalysis = Array.from({ length: WORK_HOUR_END - WORK_HOUR_START + 1 }, (_, i) => hourMap.get(WORK_HOUR_START + i)!)
+
+  const oDateExpr = "substr(COALESCE(o.createdAt, o.created_at), 1, 10) || ' 00:00:00'"
+  const weekdayHourlyRaw = await db.all<any>(`
+    SELECT CASE strftime('%w', ${oDateExpr}) WHEN '0' THEN 'Воскресенье' WHEN '1' THEN 'Понедельник'
       WHEN '2' THEN 'Вторник' WHEN '3' THEN 'Среда' WHEN '4' THEN 'Четверг' WHEN '5' THEN 'Пятница' WHEN '6' THEN 'Суббота' END as weekday,
-      strftime('%H', o.createdAt) as hour, COUNT(o.id) as orders_count, SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue
-    FROM orders o WHERE ${dateFilter('o')}
-    GROUP BY strftime('%w', o.createdAt), strftime('%H', o.createdAt), weekday ORDER BY strftime('%w', o.createdAt), hour
+      CAST(SUBSTR(COALESCE(o.createdAt, o.created_at), 12, 2) AS INTEGER) as hour, COUNT(o.id) as orders_count, SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue
+    FROM orders o WHERE ${dateAndWorkHours}
+    GROUP BY strftime('%w', ${oDateExpr}), hour, weekday ORDER BY strftime('%w', ${oDateExpr}), hour
   `, dateParams)
+  const weekdayHourlyAnalysis = weekdayHourlyRaw.filter((r: any) => r.hour >= WORK_HOUR_START && r.hour <= WORK_HOUR_END)
 
+  const peakAmongWorkHours = hourlyAnalysis.length ? hourlyAnalysis.reduce((max, h) => h.orders_count > max.orders_count ? h : max, hourlyAnalysis[0]) : { hour: '09', orders_count: 0 }
   const peakPeriods = {
-    peakHour: hourlyAnalysis.reduce((max, hour) =>
-      hour.orders_count > max.orders_count ? hour : max, hourlyAnalysis[0] || { hour: '0', orders_count: 0 }),
+    peakHour: peakAmongWorkHours,
     peakWeekday: await db.get<any>(`
-      SELECT CASE strftime('%w', o.createdAt) WHEN '0' THEN 'Воскресенье' WHEN '1' THEN 'Понедельник' WHEN '2' THEN 'Вторник'
+      SELECT CASE strftime('%w', ${oDateExpr}) WHEN '0' THEN 'Воскресенье' WHEN '1' THEN 'Понедельник' WHEN '2' THEN 'Вторник'
         WHEN '3' THEN 'Среда' WHEN '4' THEN 'Четверг' WHEN '5' THEN 'Пятница' WHEN '6' THEN 'Суббота' END as weekday,
         COUNT(o.id) as orders_count, SUM(COALESCE(o.prepaymentAmount, 0)) as total_revenue
-      FROM orders o WHERE ${dateFilter('o')}
-      GROUP BY strftime('%w', o.createdAt), weekday ORDER BY orders_count DESC LIMIT 1
-    `, dateParams),
-    busiestTimeSlot: await db.get<any>(`
-      SELECT strftime('%H', o.createdAt) as hour, COUNT(o.id) as orders_count
-      FROM orders o WHERE ${dateFilter('o')}
-      GROUP BY strftime('%H', o.createdAt) ORDER BY orders_count DESC LIMIT 1
-    `, dateParams)
+      FROM orders o WHERE ${dateAndWorkHours}
+      GROUP BY strftime('%w', ${oDateExpr}), weekday ORDER BY orders_count DESC LIMIT 1
+    `, dateParams) || { weekday: '—', orders_count: 0, total_revenue: 0 },
+    busiestTimeSlot: hourlyAnalysis.length ? peakAmongWorkHours : { hour: '09', orders_count: 0 }
   }
 
+  // Сегменты внутри рабочих часов: 9–12, 12–15, 15–18, 18–20
   const timeOfDayTrends = {
-    morning: hourlyAnalysis.filter(h => parseInt(h.hour) >= 6 && parseInt(h.hour) < 12).reduce((sum, h) => sum + h.orders_count, 0),
-    afternoon: hourlyAnalysis.filter(h => parseInt(h.hour) >= 12 && parseInt(h.hour) < 18).reduce((sum, h) => sum + h.orders_count, 0),
-    evening: hourlyAnalysis.filter(h => parseInt(h.hour) >= 18 && parseInt(h.hour) < 24).reduce((sum, h) => sum + h.orders_count, 0),
-    night: hourlyAnalysis.filter(h => parseInt(h.hour) >= 0 && parseInt(h.hour) < 6).reduce((sum, h) => sum + h.orders_count, 0)
+    morning: hourlyAnalysis.filter(h => parseInt(h.hour) >= 9 && parseInt(h.hour) < 12).reduce((sum, h) => sum + h.orders_count, 0),
+    afternoon: hourlyAnalysis.filter(h => parseInt(h.hour) >= 12 && parseInt(h.hour) < 15).reduce((sum, h) => sum + h.orders_count, 0),
+    evening: hourlyAnalysis.filter(h => parseInt(h.hour) >= 15 && parseInt(h.hour) < 18).reduce((sum, h) => sum + h.orders_count, 0),
+    night: hourlyAnalysis.filter(h => parseInt(h.hour) >= 18 && parseInt(h.hour) <= 20).reduce((sum, h) => sum + h.orders_count, 0)
   }
 
   res.json({
     period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
+    workHours: { start: WORK_HOUR_START, end: WORK_HOUR_END },
     hourlyAnalysis,
     weekdayHourlyAnalysis,
     peakPeriods,
