@@ -1,5 +1,5 @@
 import { getDb } from '../../../config/database'
-import { getCurrentTimestamp } from '../../../utils/date'
+import { getCurrentTimestamp, getTodayString } from '../../../utils/date'
 import { hasColumn } from '../../../utils/tableSchemaCache'
 import { getCachedData } from '../../../utils/dataCache'
 import { Order } from '../../../models/Order'
@@ -118,7 +118,9 @@ export class OrderService {
   }
 
   static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm', customerId?: number) {
-    const createdAt = date ? `${date}T12:00:00.000Z` : getCurrentTimestamp()
+    const dateOnly = date ? String(date).trim().slice(0, 10) : null
+    const isToday = dateOnly && dateOnly === getTodayString()
+    const createdAt = dateOnly && !isToday ? `${dateOnly}T12:00:00.000Z` : getCurrentTimestamp()
     const db = await getDb()
 
     // Default status should reference existing order_statuses.id (FK)

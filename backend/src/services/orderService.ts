@@ -205,7 +205,10 @@ export class OrderService {
   }
 
   static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string) {
-    const createdAt = date ? `${date}T12:00:00.000Z` : getCurrentTimestamp()
+    const dateOnly = date ? String(date).trim().slice(0, 10) : null
+    const today = new Date().toISOString().slice(0, 10)
+    const isToday = dateOnly && dateOnly === today
+    const createdAt = dateOnly && !isToday ? `${dateOnly}T12:00:00.000Z` : getCurrentTimestamp()
     const db = await getDb()
     const initialPrepay = Number(prepaymentAmount || 0)
     let hasPrepaymentUpdatedAt = false
