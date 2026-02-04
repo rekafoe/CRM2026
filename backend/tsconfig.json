@@ -4,6 +4,7 @@
     "module": "commonjs",             
     "moduleResolution": "node",
     "outDir": "dist",
+    "removeComments": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,

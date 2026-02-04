@@ -20,8 +20,8 @@ const options: swaggerJsdoc.Options = {
         description: 'Development server',
       },
       {
-        url: 'https://api.your-domain.com',
-        description: 'Production server',
+        url: process.env.PUBLIC_API_URL || process.env.RAILWAY_STATIC_URL || 'https://crm2026-production.up.railway.app',
+        description: 'Production server (Railway)',
       },
     ],
     components: {
@@ -65,14 +65,21 @@ const options: swaggerJsdoc.Options = {
     ],
   },
   apis: [
-    // Пути относительно корня backend (где запускается сервер)
+    // Разработка: исходники .ts (ts-node)
     path.join(process.cwd(), 'src/routes/*.ts'),
     path.join(process.cwd(), 'src/modules/**/routes/*.ts'),
     path.join(process.cwd(), 'src/controllers/*.ts'),
-    // Альтернативные пути через __dirname (для скомпилированного кода)
     path.join(__dirname, '../routes/*.ts'),
     path.join(__dirname, '../modules/**/routes/*.ts'),
     path.join(__dirname, '../controllers/*.ts'),
+    // Прод (Railway и др.): скомпилированные .js. __dirname при загрузке из dist/.../config/swagger.js даёт путь к папке с роутами
+    path.join(__dirname, '../routes/*.js'),
+    path.join(__dirname, '../modules/**/routes/*.js'),
+    // Вариант когда cwd=backend и сборка в dist/ или в dist/backend/src/
+    path.join(process.cwd(), 'dist/routes/*.js'),
+    path.join(process.cwd(), 'dist/modules/**/routes/*.js'),
+    path.join(process.cwd(), 'dist/backend/src/routes/*.js'),
+    path.join(process.cwd(), 'dist/backend/src/modules/**/routes/*.js'),
   ],
 }
 
