@@ -288,6 +288,7 @@ export class OrderService {
       prepaymentAmount?: number;
       userId?: number;
       customer_id?: number;
+      source?: 'website' | 'telegram' | 'crm';
       items: Array<{
         type: string;
         params: string;
@@ -301,7 +302,8 @@ export class OrderService {
     }
   ) {
     const db = await getDb();
-    
+    const source = orderData.source || 'crm';
+
     try {
       await db.run('BEGIN');
       
@@ -313,7 +315,7 @@ export class OrderService {
         orderData.prepaymentAmount,
         orderData.userId,
         undefined,
-        'crm',
+        source,
         orderData.customer_id
       );
       

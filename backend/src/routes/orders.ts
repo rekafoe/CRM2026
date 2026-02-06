@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { OrderController } from '../modules/orders/controllers/orderController'
 import { OrderItemController } from '../modules/orders/controllers/orderItemController'
 import { asyncHandler, authenticate } from '../middleware'
+import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
 import { upload } from '../config/upload'
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
@@ -9,7 +10,90 @@ import { hasColumn } from '../utils/tableSchemaCache'
 
 const router = Router()
 
-// Все маршруты заказов требуют аутентификации
+/**
+ * @swagger
+ * /api/orders/from-website:
+ *   post:
+ *     summary: Создать заказ с сайта (публичный API)
+ *     description: |
+ *       Публичный эндпоинт для приёма заказов с внешнего сайта. Не требует авторизации в CRM.
+ *       Авторизация по API-ключу в заголовке X-API-Key или Authorization Bearer.
+ *       Заказ создаётся с source=website, userId=null и попадает в пул заказов (unassigned).
+ *       Переменная окружения WEBSITE_ORDER_API_KEY. Если не задана — эндпоинт возвращает 503.
+ *     tags: [Orders]
+ *     security: []
+ *     parameters:
+ *       - in: header
+ *         name: X-API-Key
+ *         schema:
+ *           type: string
+ *         description: API-ключ для заказов с сайта (альтернатива — Authorization Bearer <key>)
+ *         required: true
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: Обязателен хотя бы один из customerName или customerPhone
+ *             properties:
+ *               customerName:
+ *                 type: string
+ *                 example: Иван Иванов
+ *               customerPhone:
+ *                 type: string
+ *                 example: "+375 29 123 45 67"
+ *               customerEmail:
+ *                 type: string
+ *                 format: email
+ *               prepaymentAmount:
+ *                 type: number
+ *                 example: 0
+ *               customer_id:
+ *                 type: integer
+ *                 description: ID клиента в CRM (опционально)
+ *               items:
+ *                 type: array
+ *                 description: Позиции заказа. Если передан непустой массив — заказ создаётся с позициями и списанием материалов.
+ *                 items:
+ *                   type: object
+ *                   required: [type, params, price, quantity]
+ *                   properties:
+ *                     type:
+ *                       type: string
+ *                     params:
+ *                       type: string
+ *                       description: JSON-строка параметров
+ *                     price:
+ *                       type: number
+ *                     quantity:
+ *                       type: integer
+ *     responses:
+ *       201:
+ *         description: Заказ создан
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 order:
+ *                   type: object
+ *                 deductionResult:
+ *                   type: object
+ *                   description: При наличии items
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Не указано имя или телефон клиента
+ *       401:
+ *         description: Неверный или отсутствующий API-ключ
+ *       503:
+ *         description: WEBSITE_ORDER_API_KEY не настроен
+ */
+// Публичный эндпоинт для заказов с сайта (без авторизации CRM, проверка по X-API-Key)
+router.post('/from-website', requireWebsiteOrderApiKey, asyncHandler(OrderController.createOrderFromWebsite))
+
+// Все остальные маршруты заказов требуют аутентификации
 router.use(authenticate)
 
 /**

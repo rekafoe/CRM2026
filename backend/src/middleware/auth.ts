@@ -44,6 +44,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     /^\/api\/notifications/,
     // 🆕 Photo orders endpoints (temporary for testing)
     /^\/api\/photo-orders/,
+    // Публичный эндпоинт заказов с сайта (проверка по WEBSITE_ORDER_API_KEY в middleware маршрута)
+    /^\/api\/orders\/from-website$/,
     // 🆕 Products and printing technologies for calculator
     /^\/api\/products/,
     /^\/api\/printing-technologies/,
@@ -62,6 +64,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
   const isOpenPath = isRecalcPath
     || openPaths.some(r => r.test(req.path))
+    || req.path === '/from-website' // в подмаршруте /orders path = /from-website
     || (req.path === '/api/materials' && req.method === 'GET')
     || (req.path.startsWith('/api/paper-types') && req.method === 'GET')
     || ((req.path === '/api/material-categories' || req.path === '/api/material-categories/stats') && req.method === 'GET')

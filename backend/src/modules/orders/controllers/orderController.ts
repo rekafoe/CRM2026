@@ -82,6 +82,62 @@ export class OrderController {
     }
   }
 
+  /**
+   * Публичный эндпоинт для создания заказа с сайта (без авторизации CRM).
+   * Требует заголовок X-API-Key или Authorization: Bearer <WEBSITE_ORDER_API_KEY>.
+   * Заказ создаётся с source='website', userId=null и попадает в пул заказов.
+   */
+  static async createOrderFromWebsite(req: Request, res: Response) {
+    try {
+      const { customerName, customerPhone, customerEmail, prepaymentAmount, items, customer_id } = req.body || {}
+
+      if (!customerName && !customerPhone) {
+        res.status(400).json({
+          error: 'Необходимо указать имя или телефон клиента',
+          message: 'customerName or customerPhone is required'
+        })
+        return
+      }
+
+      if (items != null && Array.isArray(items) && items.length > 0) {
+        const result = await OrderService.createOrderWithAutoDeduction({
+          customerName: customerName || undefined,
+          customerPhone: customerPhone || undefined,
+          customerEmail: customerEmail || undefined,
+          prepaymentAmount,
+          userId: undefined,
+          customer_id,
+          source: 'website',
+          items
+        })
+        res.status(201).json({
+          order: result.order,
+          deductionResult: result.deductionResult,
+          message: 'Заказ с сайта создан'
+        })
+        return
+      }
+
+      const order = await OrderService.createOrder(
+        customerName || undefined,
+        customerPhone || undefined,
+        customerEmail || undefined,
+        prepaymentAmount,
+        undefined,
+        undefined,
+        'website',
+        customer_id
+      )
+      res.status(201).json({ order, message: 'Заказ с сайта создан' })
+    } catch (error: any) {
+      logger.error('createOrderFromWebsite error', { error: error?.message, stack: error?.stack })
+      res.status(500).json({
+        error: error?.message ?? 'Ошибка создания заказа',
+        message: 'Internal server error'
+      })
+    }
+  }
+
   static async createOrderWithAutoDeduction(req: Request, res: Response) {
     try {
       const authUser = (req as any).user as { id: number } | undefined
