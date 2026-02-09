@@ -162,7 +162,8 @@ export class AutoMaterialDeductionService {
           'SELECT material_id, qty_per_sheet FROM product_materials WHERE product_id = ?',
           productId
         )
-        return (rows || []).map((m) => ({
+        const list = Array.isArray(rows) ? rows : rows != null ? [rows] : []
+        return list.map((m) => ({
           materialId: m.material_id,
           qtyPerItem: m.qty_per_sheet
         }))
@@ -174,8 +175,8 @@ export class AutoMaterialDeductionService {
         productType,
         params.description || ''
       )
-
-      return (materials || []).map((m: any) => ({
+      const list = Array.isArray(materials) ? materials : materials != null ? [materials] : []
+      return list.map((m) => ({
         materialId: m.materialId,
         qtyPerItem: m.qtyPerItem
       }))
