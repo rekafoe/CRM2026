@@ -371,12 +371,14 @@
 .calculator-content {
   display: flex;
   flex: 1;
+  min-height: 0; /* чтобы flex-ребёнок сжимался и контент не выходил за карточку */
   overflow: hidden;
 }
 
 /* Основная область */
 .calculator-main {
   flex: 1;
+  min-height: 0; /* скролл только здесь, контент не заплывает за карточку */
   padding: 20px;
   padding-bottom: 0; /* Убираем отступ снизу, так как результат фиксированный */
   overflow-y: auto;
@@ -2196,8 +2198,9 @@
 
 .section-group-content {
   padding: 20px;
-  overflow: visible;
+  overflow: visible; /* выпадающие списки и подсказки видны */
   border-radius: 0 0 12px 12px;
+  min-height: 0;
 }
 
 /* Обеспечиваем, что grid работает внутри section-group-content */

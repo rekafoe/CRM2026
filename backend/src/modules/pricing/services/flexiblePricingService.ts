@@ -13,6 +13,9 @@ import { LayoutCalculationService, ProductSize, LayoutResult } from './layoutCal
 import { logger } from '../../../utils/logger';
 import { PrintPriceService } from './printPriceService';
 
+/** Категория материалов «Рулонная бумага» — для неё не учитывается раскладка (расход по количеству изделий, не по листам). */
+const ROLL_PAPER_CATEGORY_NAME = 'Рулонная бумага';
+
 export interface OperationCostDetail {
   operationId: number;
   operationName: string;
@@ -922,14 +925,24 @@ export class FlexiblePricingService {
       // 🎯 ПРИОРИТЕТ 1: Если в конфигурации указан конкретный material_id - используем только его
       if (configuration.material_id) {
         logger.info('🎯 Используем материал из конфигурации', { materialId: configuration.material_id });
-        const selectedMaterial = await db.get(
-          `SELECT id, name, sheet_price_single, unit FROM materials WHERE id = ?`,
+        const selectedMaterial = await db.get<{
+          id: number;
+          name: string;
+          sheet_price_single: number | null;
+          unit: string;
+          category_name: string | null;
+        }>(
+          `SELECT m.id, m.name, m.sheet_price_single, m.unit, c.name as category_name
+           FROM materials m
+           LEFT JOIN material_categories c ON c.id = m.category_id
+           WHERE m.id = ?`,
           [configuration.material_id]
         );
         
         if (selectedMaterial) {
           const unitPrice = selectedMaterial.sheet_price_single || 0;
-          const roundedQty = Math.max(0, Math.ceil(sheetsNeeded));
+          const isRollPaper = selectedMaterial.category_name === ROLL_PAPER_CATEGORY_NAME;
+          const roundedQty = Math.max(0, Math.ceil(isRollPaper ? quantity : sheetsNeeded));
           const totalCost = Math.round(roundedQty * unitPrice * 100) / 100;
           
           return [{
@@ -944,20 +957,31 @@ export class FlexiblePricingService {
 
       // 🎯 ПРИОРИТЕТ 2: Материалы из product_materials (назначенные через UI)
       logger.info('📦 Получаем материалы продукта из product_materials', { productId: product.id });
-      const productMaterials = await db.all(
+      type ProductMaterialRow = {
+        material_id: number;
+        qty_per_sheet: number;
+        is_required: number;
+        material_name: string;
+        unit: string;
+        sheet_price_single: number | null;
+        category_name: string | null;
+      };
+      const productMaterials = (await db.all<ProductMaterialRow>(
         `SELECT 
           pm.material_id,
           pm.qty_per_sheet,
           pm.is_required,
           m.name as material_name,
           m.unit,
-          m.sheet_price_single
+          m.sheet_price_single,
+          c.name as category_name
          FROM product_materials pm
          JOIN materials m ON m.id = pm.material_id
+         LEFT JOIN material_categories c ON c.id = m.category_id
          WHERE pm.product_id = ?
          ORDER BY pm.is_required DESC, m.name`,
         [product.id]
-      );
+      )) as unknown as ProductMaterialRow[];
 
       if (productMaterials.length > 0) {
         logger.info('✅ Используем материалы из product_materials', {
@@ -966,14 +990,18 @@ export class FlexiblePricingService {
             name: m.material_name,
             qty_per_sheet: m.qty_per_sheet,
             sheet_price_single: m.sheet_price_single,
-            unit: m.unit
+            unit: m.unit,
+            category_name: m.category_name
           }))
         });
         const costs: MaterialCostDetail[] = [];
         
         for (const material of productMaterials) {
           const unitPrice = material.sheet_price_single || 0;
-          const calculatedQty = material.qty_per_sheet * sheetsNeeded;
+          const isRollPaper = material.category_name === ROLL_PAPER_CATEGORY_NAME;
+          const calculatedQty = isRollPaper
+            ? material.qty_per_sheet * quantity
+            : material.qty_per_sheet * sheetsNeeded;
           const roundedQty = Math.max(0, Math.ceil(calculatedQty));
           const totalCost = Math.round(roundedQty * unitPrice * 100) / 100;
           
@@ -1017,6 +1045,7 @@ export class FlexiblePricingService {
 
       for (const rule of materialRules) {
       const unitPrice = rule.sheet_price_single || 0;
+      const isRollPaper = rule.category_name === ROLL_PAPER_CATEGORY_NAME;
       let calculatedQty = 0;
 
       switch (rule.calculation_type) {
@@ -1024,7 +1053,7 @@ export class FlexiblePricingService {
           calculatedQty = rule.qty_per_item * quantity;
           break;
         case 'per_sheet':
-          calculatedQty = rule.qty_per_item * sheetsNeeded;
+          calculatedQty = isRollPaper ? rule.qty_per_item * quantity : rule.qty_per_item * sheetsNeeded;
           break;
         case 'per_sqm':
           calculatedQty = rule.qty_per_item * quantity * (areaPerItem || 1);
@@ -1054,14 +1083,27 @@ export class FlexiblePricingService {
 
     if (remainingTemplateIds.length) {
       const placeholders = remainingTemplateIds.map(() => '?').join(',');
-      const templateMaterials = await db.all(
-        `SELECT id, name, sheet_price_single, unit FROM materials WHERE id IN (${placeholders})`,
+      type TemplateMaterialRow = {
+        id: number;
+        name: string;
+        sheet_price_single: number | null;
+        unit: string;
+        category_name: string | null;
+      };
+      const templateMaterials = (await db.all<TemplateMaterialRow>(
+        `SELECT m.id, m.name, m.sheet_price_single, m.unit, c.name as category_name
+         FROM materials m
+         LEFT JOIN material_categories c ON c.id = m.category_id
+         WHERE m.id IN (${placeholders})`,
         remainingTemplateIds
-      );
+      )) as unknown as TemplateMaterialRow[];
 
       for (const material of templateMaterials) {
         const unitPrice = material.sheet_price_single || 0;
-        const baseQty = sheetsNeeded || Math.ceil(quantity / Math.max(layout.itemsPerSheet, 1));
+        const isRollPaper = material.category_name === ROLL_PAPER_CATEGORY_NAME;
+        const baseQty = isRollPaper
+          ? quantity
+          : (sheetsNeeded || Math.ceil(quantity / Math.max(layout.itemsPerSheet, 1)));
         const roundedQty = Math.max(0, Math.ceil(baseQty));
         const totalCost = Math.round(roundedQty * unitPrice * 100) / 100;
 
@@ -1078,21 +1120,31 @@ export class FlexiblePricingService {
     }
 
     if (!costs.length) {
-      const fallbackMaterials = await db.all(`
+      type FallbackMaterialRow = {
+        id: number;
+        name: string;
+        sheet_price_single: number | null;
+        unit: string;
+        category_name: string | null;
+      };
+      const fallbackMaterials = (await db.all<FallbackMaterialRow>(`
         SELECT 
           m.id,
           m.name,
           m.sheet_price_single,
-          m.unit
+          m.unit,
+          c.name as category_name
         FROM materials m
+        LEFT JOIN material_categories c ON c.id = m.category_id
         WHERE m.quantity > 0
         ORDER BY m.name
         LIMIT 5
-      `);
+      `)) as unknown as FallbackMaterialRow[];
 
       for (const material of fallbackMaterials) {
         const unitPrice = material.sheet_price_single || 0;
-        const roundedQty = Math.max(0, Math.ceil(sheetsNeeded || quantity));
+        const isRollPaper = material.category_name === ROLL_PAPER_CATEGORY_NAME;
+        const roundedQty = Math.max(0, Math.ceil(isRollPaper ? quantity : (sheetsNeeded || quantity)));
         const totalCost = Math.round(roundedQty * unitPrice * 100) / 100;
 
         costs.push({
@@ -1138,9 +1190,11 @@ export class FlexiblePricingService {
          pmr.is_required,
          m.name as material_name,
          m.unit,
-         m.sheet_price_single
+         m.sheet_price_single,
+         c.name as category_name
        FROM product_material_rules pmr
        JOIN materials m ON m.id = pmr.material_id
+       LEFT JOIN material_categories c ON c.id = m.category_id
        WHERE pmr.product_type = ? AND pmr.product_name = ?
        ORDER BY pmr.is_required DESC, m.name`,
       paramsByName
@@ -1155,9 +1209,11 @@ export class FlexiblePricingService {
            pmr.is_required,
            m.name as material_name,
            m.unit,
-           m.sheet_price_single
+           m.sheet_price_single,
+           c.name as category_name
          FROM product_material_rules pmr
          JOIN materials m ON m.id = pmr.material_id
+         LEFT JOIN material_categories c ON c.id = m.category_id
          WHERE pmr.product_type = ? AND (pmr.product_name IS NULL OR pmr.product_name = '' OR pmr.product_name = 'Универсальный')
          ORDER BY pmr.is_required DESC, m.name`,
         [presetKey]
