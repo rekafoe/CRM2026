@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { OrderController } from '../modules/orders/controllers/orderController'
 import { OrderItemController } from '../modules/orders/controllers/orderItemController'
 import { asyncHandler, authenticate } from '../middleware'
-import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
+import { requireWebsiteOrderApiKey, isWebsiteOrderApiKeyValid } from '../middleware/websiteOrderApiKey'
 import { upload } from '../config/upload'
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
@@ -113,6 +113,44 @@ router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, upload.si
   if (order.source !== 'website') {
     res.status(403).json({ message: 'Загрузка файлов разрешена только для заказов, созданных с сайта' })
     return
+  }
+  await db.run(
+    'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
+    orderId,
+    f.filename,
+    f.originalname || null,
+    f.mimetype || null,
+    f.size || null
+  )
+  const row = await db.get<any>(
+    'SELECT id, orderId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1',
+    orderId
+  )
+  res.status(201).json(row)
+}))
+
+// POST /:id/files — допускаем либо CRM-авторизацию, либо API-ключ сайта (для загрузки файлов к заказу с сайта)
+router.post('/:id/files', (req, res, next) => {
+  if (isWebsiteOrderApiKeyValid(req)) {
+    (req as any).fromWebsite = true
+    return next()
+  }
+  return authenticate(req, res, next)
+}, upload.single('file'), asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  const f = (req as any).file as { filename: string; originalname?: string; mimetype?: string; size?: number } | undefined
+  if (!f) { res.status(400).json({ message: 'Файл не получен' }); return }
+  const db = await getDb()
+  if ((req as any).fromWebsite) {
+    const order = await db.get<{ id: number; source?: string }>('SELECT id, source FROM orders WHERE id = ?', orderId)
+    if (!order) {
+      res.status(404).json({ message: 'Заказ не найден' })
+      return
+    }
+    if (order.source !== 'website') {
+      res.status(403).json({ message: 'Загрузка файлов по API-ключу разрешена только для заказов, созданных с сайта' })
+      return
+    }
   }
   await db.run(
     'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
@@ -392,26 +430,6 @@ router.get('/:id/files', asyncHandler(async (req, res) => {
     id
   )
   res.json(rows)
-}))
-
-router.post('/:id/files', upload.single('file'), asyncHandler(async (req, res) => {
-  const orderId = Number(req.params.id)
-  const f = (req as any).file as { filename: string; originalname?: string; mimetype?: string; size?: number } | undefined
-  if (!f) { res.status(400).json({ message: 'Файл не получен' }); return }
-  const db = await getDb()
-  await db.run(
-    'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
-    orderId,
-    f.filename,
-    f.originalname || null,
-    f.mimetype || null,
-    f.size || null
-  )
-  const row = await db.get<any>(
-    'SELECT id, orderId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1',
-    orderId
-  )
-  res.status(201).json(row)
 }))
 
 router.delete('/:orderId/files/:fileId', asyncHandler(async (req, res) => {

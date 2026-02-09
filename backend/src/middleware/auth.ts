@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import { getDb } from '../config/database'
+import { isWebsiteOrderApiKeyValid } from './websiteOrderApiKey'
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -66,7 +67,11 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   // Пересчёт ЗП: всегда пропускаем запрос в обработчик (авторизация там: admin или secret)
   const isRecalcPath = req.path.endsWith('/earnings/recalculate') || req.path === '/earnings/recalculate'
 
+  // POST /api/orders/:id/files с валидным API-ключом сайта (загрузка файлов к заказу с сайта)
+  const isPostOrderFilesWithWebsiteKey = req.method === 'POST' && /^\/api\/orders\/[0-9]+\/files$/.test(req.path) && isWebsiteOrderApiKeyValid(req)
+
   const isOpenPath = isRecalcPath
+    || isPostOrderFilesWithWebsiteKey
     || openPaths.some(r => r.test(req.path))
     || req.path === '/from-website' // в подмаршруте /orders path = /from-website
     || (req.path === '/api/materials' && req.method === 'GET')
