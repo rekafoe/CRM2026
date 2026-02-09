@@ -6,12 +6,15 @@ interface OrderContentProps {
   order: Order;
   onLoadOrders: () => void;
   onEditOrderItem?: (orderId: number, item: Item) => void;
+  /** В режиме пула заказов: только просмотр, без редактирования/удаления/принтера */
+  readOnly?: boolean;
 }
 
 export const OrderContent: React.FC<OrderContentProps> = ({
   order,
   onLoadOrders,
   onEditOrderItem,
+  readOnly,
 }) => {
   const items = order.items ?? [];
   return (
@@ -28,6 +31,7 @@ export const OrderContent: React.FC<OrderContentProps> = ({
           order={order}
           onUpdate={onLoadOrders}
           onEditParameters={onEditOrderItem}
+          readOnly={readOnly}
         />
       ))}
     </div>

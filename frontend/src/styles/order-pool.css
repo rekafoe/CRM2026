@@ -590,6 +590,34 @@
   background: #d32f2f;
 }
 
+.order-detail-readiness {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.order-detail-readiness-label {
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.order-detail-readiness-value {
+  color: #0c4a6e;
+}
+
+.order-detail-readiness-hint {
+  color: #64748b;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
 .loading-overlay {
   display: flex;
   align-items: center;

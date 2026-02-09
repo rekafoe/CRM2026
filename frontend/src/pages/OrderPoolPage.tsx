@@ -627,15 +627,6 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               onShowFilesModal={() => setShowFilesModal(true)}
               onShowPrepaymentModal={() => setShowPrepaymentModal(true)}
             />
-            {orderStatuses.length > 0 && (
-              <OrderStatusTimeline
-                statuses={orderStatuses}
-                currentStatusId={Number(selectedOrder.status)}
-                createdAt={selectedOrder.created_at ?? (selectedOrder as any).createdAt}
-                readyAt={(selectedOrder as any).readyAt ?? null}
-                hasItems={(selectedOrder.items?.length ?? 0) > 0}
-              />
-            )}
             <div className="order-detail-responsible">
               <label>
                 Ответственный:
@@ -678,7 +669,41 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                 <button onClick={() => handleCancelOnline(selectedOrder.id)}>Отменить онлайн</button>
               )}
             </div>
-            <OrderContent order={selectedOrder} onLoadOrders={loadOrders} />
+            {(() => {
+              const created = selectedOrder.created_at ?? (selectedOrder as any).createdAt;
+              const firstItem = (selectedOrder.items ?? [])[0];
+              const priceType = (firstItem?.params as any)?.priceType ?? (firstItem?.params as any)?.price_type ?? 'standard';
+              const readyLabels: Record<string, string> = {
+                urgent: 'В течение 3 часов',
+                online: '24 часа',
+                promo: '48 часов',
+                special: '4–5 дней',
+                standard: 'По умолчанию',
+              };
+              const readyLabel = readyLabels[String(priceType).toLowerCase()] ?? readyLabels.standard;
+              // TODO: реализовать систему уведомлений клиенту (email/SMS о готовности заказа) — см. docs/customer-notifications-setup.md
+              return (
+                <div className="order-detail-readiness">
+                  <span className="order-detail-readiness-label">Срок готовности:</span>
+                  <span className="order-detail-readiness-value">{readyLabel}</span>
+                  {created && priceType !== 'standard' && (
+                    <span className="order-detail-readiness-hint">
+                      с момента оформления {new Date(created).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
+            {orderStatuses.length > 0 && (
+              <OrderStatusTimeline
+                statuses={orderStatuses}
+                currentStatusId={Number(selectedOrder.status)}
+                createdAt={selectedOrder.created_at ?? (selectedOrder as any).createdAt}
+                readyAt={(selectedOrder as any).readyAt ?? null}
+                hasItems={(selectedOrder.items?.length ?? 0) > 0}
+              />
+            )}
+            <OrderContent order={selectedOrder} onLoadOrders={loadOrders} readOnly />
             <OrderTotal
               items={selectedItems.map(item => ({
                 id: item.id,

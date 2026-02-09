@@ -102,6 +102,85 @@ if (res.ok && data.order) {
 
 Не использовать свой формат (например `"ORD-" + Date.now()`): в CRM заказ будет под номером из `order.number`, и клиент должен видеть тот же номер.
 
+### Пример запроса на backend
+
+**Создание заказа с позициями (POST /api/orders/from-website):**
+
+```bash
+curl -X POST "https://your-backend.example.com/api/orders/from-website" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_WEBSITE_ORDER_API_KEY" \
+  -d '{
+    "customerName": "Иван Петров",
+    "customerPhone": "+375 29 123-45-67",
+    "customerEmail": "ivan@example.com",
+    "prepaymentAmount": 10.50,
+    "items": [
+      {
+        "type": "Визитки",
+        "params": {
+          "description": "Визитки 90x50, меловка 300 г/м², 100 шт"
+        },
+        "price": 25.00,
+        "quantity": 1,
+        "priceType": "online"
+      },
+      {
+        "type": "Листовки",
+        "params": {
+          "description": "Листовки A5, 500 шт"
+        },
+        "price": 45.00,
+        "quantity": 1,
+        "priceType": "standard"
+      }
+    ]
+  }'
+```
+
+**Минимальный запрос (пустой заказ, без позиций):**
+
+```bash
+curl -X POST "https://your-backend.example.com/api/orders/from-website" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_WEBSITE_ORDER_API_KEY" \
+  -d '{
+    "customerName": "Иван Петров",
+    "customerPhone": "+375 29 123-45-67"
+  }'
+```
+
+**Загрузка файла к заказу (POST /api/orders/:id/files или POST /api/orders/from-website/:orderId/files):**
+
+```bash
+curl -X POST "https://your-backend.example.com/api/orders/915/files" \
+  -H "X-API-Key: YOUR_WEBSITE_ORDER_API_KEY" \
+  -F "file=@/path/to/maket.pdf"
+```
+
+**Структура элемента в `items`:**
+- **`type`** (обязательно) — строка или ID продукта: название/тип позиции (например `"Визитки"`, `"Листовки"` или id из каталога).
+- **`params`** (опционально) — объект или JSON-строка: произвольные параметры (например `description`, `readyDate`). Сохраняются в БД и отображаются в CRM.
+- **`price`** (обязательно) — число: цена за единицу (базовая; к ней применяется `priceType`, если передан).
+- **`quantity`** (обязательно) — число: количество.
+- **`priceType`** (опционально) — строка: `standard` (без изменения), `urgent`, `online`, `promo`, `special`. Можно передать в элементе или внутри `params`.
+
+**Ответ 201 (успех):**
+```json
+{
+  "order": {
+    "id": 915,
+    "number": "ORD-0897",
+    "customerName": "Иван Петров",
+    "customerPhone": "+375 29 123-45-67",
+    "source": "website",
+    ...
+  },
+  "message": "Заказ с сайта создан",
+  "deductionResult": { ... }
+}
+```
+
 ### Заказ и файлы в одном запросе
 
 - **`POST /api/orders/from-website/with-files`** — создание заказа с сайта и прикрепление файлов в одном запросе.
@@ -132,3 +211,9 @@ if (res.ok && data.order) {
 5. Заказ появляется на странице заказов менеджера и уходит из unassigned.
 
 Если нужно, могу предложить конкретные изменения в коде (роут, контроллер, проверка API-ключа) для публичного создания заказов с сайта.
+
+---
+
+## Планы: система уведомлений клиенту (TODO)
+
+**Запланировано:** реализовать систему уведомлений для клиента — оповещение о готовности заказа по email и при необходимости по SMS (например, при переходе заказа в статус «Готов» / «Передан в ПВЗ»). Подробнее по настройке почтового агента и SMS см. **[Настройка уведомлений клиентам (email/SMS)](./customer-notifications-setup.md)**.

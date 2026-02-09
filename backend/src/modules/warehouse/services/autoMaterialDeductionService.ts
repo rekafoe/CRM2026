@@ -151,14 +151,31 @@ export class AutoMaterialDeductionService {
     const db = await getDb()
     
     try {
-      // Пытаемся найти материалы по типу продукта
-      const materials = await db.all(`
-        SELECT materialId, qtyPerItem 
-        FROM product_materials 
-        WHERE presetCategory = ? AND presetDescription = ?
-      `, productType, params.description || '')
+      const columns = (await db.all<{ name: string }>('PRAGMA table_info(product_materials)')) as unknown as Array<{ name: string }>
+      const hasNewSchema = columns.some((c) => c.name === 'material_id')
 
-      return materials.map((m: any) => ({
+      if (hasNewSchema) {
+        // Новая структура: product_id, material_id, qty_per_sheet
+        const productId = typeof productType === 'string' && /^\d+$/.test(productType) ? Number(productType) : NaN
+        if (!Number.isFinite(productId)) return []
+        const rows = await db.all<{ material_id: number; qty_per_sheet: number }>(
+          'SELECT material_id, qty_per_sheet FROM product_materials WHERE product_id = ?',
+          productId
+        )
+        return (rows || []).map((m) => ({
+          materialId: m.material_id,
+          qtyPerItem: m.qty_per_sheet
+        }))
+      }
+
+      // Старая структура: presetCategory, presetDescription, materialId, qtyPerItem
+      const materials = await db.all<{ materialId: number; qtyPerItem: number }>(
+        'SELECT materialId, qtyPerItem FROM product_materials WHERE presetCategory = ? AND presetDescription = ?',
+        productType,
+        params.description || ''
+      )
+
+      return (materials || []).map((m: any) => ({
         materialId: m.materialId,
         qtyPerItem: m.qtyPerItem
       }))

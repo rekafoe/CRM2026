@@ -68,7 +68,9 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   const isRecalcPath = req.path.endsWith('/earnings/recalculate') || req.path === '/earnings/recalculate'
 
   // POST /api/orders/:id/files с валидным API-ключом сайта (загрузка файлов к заказу с сайта)
-  const isPostOrderFilesWithWebsiteKey = req.method === 'POST' && /^\/api\/orders\/[0-9]+\/files$/.test(req.path) && isWebsiteOrderApiKeyValid(req)
+  const postOrderFilesPath = /\/api\/orders\/[0-9]+\/files$/
+  const isPostOrderFilesPath = req.method === 'POST' && (postOrderFilesPath.test(req.path) || (req.originalUrl && postOrderFilesPath.test(req.originalUrl.split('?')[0])))
+  const isPostOrderFilesWithWebsiteKey = isPostOrderFilesPath && isWebsiteOrderApiKeyValid(req)
 
   const isOpenPath = isRecalcPath
     || isPostOrderFilesWithWebsiteKey

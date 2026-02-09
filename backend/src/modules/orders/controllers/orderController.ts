@@ -91,7 +91,30 @@ export class OrderController {
    */
   static async createOrderFromWebsite(req: Request, res: Response) {
     try {
-      const { customerName, customerPhone, customerEmail, prepaymentAmount, items, customer_id } = req.body || {}
+      const body = req.body || {}
+      const { customerName, customerPhone, customerEmail, prepaymentAmount, items, customer_id } = body
+
+      // Логируем входящие данные с сайта для отладки (без больших полей)
+      logger.info('createOrderFromWebsite: входящий запрос', {
+        bodyKeys: Object.keys(body),
+        customerName: customerName ?? null,
+        customerPhone: customerPhone ?? null,
+        customerEmail: customerEmail ?? null,
+        prepaymentAmount: prepaymentAmount ?? null,
+        customer_id: customer_id ?? null,
+        itemsCount: Array.isArray(items) ? items.length : 0,
+        items: Array.isArray(items)
+          ? items.map((it: any, i: number) => ({
+              index: i,
+              type: it?.type ?? null,
+              paramsKeys: it?.params && typeof it.params === 'object' ? Object.keys(it.params) : (typeof it?.params === 'string' ? ['string'] : []),
+              params: typeof it?.params === 'object' ? it.params : (typeof it?.params === 'string' ? '(string)' : null),
+              price: it?.price ?? null,
+              quantity: it?.quantity ?? null,
+              priceType: it?.priceType ?? it?.price_type ?? (it?.params && typeof it.params === 'object' ? (it.params.priceType ?? it.params.price_type) : null),
+            }))
+          : null,
+      })
 
       if (!customerName && !customerPhone) {
         res.status(400).json({
@@ -149,12 +172,45 @@ export class OrderController {
     try {
       const body = req.body || {}
       let items = body.items
+
+      // Логируем входящие данные с сайта для отладки (без файлов)
+      logger.info('createOrderFromWebsiteWithFiles: входящий запрос', {
+        bodyKeys: Object.keys(body),
+        customerName: body.customerName ?? null,
+        customerPhone: body.customerPhone ?? null,
+        customerEmail: body.customerEmail ?? null,
+        prepaymentAmount: body.prepaymentAmount ?? null,
+        customer_id: body.customer_id ?? null,
+        itemsRawType: typeof items,
+        itemsCount: Array.isArray(items) ? items.length : (typeof items === 'string' ? '(JSON string)' : 0),
+        items: Array.isArray(items)
+          ? items.map((it: any, i: number) => ({
+              index: i,
+              type: it?.type ?? null,
+              paramsKeys: it?.params && typeof it.params === 'object' ? Object.keys(it.params) : [],
+              price: it?.price ?? null,
+              quantity: it?.quantity ?? null,
+              priceType: it?.priceType ?? it?.price_type ?? null,
+            }))
+          : null,
+      })
       if (typeof items === 'string') {
         try {
           items = JSON.parse(items)
         } catch {
           items = undefined
         }
+      }
+      if (Array.isArray(items) && items.length > 0) {
+        logger.info('createOrderFromWebsiteWithFiles: разобранные items', {
+          items: items.map((it: any, i: number) => ({
+            index: i,
+            type: it?.type ?? null,
+            paramsKeys: it?.params && typeof it.params === 'object' ? Object.keys(it.params) : [],
+            params: typeof it?.params === 'object' ? it.params : null,
+            priceType: it?.priceType ?? it?.price_type ?? (it?.params && typeof it.params === 'object' ? (it.params.priceType ?? it.params.price_type) : null),
+          })),
+        })
       }
       const customerName = body.customerName != null ? String(body.customerName) : undefined
       const customerPhone = body.customerPhone != null ? String(body.customerPhone) : undefined

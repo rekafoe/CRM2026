@@ -58,9 +58,11 @@ interface OrderItemProps {
   } | null;
   onUpdate: () => void;
   onEditParameters?: (orderId: number, item: Item) => void;
+  /** Режим пула заказов: только информация, без принтера/редактирования/удаления */
+  readOnly?: boolean;
 }
 
-export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUpdate, onEditParameters }) => {
+export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUpdate, onEditParameters, readOnly }) => {
   const { addToast } = useToast();
   const [editing, setEditing] = useState(false);
   const [qty, setQty] = useState<NumberInputValue>(item.quantity ?? 1);
@@ -327,21 +329,24 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
             ))}
         </div>
       )}
-      <OrderItemActions
-        editing={editing}
-        printerId={printerId}
-        printers={printers}
-        savingPrinter={savingPrinter}
-        onEditParameters={onEditParameters}
-        orderId={orderId}
-        item={item}
-        onSave={handleSave}
-        onCancel={() => setEditing(false)}
-        onEdit={() => setEditing(true)}
-        onDelete={() => setShowDeleteConfirm(true)}
-        onPrinterFocus={loadPrintersIfNeeded}
-        onPrinterChange={handleQuickPrinterChange}
-      />
+      {!readOnly && (
+        <OrderItemActions
+          editing={editing}
+          printerId={printerId}
+          printers={printers}
+          savingPrinter={savingPrinter}
+          onEditParameters={onEditParameters}
+          orderId={orderId}
+          item={item}
+          onSave={handleSave}
+          onCancel={() => setEditing(false)}
+          onEdit={() => setEditing(true)}
+          onDelete={() => setShowDeleteConfirm(true)}
+          onPrinterFocus={loadPrintersIfNeeded}
+          onPrinterChange={handleQuickPrinterChange}
+        />
+      )}
+      {!readOnly && (
       <ConfirmDialog
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
@@ -352,6 +357,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
         cancelText="Отмена"
         variant="danger"
       />
+      )}
     </div>
   );
 };
