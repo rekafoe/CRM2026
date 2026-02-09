@@ -187,8 +187,31 @@ export class FlexiblePricingService {
         productSize,
         quantity
       });
-      
-      const layout = LayoutCalculationService.findOptimalSheetSize(productSize);
+
+      // Печатный лист = выбранный материал (если у материала заданы sheet_width/sheet_height), иначе SRA3/A3/A4
+      let layout: LayoutResult;
+      if (configuration.material_id) {
+        const db = await getDb();
+        const materialSheet = await db.get<{ sheet_width: number | null; sheet_height: number | null }>(
+          `SELECT sheet_width, sheet_height FROM materials WHERE id = ?`,
+          [configuration.material_id]
+        );
+        const mw = materialSheet?.sheet_width != null && materialSheet.sheet_width > 0 ? Number(materialSheet.sheet_width) : 0;
+        const mh = materialSheet?.sheet_height != null && materialSheet.sheet_height > 0 ? Number(materialSheet.sheet_height) : 0;
+        if (mw > 0 && mh > 0) {
+          layout = LayoutCalculationService.calculateLayout(productSize, { width: mw, height: mh });
+          logger.info('Раскладка по размеру листа выбранного материала', {
+            material_id: configuration.material_id,
+            sheet_width: mw,
+            sheet_height: mh,
+            itemsPerSheet: layout.itemsPerSheet,
+          });
+        } else {
+          layout = LayoutCalculationService.findOptimalSheetSize(productSize);
+        }
+      } else {
+        layout = LayoutCalculationService.findOptimalSheetSize(productSize);
+      }
       
       logger.info('📊 Результат расчета раскладки', {
         productId,

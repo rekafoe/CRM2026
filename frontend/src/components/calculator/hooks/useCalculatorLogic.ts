@@ -30,9 +30,7 @@ export const useCalculatorLogic = () => {
         qty: specs.quantity,
         priceType: specs.priceType === 'standard' ? 'online' : 
                    specs.priceType === 'urgent' ? 'rush' : 
-                   specs.priceType === 'superUrgent' ? 'rush' : 
-                   specs.priceType === 'express' ? 'rush' : 
-                   specs.priceType as 'online' | 'promo',
+                   specs.priceType as 'online' | 'promo' | 'rush',
         customerType: specs.customerType
       });
 
@@ -97,10 +95,6 @@ export const useCalculatorLogic = () => {
     // Увеличиваем время для срочных заказов
     if (specs.priceType === 'urgent') {
       days = Math.max(1, Math.ceil(days * 0.5));
-    } else if (specs.priceType === 'superUrgent') {
-      days = 1;
-    } else if (specs.priceType === 'express') {
-      days = Math.max(1, Math.ceil(days * 0.3));
     }
 
     // Увеличиваем время для больших тиражей
@@ -183,10 +177,9 @@ export const useCalculatorLogic = () => {
     const colors: Record<string, string> = {
       'standard': '#1976d2',
       'urgent': '#ff9800',
-      'superUrgent': '#f44336',
       'online': '#4caf50',
       'promo': '#9c27b0',
-      'express': '#ff5722'
+      'special': '#795548',
     };
     return colors[priceType] || '#1976d2';
   }, []);
@@ -196,10 +189,9 @@ export const useCalculatorLogic = () => {
     const names: Record<string, string> = {
       'standard': 'Стандарт',
       'urgent': 'Срочно',
-      'superUrgent': 'Супер срочно',
       'online': 'Онлайн',
       'promo': 'Промо',
-      'express': 'Экспресс'
+      'special': 'Спец.предложение',
     };
     return names[priceType] || 'Стандарт';
   }, []);

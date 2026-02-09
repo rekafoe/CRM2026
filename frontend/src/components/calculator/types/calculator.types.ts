@@ -28,14 +28,14 @@ export interface ProductSpecs {
     | 'designer';
   paperDensity: number;
   lamination: 'none' | 'matte' | 'glossy';
-  priceType: 'standard' | 'urgent' | 'superUrgent' | 'online' | 'promo' | 'express';
+  priceType: 'standard' | 'urgent' | 'online' | 'promo' | 'special';
   customerType: 'regular' | 'vip';
   pages?: number;
   magnetic?: boolean;
   cutting?: boolean;
   folding?: boolean;
   roundCorners?: boolean;
-  urgency?: 'standard' | 'urgent' | 'superUrgent';
+  urgency?: 'standard' | 'urgent';
   vipLevel?: 'bronze' | 'silver' | 'gold' | 'platinum';
   specialServices?: string[];
   materialType?: 'office' | 'coated' | 'designer' | 'selfAdhesive';

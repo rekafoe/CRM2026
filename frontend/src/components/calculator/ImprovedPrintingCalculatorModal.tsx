@@ -29,6 +29,19 @@ import { usePostprintServices } from './hooks/usePostprintServices';
 import { useCustomProduct } from './hooks/useCustomProduct';
 import { useProductSelection } from './hooks/useProductSelection';
 
+/** Коэффициенты типа цены (как на бэкенде для заказов с сайта): 4 варианта + стандарт. */
+const PRICE_TYPE_MULTIPLIERS: Record<string, number> = {
+  standard: 1,
+  urgent: 1.5,
+  online: 0.85,
+  promo: 0.7,
+  special: 0.55,
+};
+
+function getPriceTypeMultiplier(priceType: string): number {
+  return PRICE_TYPE_MULTIPLIERS[priceType] ?? 1;
+}
+
 const createInitialSpecs = (initialProductType?: string): ProductSpecs => ({
   productType: initialProductType || 'flyers',
   format: 'A6',
@@ -782,6 +795,10 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         totalCost: s.totalCost,
       })) : [];
       
+      const priceTypeMult = getPriceTypeMultiplier(result.specifications.priceType || 'standard');
+      const effectivePricePerItem = Math.round(result.pricePerItem * priceTypeMult * 100) / 100;
+      const effectiveTotalCost = Math.round(result.totalCost * priceTypeMult * 100) / 100;
+
       const paramsPayload = {
         description,
         specifications: specificationsPayload,
@@ -790,6 +807,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         productionTime: result.productionTime,
         productType: result.specifications.productType,
         urgency: result.specifications.priceType,
+        priceType: result.specifications.priceType,
         customerType: result.specifications.customerType,
         estimatedDelivery,
         sheetsNeeded: computedSheets,
@@ -822,7 +840,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       const apiItem = {
         type: fallbackName,
         params: paramsPayload,
-        price: result.pricePerItem,
+        price: effectivePricePerItem,
         quantity: result.specifications.quantity,
         sides: result.specifications.sides ?? 1,
         sheets: computedSheets ?? 0,
@@ -840,7 +858,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         lamination: result.specifications.lamination,
         urgency: result.specifications.priceType,
         customerType: result.specifications.customerType,
-        finalPrice: result.pricePerItem,
+        finalPrice: effectivePricePerItem,
       });
 
       try {
@@ -1332,7 +1350,15 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
               />
             ) : (
               <ResultSection
-                result={result as any}
+                result={
+                  result
+                    ? {
+                        ...result,
+                        pricePerItem: Math.round(result.pricePerItem * getPriceTypeMultiplier(specs.priceType || 'standard') * 100) / 100,
+                        totalCost: Math.round(result.totalCost * getPriceTypeMultiplier(specs.priceType || 'standard') * 100) / 100,
+                      }
+                    : null
+                }
                 isValid={isValid}
                 onAddToOrder={() => handleAddToOrder()}
                 mode={isEditMode ? 'edit' : 'create'}

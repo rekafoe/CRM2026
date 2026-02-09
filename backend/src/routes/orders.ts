@@ -351,36 +351,35 @@ router.post('/:id/items', asyncHandler(OrderItemController.addItem))
 router.delete('/:orderId/items/:itemId', asyncHandler(OrderItemController.deleteItem))
 router.patch('/:orderId/items/:itemId', asyncHandler(OrderItemController.updateItem))
 
-// Order reassignment
+// Order reassignment: по номеру (ORD-XXXX) или по site-ord-<id> для заказов с сайта
 router.post('/reassign/:number', asyncHandler(async (req, res) => {
-  console.log('🔍 Reassign endpoint called:', req.params.number, req.body);
-  
-  const number = req.params.number;
+  const param = req.params.number;
   const { userId } = req.body;
   
   if (!userId) {
-    console.log('❌ Missing userId');
     res.status(400).json({ message: 'userId is required' });
     return;
   }
 
   const db = await getDb();
-  
-  // Находим заказ по номеру
-  const order = await db.get('SELECT * FROM orders WHERE number = ?', number);
-  console.log('🔍 Found order:', order);
+  let order: { id: number; number?: string } | undefined;
+
+  const siteOrderMatch = /^site-ord-(\d+)$/i.exec(param);
+  if (siteOrderMatch) {
+    const orderId = parseInt(siteOrderMatch[1], 10);
+    order = await db.get('SELECT id, number FROM orders WHERE id = ? AND source = ?', orderId, 'website');
+  }
+  if (!order) {
+    order = await db.get('SELECT id, number FROM orders WHERE number = ?', param);
+  }
   
   if (!order) {
-    console.log('❌ Order not found');
     res.status(404).json({ message: 'Order not found' });
     return;
   }
 
-  // Назначаем заказ пользователю и обновляем дату назначения
   const currentDate = new Date().toISOString();
-  await db.run('UPDATE orders SET userId = ?, created_at = ? WHERE number = ?', userId, currentDate, number);
-  console.log('✅ Order reassigned successfully');
-  
+  await db.run('UPDATE orders SET userId = ?, created_at = ? WHERE id = ?', userId, currentDate, order.id);
   res.json({ success: true, message: 'Order reassigned successfully' });
 }));
 

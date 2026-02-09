@@ -95,6 +95,24 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
         </>
       )}
 
+      {/* Тип цены (заказы с сайта: срочно / онлайн / промо / спец.предложение) */}
+      {item.params.priceType && (
+        <>
+          <span className="separator">|</span>
+          <span className="detail-item price-type">
+            {item.params.priceType === 'urgent'
+              ? 'Срочно (+50%)'
+              : item.params.priceType === 'online'
+              ? 'Онлайн (−15%)'
+              : item.params.priceType === 'promo'
+              ? 'Промо (−30%)'
+              : item.params.priceType === 'special'
+              ? 'Спец.предложение (−45%)'
+              : `Тип цены: ${item.params.priceType}`}
+          </span>
+        </>
+      )}
+
       {/* Тип клиента */}
       {item.params.customerType && item.params.customerType !== 'regular' && (
         <>

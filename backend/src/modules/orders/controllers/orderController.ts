@@ -47,7 +47,8 @@ export class OrderController {
       const result = await OrderService.reassignOrderByNumber(number, userId)
       res.json(result)
     } catch (error: any) {
-      res.status(400).json({ error: error.message })
+      const status = error?.message === 'Заказ не найден' ? 404 : 400
+      res.status(status).json({ error: error?.message ?? 'Error' })
     }
   }
 

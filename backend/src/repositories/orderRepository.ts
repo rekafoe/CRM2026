@@ -5,6 +5,38 @@ import { Item } from '../models/Item'
 import { Order } from '../models/Order'
 import { PhotoOrderRow } from '../models/mappers/telegramPhotoOrderMapper'
 
+/** Если type — числовая строка (ID продукта с сайта), подставляем имя из products. */
+async function enrichItemsWithProductNames(items: Item[]): Promise<Item[]> {
+  const numericTypes = [...new Set(
+    items
+      .map((i) => i.type != null ? String(i.type).trim() : '')
+      .filter((t) => /^\d+$/.test(t))
+  )].map((t) => parseInt(t, 10))
+  if (numericTypes.length === 0) return items
+
+  const db = await getDb()
+  let idToName: Map<number, string>
+  try {
+    const placeholders = numericTypes.map(() => '?').join(',')
+    const rows = await db.all<{ id: number; name: string }>(
+      `SELECT id, name FROM products WHERE id IN (${placeholders})`,
+      ...numericTypes
+    )
+    idToName = new Map((Array.isArray(rows) ? rows : []).map((r) => [r.id, r.name]))
+  } catch {
+    return items
+  }
+
+  return items.map((item) => {
+    const t = item.type != null ? String(item.type).trim() : ''
+    if (!/^\d+$/.test(t)) return item
+    const productId = parseInt(t, 10)
+    const name = idToName.get(productId)
+    if (!name) return item
+    return { ...item, type: name }
+  })
+}
+
 export const OrderRepository = {
   async getItemsByOrderId(orderId: number): Promise<Item[]> {
     const db = await getDb()
@@ -13,7 +45,8 @@ export const OrderRepository = {
         `SELECT ${itemRowSelect} FROM items WHERE orderId = ?`,
         orderId
       )
-      return Array.isArray(rows) ? rows.map(mapItemRowToItem) : []
+      const items = Array.isArray(rows) ? rows.map(mapItemRowToItem) : []
+      return enrichItemsWithProductNames(items)
     } catch (e: any) {
       // On fresh/partial DB some tables may be missing; don't break /api/orders
       console.warn('[OrderRepository] getItemsByOrderId failed:', e?.message || e)
@@ -41,6 +74,14 @@ export const OrderRepository = {
         const list = map.get(row.orderId) ?? []
         list.push(item)
         map.set(row.orderId, list)
+      }
+      const allItems = [...map.values()].flat()
+      const enriched = await enrichItemsWithProductNames(allItems)
+      let idx = 0
+      for (const orderId of map.keys()) {
+        const count = map.get(orderId)!.length
+        map.set(orderId, enriched.slice(idx, idx + count))
+        idx += count
       }
       return map
     } catch (e: any) {
@@ -240,7 +281,7 @@ export const OrderRepository = {
     }) as unknown as Order[]
   },
 
-  /** Все заказы (для пула): без фильтра по userId */
+  /** Все заказы (для пула): без фильтра по userId. Номер заказа — всегда из БД (ORD-XXXX). */
   async listAllOrders(): Promise<Order[]> {
     const db = await getDb()
     let hasIsCancelled = false
@@ -251,10 +292,7 @@ export const OrderRepository = {
     const orders = await db.all<any>(
       `SELECT 
         o.id, 
-        CASE 
-          WHEN o.source = 'website' THEN 'site-ord-' || o.id
-          ELSE o.number
-        END as number,
+        o.number,
         o.status, COALESCE(o.created_at, o.createdAt) as created_at, o.customerName, o.customerPhone, o.customerEmail, 
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
         o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,

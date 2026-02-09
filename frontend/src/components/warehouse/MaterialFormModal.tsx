@@ -26,6 +26,9 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     // поля, которые есть в форме, но могут отсутствовать в shared Material типе
     density?: number;
     paper_type_id?: number;
+    /** Размер листа (мм) — для расчёта вместимости в калькуляторе (A4: 210×297, SRA3: 320×450) */
+    sheet_width?: number | null | '';
+    sheet_height?: number | null | '';
   };
 
   const [formData, setFormData] = useState<MaterialFormData>({
@@ -46,7 +49,9 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     is_active: true,
     paper_type_id: undefined, // 🆕 Добавляем поле для связи с типом бумаги
     density: undefined, // 🆕 Добавляем поле плотности
-    finish: '' // 🆕 Отделка (для ламинации)
+    finish: '', // 🆕 Отделка (для ламинации)
+    sheet_width: '',
+    sheet_height: ''
   });
 
   // 🆕 Состояние для типов бумаги
@@ -167,7 +172,9 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         is_active: material.is_active !== undefined ? material.is_active : true,
         paper_type_id: (material as any).paper_type_id || undefined, // 🆕 Добавляем поле типа бумаги
         density: (material as any).density || undefined, // 🆕 Добавляем поле плотности
-        finish: (material as any).finish || '' // 🆕 Отделка (для ламинации)
+        finish: (material as any).finish || '', // 🆕 Отделка (для ламинации)
+        sheet_width: (material as any).sheet_width ?? '',
+        sheet_height: (material as any).sheet_height ?? ''
       });
     } else {
       // При создании нового материала сбрасываем форму
@@ -189,7 +196,9 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
         is_active: true,
         paper_type_id: undefined,
         density: undefined,
-        finish: ''
+        finish: '',
+        sheet_width: '',
+        sheet_height: ''
       });
     }
   }, [material]);
@@ -360,6 +369,36 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               </div>
             </div>
           )}
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Ширина листа (мм)</label>
+              <input
+                type="number"
+                value={formData.sheet_width ?? ''}
+                onChange={(e) => handleChange('sheet_width' as any, e.target.value === '' ? '' : parseFloat(e.target.value) || undefined)}
+                placeholder="210 (A4), 320 (SRA3)"
+                min="1"
+                max="2000"
+                step="1"
+              />
+              <small style={{ color: '#666', fontSize: '12px' }}>
+                Размер печатного листа для расчёта вместимости в калькуляторе
+              </small>
+            </div>
+            <div className="form-group">
+              <label>Высота листа (мм)</label>
+              <input
+                type="number"
+                value={formData.sheet_height ?? ''}
+                onChange={(e) => handleChange('sheet_height' as any, e.target.value === '' ? '' : parseFloat(e.target.value) || undefined)}
+                placeholder="297 (A4), 450 (SRA3)"
+                min="1"
+                max="2000"
+                step="1"
+              />
+            </div>
+          </div>
 
           <div className="form-row">
             <div className="form-group">

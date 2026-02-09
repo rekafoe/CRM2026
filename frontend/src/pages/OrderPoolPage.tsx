@@ -320,8 +320,9 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     } else {
       filtered = orders.filter((o) => {
         const s = Number(o.status);
+        // Показываем ожидающие (0), первый статус / оформленные (1) — в т.ч. неназначенные онлайн-заказы
         if (s === 0) return true;
-        if (s === 1) return getOrderDebt(o) > 0;
+        if (s === 1) return true;
         return false;
       });
       if (filters.source !== 'all') {

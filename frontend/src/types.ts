@@ -27,6 +27,8 @@ export interface ItemParams {
   productionTime?: string;
   productType?: string;
   urgency?: 'standard' | 'urgent' | 'online' | 'promo';
+  /** Тип цены для заказов с сайта: срочно (+50%), онлайн (−15%), промо (−30%), спец.предложение (−45%) */
+  priceType?: 'urgent' | 'online' | 'promo' | 'special';
   customerType?: 'regular' | 'vip' | 'wholesale';
   estimatedDelivery?: string;
   sheetsNeeded?: number;

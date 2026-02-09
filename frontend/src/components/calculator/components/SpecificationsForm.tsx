@@ -196,7 +196,7 @@ export const SpecificationsForm: React.FC<SpecificationsFormProps> = ({
         )}
       </div>
 
-      {/* Тип цены */}
+      {/* Тип цены: стандарт, срочно +50%, онлайн −15%, промо −30%, спец.предложение −45% */}
       <div className="form-group">
         <label>Тип цены</label>
         <select
@@ -205,11 +205,10 @@ export const SpecificationsForm: React.FC<SpecificationsFormProps> = ({
           className={validationErrors.priceType ? 'error' : ''}
         >
           <option value="standard">Стандартная</option>
-          <option value="urgent">Срочная</option>
-          <option value="superUrgent">Супер срочная</option>
-          <option value="online">Онлайн</option>
-          <option value="promo">Промо</option>
-          <option value="express">Экспресс</option>
+          <option value="urgent">Срочно (+50%)</option>
+          <option value="online">Онлайн (−15%)</option>
+          <option value="promo">Промо (−30%)</option>
+          <option value="special">Спец.предложение (−45%)</option>
         </select>
         {validationErrors.priceType && (
           <span className="error-message">{validationErrors.priceType}</span>
@@ -262,7 +261,6 @@ export const SpecificationsForm: React.FC<SpecificationsFormProps> = ({
         >
           <option value="standard">Стандартная</option>
           <option value="urgent">Срочная</option>
-          <option value="superUrgent">Супер срочная</option>
         </select>
         {validationErrors.urgency && (
           <span className="error-message">{validationErrors.urgency}</span>

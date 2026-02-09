@@ -226,13 +226,18 @@ export class MaterialService {
         const cols = await getTableColumns('materials');
         const hasExtraFields = cols.has('paper_type_id') && cols.has('density');
         const hasFinish = cols.has('finish');
+        const hasSheetSize = cols.has('sheet_width') && cols.has('sheet_height');
+        const sheetWidth = hasSheetSize ? ((material as any).sheet_width != null && (material as any).sheet_width !== '' ? Number((material as any).sheet_width) : null) : null;
+        const sheetHeight = hasSheetSize ? ((material as any).sheet_height != null && (material as any).sheet_height !== '' ? Number((material as any).sheet_height) : null) : null;
+        const sheetSuffix = hasSheetSize ? ', sheet_width = ?, sheet_height = ?' : '';
+        const sheetParams = hasSheetSize ? [sheetWidth, sheetHeight] : [];
         
         // Получаем min_quantity из min_quantity (совместимость с фронтендом)
         const minQuantity = (material as any).min_quantity ?? material.min_quantity ?? null;
         
         if (hasExtraFields && hasFinish) {
           await db.run(
-            'UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, paper_type_id = ?, density = ?, finish = ?, description = ? WHERE id = ?',
+            `UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, paper_type_id = ?, density = ?, finish = ?, description = ?${sheetSuffix} WHERE id = ?`,
             material.name,
             material.unit,
             material.quantity,
@@ -244,11 +249,12 @@ export class MaterialService {
             (material as any).density ?? null,
             (material as any).finish ?? null,
             (material as any).description ?? null,
+            ...sheetParams,
             material.id
           )
         } else if (hasExtraFields) {
           await db.run(
-            'UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, paper_type_id = ?, density = ?, description = ? WHERE id = ?',
+            `UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, paper_type_id = ?, density = ?, description = ?${sheetSuffix} WHERE id = ?`,
             material.name,
             material.unit,
             material.quantity,
@@ -259,11 +265,12 @@ export class MaterialService {
             (material as any).paper_type_id ?? null,
             (material as any).density ?? null,
             (material as any).description ?? null,
+            ...sheetParams,
             material.id
           )
         } else {
           await db.run(
-            'UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, description = ? WHERE id = ?',
+            `UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, description = ?${sheetSuffix} WHERE id = ?`,
             material.name,
             material.unit,
             material.quantity,
@@ -272,6 +279,7 @@ export class MaterialService {
             material.category_id ?? null,
             material.supplier_id ?? null,
             (material as any).description ?? null,
+            ...sheetParams,
             material.id
           )
         }
@@ -282,18 +290,25 @@ export class MaterialService {
         const hasFinish = cols.has('finish');
         const hasDescription = cols.has('description');
         const hasMaxStock = cols.has('max_stock_level');
+        const hasSheetSize = cols.has('sheet_width') && cols.has('sheet_height');
+        const sheetWidth = hasSheetSize ? ((material as any).sheet_width != null && (material as any).sheet_width !== '' ? Number((material as any).sheet_width) : null) : null;
+        const sheetHeight = hasSheetSize ? ((material as any).sheet_height != null && (material as any).sheet_height !== '' ? Number((material as any).sheet_height) : null) : null;
+        const sheetCols = hasSheetSize ? ', sheet_width, sheet_height' : '';
+        const sheetVals = hasSheetSize ? ', ?, ?' : '';
+        const sheetParams = hasSheetSize ? [sheetWidth, sheetHeight] : [];
         
         logger.debug('Поля в таблице materials', { 
           fields: Array.from(cols),
           hasExtraFields,
           hasDescription,
-          hasMaxStock
+          hasMaxStock,
+          hasSheetSize
         });
         
         if (hasExtraFields && hasFinish && hasDescription) {
           logger.debug('INSERT с полными полями (включая finish)');
           await db.run(
-            'INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id, paper_type_id, density, finish, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            `INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id, paper_type_id, density, finish, description${sheetCols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${sheetVals})`,
             material.name,
             material.unit,
             material.quantity,
@@ -304,12 +319,13 @@ export class MaterialService {
             (material as any).paper_type_id ?? null,
             (material as any).density ?? null,
             (material as any).finish ?? null,
-            (material as any).description ?? null
+            (material as any).description ?? null,
+            ...sheetParams
           )
         } else if (hasExtraFields && hasDescription) {
           logger.debug('Выполняем INSERT с полными полями (hasExtraFields && hasDescription)');
           await db.run(
-            'INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id, paper_type_id, density, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            `INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id, paper_type_id, density, description${sheetCols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${sheetVals})`,
             material.name,
             material.unit,
             material.quantity,
@@ -319,11 +335,12 @@ export class MaterialService {
             material.supplier_id ?? null,
             (material as any).paper_type_id ?? null,
             (material as any).density ?? null,
-            (material as any).description ?? null
+            (material as any).description ?? null,
+            ...sheetParams
           )
         } else if (hasExtraFields && hasFinish) {
           await db.run(
-            'INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id, paper_type_id, density, finish) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            `INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id, paper_type_id, density, finish${sheetCols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${sheetVals})`,
             material.name,
             material.unit,
             material.quantity,
@@ -333,11 +350,12 @@ export class MaterialService {
             material.supplier_id ?? null,
             (material as any).paper_type_id ?? null,
             (material as any).density ?? null,
-            (material as any).finish ?? null
+            (material as any).finish ?? null,
+            ...sheetParams
           )
         } else if (hasExtraFields) {
           await db.run(
-            'INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id, paper_type_id, density) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            `INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id, paper_type_id, density${sheetCols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${sheetVals})`,
             material.name,
             material.unit,
             material.quantity,
@@ -346,11 +364,12 @@ export class MaterialService {
             material.category_id ?? null,
             material.supplier_id ?? null,
             (material as any).paper_type_id ?? null,
-            (material as any).density ?? null
+            (material as any).density ?? null,
+            ...sheetParams
           )
         } else if (hasDescription) {
           await db.run(
-            'INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            `INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id, description${sheetCols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?${sheetVals})`,
             material.name,
             material.unit,
             material.quantity,
@@ -358,18 +377,20 @@ export class MaterialService {
             price,
             material.category_id ?? null,
             material.supplier_id ?? null,
-            (material as any).description ?? null
+            (material as any).description ?? null,
+            ...sheetParams
           )
         } else {
           await db.run(
-            'INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            `INSERT INTO materials (name, unit, quantity, min_quantity, sheet_price_single, category_id, supplier_id${sheetCols}) VALUES (?, ?, ?, ?, ?, ?, ?${sheetVals})`,
             material.name,
             material.unit,
             material.quantity,
             material.min_quantity ?? null,
             price,
             material.category_id ?? null,
-            material.supplier_id ?? null
+            material.supplier_id ?? null,
+            ...sheetParams
           )
         }
       }
@@ -467,37 +488,30 @@ export class MaterialService {
 
       const cols = await getTableColumns('materials');
       const hasExtraFields = cols.has('paper_type_id') && cols.has('density');
+      const hasSheetSize = cols.has('sheet_width') && cols.has('sheet_height');
+      const sheetWidth = hasSheetSize ? ((material as any).sheet_width != null && (material as any).sheet_width !== '' ? Number((material as any).sheet_width) : null) : undefined;
+      const sheetHeight = hasSheetSize ? ((material as any).sheet_height != null && (material as any).sheet_height !== '' ? Number((material as any).sheet_height) : null) : undefined;
 
       // Получаем min_quantity из min_quantity (совместимость с фронтендом)
       const minQuantity = (material as any).min_quantity ?? material.min_quantity ?? null;
       
       if (hasExtraFields) {
         await db.run(
-          'UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, paper_type_id = ?, density = ?, description = ? WHERE id = ?',
-          material.name,
-          material.unit,
-          material.quantity,
-          minQuantity,
-          price,
-          material.category_id ?? null,
-          material.supplier_id ?? null,
-          (material as any).paper_type_id ?? null,
-          (material as any).density ?? null,
-          (material as any).description ?? null,
-          id
+          hasSheetSize
+            ? 'UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, paper_type_id = ?, density = ?, description = ?, sheet_width = ?, sheet_height = ? WHERE id = ?'
+            : 'UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, paper_type_id = ?, density = ?, description = ? WHERE id = ?',
+          ...(hasSheetSize
+            ? [material.name, material.unit, material.quantity, minQuantity, price, material.category_id ?? null, material.supplier_id ?? null, (material as any).paper_type_id ?? null, (material as any).density ?? null, (material as any).description ?? null, sheetWidth, sheetHeight, id]
+            : [material.name, material.unit, material.quantity, minQuantity, price, material.category_id ?? null, material.supplier_id ?? null, (material as any).paper_type_id ?? null, (material as any).density ?? null, (material as any).description ?? null, id])
         )
       } else {
         await db.run(
-          'UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, description = ? WHERE id = ?',
-          material.name,
-          material.unit,
-          material.quantity,
-          minQuantity,
-          price,
-          material.category_id ?? null,
-          material.supplier_id ?? null,
-          (material as any).description ?? null,
-          id
+          hasSheetSize
+            ? 'UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, description = ?, sheet_width = ?, sheet_height = ? WHERE id = ?'
+            : 'UPDATE materials SET name = ?, unit = ?, quantity = ?, min_quantity = ?, sheet_price_single = ?, category_id = ?, supplier_id = ?, description = ? WHERE id = ?',
+          ...(hasSheetSize
+            ? [material.name, material.unit, material.quantity, minQuantity, price, material.category_id ?? null, material.supplier_id ?? null, (material as any).description ?? null, sheetWidth, sheetHeight, id]
+            : [material.name, material.unit, material.quantity, minQuantity, price, material.category_id ?? null, material.supplier_id ?? null, (material as any).description ?? null, id])
         )
       }
       

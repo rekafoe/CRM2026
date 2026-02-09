@@ -31,14 +31,13 @@ export const LAMINATION_LABELS: Record<string, string> = {
   glossy: 'Глянцевая',
 };
 
-// Лейблы для типов цен
+// Лейблы для типов цен (4 варианта + стандарт)
 export const PRICE_TYPE_LABELS: Record<string, string> = {
   standard: 'Стандарт',
-  urgent: 'Срочно',
-  superUrgent: 'Очень срочно',
-  online: 'Онлайн',
-  promo: 'Промо',
-  express: 'Экспресс',
+  urgent: 'Срочно (+50%)',
+  online: 'Онлайн (−15%)',
+  promo: 'Промо (−30%)',
+  special: 'Спец.предложение (−45%)',
 };
 
 // Лейблы для типов клиентов

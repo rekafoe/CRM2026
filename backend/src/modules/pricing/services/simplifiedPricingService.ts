@@ -266,12 +266,32 @@ export class SimplifiedPricingService {
       err.status = 400;
       throw err;
     }
-    
-    // Раскладка: сколько изделий на лист (для листовых — визитки, листовки и т.д.)
-    const layoutCheck = LayoutCalculationService.findOptimalSheetSize({
-      width: selectedSize.width_mm,
-      height: selectedSize.height_mm,
-    });
+
+    const productSize = { width: selectedSize.width_mm, height: selectedSize.height_mm };
+
+    // Раскладка: сколько изделий на лист. Печатный лист = выбранный материал (если у материала заданы размеры), иначе SRA3/A3/A4.
+    let layoutCheck: { fitsOnSheet: boolean; itemsPerSheet: number; wastePercentage: number; recommendedSheetSize: { width: number; height: number }; layout: { rows: number; cols: number; actualItemsPerSheet: number }; cutsPerSheet: number };
+    if (normalizedConfig.material_id) {
+      const materialSheet = await db.get<{ sheet_width: number | null; sheet_height: number | null }>(
+        `SELECT sheet_width, sheet_height FROM materials WHERE id = ?`,
+        [normalizedConfig.material_id]
+      );
+      const mw = materialSheet?.sheet_width != null && materialSheet.sheet_width > 0 ? Number(materialSheet.sheet_width) : 0;
+      const mh = materialSheet?.sheet_height != null && materialSheet.sheet_height > 0 ? Number(materialSheet.sheet_height) : 0;
+      if (mw > 0 && mh > 0) {
+        layoutCheck = LayoutCalculationService.calculateLayout(productSize, { width: mw, height: mh });
+        logger.info('Раскладка по размеру листа выбранного материала', {
+          material_id: normalizedConfig.material_id,
+          sheet_width: mw,
+          sheet_height: mh,
+          itemsPerSheet: layoutCheck.itemsPerSheet,
+        });
+      } else {
+        layoutCheck = LayoutCalculationService.findOptimalSheetSize(productSize);
+      }
+    } else {
+      layoutCheck = LayoutCalculationService.findOptimalSheetSize(productSize);
+    }
     const itemsPerSheet = Math.max(1, layoutCheck.itemsPerSheet || 1);
 
     const usePagesMultiplier = product.product_type === 'multi_page';

@@ -1,12 +1,11 @@
-export type PriceType = 'standard' | 'urgent' | 'superUrgent' | 'online' | 'promo' | 'express';
+export type PriceType = 'standard' | 'urgent' | 'online' | 'promo' | 'special';
 
 const baseDaysMap: Record<PriceType, number> = {
   standard: 3,
   urgent: 1,
-  superUrgent: 1,
   online: 3,
   promo: 7,
-  express: 1
+  special: 7,
 };
 
 export function getProductionDaysByPriceType(priceType: PriceType): number {

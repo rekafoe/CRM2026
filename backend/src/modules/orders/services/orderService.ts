@@ -11,6 +11,14 @@ import { itemRowSelect, mapItemRowToItem } from '../../../models/mappers/itemMap
 import { EarningsService } from '../../../services/earningsService'
 import { mapPhotoOrderToOrder, mapPhotoOrderToVirtualItem } from '../../../models/mappers/telegramPhotoOrderMapper'
 
+/** Коэффициенты типов цен для заказов с сайта (от базовой цены продукта). */
+const WEBSITE_PRICE_TYPE_MULTIPLIERS: Record<string, number> = {
+  urgent: 1.5,      // срочно: +50%
+  online: 0.85,     // онлайн: -15%
+  promo: 0.7,       // промо: -30%
+  special: 0.55,    // спец.предложение: -45%
+}
+
 export class OrderService {
   private static buildDefaultReadyDate(baseDate?: string) {
     const date = baseDate ? new Date(baseDate) : new Date()
@@ -321,6 +329,7 @@ export class OrderService {
       
       // 2. Добавляем товары в заказ
       const orderCreatedAt = (order as any).created_at || (order as any).createdAt
+      const isWebsite = source === 'website'
       for (const item of orderData.items) {
         let paramsObj: Record<string, any> = {}
         try {
@@ -334,9 +343,19 @@ export class OrderService {
             paramsObj.readyDate = defaultReadyDate
           }
         }
+        let finalPrice = Number(item.price) || 0
+        const priceType = (item as any).priceType ?? (item as any).price_type ?? paramsObj.priceType ?? paramsObj.price_type
+        if (isWebsite && priceType && typeof priceType === 'string') {
+          const key = priceType.toLowerCase().trim()
+          const mult = WEBSITE_PRICE_TYPE_MULTIPLIERS[key]
+          if (mult != null) {
+            finalPrice = Math.round(finalPrice * mult * 100) / 100
+            paramsObj.priceType = key
+          }
+        }
         await db.run(
           'INSERT INTO items (orderId, type, params, price, quantity) VALUES (?, ?, ?, ?, ?)',
-          [order.id, item.type, JSON.stringify(paramsObj), item.price, item.quantity]
+          [order.id, item.type, JSON.stringify(paramsObj), finalPrice, item.quantity]
         );
       }
       
@@ -506,15 +525,24 @@ export class OrderService {
     }
   }
 
-  // Переназначение заказа на другого пользователя по номеру (только при статусе 0 "ожидает")
+  // Переназначение заказа по номеру (ORD-XXXX) или site-ord-<id>. Допускаются первый статус (0 или 1).
   static async reassignOrderByNumber(orderNumber: string, targetUserId: number) {
     const db = await getDb()
-    const row = await db.get<{ id: number; status: number }>('SELECT id, status FROM orders WHERE number = ?', [orderNumber])
+    const siteMatch = /^site-ord-(\d+)$/i.exec(orderNumber)
+    let row: { id: number; status: number } | undefined
+    if (siteMatch) {
+      const orderId = parseInt(siteMatch[1], 10)
+      row = await db.get<{ id: number; status: number }>('SELECT id, status FROM orders WHERE id = ? AND source = ?', [orderId, 'website'])
+    }
+    if (!row) {
+      row = await db.get<{ id: number; status: number }>('SELECT id, status FROM orders WHERE number = ?', [orderNumber])
+    }
     if (!row) {
       throw new Error('Заказ не найден')
     }
-    if (Number(row.status) !== 0) {
-      throw new Error('Переназначение доступно только для заказов в статусе "ожидает" (0)')
+    const statusId = Number(row.status)
+    if (statusId !== 0 && statusId !== 1) {
+      throw new Error('Переназначение доступно только для заказов в статусе «ожидает» (0 или 1)')
     }
     await db.run('UPDATE orders SET userId = ?, updatedAt = datetime("now") WHERE id = ?', [targetUserId, row.id])
     return { id: row.id, userId: targetUserId }

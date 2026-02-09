@@ -8,7 +8,7 @@ interface CalculatorSpecs {
   paperType: string;
   paperDensity: number;
   lamination: 'none' | 'matte' | 'glossy';
-  priceType: 'standard' | 'urgent' | 'express';
+  priceType: 'standard' | 'urgent' | 'online' | 'promo' | 'special';
   customerType: 'regular' | 'vip';
 }
 
