@@ -36,6 +36,8 @@ export interface ProductSpecs {
   folding?: boolean;
   roundCorners?: boolean;
   urgency?: 'standard' | 'urgent';
+  /** Срок изготовления в днях (если задан — используется вместо значения по типу цены) */
+  productionDays?: number;
   vipLevel?: 'bronze' | 'silver' | 'gold' | 'platinum';
   specialServices?: string[];
   materialType?: 'office' | 'coated' | 'designer' | 'selfAdhesive';

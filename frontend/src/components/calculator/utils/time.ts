@@ -14,7 +14,13 @@ export function getProductionDaysByPriceType(priceType: PriceType): number {
 
 export function getProductionTimeLabel(priceType: PriceType): string {
   const days = getProductionDaysByPriceType(priceType);
-  return `${days} ${days === 1 ? 'день' : 'дня'}`;
+  return getProductionTimeLabelFromDays(days);
+}
+
+export function getProductionTimeLabelFromDays(days: number): string {
+  if (days === 1) return '1 день';
+  if (days >= 2 && days <= 4) return `${days} дня`;
+  return `${days} дней`;
 }
 
 

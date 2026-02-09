@@ -1,5 +1,6 @@
 import React from 'react';
 import { ProductSpecs } from '../types/calculator.types';
+import { getProductionDaysByPriceType, getProductionTimeLabelFromDays } from '../utils/time';
 
 interface SpecificationsFormProps {
   specs: ProductSpecs;
@@ -213,6 +214,25 @@ export const SpecificationsForm: React.FC<SpecificationsFormProps> = ({
         {validationErrors.priceType && (
           <span className="error-message">{validationErrors.priceType}</span>
         )}
+      </div>
+
+      {/* Срок изготовления */}
+      <div className="form-group">
+        <label>Срок изготовления</label>
+        <select
+          value={specs.productionDays ?? ''}
+          onChange={(e) => {
+            const v = e.target.value;
+            onSpecsChange({ productionDays: v === '' ? undefined : Number(v) });
+          }}
+        >
+          <option value="">По типу цены ({getProductionTimeLabelFromDays(getProductionDaysByPriceType(specs.priceType as any))})</option>
+          <option value={1}>1 день</option>
+          <option value={2}>2 дня</option>
+          <option value={3}>3 дня</option>
+          <option value={5}>5 дней</option>
+          <option value={7}>7 дней</option>
+        </select>
       </div>
 
       {/* Тип клиента */}

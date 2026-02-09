@@ -17,7 +17,7 @@ import { AdvancedSettingsSection } from './components/AdvancedSettingsSection';
 import { SelectedProductCard } from './components/SelectedProductCard';
 import { DynamicProductSelector, CUSTOM_PRODUCT_ID, POSTPRINT_PRODUCT_ID } from './components/DynamicProductSelector';
 import { PrintingSettingsSection } from './components/PrintingSettingsSection';
-import { getProductionTimeLabel, getProductionDaysByPriceType } from './utils/time';
+import { getProductionTimeLabel, getProductionDaysByPriceType, getProductionTimeLabelFromDays } from './utils/time';
 import { ProductSpecs, CalculationResult, EditContextPayload } from './types/calculator.types';
 import { useCalculatorEditContext } from './hooks/useCalculatorEditContext';
 import { useCalculatorPricingActions } from './hooks/useCalculatorPricingActions';
@@ -50,7 +50,7 @@ const createInitialSpecs = (initialProductType?: string): ProductSpecs => ({
   paperType: 'semi-matte' as any,
   paperDensity: 0,
   lamination: 'none',
-  priceType: 'online',
+  priceType: 'standard',
   customerType: 'regular',
   pages: 4,
   magnetic: false,
@@ -208,10 +208,19 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     customFormat
   });
 
-  const getProductionTime = useCallback(
-    () => getProductionTimeLabel(specs.priceType as any),
-    [specs.priceType],
-  );
+  const getProductionTime = useCallback(() => {
+    if (specs.productionDays != null && specs.productionDays > 0) {
+      return getProductionTimeLabelFromDays(specs.productionDays);
+    }
+    return getProductionTimeLabel(specs.priceType as any);
+  }, [specs.priceType, specs.productionDays]);
+
+  const getProductionDays = useCallback(() => {
+    if (specs.productionDays != null && specs.productionDays > 0) {
+      return specs.productionDays;
+    }
+    return getProductionDaysByPriceType(specs.priceType as any);
+  }, [specs.priceType, specs.productionDays]);
 
   const {
     result,
@@ -427,7 +436,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       ...prev,
       sides: prev.sides || 1,
       lamination: prev.lamination || 'none',
-      priceType: 'online', // Всегда используем онлайн по умолчанию
+      priceType: 'standard', // По умолчанию стандарт (×1)
       customerType: 'regular', // Всегда используем обычный тип клиента по умолчанию
     }));
   }, [isOpen, safeWarehousePaperTypes, specs.paperType, specs.format, availableFormats, getDefaultPaperDensity, editContext, backendProductSchema]);
@@ -676,8 +685,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   }, [setSpecs, setUserInteracted]);
 
 
-  // Вспомогательные функции
-  const getProductionDays = useCallback(() => getProductionDaysByPriceType(specs.priceType as any), [specs.priceType]);
+  // getProductionDays передаётся выше через useCalculatorPricingActions / handleAddToOrder
 
   // Сохранение пресета
   

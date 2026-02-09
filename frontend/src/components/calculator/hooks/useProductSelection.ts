@@ -69,7 +69,7 @@ export function useProductSelection({
           quantity: prev.quantity || 1,
           sides: prev.sides || 1,
           lamination: prev.lamination || 'none',
-          priceType: prev.priceType || 'online',
+          priceType: prev.priceType || 'standard',
           customerType: prev.customerType || 'regular',
           pages: prev.pages || 4,
         };
