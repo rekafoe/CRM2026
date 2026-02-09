@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProductSpecs, CalculationResult } from '../types/calculator.types';
 import { Product } from '../../../services/products';
-import { ParamsSection } from './ParamsSection';
+import { ParamsSection, type ParamsSectionSpecs } from './ParamsSection';
 import { MaterialsSection } from './MaterialsSection';
 import { PrintingSettingsSection } from './PrintingSettingsSection';
 import { DynamicFieldsSection } from './DynamicFieldsSection';
@@ -69,7 +69,16 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
         />
 
         <ParamsSection
-          specs={{ productType: specs.productType, format: specs.format, quantity: specs.quantity, sides: specs.sides, size_id: (specs as any).size_id }}
+          specs={
+            {
+              productType: specs.productType,
+              format: specs.format,
+              quantity: specs.quantity,
+              sides: specs.sides,
+              size_id: (specs as any).size_id,
+              pages: (specs as any).pages,
+            } satisfies ParamsSectionSpecs
+          }
           availableFormats={availableFormats}
           validationErrors={validationErrors}
           isCustomFormat={isCustomFormat}

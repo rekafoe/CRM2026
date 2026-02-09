@@ -1,13 +1,16 @@
 import React from 'react';
 
+export interface ParamsSectionSpecs {
+  productType: string;
+  format: string;
+  quantity: number;
+  sides: 1 | 2;
+  size_id?: string;
+  pages?: number;
+}
+
 interface ParamsSectionProps {
-  specs: {
-    productType: string;
-    format: string;
-    quantity: number;
-    sides: 1 | 2;
-    size_id?: string; // 🆕 Для упрощённых продуктов
-  };
+  specs: ParamsSectionSpecs;
   availableFormats: string[];
   validationErrors: Record<string, string>;
   isCustomFormat: boolean;
@@ -233,8 +236,8 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             {isRequired('pages') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
           </label>
           <select
-            value={(specs as any).pages || 4}
-            onChange={(e) => updateSpecs({ pages: parseInt(e.target.value) })}
+            value={specs.pages ?? 4}
+            onChange={(e) => updateSpecs({ pages: parseInt(e.target.value, 10) })}
             className="form-control"
             required={isRequired('pages')}
           >
