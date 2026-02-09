@@ -137,15 +137,17 @@ export const MultiPageProductEditor: React.FC = () => {
         </div>
       </div>
 
-      <Alert type="info" style={{ marginBottom: 16 }}>
-        <strong>Многостраничные изделия настраиваются как продукты каталога.</strong>
-        {' '}
-        Создайте отдельный продукт для каждого варианта (например «Фотоальбом на две скобы», «Фотоальбом на пружине») — у каждого будут свои операции и параметры. Эта страница — справочная настройка глобальной схемы.
-        {' '}
-        <Button variant="primary" size="sm" onClick={() => navigate('/adminpanel/products')}>
-          Каталог продуктов
-        </Button>
-      </Alert>
+      <div style={{ marginBottom: 16 }}>
+        <Alert type="info">
+          <strong>Многостраничные изделия настраиваются как продукты каталога.</strong>
+          {' '}
+          Создайте отдельный продукт для каждого варианта (например «Фотоальбом на две скобы», «Фотоальбом на пружине») — у каждого будут свои операции и параметры. Эта страница — справочная настройка глобальной схемы.
+          {' '}
+          <Button variant="primary" size="sm" onClick={() => navigate('/adminpanel/products')}>
+            Каталог продуктов
+          </Button>
+        </Alert>
+      </div>
 
       {saveStatus && (
         <div style={{ marginBottom: 16 }}>
