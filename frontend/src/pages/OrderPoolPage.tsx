@@ -380,14 +380,6 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     matchesSearch,
   ]);
 
-  const poolStats = useMemo(() => {
-    const assigned = filteredOrders.filter((o) => o.userId != null).length;
-    const cancelled = filteredOrders.filter((o) => o.is_cancelled === 1).length;
-    const withDebt = filteredOrders.filter((o) => getOrderDebt(o) > 0).length;
-    const withPrepay = filteredOrders.filter((o) => getOrderPrepayment(o) > 0).length;
-    return { assigned, cancelled, withDebt, withPrepay };
-  }, [filteredOrders, getOrderDebt, getOrderPrepayment]);
-
   const visibleOrders = useMemo(
     () => filteredOrders.slice(0, filters.visibleCount),
     [filteredOrders, filters.visibleCount]
@@ -573,25 +565,6 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             <button onClick={() => dispatchFilters({ type: 'toggleSortDirection' })} title="Направление сортировки">
               {filters.sortDirection === 'asc' ? '↑' : '↓'}
             </button>
-          </div>
-        </div>
-
-        <div className="pool-stats">
-          <div className="pool-stat">
-            <span>Назначенные</span>
-            <strong>{poolStats.assigned}</strong>
-          </div>
-          <div className="pool-stat">
-            <span>Отменённые</span>
-            <strong>{poolStats.cancelled}</strong>
-          </div>
-          <div className="pool-stat">
-            <span>С долгом</span>
-            <strong>{poolStats.withDebt}</strong>
-          </div>
-          <div className="pool-stat">
-            <span>С предоплатой</span>
-            <strong>{poolStats.withPrepay}</strong>
           </div>
         </div>
 

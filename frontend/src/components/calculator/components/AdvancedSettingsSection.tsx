@@ -1,8 +1,9 @@
 import React from 'react';
+import { getProductionDaysByPriceType, getProductionTimeLabelFromDays } from '../utils/time';
 
 interface Props {
-  specs: { priceType: string; customerType: string; pages?: number } & Record<string, any>;
-  updateSpecs: (updates: Record<string, any>, instant?: boolean) => void; // 🆕 Добавили instant
+  specs: { priceType: string; customerType: string; pages?: number; productionDays?: number } & Record<string, any>;
+  updateSpecs: (updates: Record<string, any>, instant?: boolean) => void;
   backendProductSchema: any | null;
 }
 
@@ -11,6 +12,40 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
     <div className="form-section advanced-settings compact">
       <h3>🔧 Настройки</h3>
       <div className="advanced-grid compact">
+        <div className="param-group">
+          <label>Тип цены</label>
+          <select
+            value={specs.priceType || 'standard'}
+            onChange={(e) => updateSpecs({ priceType: e.target.value }, true)}
+            className="form-control"
+          >
+            <option value="standard">Стандартная (×1)</option>
+            <option value="urgent">Срочно (+50%)</option>
+            <option value="online">Онлайн (−15%)</option>
+            <option value="promo">Промо (−30%)</option>
+            <option value="special">Спец.предложение (−45%)</option>
+          </select>
+        </div>
+
+        <div className="param-group">
+          <label>Срок изготовления</label>
+          <select
+            value={specs.productionDays ?? ''}
+            onChange={(e) => {
+              const v = e.target.value;
+              updateSpecs({ productionDays: v === '' ? undefined : Number(v) }, true);
+            }}
+            className="form-control"
+          >
+            <option value="">По типу цены ({getProductionTimeLabelFromDays(getProductionDaysByPriceType(specs.priceType as any))})</option>
+            <option value={1}>1 день</option>
+            <option value={2}>2 дня</option>
+            <option value={3}>3 дня</option>
+            <option value={5}>5 дней</option>
+            <option value={7}>7 дней</option>
+          </select>
+        </div>
+
         {Array.isArray((backendProductSchema?.fields || []).find((f: any) => f.name === 'pages')?.enum) && (
           <div className="param-group">
             <label>Страниц:</label>
