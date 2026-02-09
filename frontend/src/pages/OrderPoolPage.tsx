@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order } from '../types';
-import { getOrders, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder } from '../api';
+import { getOrders, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder, getOrderStatuses } from '../api';
 import { parseNumberFlexible } from '../utils/numberInput';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { OrderHeader } from '../components/optimized/OrderHeader';
 import { OrderContent } from '../components/optimized/OrderContent';
+import { OrderStatusTimeline } from '../components/order/OrderStatusTimeline';
 import { OrderTotal } from '../components/order/OrderTotal';
 import { FilesModal } from '../components/FilesModal';
 import { PrepaymentModal } from '../components/PrepaymentModal';
@@ -205,6 +206,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
   const [showPrepaymentDetailsModal, setShowPrepaymentDetailsModal] = useState(false);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
+  const [orderStatuses, setOrderStatuses] = useState<Array<{ id: number; name: string; color?: string; sort_order: number }>>([]);
   const [filters, dispatchFilters] = useReducer(filtersReducer, initialFilters);
   const selectedItems = selectedOrder?.items ?? [];
   const userNameById = useMemo(() => {
@@ -283,6 +285,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     if (isInitialized) return;
     loadOrders().then(() => setIsInitialized(true));
     getUsers().then(res => setAllUsers(res.data)).catch(err => logger.error('Failed to load users', err));
+    getOrderStatuses().then(res => setOrderStatuses(res.data ?? [])).catch(err => logger.error('Failed to load order statuses', err));
   }, [isInitialized, loadOrders, logger]);
 
   useEffect(() => {
@@ -539,36 +542,38 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               Сбросить
             </button>
           </div>
-          <input
-            type="text"
-            placeholder="Поиск по заказам..."
-            value={filters.searchInput}
-            onChange={(e) => dispatchFilters({ type: 'setSearchInput', value: e.target.value })}
-          />
-          <select value={filters.source} onChange={(e) => dispatchFilters({ type: 'setSource', value: e.target.value as any })}>
-            <option value="all">Все источники</option>
-            <option value="crm">CRM</option>
-            <option value="website">Онлайн</option>
-            <option value="telegram">Telegram</option>
-          </select>
-          <select value={filters.cancelled} onChange={(e) => dispatchFilters({ type: 'setCancelled', value: e.target.value as any })}>
-            <option value="all">Все</option>
-            <option value="cancelled">Отменённые</option>
-            <option value="not_cancelled">Не отменённые</option>
-          </select>
-          <select value={filters.assigned} onChange={(e) => dispatchFilters({ type: 'setAssigned', value: e.target.value as any })}>
-            <option value="all">Все</option>
-            <option value="assigned">Назначенные</option>
-            <option value="not_assigned">Неназначенные</option>
-          </select>
-          <select value={filters.sortBy} onChange={(e) => dispatchFilters({ type: 'setSortBy', value: e.target.value as any })}>
-            <option value="created_at">По дате</option>
-            <option value="number">По номеру</option>
-            <option value="totalAmount">По сумме</option>
-          </select>
-          <button onClick={() => dispatchFilters({ type: 'toggleSortDirection' })}>
-            {filters.sortDirection === 'asc' ? '↑' : '↓'}
-          </button>
+          <div className="filters-row">
+            <input
+              type="text"
+              placeholder="Поиск по заказам..."
+              value={filters.searchInput}
+              onChange={(e) => dispatchFilters({ type: 'setSearchInput', value: e.target.value })}
+            />
+            <select value={filters.source} onChange={(e) => dispatchFilters({ type: 'setSource', value: e.target.value as any })}>
+              <option value="all">Все источники</option>
+              <option value="crm">CRM</option>
+              <option value="website">Онлайн</option>
+              <option value="telegram">Telegram</option>
+            </select>
+            <select value={filters.cancelled} onChange={(e) => dispatchFilters({ type: 'setCancelled', value: e.target.value as any })}>
+              <option value="all">Все</option>
+              <option value="cancelled">Отменённые</option>
+              <option value="not_cancelled">Не отменённые</option>
+            </select>
+            <select value={filters.assigned} onChange={(e) => dispatchFilters({ type: 'setAssigned', value: e.target.value as any })}>
+              <option value="all">Все</option>
+              <option value="assigned">Назначенные</option>
+              <option value="not_assigned">Неназначенные</option>
+            </select>
+            <select value={filters.sortBy} onChange={(e) => dispatchFilters({ type: 'setSortBy', value: e.target.value as any })}>
+              <option value="created_at">По дате</option>
+              <option value="number">По номеру</option>
+              <option value="totalAmount">По сумме</option>
+            </select>
+            <button onClick={() => dispatchFilters({ type: 'toggleSortDirection' })} title="Направление сортировки">
+              {filters.sortDirection === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
         </div>
 
         <div className="pool-stats">
@@ -649,6 +654,15 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               onShowFilesModal={() => setShowFilesModal(true)}
               onShowPrepaymentModal={() => setShowPrepaymentModal(true)}
             />
+            {orderStatuses.length > 0 && (
+              <OrderStatusTimeline
+                statuses={orderStatuses}
+                currentStatusId={Number(selectedOrder.status)}
+                createdAt={selectedOrder.created_at ?? (selectedOrder as any).createdAt}
+                readyAt={(selectedOrder as any).readyAt ?? null}
+                hasItems={(selectedOrder.items?.length ?? 0) > 0}
+              />
+            )}
             <div className="order-detail-responsible">
               <label>
                 Ответственный:
@@ -668,14 +682,15 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   ))}
                 </select>
               </label>
-              {!selectedOrder.userId && Number(selectedOrder.status) === 0 && (
-                <button type="button" className="btn-assign-me" onClick={() => handleAssignToMe(selectedOrder.number!)}>
-                  Назначить мне
-                </button>
-              )}
-              {selectedOrder.userId && Number(selectedOrder.userId) !== currentUserId && (
-                <button type="button" className="btn-take-self" onClick={() => handleAssignToMe(selectedOrder.number!)}>
-                  Забрать себе
+              {(Number(selectedOrder.status) === 0 || Number(selectedOrder.status) === 1) &&
+                selectedOrder.userId !== currentUserId && (
+                <button
+                  type="button"
+                  className="btn-assign-responsible"
+                  onClick={() => handleAssignToMe(selectedOrder.number!)}
+                  title="Назначить себя ответственным по заказу"
+                >
+                  Назначить ответственного
                 </button>
               )}
             </div>

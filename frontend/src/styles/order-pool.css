@@ -42,13 +42,28 @@
   padding: 0 16px 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .filters-quick {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
+}
+
+.filters-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.filters-row input,
+.filters-row select {
+  min-width: 0;
+}
+
+.filters-row button {
+  min-width: 0;
 }
 
 .filters-quick .quick-btn {
@@ -367,6 +382,96 @@
   background: #218838;
 }
 
+/* Таймлайн статусов заказа (как в основном приложении) */
+.order-status-timeline {
+  margin: 16px 0 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.order-status-timeline__bar-wrap {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.order-status-timeline__bar-fill {
+  height: 100%;
+  background: #757575;
+  border-radius: 3px;
+  transition: width 0.25s ease;
+}
+
+.order-status-timeline__steps {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.order-status-timeline__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.order-status-timeline__circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.order-status-timeline__step--active .order-status-timeline__circle {
+  background: #616161;
+}
+
+.order-status-timeline__step--past .order-status-timeline__circle {
+  background: #9e9e9e;
+}
+
+.order-status-timeline__label {
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.order-status-timeline__step--active .order-status-timeline__label {
+  color: #333;
+  font-weight: 500;
+}
+
+.order-status-timeline__dates {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.order-status-timeline__date {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.order-status-timeline__empty {
+  font-size: 13px;
+  color: #999;
+}
+
 .order-detail-responsible {
   display: flex;
   align-items: center;
@@ -425,6 +530,21 @@
 
 .order-detail-responsible .btn-take-self:hover {
   background: #e96b00;
+}
+
+.order-detail-responsible .btn-assign-responsible {
+  padding: 8px 14px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.order-detail-responsible .btn-assign-responsible:hover {
+  background: #45a049;
 }
 
 .order-detail-actions {
