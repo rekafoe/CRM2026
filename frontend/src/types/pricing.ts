@@ -1,5 +1,12 @@
 export type PricingServiceType = 'print' | 'postprint' | 'other' | 'generic' | string;
 
+export interface ServiceCategory {
+  id: number;
+  name: string;
+  sortOrder: number;
+  createdAt?: string;
+}
+
 export interface PricingService {
   id: number;
   name: string;
@@ -12,6 +19,8 @@ export interface PricingService {
   minQuantity?: number;
   maxQuantity?: number;
   operator_percent?: number;
+  categoryId?: number | null;
+  categoryName?: string | null;
 }
 
 export interface ServiceVolumeTier {
@@ -55,10 +64,11 @@ export interface CreatePricingServicePayload {
   priceUnit?: string;
   rate: number;
   isActive?: boolean;
-  operationType?: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
+  operationType?: string;
   minQuantity?: number;
   maxQuantity?: number;
   operator_percent?: number;
+  categoryId?: number | null;
 }
 
 export interface UpdatePricingServicePayload extends Partial<CreatePricingServicePayload> {}

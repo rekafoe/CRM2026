@@ -8,6 +8,7 @@
 import { getDb } from '../../../db';
 import { logger } from '../../../utils/logger';
 import { PricingServiceRepository } from '../repositories/serviceRepository';
+import { LayoutCalculationService } from './layoutCalculationService';
 
 export interface SimplifiedPricingResult {
   productId: number;
@@ -66,6 +67,15 @@ export interface SimplifiedPricingResult {
   
   calculatedAt: string;
   calculationMethod: 'simplified';
+  /** Проверка вместимости формата на печатный лист (SRA3/A3/A4); sheetsNeeded — листов к списанию */
+  layout?: {
+    fitsOnSheet: boolean;
+    itemsPerSheet: number;
+    sheetsNeeded: number;
+    wastePercentage?: number;
+    recommendedSheetSize?: { width: number; height: number };
+  };
+  warnings?: string[];
 }
 
 interface SimplifiedQtyTier {
@@ -257,6 +267,13 @@ export class SimplifiedPricingService {
       throw err;
     }
     
+    // Раскладка: сколько изделий на лист (для листовых — визитки, листовки и т.д.)
+    const layoutCheck = LayoutCalculationService.findOptimalSheetSize({
+      width: selectedSize.width_mm,
+      height: selectedSize.height_mm,
+    });
+    const itemsPerSheet = Math.max(1, layoutCheck.itemsPerSheet || 1);
+
     const usePagesMultiplier = product.product_type === 'multi_page';
     const pagesCount = Number((configuration as any).pages);
     const effectivePages = usePagesMultiplier && Number.isFinite(pagesCount) && pagesCount > 0 ? pagesCount : 1;
@@ -265,7 +282,11 @@ export class SimplifiedPricingService {
       sidesMode === 'duplex' || sidesMode === 'duplex_bw_back'
         ? Math.max(1, Math.ceil(effectivePages / 2))
         : Math.max(1, effectivePages);
-    const effectivePrintQuantity = Math.max(1, quantity * sheetsPerItem);
+    // Листов к списанию: многостраничные — quantity * листов_на_экземпляр; листовые — ceil(quantity / вместимость_на_лист)
+    const sheetsNeeded = usePagesMultiplier
+      ? Math.max(1, quantity * sheetsPerItem)
+      : Math.ceil(quantity / itemsPerSheet);
+    const effectivePrintQuantity = sheetsNeeded;
 
     // 4. Рассчитываем цену печати
     let printPrice = 0;
@@ -622,6 +643,20 @@ export class SimplifiedPricingService {
         }
       }
     }
+
+    const layoutResult: SimplifiedPricingResult['layout'] = {
+      fitsOnSheet: layoutCheck.fitsOnSheet,
+      itemsPerSheet: layoutCheck.itemsPerSheet,
+      sheetsNeeded,
+      wastePercentage: layoutCheck.wastePercentage,
+      recommendedSheetSize: layoutCheck.recommendedSheetSize,
+    };
+    const warnings: string[] = [];
+    if (!layoutCheck.fitsOnSheet) {
+      warnings.push(
+        `Формат ${selectedSize.width_mm}×${selectedSize.height_mm} мм не помещается на стандартные печатные листы (SRA3, A3, A4). Проверьте размер.`
+      );
+    }
     
     return {
       productId,
@@ -664,6 +699,8 @@ export class SimplifiedPricingService {
       finishingDetails: finishingDetails.length > 0 ? finishingDetails : undefined,
       calculatedAt: new Date().toISOString(),
       calculationMethod: 'simplified',
+      layout: layoutResult,
+      warnings: warnings.length > 0 ? warnings : undefined,
     };
   }
   

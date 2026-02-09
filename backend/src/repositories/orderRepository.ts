@@ -72,7 +72,7 @@ export const OrderRepository = {
         c.email as customer__email
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.userId = ? OR o.userId IS NULL 
+      WHERE o.userId = ?
       ORDER BY o.id DESC`,
       userId
     )
@@ -119,9 +119,14 @@ export const OrderRepository = {
         c.phone as customer__phone, c.email as customer__email
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE (o.userId = ? OR o.userId IS NULL) AND o.status = 4
+      WHERE (o.userId = ? OR EXISTS (
+        SELECT 1 FROM user_order_page_orders uopo
+        JOIN user_order_pages uop ON uopo.page_id = uop.id
+        WHERE uopo.order_id = o.id AND uopo.order_type = 'website' AND uop.user_id = ?
+      )) AND o.status = 4
         AND EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ?)
       ORDER BY o.id DESC`,
+      userId,
       userId,
       d
     )
@@ -164,7 +169,12 @@ export const OrderRepository = {
       WHERE o.status = 4
         AND EXISTS (SELECT 1 FROM debt_closed_events d3 WHERE d3.order_id = o.id AND d3.closed_date = ?)
         AND (
-          (o.userId = ? OR o.userId IS NULL)
+          o.userId = ?
+          OR EXISTS (
+            SELECT 1 FROM user_order_page_orders uopo
+            JOIN user_order_pages uop ON uopo.page_id = uop.id
+            WHERE uopo.order_id = o.id AND uopo.order_type = 'website' AND uop.user_id = ?
+          )
           OR EXISTS (
             SELECT 1 FROM debt_closed_events d2 
             WHERE d2.order_id = o.id AND d2.closed_date = ? AND d2.issued_by_user_id = ?
@@ -172,6 +182,7 @@ export const OrderRepository = {
         )
       ORDER BY o.id DESC`,
       d,
+      userId,
       userId,
       d,
       userId
@@ -402,8 +413,10 @@ export const OrderRepository = {
   ): Promise<Order[]> {
     const db = await getDb()
 
-    let whereConditions = ['(o.userId = ? OR o.userId IS NULL)']
-    const params: any[] = [userId]
+    let whereConditions = [
+      '(o.userId = ? OR EXISTS (SELECT 1 FROM user_order_page_orders uopo JOIN user_order_pages uop ON uopo.page_id = uop.id WHERE uopo.order_id = o.id AND uopo.order_type = \'website\' AND uop.user_id = ?))'
+    ]
+    const params: any[] = [userId, userId]
 
     if (searchParams.department_id != null && Number.isFinite(searchParams.department_id)) {
       whereConditions.push('o.userId IN (SELECT id FROM users WHERE department_id = ?)')
@@ -517,8 +530,10 @@ export const OrderRepository = {
     totalPrepayment: number
   }> {
     const db = await getDb()
-    const whereConditions = ['(o.userId = ? OR o.userId IS NULL)']
-    const params: any[] = [userId]
+    const whereConditions = [
+      '(o.userId = ? OR EXISTS (SELECT 1 FROM user_order_page_orders uopo JOIN user_order_pages uop ON uopo.page_id = uop.id WHERE uopo.order_id = o.id AND uopo.order_type = \'website\' AND uop.user_id = ?))'
+    ]
+    const params: any[] = [userId, userId]
     if (dateFrom) { whereConditions.push('DATE(o.created_at) >= ?'); params.push(dateFrom) }
     if (dateTo) { whereConditions.push('DATE(o.created_at) <= ?'); params.push(dateTo) }
     const whereClause = whereConditions.join(' AND ')

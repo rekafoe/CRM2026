@@ -113,6 +113,57 @@
   min-width: 0;
 }
 
+/* Страницы: привязанные варианты (список + добавление) */
+.simplified-pages-config {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.simplified-pages-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-height: 32px;
+}
+
+.simplified-pages-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-tertiary, #f3f4f6);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.simplified-pages-chip__remove {
+  padding: 0 2px;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-secondary, #6b7280);
+}
+
+.simplified-pages-chip__remove:hover {
+  color: var(--error, #dc2626);
+}
+
+.simplified-pages-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.simplified-pages-add__input {
+  width: 100px;
+}
+
 .simplified-list {
   display: flex;
   flex-direction: column;

@@ -7,7 +7,8 @@ interface ResultSectionProps {
     specifications: { quantity: number; sides?: number };
     productionTime: string;
     parameterSummary?: Array<{ label: string; value: string }>;
-    layout?: { sheetsNeeded?: number; itemsPerSheet?: number; sheetSize?: string };
+    layout?: { sheetsNeeded?: number; itemsPerSheet?: number; sheetSize?: string; fitsOnSheet?: boolean };
+    warnings?: string[];
   } | null;
   isValid: boolean;
   onAddToOrder: () => void;
@@ -54,11 +55,24 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   const sheetsNeeded = result.layout?.sheetsNeeded;
   const itemsPerSheet = result.layout?.itemsPerSheet;
   const sheetSize = result.layout?.sheetSize;
+  const fitsOnSheet = result.layout?.fitsOnSheet;
+  const warnings = result.warnings || [];
   const parameterSummary = result.parameterSummary || [];
   const addButtonLabel = mode === 'edit' ? '💾 Обновить позицию' : '➕ Добавить в заказ';
+  const showFormatWarning = fitsOnSheet === false || warnings.length > 0;
 
   return (
     <div className="form-section result-section compact">
+      {showFormatWarning && (
+        <div className="result-section__warning" role="alert">
+          {fitsOnSheet === false && (
+            <p>⚠️ Выбранный формат не помещается на стандартные печатные листы (SRA3, A3, A4). Проверьте размер.</p>
+          )}
+          {warnings.map((msg, i) => (
+            <p key={i}>⚠️ {msg}</p>
+          ))}
+        </div>
+      )}
       <h3>💰 Стоимость: {formatNumber(result.totalCost, 'BYN')}</h3>
       <div className="result-details">
         <div className="result-item">

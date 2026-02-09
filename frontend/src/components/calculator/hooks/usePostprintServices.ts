@@ -15,6 +15,7 @@ interface PostprintOperation {
   tiers: ServiceVolumeTier[];
   minQuantity?: number;
   maxQuantity?: number;
+  categoryName?: string;
 }
 
 interface PostprintVariantOption {
@@ -37,6 +38,8 @@ interface PostprintServiceOption {
   variants: PostprintVariantOption[];
   minQuantity?: number;
   maxQuantity?: number;
+  categoryId?: number | null;
+  categoryName?: string;
 }
 
 interface UsePostprintServicesParams {
@@ -176,6 +179,8 @@ export function usePostprintServices({
             variants: [],
             minQuantity: service.minQuantity,
             maxQuantity: service.maxQuantity,
+            categoryId: (service as { categoryId?: number | null }).categoryId ?? null,
+            categoryName: (service as { categoryName?: string }).categoryName ?? 'Без категории',
           };
           if (!hasNumericServiceName && displayableVariants.length > 0) {
             displayableVariants.forEach((variant) => {
@@ -190,6 +195,7 @@ export function usePostprintServices({
                 minQuantity: service.minQuantity,
                 maxQuantity: service.maxQuantity,
               });
+              const catName = (service as { categoryName?: string }).categoryName ?? 'Без категории';
               operations.push({
                 key: `${service.id}:${variant.id}`,
                 serviceId: service.id,
@@ -201,9 +207,11 @@ export function usePostprintServices({
                 tiers: variantTiers,
                 minQuantity: service.minQuantity,
                 maxQuantity: service.maxQuantity,
+                categoryName: catName,
               });
             });
           } else {
+            const catName = (service as { categoryName?: string }).categoryName ?? 'Без категории';
             operations.push({
               key: String(service.id),
               serviceId: service.id,
@@ -214,13 +222,20 @@ export function usePostprintServices({
               tiers: activeTiers.filter((tier) => !tier.variantId),
               minQuantity: service.minQuantity,
               maxQuantity: service.maxQuantity,
+              categoryName: catName,
             });
           }
           servicesList.push(serviceOption);
         })
       );
-      operations.sort((a, b) => a.name.localeCompare(b.name));
-      servicesList.sort((a, b) => a.name.localeCompare(b.name));
+      const sortByCategoryThenName = (a: { categoryName?: string; name: string }, b: { categoryName?: string; name: string }) => {
+        const ca = a.categoryName ?? 'Без категории';
+        const cb = b.categoryName ?? 'Без категории';
+        if (ca !== cb) return ca.localeCompare(cb);
+        return a.name.localeCompare(b.name);
+      };
+      operations.sort(sortByCategoryThenName);
+      servicesList.sort(sortByCategoryThenName);
       setPostprintOperations(operations);
       setPostprintServices(servicesList);
       loadedRef.current = true;

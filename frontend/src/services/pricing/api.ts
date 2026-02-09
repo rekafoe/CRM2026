@@ -1,6 +1,7 @@
 import { api } from '../../api/client';
 import {
   PricingService,
+  ServiceCategory,
   ServiceVolumeTier,
   ServiceVolumeTierPayload,
   CreatePricingServicePayload,
@@ -42,6 +43,8 @@ const mapService = (svc: any): PricingService => ({
   minQuantity: svc.min_quantity ?? svc.minQuantity ?? undefined,
   maxQuantity: svc.max_quantity ?? svc.maxQuantity ?? undefined,
   operator_percent: svc.operator_percent ?? svc.operatorPercent ?? undefined,
+  categoryId: svc.categoryId ?? svc.category_id ?? undefined,
+  categoryName: svc.categoryName ?? svc.category_name ?? undefined,
 });
 
 const mapTier = (tier: any): ServiceVolumeTier => ({
@@ -76,6 +79,7 @@ export async function createPricingService(payload: CreatePricingServicePayload)
     ...(payload.minQuantity !== undefined ? { min_quantity: payload.minQuantity } : {}),
     ...(payload.maxQuantity !== undefined ? { max_quantity: payload.maxQuantity } : {}),
     ...(payload.operator_percent !== undefined && Number.isFinite(Number(payload.operator_percent)) ? { operator_percent: Number(payload.operator_percent) } : {}),
+    ...(payload.categoryId !== undefined && payload.categoryId !== null ? { category_id: payload.categoryId } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);
@@ -97,6 +101,7 @@ export async function updatePricingService(id: number, payload: UpdatePricingSer
     ...(payload.minQuantity !== undefined ? { min_quantity: payload.minQuantity } : {}),
     ...(payload.maxQuantity !== undefined ? { max_quantity: payload.maxQuantity } : {}),
     ...(payload.operator_percent !== undefined ? { operator_percent: Number(payload.operator_percent) } : {}),
+    ...(payload.categoryId !== undefined ? { category_id: payload.categoryId } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);
@@ -104,6 +109,30 @@ export async function updatePricingService(id: number, payload: UpdatePricingSer
 
 export async function deletePricingService(id: number): Promise<void> {
   await api.delete(`/pricing/services/${id}`);
+}
+
+// --- Категории послепечатных услуг ---
+export async function getServiceCategories(): Promise<ServiceCategory[]> {
+  const response = await api.get('/pricing/service-categories');
+  const payload: any = (response.data as any)?.data ?? response.data ?? [];
+  return Array.isArray(payload) ? payload : [];
+}
+
+export async function createServiceCategory(name: string, sortOrder: number = 0): Promise<ServiceCategory> {
+  const response = await api.post('/pricing/service-categories', { name: name.trim(), sort_order: sortOrder });
+  return (response.data as any)?.data ?? response.data;
+}
+
+export async function updateServiceCategory(id: number, data: { name?: string; sortOrder?: number }): Promise<ServiceCategory> {
+  const response = await api.put(`/pricing/service-categories/${id}`, {
+    name: data.name?.trim(),
+    sort_order: data.sortOrder,
+  });
+  return (response.data as any)?.data ?? response.data;
+}
+
+export async function deleteServiceCategory(id: number): Promise<void> {
+  await api.delete(`/pricing/service-categories/${id}`);
 }
 
 export async function getServiceVolumeTiers(serviceId: number): Promise<ServiceVolumeTier[]> {

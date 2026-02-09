@@ -558,14 +558,16 @@ export function useCalculatorPricingActions({
         // Если нет формата материала со склада - не показываем "Формат листа"
 
         const wastePercentage = layoutData.wastePercentage ?? layoutData.waste_percentage;
+        const fitsOnSheet = layoutData.fitsOnSheet;
         const layoutSummary =
-          itemsPerSheet || sheetsNeeded || sheetSizeLabel || wastePercentage
+          itemsPerSheet || sheetsNeeded || sheetSizeLabel || wastePercentage || fitsOnSheet === false
             ? {
                 itemsPerSheet,
                 sheetsNeeded,
                 sheetSize: sheetSizeLabel,
                 wastePercentage:
                   wastePercentage != null ? Math.round(Number(wastePercentage) * 100) / 100 : undefined,
+                fitsOnSheet: fitsOnSheet === undefined ? undefined : !!fitsOnSheet,
               }
             : undefined;
 
@@ -799,6 +801,7 @@ export function useCalculatorPricingActions({
           layout: layoutSummary,
           parameterSummary,
           formatInfo,
+          warnings: Array.isArray(backendResult.warnings) ? backendResult.warnings : undefined,
         };
 
         setResult(calculationResult);

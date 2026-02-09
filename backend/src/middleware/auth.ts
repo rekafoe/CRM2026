@@ -46,6 +46,10 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     /^\/api\/photo-orders/,
     // Публичный эндпоинт заказов с сайта (проверка по WEBSITE_ORDER_API_KEY в middleware маршрута)
     /^\/api\/orders\/from-website$/,
+    // Создание заказа с сайта с файлами в одном запросе
+    /^\/api\/orders\/from-website\/with-files$/,
+    // Загрузка файлов к заказу с сайта (тот же API-ключ)
+    /^\/api\/orders\/from-website\/[0-9]+\/files$/,
     // 🆕 Products and printing technologies for calculator
     /^\/api\/products/,
     /^\/api\/printing-technologies/,

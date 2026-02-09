@@ -11,6 +11,7 @@ import {
   ServiceVariantDTO,
   CreateServiceVariantDTO,
   UpdateServiceVariantDTO,
+  ServiceCategoryDTO,
 } from '../dtos/service.dto';
 
 const DEFAULT_CURRENCY = 'BYN';
@@ -60,6 +61,8 @@ type RawServiceRow = {
   min_quantity?: number | null;
   max_quantity?: number | null;
   operator_percent?: number | null;
+  category_id?: number | null;
+  category_name?: string | null;
 };
 
 type RawTierRow = {
@@ -183,6 +186,23 @@ export class PricingServiceRepository {
     await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_range_boundaries_service_id ON service_range_boundaries(service_id)`);
     await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_variant_prices_variant_id ON service_variant_prices(variant_id)`);
     await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_variant_prices_range_id ON service_variant_prices(range_id)`);
+
+    // Категории послепечатных услуг (для группировки в выборе продукта)
+    await db.exec(`CREATE TABLE IF NOT EXISTS service_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`);
+    try {
+      if (!(await hasColumn('post_processing_services', 'category_id'))) {
+        await db.run(`ALTER TABLE post_processing_services ADD COLUMN category_id INTEGER REFERENCES service_categories(id) ON DELETE SET NULL`);
+        invalidateTableSchemaCache('post_processing_services');
+      }
+    } catch {
+      // ignore
+    }
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_post_processing_services_category_id ON post_processing_services(category_id)`);
   }
 
   private static mapService(row: RawServiceRow): PricingServiceDTO {
@@ -191,8 +211,6 @@ export class PricingServiceRepository {
       id: row.id,
       name: row.service_name,
       type: row.service_type ?? 'generic',
-      // Для обратной совместимости с фронтом: если цена "за рез/за лист/фикс" — показываем это в unit,
-      // потому что в UI поле unit сейчас совмещает unit и price_unit.
       unit:
         priceUnit && priceUnit !== 'per_item'
           ? priceUnit
@@ -205,6 +223,8 @@ export class PricingServiceRepository {
       minQuantity: row.min_quantity ?? undefined,
       maxQuantity: row.max_quantity ?? undefined,
       operator_percent: row.operator_percent !== undefined && row.operator_percent !== null ? Number(row.operator_percent) : undefined,
+      categoryId: row.category_id != null ? row.category_id : undefined,
+      categoryName: row.category_name != null && row.category_name !== '' ? row.category_name : undefined,
     };
   }
 
@@ -221,47 +241,57 @@ export class PricingServiceRepository {
 
   static async listServices(): Promise<PricingServiceDTO[]> {
     const db = await this.getConnection();
-    // ИЗМЕНЕНО: Берем из post_processing_services вместо service_prices
     let hasOpPercent = false;
+    let hasCategoryId = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
-    const opPercentSel = hasOpPercent ? ', operator_percent' : '';
+    try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
+    const opPercentSel = hasOpPercent ? ', pps.operator_percent' : '';
+    const categorySel = hasCategoryId ? ', pps.category_id, sc.name as category_name' : '';
+    const joinCategory = hasCategoryId ? 'LEFT JOIN service_categories sc ON sc.id = pps.category_id' : '';
+    const fromTable = hasCategoryId ? 'post_processing_services pps' : 'post_processing_services';
+    const prefix = hasCategoryId ? 'pps.' : '';
     const rows = await db.all<any[]>(`
       SELECT 
-        id, 
-        name as service_name, 
-        operation_type as service_type,
-        operation_type, 
-        unit, 
-        price_unit,
-        price as price_per_unit, 
-        is_active,
-        min_quantity,
-        max_quantity${opPercentSel}
-      FROM post_processing_services 
-      ORDER BY name
+        ${prefix}id, 
+        ${prefix}name as service_name, 
+        ${prefix}operation_type as service_type,
+        ${prefix}operation_type, 
+        ${prefix}unit, 
+        ${prefix}price_unit,
+        ${prefix}price as price_per_unit, 
+        ${prefix}is_active,
+        ${prefix}min_quantity,
+        ${prefix}max_quantity${opPercentSel}${categorySel}
+      FROM ${fromTable} ${joinCategory}
+      ORDER BY ${hasCategoryId ? 'sc.sort_order, sc.name, pps.name' : 'name'}
     `);
     return rows.map(this.mapService);
   }
 
   static async getServiceById(id: number): Promise<PricingServiceDTO | null> {
     const db = await this.getConnection();
-    // ИЗМЕНЕНО: Читаем из post_processing_services
     let hasOpPercent = false;
+    let hasCategoryId = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
-    const opPercentSel = hasOpPercent ? ', operator_percent' : '';
+    try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
+    const opPercentSel = hasOpPercent ? ', pps.operator_percent' : '';
+    const categorySel = hasCategoryId ? ', pps.category_id, sc.name as category_name' : '';
+    const joinCategory = hasCategoryId ? 'LEFT JOIN service_categories sc ON sc.id = pps.category_id' : '';
+    const prefix = hasCategoryId ? 'pps.' : '';
+    const fromTable = hasCategoryId ? 'post_processing_services pps' : 'post_processing_services';
     const row = await db.get<any>(`
       SELECT 
-        id, 
-        name as service_name, 
-        operation_type as service_type, 
-        unit, 
-        price_unit,
-        price as price_per_unit, 
-        is_active,
-        min_quantity,
-        max_quantity${opPercentSel}
-      FROM post_processing_services 
-      WHERE id = ?
+        ${prefix}id, 
+        ${prefix}name as service_name, 
+        ${prefix}operation_type as service_type, 
+        ${prefix}unit, 
+        ${prefix}price_unit,
+        ${prefix}price as price_per_unit, 
+        ${prefix}is_active,
+        ${prefix}min_quantity,
+        ${prefix}max_quantity${opPercentSel}${categorySel}
+      FROM ${fromTable} ${joinCategory}
+      WHERE ${prefix}id = ?
     `, id);
     return row ? this.mapService(row) : null;
   }
@@ -293,13 +323,19 @@ export class PricingServiceRepository {
     }
 
     let hasOpPercent = false;
+    let hasCategoryId = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
+    try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
     const opPercentVal = (payload as any).operator_percent;
     const includeOpPercent = hasOpPercent && opPercentVal !== undefined && opPercentVal !== null && Number.isFinite(Number(opPercentVal));
-    const insertCols = includeOpPercent
-      ? '(name, operation_type, unit, price_unit, price, is_active, min_quantity, max_quantity, operator_percent)'
-      : '(name, operation_type, unit, price_unit, price, is_active, min_quantity, max_quantity)';
-    const insertVals = includeOpPercent ? '?, ?, ?, ?, ?, ?, ?, ?, ?' : '?, ?, ?, ?, ?, ?, ?, ?';
+    const categoryIdVal = payload.categoryId != null && Number.isFinite(Number(payload.categoryId)) ? Number(payload.categoryId) : null;
+    const includeCategoryId = hasCategoryId;
+    const insertCols = [
+      'name', 'operation_type', 'unit', 'price_unit', 'price', 'is_active', 'min_quantity', 'max_quantity',
+      ...(includeOpPercent ? ['operator_percent'] : []),
+      ...(includeCategoryId ? ['category_id'] : []),
+    ];
+    const insertVals = insertCols.map(() => '?').join(', ');
     const insertParams: any[] = [
       payload.name,
       operationType,
@@ -311,11 +347,13 @@ export class PricingServiceRepository {
       maxQuantity,
     ];
     if (includeOpPercent) insertParams.push(Number(opPercentVal));
+    if (includeCategoryId) insertParams.push(categoryIdVal);
     const result = await db.run(
-      `INSERT INTO post_processing_services ${insertCols} VALUES (${insertVals})`,
+      `INSERT INTO post_processing_services (${insertCols.join(', ')}) VALUES (${insertVals})`,
       ...insertParams
     );
     const opPercentSel = hasOpPercent ? ', operator_percent' : '';
+    const categorySel = hasCategoryId ? ', category_id, (SELECT name FROM service_categories WHERE id = post_processing_services.category_id) as category_name' : '';
     const created = await db.get<any>(`
       SELECT 
         id, 
@@ -327,7 +365,7 @@ export class PricingServiceRepository {
         price as price_per_unit, 
         is_active,
         min_quantity,
-        max_quantity${opPercentSel}
+        max_quantity${opPercentSel}${categorySel}
       FROM post_processing_services 
       WHERE id = ?
     `, result.lastID);
@@ -376,9 +414,12 @@ export class PricingServiceRepository {
     }
 
     let hasOpPercent = false;
+    let hasCategoryId = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
-    const opPercentUpdate = hasOpPercent && (payload as any).operator_percent !== undefined
-      ? ', operator_percent = ?'
+    try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
+    const opPercentUpdate = hasOpPercent && (payload as any).operator_percent !== undefined ? ', operator_percent = ?' : '';
+    const categoryIdUpdate = hasCategoryId && payload.categoryId !== undefined
+      ? ', category_id = ?'
       : '';
     const updateParams: any[] = [
       payload.name ?? current.name,
@@ -391,15 +432,17 @@ export class PricingServiceRepository {
       maxQuantity,
     ];
     if (opPercentUpdate) updateParams.push(Number((payload as any).operator_percent));
+    if (categoryIdUpdate) updateParams.push(payload.categoryId != null && Number.isFinite(Number(payload.categoryId)) ? payload.categoryId : null);
     updateParams.push(id);
     await db.run(
       `UPDATE post_processing_services 
-       SET name = ?, operation_type = ?, unit = ?, price_unit = ?, price = ?, is_active = ?, min_quantity = ?, max_quantity = ?${opPercentUpdate}
+       SET name = ?, operation_type = ?, unit = ?, price_unit = ?, price = ?, is_active = ?, min_quantity = ?, max_quantity = ?${opPercentUpdate}${categoryIdUpdate}
        WHERE id = ?`,
       ...updateParams
     );
 
     const opPercentSel = hasOpPercent ? ', operator_percent' : '';
+    const categorySel = hasCategoryId ? ', category_id, (SELECT name FROM service_categories WHERE id = post_processing_services.category_id) as category_name' : '';
     const updated = await db.get<any>(`
       SELECT 
         id, 
@@ -411,7 +454,7 @@ export class PricingServiceRepository {
         price as price_per_unit, 
         is_active,
         min_quantity,
-        max_quantity${opPercentSel}
+        max_quantity${opPercentSel}${categorySel}
       FROM post_processing_services 
       WHERE id = ?
     `, id);
@@ -420,9 +463,45 @@ export class PricingServiceRepository {
 
   static async deleteService(id: number): Promise<void> {
     const db = await this.getConnection();
-    // ИЗМЕНЕНО: Удаляем из post_processing_services
     await db.run(`DELETE FROM service_volume_prices WHERE service_id = ?`, id);
     await db.run(`DELETE FROM post_processing_services WHERE id = ?`, id);
+  }
+
+  // --- Категории послепечатных услуг ---
+  static async listServiceCategories(): Promise<ServiceCategoryDTO[]> {
+    const db = await this.getConnection();
+    const rows = await db.all<any[]>(`SELECT id, name, sort_order, created_at FROM service_categories ORDER BY sort_order, name`);
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      sortOrder: Number(r.sort_order ?? 0),
+      createdAt: r.created_at,
+    }));
+  }
+
+  static async createServiceCategory(name: string, sortOrder: number = 0): Promise<ServiceCategoryDTO> {
+    const db = await this.getConnection();
+    const result = await db.run(`INSERT INTO service_categories (name, sort_order) VALUES (?, ?)`, name.trim(), sortOrder);
+    const row = await db.get<any>(`SELECT id, name, sort_order, created_at FROM service_categories WHERE id = ?`, result.lastID);
+    if (!row) throw new Error('Failed to retrieve created service category');
+    return { id: row.id, name: row.name, sortOrder: Number(row.sort_order), createdAt: row.created_at };
+  }
+
+  static async updateServiceCategory(id: number, data: { name?: string; sortOrder?: number }): Promise<ServiceCategoryDTO | null> {
+    const db = await this.getConnection();
+    const current = await db.get<any>(`SELECT id, name, sort_order FROM service_categories WHERE id = ?`, id);
+    if (!current) return null;
+    const name = data.name !== undefined ? data.name.trim() : current.name;
+    const sortOrder = data.sortOrder !== undefined ? data.sortOrder : current.sort_order;
+    await db.run(`UPDATE service_categories SET name = ?, sort_order = ? WHERE id = ?`, name, sortOrder, id);
+    const row = await db.get<any>(`SELECT id, name, sort_order, created_at FROM service_categories WHERE id = ?`, id);
+    return row ? { id: row.id, name: row.name, sortOrder: Number(row.sort_order), createdAt: row.created_at } : null;
+  }
+
+  static async deleteServiceCategory(id: number): Promise<void> {
+    const db = await this.getConnection();
+    await db.run(`UPDATE post_processing_services SET category_id = NULL WHERE category_id = ?`, id);
+    await db.run(`DELETE FROM service_categories WHERE id = ?`, id);
   }
 
   static async listServiceTiers(serviceId: number, variantId?: number): Promise<ServiceVolumeTierDTO[]> {

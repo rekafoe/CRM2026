@@ -8,11 +8,12 @@ export interface ServiceFormState {
   unit: string;
   rate: string;
   isActive: boolean;
-  hasVariants: boolean; // true = сложная услуга (с вариантами), false = простая
-  operationType: string; // 🆕 Тип операции (laminate, cut, fold, etc.)
+  hasVariants: boolean;
+  operationType: string;
   minQuantity: string;
   maxQuantity: string;
-  operatorPercent: string; // Процент от суммы позиции заказа, который идёт в ЗП
+  operatorPercent: string;
+  categoryId: number | ''; // id категории послепечатной услуги (для группировки в выборе продукта)
 }
 
 interface ServiceFormProps {
@@ -21,6 +22,7 @@ interface ServiceFormProps {
   disabled?: boolean;
   typeOptions?: Array<{ value: PricingServiceType; label: string }>;
   unitOptions?: Array<{ value: string; label: string }>;
+  categories?: Array<{ id: number; name: string }>;
 }
 
 const defaultTypeOptions: Array<{ value: PricingServiceType; label: string }> = [
@@ -67,6 +69,7 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
   disabled = false,
   typeOptions = defaultTypeOptions,
   unitOptions = defaultUnitOptions,
+  categories = [],
 }) => {
   const updateField = <K extends keyof ServiceFormState>(field: K, fieldValue: ServiceFormState[K]) => {
     onChange({ ...value, [field]: fieldValue });
@@ -74,6 +77,23 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
 
   return (
     <div className="grid gap-3">
+      {categories.length > 0 && (
+        <FormField label="Категория" help="Группировка в выборе продукта и калькуляторе">
+          <select
+            className="px-2 py-1 border rounded w-full"
+            value={value.categoryId === '' ? '' : value.categoryId}
+            disabled={disabled}
+            onChange={(e) => updateField('categoryId', e.target.value === '' ? '' : Number(e.target.value))}
+          >
+            <option value="">— Без категории</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
+      )}
       <FormField label="Название" required>
         <input
           className="px-2 py-1 border rounded w-full"

@@ -65,6 +65,8 @@ export interface UnifiedPricingResult {
   // Метаданные
   calculatedAt: string;
   calculationMethod: 'flexible_operations' | 'fallback_legacy' | 'simplified';
+  /** Предупреждения (например: формат не помещается на лист) */
+  warnings?: string[];
 }
 
 export class UnifiedPricingService {
@@ -348,16 +350,22 @@ export class UnifiedPricingService {
         width: result.selectedSize.width_mm,
         height: result.selectedSize.height_mm,
       } : { width: 0, height: 0 },
-      layout: {},
+      layout: result.layout ? {
+        fitsOnSheet: result.layout.fitsOnSheet,
+        itemsPerSheet: result.layout.itemsPerSheet,
+        sheetsNeeded: result.layout.sheetsNeeded,
+        wastePercentage: result.layout.wastePercentage,
+        recommendedSheetSize: result.layout.recommendedSheetSize,
+      } : {},
+      sheetsNeeded: result.layout?.sheetsNeeded,
+      warnings: result.warnings,
       materials: result.selectedMaterial ? [{
         materialId: result.selectedMaterial.material_id,
         materialName: result.selectedMaterial.material_name,
-        quantity: result.quantity,
+        quantity: result.layout?.sheetsNeeded ?? result.quantity,
         unitPrice: result.materialDetails?.tier.price || 0,
         totalCost: result.materialPrice,
-        // 🆕 Добавляем плотность материала из БД
         density: result.selectedMaterial.density,
-        // 🆕 Добавляем paper_type_name для установки materialType на фронтенде
         paper_type_name: result.selectedMaterial.paper_type_name,
       }] : [],
       operations: [

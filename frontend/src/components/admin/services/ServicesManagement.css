@@ -232,12 +232,134 @@
 /* =================================
    Таблица услуг (улучшенная)
    ================================= */
+/* Блок управления категориями услуг */
+.service-categories-block {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.service-categories-block__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.service-categories-block__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.service-categories-block__desc {
+  flex-basis: 100%;
+  margin: 0 0 0.25rem 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+.service-categories-block__error {
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--error-color, #ef4444);
+  border-radius: 8px;
+  color: var(--error-color, #b91c1c);
+  font-size: 0.9rem;
+}
+.service-categories-block__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.service-categories-block__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.service-categories-block__item:last-child {
+  border-bottom: none;
+}
+.service-categories-block__item-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.service-categories-block__item-order {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.service-categories-block__item-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.service-categories-block__empty {
+  padding: 0.5rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.service-categories-block__edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+.service-categories-block__input,
+.service-categories-block__input-num {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+.service-categories-block__input {
+  min-width: 180px;
+}
+.service-categories-block__input-num {
+  width: 70px;
+}
+.service-categories-block__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+.service-categories-block__label .service-categories-block__input {
+  min-width: 100%;
+}
+.service-categories-block__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Группы по категориям послепечатных услуг */
+.services-category-group {
+  margin-bottom: 1.5rem;
+}
+.services-category-group:last-child {
+  margin-bottom: 0;
+}
+.services-category-group__title {
+  margin: 0 0 0.5rem 0;
+  padding: 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
 .services-table-container {
   background: var(--bg-primary);
   border-radius: 12px;
   border: 1px solid var(--border-color);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  overflow: visible; /* 🆕 Изменено с hidden на visible для корректного отображения ServiceVariantsTable */
+  overflow: visible;
 }
 
 /* 🆕 Стили для развернутых строк с ServiceVariantsTable */

@@ -93,6 +93,42 @@ const router = Router()
 // Публичный эндпоинт для заказов с сайта (без авторизации CRM, проверка по X-API-Key)
 router.post('/from-website', requireWebsiteOrderApiKey, asyncHandler(OrderController.createOrderFromWebsite))
 
+// Создание заказа с сайта + файлы в одном запросе (multipart/form-data; файлы опциональны)
+router.post('/from-website/with-files', requireWebsiteOrderApiKey, upload.array('file', 20), asyncHandler(OrderController.createOrderFromWebsiteWithFiles))
+
+// Загрузка файлов к заказу с сайта (тот же API-ключ; только заказы с source=website)
+router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, upload.single('file'), asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.orderId)
+  const f = (req as any).file as { filename: string; originalname?: string; mimetype?: string; size?: number } | undefined
+  if (!f) {
+    res.status(400).json({ message: 'Файл не получен' })
+    return
+  }
+  const db = await getDb()
+  const order = await db.get<{ id: number; source?: string }>('SELECT id, source FROM orders WHERE id = ?', orderId)
+  if (!order) {
+    res.status(404).json({ message: 'Заказ не найден' })
+    return
+  }
+  if (order.source !== 'website') {
+    res.status(403).json({ message: 'Загрузка файлов разрешена только для заказов, созданных с сайта' })
+    return
+  }
+  await db.run(
+    'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
+    orderId,
+    f.filename,
+    f.originalname || null,
+    f.mimetype || null,
+    f.size || null
+  )
+  const row = await db.get<any>(
+    'SELECT id, orderId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1',
+    orderId
+  )
+  res.status(201).json(row)
+}))
+
 // Все остальные маршруты заказов требуют аутентификации
 router.use(authenticate)
 

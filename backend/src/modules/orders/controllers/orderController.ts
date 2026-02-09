@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { OrderService } from '../services/orderService'
 import { asyncHandler } from '../../../middleware'
 import { logger } from '../../../utils/logger'
+import { getDb } from '../../../config/database'
 
 export class OrderController {
   static async getAllOrders(req: Request, res: Response) {
@@ -131,6 +132,98 @@ export class OrderController {
       res.status(201).json({ order, message: 'Заказ с сайта создан' })
     } catch (error: any) {
       logger.error('createOrderFromWebsite error', { error: error?.message, stack: error?.stack })
+      res.status(500).json({
+        error: error?.message ?? 'Ошибка создания заказа',
+        message: 'Internal server error'
+      })
+    }
+  }
+
+  /**
+   * Создание заказа с сайта в одном запросе с файлами (multipart/form-data).
+   * Поля: customerName, customerPhone, customerEmail, prepaymentAmount, customer_id, items (JSON-строка).
+   * Файлы: поле "file" (можно несколько — file[] или несколько полей file).
+   */
+  static async createOrderFromWebsiteWithFiles(req: Request, res: Response) {
+    try {
+      const body = req.body || {}
+      let items = body.items
+      if (typeof items === 'string') {
+        try {
+          items = JSON.parse(items)
+        } catch {
+          items = undefined
+        }
+      }
+      const customerName = body.customerName != null ? String(body.customerName) : undefined
+      const customerPhone = body.customerPhone != null ? String(body.customerPhone) : undefined
+      const customerEmail = body.customerEmail != null ? String(body.customerEmail) : undefined
+      const prepaymentAmount = body.prepaymentAmount != null ? Number(body.prepaymentAmount) : undefined
+      const customer_id = body.customer_id != null ? Number(body.customer_id) : undefined
+
+      if (!customerName && !customerPhone) {
+        res.status(400).json({
+          error: 'Необходимо указать имя или телефон клиента',
+          message: 'customerName or customerPhone is required'
+        })
+        return
+      }
+
+      let order: { id: number; [key: string]: any }
+      let deductionResult: any
+
+      if (items != null && Array.isArray(items) && items.length > 0) {
+        const result = await OrderService.createOrderWithAutoDeduction({
+          customerName,
+          customerPhone,
+          customerEmail,
+          prepaymentAmount,
+          userId: undefined,
+          customer_id,
+          source: 'website',
+          items
+        })
+        order = result.order as any
+        deductionResult = result.deductionResult
+      } else {
+        order = await OrderService.createOrder(
+          customerName,
+          customerPhone,
+          customerEmail,
+          prepaymentAmount,
+          undefined,
+          undefined,
+          'website',
+          customer_id
+        ) as any
+      }
+
+      const files = (req as any).files as Array<{ filename: string; originalname?: string; mimetype?: string; size?: number }> | undefined
+      let insertedFiles: any[] = []
+      if (files && files.length > 0) {
+        const db = await getDb()
+        for (const f of files) {
+          await db.run(
+            'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
+            order.id,
+            f.filename,
+            f.originalname || null,
+            f.mimetype || null,
+            f.size ?? null
+          )
+        }
+        const rows = await db.all<any>(
+          'SELECT id, orderId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id ASC',
+          order.id
+        )
+        insertedFiles = rows || []
+      }
+
+      const payload: any = { order, files: insertedFiles, message: 'Заказ с сайта создан' }
+      if (deductionResult !== undefined) payload.deductionResult = deductionResult
+      res.status(201).json(payload)
+    } catch (error: any) {
+      logger.error('createOrderFromWebsiteWithFiles error', { error: error?.message, stack: error?.stack })
       res.status(500).json({
         error: error?.message ?? 'Ошибка создания заказа',
         message: 'Internal server error'

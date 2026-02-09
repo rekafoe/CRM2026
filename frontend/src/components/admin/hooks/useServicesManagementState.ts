@@ -73,10 +73,11 @@ const initialState: ServicesManagementState = {
     rate: '',
     isActive: true,
     hasVariants: false,
-    operationType: 'other', // 🆕
+    operationType: 'other',
     minQuantity: '1',
     maxQuantity: '',
     operatorPercent: '',
+    categoryId: '',
   },
   editingService: null,
   editingServiceForm: null,

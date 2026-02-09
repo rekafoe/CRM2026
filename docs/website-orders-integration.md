@@ -75,6 +75,25 @@
   - Опционально: **`items`** — массив позиций заказа (как в `POST /api/orders/with-auto-deduction`). Если передан непустой массив — заказ создаётся с позициями и автоматическим списанием материалов; иначе создаётся пустой заказ.
 - Заказ создаётся с **`source = 'website'`**, **`userId = null`** и попадает в пул заказов (unassigned).
 
+### Заказ и файлы в одном запросе
+
+- **`POST /api/orders/from-website/with-files`** — создание заказа с сайта и прикрепление файлов в одном запросе.
+- **Авторизация:** тот же **`X-API-Key`** или **`Authorization: Bearer <WEBSITE_ORDER_API_KEY>`**.
+- **Тело запроса:** **`multipart/form-data`**.
+  - Поля: `customerName`, `customerPhone`, `customerEmail` (опционально), `prepaymentAmount`, `customer_id`, `items` (опционально; если есть — JSON-строка массива позиций, как в `from-website`).
+  - Файлы: поле **`file`** (можно несколько полей с именем `file`; до 20 файлов).
+- Ответ 201: `{ order, files: [...], message, deductionResult? }`. Файлы опциональны — можно отправить 0 файлов, тогда `files: []`.
+
+### Файлы клиента (отдельная загрузка к уже созданному заказу)
+
+- **`POST /api/orders/from-website/:orderId/files`** — загрузка файла к заказу, созданному с сайта.
+- **Авторизация:** тот же заголовок **`X-API-Key`** или **`Authorization: Bearer <WEBSITE_ORDER_API_KEY>`**.
+- **Тело запроса:** `multipart/form-data`, поле **`file`** — сам файл.
+- Разрешена только для заказов с **`source = 'website'`** (для остальных — 403).
+- Ответ: 201 и объект файла (`id`, `orderId`, `filename`, `originalName`, `mime`, `size`, `uploadedAt`, …).
+
+**Сценарии:** (1) Один запрос: `POST /api/orders/from-website/with-files` (multipart с полями заказа и полем `file`/файлами). (2) Два шага: сайт создаёт заказ через `POST /api/orders/from-website`, получает `order.id`, затем для каждого файла вызывает `POST /api/orders/from-website/{order.id}/files`. В CRM в пуле заказов менеджер видит заказ и после назначения — вкладку «Файлы» с загруженными файлами (как у обычных заказов).
+
 ---
 
 ## Краткая схема для интеграции типа karandash.by

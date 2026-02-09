@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AIService } from '../../services/aiService';
 import { Product } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
@@ -136,6 +136,15 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     logger,
     toast,
   });
+  const postprintByCategory = useMemo(() => {
+    const groups = new Map<string, typeof postprintServices>();
+    for (const s of postprintServices) {
+      const cat = s.categoryName ?? 'Без категории';
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat)!.push(s);
+    }
+    return Array.from(groups.entries()).map(([categoryName, services]) => ({ categoryName, services }));
+  }, [postprintServices]);
   
   // Схема и типы — вынесено в хук
 
@@ -1031,7 +1040,10 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                             Нет доступных операций
                           </div>
                         ) : (
-                          postprintServices.map((service) => {
+                          postprintByCategory.map((group) => (
+                            <div key={group.categoryName} className="postprint-category-group">
+                              <h3 className="postprint-category-group__title">{group.categoryName}</h3>
+                              {group.services.map((service) => {
                             const serviceKey = String(service.serviceId);
                             const serviceKeyPrefix = `${service.serviceId}:`;
                             const selectedVariantKey = Object.keys(postprintSelections).find((key) =>
@@ -1268,7 +1280,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                                 )}
                               </div>
                             );
-                          })
+                              })}
+                            </div>
+                          ))
                         )}
                       </div>
                     )}

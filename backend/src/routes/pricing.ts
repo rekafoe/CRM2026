@@ -25,6 +25,8 @@ const toServiceResponse = (service: any) => ({
   min_quantity: service.minQuantity ?? service.min_quantity ?? null,
   max_quantity: service.maxQuantity ?? service.max_quantity ?? null,
   operator_percent: service.operator_percent ?? service.operatorPercent ?? null,
+  categoryId: service.categoryId ?? service.category_id ?? null,
+  categoryName: service.categoryName ?? service.category_name ?? null,
 })
 
 const toTierResponse = (tier: any) => ({
@@ -388,6 +390,34 @@ router.get('/services', asyncHandler(async (_req, res) => {
   res.json(services.map(toServiceResponse))
 }))
 
+// --- Категории послепечатных услуг (для группировки в services-management и выборе продукта) ---
+router.get('/service-categories', asyncHandler(async (_req, res) => {
+  const categories = await ServiceManagementService.listServiceCategories()
+  res.json(categories)
+}))
+router.post('/service-categories', asyncHandler(async (req, res) => {
+  const { name, sort_order, sortOrder } = req.body
+  const category = await ServiceManagementService.createServiceCategory(name, Number(sort_order ?? sortOrder ?? 0))
+  res.status(201).json(category)
+}))
+router.put('/service-categories/:id', asyncHandler(async (req, res) => {
+  const id = Number(req.params.id)
+  const { name, sort_order, sortOrder } = req.body
+  const category = await ServiceManagementService.updateServiceCategory(id, {
+    name,
+    sortOrder: sort_order !== undefined ? Number(sort_order) : sortOrder !== undefined ? Number(sortOrder) : undefined,
+  })
+  if (!category) {
+    res.status(404).json({ error: 'Category not found' })
+    return
+  }
+  res.json(category)
+}))
+router.delete('/service-categories/:id', asyncHandler(async (req, res) => {
+  await ServiceManagementService.deleteServiceCategory(Number(req.params.id))
+  res.json({ success: true })
+}))
+
 async function ensureMarkupDefaults(db: any): Promise<void> {
   // Таблица могла не примениться на Railway (мigrations не запускались) — самовосстановление.
   await db.exec(`
@@ -654,7 +684,7 @@ router.post('/service-prices', asyncHandler(async (req, res) => {
 }))
 
 router.post('/services', asyncHandler(async (req, res) => {
-  const { name, service_type, type, unit, price_unit, priceUnit, rate, currency, is_active, isActive, min_quantity, max_quantity, operator_percent } = req.body
+  const { name, service_type, type, unit, price_unit, priceUnit, rate, currency, is_active, isActive, min_quantity, max_quantity, operator_percent, category_id, categoryId } = req.body
   const created = await ServiceManagementService.createService({
     name,
     type: (service_type ?? type) || 'generic',
@@ -666,13 +696,14 @@ router.post('/services', asyncHandler(async (req, res) => {
     minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
     maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
     operator_percent: operator_percent !== undefined && operator_percent !== '' ? Number(operator_percent) : undefined,
+    categoryId: category_id ?? categoryId,
   })
   res.status(201).json(toServiceResponse(created))
 }))
 
 router.put('/services/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { name, service_type, type, unit, price_unit, priceUnit, rate, is_active, isActive, min_quantity, max_quantity, operator_percent } = req.body
+  const { name, service_type, type, unit, price_unit, priceUnit, rate, is_active, isActive, min_quantity, max_quantity, operator_percent, category_id, categoryId } = req.body
   const updated = await ServiceManagementService.updateService(Number(id), {
     name,
     type: service_type ?? type,
@@ -683,6 +714,7 @@ router.put('/services/:id', asyncHandler(async (req, res) => {
     minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
     maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
     operator_percent: operator_percent !== undefined ? (operator_percent === '' || operator_percent === null ? undefined : Number(operator_percent)) : undefined,
+    categoryId: category_id !== undefined ? category_id : categoryId,
   })
 
   if (!updated) {

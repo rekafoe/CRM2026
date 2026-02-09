@@ -813,6 +813,23 @@
   padding-bottom: 8px;
 }
 
+.result-section__warning {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.result-section__warning p {
+  margin: 0 0 4px 0;
+}
+
+.result-section__warning p:last-child {
+  margin-bottom: 0;
+}
+
 .result-details {
   display: flex;
   gap: 20px;
@@ -1799,9 +1816,28 @@
 }
 
 .postprint-services-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.postprint-category-group {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  align-content: start;
+}
+.postprint-category-group:not(:first-child) {
+  padding-top: 4px;
+}
+.postprint-category-group__title {
+  grid-column: 1 / -1;
+  margin: 0 0 4px 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
 }
 
 .postprint-service-card {

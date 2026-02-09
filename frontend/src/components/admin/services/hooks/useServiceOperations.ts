@@ -39,10 +39,11 @@ export function useServiceOperations({
       rate: number;
       isActive: boolean;
       hasVariants?: boolean;
-      operationType?: string; // 🆕
+      operationType?: string;
       minQuantity?: number;
       maxQuantity?: number;
       operator_percent?: number;
+      categoryId?: number | null;
     }) => {
       try {
         if (!payload.name.trim() || !payload.unit.trim()) {
@@ -56,10 +57,11 @@ export function useServiceOperations({
           unit: payload.unit || 'item',
           rate: Number.isFinite(payload.rate) ? payload.rate : 0,
           isActive: payload.isActive,
-          operationType: payload.operationType || 'other', // 🆕
+          operationType: payload.operationType || 'other',
           minQuantity: payload.minQuantity,
           maxQuantity: payload.maxQuantity,
           operator_percent: payload.operator_percent,
+          categoryId: payload.categoryId,
         });
 
         // Если услуга сложная (hasVariants = true), создаем первый вариант-тип

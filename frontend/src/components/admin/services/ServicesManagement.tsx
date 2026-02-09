@@ -8,6 +8,9 @@ import { Button, Alert, Modal } from '../../common';
 import { PricingService } from '../../../types/pricing';
 import { ServiceFormState } from './components/ServiceForm';
 import usePricingServices from '../../../hooks/pricing/usePricingServices';
+import { getServiceCategories } from '../../../services/pricing';
+import { ServiceCategory } from '../../../types/pricing';
+import { ServiceCategoriesBlock } from './components/ServiceCategoriesBlock';
 import { useServicesManagementState } from '../hooks/useServicesManagementState';
 import { useServiceOperations } from './hooks/useServiceOperations';
 import { useTierOperations } from './hooks/useTierOperations';
@@ -29,10 +32,11 @@ const emptyServiceForm: ServiceFormState = {
   rate: '',
   isActive: true,
   hasVariants: false,
-  operationType: 'other', // 🆕
+  operationType: 'other',
   minQuantity: '1',
   maxQuantity: '',
   operatorPercent: '',
+  categoryId: '',
 };
 
 const serviceToFormState = (service: PricingService): ServiceFormState => ({
@@ -42,10 +46,11 @@ const serviceToFormState = (service: PricingService): ServiceFormState => ({
   rate: service.rate.toString(),
   isActive: service.isActive,
   hasVariants: false,
-  operationType: service.operationType || 'other', // 🆕
+  operationType: service.operationType || 'other',
   minQuantity: service.minQuantity !== undefined ? String(service.minQuantity) : '1',
   maxQuantity: service.maxQuantity !== undefined ? String(service.maxQuantity) : '',
   operatorPercent: (service as any).operator_percent !== undefined ? String((service as any).operator_percent) : '',
+  categoryId: service.categoryId != null ? service.categoryId : '',
 });
 
 interface ServicesManagementProps {
@@ -82,6 +87,15 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
   } = usePricingServices(true);
 
   const [servicesWithVariants, setServicesWithVariants] = useState<Set<number>>(new Set());
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
+
+  const loadCategories = useCallback(() => {
+    getServiceCategories().then(setCategories).catch(() => setCategories([]));
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   const combinedError = state.actionError || servicesError;
 
@@ -169,6 +183,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       operator_percent: state.editingServiceForm.operatorPercent !== ''
         ? Number(state.editingServiceForm.operatorPercent) || 0
         : undefined,
+      categoryId: state.editingServiceForm.categoryId !== '' ? state.editingServiceForm.categoryId : null,
     };
     await serviceOperationsRef.current.updateService(state.editingService.id, payload);
     resetEditingService();
@@ -192,6 +207,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       operator_percent: state.newServiceForm.operatorPercent !== ''
         ? Number(state.newServiceForm.operatorPercent) || 0
         : undefined,
+      categoryId: state.newServiceForm.categoryId !== '' ? state.newServiceForm.categoryId : undefined,
     });
     
     if (created) {
@@ -232,6 +248,24 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       sortOrder: state.sortOrder,
     });
   }, [services, state.serviceSearch, state.typeFilter, state.sortBy, state.sortOrder]);
+
+  // Группировка по категориям для отображения (порядок: по sort_order категорий, затем "Без категории")
+  const servicesByCategory = useMemo(() => {
+    const order = new Map<number | null, number>();
+    categories.forEach((c, i) => order.set(c.id, c.sortOrder ?? i));
+    order.set(null, 1e9);
+    const groups = new Map<string, { categoryId: number | null; categoryName: string; services: PricingService[] }>();
+    for (const s of filteredServices) {
+      const categoryId = s.categoryId ?? null;
+      const categoryName = s.categoryName ?? 'Без категории';
+      const key = categoryId !== null ? `id:${categoryId}` : 'none';
+      if (!groups.has(key)) groups.set(key, { categoryId, categoryName, services: [] });
+      groups.get(key)!.services.push(s);
+    }
+    return Array.from(groups.values()).sort(
+      (a, b) => (order.get(a.categoryId) ?? 1e9) - (order.get(b.categoryId) ?? 1e9)
+    );
+  }, [filteredServices, categories]);
 
   // Рендеринг действий для строки услуги
   const renderActions = useCallback((service: PricingService) => (
@@ -315,6 +349,9 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Категории услуг */}
+          <ServiceCategoriesBlock categories={categories} onReload={loadCategories} />
+
           {/* Фильтры */}
           <ServicesFilters
             services={services}
@@ -340,21 +377,25 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
             </div>
           </Alert>
 
-          {/* Таблица услуг */}
+          {/* Таблица услуг по категориям */}
           {filteredServices.length > 0 ? (
             <>
               <div className="services-table-container">
-                <ServicesTable
-                  services={filteredServices}
-                  renderActions={renderActions}
-                  expandedServiceId={state.expandedServiceId}
-                  renderExpandedRow={renderExpandedRow}
-                  getServiceIcon={getServiceIcon}
-                  getServiceTypeLabel={getServiceTypeLabel}
-                  getUnitLabel={getUnitLabel}
-                />
+                {servicesByCategory.map((group) => (
+                  <div key={group.categoryId ?? 'none'} className="services-category-group">
+                    <h3 className="services-category-group__title">{group.categoryName}</h3>
+                    <ServicesTable
+                      services={group.services}
+                      renderActions={renderActions}
+                      expandedServiceId={state.expandedServiceId}
+                      renderExpandedRow={renderExpandedRow}
+                      getServiceIcon={getServiceIcon}
+                      getServiceTypeLabel={getServiceTypeLabel}
+                      getUnitLabel={getUnitLabel}
+                    />
+                  </div>
+                ))}
               </div>
-              
               {/* Футер таблицы */}
               <div className="services-table-footer">
                 <span>
@@ -387,7 +428,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       {/* Модальное окно создания услуги */}
       {state.showCreateService && (
         <Modal isOpen={true} title="Новая услуга" onClose={() => setShowCreateService(false)}>
-          <ServiceForm value={state.newServiceForm} onChange={setNewServiceForm} />
+          <ServiceForm value={state.newServiceForm} onChange={setNewServiceForm} categories={categories} />
           <Alert type="info" className="mt-4">
             После создания услугу можно привязать к продукту в разделе управления продуктами.
           </Alert>
@@ -405,7 +446,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
           title="Редактирование услуги"
           onClose={resetEditingService}
         >
-          <ServiceForm value={state.editingServiceForm} onChange={setEditingServiceForm} />
+          <ServiceForm value={state.editingServiceForm} onChange={setEditingServiceForm} categories={categories} />
           <div className="flex justify-end gap-2 w-full mt-4 pt-4 border-t">
             <Button variant="secondary" onClick={resetEditingService}>
               Отмена

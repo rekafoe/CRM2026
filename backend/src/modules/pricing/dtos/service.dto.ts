@@ -11,6 +11,15 @@ export interface PricingServiceDTO {
   minQuantity?: number;
   maxQuantity?: number;
   operator_percent?: number;
+  categoryId?: number | null;
+  categoryName?: string | null;
+}
+
+export interface ServiceCategoryDTO {
+  id: number;
+  name: string;
+  sortOrder: number;
+  createdAt?: string;
 }
 
 export interface CreatePricingServiceDTO {
@@ -25,6 +34,7 @@ export interface CreatePricingServiceDTO {
   minQuantity?: number;
   maxQuantity?: number;
   operator_percent?: number;
+  categoryId?: number | null;
 }
 
 export interface UpdatePricingServiceDTO {
@@ -39,6 +49,7 @@ export interface UpdatePricingServiceDTO {
   minQuantity?: number;
   maxQuantity?: number;
   operator_percent?: number;
+  categoryId?: number | null;
 }
 
 export interface ServiceVolumeTierDTO {

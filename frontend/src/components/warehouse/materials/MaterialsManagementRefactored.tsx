@@ -212,26 +212,20 @@ export const MaterialsManagementRefactored: React.FC<MaterialsManagementProps> =
         material={editingMaterial || undefined}
         onSave={async (materialData) => {
           try {
-            console.log('=== СОХРАНЕНИЕ МАТЕРИАЛА ===');
-            console.log('editingMaterial:', editingMaterial);
-            console.log('materialData:', materialData);
-            
             if (editingMaterial) {
-              // Обновляем существующий материал
-              console.log('Обновляем материал ID:', editingMaterial.id);
               await updateMaterialMutation.mutateAsync({
                 id: editingMaterial.id,
                 data: materialData
               });
             } else {
-              // Создаем новый материал
-              console.log('Создаем новый материал');
               await createMaterialMutation.mutateAsync(materialData);
             }
             onRefresh();
             handleModalClose();
-          } catch (error) {
-            console.error('Ошибка сохранения материала:', error);
+            showToast(editingMaterial ? 'Материал обновлён' : 'Материал создан', 'success');
+          } catch (error: any) {
+            const message = error?.response?.data?.error || error?.message || 'Ошибка сохранения материала';
+            showToast(message, 'error');
           }
         }}
       />

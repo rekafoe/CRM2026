@@ -8,12 +8,29 @@ import {
   ServiceVariantDTO,
   CreateServiceVariantDTO,
   UpdateServiceVariantDTO,
+  ServiceCategoryDTO,
 } from '../dtos/service.dto';
 import { PricingServiceRepository } from '../repositories/serviceRepository';
 
 export class ServiceManagementService {
   static listServices(): Promise<PricingServiceDTO[]> {
     return PricingServiceRepository.listServices();
+  }
+
+  static listServiceCategories(): Promise<ServiceCategoryDTO[]> {
+    return PricingServiceRepository.listServiceCategories();
+  }
+
+  static createServiceCategory(name: string, sortOrder: number = 0): Promise<ServiceCategoryDTO> {
+    return PricingServiceRepository.createServiceCategory(name, sortOrder);
+  }
+
+  static updateServiceCategory(id: number, data: { name?: string; sortOrder?: number }): Promise<ServiceCategoryDTO | null> {
+    return PricingServiceRepository.updateServiceCategory(id, data);
+  }
+
+  static deleteServiceCategory(id: number): Promise<void> {
+    return PricingServiceRepository.deleteServiceCategory(id);
   }
 
   static createService(payload: CreatePricingServiceDTO): Promise<PricingServiceDTO> {

@@ -200,6 +200,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     boundary: '',
   })
   const [isMobile, setIsMobile] = useState(false)
+  const [newPageToAdd, setNewPageToAdd] = useState('')
 
   const selected = useMemo(
     () => value.sizes.find(s => s.id === selectedSizeId) || null,
@@ -636,39 +637,96 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           <div className="simplified-card__header">
             <div>
               <strong>Страницы (для многостраничных изделий)</strong>
-              <div className="text-muted text-sm">Укажите варианты количества страниц, доступные в калькуляторе.</div>
+              <div className="text-muted text-sm">Привяжите к продукту варианты количества страниц — они появятся в калькуляторе.</div>
             </div>
           </div>
-          <div className="simplified-card__content simplified-form-grid">
-            <FormField label="Варианты страниц">
-              <input
-                className="form-input"
-                value={pagesConfig.options?.join(', ') || ''}
-                onChange={(e) => {
-                  const nextOptions = e.target.value
-                    .split(',')
-                    .map((item) => Number(item.trim()))
-                    .filter((num) => Number.isFinite(num) && num > 0);
-                  const unique = Array.from(new Set(nextOptions)).sort((a, b) => a - b);
-                  const nextDefault = pagesConfig.default && unique.includes(pagesConfig.default)
-                    ? pagesConfig.default
-                    : unique[0];
-                  updatePagesConfig({ options: unique, default: nextDefault });
-                }}
-                placeholder="4, 8, 12, 16"
-              />
+          <div className="simplified-card__content simplified-pages-config">
+            <FormField label="Привязанные варианты">
+              <div className="simplified-pages-list">
+                {(pagesConfig.options || []).length === 0 ? (
+                  <span className="text-muted text-sm">Нет привязанных вариантов. Добавьте количество страниц ниже.</span>
+                ) : (
+                  (pagesConfig.options || [])
+                    .slice()
+                    .sort((a, b) => a - b)
+                    .map((num) => (
+                      <span key={num} className="simplified-pages-chip">
+                        <span>{num} стр.</span>
+                        <button
+                          type="button"
+                          className="simplified-pages-chip__remove"
+                          onClick={() => {
+                            const nextOptions = (pagesConfig.options || []).filter((n) => n !== num);
+                            const nextDefault =
+                              pagesConfig.default === num
+                                ? (nextOptions[0] ?? undefined)
+                                : pagesConfig.default && nextOptions.includes(pagesConfig.default)
+                                  ? pagesConfig.default
+                                  : nextOptions[0];
+                            updatePagesConfig({ options: nextOptions, default: nextDefault });
+                          }}
+                          title="Отвязать"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))
+                )}
+              </div>
+              <div className="simplified-pages-add">
+                <input
+                  className="form-input simplified-pages-add__input"
+                  type="number"
+                  min={4}
+                  max={500}
+                  step={4}
+                  value={newPageToAdd}
+                  onChange={(e) => setNewPageToAdd(e.target.value)}
+                  placeholder="Напр. 16"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const num = parseInt(newPageToAdd.trim(), 10);
+                      if (Number.isFinite(num) && num >= 4 && num <= 500) {
+                        const options = pagesConfig.options || [];
+                        if (!options.includes(num)) {
+                          const nextOptions = [...options, num].sort((a, b) => a - b);
+                          const nextDefault = options.length === 0 ? num : pagesConfig.default;
+                          updatePagesConfig({ options: nextOptions, default: nextDefault ?? num });
+                          setNewPageToAdd('');
+                        }
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const num = parseInt(newPageToAdd.trim(), 10);
+                    if (!Number.isFinite(num) || num < 4 || num > 500) return;
+                    const options = pagesConfig.options || [];
+                    if (options.includes(num)) return;
+                    const nextOptions = [...options, num].sort((a, b) => a - b);
+                    const nextDefault = options.length === 0 ? num : pagesConfig.default;
+                    updatePagesConfig({ options: nextOptions, default: nextDefault ?? num });
+                    setNewPageToAdd('');
+                  }}
+                >
+                  Добавить
+                </Button>
+              </div>
             </FormField>
-            <FormField label="По умолчанию">
+            <FormField label="По умолчанию в калькуляторе">
               <select
                 className="form-select"
                 value={pagesConfig.default ?? ''}
-                onChange={(e) => updatePagesConfig({ default: Number(e.target.value) })}
+                onChange={(e) => updatePagesConfig({ default: e.target.value === '' ? undefined : Number(e.target.value) })}
                 disabled={!pagesConfig.options || pagesConfig.options.length === 0}
               >
-                {pagesConfig.options && pagesConfig.options.length === 0 && (
-                  <option value="">—</option>
-                )}
-                {(pagesConfig.options || []).map((pages) => (
+                <option value="">—</option>
+                {(pagesConfig.options || []).slice().sort((a, b) => a - b).map((pages) => (
                   <option key={pages} value={pages}>{pages} стр.</option>
                 ))}
               </select>

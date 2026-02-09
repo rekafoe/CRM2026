@@ -82,7 +82,10 @@ export interface CalculationResult {
     itemsPerSheet?: number;
     sheetSize?: string;
     wastePercentage?: number;
+    fitsOnSheet?: boolean;
   };
+  /** Предупреждения от бэкенда (например: формат не помещается на печатный лист) */
+  warnings?: string[];
 }
 
 export interface CalculatorModalProps {
