@@ -15,7 +15,7 @@ export async function up(db: Database): Promise<void> {
     return
   }
 
-  const columns = await db.all<{ name: string }>("PRAGMA table_info('material_categories')")
+  const columns = (await db.all<{ name: string }>("PRAGMA table_info('material_categories')")) as unknown as Array<{ name: string }>
   const names = columns.map((c) => c.name)
 
   if (names.includes('sort_order')) {
