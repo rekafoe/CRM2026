@@ -16,6 +16,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     // infra / health
     /^\/$/,
     /^\/health$/,
+    // Загруженные файлы (макеты, PDF) — доступ без авторизации для скачивания по прямой ссылке
+    /^\/api\/uploads\//,
     // Swagger documentation
     /^\/api-docs/,
     /^\/api-docs\.json$/,
