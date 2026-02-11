@@ -445,9 +445,9 @@ export function useCalculatorPricingActions({
           }
         }
 
+        // Продукты без печати и без операций могут иметь только стоимость материалов — это допустимо
         if (services.length === 0) {
-          logger.info('⚠️ Бэкенд не вернул операции', { productId: selectedProduct.id });
-          throw new Error('Для продукта не настроены операции. Добавьте операции в админке.');
+          logger.info('ℹ️ Бэкенд вернул расчёт без операций (только материалы)', { productId: selectedProduct.id });
         }
 
         // ✅ Детальное логирование операций для проверки стоимости печати

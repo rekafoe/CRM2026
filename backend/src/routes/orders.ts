@@ -1,9 +1,11 @@
 import { Router } from 'express'
+import path from 'path'
+import fs from 'fs'
 import { OrderController } from '../modules/orders/controllers/orderController'
 import { OrderItemController } from '../modules/orders/controllers/orderItemController'
 import { asyncHandler, authenticate } from '../middleware'
 import { requireWebsiteOrderApiKey, isWebsiteOrderApiKeyValid } from '../middleware/websiteOrderApiKey'
-import { upload, uploadMemory, saveBufferToUploads } from '../config/upload'
+import { upload, uploadMemory, saveBufferToUploads, uploadsDir } from '../config/upload'
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
 import { hasColumn } from '../utils/tableSchemaCache'
@@ -441,6 +443,35 @@ router.get('/:id/files', asyncHandler(async (req, res) => {
     id
   )
   res.json(rows)
+}))
+
+// Скачивание файла с правильным именем (кириллица) и отдачей содержимого с диска
+router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  const fileId = Number(req.params.fileId)
+  const db = await getDb()
+  const row = await db.get<any>(
+    'SELECT filename, originalName, mime FROM order_files WHERE id = ? AND orderId = ?',
+    fileId,
+    orderId
+  )
+  if (!row || !row.filename) {
+    res.status(404).json({ message: 'Файл не найден' })
+    return
+  }
+  const filePath = path.join(uploadsDir, String(row.filename))
+  if (!fs.existsSync(filePath)) {
+    res.status(404).json({ message: 'Файл не найден на диске' })
+    return
+  }
+  const displayName = (row.originalName || row.filename).trim() || row.filename
+  res.setHeader('Content-Disposition', `attachment; filename="${displayName.replace(/"/g, '%22')}"; filename*=UTF-8''${encodeURIComponent(displayName)}`)
+  if (row.mime) res.setHeader('Content-Type', row.mime)
+  const stream = fs.createReadStream(filePath)
+  stream.on('error', (err) => {
+    if (!res.headersSent) res.status(500).json({ message: 'Ошибка чтения файла' })
+  })
+  stream.pipe(res)
 }))
 
 router.delete('/:orderId/files/:fileId', asyncHandler(async (req, res) => {

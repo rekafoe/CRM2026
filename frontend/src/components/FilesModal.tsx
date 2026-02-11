@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { OrderFile } from '../types';
-import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile } from '../api';
+import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, downloadOrderFile } from '../api';
 
 interface FilesModalProps {
   isOpen: boolean;
@@ -55,19 +55,15 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   };
 
   const handleDownloadAll = () => {
-    files.forEach(f => {
-      const link = document.createElement('a');
-      link.href = `/api/uploads/${encodeURIComponent(f.filename)}`;
-      link.download = f.originalName || f.filename;
-      link.click();
+    files.forEach((f, i) => {
+      setTimeout(() => {
+        downloadOrderFile(orderId, f.id, f.originalName || f.filename).catch(() => alert('Не удалось скачать файл'));
+      }, i * 200);
     });
   };
 
   const handleDownloadFile = (file: OrderFile) => {
-    const link = document.createElement('a');
-    link.href = `/api/uploads/${encodeURIComponent(file.filename)}`;
-    link.download = file.originalName || file.filename;
-    link.click();
+    downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch(() => alert('Не удалось скачать файл'));
   };
 
   const handleApproveFile = async (fileId: number) => {
@@ -154,13 +150,13 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                 <div key={file.id} className={`file-item ${file.approved ? 'approved' : 'pending'}`}>
                   <div className="file-info">
                     <div className="file-name">
-                      <a 
-                        href={`/api/uploads/${encodeURIComponent(file.filename)}`}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        className="file-name-link"
+                        onClick={() => handleDownloadFile(file)}
                       >
                         {file.originalName || file.filename}
-                      </a>
+                      </button>
                     </div>
                     <div className="file-details">
                       <span className="file-size">
@@ -415,14 +411,19 @@ const styles = `
     margin-bottom: 4px;
   }
 
-  .file-name a {
+  .file-name .file-name-link {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
     color: #1976d2;
     text-decoration: none;
     font-weight: 500;
     font-size: 14px;
+    font-family: inherit;
   }
 
-  .file-name a:hover {
+  .file-name .file-name-link:hover {
     text-decoration: underline;
   }
 

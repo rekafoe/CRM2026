@@ -434,6 +434,18 @@ export const uploadOrderFile = (orderId: number, file: File) => {
 export const deleteOrderFile = (orderId: number, fileId: number) => api.delete(`/orders/${orderId}/files/${fileId}`);
 export const approveOrderFile = (orderId: number, fileId: number) => api.post<OrderFile>(`/orders/${orderId}/files/${fileId}/approve`, {});
 
+/** Скачивание файла по ID (отдаёт бэкенд с правильным именем и кириллицей в Content-Disposition) */
+export const downloadOrderFile = async (orderId: number, fileId: number, suggestedFileName: string) => {
+  const res = await api.get<Blob>(`/orders/${orderId}/files/${fileId}/download`, { responseType: 'blob' });
+  const blob = res.data;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = suggestedFileName || 'download';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 // Payments / Prepayment
 export const createPrepaymentLink = (
   orderId: number,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { OrderFile } from '../types';
-import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile } from '../api';
+import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, downloadOrderFile } from '../api';
 
 interface CompactFilesSectionProps {
   orderId: number;
@@ -34,19 +34,15 @@ export const CompactFilesSection: React.FC<CompactFilesSectionProps> = ({
   };
 
   const handleDownloadAll = () => {
-    files.forEach(f => {
-      const link = document.createElement('a');
-      link.href = `/api/uploads/${encodeURIComponent(f.filename)}`;
-      link.download = f.originalName || f.filename;
-      link.click();
+    files.forEach((f, i) => {
+      setTimeout(() => {
+        downloadOrderFile(orderId, f.id, f.originalName || f.filename).catch(() => alert('Не удалось скачать файл'));
+      }, i * 200);
     });
   };
 
   const handleDownloadFile = (file: OrderFile) => {
-    const link = document.createElement('a');
-    link.href = `/api/uploads/${encodeURIComponent(file.filename)}`;
-    link.download = file.originalName || file.filename;
-    link.click();
+    downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch(() => alert('Не удалось скачать файл'));
   };
 
   const handleApproveFile = async (fileId: number) => {
@@ -121,14 +117,13 @@ export const CompactFilesSection: React.FC<CompactFilesSectionProps> = ({
               {files.map(file => (
                 <div key={file.id} className="file-item">
                   <div className="file-info">
-                    <a 
-                      href={`/api/uploads/${encodeURIComponent(file.filename)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="file-name"
+                    <button
+                      type="button"
+                      className="file-name file-name-link"
+                      onClick={() => handleDownloadFile(file)}
                     >
                       {file.originalName || file.filename}
-                    </a>
+                    </button>
                     <span className="file-size">
                       {file.size ? Math.round(file.size / 1024) : 0} KB
                     </span>
@@ -301,6 +296,15 @@ const styles = `
 
   .file-name:hover {
     text-decoration: underline;
+  }
+
+  .file-name.file-name-link,
+  .file-name-link {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
   }
 
   .file-size {

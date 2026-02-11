@@ -100,13 +100,8 @@ export class UnifiedPricingService {
       }
       
       // 3. Иначе - используем FlexiblePricingService (стандартный калькулятор)
-      // Проверяем и при необходимости создаём операции для продукта
-      const hasOperations = await this.ensureProductHasOperations(productId);
-
-      if (!hasOperations) {
-        logger.error('❌ Для продукта не настроены операции, расчет невозможен', { productId });
-        throw new Error('Для продукта не настроены операции ценообразования. Добавьте операции в админке и повторите расчет.');
-      }
+      // При необходимости пробуем автоматически привязать операции по нормам; если операций нет — всё равно считаем (только материалы)
+      await this.ensureProductHasOperations(productId);
 
       logger.info('✨ Используется FlexiblePricingService (новая система)', { productId });
       return await this.calculateViaFlexibleSystem(productId, configuration, quantity);
