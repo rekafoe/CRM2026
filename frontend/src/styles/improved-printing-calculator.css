@@ -238,18 +238,20 @@
   to { opacity: 1; }
 }
 
+/* Модалка калькулятора — фиксированно 80% области просмотра */
 .improved-printing-calculator {
   background: white;
   border-radius: 20px;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-  width: 100%;
-  max-width: 1400px;
-  max-height: 90vh;
+  width: 80vw;
+  height: 80vh;
+  max-width: 80vw;
+  max-height: 80vh;
   overflow: hidden;
   animation: modalSlideIn 0.3s ease-out;
   display: flex;
   flex-direction: column;
-  position: relative; /* Для позиционирования кнопки закрытия */
+  position: relative;
 }
 
 /* Кнопка закрытия */
@@ -1083,7 +1085,10 @@
   }
   
   .improved-printing-calculator {
-    max-height: 95vh;
+    width: 80vw;
+    height: 80vh;
+    max-width: 80vw;
+    max-height: 80vh;
   }
   
   .calculator-header {
