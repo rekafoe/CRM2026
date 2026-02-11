@@ -288,20 +288,22 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     }
   }, [selectedMaterialType, densitiesForSelectedType]);
 
-  // По выбранным типу и плотности выставляем material_id и materialType
+  // По выбранным типу и плотности выставляем material_id и materialType (только при изменении — иначе рекурсия)
   useEffect(() => {
     if (!isSimplifiedProduct || !specs.size_id) return;
     const material = materialByTypeAndDensity;
-    if (material) {
-      const paperType = warehousePaperTypes.length > 0 && (material as any).paper_type_name
-        ? warehousePaperTypes.find(pt => pt.display_name === (material as any).paper_type_name)
-        : null;
-      updateSpecs({
-        material_id: material.id,
-        ...(paperType ? { materialType: paperType.name as any } : {}),
-      }, true);
-    }
-  }, [materialByTypeAndDensity, isSimplifiedProduct, specs.size_id, warehousePaperTypes, updateSpecs]);
+    if (!material) return;
+    const paperType = warehousePaperTypes.length > 0 && (material as any).paper_type_name
+      ? warehousePaperTypes.find(pt => pt.display_name === (material as any).paper_type_name)
+      : null;
+    const nextMaterialType = paperType ? paperType.name : undefined;
+    const alreadyEqual = Number(specs.material_id) === Number(material.id) && (!nextMaterialType || specs.materialType === nextMaterialType);
+    if (alreadyEqual) return;
+    updateSpecs({
+      material_id: material.id,
+      ...(nextMaterialType ? { materialType: nextMaterialType as any } : {}),
+    }, true);
+  }, [materialByTypeAndDensity, isSimplifiedProduct, specs.size_id, specs.material_id, specs.materialType, warehousePaperTypes, updateSpecs]);
 
 
   // Продукт без материалов (нет paperType в схеме и не упрощённый с размерами/материалами) — не показываем секцию

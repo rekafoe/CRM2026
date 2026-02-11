@@ -441,38 +441,13 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     }));
   }, [isOpen, safeWarehousePaperTypes, specs.paperType, specs.format, availableFormats, getDefaultPaperDensity, editContext, backendProductSchema]);
 
-  // 🆕 Устанавливаем materialType на основе выбранного материала или paperType
-  // materialType = тип бумаги со склада (вторая вкладка "Типы бумаги")
+  // Устанавливаем materialType только для обычных продуктов (из paperType).
+  // Для упрощённых продуктов materialType задаёт только MaterialsSection (тип+плотность → material_id + materialType), чтобы не было рекурсии result ↔ materialType.
   useEffect(() => {
     if (safeWarehousePaperTypes.length === 0) return;
+    if (specs.material_id && backendProductSchema?.template?.simplified) return;
 
-    // 🆕 Для упрощённых продуктов: materialType берётся из paper_type_id выбранного материала
-    if (specs.material_id && backendProductSchema?.template?.simplified) {
-      if (result?.materials && result.materials.length > 0) {
-        const selectedMaterial = result.materials.find((m: any) =>
-          (m.materialId ?? m.material_id ?? m.id) === specs.material_id
-        );
-        if (selectedMaterial) {
-          const paperTypeName = (selectedMaterial as any).paper_type_name;
-          if (paperTypeName) {
-            const paperType = safeWarehousePaperTypes.find(pt => pt.display_name === paperTypeName);
-            if (paperType) {
-              // Ранний выход: уже совпадает — не вызываем setSpecs, чтобы не запускать цикл обновлений
-              if (specs.materialType === paperType.name) return;
-              setSpecs(prev => {
-                if (prev.materialType === paperType.name) return prev;
-                return { ...prev, materialType: paperType.name as any };
-              });
-              return;
-            }
-          }
-        }
-      }
-      return;
-    }
-
-    // Для обычных продуктов: materialType берётся из выбранного paperType
-    if (specs.paperType && !(specs.material_id && backendProductSchema?.template?.simplified)) {
+    if (specs.paperType) {
       const selectedPaperType = safeWarehousePaperTypes.find(pt => pt.name === specs.paperType);
       if (selectedPaperType && specs.materialType !== selectedPaperType.name) {
         setSpecs(prev => {
@@ -481,7 +456,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         });
       }
     }
-  }, [safeWarehousePaperTypes, specs.paperType, specs.material_id, specs.materialType, backendProductSchema, result]);
+  }, [safeWarehousePaperTypes, specs.paperType, specs.materialType, backendProductSchema]);
 
 
   const { handleProductSelect } = useProductSelection({
