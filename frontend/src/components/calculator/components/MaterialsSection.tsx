@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { checkMaterialAvailability, calculateMaterialCost } from '../../../services/calculatorMaterialService';
 import type { CalculationResult } from '../types/calculator.types';
 import { getMaterials } from '../../../api';
@@ -82,6 +82,8 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   const [selectedMaterialType, setSelectedMaterialType] = useState<string>('');
   /** Выбранная плотность (г/м²) для выбранного типа */
   const [selectedDensity, setSelectedDensity] = useState<number | ''>('');
+  /** Флаг: пользователь вручную выбрал тип — не перезаписывать из specs (избегаем рекурсии) */
+  const userChoseTypeRef = useRef(false);
 
   // 🆕 Загружаем список всех материалов для упрощённых продуктов
   useEffect(() => {
@@ -263,30 +265,47 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   }, [isSimplifiedProduct, specs.size_id, specs.material_id, allowedMaterialsForSize, updateSpecs]);
 
   // Инициализация типа и плотности по текущему материалу (из разрешённых для продукта)
+  // Не перезаписываем, если пользователь выбрал тип без плотностей — иначе «не даёт выбрать»
   useEffect(() => {
     if (!isSimplifiedProduct || !specs.size_id || materialTypesFromMaterials.length === 0) return;
+    // Если пользователь вручную выбрал тип, у которого нет плотностей — не перезаписывать из specs
+    if (selectedMaterialType && densitiesForSelectedType.length === 0) {
+      userChoseTypeRef.current = false;
+      return;
+    }
     const currentMaterial = allowedMaterialsForSize.find(m => Number(m.id) === specs.material_id);
     const typeFromCurrent = currentMaterial ? (currentMaterial as any).paper_type_name : undefined;
     const densityFromCurrent = currentMaterial ? (currentMaterial as any).density : undefined;
     if (typeFromCurrent && materialTypesFromMaterials.includes(typeFromCurrent)) {
-      setSelectedMaterialType(prev => (prev !== typeFromCurrent ? typeFromCurrent : prev));
+      if (!userChoseTypeRef.current) {
+        setSelectedMaterialType(prev => (prev !== typeFromCurrent ? typeFromCurrent : prev));
+      } else {
+        userChoseTypeRef.current = false;
+      }
       if (densityFromCurrent != null) {
         setSelectedDensity(prev => (prev !== densityFromCurrent ? densityFromCurrent : prev));
       }
     } else if (materialTypesFromMaterials.length > 0 && !selectedMaterialType) {
       setSelectedMaterialType(materialTypesFromMaterials[0]);
     }
-  }, [isSimplifiedProduct, specs.size_id, materialTypesFromMaterials, specs.material_id, allowedMaterialsForSize, selectedMaterialType]);
+  }, [isSimplifiedProduct, specs.size_id, materialTypesFromMaterials, specs.material_id, allowedMaterialsForSize, selectedMaterialType, densitiesForSelectedType]);
 
-  // При смене типа — ставим первую плотность этого типа и материал обновится в эффекте ниже
+  // При смене типа — ставим первую плотность этого типа (или сбрасываем, если у типа нет плотностей)
   useEffect(() => {
     if (!isSimplifiedProduct || !specs.size_id) return;
-    if (densitiesForSelectedType.length > 0 && !selectedDensity) {
+    if (densitiesForSelectedType.length === 0) {
+      setSelectedDensity('');
+      if (specs.material_id != null) {
+        updateSpecs({ material_id: undefined }, true);
+      }
+      return;
+    }
+    if (!selectedDensity) {
       setSelectedDensity(densitiesForSelectedType[0]);
-    } else if (densitiesForSelectedType.length > 0 && !densitiesForSelectedType.includes(selectedDensity as number)) {
+    } else if (!densitiesForSelectedType.includes(selectedDensity as number)) {
       setSelectedDensity(densitiesForSelectedType[0]);
     }
-  }, [selectedMaterialType, densitiesForSelectedType]);
+  }, [selectedMaterialType, densitiesForSelectedType, selectedDensity, isSimplifiedProduct, specs.size_id, specs.material_id, updateSpecs]);
 
   // По выбранным типу и плотности выставляем material_id и materialType (только при изменении — иначе рекурсия)
   useEffect(() => {
@@ -324,7 +343,10 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         ) : (
           <select
             value={selectedMaterialType}
-            onChange={(e) => setSelectedMaterialType(e.target.value)}
+            onChange={(e) => {
+              userChoseTypeRef.current = true;
+              setSelectedMaterialType(e.target.value);
+            }}
             className="form-control"
             required
             title={selectedMaterialType || undefined}
@@ -342,7 +364,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         ) : allowedMaterialsForSize.length === 0 ? (
           <div className="alert alert-warning"><small>⚠️ Для размера нет разрешённых материалов</small></div>
         ) : densitiesForSelectedType.length === 0 ? (
-          <div className="form-control" style={{ color: '#666' }}>Выберите тип материала</div>
+          <div className="form-control" style={{ color: '#666' }}>Нет плотностей для этого типа</div>
         ) : (
           <select
             value={selectedDensity}
@@ -483,7 +505,10 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
               ) : (
                 <select
                   value={selectedMaterialType}
-                  onChange={(e) => setSelectedMaterialType(e.target.value)}
+                  onChange={(e) => {
+                    userChoseTypeRef.current = true;
+                    setSelectedMaterialType(e.target.value);
+                  }}
                   className="form-control"
                   required
                   title={selectedMaterialType || undefined}
@@ -501,7 +526,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
             ) : allowedMaterialsForSize.length === 0 ? (
               <div className="alert alert-warning"><small>⚠️ Для размера нет разрешённых материалов</small></div>
             ) : densitiesForSelectedType.length === 0 ? (
-              <div className="form-control" style={{ color: '#666' }}>Выберите тип материала</div>
+              <div className="form-control" style={{ color: '#666' }}>Нет плотностей для этого типа</div>
             ) : (
               <select
                 value={selectedDensity}
