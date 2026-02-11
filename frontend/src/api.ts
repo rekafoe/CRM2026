@@ -448,7 +448,7 @@ export const uploadOrderFile = async (orderId: number, file: File): Promise<{ da
 export const deleteOrderFile = (orderId: number, fileId: number) => api.delete(`/orders/${orderId}/files/${fileId}`);
 export const approveOrderFile = (orderId: number, fileId: number) => api.post<OrderFile>(`/orders/${orderId}/files/${fileId}/approve`, {});
 
-/** Скачивание файла по ID через fetch (надёжнее для бинарных данных). Имя и кириллица — из Content-Disposition. */
+/** Скачивание файла по ID через fetch. Имя — из Content-Disposition. */
 export const downloadOrderFile = async (orderId: number, fileId: number, suggestedFileName: string) => {
   const base = api.defaults.baseURL || API_BASE_URL || '/api';
   const fullUrl = (base.startsWith('http') ? base : `${typeof window !== 'undefined' ? window.location.origin : ''}${base}`).replace(/\/$/, '') + `/orders/${orderId}/files/${fileId}/download`;
@@ -459,12 +459,15 @@ export const downloadOrderFile = async (orderId: number, fileId: number, suggest
     throw new Error(res.status === 404 ? 'Файл не найден' : `${res.status}: ${text || res.statusText}`);
   }
   const blob = await res.blob();
+  if (blob.size === 0) {
+    throw new Error('Сервер вернул пустой файл (0 байт). Проверьте, что файл есть на диске.');
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = suggestedFileName || 'download';
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
 // Payments / Prepayment

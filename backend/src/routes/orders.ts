@@ -471,12 +471,12 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
     res.status(404).json({ message: 'Файл не найден на диске' })
     return
   }
-  const stat = fs.statSync(filePath)
+  const buffer = fs.readFileSync(filePath)
   const displayName = (row.originalName || row.filename).trim() || row.filename
   res.setHeader('Content-Disposition', `attachment; filename="${displayName.replace(/"/g, '%22')}"; filename*=UTF-8''${encodeURIComponent(displayName)}`)
-  res.setHeader('Content-Length', String(stat.size))
+  res.setHeader('Content-Length', String(buffer.length))
   if (row.mime) res.setHeader('Content-Type', row.mime)
-  res.sendFile(path.resolve(filePath))
+  res.send(buffer)
 }))
 
 router.delete('/:orderId/files/:fileId', asyncHandler(async (req, res) => {

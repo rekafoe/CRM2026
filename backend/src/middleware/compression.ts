@@ -6,6 +6,10 @@ export function compressionMiddleware(req: Request, res: Response, next: NextFun
   if (req.path.startsWith('/api-docs')) {
     return next()
   }
+  // Не сжимаем скачивание файлов — отдаём бинарные данные как есть
+  if (/\/orders\/[^/]+\/files\/[^/]+\/download$/.test(req.path)) {
+    return next()
+  }
   
   const originalSend = res.send
   const acceptEncoding = req.headers['accept-encoding'] || ''
