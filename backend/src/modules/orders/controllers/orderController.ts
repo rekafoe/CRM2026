@@ -3,6 +3,7 @@ import { OrderService } from '../services/orderService'
 import { asyncHandler } from '../../../middleware'
 import { logger } from '../../../utils/logger'
 import { getDb } from '../../../config/database'
+import { saveBufferToUploads } from '../../../config/upload'
 
 export class OrderController {
   static async getAllOrders(req: Request, res: Response) {
@@ -255,18 +256,24 @@ export class OrderController {
         ) as any
       }
 
-      const files = (req as any).files as Array<{ filename: string; originalname?: string; mimetype?: string; size?: number }> | undefined
+      const files = (req as any).files as Array<{ buffer?: Buffer; originalname?: string; originalName?: string; mimetype?: string }> | undefined
       let insertedFiles: any[] = []
       if (files && files.length > 0) {
         const db = await getDb()
         for (const f of files) {
+          const nameFromClient = f.originalname ?? (f as any).originalName
+          const saved = saveBufferToUploads(f.buffer, nameFromClient)
+          if (!saved) {
+            logger.warn('createOrderFromWebsiteWithFiles: пропущен пустой файл', { originalname: nameFromClient })
+            continue
+          }
           await db.run(
             'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
             order.id,
-            f.filename,
-            f.originalname || null,
+            saved.filename,
+            saved.originalName,
             f.mimetype || null,
-            f.size ?? null
+            saved.size
           )
         }
         const rows = await db.all<any>(

@@ -46,6 +46,27 @@ interface UseCalculatorPricingActionsReturn {
   calculateCost: (showToast?: boolean) => Promise<void>;
 }
 
+/** Продукт «требует печать», только если в схеме явно заданы технологии/цены печати (иначе — продукт без печати: секция «Печать» не показывается, расчёт идёт без выбора типа/режима). */
+function productRequiresPrint(schema: any): boolean {
+  if (!schema) return false;
+  const constraints = schema.constraints;
+  if (constraints?.allowed_print_technologies && Array.isArray(constraints.allowed_print_technologies) && constraints.allowed_print_technologies.length > 0) {
+    return true;
+  }
+  const template = schema.template;
+  if (template?.simplified?.sizes && Array.isArray(template.simplified.sizes)) {
+    const hasPrintPrices = template.simplified.sizes.some((size: any) =>
+      Array.isArray(size.print_prices) && size.print_prices.length > 0
+    );
+    if (hasPrintPrices) return true;
+  }
+  const configData = template?.config_data || template;
+  if (configData?.print_prices && Array.isArray(configData.print_prices) && configData.print_prices.length > 0) {
+    return true;
+  }
+  return false;
+}
+
 export function useCalculatorPricingActions({
   specs,
   isValid,
@@ -150,15 +171,13 @@ export function useCalculatorPricingActions({
           logger.info('ℹ️ format не указан, бэкенд должен взять размер из шаблона продукта', { productId: selectedProduct.id });
         }
 
-        // ✅ Проверяем, что параметры печати установлены (если продукт требует печать)
-        // Это нужно для того, чтобы бэкенд мог найти принтер и рассчитать цену
-        // ⚠️ Для автопересчета не показываем ошибку - просто пропускаем расчет
-        if (!printTechnology || !printColorMode) {
+        // ✅ Параметры печати обязательны только для продуктов с печатью. Продукты без печати считаем без них.
+        const requiresPrint = productRequiresPrint(backendProductSchema);
+        if (requiresPrint && (!printTechnology || !printColorMode)) {
           const missingParams = [];
           if (!printTechnology) missingParams.push('технология печати');
           if (!printColorMode) missingParams.push('режим цвета (чб/цвет)');
           
-          // Если это автопересчет (showToast = false), просто пропускаем без ошибки
           if (!showToast) {
             logger.info('⏭️ Пропускаем автопересчет: параметры печати не выбраны', {
               missingParams,
@@ -168,7 +187,6 @@ export function useCalculatorPricingActions({
             return;
           }
           
-          // Для ручного расчета показываем ошибку
           throw new Error(
             `❌ Не указаны параметры печати: ${missingParams.join(', ')}. ` +
             `Пожалуйста, выберите технологию печати и режим цвета в разделе "Печать" перед расчетом.`
@@ -318,19 +336,19 @@ export function useCalculatorPricingActions({
           // fullConfiguration: configuration
         });
         
-        // ✅ Дополнительная проверка параметров печати
-        if (!configuration.print_technology || !configuration.print_color_mode) {
+        // ✅ Для продуктов с печатью параметры должны быть переданы; для продуктов без печати — нормально, что их нет
+        if (requiresPrint && (!configuration.print_technology || !configuration.print_color_mode)) {
           logger.info('⚠️ Параметры печати не переданы в конфигурацию!', {
             print_technology: configuration.print_technology,
-            print_color_mode: configuration.print_color_mode,
-            printTechnology,
-            printColorMode
+            print_color_mode: configuration.print_color_mode
           });
-        } else {
+        } else if (requiresPrint) {
           logger.info('✅ Параметры печати переданы в конфигурацию', {
             print_technology: configuration.print_technology,
             print_color_mode: configuration.print_color_mode
           });
+        } else {
+          logger.info('ℹ️ Продукт без печати — расчёт без параметров печати', { productId: selectedProduct.id });
         }
 
         const pricingResult = await calculatePriceViaBackend(

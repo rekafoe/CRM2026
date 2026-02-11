@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import { rateLimiter } from '../../../middleware/rateLimiter'
 import { OrderController, OrderItemController } from '../controllers'
 import { asyncHandler } from '../../../middleware'
-import { upload } from '../../../config/upload'
+import { uploadMemory, saveBufferToUploads } from '../../../config/upload'
 import { getDb } from '../../../config/database'
 import { hasColumn } from '../../../utils/tableSchemaCache'
 
@@ -65,18 +65,23 @@ router.get('/:id/files', asyncHandler(async (req: Request, res: Response) => {
   res.json(rows)
 }))
 
-router.post('/:id/files', upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+router.post('/:id/files', uploadMemory.single('file'), asyncHandler(async (req: Request, res: Response) => {
   const orderId = Number(req.params.id)
-  const f = (req as any).file as { filename: string; originalname?: string; mimetype?: string; size?: number } | undefined
+  const f = (req as any).file as { buffer?: Buffer; originalname?: string; mimetype?: string } | undefined
   if (!f) { res.status(400).json({ message: 'Файл не получен' }); return }
+  const saved = saveBufferToUploads(f.buffer, (f as any).originalname ?? (f as any).originalName)
+  if (!saved) {
+    res.status(400).json({ message: 'Файл пустой (0 байт). Проверьте отправку.' })
+    return
+  }
   const db = await getDb()
   await db.run(
     'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
     orderId,
-    f.filename,
-    f.originalname || null,
+    saved.filename,
+    saved.originalName,
     f.mimetype || null,
-    f.size || null
+    saved.size
   )
   const row = await db.get<any>(
     'SELECT id, orderId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1',

@@ -3,7 +3,7 @@ import { OrderController } from '../modules/orders/controllers/orderController'
 import { OrderItemController } from '../modules/orders/controllers/orderItemController'
 import { asyncHandler, authenticate } from '../middleware'
 import { requireWebsiteOrderApiKey, isWebsiteOrderApiKeyValid } from '../middleware/websiteOrderApiKey'
-import { upload } from '../config/upload'
+import { upload, uploadMemory, saveBufferToUploads } from '../config/upload'
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
 import { hasColumn } from '../utils/tableSchemaCache'
@@ -93,15 +93,21 @@ const router = Router()
 // Публичный эндпоинт для заказов с сайта (без авторизации CRM, проверка по X-API-Key)
 router.post('/from-website', requireWebsiteOrderApiKey, asyncHandler(OrderController.createOrderFromWebsite))
 
-// Создание заказа с сайта + файлы в одном запросе (multipart/form-data; файлы опциональны)
-router.post('/from-website/with-files', requireWebsiteOrderApiKey, upload.array('file', 20), asyncHandler(OrderController.createOrderFromWebsiteWithFiles))
+// Создание заказа с сайта + файлы в одном запросе (multipart/form-data; файлы опциональны).
+// Используем uploadMemory + ручная запись буфера, чтобы файлы не сохранялись как 0 КБ.
+router.post('/from-website/with-files', requireWebsiteOrderApiKey, uploadMemory.array('file', 20), asyncHandler(OrderController.createOrderFromWebsiteWithFiles))
 
 // Загрузка файлов к заказу с сайта (тот же API-ключ; только заказы с source=website)
-router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, upload.single('file'), asyncHandler(async (req, res) => {
+router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, uploadMemory.single('file'), asyncHandler(async (req, res) => {
   const orderId = Number(req.params.orderId)
-  const f = (req as any).file as { filename: string; originalname?: string; mimetype?: string; size?: number } | undefined
+  const f = (req as any).file as { buffer?: Buffer; originalname?: string; mimetype?: string } | undefined
   if (!f) {
     res.status(400).json({ message: 'Файл не получен' })
+    return
+  }
+  const saved = saveBufferToUploads(f.buffer, (f as any).originalname ?? (f as any).originalName)
+  if (!saved) {
+    res.status(400).json({ message: 'Файл пустой (0 байт). Проверьте отправку на клиенте.' })
     return
   }
   const db = await getDb()
@@ -117,10 +123,10 @@ router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, upload.si
   await db.run(
     'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
     orderId,
-    f.filename,
-    f.originalname || null,
+    saved.filename,
+    saved.originalName,
     f.mimetype || null,
-    f.size || null
+    saved.size
   )
   const row = await db.get<any>(
     'SELECT id, orderId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1',
@@ -136,10 +142,15 @@ router.post('/:id/files', (req, res, next) => {
     return next()
   }
   return authenticate(req, res, next)
-}, upload.single('file'), asyncHandler(async (req, res) => {
+}, uploadMemory.single('file'), asyncHandler(async (req, res) => {
   const orderId = Number(req.params.id)
-  const f = (req as any).file as { filename: string; originalname?: string; mimetype?: string; size?: number } | undefined
+  const f = (req as any).file as { buffer?: Buffer; originalname?: string; mimetype?: string } | undefined
   if (!f) { res.status(400).json({ message: 'Файл не получен' }); return }
+  const saved = saveBufferToUploads(f.buffer, (f as any).originalname ?? (f as any).originalName)
+  if (!saved) {
+    res.status(400).json({ message: 'Файл пустой (0 байт). Проверьте отправку на клиенте.' })
+    return
+  }
   const db = await getDb()
   if ((req as any).fromWebsite) {
     const order = await db.get<{ id: number; source?: string }>('SELECT id, source FROM orders WHERE id = ?', orderId)
@@ -155,10 +166,10 @@ router.post('/:id/files', (req, res, next) => {
   await db.run(
     'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
     orderId,
-    f.filename,
-    f.originalname || null,
+    saved.filename,
+    saved.originalName,
     f.mimetype || null,
-    f.size || null
+    saved.size
   )
   const row = await db.get<any>(
     'SELECT id, orderId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1',
