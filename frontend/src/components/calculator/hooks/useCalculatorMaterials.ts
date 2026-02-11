@@ -110,15 +110,8 @@ export function useCalculatorMaterials({ specs, setSpecs, log, toast }: UseCalcu
     loadDensitiesForPaperType(specs.paperType);
   }, [specs.paperType, warehousePaperTypes.length]);
 
-  // Auto switch to a type with densities if current has none
-  useEffect(() => {
-    if (warehousePaperTypes.length > 0 && dynamicDensities.length === 0 && specs.paperType) {
-      const typeWithDensities = warehousePaperTypes.find(type => type.densities && type.densities.length > 0);
-      if (typeWithDensities && typeWithDensities.name !== specs.paperType) {
-        setSpecs(prev => ({ ...prev, paperType: typeWithDensities.name }));
-      }
-    }
-  }, [warehousePaperTypes, dynamicDensities.length, specs.paperType, setSpecs]);
+  // Не переключаем автоматически на другой тип материала при отсутствии плотностей:
+  // связка материал↔плотность иначе входит в рекурсию (materialType ↔ result).
 
   // Initial paper type set
   useEffect(() => {
