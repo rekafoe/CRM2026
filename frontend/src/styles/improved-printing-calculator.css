@@ -367,25 +367,31 @@
   transform: scale(1.1);
 }
 
-/* Основной контент */
+/* Основной контент: колонка — сверху скролл, внизу блок результата */
 .calculator-content {
   display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0; /* чтобы flex-ребёнок сжимался и контент не выходил за карточку */
   overflow: hidden;
 }
 
-/* Основная область */
+/* Основная область — скроллится, не уезжает за subtotal */
 .calculator-main {
-  flex: 1;
-  min-height: 0; /* скролл только здесь, контент не заплывает за карточку */
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 20px;
-  padding-bottom: 0; /* Убираем отступ снизу, так как результат фиксированный */
+  padding-bottom: 16px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #cbd5e0 #f7fafc;
   display: flex;
   flex-direction: column;
+}
+
+/* Блок стоимости/кнопки внизу — не сжимается, всегда виден */
+.calculator-content > .form-section.result-section {
+  flex-shrink: 0;
 }
 
 .calculator-main::-webkit-scrollbar {
