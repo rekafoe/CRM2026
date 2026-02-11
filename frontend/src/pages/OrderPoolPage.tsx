@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo, useReducer } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useReducer, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order } from '../types';
-import { getOrders, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder, getOrderStatuses } from '../api';
+import { getOrders, getOrderPoolSync, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder, getOrderStatuses } from '../api';
 import { parseNumberFlexible } from '../utils/numberInput';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { OrderHeader } from '../components/optimized/OrderHeader';
@@ -208,6 +208,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [orderStatuses, setOrderStatuses] = useState<Array<{ id: number; name: string; color?: string; sort_order: number }>>([]);
   const [filters, dispatchFilters] = useReducer(filtersReducer, initialFilters);
+  const orderIdsRef = useRef<Set<number>>(new Set());
   const selectedItems = selectedOrder?.items ?? [];
   const userNameById = useMemo(() => {
     const map = new Map<number, string>();
@@ -266,6 +267,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       setLoading(true);
       const res = await getOrders({ all: true });
       const list = res.data as Order[];
+      orderIdsRef.current = new Set(list.map((o) => o.id));
       setOrders(list);
       setError(null);
       setSelectedOrder((prev) => {
@@ -281,12 +283,59 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     }
   }, [logger]);
 
+  /** Фоновое обновление списка (без индикатора загрузки) — вызывается при изменении маркера «заказ с сайта» */
+  const refreshOrdersInBackground = useCallback(async () => {
+    try {
+      const res = await getOrders({ all: true });
+      const list = res.data as Order[];
+      const prevIds = orderIdsRef.current;
+      const newCount = list.filter((o) => !prevIds.has(o.id)).length;
+      orderIdsRef.current = new Set(list.map((o) => o.id));
+      setOrders(list);
+      setSelectedOrder((prev) => {
+        if (!prev) return prev;
+        const next = list.find((o) => o.id === prev!.id);
+        return next ?? prev;
+      });
+      if (newCount > 0) {
+        toast.info(`Обновлён пул заказов: ${newCount} новых`);
+      }
+    } catch (err) {
+      logger.error('Background refresh orders failed', err);
+    }
+  }, [logger, toast]);
+
   useEffect(() => {
     if (isInitialized) return;
     loadOrders().then(() => setIsInitialized(true));
     getUsers().then(res => setAllUsers(res.data)).catch(err => logger.error('Failed to load users', err));
     getOrderStatuses().then(res => setOrderStatuses(res.data ?? [])).catch(err => logger.error('Failed to load order statuses', err));
   }, [isInitialized, loadOrders, logger]);
+
+  /** Опрос маркера «заказ с сайта»: при обращении к orderpool API с printcore.by бэкенд обновляет lastWebsiteOrderAt — принудительно обновляем список */
+  const poolSyncRef = useRef<number>(0);
+  useEffect(() => {
+    if (!isInitialized) return;
+    const pollMs = 5000;
+    const tid = setInterval(async () => {
+      try {
+        const { data } = await getOrderPoolSync();
+        const at = data?.lastWebsiteOrderAt ?? 0;
+        if (at <= 0) return;
+        if (poolSyncRef.current === 0) {
+          poolSyncRef.current = at;
+          return;
+        }
+        if (at !== poolSyncRef.current) {
+          poolSyncRef.current = at;
+          refreshOrdersInBackground();
+        }
+      } catch {
+        // игнорируем ошибки опроса
+      }
+    }, pollMs);
+    return () => clearInterval(tid);
+  }, [isInitialized, refreshOrdersInBackground]);
 
   useEffect(() => {
     const t = setTimeout(() => dispatchFilters({ type: 'setSearchTerm', value: filters.searchInput.trim() }), 200);

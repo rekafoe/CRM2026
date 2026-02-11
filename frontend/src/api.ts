@@ -60,6 +60,10 @@ export const getOrders = (params?: { all?: boolean; issued_on?: string }) => {
   if (params?.issued_on) p.issued_on = params.issued_on.slice(0, 10);
   return api.get<Order[]>('/orders', { params: Object.keys(p).length ? p : undefined });
 };
+
+/** Маркер «последний заказ с сайта»: при обращении к orderpool API с printcore.by бэкенд обновляет значение; при изменении — принудительно обновляем список в Order Pool */
+export const getOrderPoolSync = () =>
+  api.get<{ lastWebsiteOrderAt: number }>('/orders/pool-sync');
 export const createOrder = (date?: string) => api.post<Order>('/orders', { date });
 export const updateOrderStatus = (id: number, status: number) =>
   api.put<Order>(`/orders/${id}/status`, { status });

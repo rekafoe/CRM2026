@@ -9,6 +9,7 @@ import { upload, uploadMemory, saveBufferToUploads, uploadsDir } from '../config
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
 import { hasColumn } from '../utils/tableSchemaCache'
+import { getLastWebsiteOrderAt } from '../utils/poolSync'
 
 const router = Router()
 
@@ -200,6 +201,11 @@ router.post('/:id/files', (req, res, next) => {
 
 // Все остальные маршруты заказов требуют аутентификации
 router.use(authenticate)
+
+/** Лёгкий эндпоинт для CRM: при обращении к orderpool API с сайта (printcore.by) значение меняется — страница Order Pool принудительно обновляет список */
+router.get('/pool-sync', (_req, res) => {
+  res.json({ lastWebsiteOrderAt: getLastWebsiteOrderAt() })
+})
 
 /**
  * @swagger

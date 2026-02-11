@@ -4,6 +4,7 @@ import { asyncHandler } from '../../../middleware'
 import { logger } from '../../../utils/logger'
 import { getDb } from '../../../config/database'
 import { saveBufferToUploads } from '../../../config/upload'
+import { setLastWebsiteOrderAt } from '../../../utils/poolSync'
 
 export class OrderController {
   static async getAllOrders(req: Request, res: Response) {
@@ -136,6 +137,7 @@ export class OrderController {
           source: 'website',
           items
         })
+        setLastWebsiteOrderAt(Date.now())
         res.status(201).json({
           order: result.order,
           deductionResult: result.deductionResult,
@@ -154,6 +156,7 @@ export class OrderController {
         'website',
         customer_id
       )
+      setLastWebsiteOrderAt(Date.now())
       res.status(201).json({ order, message: 'Заказ с сайта создан' })
     } catch (error: any) {
       logger.error('createOrderFromWebsite error', { error: error?.message, stack: error?.stack })
@@ -255,6 +258,7 @@ export class OrderController {
           customer_id
         ) as any
       }
+      setLastWebsiteOrderAt(Date.now())
 
       const files = (req as any).files as Array<{ buffer?: Buffer; originalname?: string; originalName?: string; mimetype?: string }> | undefined
       let insertedFiles: any[] = []
