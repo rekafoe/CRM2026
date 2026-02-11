@@ -445,7 +445,7 @@ router.get('/:id/files', asyncHandler(async (req, res) => {
   res.json(rows)
 }))
 
-// Скачивание файла с правильным именем (кириллица) и отдачей содержимого с диска
+// Скачивание файла с правильным именем (кириллица), отдача целиком с Content-Length
 router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
   const orderId = Number(req.params.id)
   const fileId = Number(req.params.fileId)
@@ -464,14 +464,12 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
     res.status(404).json({ message: 'Файл не найден на диске' })
     return
   }
+  const stat = fs.statSync(filePath)
   const displayName = (row.originalName || row.filename).trim() || row.filename
   res.setHeader('Content-Disposition', `attachment; filename="${displayName.replace(/"/g, '%22')}"; filename*=UTF-8''${encodeURIComponent(displayName)}`)
+  res.setHeader('Content-Length', String(stat.size))
   if (row.mime) res.setHeader('Content-Type', row.mime)
-  const stream = fs.createReadStream(filePath)
-  stream.on('error', (err) => {
-    if (!res.headersSent) res.status(500).json({ message: 'Ошибка чтения файла' })
-  })
-  stream.pipe(res)
+  res.sendFile(path.resolve(filePath))
 }))
 
 router.delete('/:orderId/files/:fileId', asyncHandler(async (req, res) => {

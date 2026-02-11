@@ -434,10 +434,17 @@ export const uploadOrderFile = (orderId: number, file: File) => {
 export const deleteOrderFile = (orderId: number, fileId: number) => api.delete(`/orders/${orderId}/files/${fileId}`);
 export const approveOrderFile = (orderId: number, fileId: number) => api.post<OrderFile>(`/orders/${orderId}/files/${fileId}/approve`, {});
 
-/** Скачивание файла по ID (отдаёт бэкенд с правильным именем и кириллицей в Content-Disposition) */
+/** Скачивание файла по ID через fetch (надёжнее для бинарных данных). Имя и кириллица — из Content-Disposition. */
 export const downloadOrderFile = async (orderId: number, fileId: number, suggestedFileName: string) => {
-  const res = await api.get<Blob>(`/orders/${orderId}/files/${fileId}/download`, { responseType: 'blob' });
-  const blob = res.data;
+  const base = api.defaults.baseURL || API_BASE_URL || '/api';
+  const fullUrl = (base.startsWith('http') ? base : `${typeof window !== 'undefined' ? window.location.origin : ''}${base}`).replace(/\/$/, '') + `/orders/${orderId}/files/${fileId}/download`;
+  const token = typeof localStorage !== 'undefined' ? (localStorage.getItem(APP_CONFIG?.storage?.token || '') || localStorage.getItem('crmToken')) : '';
+  const res = await fetch(fullUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(res.status === 404 ? 'Файл не найден' : `${res.status}: ${text || res.statusText}`);
+  }
+  const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
