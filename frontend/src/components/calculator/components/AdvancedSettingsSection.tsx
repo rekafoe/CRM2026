@@ -12,7 +12,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
     <div className="form-section advanced-settings compact">
       <h3>🔧 Настройки</h3>
       <div className="advanced-grid compact">
-        <div className="param-group">
+        <div className="param-group param-group--narrow">
           <label>Тип цены</label>
           <select
             value={specs.priceType || 'standard'}
@@ -27,7 +27,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
           </select>
         </div>
 
-        <div className="param-group">
+        <div className="param-group param-group--narrow">
           <label>Срок изготовления</label>
           <select
             value={specs.productionDays ?? ''}

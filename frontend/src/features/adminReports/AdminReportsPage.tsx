@@ -163,35 +163,21 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
         </div>
 
         {/* Вкладки аналитики */}
-        <div style={{ marginBottom: '20px', borderBottom: '1px solid var(--border-color)' }}>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {[
-              { key: 'overview', label: '📊 Обзор', icon: '📊' },
-              { key: 'managers', label: '👥 Менеджеры', icon: '👥' },
-              { key: 'materials', label: '📦 Материалы', icon: '📦' },
-              { key: 'time', label: '🕐 Время', icon: '🕐' }
-            ].map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => handleTabChange(tab.key as AnalyticsTab)}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: activeTab === tab.key ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-                  color: activeTab === tab.key ? 'var(--bg-primary)' : 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                {tab.icon} {tab.label}
-              </button>
-            ))}
-          </div>
+        <div className="reports-tabs">
+          {[
+            { key: 'overview', label: '📊 Обзор', icon: '📊' },
+            { key: 'managers', label: '👥 Менеджеры', icon: '👥' },
+            { key: 'materials', label: '📦 Материалы', icon: '📦' },
+            { key: 'time', label: '🕐 Время', icon: '🕐' }
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => handleTabChange(tab.key as AnalyticsTab)}
+              className={`reports-tab-btn ${activeTab === tab.key ? 'reports-tab-btn--active' : ''}`}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Выбор периода и департамента для аналитики */}
@@ -264,15 +250,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
             <button
               onClick={refreshAnalytics}
               disabled={isLoading}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: 'var(--accent-primary)',
-                color: 'var(--bg-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                opacity: isLoading ? 0.6 : 1
-              }}
+              className="reports-update-btn"
             >
               {isLoading ? '⏳ Загрузка...' : '🔄 Обновить'}
             </button>

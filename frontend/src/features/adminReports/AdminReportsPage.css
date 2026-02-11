@@ -1,19 +1,24 @@
-/* AdminReportsPage.css - Стили для рефакторинга страницы аналитики */
+/* AdminReportsPage.css — в одном стиле с модалкой калькулятора (белая карточка, кант, скругления) */
 
-/* Основные стили страницы */
+/* Страница = белая карточка как блок основных параметров (тот же стиль, что и модалка калькулятора) */
 .reports-page {
-  padding: 20px;
+  padding: 24px;
   max-width: 1200px;
-  margin: 0 auto;
+  margin: 20px auto;
+  background: white;
+  border: 2px solid #f1f5f9;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  min-height: 0;
 }
 
 .reports-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
-  border-bottom: 2px solid var(--border-color);
-  padding-bottom: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f1f5f9;
 }
 
 .reports-header-left {
@@ -23,55 +28,78 @@
 }
 
 .reports-back-btn {
-  padding: 8px 16px;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  padding: 10px 16px;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 600;
+  color: #1a202c;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reports-back-btn:hover {
+  border-color: #cbd5e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .reports-header-title {
   margin: 0;
-  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a202c;
+  letter-spacing: 0.025em;
 }
 
 .reports-header-description {
-  margin: 4px 0 0 0;
+  margin: 6px 0 0 0;
   font-size: 14px;
-  color: var(--text-secondary);
+  color: #64748b;
 }
 
 .reports-header-actions {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .reports-user-info {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: #64748b;
 }
 
 .reports-action-btn {
-  padding: 8px 12px;
-  background-color: var(--accent-light);
-  color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  padding: 10px 16px;
+  background: white;
+  color: #1a202c;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: bold;
+  font-size: 13px;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reports-action-btn:hover {
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
 }
 
 .reports-export-btn {
-  background-color: var(--accent-primary);
+  background: var(--accent-primary, #667eea);
+  color: white;
+  border-color: var(--accent-primary, #667eea);
 }
 
-/* Статистика */
+.reports-export-btn:hover {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
+}
+
+/* Статистика — карточки в стиле модалки */
 .reports-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -80,70 +108,136 @@
 }
 
 .reports-stat-card {
-  padding: 16px;
-  background-color: var(--bg-secondary);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  padding: 20px;
+  background: white;
+  border: 2px solid #f1f5f9;
+  border-radius: 16px;
   text-align: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reports-stat-card:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .reports-stat-value {
   font-size: 24px;
-  font-weight: bold;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 4px;
 }
 
 .reports-stat-label {
   font-size: 14px;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: #64748b;
 }
 
-/* Фильтры */
+/* Вкладки — в стиле модалки */
+.reports-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.reports-tab-btn {
+  padding: 10px 16px;
+  background: white;
+  color: #1a202c;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.reports-tab-btn:hover {
+  border-color: #cbd5e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.reports-tab-btn--active {
+  background: var(--accent-primary, #667eea);
+  color: white;
+  border-color: var(--accent-primary, #667eea);
+}
+
+.reports-tab-btn--active:hover {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
+}
+
+/* Фильтры — блок как секция в модалке */
 .reports-filters {
   display: flex;
   gap: 16px;
   margin-bottom: 24px;
-  padding: 16px;
-  background-color: var(--bg-secondary);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  padding: 16px 20px;
+  background: white;
+  border: 2px solid #f1f5f9;
+  border-radius: 16px;
   flex-wrap: wrap;
 }
 
 .reports-filter-group {
   display: flex;
-  align-items: end;
+  align-items: flex-end;
   gap: 8px;
 }
 
 .reports-filter-label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   font-size: 14px;
-  font-weight: bold;
+  font-weight: 600;
+  color: #1a202c;
 }
 
 .reports-filter-input {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  padding: 10px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
   min-width: 150px;
+  font-size: 14px;
+  background: #f8fafc;
+  transition: border-color 0.2s ease;
+}
+
+.reports-filter-input:focus {
+  outline: none;
+  border-color: #667eea;
 }
 
 .reports-filter-date {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  padding: 10px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #f8fafc;
 }
 
 .reports-update-btn {
-  padding: 8px 16px;
-  background-color: var(--accent-primary);
-  color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  padding: 10px 18px;
+  background: var(--accent-primary, #667eea);
+  color: white;
+  border: 2px solid var(--accent-primary, #667eea);
+  border-radius: 12px;
   cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
   opacity: 1;
+  transition: box-shadow 0.2s ease;
+}
+
+.reports-update-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
 }
 
 .reports-update-btn:disabled {
@@ -151,35 +245,52 @@
   cursor: not-allowed;
 }
 
-/* Компоненты аналитики */
+/* Блоки аналитики — карточки с кантом как в модалке */
 .reports-chart {
-  background-color: var(--bg-primary);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  background: white;
+  border: 2px solid #f1f5f9;
+  border-radius: 16px;
+  padding: 20px;
   margin-bottom: 20px;
   overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reports-chart:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .reports-chart-title {
   margin: 0 0 12px 0;
-  color: var(--text-primary);
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 700;
+  color: #1a202c;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f1f5f9;
 }
 
 .reports-metrics {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 16px;
+  background: white;
+  border: 2px solid #f1f5f9;
+  border-radius: 16px;
+  padding: 20px;
   margin-bottom: 20px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reports-metrics:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .reports-metrics-title {
   margin: 0 0 12px 0;
-  color: var(--text-primary);
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 700;
+  color: #1a202c;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f1f5f9;
 }
 
 .reports-metrics-grid {
@@ -189,33 +300,44 @@
 }
 
 .reports-metric {
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-light);
-  border-radius: 6px;
-  padding: 12px;
+  background: #f8fafc;
+  border: 2px solid #f1f5f9;
+  border-radius: 12px;
+  padding: 14px;
   text-align: center;
+  transition: border-color 0.2s ease;
+}
+
+.reports-metric:hover {
+  border-color: #e2e8f0;
 }
 
 .reports-metric-value {
   font-size: 18px;
-  font-weight: bold;
-  color: var(--accent-primary);
+  font-weight: 700;
+  color: var(--accent-primary, #667eea);
   margin-bottom: 4px;
 }
 
 .reports-metric-label {
   font-size: 12px;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: #64748b;
   line-height: 1.3;
 }
 
-/* Специфические стили для компонентов */
+/* Элементы списков и воронок */
 .reports-product-item {
-  padding: 16px;
-  background-color: var(--bg-secondary);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  padding: 16px 20px;
+  background: white;
+  border: 2px solid #f1f5f9;
+  border-radius: 12px;
   margin-bottom: 12px;
+  transition: border-color 0.2s ease;
+}
+
+.reports-product-item:hover {
+  border-color: #e2e8f0;
 }
 
 .reports-status-funnel {
@@ -234,42 +356,42 @@
 .reports-status-name {
   min-width: 100px;
   font-size: 13px;
-  color: var(--text-secondary);
-  font-weight: bold;
+  font-weight: 600;
+  color: #64748b;
 }
 
 .reports-status-bar {
   flex: 1;
   height: 32px;
-  background-color: var(--bg-secondary);
-  border-radius: 4px;
+  background: #f1f5f9;
+  border-radius: 8px;
   position: relative;
-  border: 1px solid var(--border-color);
+  border: 2px solid #e2e8f0;
 }
 
 .reports-status-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
-  justifyContent: center;
-  color: var(--bg-primary);
-  font-weight: bold;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
   font-size: 12px;
 }
 
 .reports-status-fill.completed {
-  background-color: var(--accent-primary);
+  background: var(--accent-primary, #667eea);
 }
 
 .reports-status-fill.cancelled {
-  background-color: #dc3545;
+  background: #dc3545;
 }
 
 .reports-hourly-chart {
   height: 200px;
   display: flex;
-  align-items: end;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 2px;
   margin-bottom: 12px;
@@ -282,20 +404,20 @@
 }
 
 .reports-hourly-value {
-  background-color: var(--accent-primary);
-  border-radius: 2px 2px 0 0;
+  background: var(--accent-primary, #667eea);
+  border-radius: 4px 4px 0 0;
   min-height: 4px;
   margin-bottom: 4px;
   display: flex;
-  align-items: end;
-  justifyContent: center;
+  align-items: flex-end;
+  justify-content: center;
   color: white;
   font-size: 9px;
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .reports-hourly-value.off-hours {
-  background-color: var(--accent-light);
+  background: #cbd5e0;
 }
 
 .reports-time-of-day-grid {
@@ -305,20 +427,28 @@
 }
 
 .reports-time-period-card {
-  padding: 16px;
-  background-color: var(--bg-secondary);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  padding: 20px;
+  background: white;
+  border: 2px solid #f1f5f9;
+  border-radius: 16px;
   text-align: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reports-time-period-card:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .reports-time-period-count {
   font-size: 24px;
-  font-weight: bold;
+  font-weight: 700;
   margin-bottom: 8px;
+  color: #1a202c;
 }
 
 .reports-time-period-label {
   font-size: 12px;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: #64748b;
 }

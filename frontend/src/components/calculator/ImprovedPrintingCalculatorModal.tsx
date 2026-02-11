@@ -933,6 +933,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         onClose();
       }
     }}>
+      {/* Обёртка: модалка + субтотал-бар одной шириной, без смещения */}
+      <div className="calculator-modal-wrapper">
       {/* Основной калькулятор */}
       <div className="improved-printing-calculator">
         {/* Кнопка закрытия */}
@@ -1341,42 +1343,45 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
               />
             )}
 
-            {/* Результат расчета - фиксированный внизу */}
-            {isCustomProduct ? (
-              <ResultSection
-                result={customResult as any}
-                isValid={isCustomValid}
-                onAddToOrder={() => handleAddCustomProduct()}
-                mode={isEditMode ? 'edit' : 'create'}
-              />
-            ) : isPostprintProduct ? (
-              <ResultSection
-                result={postprintResult as any}
-                isValid={isPostprintValid}
-                onAddToOrder={() => handleAddPostprintProduct()}
-                mode={isEditMode ? 'edit' : 'create'}
-              />
-            ) : (
-              <ResultSection
-                result={
-                  result
-                    ? {
-                        ...result,
-                        pricePerItem: Math.round(result.pricePerItem * getPriceTypeMultiplier(specs.priceType || 'standard') * 100) / 100,
-                        totalCost: Math.round(result.totalCost * getPriceTypeMultiplier(specs.priceType || 'standard') * 100) / 100,
-                      }
-                    : null
-                }
-                isValid={isValid}
-                onAddToOrder={() => handleAddToOrder()}
-                mode={isEditMode ? 'edit' : 'create'}
-              />
-            )}
-
           </div>
         </div>
 
         {/* Пресеты удалены */}
+      </div>
+
+      {/* Блок субтотала — под модалкой, единая ширина и стиль */}
+      <div className="calculator-subtotal-bar">
+        {isCustomProduct ? (
+          <ResultSection
+            result={customResult as any}
+            isValid={isCustomValid}
+            onAddToOrder={() => handleAddCustomProduct()}
+            mode={isEditMode ? 'edit' : 'create'}
+          />
+        ) : isPostprintProduct ? (
+          <ResultSection
+            result={postprintResult as any}
+            isValid={isPostprintValid}
+            onAddToOrder={() => handleAddPostprintProduct()}
+            mode={isEditMode ? 'edit' : 'create'}
+          />
+        ) : (
+          <ResultSection
+            result={
+              result
+                ? {
+                    ...result,
+                    pricePerItem: Math.round(result.pricePerItem * getPriceTypeMultiplier(specs.priceType || 'standard') * 100) / 100,
+                    totalCost: Math.round(result.totalCost * getPriceTypeMultiplier(specs.priceType || 'standard') * 100) / 100,
+                  }
+                : null
+            }
+            isValid={isValid}
+            onAddToOrder={() => handleAddToOrder()}
+            mode={isEditMode ? 'edit' : 'create'}
+          />
+        )}
+      </div>
       </div>
 
       {/* Модальное окно выбора продукта */}

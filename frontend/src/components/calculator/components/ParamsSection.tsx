@@ -66,38 +66,43 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
     <div className="form-section compact">
       <h3>⚙️ Параметры</h3>
       <div className="params-grid compact">
-        {/* 🆕 Размер изделия для упрощённых продуктов */}
-        {isSimplifiedProduct && (
-          <div className="param-group">
-            <label>
-              Размер изделия <span style={{ color: 'var(--danger, #c53030)' }}>*</span>
-            </label>
-            <select
-              value={specs.size_id || (simplifiedSizes.length > 0 ? simplifiedSizes[0].id : '')}
-              onChange={(e) => {
-                const selectedSizeId = e.target.value;
-                const selectedSize = simplifiedSizes.find(s => s.id === selectedSizeId);
-                updateSpecs({ 
-                  size_id: selectedSizeId,
-                  // Обновляем format на основе выбранного размера
-                  format: selectedSize ? `${selectedSize.width_mm}×${selectedSize.height_mm}` : specs.format
-                }, true);
-              }}
-              className="form-control"
-              required
-            >
-              {simplifiedSizes.map(size => (
-                <option key={size.id} value={size.id}>
-                  {size.label} ({size.width_mm}×{size.height_mm} мм)
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* 🆕 Размер изделия для упрощённых продуктов (длинные названия — подсказка + обрезка) */}
+        {isSimplifiedProduct && (() => {
+          const selectedSizeId = specs.size_id || (simplifiedSizes.length > 0 ? simplifiedSizes[0].id : '');
+          const selectedSize = simplifiedSizes.find(s => s.id === selectedSizeId);
+          const sizeOptionLabel = selectedSize ? `${selectedSize.label} (${selectedSize.width_mm}×${selectedSize.height_mm} мм)` : '';
+          return (
+            <div className="param-group param-group--narrow param-group--size-block">
+              <label>
+                Размер изделия <span style={{ color: 'var(--danger, #c53030)' }}>*</span>
+              </label>
+              <select
+                value={selectedSizeId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  const size = simplifiedSizes.find(s => s.id === id);
+                  updateSpecs({
+                    size_id: id,
+                    format: size ? `${size.width_mm}×${size.height_mm}` : specs.format
+                  }, true);
+                }}
+                className="form-control"
+                required
+                title={sizeOptionLabel || undefined}
+              >
+                {simplifiedSizes.map(size => (
+                  <option key={size.id} value={size.id}>
+                    {size.label} ({size.width_mm}×{size.height_mm} мм)
+                  </option>
+                ))}
+              </select>
+            </div>
+          );
+        })()}
 
         {/* Формат (скрываем для упрощённых продуктов) */}
         {hasField('format') && !isSimplifiedProduct && (
-        <div className="param-group">
+        <div className="param-group param-group--narrow">
           <label>
             {getLabel('format', 'Формат')}
             {isRequired('format') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}

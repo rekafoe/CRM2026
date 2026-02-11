@@ -89,18 +89,43 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           schema={backendProductSchema}
         />
 
-        <PrintingSettingsSection
-          printTechnology={printTechnology}
-          printColorMode={printColorMode}
-          sides={specs.sides}
-          onPrintTechnologyChange={setPrintTechnology}
-          onPrintColorModeChange={setPrintColorMode}
-          onSidesChange={(value) => updateSpecs({ sides: value as 1 | 2 })}
-          selectedProduct={selectedProduct}
-          backendProductSchema={backendProductSchema}
-        />
-
-        <MaterialsSection
+        <div className="unified-params-row">
+          <PrintingSettingsSection
+            printTechnology={printTechnology}
+            printColorMode={printColorMode}
+            sides={specs.sides}
+            onPrintTechnologyChange={setPrintTechnology}
+            onPrintColorModeChange={setPrintColorMode}
+            onSidesChange={(value) => updateSpecs({ sides: value as 1 | 2 })}
+            selectedProduct={selectedProduct}
+            backendProductSchema={backendProductSchema}
+            materialInFirstColumn={
+              backendProductSchema?.template?.simplified?.sizes?.length && (specs as any).size_id
+                ? (
+                    <MaterialsSection
+                      specs={{
+                        paperType: specs.paperType,
+                        paperDensity: specs.paperDensity,
+                        lamination: specs.lamination,
+                        quantity: specs.quantity,
+                        material_id: (specs as any).material_id,
+                        size_id: (specs as any).size_id,
+                      }}
+                      warehousePaperTypes={warehousePaperTypes}
+                      availableDensities={availableDensities.map(d => ({ value: d.value, label: d.label }))}
+                      loadingPaperTypes={loadingPaperTypes}
+                      getDefaultPaperDensity={getDefaultPaperDensity}
+                      updateSpecs={updateSpecs}
+                      schema={backendProductSchema}
+                      result={result}
+                      renderMaterialOnly
+                    />
+                  )
+                : undefined
+            }
+          />
+          {!backendProductSchema?.template?.simplified?.sizes?.length ? (
+          <MaterialsSection
           specs={{ 
             paperType: specs.paperType, 
             paperDensity: specs.paperDensity, 
@@ -117,6 +142,8 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           schema={backendProductSchema}
           result={result}
         />
+          ) : null}
+        </div>
 
         <DynamicFieldsSection
           schema={backendProductSchema}
