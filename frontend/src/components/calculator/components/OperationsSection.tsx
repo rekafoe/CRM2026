@@ -370,9 +370,9 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   }
 
   return (
-    <div className="form-section compact">
+    <div className="form-section compact operations-section">
       <h3>🔧 Операции</h3>
-      <div className="advanced-grid compact">
+      <div className="advanced-grid compact operations-grid">
         {operationsWithSubtypes.map(({ operation, subtypes }: { operation: Operation; subtypes: Array<{ value: string; label: string }> }) => {
           const operationId = operation.operation_id || operation.id;
           if (!operationId) return null;

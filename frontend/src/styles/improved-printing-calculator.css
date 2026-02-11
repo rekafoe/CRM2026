@@ -2484,3 +2484,16 @@
   gap: 8px;
   flex-direction: row;
 }
+
+/* Операции (резка, ламинация, упаковка): вертикальная раскладка — контент не накладывается */
+.operations-section .operations-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+  align-items: stretch;
+}
+
+.operations-section .operation-group {
+  grid-column: 1 !important;
+  min-width: 0;
+}
