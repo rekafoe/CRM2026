@@ -389,9 +389,11 @@
   flex-direction: column;
 }
 
-/* Блок стоимости/кнопки внизу — не сжимается, всегда виден */
+/* Блок стоимости/кнопки внизу — не сжимается, не перекрывает контент (без sticky/z-index) */
 .calculator-content > .form-section.result-section {
   flex-shrink: 0;
+  position: relative;
+  z-index: 0;
 }
 
 .calculator-main::-webkit-scrollbar {
@@ -422,15 +424,11 @@
   transition: all 0.3s ease;
 }
 
-/* Результат расчета - фиксированный внизу */
+/* Результат расчета — в модалке позиция задаётся flex, без sticky чтобы не перекрывать скролл */
 .form-section.result-section {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
   background: white;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
   margin-bottom: 0;
-  margin-top: auto;
 }
 
 .form-section:hover {
