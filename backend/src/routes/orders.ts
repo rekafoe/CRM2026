@@ -148,7 +148,14 @@ router.post('/:id/files', (req, res, next) => {
   const orderId = Number(req.params.id)
   const f = (req as any).file as { buffer?: Buffer; originalname?: string; mimetype?: string } | undefined
   if (!f) { res.status(400).json({ message: 'Файл не получен' }); return }
-  const saved = saveBufferToUploads(f.buffer, (f as any).originalname ?? (f as any).originalName)
+  const buf = f.buffer
+  if (!buf || !Buffer.isBuffer(buf) || buf.length === 0) {
+    res.status(400).json({
+      message: 'Тело файла пустое (0 байт). Убедитесь, что запрос отправляется как multipart/form-data с boundary (не задавайте Content-Type вручную).'
+    })
+    return
+  }
+  const saved = saveBufferToUploads(buf, (f as any).originalname ?? (f as any).originalName)
   if (!saved) {
     res.status(400).json({ message: 'Файл пустой (0 байт). Проверьте отправку на клиенте.' })
     return

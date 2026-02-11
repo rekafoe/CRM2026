@@ -426,11 +426,24 @@ export const getOrderStatuses = () => api.get<Array<{ id: number; name: string; 
 
 // Files API
 export const listOrderFiles = (orderId: number) => api.get<OrderFile[]>(`/orders/${orderId}/files`);
-export const uploadOrderFile = (orderId: number, file: File) => {
+/** Загрузка через fetch без явного Content-Type — браузер ставит multipart/form-data с boundary (axios иногда ломал тело). */
+export const uploadOrderFile = async (orderId: number, file: File): Promise<{ data: OrderFile }> => {
+  const base = api.defaults.baseURL || API_BASE_URL || '/api';
+  const fullUrl = (base.startsWith('http') ? base : `${typeof window !== 'undefined' ? window.location.origin : ''}${base}`).replace(/\/$/, '') + `/orders/${orderId}/files`;
+  const token = typeof localStorage !== 'undefined' ? (localStorage.getItem(APP_CONFIG?.storage?.token || '') || localStorage.getItem('crmToken')) : '';
   const fd = new FormData();
   fd.append('file', file);
-  // Не задаём Content-Type — браузер подставит multipart/form-data с boundary, иначе сервер получит пустой файл (0 байт)
-  return api.post<OrderFile>(`/orders/${orderId}/files`, fd);
+  const res = await fetch(fullUrl, {
+    method: 'POST',
+    body: fd,
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status}: ${text || res.statusText}`);
+  }
+  const data = await res.json() as OrderFile;
+  return { data };
 };
 export const deleteOrderFile = (orderId: number, fileId: number) => api.delete(`/orders/${orderId}/files/${fileId}`);
 export const approveOrderFile = (orderId: number, fileId: number) => api.post<OrderFile>(`/orders/${orderId}/files/${fileId}/approve`, {});
