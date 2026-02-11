@@ -210,6 +210,8 @@ export interface UserRef { id: number; name: string }
 export interface OrderFile {
   id: number;
   orderId: number;
+  /** id позиции заказа (items), null — файл без привязки */
+  orderItemId?: number | null;
   filename: string;
   originalName?: string;
   mime?: string;

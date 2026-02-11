@@ -733,6 +733,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           onClose={() => setShowFilesModal(false)}
           orderId={selectedOrder.id}
           orderNumber={selectedOrder.number || ''}
+          items={selectedOrder.items ?? []}
         />
       )}
       {showPrepaymentModal && selectedOrder && (

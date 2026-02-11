@@ -439,6 +439,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
         onClose={() => setShowFilesModal(false)}
         orderId={selectedOrder?.id || 0}
         orderNumber={selectedOrder?.number || ''}
+        items={selectedOrder?.items ?? []}
       />
 
       {/* Модальное окно предоплаты */}

@@ -123,15 +123,16 @@ router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, uploadMem
     return
   }
   await db.run(
-    'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO order_files (orderId, orderItemId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?, ?)',
     orderId,
+    null,
     saved.filename,
     saved.originalName,
     f.mimetype || null,
     saved.size
   )
   const row = await db.get<any>(
-    'SELECT id, orderId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1',
+    'SELECT id, orderId, orderItemId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1',
     orderId
   )
   res.status(201).json(row)
@@ -172,16 +173,26 @@ router.post('/:id/files', (req, res, next) => {
       return
     }
   }
+  const orderItemIdRaw = (req.body && (req.body as any).orderItemId) != null ? (req.body as any).orderItemId : null
+  let orderItemId: number | null = null
+  if (orderItemIdRaw !== '' && orderItemIdRaw != null) {
+    const id = Number(orderItemIdRaw)
+    if (!Number.isNaN(id)) {
+      const item = await db.get<{ orderId: number }>('SELECT orderId FROM items WHERE id = ?', id)
+      if (item && item.orderId === orderId) orderItemId = id
+    }
+  }
   await db.run(
-    'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO order_files (orderId, orderItemId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?, ?)',
     orderId,
+    orderItemId,
     saved.filename,
     saved.originalName,
     f.mimetype || null,
     saved.size
   )
   const row = await db.get<any>(
-    'SELECT id, orderId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1',
+    'SELECT id, orderId, orderItemId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1',
     orderId
   )
   res.status(201).json(row)
@@ -446,7 +457,7 @@ router.get('/:id/files', asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
   const db = await getDb()
   const rows = await db.all<any>(
-    'SELECT id, orderId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC',
+    'SELECT id, orderId, orderItemId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY (orderItemId IS NULL), orderItemId, id DESC',
     id
   )
   res.json(rows)
@@ -507,7 +518,7 @@ router.post('/:orderId/files/:fileId/approve', asyncHandler(async (req, res) => 
     orderId
   )
   const row = await db.get<any>(
-    'SELECT id, orderId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE id = ? AND orderId = ?',
+    'SELECT id, orderId, orderItemId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE id = ? AND orderId = ?',
     fileId,
     orderId
   )

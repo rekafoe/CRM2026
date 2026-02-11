@@ -70,6 +70,7 @@ export const OrderModals: React.FC<OrderModalsProps> = ({
         onClose={onCloseFilesModal}
         orderId={selectedOrder?.id || 0}
         orderNumber={selectedOrder?.number || ''}
+        items={selectedOrder?.items ?? []}
       />
 
     </>

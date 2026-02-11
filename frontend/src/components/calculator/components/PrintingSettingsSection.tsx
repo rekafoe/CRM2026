@@ -187,9 +187,10 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       return ['color'];
     }
 
-    const printersForTech = printers.filter(p => p.technology_code === printTechnology);
     const colorModes = new Set<'bw' | 'color'>();
-    
+
+    // 1) Из принтеров с этой технологией
+    const printersForTech = printers.filter(p => p.technology_code === printTechnology);
     printersForTech.forEach(printer => {
       const mode = printer.color_mode;
       if (mode === 'bw' || mode === 'color') {
@@ -200,8 +201,35 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       }
     });
 
+    // 2) Fallback: из шаблона продукта (print_prices) — цены настроены в упрощённом калькуляторе, режимы должны быть
+    if (colorModes.size === 0) {
+      const template = backendProductSchema?.template;
+      const collectFromPrintPrices = (list: any[] | undefined) => {
+        if (!Array.isArray(list)) return;
+        list.forEach((priceConfig: any) => {
+          const tech = priceConfig.technology_code || priceConfig.technologyCode;
+          if (tech !== printTechnology) return;
+          const mode = priceConfig.color_mode ?? priceConfig.colorMode;
+          const normalized = mode === 'bw' || mode === 'color' ? mode : String(mode).toLowerCase() === 'bw' ? 'bw' : String(mode).toLowerCase() === 'color' ? 'color' : null;
+          if (normalized) colorModes.add(normalized);
+        });
+      };
+      const sizes = template?.simplified?.sizes;
+      if (Array.isArray(sizes)) {
+        sizes.forEach((size: any) => collectFromPrintPrices(size.print_prices));
+      }
+      const configData = template?.config_data || template;
+      if (configData?.print_prices) collectFromPrintPrices(configData.print_prices);
+    }
+
+    // 3) Если всё ещё пусто — для выбранной технологии предлагаем оба режима (чтобы не зависать на «Загрузка режимов печати...»)
+    if (colorModes.size === 0 && allowedPrintTechnologies.some(t => t.code === printTechnology)) {
+      colorModes.add('bw');
+      colorModes.add('color');
+    }
+
     return Array.from(colorModes);
-  }, [printTechnology, printers, isColorOnly]);
+  }, [printTechnology, printers, isColorOnly, backendProductSchema, allowedPrintTechnologies]);
 
   // 🆕 Устанавливаем дефолтные значения для селекторов печати
   useEffect(() => {

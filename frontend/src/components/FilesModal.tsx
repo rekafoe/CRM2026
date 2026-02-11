@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { OrderFile } from '../types';
+import React, { useMemo, useState } from 'react';
+import { OrderFile, Item } from '../types';
 import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, downloadOrderFile } from '../api';
 
 interface FilesModalProps {
@@ -7,17 +7,27 @@ interface FilesModalProps {
   onClose: () => void;
   orderId: number;
   orderNumber: string;
+  /** Позиции заказа — для привязки файлов и группировки по позициям */
+  items?: Item[];
+}
+
+function getItemLabel(item: Item, index: number): string {
+  const desc = item.params?.description || item.type || '';
+  return desc ? `Позиция ${index + 1}: ${desc}` : `Позиция ${index + 1}`;
 }
 
 export const FilesModal: React.FC<FilesModalProps> = ({
   isOpen,
   onClose,
   orderId,
-  orderNumber
+  orderNumber,
+  items = []
 }) => {
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  /** К какой позиции привязать следующий загружаемый файл (null = общие) */
+  const [selectedOrderItemId, setSelectedOrderItemId] = useState<number | null>(null);
 
   // Загружаем файлы при открытии модального окна
   React.useEffect(() => {
@@ -44,7 +54,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
 
     setIsUploading(true);
     try {
-      await uploadOrderFile(orderId, file);
+      await uploadOrderFile(orderId, file, selectedOrderItemId ?? undefined);
       await loadFiles();
       e.currentTarget.value = '';
     } catch (error) {
@@ -89,6 +99,44 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const approvedCount = files.filter(f => f.approved).length;
   const totalCount = files.length;
 
+  /** Группировка файлов по позиции заказа для отображения */
+  const filesByItem = useMemo(() => {
+    const map = new Map<number | null, OrderFile[]>();
+    for (const f of files) {
+      const k = f.orderItemId ?? null;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(f);
+    }
+    return map;
+  }, [files]);
+
+  const renderFileList = (list: OrderFile[]) => (
+    list.map(file => (
+      <div key={file.id} className={`file-item ${file.approved ? 'approved' : 'pending'}`}>
+        <div className="file-info">
+          <div className="file-name">
+            <button type="button" className="file-name-link" onClick={() => handleDownloadFile(file)}>
+              {file.originalName || file.filename}
+            </button>
+          </div>
+          <div className="file-details">
+            <span className="file-size">{file.size ? Math.round(file.size / 1024) : 0} KB</span>
+            <span className="file-date">{file.uploadedAt ? new Date(file.uploadedAt).toLocaleDateString('ru-RU') : ''}</span>
+          </div>
+        </div>
+        <div className="file-actions">
+          <button className="btn-download" onClick={() => handleDownloadFile(file)} title="Скачать файл">📥</button>
+          {file.approved ? (
+            <span className="status-approved" title="Файл утвержден">✓</span>
+          ) : (
+            <button className="btn-approve" onClick={() => handleApproveFile(file.id)} title="Утвердить файл">✓</button>
+          )}
+          <button className="btn-delete" onClick={() => handleDeleteFile(file.id)} title="Удалить файл">✕</button>
+        </div>
+      </div>
+    ))
+  );
+
   if (!isOpen) return null;
 
   return (
@@ -118,6 +166,19 @@ export const FilesModal: React.FC<FilesModalProps> = ({
 
         {/* Действия */}
         <div className="files-actions">
+          {items.length > 0 && (
+            <select
+              className="files-position-select"
+              value={selectedOrderItemId ?? ''}
+              onChange={(e) => setSelectedOrderItemId(e.target.value === '' ? null : Number(e.target.value))}
+              title="К какой позиции заказа привязать загружаемый файл"
+            >
+              <option value="">Общие (без привязки)</option>
+              {items.map((it, i) => (
+                <option key={it.id} value={it.id}>{getItemLabel(it, i)}</option>
+              ))}
+            </select>
+          )}
           {files.length > 0 && (
             <button className="btn-download-all" onClick={handleDownloadAll}>
               📥 Скачать все файлы
@@ -146,54 +207,22 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             </div>
           ) : (
             <div className="files-list">
-              {files.map(file => (
-                <div key={file.id} className={`file-item ${file.approved ? 'approved' : 'pending'}`}>
-                  <div className="file-info">
-                    <div className="file-name">
-                      <button
-                        type="button"
-                        className="file-name-link"
-                        onClick={() => handleDownloadFile(file)}
-                      >
-                        {file.originalName || file.filename}
-                      </button>
-                    </div>
-                    <div className="file-details">
-                      <span className="file-size">
-                        {file.size ? Math.round(file.size / 1024) : 0} KB
-                      </span>
-                      <span className="file-date">
-                        {file.uploadedAt ? new Date(file.uploadedAt).toLocaleDateString('ru-RU') : ''}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="file-actions">
-                    <button 
-                      className="btn-download"
-                      onClick={() => handleDownloadFile(file)}
-                      title="Скачать файл"
-                    >
-                      📥
-                    </button>
-                    {file.approved ? (
-                      <span className="status-approved" title="Файл утвержден">✓</span>
-                    ) : (
-                      <button 
-                        className="btn-approve"
-                        onClick={() => handleApproveFile(file.id)}
-                        title="Утвердить файл"
-                      >
-                        ✓
-                      </button>
-                    )}
-                    <button 
-                      className="btn-delete"
-                      onClick={() => handleDeleteFile(file.id)}
-                      title="Удалить файл"
-                    >
-                      ✕
-                    </button>
-                  </div>
+              {filesByItem.has(null) && (
+                <div className="files-group">
+                  <div className="files-group-title">Общие (без привязки к позиции)</div>
+                  {renderFileList(filesByItem.get(null)!)}
+                </div>
+              )}
+              {items.map((it, i) => filesByItem.has(it.id) && (
+                <div key={it.id} className="files-group">
+                  <div className="files-group-title">{getItemLabel(it, i)}</div>
+                  {renderFileList(filesByItem.get(it.id)!)}
+                </div>
+              ))}
+              {Array.from(filesByItem.entries()).filter(([k]) => k !== null && !items.some(i => i.id === k)).map(([itemId, list]) => (
+                <div key={`item-${itemId}`} className="files-group">
+                  <div className="files-group-title">Позиция (ID {itemId})</div>
+                  {renderFileList(list)}
                 </div>
               ))}
             </div>
@@ -300,9 +329,33 @@ const styles = `
   .files-actions {
     display: flex;
     gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
     padding: 16px 24px;
     background: #f8f9fa;
     border-bottom: 1px solid #e9ecef;
+  }
+
+  .files-position-select {
+    padding: 8px 12px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #fff;
+    min-width: 200px;
+  }
+
+  .files-group {
+    margin-bottom: 20px;
+  }
+
+  .files-group-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #dee2e6;
   }
 
   .btn-download-all,
