@@ -429,7 +429,8 @@ export const listOrderFiles = (orderId: number) => api.get<OrderFile[]>(`/orders
 export const uploadOrderFile = (orderId: number, file: File) => {
   const fd = new FormData();
   fd.append('file', file);
-  return api.post<OrderFile>(`/orders/${orderId}/files`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  // Не задаём Content-Type — браузер подставит multipart/form-data с boundary, иначе сервер получит пустой файл (0 байт)
+  return api.post<OrderFile>(`/orders/${orderId}/files`, fd);
 };
 export const deleteOrderFile = (orderId: number, fileId: number) => api.delete(`/orders/${orderId}/files/${fileId}`);
 export const approveOrderFile = (orderId: number, fileId: number) => api.post<OrderFile>(`/orders/${orderId}/files/${fileId}/approve`, {});
@@ -716,9 +717,7 @@ export const getDocumentTemplatesByType = (type: 'contract' | 'act' | 'invoice')
 export const getDocumentTemplate = (id: number) => 
   api.get<DocumentTemplate>(`/document-templates/${id}`);
 export const uploadDocumentTemplate = (formData: FormData) => 
-  api.post<DocumentTemplate>('/document-templates', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
+  api.post<DocumentTemplate>('/document-templates', formData);
 export const setDefaultTemplate = (id: number) => 
   api.patch<DocumentTemplate>(`/document-templates/${id}/set-default`);
 export const deleteDocumentTemplate = (id: number) => 
