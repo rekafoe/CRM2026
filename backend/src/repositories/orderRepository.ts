@@ -430,6 +430,27 @@ export const OrderRepository = {
     }
   },
 
+  /** Загружает photo_orders для нескольких id одним запросом (устранение N+1). */
+  async getPhotoOrdersByIds(ids: number[]): Promise<Map<number, PhotoOrderRow>> {
+    const map = new Map<number, PhotoOrderRow>()
+    if (ids.length === 0) return map
+    const db = await getDb()
+    try {
+      const placeholders = ids.map(() => '?').join(',')
+      const rows = await db.all<PhotoOrderRow>(
+        `SELECT id, status, created_at, first_name, chat_id, total_price, selected_size, processing_options, quantity
+         FROM photo_orders WHERE id IN (${placeholders})`,
+        ...ids
+      )
+      for (const row of Array.isArray(rows) ? rows : []) {
+        map.set(row.id, row)
+      }
+    } catch (e: any) {
+      console.warn('[OrderRepository] getPhotoOrdersByIds failed:', e?.message || e)
+    }
+    return map
+  },
+
   async searchOrders(
     userId: number,
     searchParams: {

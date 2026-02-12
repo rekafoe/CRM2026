@@ -110,16 +110,21 @@ export class OrderService {
     return orders
   }
 
-  /** Все заказы без фильтра по пользователю (для пула заказов) */
+  /** Все заказы без фильтра по пользователю (для пула заказов). Batch loading — устранение N+1. */
   static async getAllOrdersForPool() {
     const orders = (await OrderRepository.listAllOrders()) as Order[]
+    const telegramIds = orders.filter((o) => o.paymentMethod === 'telegram').map((o) => o.id)
+    const websiteIds = orders.filter((o) => o.paymentMethod !== 'telegram').map((o) => o.id)
+    const [itemsByOrderId, photoOrdersById] = await Promise.all([
+      OrderRepository.getItemsByOrderIds(websiteIds),
+      OrderRepository.getPhotoOrdersByIds(telegramIds),
+    ])
     for (const order of orders) {
-      const isTelegramOrder = order.paymentMethod === 'telegram'
-      if (isTelegramOrder) {
-        const telegramOrder = await OrderRepository.getPhotoOrderById(order.id)
-        order.items = telegramOrder ? [mapPhotoOrderToVirtualItem(telegramOrder)] : []
+      if (order.paymentMethod === 'telegram') {
+        const photo = photoOrdersById.get(order.id)
+        order.items = photo ? [mapPhotoOrderToVirtualItem(photo)] : []
       } else {
-        order.items = await OrderRepository.getItemsByOrderId(order.id)
+        order.items = itemsByOrderId.get(order.id) ?? []
       }
     }
     return orders
