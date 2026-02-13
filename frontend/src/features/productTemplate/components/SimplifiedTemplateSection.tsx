@@ -4,8 +4,10 @@ import type { CalculatorMaterial } from '../../../services/calculatorMaterialSer
 import { getPaperTypesFromWarehouse, type PaperTypeForCalculator } from '../../../services/calculatorMaterialService'
 import { getPrintTechnologies } from '../../../api'
 import { api } from '../../../api'
-import type { SimplifiedConfig, SimplifiedSizeConfig } from '../hooks/useProductTemplate'
+import type { SimplifiedConfig, SimplifiedSizeConfig, SimplifiedTypeConfig } from '../hooks/useProductTemplate'
+import { useSimplifiedTypes } from '../hooks/useSimplifiedTypes'
 import { ServicePricingTable, type ServiceItem, type ServicePricing } from './ServicePricingTable'
+import { ProductTypesCard } from './ProductTypesCard'
 import './SimplifiedTemplateSection.css'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
@@ -223,7 +225,24 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   allMaterials,
   showPagesConfig = true,
 }) => {
-  const [selectedSizeId, setSelectedSizeId] = useState<string | null>(value.sizes[0]?.id ?? null)
+  const {
+    hasTypes,
+    selectedTypeId,
+    setSelectedTypeId,
+    sizes,
+    selectedSizeId,
+    setSelectedSizeId,
+    selected,
+    pagesConfig,
+    applyToCurrentConfig,
+    updatePagesConfig,
+    updateSize,
+    removeSize,
+    addType,
+    setDefaultType,
+    removeType,
+  } = useSimplifiedTypes(value, onChange)
+
   const [paperTypes, setPaperTypes] = useState<PaperTypeRow[]>([])
   const [printTechs, setPrintTechs] = useState<PrintTechRow[]>([])
   const [services, setServices] = useState<ServiceRow[]>([])
@@ -239,38 +258,22 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const [isMobile, setIsMobile] = useState(false)
   const [newPageToAdd, setNewPageToAdd] = useState('')
 
-  const selected = useMemo(
-    () => value.sizes.find(s => s.id === selectedSizeId) || null,
-    [value.sizes, selectedSizeId],
+  const handleSelectType = useCallback(
+    (typeId: string) => {
+      setSelectedTypeId(typeId)
+      const cfg = value.typeConfigs?.[typeId]?.sizes ?? []
+      setSelectedSizeId(cfg[0]?.id ?? null)
+    },
+    [value.typeConfigs, setSelectedTypeId, setSelectedSizeId],
   )
-
-  const pagesConfig = useMemo(() => value.pages || { options: [] as number[] }, [value.pages])
-  const updatePagesConfig = useCallback((patch: Partial<NonNullable<SimplifiedConfig['pages']>>) => {
-    onChange({ ...value, pages: { ...pagesConfig, ...patch } })
-  }, [onChange, value, pagesConfig])
 
   // Восстанавливаем флаг взаимодействия с материалами при смене размера
   useEffect(() => {
     if (!selected) return
-    
-    // Если есть сохраненные allowed_material_ids, значит пользователь уже выбирал материалы
     if (selected.allowed_material_ids && selected.allowed_material_ids.length > 0) {
       hasUserInteractedWithMaterialsRef.current = true
     }
   }, [selected])
-
-  const updateSize = useCallback((id: string, patch: Partial<SimplifiedSizeConfig>) => {
-    onChange({
-      ...value,
-      sizes: value.sizes.map(s => (s.id === id ? { ...s, ...patch } : s)),
-    })
-  }, [onChange, value])
-
-  const removeSize = useCallback((id: string) => {
-    const nextSizes = value.sizes.filter(s => s.id !== id)
-    onChange({ ...value, sizes: nextSizes })
-    if (selectedSizeId === id) setSelectedSizeId(nextSizes[0]?.id ?? null)
-  }, [onChange, selectedSizeId, value.sizes, value])
 
   const loadLists = useCallback(async () => {
     setLoadingLists(true)
@@ -420,12 +423,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       material_prices: [],
       finishing: [],
     }
-    const next = { ...value, sizes: [...value.sizes, size] }
-    onChange(next)
+    applyToCurrentConfig(prev => ({ ...prev, sizes: [...(prev.sizes || []), size] }))
     setSelectedSizeId(size.id)
     setShowAddSize(false)
     setNewSize({ label: '', width_mm: '', height_mm: '' })
-  }, [newSize.height_mm, newSize.label, newSize.width_mm, onChange, value])
+  }, [newSize.height_mm, newSize.label, newSize.width_mm, applyToCurrentConfig])
 
   const techName = useCallback((code: string) => printTechs.find(t => t.code === code)?.name || code, [printTechs])
   const svcName = useCallback((id: number) => services.find(s => Number(s.id) === Number(id))?.name || `#${id}`, [services])
@@ -446,7 +448,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
 
   // Обновить диапазоны во всех связанных данных размера
   const updateSizeRanges = useCallback((sizeId: string, newRanges: Tier[]) => {
-    const size = value.sizes.find(s => s.id === sizeId)
+    const size = sizes.find(s => s.id === sizeId)
     if (!size) return
 
     // Обновляем диапазоны в печати
@@ -484,7 +486,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       material_prices: updatedMaterialPrices,
       finishing: updatedFinishing
     })
-  }, [value.sizes, updateSize])
+  }, [sizes, updateSize])
 
   // Материалы выбранного типа бумаги (или всех типов, если selectedPaperTypeId не выбран)
   // Поддерживаем выбор нескольких типов бумаги - показываем материалы из выбранного типа
@@ -669,6 +671,16 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         </div>
       </div>
 
+      <ProductTypesCard
+        value={value}
+        onChange={onChange}
+        selectedTypeId={selectedTypeId}
+        onSelectType={handleSelectType}
+        onAddType={addType}
+        setDefaultType={setDefaultType}
+        removeType={removeType}
+      />
+
       {showPagesConfig && (
         <div className="simplified-card">
           <div className="simplified-card__header">
@@ -772,13 +784,13 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         </div>
       )}
 
-      {value.sizes.length === 0 ? (
+      {sizes.length === 0 ? (
         <Alert type="info">Добавьте хотя бы один размер (обрезной формат), чтобы начать настройку.</Alert>
       ) : (
         <div className="simplified-template__grid">
           <div className="simplified-template__sizes">
             <div className="simplified-template__sizes-title">Обрезные форматы</div>
-            {value.sizes.map(s => (
+            {sizes.map(s => (
               <button
                 key={s.id}
                 type="button"

@@ -41,7 +41,35 @@ export type SimplifiedSizeConfig = {
   material_prices: SimplifiedMaterialPrice[];
   finishing: SimplifiedFinishingPrice[];
 }
-export type SimplifiedConfig = { sizes: SimplifiedSizeConfig[]; pages?: SimplifiedPagesConfig }
+
+/** Тип продукта внутри одного продукта (например «Односторонние», «Дизайнерские») — свой набор полей и цен */
+export type ProductTypeVariant = {
+  id: string;
+  name: string;
+  /** Имена полей калькулятора для этого типа (опционально; если пусто — все поля из схемы) */
+  fieldNames?: string[];
+  default?: boolean;
+}
+
+/** Конфиг одного типа: размеры и цены (печать, материалы, отделка) */
+export type SimplifiedTypeConfig = {
+  sizes: SimplifiedSizeConfig[];
+  pages?: SimplifiedPagesConfig;
+}
+
+/**
+ * Упрощённый конфиг продукта.
+ * — Legacy: только sizes (и pages) — один «виртуальный» тип.
+ * — С типами: types[] + typeConfigs[typeId] — у каждого типа свои размеры и цены.
+ */
+export type SimplifiedConfig = {
+  sizes: SimplifiedSizeConfig[];
+  pages?: SimplifiedPagesConfig;
+  /** Типы продукта (варианты): если заданы, у каждого типа свой конфиг в typeConfigs */
+  types?: ProductTypeVariant[];
+  /** Конфиг по типам: typeId -> размеры и цены */
+  typeConfigs?: Record<string, SimplifiedTypeConfig>;
+}
 
 export interface TemplateState {
   meta: { name: string; description: string; icon: string; operator_percent: string }
@@ -144,6 +172,18 @@ export function useProductTemplateInitial(): TemplateState {
     simplified: { sizes: [], pages: { options: [] } },
     test: { qty: 100, params: {}, paramsJson: '{}' }
   }
+}
+
+/** Конфиг текущего типа или legacy (sizes/pages из корня) */
+export function getEffectiveConfig(value: SimplifiedConfig, selectedTypeId: string | null): SimplifiedTypeConfig {
+  if (value.types?.length && value.typeConfigs && selectedTypeId) {
+    return value.typeConfigs[selectedTypeId] ?? { sizes: [], pages: value.pages }
+  }
+  return { sizes: value.sizes, pages: value.pages }
+}
+
+export function generateTypeId(): string {
+  return `type_${Date.now()}_${Math.random().toString(16).slice(2)}`
 }
 
 export default function useProductTemplate() {

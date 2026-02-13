@@ -15,7 +15,6 @@ import AllowedMaterialsSection from './components/AllowedMaterialsSection';
 import ParametersSection from './components/ParametersSection';
 import MetaSection from './components/MetaSection';
 import { ProductSetupStatus } from '../../components/admin/ProductSetupStatus';
-import { ProductSetupWizard } from './components/ProductSetupWizard';
 import './ProductTemplateLayout.css';
 import useProductTemplatePage from './hooks/useProductTemplatePage';
 import { useProductOperations } from './hooks/useProductOperations';
@@ -153,36 +152,6 @@ const ProductTemplatePage: React.FC = () => {
 
 
   const notFound = !loading && !product;
-
-  // Обработчик навигации из мастера настройки
-  const handleWizardNavigate = (tab: string) => {
-    const sectionMap: Record<string, string> = {
-      'structure': 'section-format',
-      'materials': 'section-materials',
-      'operations': 'section-operations',
-      'pricing': 'section-pricing',
-      'parameters': 'section-parameters',
-      'finishing': 'section-finishing',
-      'run': 'section-run'
-    };
-
-    // Переключаем вкладку в зависимости от секции
-    if (tab === 'materials') {
-      setActiveTab('materials');
-    } else if (tab === 'run') {
-      setActiveTab('run');
-    } else {
-      setActiveTab('main');
-    }
-
-    const sectionId = sectionMap[tab];
-    if (sectionId) {
-      // Дадим React время переключить вкладку, затем скроллим
-      setTimeout(() => {
-        document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 0);
-    }
-  };
 
   return (
     <div className="product-template">
@@ -577,17 +546,6 @@ const ProductTemplatePage: React.FC = () => {
           }}
         />
       </Modal>
-
-      {productId && (
-        <ProductSetupWizard
-          productId={productId}
-          onNavigateToStep={handleWizardNavigate}
-          onComplete={() => {
-            // Можно обновить данные после завершения настройки
-            console.log('Setup wizard completed');
-          }}
-        />
-      )}
     </div>
   );
 };
