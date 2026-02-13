@@ -215,7 +215,7 @@ export class OrderService {
       customer_id?: number;
       items: Array<{
         type: string;
-        params: string;
+        params: string | Record<string, unknown>;
         price: number;
         quantity: number;
         materialRequirements?: Array<{
@@ -304,7 +304,7 @@ export class OrderService {
       source?: 'website' | 'telegram' | 'crm';
       items: Array<{
         type: string;
-        params: string;
+        params: string | Record<string, unknown>;
         price: number;
         quantity: number;
         components?: Array<{
@@ -364,15 +364,18 @@ export class OrderService {
         );
       }
       
-      // 3. Автоматическое списание материалов
+      // 3. Автоматическое списание материалов (params уже объект при заказе с сайта, иначе строка JSON)
       const deductionResult = await AutoMaterialDeductionService.deductMaterialsForOrder(
         order.id,
-        orderData.items.map(item => ({
-          type: item.type,
-          params: JSON.parse(item.params || '{}'),
-          quantity: item.quantity,
-          components: item.components
-        })),
+        orderData.items.map(item => {
+          const paramsObj = typeof item.params === 'string' ? (() => { try { return JSON.parse(item.params || '{}'); } catch { return {}; } })() : (item.params || {});
+          return {
+            type: item.type,
+            params: paramsObj,
+            quantity: item.quantity,
+            components: item.components
+          };
+        }),
         orderData.userId
       );
       
