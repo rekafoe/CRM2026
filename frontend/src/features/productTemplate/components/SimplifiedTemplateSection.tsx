@@ -33,6 +33,43 @@ interface Props {
 
 const uid = () => `sz_${Date.now()}_${Math.random().toString(16).slice(2)}`
 
+/** Поле цены за диапазон: при вводе хранит строку, чтобы можно было набрать 3.05 (ноль не пропадает); число записывается по blur */
+const PriceCell: React.FC<{
+  value: number
+  onChange: (v: number) => void
+  className?: string
+}> = ({ value, onChange, className }) => {
+  const [inputValue, setInputValue] = useState('')
+  const [isFocused, setIsFocused] = useState(false)
+  const displayValue = isFocused ? inputValue : String(value ?? 0)
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      className={className}
+      value={displayValue}
+      onFocus={() => {
+        setInputValue(String(value ?? 0))
+        setIsFocused(true)
+      }}
+      onChange={(e) => {
+        const raw = e.target.value
+        if (raw === '' || /^\d*[.,]?\d*$/.test(raw)) setInputValue(raw)
+      }}
+      onBlur={() => {
+        const normalized = inputValue.replace(',', '.')
+        if (normalized === '') {
+          onChange(0)
+        } else {
+          const num = parseFloat(normalized)
+          if (!Number.isNaN(num) && num >= 0) onChange(num)
+        }
+        setIsFocused(false)
+      }}
+    />
+  )
+}
+
 // По умолчанию: один диапазон от 1 до бесконечности
 const defaultTiers = () => [
   { min_qty: 1, max_qty: undefined, unit_price: 0 }
@@ -1069,14 +1106,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                           const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
                                           return (
                                         <td key={ti}>
-                                          <input
+                                          <PriceCell
                                             className="form-input form-input--compact-table"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                                value={String(priceTier.unit_price || 0)}
-                                            onChange={(e) => {
-                                              const v = Number(e.target.value) || 0
+                                            value={priceTier.unit_price ?? 0}
+                                            onChange={(v) => {
                                               const next = selected.print_prices.map((r, i) => {
                                                     if (i !== actualIdx) return r
                                                     const updatedTiers = commonRanges.map((rt, rti) => {
@@ -1143,14 +1176,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                           const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
                                           return (
                                             <td key={ti}>
-                                              <input
+                                              <PriceCell
                                                 className="form-input form-input--compact-table"
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={String(priceTier.unit_price || 0)}
-                                                onChange={(e) => {
-                                                  const v = Number(e.target.value) || 0
+                                                value={priceTier.unit_price ?? 0}
+                                                onChange={(v) => {
                                                   const next = selected.print_prices.map((r, i) => {
                                                     if (i !== actualIdx) return r
                                                     const updatedTiers = commonRanges.map((rt, rti) => {
@@ -1248,14 +1277,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                           const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
                                           return (
                                             <td key={ti}>
-                                              <input
+                                              <PriceCell
                                                 className="form-input form-input--compact-table"
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={String(priceTier.unit_price || 0)}
-                                                onChange={(e) => {
-                                                  const v = Number(e.target.value) || 0
+                                                value={priceTier.unit_price ?? 0}
+                                                onChange={(v) => {
                                                   const next = selected.print_prices.map((r, i) => {
                                                     if (i !== actualIdx) return r
                                                     const updatedTiers = commonRanges.map((rt, rti) => {
@@ -1322,14 +1347,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                           const priceTier = row.tiers.find(rt => rt.min_qty === t.min_qty) || t
                                           return (
                                             <td key={ti}>
-                                              <input
+                                              <PriceCell
                                                 className="form-input form-input--compact-table"
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={String(priceTier.unit_price || 0)}
-                                                onChange={(e) => {
-                                                  const v = Number(e.target.value) || 0
+                                                value={priceTier.unit_price ?? 0}
+                                                onChange={(v) => {
                                                   const next = selected.print_prices.map((r, i) => {
                                                     if (i !== actualIdx) return r
                                                     const updatedTiers = commonRanges.map((rt, rti) => {
@@ -1717,16 +1738,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                       const priceTier = materialPrice?.tiers.find(rt => rt.min_qty === t.min_qty) || t
                                       return (
                                         <td key={ti}>
-                                          <input
+                                          <PriceCell
                                             className="form-input form-input--compact-table"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={String(priceTier.unit_price || 0)}
-                                            onChange={(e) => {
-                                              const v = Number(e.target.value) || 0
+                                            value={priceTier.unit_price ?? 0}
+                                            onChange={(v) => {
                                               if (actualIdx === -1) {
-                                                // Создаем новую запись для материала
                                                 const newMaterialPrice = {
                                                   material_id: Number(m.id),
                                                   tiers: commonRanges.map((rt, rti) => {
@@ -1738,7 +1754,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                                   material_prices: [...selected.material_prices, newMaterialPrice]
                                                 })
                                               } else {
-                                              const next = selected.material_prices.map((r, i) => {
+                                                const next = selected.material_prices.map((r, i) => {
                                                   if (i !== actualIdx) return r
                                                   const updatedTiers = commonRanges.map((rt, rti) => {
                                                     if (rti === ti) return { ...rt, unit_price: v }
@@ -1746,8 +1762,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                                     return existingTier || rt
                                                   })
                                                   return { ...r, tiers: updatedTiers }
-                                              })
-                                              updateSize(selected.id, { material_prices: next })
+                                                })
+                                                updateSize(selected.id, { material_prices: next })
                                               }
                                             }}
                                           />
