@@ -1,8 +1,12 @@
-/* Order Pool Page Styles */
+/* Order Pool Page — в одном стиле с модалкой калькулятора и страницей отчётов */
+
 .order-pool-page {
   display: flex;
   height: 100vh;
-  background: #f5f5f5;
+  background: #f1f5f9;
+  padding: 20px;
+  gap: 20px;
+  box-sizing: border-box;
 }
 
 .order-pool-sidebar {
@@ -10,65 +14,91 @@
   width: 40%;
   min-width: 260px;
   background: white;
-  border-right: 1px solid #e0e0e0;
+  border: 2px solid #f1f5f9;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.order-pool-sidebar:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .back-button {
-  padding: 12px 16px;
-  background: #f0f0f0;
-  border: 1px solid #d0d0d0;
-  border-radius: 4px;
+  padding: 10px 16px;
+  margin: 16px 16px 0;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 14px;
-  margin: 16px;
-  transition: background-color 0.2s;
+  font-weight: 600;
+  color: #1a202c;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .back-button:hover {
-  background: #e0e0e0;
+  border-color: #cbd5e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .order-pool-sidebar h2 {
   margin: 0 16px 16px;
   font-size: 18px;
-  font-weight: 600;
-  color: #333;
+  font-weight: 700;
+  color: #1a202c;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f1f5f9;
 }
 
 .filters {
   padding: 0 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .filters-quick {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .filters-quick .quick-btn {
   flex-shrink: 0;
-  padding: 4px 8px;
-  border: 1px solid #d0d0d0;
-  border-radius: 999px;
-  background: #f7f7f7;
-  font-size: 11px;
+  padding: 6px 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
+  color: #1a202c;
+}
+
+.filters-quick .quick-btn:hover {
+  border-color: #cbd5e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.filters-quick .quick-btn.active {
+  background: var(--accent-primary, #667eea);
+  border-color: var(--accent-primary, #667eea);
+  color: white;
 }
 
 .filters-row {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .filters-row input {
@@ -85,44 +115,37 @@
   flex-shrink: 0;
 }
 
-.filters-quick .quick-btn:hover {
-  background: #ededed;
-}
-
-.filters-quick .quick-btn.active {
-  background: #e3f2fd;
-  border-color: #90caf9;
-  color: #1565c0;
-  font-weight: 600;
-}
-
 .filters input,
 .filters select {
-  padding: 6px 10px;
-  border: 1px solid #d0d0d0;
-  border-radius: 4px;
+  padding: 10px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
   font-size: 13px;
+  background: #f8fafc;
+  transition: border-color 0.2s ease;
 }
 
 .filters input:focus,
 .filters select:focus {
   outline: none;
-  border-color: #2196F3;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+  border-color: #667eea;
 }
 
 .filters button {
-  padding: 6px 10px;
-  background: #f0f0f0;
-  border: 1px solid #d0d0d0;
-  border-radius: 4px;
+  padding: 10px 14px;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 13px;
-  transition: background-color 0.2s;
+  font-weight: 600;
+  color: #1a202c;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .filters button:hover {
-  background: #e0e0e0;
+  border-color: #cbd5e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .order-list {
@@ -135,20 +158,20 @@
   width: 100%;
   border-collapse: collapse;
   background: white;
-  border-radius: 6px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 2px solid #f1f5f9;
 }
 
 .order-list-table th {
-  background: #f8f9fa;
+  background: #f8fafc;
   padding: 12px 8px;
   text-align: center;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 12px;
-  color: #495057;
-  border-bottom: 1px solid #dee2e6;
-  border-right: 1px solid #e2e4e8;
+  color: #1a202c;
+  border-bottom: 2px solid #f1f5f9;
+  border-right: 1px solid #e2e8f0;
   white-space: nowrap;
   position: sticky;
   top: 0;
@@ -168,8 +191,8 @@
 
 .order-list-table td {
   padding: 12px 8px;
-  border-bottom: 1px solid #f1f3f4;
-  border-right: 1px solid #e8eaed;
+  border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #e2e8f0;
   font-size: 13px;
   vertical-align: middle;
   text-align: center;
@@ -192,7 +215,7 @@
 }
 
 .order-list-table tr:nth-child(even) {
-  background: #fcfcfc;
+  background: #fcfcfd;
 }
 
 .order-debt--due {
@@ -229,55 +252,59 @@
 
 .load-more-btn {
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid #d0d0d0;
-  background: #f7f7f7;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+  background: white;
   cursor: pointer;
-  transition: background 0.2s;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a202c;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .load-more-btn:hover {
-  background: #ededed;
+  border-color: #cbd5e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .order-assignee,
 .order-payment-method,
 .order-debt {
-  color: #333;
+  color: #334155;
 }
 
 .order-list-table tr {
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s;
 }
 
 .order-list-table tr:hover {
-  background: #f8f9fa;
+  background: #f8fafc;
 }
 
 .order-list-table tr.selected {
-  background: #e3f2fd;
-  border-left: 3px solid #2196F3;
+  background: #eef2ff;
+  border-left: 3px solid var(--accent-primary, #667eea);
 }
 
 .order-list-table tr.assigned {
-  opacity: 0.6;
-  background: #f8f9fa;
+  opacity: 0.7;
+  background: #f8fafc;
 }
 
 .order-list-table tr.assigned:hover {
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 .order-number {
   font-weight: 600;
-  color: #333;
+  color: #1a202c;
   white-space: nowrap;
 }
 
 .order-date {
-  color: #666;
+  color: #64748b;
   font-size: 11px;
   white-space: nowrap;
 }
@@ -289,7 +316,7 @@
 }
 
 .order-customer {
-  color: #555;
+  color: #475569;
   max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -298,7 +325,7 @@
 
 .order-total {
   font-weight: 600;
-  color: #2196F3;
+  color: var(--accent-primary, #667eea);
   text-align: right;
   white-space: nowrap;
 }
@@ -306,7 +333,7 @@
 .order-phone,
 .order-email {
   font-size: 12px;
-  color: #666;
+  color: #64748b;
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -322,25 +349,9 @@
   font-size: 13px;
 }
 
-.prepayment-amount.paid {
-  color: #28a745;
-}
-
-.prepayment-amount.pending {
-  color: #ffc107;
-}
-
 .prepayment-status {
   font-size: 10px;
-  font-weight: 500;
-}
-
-.prepayment-status.paid {
-  color: #28a745;
-}
-
-.prepayment-status.pending {
-  color: #ffc107;
+  font-weight: 600;
 }
 
 .order-status {
@@ -348,56 +359,67 @@
 }
 
 .assigned-badge {
-  background: #28a745;
+  background: var(--accent-primary, #667eea);
   color: white;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: 6px;
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
 }
 
+/* Правая панель — карточка как в модалке */
 .order-pool-detail {
   flex: 1;
   flex-basis: 60%;
   min-width: 0;
-  padding: 16px 24px;
+  padding: 20px 24px;
   overflow-y: auto;
   background: white;
-  margin: 16px;
-  margin-left: 0;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 2px solid #f1f5f9;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.order-pool-detail:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .order-detail-actions .btn-close-debt {
-  background: #28a745;
+  background: #15803d;
   color: white;
+  border: 2px solid #15803d;
+  border-radius: 12px;
+  font-weight: 600;
 }
 
 .order-detail-actions .btn-close-debt:hover {
-  background: #218838;
+  background: #166534;
+  border-color: #166534;
+  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.25);
 }
 
-/* Таймлайн статусов заказа (как в основном приложении) */
+/* Таймлайн статусов */
 .order-status-timeline {
   margin: 16px 0 20px;
   padding: 12px 0;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 2px solid #f1f5f9;
 }
 
 .order-status-timeline__bar-wrap {
   height: 6px;
-  background: #e0e0e0;
-  border-radius: 3px;
+  background: #e2e8f0;
+  border-radius: 6px;
   overflow: hidden;
   margin-bottom: 16px;
 }
 
 .order-status-timeline__bar-fill {
   height: 100%;
-  background: #757575;
-  border-radius: 3px;
+  background: var(--accent-primary, #667eea);
+  border-radius: 6px;
   transition: width 0.25s ease;
 }
 
@@ -420,10 +442,10 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #e0e0e0;
-  color: #fff;
+  background: #e2e8f0;
+  color: #64748b;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -432,30 +454,32 @@
 }
 
 .order-status-timeline__step--active .order-status-timeline__circle {
-  background: #616161;
+  background: var(--accent-primary, #667eea);
+  color: white;
 }
 
 .order-status-timeline__step--past .order-status-timeline__circle {
-  background: #9e9e9e;
+  background: #94a3b8;
+  color: white;
 }
 
 .order-status-timeline__label {
   font-size: 11px;
-  color: #666;
+  font-weight: 600;
+  color: #64748b;
   text-align: center;
   line-height: 1.2;
 }
 
 .order-status-timeline__step--active .order-status-timeline__label {
-  color: #333;
-  font-weight: 500;
+  color: #1a202c;
 }
 
 .order-status-timeline__dates {
   display: flex;
   gap: 16px;
   font-size: 13px;
-  color: #666;
+  color: #64748b;
   margin-bottom: 8px;
 }
 
@@ -466,16 +490,17 @@
 
 .order-status-timeline__empty {
   font-size: 13px;
-  color: #999;
+  color: #94a3b8;
 }
 
+/* Блок ответственного */
 .order-detail-responsible {
   display: flex;
   align-items: center;
   gap: 12px;
   margin: 16px 0;
-  padding: 12px 0;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 16px 0;
+  border-bottom: 2px solid #f1f5f9;
 }
 
 .order-detail-responsible label {
@@ -483,111 +508,114 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: #333;
+  font-weight: 600;
+  color: #1a202c;
 }
 
 .order-detail-responsible select {
-  padding: 8px 12px;
-  border: 1px solid #d0d0d0;
-  border-radius: 4px;
+  padding: 10px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
   font-size: 14px;
   min-width: 180px;
+  background: #f8fafc;
 }
 
 .order-detail-responsible select:focus {
   outline: none;
-  border-color: #2196F3;
+  border-color: #667eea;
 }
 
-.order-detail-responsible .btn-assign-me {
-  padding: 8px 14px;
-  background: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
+.order-detail-responsible .btn-assign-me,
+.order-detail-responsible .btn-take-self,
+.order-detail-responsible .btn-assign-responsible {
+  padding: 10px 16px;
+  border: 2px solid transparent;
+  border-radius: 12px;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  font-weight: 500;
+  transition: box-shadow 0.2s ease;
 }
 
-.order-detail-responsible .btn-assign-me:hover {
-  background: #45a049;
+.order-detail-responsible .btn-assign-me,
+.order-detail-responsible .btn-assign-responsible {
+  background: #15803d;
+  color: white;
+  border-color: #15803d;
+}
+
+.order-detail-responsible .btn-assign-me:hover,
+.order-detail-responsible .btn-assign-responsible:hover {
+  background: #166534;
+  border-color: #166534;
+  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.25);
 }
 
 .order-detail-responsible .btn-take-self {
-  padding: 8px 14px;
-  background: #fd7e14;
+  background: #ea580c;
   color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  font-weight: 500;
+  border-color: #ea580c;
 }
 
 .order-detail-responsible .btn-take-self:hover {
-  background: #e96b00;
+  background: #c2410c;
+  border-color: #c2410c;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);
 }
 
-.order-detail-responsible .btn-assign-responsible {
-  padding: 8px 14px;
-  background: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.order-detail-responsible .btn-assign-responsible:hover {
-  background: #45a049;
-}
-
+/* Действия с заказом */
 .order-detail-actions {
   display: flex;
   gap: 12px;
   margin: 16px 0;
   padding: 16px 0;
-  border-top: 1px solid #e0e0e0;
-  border-bottom: 1px solid #e0e0e0;
+  border-top: 2px solid #f1f5f9;
+  border-bottom: 2px solid #f1f5f9;
 }
 
 .order-detail-actions button {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 4px;
+  padding: 10px 18px;
+  border: 2px solid transparent;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s;
+  font-weight: 600;
+  transition: box-shadow 0.2s ease;
 }
 
 .order-detail-actions button:first-child {
-  background: #4CAF50;
+  background: #15803d;
   color: white;
+  border-color: #15803d;
 }
 
 .order-detail-actions button:first-child:hover {
-  background: #45a049;
+  background: #166534;
+  border-color: #166534;
+  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.25);
 }
 
 .order-detail-actions button:nth-child(2) {
-  background: #2196F3;
+  background: var(--accent-primary, #667eea);
   color: white;
+  border-color: var(--accent-primary, #667eea);
 }
 
 .order-detail-actions button:nth-child(2):hover {
-  background: #1976D2;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
 }
 
 .order-detail-actions button:nth-child(3) {
-  background: #f44336;
+  background: #dc2626;
   color: white;
+  border-color: #dc2626;
 }
 
 .order-detail-actions button:nth-child(3):hover {
-  background: #d32f2f;
+  background: #b91c1c;
+  border-color: #b91c1c;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
 }
 
 .order-detail-readiness {
@@ -596,20 +624,21 @@
   align-items: center;
   gap: 8px;
   margin: 12px 0;
-  padding: 10px 12px;
+  padding: 12px 16px;
   background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  border-radius: 8px;
+  border: 2px solid #e0f2fe;
+  border-radius: 12px;
   font-size: 14px;
 }
 
 .order-detail-readiness-label {
-  font-weight: 600;
+  font-weight: 700;
   color: #0369a1;
 }
 
 .order-detail-readiness-value {
   color: #0c4a6e;
+  font-weight: 600;
 }
 
 .order-detail-readiness-hint {
@@ -624,7 +653,8 @@
   justify-content: center;
   height: 100vh;
   font-size: 16px;
-  color: #666;
+  font-weight: 600;
+  color: #64748b;
 }
 
 .error-message {
@@ -633,7 +663,8 @@
   justify-content: center;
   height: 100vh;
   font-size: 16px;
-  color: #f44336;
+  font-weight: 600;
+  color: #dc2626;
 }
 
 .text-center {
@@ -641,24 +672,28 @@
 }
 
 .text-gray-500 {
-  color: #666;
+  color: #64748b;
 }
 
-/* Responsive design */
+/* Адаптив */
 @media (max-width: 768px) {
   .order-pool-page {
     flex-direction: column;
+    padding: 12px;
+    gap: 12px;
   }
-  
+
   .order-pool-sidebar {
     flex: 0 0 auto;
     width: 100%;
     height: 300px;
+    border-radius: 16px;
   }
-  
+
   .order-pool-detail {
-    margin: 8px;
-    margin-left: 8px;
+    margin: 0;
+    padding: 16px;
+    border-radius: 16px;
     min-width: 0;
   }
 }
