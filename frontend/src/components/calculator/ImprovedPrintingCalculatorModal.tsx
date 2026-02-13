@@ -18,6 +18,7 @@ import { SelectedProductCard } from './components/SelectedProductCard';
 import { DynamicProductSelector, CUSTOM_PRODUCT_ID, POSTPRINT_PRODUCT_ID } from './components/DynamicProductSelector';
 import { PrintingSettingsSection } from './components/PrintingSettingsSection';
 import { getProductionTimeLabel, getProductionDaysByPriceType, getProductionTimeLabelFromDays } from './utils/time';
+import { getEffectiveSimplifiedConfig } from './utils/simplifiedConfig';
 import { ProductSpecs, CalculationResult, EditContextPayload } from './types/calculator.types';
 import { useCalculatorEditContext } from './hooks/useCalculatorEditContext';
 import { useCalculatorPricingActions } from './hooks/useCalculatorPricingActions';
@@ -99,7 +100,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   
   // Состояние для названий типов продуктов (загружаются из API)
   const [productTypeLabels, setProductTypeLabels] = useState<Record<string, string>>({});
-  
+  // Тип продукта внутри одного продукта (односторонние, с ламинацией и т.д.)
+  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
+
   const { ui, open, close } = useCalculatorUI({ showProductSelection: !initialProductType });
   const [selectedProduct, setSelectedProduct] = useState<(Product & { resolvedProductType?: string }) | null>(null);
   const isCustomProduct = selectedProduct?.id === CUSTOM_PRODUCT_ID;
@@ -168,14 +171,53 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     setSpecs
   });
   
-  // 🆕 Логируем состояние selectedProduct для диагностики
+  const simplified = backendProductSchema?.template?.simplified;
+  const hasProductTypes = Boolean(simplified?.types?.length);
+  const defaultTypeId = simplified?.types?.find((t: any) => t.default)?.id ?? simplified?.types?.[0]?.id ?? null;
+
+  const effectiveConfig = useMemo(
+    () => getEffectiveSimplifiedConfig(simplified, hasProductTypes ? selectedTypeId : null),
+    [simplified, hasProductTypes, selectedTypeId]
+  );
+  const effectiveSizes = effectiveConfig.sizes;
+  const effectivePagesOptions = effectiveConfig.pages?.options;
+
   useEffect(() => {
-    console.log('🔍 [ImprovedPrintingCalculatorModal] selectedProduct изменился', {
-      selectedProductId: selectedProduct?.id,
-      selectedProductName: selectedProduct?.name,
-      willPassToUseCalculatorSchema: selectedProduct?.id || null
-    });
-  }, [selectedProduct?.id]);
+    if (!hasProductTypes) {
+      if (selectedTypeId !== null) setSelectedTypeId(null);
+      return;
+    }
+    const valid = simplified?.types?.some((t: any) => t.id === selectedTypeId);
+    if (!valid) {
+      const nextId = defaultTypeId ?? simplified?.types?.[0]?.id ?? null;
+      setSelectedTypeId(nextId);
+      const typeVariant = simplified?.types?.find((t: any) => t.id === nextId);
+      const cfg = nextId ? simplified?.typeConfigs?.[nextId] : null;
+      const firstSizeId = cfg?.sizes?.[0]?.id;
+      setSpecs((prev) => ({
+        ...prev,
+        typeId: nextId ?? undefined,
+        typeName: typeVariant?.name ?? undefined,
+        ...(firstSizeId ? { size_id: firstSizeId, format: cfg?.sizes?.[0] ? `${cfg.sizes[0].width_mm}×${cfg.sizes[0].height_mm}` : prev.format } : {}),
+      }));
+    }
+  }, [hasProductTypes, simplified?.types, simplified?.typeConfigs, defaultTypeId, selectedTypeId, setSpecs]);
+
+  const handleSelectProductType = useCallback(
+    (typeId: string) => {
+      setSelectedTypeId(typeId);
+      const typeVariant = simplified?.types?.find((t: any) => t.id === typeId);
+      const cfg = typeId ? simplified?.typeConfigs?.[typeId] : null;
+      const firstSize = cfg?.sizes?.[0];
+      setSpecs((prev) => ({
+        ...prev,
+        typeId,
+        typeName: typeVariant?.name ?? undefined,
+        ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}` } : {}),
+      }));
+    },
+    [simplified?.types, simplified?.typeConfigs, setSpecs]
+  );
 
   const { resolveProductType } = useCalculatorEditContext({
     isOpen,
@@ -202,10 +244,12 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   // Валидация вынесена в хук
   const { validationErrors, isValid } = useCalculatorValidation({
-    specs: { productType: specs.productType, quantity: specs.quantity, pages: specs.pages },
+    specs: { productType: specs.productType, quantity: specs.quantity, pages: specs.pages, size_id: specs.size_id, selectedOperations: specs.selectedOperations },
     backendProductSchema,
     isCustomFormat,
-    customFormat
+    customFormat,
+    effectiveSizes: effectiveSizes?.length ? effectiveSizes : undefined,
+    effectivePagesOptions: Array.isArray(effectivePagesOptions) && effectivePagesOptions.length > 0 ? effectivePagesOptions : undefined,
   });
 
   const getProductionTime = useCallback(() => {
@@ -246,6 +290,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     productTypeLabels,
     printTechnology,
     printColorMode,
+    effectiveSizes: effectiveSizes?.length ? effectiveSizes : undefined,
     toast,
     logger,
   });
@@ -276,6 +321,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       return;
     }
     prevProductIdRef.current = selectedProduct.id;
+    setSelectedTypeId(null);
 
     setSpecs(prev => {
       const next: any = { ...prev };
@@ -291,7 +337,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       next.selectedOperations = [];
       // Для обычных продуктов сбрасываем paperType, чтобы MaterialsSection
       // мог выбрать первый разрешённый тип бумаги из нового продукта
-      const isSimplified = backendProductSchema?.template?.simplified?.sizes?.length > 0;
+      const sim = backendProductSchema?.template?.simplified;
+      const isSimplified = (sim?.sizes?.length ?? 0) > 0 || Boolean(sim?.types?.length && sim?.typeConfigs);
       if (!isSimplified && next.paperType) {
         delete next.paperType;
         // Также сбрасываем плотность, так как она зависит от типа бумаги
@@ -745,6 +792,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         parameterSummary: cleanParameterSummary,
         productId: selectedProduct?.id,
         productName: selectedProduct?.name,
+        ...(result.specifications.typeId != null ? { typeId: result.specifications.typeId } : {}),
+        ...(result.specifications.typeName != null ? { type: result.specifications.typeName } : {}),
         ...(selectedProduct?.operator_percent !== undefined
           ? { operator_percent: Number(selectedProduct.operator_percent) }
           : {}),
@@ -1261,6 +1310,11 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                 selectedProduct={selectedProduct}
                 currentConfig={currentConfig}
                 onOpenProductSelector={handleOpenProductSelector}
+                effectiveSizes={effectiveSizes}
+                effectivePages={effectiveConfig.pages}
+                productTypes={hasProductTypes ? simplified?.types : undefined}
+                selectedTypeId={selectedTypeId}
+                onSelectType={handleSelectProductType}
               />
             )}
 

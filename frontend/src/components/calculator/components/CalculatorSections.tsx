@@ -31,6 +31,11 @@ interface CalculatorSectionsProps {
   result: CalculationResult | null;
   currentConfig?: { name?: string } | null;
   onOpenProductSelector: () => void;
+  effectiveSizes?: Array<{ id: string; label?: string; width_mm: number; height_mm: number; [key: string]: any }>;
+  effectivePages?: { options?: number[]; default?: number };
+  productTypes?: Array<{ id: string; name: string; default?: boolean }>;
+  selectedTypeId?: string | null;
+  onSelectType?: (typeId: string) => void;
 }
 
 export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(({
@@ -55,7 +60,14 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   selectedProduct,
   currentConfig,
   onOpenProductSelector,
+  effectiveSizes,
+  productTypes,
+  selectedTypeId,
+  onSelectType,
 }) => {
+  const hasEffectiveSizes = Array.isArray(effectiveSizes) && effectiveSizes.length > 0;
+  const showTypeSelector = Array.isArray(productTypes) && productTypes.length > 0 && onSelectType != null;
+
   return (
     <div className="calculator-section-group calculator-section-unified">
       <div className="section-group-header">
@@ -67,6 +79,25 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           displayName={selectedProduct?.name || (backendProductSchema?.type || currentConfig?.name || specs.productType) as string}
           onOpenSelector={onOpenProductSelector}
         />
+
+        {showTypeSelector && (
+          <div className="calculator-product-types">
+            <label className="calculator-product-types__label">Тип продукта</label>
+            <div className="calculator-product-types__tabs">
+              {productTypes.map((t: { id: string; name: string; default?: boolean }) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`calculator-product-types__tab ${selectedTypeId === t.id ? 'calculator-product-types__tab--active' : ''}`}
+                  onClick={() => onSelectType(t.id)}
+                >
+                  {t.name}
+                  {t.default && <span className="calculator-product-types__badge">по умолчанию</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <ParamsSection
           specs={
@@ -87,6 +118,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           setCustomFormat={setCustomFormat}
           updateSpecs={updateSpecs}
           schema={backendProductSchema}
+          effectiveSizes={effectiveSizes}
         />
 
         <div className="unified-params-row">
@@ -99,8 +131,9 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
             onSidesChange={(value) => updateSpecs({ sides: value as 1 | 2 })}
             selectedProduct={selectedProduct}
             backendProductSchema={backendProductSchema}
+            effectiveSizes={effectiveSizes}
             materialInFirstColumn={
-              backendProductSchema?.template?.simplified?.sizes?.length && (specs as any).size_id
+              hasEffectiveSizes && (specs as any).size_id
                 ? (
                     <MaterialsSection
                       specs={{
@@ -119,12 +152,13 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
                       schema={backendProductSchema}
                       result={result}
                       renderMaterialOnly
+                      effectiveSizes={effectiveSizes}
                     />
                   )
                 : undefined
             }
           />
-          {!backendProductSchema?.template?.simplified?.sizes?.length ? (
+          {!hasEffectiveSizes ? (
           <MaterialsSection
           specs={{ 
             paperType: specs.paperType, 
@@ -141,6 +175,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           updateSpecs={updateSpecs}
           schema={backendProductSchema}
           result={result}
+          effectiveSizes={effectiveSizes}
         />
           ) : null}
         </div>

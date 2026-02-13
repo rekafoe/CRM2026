@@ -2392,6 +2392,50 @@
   padding: 16px;
 }
 
+/* Типы продукта (варианты внутри одного продукта) */
+.calculator-product-types {
+  margin-bottom: 12px;
+}
+.calculator-product-types__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 8px;
+}
+.calculator-product-types__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.calculator-product-types__tab {
+  padding: 8px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  color: #2d3748;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.calculator-product-types__tab:hover {
+  border-color: #cbd5e0;
+  background: #f7fafc;
+}
+.calculator-product-types__tab--active {
+  border-color: #3182ce;
+  background: #ebf8ff;
+  color: #2b6cb0;
+}
+.calculator-product-types__badge {
+  font-size: 10px;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(49, 130, 206, 0.15);
+  color: #2b6cb0;
+}
+
 .section-group-content > * {
   margin-bottom: 12px;
 }

@@ -31,6 +31,8 @@ interface UseCalculatorPricingActionsParams {
   productTypeLabels?: Record<string, string>;
   printTechnology?: string;
   printColorMode?: 'bw' | 'color' | null;
+  /** Размеры текущего типа продукта (для продуктов с типами) */
+  effectiveSizes?: any[];
   toast: { success: Function; error: Function };
   logger: { info: Function; error: Function };
 }
@@ -47,15 +49,16 @@ interface UseCalculatorPricingActionsReturn {
 }
 
 /** Продукт «требует печать», только если в схеме явно заданы технологии/цены печати (иначе — продукт без печати: секция «Печать» не показывается, расчёт идёт без выбора типа/режима). */
-function productRequiresPrint(schema: any): boolean {
+function productRequiresPrint(schema: any, effectiveSizes?: any[]): boolean {
   if (!schema) return false;
   const constraints = schema.constraints;
   if (constraints?.allowed_print_technologies && Array.isArray(constraints.allowed_print_technologies) && constraints.allowed_print_technologies.length > 0) {
     return true;
   }
   const template = schema.template;
-  if (template?.simplified?.sizes && Array.isArray(template.simplified.sizes)) {
-    const hasPrintPrices = template.simplified.sizes.some((size: any) =>
+  const sizesToCheck = Array.isArray(effectiveSizes) ? effectiveSizes : template?.simplified?.sizes;
+  if (sizesToCheck && Array.isArray(sizesToCheck)) {
+    const hasPrintPrices = sizesToCheck.some((size: any) =>
       Array.isArray(size.print_prices) && size.print_prices.length > 0
     );
     if (hasPrintPrices) return true;
@@ -83,6 +86,7 @@ export function useCalculatorPricingActions({
   productTypeLabels,
   printTechnology,
   printColorMode,
+  effectiveSizes,
   toast,
   logger,
 }: UseCalculatorPricingActionsParams): UseCalculatorPricingActionsReturn {
@@ -172,7 +176,7 @@ export function useCalculatorPricingActions({
         }
 
         // ✅ Параметры печати обязательны только для продуктов с печатью. Продукты без печати считаем без них.
-        const requiresPrint = productRequiresPrint(backendProductSchema);
+        const requiresPrint = productRequiresPrint(backendProductSchema, effectiveSizes);
         if (requiresPrint && (!printTechnology || !printColorMode)) {
           const missingParams = [];
           if (!printTechnology) missingParams.push('технология печати');
@@ -880,6 +884,7 @@ export function useCalculatorPricingActions({
       buildParameterSummary,
       calculatePriceViaBackend,
       customFormat,
+      effectiveSizes,
       getProductionTime,
       isCustomFormat,
       isValid,

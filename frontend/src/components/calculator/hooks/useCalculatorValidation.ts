@@ -16,6 +16,10 @@ interface UseCalculatorValidationParams {
   backendProductSchema?: any | null;
   isCustomFormat?: boolean;
   customFormat?: { width: string; height: string };
+  /** Размеры текущего типа продукта (если у продукта есть типы) */
+  effectiveSizes?: Array<{ id: string; min_qty?: number; max_qty?: number; [key: string]: any }>;
+  /** Варианты страниц текущего типа (для упрощённых продуктов с типами) */
+  effectivePagesOptions?: number[];
 }
 
 function computeErrors(params: {
@@ -71,15 +75,20 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
     backendProductSchema = null,
     isCustomFormat = false,
     customFormat = { width: '', height: '' },
+    effectiveSizes,
+    effectivePagesOptions,
   } = params;
 
   const schemaPagesEnum = useMemo(() => {
+    if (Array.isArray(effectivePagesOptions) && effectivePagesOptions.length > 0) {
+      return effectivePagesOptions;
+    }
     return backendProductSchema?.fields?.find((f: any) => f.name === 'pages')?.enum as number[] | undefined;
-  }, [backendProductSchema]);
+  }, [backendProductSchema, effectivePagesOptions]);
 
   const getSizeLimits = useCallback((sizeId?: string) => {
     if (!sizeId) return undefined;
-    const sizes = backendProductSchema?.template?.simplified?.sizes;
+    const sizes = Array.isArray(effectiveSizes) ? effectiveSizes : backendProductSchema?.template?.simplified?.sizes;
     if (!Array.isArray(sizes)) return undefined;
     const selectedSize = sizes.find((s: any) => s.id === sizeId);
     if (!selectedSize) return undefined;
@@ -87,7 +96,7 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
       min: selectedSize.min_qty ?? 1,
       max: selectedSize.max_qty ?? undefined,
     };
-  }, [backendProductSchema]);
+  }, [backendProductSchema, effectiveSizes]);
 
   const getOperationLimits = useCallback((selectedOps?: Array<{ operationId?: number | string }>) => {
     if (!Array.isArray(selectedOps) || selectedOps.length === 0) return undefined;

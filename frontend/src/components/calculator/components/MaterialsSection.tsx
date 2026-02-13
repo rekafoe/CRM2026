@@ -51,6 +51,8 @@ interface MaterialsSectionProps {
   result?: CalculationResult | null;
   /** Только блок «Материал» для упрощённых продуктов (в одну колонку с «Тип печати») */
   renderMaterialOnly?: boolean;
+  /** Размеры текущего типа продукта (если у продукта есть типы) */
+  effectiveSizes?: Array<{ id: string; allowed_material_ids?: number[]; [key: string]: any }>;
 }
 
 export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
@@ -63,7 +65,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   schema,
   result,
   renderMaterialOnly = false,
+  effectiveSizes: effectiveSizesProp,
 }) => {
+  const simplifiedSizesSource = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
+    ? effectiveSizesProp
+    : schema?.template?.simplified?.sizes;
+
   const [materialAvailability, setMaterialAvailability] = useState<{
     available: boolean;
     available_quantity: number;
@@ -85,10 +92,9 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   /** Флаг: пользователь вручную выбрал тип — не перезаписывать из specs (избегаем рекурсии) */
   const userChoseTypeRef = useRef(false);
 
-  // 🆕 Загружаем список всех материалов для упрощённых продуктов
+  // Загружаем список всех материалов для упрощённых продуктов
   useEffect(() => {
-    const simplifiedSizes = schema?.template?.simplified?.sizes;
-    if (simplifiedSizes && simplifiedSizes.length > 0 && allMaterials.length === 0 && !loadingMaterials) {
+    if (simplifiedSizesSource && simplifiedSizesSource.length > 0 && allMaterials.length === 0 && !loadingMaterials) {
       setLoadingMaterials(true);
       getMaterials()
         .then(response => {
@@ -103,7 +109,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
           setLoadingMaterials(false);
         });
     }
-  }, [schema?.template?.simplified, allMaterials.length, loadingMaterials]);
+  }, [simplifiedSizesSource, allMaterials.length, loadingMaterials]);
 
   const hasField = (name: string) => !!schema?.fields?.some(f => f.name === name);
   const getLabel = (name: string, fallback: string) => (schema?.fields as any)?.find((f: any) => f.name === name)?.label || fallback;
@@ -209,21 +215,20 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   }, [filteredPaperTypes, specs.paperType, updateSpecs, getDefaultPaperDensity]);
 
   // 🆕 Проверяем, является ли продукт упрощённым
-  const simplifiedSizes = schema?.template?.simplified?.sizes;
-  const isSimplifiedProduct = simplifiedSizes && simplifiedSizes.length > 0;
+  const isSimplifiedProduct = simplifiedSizesSource && simplifiedSizesSource.length > 0;
   
   // 🆕 Получаем разрешённые материалы для выбранного размера
   const allowedMaterialsForSize = useMemo(() => {
     if (!isSimplifiedProduct || !specs.size_id) return [];
     
-    const selectedSize = simplifiedSizes.find(s => s.id === specs.size_id);
+    const selectedSize = simplifiedSizesSource?.find((s: any) => s.id === specs.size_id);
     if (!selectedSize || !selectedSize.allowed_material_ids || selectedSize.allowed_material_ids.length === 0) {
       return [];
     }
     
     // Фильтруем материалы по allowed_material_ids
     return allMaterials.filter(m => selectedSize.allowed_material_ids!.includes(Number(m.id)));
-  }, [isSimplifiedProduct, specs.size_id, simplifiedSizes, allMaterials]);
+  }, [isSimplifiedProduct, specs.size_id, simplifiedSizesSource, allMaterials]);
 
   // Уникальные типы материала (paper_type_name) из разрешённых материалов — для фильтра
   const materialTypesFromMaterials = useMemo(() => {

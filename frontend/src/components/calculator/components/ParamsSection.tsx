@@ -22,6 +22,8 @@ interface ParamsSectionProps {
     fields?: Array<{ name: string; type?: string; enum?: any[]; label?: string; required?: boolean; min?: number; max?: number; placeholder?: string }>; 
     template?: { simplified?: { sizes?: Array<{ id: string; label: string; width_mm: number; height_mm: number }> } } | null;
   } | null;
+  /** Размеры текущего типа продукта (если у продукта есть типы — подставляются из модалки) */
+  effectiveSizes?: Array<{ id: string; label?: string; width_mm: number; height_mm: number }>;
 }
 
 export const ParamsSection: React.FC<ParamsSectionProps> = ({
@@ -33,7 +35,8 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   setIsCustomFormat,
   setCustomFormat,
   updateSpecs,
-  schema
+  schema,
+  effectiveSizes: effectiveSizesProp,
 }) => {
   const hasField = (name: string) => !!schema?.fields?.some(f => f.name === name);
   const getEnum = (name: string): any[] => schema?.fields?.find(f => f.name === name)?.enum || [];
@@ -42,8 +45,10 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   const getMin = (name: string) => schema?.fields?.find(f => f.name === name)?.min;
   const getMax = (name: string) => schema?.fields?.find(f => f.name === name)?.max;
   const getPlaceholder = (name: string, fb: string) => schema?.fields?.find(f => f.name === name)?.placeholder || fb;
-  // 🆕 Проверяем, является ли продукт упрощённым
-  const simplifiedSizes = schema?.template?.simplified?.sizes;
+  // Размеры: при наличии effectiveSizes (типы продукта) используем их, иначе из схемы
+  const simplifiedSizes = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
+    ? effectiveSizesProp
+    : schema?.template?.simplified?.sizes;
   const isSimplifiedProduct = simplifiedSizes && simplifiedSizes.length > 0;
 
   // 🆕 Устанавливаем первый размер для упрощённых продуктов, если не выбран

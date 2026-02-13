@@ -12,6 +12,8 @@ interface PrintingSettingsSectionProps {
   onSidesChange: (value: number) => void;
   selectedProduct: (Product & { resolvedProductType?: string }) | null;
   backendProductSchema: any;
+  /** Размеры текущего типа продукта (если у продукта есть типы) */
+  effectiveSizes?: Array<{ id: string; print_prices?: any[]; [key: string]: any }>;
   /** Блок «Материал» для первой колонки (под «Тип печати») — одна линия по вертикали */
   materialInFirstColumn?: React.ReactNode;
 }
@@ -27,6 +29,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   onSidesChange,
   selectedProduct,
   backendProductSchema,
+  effectiveSizes: effectiveSizesProp,
   materialInFirstColumn,
 }) => {
   const [printTechnologies, setPrintTechnologies] = useState<Array<{ code: string; name: string; pricing_mode: string; supports_duplex?: number | boolean }>>([]);
@@ -98,12 +101,13 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       );
     }
 
-    // 2) Для упрощённых продуктов: извлекаем технологии из template.simplified.sizes[].print_prices[]
-    // Это технологии, для которых настроены цены в шаблоне продукта
-    const template = backendProductSchema?.template;
-    if (template?.simplified?.sizes && Array.isArray(template.simplified.sizes)) {
+    // 2) Для упрощённых продуктов: извлекаем технологии из sizes[].print_prices[]
+    const sizesToCheck = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
+      ? effectiveSizesProp
+      : backendProductSchema?.template?.simplified?.sizes;
+    if (sizesToCheck && Array.isArray(sizesToCheck)) {
       const techCodesFromPrintPrices = new Set<string>();
-      template.simplified.sizes.forEach((size: any) => {
+      sizesToCheck.forEach((size: any) => {
         if (Array.isArray(size.print_prices)) {
           size.print_prices.forEach((priceConfig: any) => {
             const techCode = priceConfig.technology_code || priceConfig.technologyCode;
@@ -113,11 +117,11 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
           });
         }
       });
-      
       if (techCodesFromPrintPrices.size > 0) {
         return printTechnologies.filter(tech => techCodesFromPrintPrices.has(tech.code));
       }
     }
+    const template = backendProductSchema?.template;
 
     // 3) Для обычных продуктов: проверяем config_data.print_prices (если есть)
     // На странице шаблона продукта могут быть сохранены цены печати по технологиям
@@ -153,7 +157,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
 
     // 5) Если ничего не найдено - возвращаем пустой массив (не показываем лишние технологии)
     return [];
-  }, [printTechnologies, printers, backendProductSchema]);
+  }, [printTechnologies, printers, backendProductSchema, effectiveSizesProp]);
 
   // Получаем информацию о выбранной технологии печати
   const selectedPrintTechnology = useMemo(() => {
@@ -204,7 +208,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       }
     });
 
-    // 2) Fallback: из шаблона продукта (print_prices) — цены настроены в упрощённом калькуляторе, режимы должны быть
+    // 2) Fallback: из шаблона продукта (print_prices)
     if (colorModes.size === 0) {
       const template = backendProductSchema?.template;
       const collectFromPrintPrices = (list: any[] | undefined) => {
@@ -217,9 +221,11 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
           if (normalized) colorModes.add(normalized);
         });
       };
-      const sizes = template?.simplified?.sizes;
-      if (Array.isArray(sizes)) {
-        sizes.forEach((size: any) => collectFromPrintPrices(size.print_prices));
+      const sizesForColor = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
+        ? effectiveSizesProp
+        : template?.simplified?.sizes;
+      if (Array.isArray(sizesForColor)) {
+        sizesForColor.forEach((size: any) => collectFromPrintPrices(size.print_prices));
       }
       const configData = template?.config_data || template;
       if (configData?.print_prices) collectFromPrintPrices(configData.print_prices);
@@ -232,7 +238,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     }
 
     return Array.from(colorModes);
-  }, [printTechnology, printers, isColorOnly, backendProductSchema, allowedPrintTechnologies]);
+  }, [printTechnology, printers, isColorOnly, backendProductSchema, allowedPrintTechnologies, effectiveSizesProp]);
 
   // 🆕 Устанавливаем дефолтные значения для селекторов печати
   useEffect(() => {
