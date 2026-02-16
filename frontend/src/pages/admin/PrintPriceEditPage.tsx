@@ -193,6 +193,7 @@ export const PrintPriceEditPage: React.FC = () => {
 
       if (!isNew && priceRes?.data) {
         const item = priceRes.data as PrintPrice & { tiers?: PrintPriceTier[] };
+        const loadedTiers = (item.tiers ?? []) as PrintPriceTier[];
         setForm({
           technology_code: item.technology_code || '',
           counter_unit: (item.counter_unit as 'sheets' | 'meters') || 'sheets',
@@ -204,7 +205,7 @@ export const PrintPriceEditPage: React.FC = () => {
           price_color_duplex: item.price_color_duplex ?? 0,
           price_bw_per_meter: item.price_bw_per_meter ?? null,
           price_color_per_meter: item.price_color_per_meter ?? null,
-          tiers: (item.tiers ?? []) as PrintPriceTier[],
+          tiers: loadedTiers.length > 0 ? loadedTiers : PRICE_MODES.flatMap((m) => buildDefaultTiers(m.key)),
         });
       } else if (isNew) {
         setForm((prev) => ({
