@@ -205,6 +205,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [showFilesModal, setShowFilesModal] = useState(false);
   const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
   const [showPrepaymentDetailsModal, setShowPrepaymentDetailsModal] = useState(false);
+  const [issuingOrderId, setIssuingOrderId] = useState<number | null>(null);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [orderStatuses, setOrderStatuses] = useState<Array<{ id: number; name: string; color?: string; sort_order: number }>>([]);
   const [filters, dispatchFilters] = useReducer(filtersReducer, initialFilters);
@@ -473,8 +474,12 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     [allUsers, orders, toast, logger, updateOrderInList]
   );
 
+  const issuingRef = useRef(false);
   const handleIssueOrder = useCallback(
     async (orderId: number) => {
+      if (issuingRef.current) return;
+      issuingRef.current = true;
+      setIssuingOrderId(orderId);
       try {
         await issueOrder(orderId);
         toast.success('Заказ выдан', 'Долг закрыт, заказ переведён в «Выдан»');
@@ -488,6 +493,9 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       } catch (err: any) {
         logger.error('Issue order failed', err);
         toast.error('Ошибка', err?.message ?? 'Не удалось выдать заказ');
+      } finally {
+        issuingRef.current = false;
+        setIssuingOrderId(null);
       }
     },
     [orderMetrics, toast, logger, updateOrderInList]
@@ -709,9 +717,13 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             </div>
             <div className="order-detail-actions">
               <button onClick={() => setShowPrepaymentModal(true)}>💳 Внести предоплату</button>
-              {getOrderDebt(selectedOrder) > 0 && (
-                <button className="btn-close-debt" onClick={() => handleIssueOrder(selectedOrder.id)}>
-                  ✅ Выдать заказ
+              {(getOrderDebt(selectedOrder) > 0 || (getOrderPrepayment(selectedOrder) >= getOrderTotal(selectedOrder) && getOrderTotal(selectedOrder) > 0)) && Number(selectedOrder.status) !== 4 && (
+                <button
+                  className="btn-close-debt"
+                  onClick={() => handleIssueOrder(selectedOrder.id)}
+                  disabled={issuingOrderId === selectedOrder.id}
+                >
+                  {issuingOrderId === selectedOrder.id ? '⏳ Выдача...' : '✅ Выдать заказ'}
                 </button>
               )}
               {selectedOrder.source && (selectedOrder.source === 'website' || selectedOrder.source === 'telegram') && (
@@ -724,10 +736,9 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               const priceType = (firstItem?.params as any)?.priceType ?? (firstItem?.params as any)?.price_type ?? 'standard';
               const readyLabels: Record<string, string> = {
                 urgent: 'В течение 3 часов',
-                online: '24 часа',
                 promo: '48 часов',
                 special: '4–5 дней',
-                standard: 'По умолчанию',
+                standard: '24 часа',
               };
               const readyLabel = readyLabels[String(priceType).toLowerCase()] ?? readyLabels.standard;
               // TODO: реализовать систему уведомлений клиенту (email/SMS о готовности заказа) — см. docs/customer-notifications-setup.md

@@ -165,6 +165,105 @@ curl -X POST "https://your-backend.example.com/api/orders/915/files" \
 - **`quantity`** (обязательно) — число: количество.
 - **`priceType`** (опционально) — строка: `standard` (без изменения), `urgent`, `online`, `promo`, `special`. Можно передать в элементе или внутри `params`.
 
+### Пример: фото «Премиум - Квадратные фото» с заполненными полями
+
+Чтобы в Order Pool отображались описание, размер, тип бумаги и прочие детали — передайте полный `params`:
+
+```bash
+curl -X POST "https://api.printcore.by/api/orders/from-website" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_WEBSITE_ORDER_API_KEY" \
+  -d '{
+    "customerName": "Мария Иванова",
+    "customerPhone": "+375 29 555-12-34",
+    "customerEmail": "maria@example.com",
+    "prepaymentAmount": 4.80,
+    "items": [
+      {
+        "type": "Премиум - Квадратные фото",
+        "params": {
+          "description": "Квадратные фото 10×10 см, матовая бумага, 4 шт",
+          "specifications": {
+            "format": "10×10",
+            "paperType": "glossy",
+            "paperDensity": 250,
+            "sides": 1,
+            "quantity": 4
+          },
+          "formatInfo": "100×100 мм",
+          "parameterSummary": [
+            { "label": "Формат печати", "value": "10×10 см" },
+            { "label": "Материал", "value": "Матовая бумага 250 г/м²" },
+            { "label": "Плотность", "value": "250 г/м²" }
+          ],
+          "layout": {
+            "sheetsNeeded": 1,
+            "itemsPerSheet": 4,
+            "sheetSize": "SRA3"
+          },
+          "sheetsNeeded": 1,
+          "piecesPerSheet": 4
+        },
+        "price": 1.20,
+        "quantity": 4,
+        "priceType": "standard"
+      }
+    ]
+  }'
+```
+
+**Поля `params`, которые отображаются в Order Pool:**
+
+| Поле | Назначение |
+|------|------------|
+| `description` | Текст под названием (вместо «Без описания») |
+| `specifications.format` | Размер/формат — «Формат печати: 10×10» |
+| `specifications.paperType` | Тип бумаги (glossy, matte и т.д.) |
+| `specifications.paperDensity` | Плотность (г/м²) |
+| `specifications.sides` | Стороны печати (1 или 2) |
+| `formatInfo` | Альтернатива для формата, если нет `specifications.format` |
+| `parameterSummary` | Чипы: формат, материал, плотность |
+| `layout.sheetsNeeded` | Количество листов |
+| `layout.itemsPerSheet` | Штук на листе |
+| `layout.sheetSize` | Формат листа (SRA3, A4 и т.д.) |
+| `priceType` | Тип цены (срочно, онлайн, промо и т.д.) |
+
+**Вариант: 4 разных фото как 4 отдельные позиции** (если каждое фото — своя строка):
+
+```json
+{
+  "customerName": "Мария Иванова",
+  "customerPhone": "+375 29 555-12-34",
+  "prepaymentAmount": 4.80,
+  "items": [
+    {
+      "type": "Премиум - Квадратные фото",
+      "params": {
+        "description": "Фото 1 — 10×10 см, матовая бумага",
+        "specifications": { "format": "10×10", "paperType": "glossy", "paperDensity": 250, "sides": 1 },
+        "parameterSummary": [{ "label": "Формат печати", "value": "10×10 см" }]
+      },
+      "price": 1.20,
+      "quantity": 1,
+      "priceType": "standard"
+    },
+    {
+      "type": "Премиум - Квадратные фото",
+      "params": {
+        "description": "Фото 2 — 10×10 см, матовая бумага",
+        "specifications": { "format": "10×10", "paperType": "glossy", "paperDensity": 250, "sides": 1 },
+        "parameterSummary": [{ "label": "Формат печати", "value": "10×10 см" }]
+      },
+      "price": 1.20,
+      "quantity": 1,
+      "priceType": "standard"
+    }
+  ]
+}
+```
+
+У каждой позиции свой `description` — в Order Pool не будет «Без описания».
+
 **Ответ 201 (успех):**
 ```json
 {
@@ -199,6 +298,87 @@ curl -X POST "https://your-backend.example.com/api/orders/915/files" \
 - Ответ: 201 и объект файла (`id`, `orderId`, `filename`, `originalName`, `mime`, `size`, `uploadedAt`, …).
 
 **Сценарии:** (1) Один запрос: `POST /api/orders/from-website/with-files` (multipart с полями заказа и полем `file`/файлами). (2) Два шага: сайт создаёт заказ через `POST /api/orders/from-website`, получает `order.id` и **`order.number`**, затем для каждого файла вызывает `POST /api/orders/from-website/{order.id}/files`. Чтобы заказ в пуле приходил **с файлами**, сайт должен либо использовать `with-files`, либо после создания заказа загружать файлы по `order.id`. **Позиции заказа:** если в `items` передаётся `type` как ID продукта (число), в CRM при отображении он подменяется на название продукта из каталога; описание берётся из `params.description` или «Без описания».
+
+---
+
+## Каталог продуктов для сайта (описания подтипов)
+
+API продуктов возвращает данные для отображения каталога на сайте. Swagger: `/api-docs` (тег **Website Catalog**).
+
+**`GET /api/products/categories`** — список категорий (Визитки, Брошюры и т.д.).
+
+**`GET /api/products`** — список продуктов (id, name, category_id, description, icon и т.д.).
+
+**`GET /api/products/:id/schema`** — полная схема продукта. В `data.template.simplified` содержатся:
+- **`types`** — подтипы продукта (ProductTypeSubtype). Каждый подтип может иметь:
+  - `id`, `name`, `default`
+  - `briefDescription` — краткое описание для карточки
+  - `fullDescription` — полное описание для страницы продукта
+  - `characteristics` — массив строк (характеристики)
+  - `advantages` — массив строк (преимущества)
+- **`typeConfigs`** — конфиг по типам (размеры, цены, материалы).
+
+Редактирование этих полей — в CRM, в шаблоне продукта, блок «Типы продукта» → «Контент для сайта».
+
+### Примеры запросов с сайта printcore.by
+
+**Базовый URL API** — замените на ваш (например `https://api.printcore.by` или URL CRM на Railway).
+
+#### 1. Получить категории (страница «Наша продукция»)
+
+```bash
+curl -X GET "https://api.printcore.by/api/products/categories?activeOnly=true"
+```
+
+```javascript
+// fetch (браузер / Next.js)
+const res = await fetch('https://api.printcore.by/api/products/categories?activeOnly=true');
+const categories = await res.json();
+// [{ id: 1, name: "Визитки", sort_order: 1, icon: "..." }, ...]
+```
+
+#### 2. Получить продукты (все или по категории)
+
+```bash
+# Все активные продукты
+curl -X GET "https://api.printcore.by/api/products?activeOnly=true"
+
+# Продукты категории «Визитки» (categoryId=1)
+curl -X GET "https://api.printcore.by/api/products/category/1?activeOnly=true"
+```
+
+```javascript
+const products = await fetch('https://api.printcore.by/api/products?activeOnly=true').then(r => r.json());
+// [{ id: 58, name: "Визитки", category_id: 1, category_name: "Визитки", ... }, ...]
+```
+
+#### 3. Получить подтипы и контент для страницы продукта
+
+```bash
+# Схема продукта «Визитки» (productId=58) — подтипы, описания, калькулятор
+curl -X GET "https://api.printcore.by/api/products/58/schema"
+```
+
+```javascript
+const res = await fetch('https://api.printcore.by/api/products/58/schema');
+const { data } = await res.json();
+
+// Подтипы с описаниями для карточек и страницы
+const subtypes = data?.template?.simplified?.types ?? [];
+// [{ id: "type_xxx", name: "Визитки стандартные цветные", briefDescription: "Цветные на плотной бумаге",
+//    fullDescription: "Классические цветные визитки...", characteristics: ["Размер: 90×50 мм", ...],
+//    advantages: ["Высокое качество печати", ...] }, ...]
+
+// Конфиг калькулятора по подтипу
+const typeConfigs = data?.template?.simplified?.typeConfigs ?? {};
+```
+
+#### 4. Типичный сценарий для printcore.by
+
+1. **Главная каталога** — `GET /api/products/categories?activeOnly=true` → сетка категорий.
+2. **При клике на категорию** — `GET /api/products/category/{categoryId}?activeOnly=true` → список продуктов.
+3. **При клике на продукт** — `GET /api/products/{productId}/schema` → подтипы с `briefDescription`, цены «от» из `typeConfigs`.
+4. **При клике на подтип** — страница продукта: `fullDescription`, `characteristics`, `advantages` + калькулятор из `typeConfigs`.
 
 ---
 

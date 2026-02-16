@@ -20,7 +20,6 @@ const options: swaggerJsdoc.Options = {
         description: 'Development server',
       },
       (() => {
-        // Базовый URL API (без /api-docs), чтобы «Try it out» в Swagger шёл к API, а не к странице документации
         const raw =
           process.env.PUBLIC_API_URL ||
           process.env.RAILWAY_STATIC_URL ||
@@ -28,6 +27,14 @@ const options: swaggerJsdoc.Options = {
         const url = raw.replace(/\/api-docs\/?$/, '') || raw
         return { url, description: 'Production server (Railway)' }
       })(),
+      {
+        url: 'https://api.printcore.by',
+        description: 'printcore.by (если настроен)',
+      },
+    ],
+    tags: [
+      { name: 'Products', description: 'Продукты и каталог' },
+      { name: 'Website Catalog', description: 'API для каталога на сайте (printcore.by)' },
     ],
     components: {
       securitySchemes: {
@@ -58,6 +65,27 @@ const options: swaggerJsdoc.Options = {
             message: {
               type: 'string',
               description: 'Сообщение об успехе',
+            },
+          },
+        },
+        ProductTypeSubtype: {
+          type: 'object',
+          description: 'Подтип продукта (например: Визитки стандартные цветные, Визитки ламинированные)',
+          properties: {
+            id: { type: 'string', description: 'Уникальный ID подтипа' },
+            name: { type: 'string', description: 'Название подтипа' },
+            default: { type: 'boolean', description: 'Подтип по умолчанию' },
+            briefDescription: { type: 'string', description: 'Краткое описание для карточки на сайте' },
+            fullDescription: { type: 'string', description: 'Полное описание для страницы продукта' },
+            characteristics: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Характеристики (размер, печать, бумага и т.д.)',
+            },
+            advantages: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Преимущества',
             },
           },
         },

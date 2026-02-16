@@ -239,7 +239,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               >
                 💳 Внести предоплату
               </button>
-              {onIssueOrder && debt > 0 && (
+              {onIssueOrder && (debt > 0 || (debt === 0 && total > 0)) && Number(selectedOrder.status) !== 4 && (
                 <button 
                   onClick={() => onIssueOrder(selectedOrder.id)}
                   style={{

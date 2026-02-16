@@ -157,18 +157,56 @@
   color: var(--accent-primary, #1976d2);
 }
 
+.simplified-template__type-panel {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-hover, #fafafa);
+}
+
 .simplified-template__type-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-top: 1px solid var(--border-color, #e5e7eb);
-  background: var(--bg-hover, #fafafa);
   flex-wrap: wrap;
 }
 
 .simplified-template__type-actions .form-input--sm {
   max-width: 200px;
+}
+
+.simplified-template__type-website-content {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-primary, #fff);
+}
+
+.simplified-template__type-website-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.simplified-template__type-website-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.simplified-template__type-website-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+}
+
+.simplified-template__type-website-field .form-input,
+.simplified-template__type-website-field textarea {
+  width: 100%;
+  min-width: 0;
 }
 
 .simplified-form-grid {

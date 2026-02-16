@@ -538,8 +538,13 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const authUser = (req as any).user as { id: number } | undefined
   const issuerId = authUser?.id ?? null
   const db = await getDb()
-  const order = await db.get<any>('SELECT id, prepaymentAmount, discount_percent FROM orders WHERE id = ?', id)
+  const order = await db.get<any>('SELECT id, status, prepaymentAmount, discount_percent FROM orders WHERE id = ?', id)
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
+  if (Number(order.status) === 4) {
+    const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
+    res.json(updated)
+    return
+  }
   const items = await db.all<any>('SELECT price, quantity FROM items WHERE orderId = ?', id)
   const subtotal = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0)
   const discount = Number(order.discount_percent) || 0

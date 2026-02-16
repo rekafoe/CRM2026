@@ -211,15 +211,17 @@ router.get('/parameter-presets', asyncHandler(async (req, res) => {
  * /api/products/categories:
  *   get:
  *     summary: Список категорий продуктов
- *     description: Возвращает категории продуктов. Для калькулятора можно передать activeOnly=true.
- *     tags: [Products]
+ *     description: |
+ *       Возвращает категории продуктов. Для каталога на сайте (printcore.by) используйте activeOnly=true.
+ *       Категории — верхний уровень каталога (Визитки, Брошюры, Подарочные сертификаты и т.д.).
+ *     tags: [Products, Website Catalog]
  *     parameters:
  *       - in: query
  *         name: activeOnly
  *         schema:
  *           type: string
  *           enum: [true, false]
- *         description: Только активные категории
+ *         description: Только активные категории (для сайта — true)
  *     responses:
  *       200:
  *         description: Массив категорий продуктов
@@ -230,10 +232,11 @@ router.get('/parameter-presets', asyncHandler(async (req, res) => {
  *               items:
  *                 type: object
  *                 properties:
- *                   id: { type: integer }
- *                   name: { type: string }
+ *                   id: { type: integer, example: 1 }
+ *                   name: { type: string, example: "Визитки" }
  *                   sort_order: { type: integer }
  *                   is_active: { type: integer }
+ *                   icon: { type: string, nullable: true }
  */
 // Получить все категории продуктов (для админки - показываем все)
 router.get('/categories', async (req, res) => {
@@ -269,15 +272,19 @@ router.get('/categories', async (req, res) => {
  * /api/products:
  *   get:
  *     summary: Список продуктов
- *     description: Возвращает все продукты (или только активные при activeOnly=true). Для внешних систем (printcore.by) и калькулятора.
- *     tags: [Products]
+ *     description: |
+ *       Возвращает все продукты (или только активные при activeOnly=true).
+ *       Для каталога на сайте printcore.by — используйте activeOnly=true.
+ *       Продукты — абстрактные категории (Визитки, Брошюры, Подарочные сертификаты).
+ *       Подтипы с описаниями — в GET /api/products/{id}/schema.
+ *     tags: [Products, Website Catalog]
  *     parameters:
  *       - in: query
  *         name: activeOnly
  *         schema:
  *           type: string
  *           enum: [true, false]
- *         description: Только активные продукты (для калькулятора)
+ *         description: Только активные продукты (для сайта — true)
  *       - in: query
  *         name: search
  *         schema:
@@ -285,13 +292,21 @@ router.get('/categories', async (req, res) => {
  *         description: Поиск по названию и описанию
  *     responses:
  *       200:
- *         description: Массив продуктов с полями id, name, category_id, template, config_data и т.д.
+ *         description: Массив продуктов
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
  *                 type: object
+ *                 properties:
+ *                   id: { type: integer, example: 58 }
+ *                   name: { type: string, example: "Визитки" }
+ *                   category_id: { type: integer }
+ *                   category_name: { type: string }
+ *                   description: { type: string, nullable: true }
+ *                   icon: { type: string, nullable: true }
+ *                   is_active: { type: integer }
  */
 // Получить все продукты (для админки - показываем все, для калькулятора - фильтруем)
 router.get('/', async (req, res) => {
@@ -339,19 +354,23 @@ router.get('/', async (req, res) => {
  * /api/products/category/{categoryId}:
  *   get:
  *     summary: Продукты по категории
- *     description: Возвращает продукты выбранной категории.
- *     tags: [Products]
+ *     description: |
+ *       Возвращает продукты выбранной категории.
+ *       Для сайта — после выбора категории из GET /api/products/categories.
+ *     tags: [Products, Website Catalog]
  *     parameters:
  *       - in: path
  *         name: categoryId
  *         required: true
  *         schema:
  *           type: integer
+ *           example: 1
  *       - in: query
  *         name: activeOnly
  *         schema:
  *           type: string
  *           enum: [true, false]
+ *         description: Только активные продукты (для сайта — true)
  *     responses:
  *       200:
  *         description: Массив продуктов категории
@@ -388,22 +407,46 @@ router.get('/category/:categoryId', async (req, res) => {
  * @swagger
  * /api/products/{productId}/schema:
  *   get:
- *     summary: Схема продукта (JSON для калькулятора)
- *     description: Возвращает полную схему продукта — поля, ограничения, типы бумаги, цены печати. Используется калькулятором и внешними системами (printcore.by) для расчёта и отображения опций.
- *     tags: [Products]
+ *     summary: Схема продукта (калькулятор + каталог для сайта)
+ *     description: |
+ *       Возвращает полную схему продукта — поля калькулятора, ограничения, цены.
+ *       Для каталога на сайте (printcore.by) — в data.template.simplified содержатся:
+ *       - types — подтипы продукта (ProductTypeSubtype) с briefDescription, fullDescription, characteristics, advantages
+ *       - typeConfigs — размеры, цены, материалы по каждому подтипу
+ *     tags: [Products, Website Catalog]
  *     parameters:
  *       - in: path
  *         name: productId
  *         required: true
  *         schema:
  *           type: integer
+ *           example: 58
  *     responses:
  *       200:
- *         description: Объект schema (template, constraints, fields, simplified и т.д.)
+ *         description: Схема продукта с подтипами и контентом для сайта
  *         content:
  *           application/json:
  *             schema:
  *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     template:
+ *                       type: object
+ *                       properties:
+ *                         simplified:
+ *                           type: object
+ *                           properties:
+ *                             types:
+ *                               type: array
+ *                               description: Подтипы продукта (карточки на сайте)
+ *                               items:
+ *                                 $ref: '#/components/schemas/ProductTypeSubtype'
+ *                             typeConfigs:
+ *                               type: object
+ *                               additionalProperties: true
+ *                               description: Конфиг по typeId — размеры, цены, материалы
  *       404:
  *         description: Продукт не найден
  */
