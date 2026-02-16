@@ -8,9 +8,10 @@
  * - Фильтрация активных продуктов
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useProducts } from '../../../hooks/useProducts';
 import { Product, ProductCategory } from '../../../services/products';
+import { useDebounce } from '../../../hooks/useDebounce';
 import { useLogger } from '../../../utils/logger';
 import { useToastNotifications } from '../../Toast';
 
@@ -81,6 +82,46 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const searchRequestIdRef = useRef(0);
+
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  // Сброс результатов при очистке поля (мгновенно)
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+    }
+  }, [searchQuery]);
+
+  // Поиск при изменении debounced-запроса (избегаем race condition и лишних запросов)
+  useEffect(() => {
+    const query = debouncedSearchQuery.trim();
+    if (!query) {
+      setIsSearching(false);
+      return;
+    }
+    const requestId = ++searchRequestIdRef.current;
+    setIsSearching(true);
+    searchProducts(query)
+      .then((results) => {
+        if (requestId === searchRequestIdRef.current) {
+          setSearchResults(results);
+          logger.info('Поиск выполнен', { query, resultsCount: results.length });
+        }
+      })
+      .catch((error) => {
+        if (requestId === searchRequestIdRef.current) {
+          logger.error('Ошибка поиска', error);
+          toast.error('Ошибка поиска продуктов');
+          setSearchResults([]);
+        }
+      })
+      .finally(() => {
+        if (requestId === searchRequestIdRef.current) {
+          setIsSearching(false);
+        }
+      });
+  }, [debouncedSearchQuery, searchProducts, logger, toast]);
 
   // Фильтрованные продукты
   const filteredProducts = useMemo(() => {
@@ -103,27 +144,6 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
     setSearchResults([]);
     loadProductsByCategory(categoryId);
     logger.info('Выбрана категория', { categoryId });
-  };
-
-  // Обработка поиска
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-    
-    if (query.trim()) {
-      setIsSearching(true);
-      try {
-        const results = await searchProducts(query);
-        setSearchResults(results);
-        logger.info('Поиск выполнен', { query, resultsCount: results.length });
-      } catch (error) {
-        logger.error('Ошибка поиска', error);
-        toast.error('Ошибка поиска продуктов');
-      } finally {
-        setIsSearching(false);
-      }
-    } else {
-      setSearchResults([]);
-    }
   };
 
   // Обработка выбора продукта
@@ -182,7 +202,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
               type="text"
               placeholder="Поиск по названию продукта..."
               value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="search-input"
             />
             {isSearching && (

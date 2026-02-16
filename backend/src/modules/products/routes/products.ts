@@ -326,12 +326,11 @@ router.get('/', async (req, res) => {
       }
     }
     if (searchValue) {
-      // Используем LOWER() для регистронезависимого поиска кириллицы
-      // SQLite LIKE регистронезависим только для ASCII, но не для unicode/кириллицы
+      // Поиск по названию, описанию и категории. LOWER() для регистронезависимости кириллицы.
       const lowerSearch = searchValue.toLowerCase();
-      conditions.push('(LOWER(p.name) LIKE ? OR LOWER(p.description) LIKE ?)');
+      conditions.push('(LOWER(p.name) LIKE ? OR LOWER(COALESCE(p.description, \'\')) LIKE ? OR LOWER(COALESCE(pc.name, \'\')) LIKE ?)');
       const searchPattern = `%${lowerSearch}%`;
-      params.push(searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern);
     }
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE 1=1';
     
