@@ -193,12 +193,13 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       setSelectedTypeId(nextId);
       const typeVariant = simplified?.types?.find((t: any) => t.id === nextId);
       const cfg = nextId ? simplified?.typeConfigs?.[nextId] : null;
-      const firstSizeId = cfg?.sizes?.[0]?.id;
+      const firstSize = cfg?.sizes?.[0] as { id: string; width_mm: number; height_mm: number; min_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> } | undefined;
+      const minQty = firstSize?.min_qty ?? firstSize?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
       setSpecs((prev) => ({
         ...prev,
         typeId: nextId ?? undefined,
         typeName: typeVariant?.name ?? undefined,
-        ...(firstSizeId ? { size_id: firstSizeId, format: cfg?.sizes?.[0] ? `${cfg.sizes[0].width_mm}×${cfg.sizes[0].height_mm}` : prev.format } : {}),
+        ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}`, quantity: minQty } : {}),
       }));
     }
   }, [hasProductTypes, simplified?.types, simplified?.typeConfigs, defaultTypeId, selectedTypeId, setSpecs]);
@@ -208,12 +209,13 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       setSelectedTypeId(typeId);
       const typeVariant = simplified?.types?.find((t: any) => t.id === typeId);
       const cfg = typeId ? simplified?.typeConfigs?.[typeId] : null;
-      const firstSize = cfg?.sizes?.[0];
+      const firstSize = cfg?.sizes?.[0] as { id: string; width_mm: number; height_mm: number; min_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> } | undefined;
+      const minQty = firstSize?.min_qty ?? firstSize?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
       setSpecs((prev) => ({
         ...prev,
         typeId,
         typeName: typeVariant?.name ?? undefined,
-        ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}` } : {}),
+        ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}`, quantity: minQty } : {}),
       }));
     },
     [simplified?.types, simplified?.typeConfigs, setSpecs]

@@ -23,7 +23,7 @@ interface ParamsSectionProps {
     template?: { simplified?: { sizes?: Array<{ id: string; label: string; width_mm: number; height_mm: number }> } } | null;
   } | null;
   /** Размеры текущего типа продукта (если у продукта есть типы — подставляются из модалки) */
-  effectiveSizes?: Array<{ id: string; label?: string; width_mm: number; height_mm: number }>;
+  effectiveSizes?: Array<{ id: string; label?: string; width_mm: number; height_mm: number; min_qty?: number; max_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> }>;
 }
 
 export const ParamsSection: React.FC<ParamsSectionProps> = ({
@@ -51,17 +51,23 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
     : schema?.template?.simplified?.sizes;
   const isSimplifiedProduct = simplifiedSizes && simplifiedSizes.length > 0;
 
-  // 🆕 Устанавливаем первый размер для упрощённых продуктов, если не выбран
-  // Важно: также срабатывает при изменении simplifiedSizes (при смене продукта)
+  const selectedSizeId = specs.size_id || (simplifiedSizes?.length ? simplifiedSizes[0].id : '');
+  const selectedSize = simplifiedSizes?.find((s: any) => s.id === selectedSizeId);
+  const minQtyForSize = selectedSize
+    ? ((selectedSize as any).min_qty ?? (selectedSize as any).print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1)
+    : 1;
+
+  // 🆕 Устанавливаем первый размер и мин. количество для упрощённых продуктов
   React.useEffect(() => {
     if (isSimplifiedProduct && simplifiedSizes.length > 0) {
-      // Если size_id не установлен ИЛИ size_id не соответствует ни одному размеру из текущего продукта
-      // (это может произойти при смене продукта, когда старый size_id не валиден для нового продукта)
-      const isValidSizeId = specs.size_id && simplifiedSizes.some(s => s.id === specs.size_id);
+      const isValidSizeId = specs.size_id && simplifiedSizes.some((s: any) => s.id === specs.size_id);
       if (!isValidSizeId) {
+        const first = simplifiedSizes[0] as any;
+        const minQty = first.min_qty ?? first.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
         updateSpecs({ 
-          size_id: simplifiedSizes[0].id,
-          format: `${simplifiedSizes[0].width_mm}×${simplifiedSizes[0].height_mm}`
+          size_id: first.id,
+          format: `${first.width_mm}×${first.height_mm}`,
+          quantity: minQty,
         }, true);
       }
     }
@@ -73,8 +79,6 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
       <div className="params-grid compact">
         {/* 🆕 Размер изделия для упрощённых продуктов (длинные названия — подсказка + обрезка) */}
         {isSimplifiedProduct && (() => {
-          const selectedSizeId = specs.size_id || (simplifiedSizes.length > 0 ? simplifiedSizes[0].id : '');
-          const selectedSize = simplifiedSizes.find(s => s.id === selectedSizeId);
           const sizeOptionLabel = selectedSize ? `${selectedSize.label} (${selectedSize.width_mm}×${selectedSize.height_mm} мм)` : '';
           return (
             <div className="param-group param-group--narrow param-group--size-block">
@@ -85,10 +89,12 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                 value={selectedSizeId}
                 onChange={(e) => {
                   const id = e.target.value;
-                  const size = simplifiedSizes.find(s => s.id === id);
+                  const size = simplifiedSizes.find((s: any) => s.id === id) as any;
+                  const minQty = size?.min_qty ?? size?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
                   updateSpecs({
                     size_id: id,
-                    format: size ? `${size.width_mm}×${size.height_mm}` : specs.format
+                    format: size ? `${size.width_mm}×${size.height_mm}` : specs.format,
+                    quantity: minQty,
                   }, true);
                 }}
                 className="form-control"
@@ -179,7 +185,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
           </label>
           <div className="quantity-controls">
             {(() => {
-              const minQty = getMin('quantity') ?? 1;
+              const minQty = isSimplifiedProduct ? minQtyForSize : (getMin('quantity') ?? 1);
               const safeQty = Number.isFinite(specs.quantity) ? specs.quantity : 0;
               return (
                 <>
@@ -215,6 +221,11 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
           </div>
           {validationErrors.quantity && (
             <div className="text-sm text-red-600">{validationErrors.quantity}</div>
+          )}
+          {isSimplifiedProduct && specs.quantity != null && specs.quantity < minQtyForSize && (
+            <div className="text-sm text-warning mt-1">
+              Рекомендуемое количество для выбранного размера: {minQtyForSize} шт.
+            </div>
           )}
         </div>
 

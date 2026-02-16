@@ -344,7 +344,8 @@ export class SimplifiedPricingService {
       });
       
       if (printPriceConfig) {
-        const tier = this.findTierForQuantity(printPriceConfig.tiers, effectivePrintQuantity);
+        // unit_price в шаблоне — «цена за изделие» (UI), tiers.min_qty — в штуках. Ищем по quantity.
+        const tier = this.findTierForQuantity(printPriceConfig.tiers, quantity);
         let priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         // Fallback: если в шаблоне цены 0 — берём из центральных print_prices
         if (priceForTier <= 0 && normalizedConfig.print_technology) {
@@ -367,7 +368,8 @@ export class SimplifiedPricingService {
           }
         }
         if (priceForTier > 0) {
-          printPrice = priceForTier * effectivePrintQuantity;
+          // unit_price — за изделие, умножаем на quantity
+          printPrice = priceForTier * quantity;
           printDetails = {
             tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
             priceForQuantity: printPrice,
@@ -381,9 +383,9 @@ export class SimplifiedPricingService {
             printPrice,
           });
         } else if (tier) {
-          logger.warn('Цена печати в шаблоне и центральных ценах равна 0', { effectivePrintQuantity });
+          logger.warn('Цена печати в шаблоне и центральных ценах равна 0', { quantity });
         } else {
-          logger.warn('Не найден диапазон для печати', { effectivePrintQuantity, tiers: printPriceConfig.tiers });
+          logger.warn('Не найден диапазон для печати', { quantity, tiers: printPriceConfig.tiers });
         }
       } else {
         // Fallback: конфигурации нет в шаблоне — пробуем центральные print_prices
@@ -397,7 +399,7 @@ export class SimplifiedPricingService {
               : (isDuplex ? centralPrice.price_bw_duplex : centralPrice.price_bw_single);
             if (pricePerSheet != null && pricePerSheet > 0) {
               const priceForTier = pricePerSheet / itemsPerSheet;
-              printPrice = priceForTier * effectivePrintQuantity;
+              printPrice = priceForTier * quantity;
               printDetails = {
                 tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
                 priceForQuantity: printPrice,
