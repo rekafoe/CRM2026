@@ -326,11 +326,18 @@ router.get('/', async (req, res) => {
       }
     }
     if (searchValue) {
-      // Поиск по названию, описанию и категории. LOWER() для регистронезависимости кириллицы.
+      // Поиск по названию, описанию и категории. SQLite LOWER() не всегда работает с кириллицей на Windows,
+      // поэтому используем несколько вариантов регистра: "чер" и "Чер".
       const lowerSearch = searchValue.toLowerCase();
-      conditions.push('(LOWER(p.name) LIKE ? OR LOWER(COALESCE(p.description, \'\')) LIKE ? OR LOWER(COALESCE(pc.name, \'\')) LIKE ?)');
-      const searchPattern = `%${lowerSearch}%`;
-      params.push(searchPattern, searchPattern, searchPattern);
+      const cappedSearch = lowerSearch.charAt(0).toUpperCase() + lowerSearch.slice(1);
+      const patternLower = `%${lowerSearch}%`;
+      const patternCapped = `%${cappedSearch}%`;
+      conditions.push(`(
+        p.name LIKE ? OR p.name LIKE ? OR
+        COALESCE(p.description, '') LIKE ? OR COALESCE(p.description, '') LIKE ? OR
+        COALESCE(pc.name, '') LIKE ? OR COALESCE(pc.name, '') LIKE ?
+      )`);
+      params.push(patternLower, patternCapped, patternLower, patternCapped, patternLower, patternCapped);
     }
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE 1=1';
     
