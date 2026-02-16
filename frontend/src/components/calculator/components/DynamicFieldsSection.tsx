@@ -25,6 +25,11 @@ const RESERVED_FIELDS = new Set([
   'printMethod',
   'printer',
   'printer_id',
+  // Чекбоксы резка/фальцовка/скругление/магнит — в AdvancedSettingsSection
+  'cutting',
+  'folding',
+  'roundCorners',
+  'magnetic',
 ]);
 
 export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({ schema, specs, updateSpecs }) => {

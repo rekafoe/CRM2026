@@ -31,6 +31,11 @@ function getSpecsKey(specs: any, customFormat?: { width: string; height: string 
     // ✅ Кастомный формат тоже важен для расчета
     customFormat: isCustomFormat ? customFormat : undefined,
     isCustomFormat: isCustomFormat || false,
+    // 🆕 Резка, фальцовка и др. влияют на цену
+    cutting: specs.cutting,
+    folding: specs.folding,
+    roundCorners: specs.roundCorners,
+    magnetic: specs.magnetic,
   });
 }
 
