@@ -587,6 +587,7 @@ async function ensureMarkupDefaults(db: any): Promise<void> {
     { name: 'rush_multiplier', value: 1.5, description: 'Множитель срочности' },
     { name: 'complexity_multiplier', value: 1.0, description: 'Множитель сложности' },
     { name: 'operation_price_multiplier', value: 1.0, description: 'Общий множитель стоимости операций' },
+    { name: 'auto_cutting_price', value: 0, description: 'Цена за рез стопой (руб) — для автоматической резки по раскладке. 0 = брать цену из услуги резки.' },
   ]
 
   for (const s of seeds) {

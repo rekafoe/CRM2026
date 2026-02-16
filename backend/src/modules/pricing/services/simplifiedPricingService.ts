@@ -652,6 +652,65 @@ export class SimplifiedPricingService {
         }
       }
     }
+
+    // ✂️ Резка по раскладке (стопой): если configuration.cutting === true, считаем резы как cutsPerSheet
+    // (режем стопу листов одним проходом — количество резов = число линий раскладки на лист, не × на кол-во листов)
+    // Цена: сначала из markup_settings.auto_cutting_price (если > 0), иначе из услуги резки
+    const configCutting = (configuration as any).cutting === true;
+    if (configCutting) {
+      const cuttingService = await db.get<{ id: number; name: string }>(
+        `SELECT id, name FROM post_processing_services WHERE operation_type = 'cut' AND price_unit = 'per_cut' AND is_active = 1 LIMIT 1`
+      );
+      if (cuttingService) {
+        const totalCuts = layoutCheck.cutsPerSheet ?? 0;
+        if (totalCuts > 0) {
+          let pricePerCut = 0;
+          const centralPriceRow = await db.get<{ setting_value: number }>(
+            `SELECT setting_value FROM markup_settings WHERE setting_name = 'auto_cutting_price' AND is_active = 1`
+          );
+          const centralPrice = centralPriceRow?.setting_value != null ? Number(centralPriceRow.setting_value) : 0;
+          if (centralPrice > 0) {
+            pricePerCut = centralPrice;
+            logger.info('✂️ [SimplifiedPricingService] Используем централизованную цену резки', { auto_cutting_price: centralPrice });
+          } else {
+            const tiers = await PricingServiceRepository.listServiceTiers(cuttingService.id);
+            if (tiers && tiers.length > 0) {
+              const sorted = [...tiers].sort((a, b) => a.minQuantity - b.minQuantity);
+              const tier = this.findTierForQuantity(
+                sorted.map((t, idx) => ({
+                  min_qty: t.minQuantity,
+                  max_qty: idx < sorted.length - 1 ? sorted[idx + 1].minQuantity - 1 : undefined,
+                  unit_price: t.rate,
+                })),
+                totalCuts
+              );
+              pricePerCut = tier ? this.getPriceForQuantityTier(tier) : 0;
+            } else {
+              const baseService = await PricingServiceRepository.getServiceById(cuttingService.id);
+              pricePerCut = baseService?.rate ?? 0;
+            }
+          }
+          const cuttingPrice = pricePerCut * totalCuts;
+          finishingPrice += cuttingPrice;
+          finishingDetails.push({
+            service_id: cuttingService.id,
+            service_name: cuttingService.name,
+            tier: { min_qty: 1, max_qty: undefined, price: pricePerCut },
+            units_needed: totalCuts,
+            priceForQuantity: cuttingPrice,
+          });
+          logger.info('✂️ [SimplifiedPricingService] Резка стопой (по раскладке)', {
+            productId,
+            cutsPerSheet: layoutCheck.cutsPerSheet,
+            totalCuts,
+            pricePerCut,
+            cuttingPrice,
+          });
+        }
+      } else {
+        logger.warn('✂️ [SimplifiedPricingService] Резка включена, но не найдена услуга operation_type=cut, price_unit=per_cut');
+      }
+    }
     
     // 7. Рассчитываем итоги
     const subtotal = printPrice + materialPrice + finishingPrice;

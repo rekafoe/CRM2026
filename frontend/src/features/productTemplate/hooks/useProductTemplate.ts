@@ -77,6 +77,8 @@ export type SimplifiedConfig = {
   types?: ProductTypeVariant[];
   /** Конфиг по типам: typeId -> размеры и цены */
   typeConfigs?: Record<string, SimplifiedTypeConfig>;
+  /** Включить опцию «Резка» в калькуляторе: считает резы по раскладке (sheetsNeeded × cutsPerSheet), а не по тиражу */
+  cutting?: boolean;
 }
 
 export interface TemplateState {

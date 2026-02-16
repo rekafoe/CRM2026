@@ -285,10 +285,10 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/warehouse" element={<WarehousePage onBack={() => window.history.back()} />} />
           <Route path="/warehouse-reports" element={<ReportsPage onBack={() => window.history.back()} />} />
           <Route path="/low-stock-alerts" element={<WarehousePage onBack={() => window.history.back()} />} />
-          <Route path="/cost-calculation" element={<PricingPage onBack={() => window.history.back()} />} />
           
           {/* Ценообразование */}
           <Route path="/pricing" element={<PricingPage onBack={() => window.history.back()} />} />
+          <Route path="/cost-calculation" element={<Navigate to="/adminpanel/pricing" replace />} />
           <Route path="/services-management" element={<AdminDashboard />} />
           <Route path="/discounts" element={<PricingPage onBack={() => window.history.back()} />} />
           <Route path="/earnings" element={<EarningsAdminPage />} />

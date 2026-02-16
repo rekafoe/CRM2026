@@ -19,6 +19,7 @@ import { getServiceIcon, getServiceTypeLabel, getUnitLabel } from './utils/servi
 import ServiceForm from './components/ServiceForm';
 import ServicesTable from './components/ServicesTable';
 import ServiceVolumeTiersPanel from './components/ServiceVolumeTiersPanel';
+import { AutoCuttingPriceSection } from './components/AutoCuttingPriceSection';
 import { ServiceVariantsTable } from './components/ServiceVariantsTable';
 import { ServicesFilters } from './components/ServicesFilters';
 import { ServicesStats } from './components/ServicesStats';
@@ -327,6 +328,9 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
 
       {/* Статистика */}
       <ServicesStats services={services} />
+
+      {/* Цена автоматической резки */}
+      <AutoCuttingPriceSection />
 
       {/* Ошибки и успех */}
       {combinedError && (

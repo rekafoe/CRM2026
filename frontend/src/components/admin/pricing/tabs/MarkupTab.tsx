@@ -45,7 +45,10 @@ const MarkupTabComponent: React.FC<MarkupTabProps> = ({
   updateEditingValue,
 }) => {
   const filteredItems = useMemo(
-    () => getFilteredData(markupSettings, searchTerm),
+    () => getFilteredData(
+      markupSettings.filter((s) => s.setting_name !== 'auto_cutting_price'),
+      searchTerm
+    ),
     [markupSettings, searchTerm]
   );
 
@@ -112,9 +115,11 @@ const MarkupTabComponent: React.FC<MarkupTabProps> = ({
                       />
                     ) : (
                       <span className="field-value">
-                        {(item.setting_name.includes('multiplier') || item.setting_name.includes('markup')) ?
-                          `×${item.setting_value} (${((item.setting_value - 1) * 100).toFixed(0)}%)` :
-                          `${item.setting_value}%`}
+                        {item.setting_name === 'auto_cutting_price'
+                          ? `${item.setting_value} ₽/рез`
+                          : (item.setting_name.includes('multiplier') || item.setting_name.includes('markup'))
+                            ? `×${item.setting_value} (${((item.setting_value - 1) * 100).toFixed(0)}%)`
+                            : `${item.setting_value}%`}
                       </span>
                     )}
                   </FormField>

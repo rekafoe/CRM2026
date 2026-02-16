@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
-// import { DynamicPricingManager } from '../../components/calculator/DynamicPricingManager'; // архивировано
-import { CostCalculation } from '../../components/warehouse/CostCalculation';
 import { Button, Alert, LoadingState } from '../../components/common';
 import { getEnhancedProductTypes } from '../../api';
 import { listOperationNorms } from '../../api/pricing';
@@ -15,7 +13,6 @@ interface PricingPageProps {
 
 export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
   const navigate = useNavigate();
-  const [activeModal, setActiveModal] = useState<'pricing' | null>(null);
   const [showInstructions, setShowInstructions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [productTypesCount, setProductTypesCount] = useState(0);
@@ -60,15 +57,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
       color: 'primary'
     },
     // Модуль динамического прайсинга архивирован
-    {
-      id: 'cost-analysis',
-      title: '📊 Расчет себестоимости',
-      description: 'Анализ затрат и прибыльности товаров',
-      icon: '📊',
-      features: ['Анализ затрат', 'Маржинальность', 'Отчеты по прибыли', 'Оптимизация'],
-      action: null,
-      color: 'success'
-    }
   ];
 
   return (
@@ -152,7 +140,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
                   </div>
                   
                   <div className="pricing-card-actions">
-                    {module.action ? (
+                    {module.action && (
                       <Button
                         variant={module.color as any}
                         onClick={module.action}
@@ -160,10 +148,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
                       >
                         Открыть модуль
                       </Button>
-                    ) : (
-                      <div className="pricing-card-embedded">
-                        <CostCalculation />
-                      </div>
                     )}
                   </div>
                 </div>
@@ -185,10 +169,17 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
             </Button>
             <Button
               variant="success"
-              onClick={() => setActiveModal('pricing')}
-              icon={<span>⚡</span>}
+              onClick={() => navigate('/adminpanel/printers')}
+              icon={<span>🖨️</span>}
             >
-              Настроить цены
+              Принтеры и цены печати
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/adminpanel/services-management')}
+              icon={<span>🔧</span>}
+            >
+              Настройка операций
             </Button>
           </div>
         </div>

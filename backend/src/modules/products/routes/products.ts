@@ -703,6 +703,20 @@ router.get('/:productId/schema', async (req, res) => {
       }
     }
 
+    // ✂️ Добавляем поле cutting из simplified-конфига, если включена опция резки
+    const simplifiedCutting = templateConfigData?.simplified?.cutting;
+    if (simplifiedCutting === true) {
+      const hasCuttingField = fields.some((f: any) => f.name === 'cutting');
+      if (!hasCuttingField) {
+        fields.push({
+          name: 'cutting',
+          label: 'Резка',
+          type: 'boolean',
+          required: false,
+        });
+      }
+    }
+
     // 📄 Добавляем поле pages из simplified-конфига, если задано
     const simplifiedPages = templateConfigData?.simplified?.pages;
     if (Array.isArray(simplifiedPages?.options) && simplifiedPages.options.length > 0) {

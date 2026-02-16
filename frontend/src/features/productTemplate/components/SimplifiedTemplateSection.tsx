@@ -630,6 +630,25 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         </div>
       </div>
 
+      <div className="simplified-card">
+        <div className="simplified-card__header">
+          <div>
+            <strong>Опции калькулятора</strong>
+            <div className="text-muted text-sm">Дополнительные чекбоксы, которые появятся в калькуляторе при расчёте.</div>
+          </div>
+        </div>
+        <div className="simplified-card__content">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={!!value.cutting}
+              onChange={(e) => onChange({ ...value, cutting: e.target.checked })}
+            />
+            Резка стопой — считать резы по раскладке (резов на лист), а не по тиражу
+          </label>
+        </div>
+      </div>
+
       <ProductTypesCard
         value={value}
         onChange={onChange}

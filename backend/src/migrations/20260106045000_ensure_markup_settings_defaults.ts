@@ -22,6 +22,7 @@ export async function up(db: Database) {
     { name: 'rush_multiplier', value: 1.5, description: 'Множитель срочности' },
     { name: 'complexity_multiplier', value: 1.0, description: 'Множитель сложности' },
     { name: 'operation_price_multiplier', value: 1.0, description: 'Общий множитель стоимости операций' },
+    { name: 'auto_cutting_price', value: 0, description: 'Цена за рез стопой (руб) — для автоматической резки по раскладке. 0 = брать цену из услуги резки.' },
   ]
 
   for (const s of seeds) {
@@ -48,7 +49,7 @@ export async function down(db: Database) {
   await db.exec(`
     UPDATE markup_settings
     SET is_active = 0, updated_at = datetime('now')
-    WHERE setting_name IN ('base_markup', 'rush_multiplier', 'complexity_multiplier', 'operation_price_multiplier');
+    WHERE setting_name IN ('base_markup', 'rush_multiplier', 'complexity_multiplier', 'operation_price_multiplier', 'auto_cutting_price');
   `)
 }
 

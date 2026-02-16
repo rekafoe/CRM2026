@@ -101,6 +101,17 @@
   padding: 8px 10px;
 }
 
+.simplified-card .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.simplified-card .checkbox-label input[type="checkbox"] {
+  margin: 0;
+}
+
 /* Типы продукта */
 .simplified-template__types .simplified-card__header {
   display: flex;

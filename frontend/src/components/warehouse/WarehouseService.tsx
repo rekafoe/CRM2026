@@ -11,7 +11,7 @@ interface WarehouseServiceProps {
   totalRevenue: number;
 }
 
-type WarehouseSection = 'materials' | 'inventory' | 'suppliers' | 'reports' | 'settings' | 'alerts' | 'analytics' | 'automation' | 'mobile' | 'cost-calculation' | 'user-roles';
+type WarehouseSection = 'materials' | 'inventory' | 'suppliers' | 'reports' | 'settings' | 'alerts' | 'analytics' | 'automation' | 'mobile' | 'user-roles';
 
 export const WarehouseService: React.FC<WarehouseServiceProps> = ({
   currentUser,
@@ -56,13 +56,6 @@ export const WarehouseService: React.FC<WarehouseServiceProps> = ({
       color: '#F44336',
       badge: lowStockCount
     },
-  { 
-    id: 'cost-calculation' as WarehouseSection, 
-    title: '💰 Себестоимость', 
-    icon: '💰', 
-    description: 'Расчет себестоимости и прибыльности товаров',
-    color: '#28a745'
-  },
   { 
     id: 'user-roles' as WarehouseSection, 
     title: '👥 Роли пользователей', 
@@ -122,8 +115,6 @@ export const WarehouseService: React.FC<WarehouseServiceProps> = ({
       onNavigate('reports');
     } else if (section === 'alerts') {
       onOpenModal('warehouse-alerts');
-  } else if (section === 'cost-calculation') {
-    onOpenModal('warehouse-cost-calculation');
   } else if (section === 'user-roles') {
     onOpenModal('warehouse-user-roles');
   } else if (section === 'analytics') {

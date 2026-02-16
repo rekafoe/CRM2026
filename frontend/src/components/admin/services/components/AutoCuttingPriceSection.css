@@ -1,0 +1,47 @@
+.auto-cutting-price-section {
+  margin-bottom: 24px;
+}
+
+.auto-cutting-price-section__card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px 20px;
+  max-width: 480px;
+}
+
+.auto-cutting-price-section__header h3 {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.auto-cutting-price-section__desc {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.auto-cutting-price-section__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.auto-cutting-price-section__input {
+  width: 120px;
+}
+
+.auto-cutting-price-section__error {
+  color: var(--danger, #dc3545);
+  font-size: 13px;
+  margin: 0;
+}
+
+.auto-cutting-price-section__skeleton {
+  padding: 16px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
