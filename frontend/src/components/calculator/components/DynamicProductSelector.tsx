@@ -93,7 +93,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
     }
   }, [searchQuery]);
 
-  // Поиск при изменении debounced-запроса (избегаем race condition и лишних запросов)
+  // Поиск при изменении debounced-запроса (только debouncedSearchQuery — иначе бесконечный цикл из-за searchProducts/logger/toast)
   useEffect(() => {
     const query = debouncedSearchQuery.trim();
     if (!query) {
@@ -121,7 +121,8 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
           setIsSearching(false);
         }
       });
-  }, [debouncedSearchQuery, searchProducts, logger, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- только debouncedSearchQuery, иначе бесконечные запросы
+  }, [debouncedSearchQuery]);
 
   // Фильтрованные продукты
   const filteredProducts = useMemo(() => {
@@ -204,6 +205,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="search-input"
+              autoFocus
             />
             {isSearching && (
               <div className="search-loading">
