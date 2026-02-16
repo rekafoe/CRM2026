@@ -359,43 +359,30 @@ export class SimplifiedPricingService {
       }
     }
     
-    // 5. Рассчитываем цену материала
+    // 5. Рассчитываем цену материала (берём со склада — sheet_price_single, без диапазонов)
     let materialPrice = 0;
     let materialDetails: SimplifiedPricingResult['materialDetails'] | undefined;
     
     if (normalizedConfig.material_id) {
-      const materialPriceConfig = selectedSize.material_prices.find(m => m.material_id === normalizedConfig.material_id);
-      
-      logger.info('Расчет цены материала', {
-        material_id: normalizedConfig.material_id,
-        foundConfig: !!materialPriceConfig,
-        tiersCount: materialPriceConfig?.tiers?.length || 0
-      });
-      
-      if (materialPriceConfig) {
-        const tier = this.findTierForQuantity(materialPriceConfig.tiers, effectivePrintQuantity);
-        if (tier) {
-          const priceForTier = this.getPriceForQuantityTier(tier);
-          materialPrice = priceForTier * effectivePrintQuantity;
-          materialDetails = {
-            tier: { ...tier, price: priceForTier },
-            priceForQuantity: materialPrice,
-          };
-          logger.info('Цена материала рассчитана', {
-            priceForTier,
-            quantity,
-            pages: effectivePages,
-            sheetsPerItem,
-            effectivePrintQuantity,
-            materialPrice,
-          });
-        } else {
-          logger.warn('Не найден диапазон для материала', { effectivePrintQuantity, tiers: materialPriceConfig.tiers });
-        }
+      const isAllowed = selectedSize.allowed_material_ids?.includes(normalizedConfig.material_id) ?? true;
+      if (!isAllowed) {
+        logger.warn('Материал не в списке разрешённых для размера', { material_id: normalizedConfig.material_id });
       } else {
-        logger.warn('Не найдена конфигурация материала', {
+        const material = await db.get<{ sheet_price_single: number | null }>(
+          `SELECT sheet_price_single FROM materials WHERE id = ? AND is_active = 1`,
+          [normalizedConfig.material_id]
+        );
+        const pricePerSheet = material?.sheet_price_single ?? 0;
+        materialPrice = effectivePrintQuantity * pricePerSheet;
+        materialDetails = {
+          tier: { min_qty: 1, max_qty: undefined, unit_price: pricePerSheet },
+          priceForQuantity: materialPrice,
+        };
+        logger.info('Цена материала со склада', {
           material_id: normalizedConfig.material_id,
-          available: selectedSize.material_prices.map(m => m.material_id)
+          pricePerSheet,
+          effectivePrintQuantity,
+          materialPrice,
         });
       }
     }

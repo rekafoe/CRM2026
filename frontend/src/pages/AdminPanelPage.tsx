@@ -36,6 +36,7 @@ const PricingPage = lazy(() =>
   import('./admin/PricingPage').then((m) => ({ default: m.PricingPage }))
 );
 const PrintersPage = lazy(() => import('./admin/PrintersPage'));
+const PrintPriceEditPage = lazy(() => import('./admin/PrintPriceEditPage'));
 const CountersServicePage = lazy(() => import('./admin/CountersServicePage'));
 const CustomersAdminPage = lazy(() =>
   import('./admin/CustomersAdminPage').then((m) => ({ default: m.default }))
@@ -292,6 +293,8 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/discounts" element={<PricingPage onBack={() => window.history.back()} />} />
           <Route path="/earnings" element={<EarningsAdminPage />} />
           <Route path="/printers" element={<PrintersPage />} />
+          <Route path="/print-prices/new" element={<PrintPriceEditPage />} />
+          <Route path="/print-prices/:id" element={<PrintPriceEditPage />} />
           <Route path="/counters" element={<CountersServicePage />} />
           <Route path="/clients" element={<CustomersAdminPage />} />
           <Route path="/document-templates" element={<DocumentTemplatesPage />} />

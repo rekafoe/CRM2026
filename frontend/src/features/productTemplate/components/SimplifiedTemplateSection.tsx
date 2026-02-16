@@ -433,27 +433,20 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const svcName = useCallback((id: number) => services.find(s => Number(s.id) === Number(id))?.name || `#${id}`, [services])
   const materialName = useCallback((id: number) => allMaterials.find(m => Number(m.id) === Number(id))?.name || `#${id}`, [allMaterials])
 
-  // Получить общие диапазоны для размера (из первой вариации печати или материалов)
-  // ✅ finishing.tiers больше не используются - цены берутся из централизованной системы
+  // Получить диапазоны для печати (только из print_prices, материалы имеют свои стандартные диапазоны)
   const getSizeRanges = useCallback((size: SimplifiedSizeConfig): Tier[] => {
     if (size.print_prices.length > 0 && size.print_prices[0].tiers.length > 0) {
       return normalizeTiers(size.print_prices[0].tiers)
     }
-    if (size.material_prices.length > 0 && size.material_prices[0].tiers.length > 0) {
-      return normalizeTiers(size.material_prices[0].tiers)
-    }
-    // ✅ finishing.tiers больше не проверяем - они не хранятся в шаблоне
     return defaultTiers()
   }, [])
 
-  // Обновить диапазоны во всех связанных данных размера
+  // Обновить диапазоны только в печати (материалы имеют фиксированные стандартные диапазоны SRA3)
   const updateSizeRanges = useCallback((sizeId: string, newRanges: Tier[]) => {
     const size = sizes.find(s => s.id === sizeId)
     if (!size) return
 
-    // Обновляем диапазоны в печати
     const updatedPrintPrices = size.print_prices.map(pp => {
-      // Сохраняем цены для существующих диапазонов, добавляем нулевые для новых
       const priceMap = new Map(pp.tiers.map(t => [t.min_qty, t.unit_price]))
       const newTiers = newRanges.map(r => ({
         ...r,
@@ -462,30 +455,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       return { ...pp, tiers: newTiers }
     })
 
-    // Обновляем диапазоны в материалах
-    const updatedMaterialPrices = size.material_prices.map(mp => {
-      const priceMap = new Map(mp.tiers.map(t => [t.min_qty, t.unit_price]))
-      const newTiers = newRanges.map(r => ({
-        ...r,
-        unit_price: priceMap.get(r.min_qty) ?? 0
-      }))
-      return { ...mp, tiers: newTiers }
-    })
-
-    // ✅ Обновляем только структуру finishing (service_id, price_unit, units_per_item)
-    // tiers больше не сохраняем - цены берутся из централизованной системы услуг
-    const updatedFinishing = size.finishing.map(f => ({
-      service_id: f.service_id,
-      price_unit: f.price_unit,
-      units_per_item: f.units_per_item,
-      // tiers не сохраняем
-    }))
-
-    updateSize(sizeId, {
-      print_prices: updatedPrintPrices,
-      material_prices: updatedMaterialPrices,
-      finishing: updatedFinishing
-    })
+    updateSize(sizeId, { print_prices: updatedPrintPrices })
   }, [sizes, updateSize])
 
   // Материалы выбранного типа бумаги (или всех типов, если selectedPaperTypeId не выбран)
@@ -591,20 +561,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     
     if (materialsToAdd.length > 0) {
       const nextAllowed = [...selected.allowed_material_ids, ...materialsToAdd.map(m => Number(m.id))]
-      const commonRanges = getSizeRanges(selected)
-      const nextMaterialPrices = [
-        ...selected.material_prices,
-        ...materialsToAdd.map(m => ({
-          material_id: Number(m.id),
-          tiers: commonRanges.map(r => ({ ...r, unit_price: 0 }))
-        }))
-      ]
-      updateSize(selected.id, {
-        allowed_material_ids: nextAllowed,
-        material_prices: nextMaterialPrices
-      })
+      updateSize(selected.id, { allowed_material_ids: nextAllowed })
     }
-  }, [selectedPaperTypeId, materialsForSelectedPaperType, selected, getSizeRanges, updateSize])
+  }, [selectedPaperTypeId, materialsForSelectedPaperType, selected, updateSize])
 
   // Отслеживание взаимодействия пользователя с услугами для каждого размера отдельно
   // Ключ - ID размера, значение - был ли пользователь взаимодействовал с услугами
@@ -873,6 +832,49 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                       <strong>Печать (цена за изделие)</strong>
                       <div className="text-muted text-sm">Выберите технологию печати, и система автоматически покажет все доступные вариации с диапазонами цен.</div>
                     </div>
+                    {selected.default_print?.technology_code && selected.width_mm > 0 && selected.height_mm > 0 && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={async () => {
+                          const tech = selected.default_print?.technology_code ?? ''
+                          if (!tech) return
+                          const w = selected.width_mm
+                          const h = selected.height_mm
+                          const modes: Array<{ color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex' }> = [
+                            { color_mode: 'color', sides_mode: 'single' },
+                            { color_mode: 'color', sides_mode: 'duplex' },
+                            { color_mode: 'bw', sides_mode: 'single' },
+                            { color_mode: 'bw', sides_mode: 'duplex' },
+                          ]
+                          const updated: typeof selected.print_prices = []
+                          for (const m of modes) {
+                            try {
+                              const r = await api.get('/pricing/print-prices/derive', {
+                                params: { technology_code: tech, width_mm: w, height_mm: h, color_mode: m.color_mode, sides_mode: m.sides_mode },
+                              })
+                              const data = r.data as { tiers?: Array<{ min_qty: number; max_qty?: number; unit_price: number }> }
+                              const tiers = data?.tiers ?? []
+                              if (tiers.length > 0) {
+                                updated.push({
+                                  technology_code: tech,
+                                  color_mode: m.color_mode,
+                                  sides_mode: m.sides_mode,
+                                  tiers: tiers.map((t: any) => ({ min_qty: t.min_qty, max_qty: t.max_qty, unit_price: t.unit_price ?? 0 })),
+                                })
+                              }
+                            } catch {
+                              // Пропускаем режим, если нет центральных цен
+                            }
+                          }
+                          if (updated.length > 0) {
+                            updateSize(selected.id, { print_prices: updated })
+                          }
+                        }}
+                      >
+                        Заполнить из центральных цен
+                      </Button>
+                    )}
                   </div>
                   <div className="simplified-card__content">
                     <div className="simplified-form-grid mb-3">
@@ -1518,7 +1520,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   <div className="simplified-card__header">
                     <div>
                       <strong>Материалы (разрешённые)</strong>
-                      <div className="text-muted text-sm">Выберите тип бумаги, затем конкретные материалы с чекбоксами. Для каждого можно задать цену "за изделие" по диапазонам.</div>
+                      <div className="text-muted text-sm">Выберите тип бумаги, затем конкретные материалы. Цены подтягиваются со склада автоматически.</div>
                             </div>
                   </div>
                   <div className="simplified-card__content">
@@ -1576,32 +1578,13 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                     onChange={(e) => {
                                       hasUserInteractedWithMaterialsRef.current = true
                                       const checked = e.target.checked
-                                      const commonRanges = getSizeRanges(selected)
-                                      
                                       if (checked) {
-                                        // Добавляем материал
-                                        const nextAllowed = [...selected.allowed_material_ids, Number(m.id)]
-                                        const materialPrice = selected.material_prices.find(mp => mp.material_id === Number(m.id))
-                                        const nextMaterialPrices = materialPrice
-                                          ? selected.material_prices
-                                          : [
-                                              ...selected.material_prices,
-                                              {
-                                                material_id: Number(m.id),
-                                                tiers: commonRanges.map(r => ({ ...r, unit_price: 0 }))
-                                              }
-                                            ]
                                         updateSize(selected.id, {
-                                          allowed_material_ids: nextAllowed,
-                                          material_prices: nextMaterialPrices
+                                          allowed_material_ids: [...selected.allowed_material_ids, Number(m.id)]
                                         })
                                       } else {
-                                        // Удаляем материал
-                                        const nextAllowed = selected.allowed_material_ids.filter(id => id !== Number(m.id))
-                                        const nextMaterialPrices = selected.material_prices.filter(mp => mp.material_id !== Number(m.id))
                                         updateSize(selected.id, {
-                                          allowed_material_ids: nextAllowed,
-                                          material_prices: nextMaterialPrices
+                                          allowed_material_ids: selected.allowed_material_ids.filter(id => id !== Number(m.id))
                                         })
                                       }
                                     }}
@@ -1609,6 +1592,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                   />
                                   <span>
                                     {m.name}{densityInfo ? ` (${densityInfo.value} г/м²)` : ''}
+                                    {densityInfo?.price != null && (
+                                      <span className="text-muted" style={{ marginLeft: 6 }}>
+                                        {densityInfo.price.toFixed(2)} ₽/лист
+                                      </span>
+                                    )}
                                   </span>
                                 </label>
                               )
@@ -1616,181 +1604,32 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                           </div>
                         </div>
 
-                        {/* Таблица с ценами для выбранных материалов */}
-                        {selected.allowed_material_ids.length > 0 && (() => {
-                          const commonRanges = getSizeRanges(selected)
-                          // Показываем все разрешенные материалы из всех типов бумаги
-                          const allowedMaterials = allMaterialsFromAllPaperTypes.filter(m => 
-                            selected.allowed_material_ids.includes(Number(m.id))
-                          )
-                          
-                          return (
-                            <div className="simplified-tiers-table mt-3">
-                              <table className={`simplified-table simplified-table--compact ${isMobile ? 'simplified-table--mobile-stack' : ''}`}>
-                                <thead>
-                                  <tr>
-                                    <th>Параметры материалов (цена за изделие указанного формата)</th>
-                                {commonRanges.map((t, ti) => {
-                                  const rangeLabel = t.max_qty == null ? `${t.min_qty} - ∞` : String(t.min_qty)
-                                        return (
-                                          <th key={ti} className="simplified-table__range-cell">
-                                      <div className="cell">
-                                        <span
-                                          style={{ cursor: 'pointer' }}
-                                                onClick={() => {
-                                                  setTierModal({
-                                              type: 'edit',
-                                              tierIndex: ti,
-                                                    isOpen: true,
-                                              boundary: String(t.min_qty),
-                                              anchorElement: undefined
-                                                  })
-                                                }}
-                                              >
-                                          {rangeLabel}
+                        {/* Список выбранных материалов с ценами со склада */}
+                        {selected.allowed_material_ids.length > 0 && (
+                          <div className="mt-3" style={{ fontSize: 13 }}>
+                            <div className="text-muted text-sm mb-2">Цены подтягиваются со склада при расчёте заказа</div>
+                            <ul style={{ margin: 0, paddingLeft: 20 }}>
+                              {allMaterialsFromAllPaperTypes
+                                .filter(m => selected.allowed_material_ids.includes(Number(m.id)))
+                                .map(m => {
+                                  const pt = paperTypes.find(p => p.densities?.some(d => d.material_id === Number(m.id)))
+                                  const density = pt?.densities?.find(d => d.material_id === Number(m.id))
+                                  return (
+                                    <li key={m.id} style={{ marginBottom: 4 }}>
+                                      {m.name}
+                                      {density ? ` (${density.value} г/м²)` : ''}
+                                      {pt && ` [${pt.display_name || pt.name}]`}
+                                      {density?.price != null && (
+                                        <span className="text-muted" style={{ marginLeft: 6 }}>
+                                          — {density.price.toFixed(2)} ₽/лист
                                         </span>
-                                        <span>
-                                          <button
-                                            type="button"
-                                            className="el-button remove-range el-button--text el-button--mini"
-                                            style={{ color: 'red', marginRight: '-15px' }}
-                                                onClick={() => {
-                                              const newRanges = removeRange(commonRanges, ti)
-                                              updateSizeRanges(selected.id, newRanges)
-                                            }}
-                                          >
-                                            ×
-                                          </button>
-                                        </span>
-                                            </div>
-                                          </th>
-                                        )
-                                      })}
-                                <th>
-                                  <div className="cell">
-                                    <div className="simplified-row__add-range-wrapper">
-                                      <button
-                                        type="button"
-                                        className="el-button el-button--info el-button--mini is-plain"
-                                        style={{ width: '100%', marginLeft: '0px' }}
-                                        onClick={(e) => {
-                                          const button = e.currentTarget as HTMLElement
-                                          setTierModal({
-                                            type: 'add',
-                                            isOpen: true,
-                                            boundary: '',
-                                            anchorElement: button
-                                          })
-                                        }}
-                                      >
-                                        + Диапазон
-                                      </button>
-                                    </div>
-                                  </div>
-                                </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                              {allowedMaterials.map(m => {
-                                // Находим тип бумаги и плотность для этого материала
-                                let densityInfo: any = null
-                                let materialPaperType: any = null
-                                for (const pt of paperTypes) {
-                                  const density = pt.densities?.find(d => d.material_id === Number(m.id))
-                                  if (density) {
-                                    densityInfo = density
-                                    materialPaperType = pt
-                                    break
-                                  }
-                                }
-                                
-                                const materialPrice = selected.material_prices.find(mp => mp.material_id === Number(m.id))
-                                const actualIdx = selected.material_prices.findIndex(mp => mp.material_id === Number(m.id))
-                                
-                                return (
-                                  <tr key={m.id}>
-                                    <td>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <input
-                                          type="checkbox"
-                                          checked={true}
-                                          onChange={(e) => {
-                                            hasUserInteractedWithMaterialsRef.current = true
-                                            if (!e.target.checked) {
-                                              // Удаляем материал
-                                              const nextAllowed = selected.allowed_material_ids.filter(id => id !== Number(m.id))
-                                              const nextMaterialPrices = selected.material_prices.filter(mp => mp.material_id !== Number(m.id))
-                                              updateSize(selected.id, {
-                                                allowed_material_ids: nextAllowed,
-                                                material_prices: nextMaterialPrices
-                                              })
-                                            }
-                                          }}
-                                          style={{ cursor: 'pointer' }}
-                                        />
-                                        <div className="el-select el-select--small" style={{ flex: 1 }}>
-                                          <div className="el-input el-input--small el-input--suffix">
-                                            <input
-                                              type="text"
-                                              readOnly
-                                              className="el-input__inner"
-                                              value={`${m.name}${densityInfo ? ` (${densityInfo.value} г/м²)` : ''}${materialPaperType ? ` [${materialPaperType.display_name || materialPaperType.name}]` : ''}`}
-                                              style={{ cursor: 'default' }}
-                                            />
-                                            <span className="el-input__suffix">
-                                              <span className="el-input__suffix-inner">
-                                                <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                              </span>
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </td>
-                                    {commonRanges.map((t, ti) => {
-                                      const priceTier = materialPrice?.tiers.find(rt => rt.min_qty === t.min_qty) || t
-                                      return (
-                                        <td key={ti}>
-                                          <PriceCell
-                                            className="form-input form-input--compact-table"
-                                            value={priceTier.unit_price ?? 0}
-                                            onChange={(v) => {
-                                              if (actualIdx === -1) {
-                                                const newMaterialPrice = {
-                                                  material_id: Number(m.id),
-                                                  tiers: commonRanges.map((rt, rti) => {
-                                                    if (rti === ti) return { ...rt, unit_price: v }
-                                                    return { ...rt, unit_price: 0 }
-                                                  })
-                                                }
-                                                updateSize(selected.id, {
-                                                  material_prices: [...selected.material_prices, newMaterialPrice]
-                                                })
-                                              } else {
-                                                const next = selected.material_prices.map((r, i) => {
-                                                  if (i !== actualIdx) return r
-                                                  const updatedTiers = commonRanges.map((rt, rti) => {
-                                                    if (rti === ti) return { ...rt, unit_price: v }
-                                                    const existingTier = r.tiers.find(t => t.min_qty === rt.min_qty)
-                                                    return existingTier || rt
-                                                  })
-                                                  return { ...r, tiers: updatedTiers }
-                                                })
-                                                updateSize(selected.id, { material_prices: next })
-                                              }
-                                            }}
-                                          />
-                                        </td>
-                                      )
-                                    })}
-                                      <td></td>
-                                    </tr>
-                                )
-                              })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )
-                          })()}
+                                      )}
+                                    </li>
+                                  )
+                                })}
+                            </ul>
+                          </div>
+                        )}
                         </>
                     )}
 

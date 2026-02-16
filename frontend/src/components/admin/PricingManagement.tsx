@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, Suspense, lazy, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Alert, FormField, LoadingState, Modal } from '../common';
 import './PricingManagement.css';
 import { api } from '../../api';
@@ -64,6 +65,7 @@ interface PricingManagementProps {
 }
 
 const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tech', mode = 'full' }) => {
+  const navigate = useNavigate();
   const {
     state,
     setPrintPrices,
@@ -276,11 +278,21 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
   }, []);
 
   const handleAddPrintPrice = useCallback(() => {
+    const defaultTiers = [
+      { price_mode: 'color_single', min_sheets: 1, max_sheets: 4, price_per_sheet: 8 },
+      { price_mode: 'color_single', min_sheets: 5, max_sheets: 9, price_per_sheet: 6 },
+      { price_mode: 'color_single', min_sheets: 10, max_sheets: 49, price_per_sheet: 4 },
+      { price_mode: 'color_single', min_sheets: 50, max_sheets: 99, price_per_sheet: 2.5 },
+      { price_mode: 'color_single', min_sheets: 100, max_sheets: 499, price_per_sheet: 1.5 },
+      { price_mode: 'color_single', min_sheets: 500, max_sheets: 999, price_per_sheet: 1 },
+      { price_mode: 'color_single', min_sheets: 1000, max_sheets: undefined, price_per_sheet: 0.85 },
+    ];
     setEditingItem({
-      // id -1 означает создание новой записи
       id: -1,
       technology_code: '',
       counter_unit: 'sheets',
+      sheet_width_mm: 320,
+      sheet_height_mm: 450,
       price_bw_single: null,
       price_bw_duplex: null,
       price_color_single: null,
@@ -293,6 +305,8 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
     setEditingValues({
       technology_code: '',
       counter_unit: 'sheets',
+      sheet_width_mm: 320,
+      sheet_height_mm: 450,
       price_bw_single: '',
       price_bw_duplex: '',
       price_color_single: '',
@@ -300,6 +314,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
       price_bw_per_meter: '',
       price_color_per_meter: '',
       is_active: 1,
+      tiers: defaultTiers,
     });
   }, []);
 
@@ -366,7 +381,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
     return typeof value === 'number' ? value : String(value);
   }, [editingValues]);
 
-  const updateEditingValue = useCallback((key: string, value: string | number) => {
+  const updateEditingValue = useCallback((key: string, value: string | number | unknown) => {
     setEditingValues({ ...editingValues, [key]: value });
   }, [editingValues]);
 
@@ -497,14 +512,8 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
                 printTechnologies={printTechnologies}
                 loading={loading}
                 searchTerm={searchTerm}
-                editingItem={editingItem}
-                editingValues={editingValues}
-                onEdit={handleEdit}
-                onAddNew={handleAddPrintPrice}
-                onSave={handleSave}
-                onCancel={handleCancel}
-                getEditingValue={getEditingValue}
-                updateEditingValue={updateEditingValue}
+                onNavigateToEdit={(id) => navigate(`/adminpanel/print-prices/${id}`)}
+                onNavigateToAdd={() => navigate('/adminpanel/print-prices/new')}
               />
             )}
             {mode === 'full' && activeTab === 'services' && (

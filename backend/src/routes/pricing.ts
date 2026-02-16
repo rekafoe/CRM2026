@@ -41,6 +41,23 @@ const toTierResponse = (tier: any) => ({
   is_active: tier.isActive,
 })
 
+/** Сохранить диапазоны цен печати (по листам) */
+async function upsertPrintPriceTiers(db: any, printPriceId: number, tiers: Array<{ price_mode: string; min_sheets: number; max_sheets?: number; price_per_sheet: number }> | undefined) {
+  if (!tiers || !Array.isArray(tiers) || tiers.length === 0) return
+  try {
+    await db.run('DELETE FROM print_price_tiers WHERE print_price_id = ?', [printPriceId])
+    for (const t of tiers) {
+      if (!t.price_mode || t.min_sheets == null) continue
+      await db.run(`
+        INSERT INTO print_price_tiers (print_price_id, price_mode, min_sheets, max_sheets, price_per_sheet)
+        VALUES (?, ?, ?, ?, ?)
+      `, [printPriceId, t.price_mode, t.min_sheets, t.max_sheets ?? null, t.price_per_sheet ?? 0])
+    }
+  } catch (e) {
+    console.warn('print_price_tiers not available:', e)
+  }
+}
+
 /**
  * @swagger
  * /api/pricing/test:
@@ -291,6 +308,8 @@ router.get('/print-prices', asyncHandler(async (req, res) => {
         pp.id,
         pp.technology_code,
         pp.counter_unit,
+        pp.sheet_width_mm,
+        pp.sheet_height_mm,
         pp.price_bw_single,
         pp.price_bw_duplex,
         pp.price_color_single,
@@ -304,11 +323,120 @@ router.get('/print-prices', asyncHandler(async (req, res) => {
       WHERE pp.is_active = 1
       ORDER BY pp.technology_code
     `)
+    // Загружаем диапазоны для каждого print_price (если таблица есть)
+    try {
+      const tiers = await db.all<any>(`
+        SELECT print_price_id, price_mode, min_sheets, max_sheets, price_per_sheet
+        FROM print_price_tiers
+        ORDER BY print_price_id, price_mode, min_sheets
+      `)
+      const tiersByPp = tiers.reduce((acc: Record<number, any[]>, t: any) => {
+        const id = t.print_price_id
+        if (!acc[id]) acc[id] = []
+        acc[id].push({ price_mode: t.price_mode, min_sheets: t.min_sheets, max_sheets: t.max_sheets, price_per_sheet: t.price_per_sheet })
+        return acc
+      }, {})
+      printPrices.forEach((pp: any) => {
+        pp.tiers = tiersByPp[pp.id] || []
+      })
+    } catch {
+      printPrices.forEach((pp: any) => { pp.tiers = [] })
+    }
     res.json(printPrices)
   } catch (error) {
     // Если таблицы не существуют, возвращаем пустой массив
     console.log('Print prices table not found, returning empty array')
     res.json([])
+  }
+}))
+
+// GET /api/pricing/print-prices/derive — должен быть ДО /:id, иначе "derive" матчится как id - рассчитать цены за ед. по размеру продукта из центральных диапазонов
+// ?technology_code=laser_prof&width_mm=105&height_mm=148&color_mode=color&sides_mode=single
+router.get('/print-prices/derive', asyncHandler(async (req, res) => {
+  const { technology_code, width_mm, height_mm, color_mode = 'color', sides_mode = 'single' } = req.query
+  if (!technology_code || !width_mm || !height_mm) {
+    res.status(400).json({ error: 'technology_code, width_mm, height_mm обязательны' })
+    return
+  }
+  const w = Number(width_mm)
+  const h = Number(height_mm)
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+    res.status(400).json({ error: 'width_mm и height_mm должны быть положительными числами' })
+    return
+  }
+  const priceMode = (color_mode === 'bw' ? 'bw' : 'color') + '_' + (sides_mode === 'duplex' ? 'duplex' : 'single')
+  try {
+    const db = await getDb()
+    const pp = await db.get<any>(`
+      SELECT id, sheet_width_mm, sheet_height_mm FROM print_prices
+      WHERE technology_code = ? AND is_active = 1 AND counter_unit = 'sheets'
+      ORDER BY id DESC LIMIT 1
+    `, [technology_code])
+    if (!pp) {
+      res.status(404).json({ error: `Цены для технологии ${technology_code} не найдены` })
+      return
+    }
+    const sheetW = pp.sheet_width_mm ?? 320
+    const sheetH = pp.sheet_height_mm ?? 450
+    const itemsPerSheet = calcItemsPerSheet(w, h, sheetW, sheetH)
+    const tiers = await db.all<any>(`
+      SELECT min_sheets, max_sheets, price_per_sheet FROM print_price_tiers
+      WHERE print_price_id = ? AND price_mode = ?
+      ORDER BY min_sheets
+    `, [pp.id, priceMode])
+    if (tiers.length === 0) {
+      res.json({ items_per_sheet: itemsPerSheet, tiers: [], message: 'Нет диапазонов — используйте плоские цены или добавьте диапазоны' })
+      return
+    }
+    const derivedTiers = tiers.map((t: any) => {
+      const minQty = t.min_sheets * itemsPerSheet
+      const maxQty = t.max_sheets != null ? (t.max_sheets + 1) * itemsPerSheet - 1 : undefined
+      const unitPrice = t.price_per_sheet / itemsPerSheet
+      return { min_qty: minQty, max_qty: maxQty, unit_price: Math.round(unitPrice * 100) / 100 }
+    })
+    res.json({ items_per_sheet: itemsPerSheet, sheet_size: { width_mm: sheetW, height_mm: sheetH }, tiers: derivedTiers })
+  } catch (e) {
+    console.error('derive print prices:', e)
+    res.status(500).json({ error: 'Ошибка расчёта' })
+  }
+}))
+
+function calcItemsPerSheet(itemW: number, itemH: number, sheetW: number, sheetH: number): number {
+  const MARGIN = 5
+  const GAP = 2
+  const aw = sheetW - MARGIN * 2
+  const ah = sheetH - MARGIN * 2
+  const cols = Math.floor(aw / (itemW + GAP))
+  const rows = Math.floor(ah / (itemH + GAP))
+  const n1 = cols * rows
+  const cols2 = Math.floor(aw / (itemH + GAP))
+  const rows2 = Math.floor(ah / (itemW + GAP))
+  const n2 = cols2 * rows2
+  return Math.max(1, n1, n2)
+}
+
+// GET /api/pricing/print-prices/:id - одна запись по id (после /derive!)
+router.get('/print-prices/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  try {
+    const db = await getDb()
+    const pp = await db.get<any>(`SELECT * FROM print_prices WHERE id = ?`, [id])
+    if (!pp) {
+      res.status(404).json({ error: 'Цена печати не найдена' })
+      return
+    }
+    try {
+      const tiers = await db.all<any>(`
+        SELECT price_mode, min_sheets, max_sheets, price_per_sheet
+        FROM print_price_tiers WHERE print_price_id = ? ORDER BY price_mode, min_sheets
+      `, [id])
+      pp.tiers = tiers
+    } catch {
+      pp.tiers = []
+    }
+    res.json(pp)
+  } catch (e) {
+    res.status(500).json({ error: 'Ошибка загрузки' })
   }
 }))
 
@@ -568,20 +696,27 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
   const {
     technology_code,
     counter_unit,
+    sheet_width_mm,
+    sheet_height_mm,
     price_bw_single,
     price_bw_duplex,
     price_color_single,
     price_color_duplex,
     price_bw_per_meter,
-    price_color_per_meter
+    price_color_per_meter,
+    tiers
   } = req.body
 
   try {
     const db = await getDb()
+    const sw = sheet_width_mm ?? 320
+    const sh = sheet_height_mm ?? 450
     const result = await db.run(`
       INSERT INTO print_prices (
         technology_code,
         counter_unit,
+        sheet_width_mm,
+        sheet_height_mm,
         price_bw_single,
         price_bw_duplex,
         price_color_single,
@@ -591,10 +726,12 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
         is_active,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
     `, [
       technology_code,
       counter_unit || 'sheets',
+      sw,
+      sh,
       price_bw_single || 0,
       price_bw_duplex || 0,
       price_color_single || 0,
@@ -603,10 +740,15 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
       price_color_per_meter || null
     ])
 
+    const id = result.lastID
+    await upsertPrintPriceTiers(db, id, tiers)
+
     res.json({
-      id: result.lastID,
+      id,
       technology_code,
       counter_unit: counter_unit || 'sheets',
+      sheet_width_mm: sw,
+      sheet_height_mm: sh,
       price_bw_single: price_bw_single || 0,
       price_bw_duplex: price_bw_duplex || 0,
       price_color_single: price_color_single || 0,
@@ -1128,21 +1270,28 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
   const {
     technology_code,
     counter_unit,
+    sheet_width_mm,
+    sheet_height_mm,
     price_bw_single,
     price_bw_duplex,
     price_color_single,
     price_color_duplex,
     price_bw_per_meter,
     price_color_per_meter,
-    is_active
+    is_active,
+    tiers
   } = req.body
 
   try {
     const db = await getDb()
+    const sw = sheet_width_mm ?? 320
+    const sh = sheet_height_mm ?? 450
     await db.run(`
       UPDATE print_prices SET
         technology_code = ?,
         counter_unit = ?,
+        sheet_width_mm = ?,
+        sheet_height_mm = ?,
         price_bw_single = ?,
         price_bw_duplex = ?,
         price_color_single = ?,
@@ -1155,6 +1304,8 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
     `, [
       technology_code,
       counter_unit || 'sheets',
+      sw,
+      sh,
       price_bw_single || 0,
       price_bw_duplex || 0,
       price_color_single || 0,
@@ -1165,10 +1316,14 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
       id
     ])
 
+    await upsertPrintPriceTiers(db, parseInt(id), tiers)
+
     res.json({
       id: parseInt(id),
       technology_code,
       counter_unit: counter_unit || 'sheets',
+      sheet_width_mm: sw,
+      sheet_height_mm: sh,
       price_bw_single: price_bw_single || 0,
       price_bw_duplex: price_bw_duplex || 0,
       price_color_single: price_color_single || 0,

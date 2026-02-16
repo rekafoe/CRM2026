@@ -1,9 +1,18 @@
 import { useReducer, useCallback } from 'react'
 
+export interface PrintPriceTier {
+  price_mode: string
+  min_sheets: number
+  max_sheets?: number
+  price_per_sheet: number
+}
+
 export interface PrintPrice {
   id: number
   technology_code: string
   counter_unit: 'sheets' | 'meters'
+  sheet_width_mm?: number | null
+  sheet_height_mm?: number | null
   price_bw_single: number | null
   price_bw_duplex: number | null
   price_color_single: number | null
@@ -11,6 +20,7 @@ export interface PrintPrice {
   price_bw_per_meter: number | null
   price_color_per_meter: number | null
   is_active: number
+  tiers?: PrintPriceTier[]
 }
 
 export interface ServicePrice {

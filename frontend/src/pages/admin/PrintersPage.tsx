@@ -9,7 +9,7 @@ export const PrintersPage: React.FC = () => {
       icon="🖨️"
       onBack={() => window.history.back()}
     >
-      <PricingManagement initialTab="markup" mode="full" />
+      <PricingManagement initialTab="print" mode="full" />
     </AdminPageLayout>
   );
 };

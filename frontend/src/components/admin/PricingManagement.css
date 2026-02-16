@@ -4,6 +4,40 @@
   margin: 0 auto;
 }
 
+/* Страница редактирования цены печати */
+.print-price-edit-page .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+.print-price-edit-page .flex {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.print-price-edit-page .tier-section {
+  padding: 16px;
+  background: var(--bg-secondary, #f8f9fa);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.print-price-edit-page .tier-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.print-price-edit-page .tier-section-header h5 {
+  margin: 0;
+  font-size: 16px;
+}
+.print-price-edit-page .mb-4 { margin-bottom: 24px; }
+.print-price-edit-page .mt-3 { margin-top: 16px; }
+.print-price-edit-page .mt-4 { margin-top: 24px; }
+.price-summary { font-size: 14px; line-height: 1.6; }
+.price-summary div { margin-bottom: 4px; }
+.badge-secondary { background: var(--bg-secondary, #e9ecef); color: var(--text-secondary); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+
 .pricing-header {
   margin-bottom: 32px;
   text-align: center;
@@ -373,4 +407,285 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Таблица диапазонов (как в product template) */
+.simplified-tiers-table {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.simplified-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.simplified-table thead {
+  background: var(--bg-hover, #fafafa);
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.simplified-table th {
+  padding: 8px 6px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.simplified-table th:first-child {
+  width: 200px;
+  min-width: 200px;
+}
+
+.simplified-table__parent-row {
+  background-color: #f5f7fa;
+}
+
+.simplified-table__parent-row td {
+  background-color: #f5f7fa !important;
+  font-weight: 500;
+}
+
+.simplified-table__parent-cell {
+  padding-left: 10px !important;
+}
+
+.simplified-table__child-row {
+  background-color: #fff;
+}
+
+.simplified-table__child-cell {
+  padding-left: 32px !important;
+  position: relative;
+}
+
+.simplified-table__child-cell::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 60%;
+  background-color: #dcdfe6;
+}
+
+.simplified-table .el-select--small {
+  font-size: 12px;
+}
+
+.simplified-table .el-input--small {
+  font-size: 12px;
+}
+
+.simplified-table .el-input--small .el-input__inner {
+  height: 32px;
+  line-height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.simplified-table .el-input__suffix {
+  right: 5px;
+}
+
+.simplified-table .el-input__suffix-inner {
+  font-size: 12px;
+}
+
+.simplified-table .el-select__caret {
+  font-size: 12px;
+}
+
+.simplified-table .el-icon-arrow-up::before {
+  content: '▲';
+  font-size: 10px;
+  color: #909399;
+}
+
+.simplified-table .el-input__suffix {
+  pointer-events: none;
+}
+
+.simplified-table .el-input__inner[readonly] {
+  cursor: default;
+  background-color: #fff;
+}
+
+.simplified-table .el-input__inner[readonly][style*="background-color: #f5f7fa"] {
+  background-color: #f5f7fa !important;
+}
+
+.simplified-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.simplified-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.simplified-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.form-input--table {
+  width: 100%;
+  min-width: 80px;
+  padding: 6px 8px;
+  font-size: 14px;
+}
+
+.simplified-row__add-range-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.simplified-tier-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2000;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 220px;
+  max-width: 260px;
+  pointer-events: auto;
+  overflow: visible;
+}
+
+.simplified-tier-modal__content {
+  padding: 12px;
+}
+
+.simplified-tier-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.simplified-tier-modal__close {
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-secondary, #6b7280);
+  padding: 2px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.simplified-tier-modal__close:hover {
+  background: var(--bg-hover, #f9fafb);
+  color: var(--text-primary, #374151);
+}
+
+.simplified-tier-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.simplified-tier-modal__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.form-input--compact {
+  padding: 6px 8px;
+  font-size: 13px;
+  min-width: 80px;
+}
+
+.form-input--compact-table {
+  width: 80px;
+  min-width: 70px;
+  max-width: 100px;
+  padding: 4px 6px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.simplified-table--compact {
+  font-size: 12px;
+}
+
+.simplified-table--compact th,
+.simplified-table--compact td {
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+
+.simplified-table__range-cell {
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+  text-align: center;
+  background: transparent;
+  padding: 4px 2px;
+  position: relative;
+  min-width: 70px;
+  max-width: 100px;
+}
+
+.simplified-table__range-cell .cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.simplified-table__edit-range {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background-color 0.15s, color 0.15s;
+  opacity: 0.6;
+}
+
+.simplified-table__edit-range:hover {
+  background: var(--bg-secondary, #fff);
+  color: var(--accent-primary, #1976d2);
+  opacity: 1;
+}
+
+.el-button.remove-range {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.el-button.el-button--info.el-button--mini.is-plain {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.el-button.el-button--info.el-button--mini.is-plain:hover {
+  background: var(--bg-hover);
+  border-color: var(--primary);
+  color: var(--primary);
 }
