@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, FormField } from '../../common';
-import { api } from '../../../api';
+import { Button, FormField } from '../../../common';
+import { api } from '../../../../api';
 import './AutoCuttingPriceSection.css';
 
 interface MarkupSetting {
@@ -24,12 +24,12 @@ export const AutoCuttingPriceSection: React.FC = () => {
     try {
       let res = await api.get<MarkupSetting[]>('/pricing/markup-settings');
       let list = Array.isArray(res?.data) ? res.data : [];
-      let found = list.find((s) => s.setting_name === 'auto_cutting_price') ?? null;
+      let found = list.find((s: MarkupSetting) => s.setting_name === 'auto_cutting_price') ?? null;
       if (!found) {
         await api.post('/pricing/markup-settings/ensure-defaults');
         res = await api.get<MarkupSetting[]>('/pricing/markup-settings');
         list = Array.isArray(res?.data) ? res.data : [];
-        found = list.find((s) => s.setting_name === 'auto_cutting_price') ?? null;
+        found = list.find((s: MarkupSetting) => s.setting_name === 'auto_cutting_price') ?? null;
       }
       setSetting(found ?? null);
       setValue(found ? String(found.setting_value) : '0');
