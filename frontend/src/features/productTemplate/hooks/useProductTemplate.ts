@@ -177,7 +177,7 @@ export function useProductTemplateInitial(): TemplateState {
     packaging: [],
     print_run: { enabled: false, min: '', max: '' },
     price_rules: [],
-    simplified: { sizes: [], pages: { options: [] } },
+    simplified: { sizes: buildDefaultSizes(), pages: { options: [] } },
     test: { qty: 100, params: {}, paramsJson: '{}' }
   }
 }
@@ -192,6 +192,62 @@ export function getEffectiveConfig(value: SimplifiedConfig, selectedTypeId: stri
 
 export function generateTypeId(): string {
   return `type_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
+export function generateSizeId(): string {
+  return `sz_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
+/** Стандартные диапазоны тиража: 1, 5, 10, 50, 100, 500, 1000 */
+const DEFAULT_TIER_BOUNDARIES = [1, 5, 10, 50, 100, 500, 1000]
+
+function buildDefaultPrintTiers(): SimplifiedQtyTier[] {
+  const tiers: SimplifiedQtyTier[] = []
+  for (let i = 0; i < DEFAULT_TIER_BOUNDARIES.length; i++) {
+    const min_qty = DEFAULT_TIER_BOUNDARIES[i]
+    const max_qty = i < DEFAULT_TIER_BOUNDARIES.length - 1
+      ? DEFAULT_TIER_BOUNDARIES[i + 1] - 1
+      : undefined
+    tiers.push({ min_qty, max_qty, unit_price: 0 })
+  }
+  return tiers
+}
+
+/** Лазерный профессиональный — тип печати по умолчанию для подтипа (laser_prof или laser_sheet) */
+const DEFAULT_PRINT_TECHNOLOGY = 'laser_prof'
+
+function buildDefaultPrintPrices(): SimplifiedPrintPrice[] {
+  const tiers = buildDefaultPrintTiers()
+  return [
+    { technology_code: DEFAULT_PRINT_TECHNOLOGY, color_mode: 'color', sides_mode: 'single', tiers: [...tiers] },
+    { technology_code: DEFAULT_PRINT_TECHNOLOGY, color_mode: 'color', sides_mode: 'duplex', tiers: [...tiers] },
+    { technology_code: DEFAULT_PRINT_TECHNOLOGY, color_mode: 'bw', sides_mode: 'single', tiers: [...tiers] },
+    { technology_code: DEFAULT_PRINT_TECHNOLOGY, color_mode: 'bw', sides_mode: 'duplex', tiers: [...tiers] },
+  ]
+}
+
+/** Стандартные размеры: A4, A5, A6 */
+const DEFAULT_SIZES_SPEC: Array<{ label: string; width_mm: number; height_mm: number }> = [
+  { label: 'A4', width_mm: 210, height_mm: 297 },
+  { label: 'A5', width_mm: 148, height_mm: 210 },
+  { label: 'A6', width_mm: 105, height_mm: 148 },
+]
+
+export function buildDefaultSizes(): SimplifiedSizeConfig[] {
+  const printPrices = buildDefaultPrintPrices()
+  return DEFAULT_SIZES_SPEC.map((spec) => ({
+    id: generateSizeId(),
+    label: spec.label,
+    width_mm: spec.width_mm,
+    height_mm: spec.height_mm,
+    print_prices: printPrices.map((p) => ({
+      ...p,
+      tiers: p.tiers.map((t) => ({ ...t })),
+    })),
+    allowed_material_ids: [],
+    material_prices: [],
+    finishing: [],
+  }))
 }
 
 export default function useProductTemplate() {

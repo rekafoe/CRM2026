@@ -18,7 +18,7 @@ import {
 } from '../../../services/products'
 import { getAllWarehouseMaterials, CalculatorMaterial } from '../../../services/calculatorMaterialService'
 import { calculatePrice } from '../../../services/pricing'
-import useProductTemplate from './useProductTemplate'
+import useProductTemplate, { buildDefaultSizes } from './useProductTemplate'
 import type { Material } from '../../../types/shared'
 
 interface QuickTestPayload {
@@ -82,7 +82,10 @@ export default function useProductTemplatePage(productId: number | undefined): U
   const [parameterPresetsLoading, setParameterPresetsLoading] = useState(false)
 
   const lastLoadedProductIdRef = useRef<number | null>(null)
-  const defaultSimplifiedConfig = useMemo(() => ({ sizes: [], pages: { options: [] as number[] } }), [])
+  const defaultSimplifiedConfig = useMemo(
+    () => ({ sizes: buildDefaultSizes(), pages: { options: [] as number[] } }),
+    []
+  )
 
   const resolvePresetKey = useCallback((details: ProductWithDetails | null) => {
     if (!details) return null

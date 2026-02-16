@@ -6,6 +6,7 @@ import {
   type ProductTypeVariant,
   getEffectiveConfig,
   generateTypeId,
+  buildDefaultSizes,
 } from './useProductTemplate'
 
 export interface UseSimplifiedTypesResult {
@@ -102,15 +103,16 @@ export function useSimplifiedTypes(
     const name = hasTypes ? 'Новый тип' : 'Основной'
     if (!hasTypes) {
       const types: ProductTypeVariant[] = [{ id, name, default: true }]
+      const sizesToUse = value.sizes?.length ? value.sizes : buildDefaultSizes()
       const typeConfigs: Record<string, SimplifiedTypeConfig> = {
-        [id]: { sizes: value.sizes || [], pages: value.pages },
+        [id]: { sizes: sizesToUse, pages: value.pages },
       }
       onChange({ ...value, types, typeConfigs })
     } else {
       const types: ProductTypeVariant[] = [...(value.types || []), { id, name, default: false }]
       const typeConfigs: Record<string, SimplifiedTypeConfig> = {
         ...value.typeConfigs,
-        [id]: { sizes: [], pages: effectiveConfig.pages },
+        [id]: { sizes: buildDefaultSizes(), pages: effectiveConfig.pages },
       }
       onChange({ ...value, types, typeConfigs })
     }
