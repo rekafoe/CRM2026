@@ -9,6 +9,7 @@ import { getDb } from '../../../db';
 import { logger } from '../../../utils/logger';
 import { PricingServiceRepository } from '../repositories/serviceRepository';
 import { LayoutCalculationService } from './layoutCalculationService';
+import { PrintPriceService } from './printPriceService';
 
 export interface SimplifiedPricingResult {
   productId: number;
@@ -175,7 +176,17 @@ export class SimplifiedPricingService {
     
     const simplifiedConfig: SimplifiedConfig = configData.simplified || { sizes: [] };
     
-    if (!simplifiedConfig.sizes || simplifiedConfig.sizes.length === 0) {
+    // Для продуктов с типами (typeConfigs) размеры берём из typeConfigs[typeId].sizes
+    const typeId = (configuration as any).typeId ?? (configuration as any).type_id;
+    const typeConfigs = (configData.simplified as any)?.typeConfigs;
+    let sizesToUse: SimplifiedSizeConfig[] = simplifiedConfig.sizes ?? [];
+    
+    if (typeId && typeConfigs?.[typeId]?.sizes?.length) {
+      sizesToUse = typeConfigs[typeId].sizes;
+      logger.info('Используем размеры из typeConfigs', { typeId, sizesCount: sizesToUse.length });
+    }
+    
+    if (!sizesToUse || sizesToUse.length === 0) {
       throw new Error('No sizes configured in simplified config');
     }
     
@@ -243,10 +254,10 @@ export class SimplifiedPricingService {
     let selectedSize: SimplifiedSizeConfig | null = null;
     
     if (normalizedConfig.size_id) {
-      selectedSize = simplifiedConfig.sizes.find(s => s.id === normalizedConfig.size_id) || null;
+      selectedSize = sizesToUse.find(s => s.id === normalizedConfig.size_id) || null;
     } else if (normalizedConfig.trim_size) {
       // Ищем по размерам (примерное совпадение с допуском ±1мм)
-      selectedSize = simplifiedConfig.sizes.find(s => 
+      selectedSize = sizesToUse.find(s => 
         Math.abs(s.width_mm - normalizedConfig.trim_size!.width) <= 1 &&
         Math.abs(s.height_mm - normalizedConfig.trim_size!.height) <= 1
       ) || null;
@@ -317,10 +328,11 @@ export class SimplifiedPricingService {
     let printDetails: SimplifiedPricingResult['printDetails'] | undefined;
     
     if (normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode) {
+      const techNorm = (s: string) => (s ?? '').trim().toLowerCase();
       const printPriceConfig = selectedSize.print_prices.find(p =>
-        p.technology_code === normalizedConfig.print_technology &&
-        p.color_mode === normalizedConfig.print_color_mode &&
-        p.sides_mode === normalizedConfig.print_sides_mode
+        techNorm(p.technology_code) === techNorm(normalizedConfig.print_technology!) &&
+        (p.color_mode ?? '').toLowerCase() === (normalizedConfig.print_color_mode ?? '').toLowerCase() &&
+        (p.sides_mode ?? '').toLowerCase() === (normalizedConfig.print_sides_mode ?? '').toLowerCase()
       );
       
       logger.info('Расчет цены печати', {
@@ -333,12 +345,31 @@ export class SimplifiedPricingService {
       
       if (printPriceConfig) {
         const tier = this.findTierForQuantity(printPriceConfig.tiers, effectivePrintQuantity);
-        if (tier) {
-          // Используем unit_price из диапазона
-          const priceForTier = this.getPriceForQuantityTier(tier);
+        let priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
+        // Fallback: если в шаблоне цены 0 — берём из центральных print_prices
+        if (priceForTier <= 0 && normalizedConfig.print_technology) {
+          const centralPrice = await PrintPriceService.getByTechnology(normalizedConfig.print_technology);
+          if (centralPrice?.counter_unit === 'sheets') {
+            const isDuplex = normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back';
+            const isColor = normalizedConfig.print_color_mode === 'color';
+            const pricePerSheet = isColor
+              ? (isDuplex ? centralPrice.price_color_duplex : centralPrice.price_color_single)
+              : (isDuplex ? centralPrice.price_bw_duplex : centralPrice.price_bw_single);
+            if (pricePerSheet != null && pricePerSheet > 0) {
+              priceForTier = pricePerSheet / itemsPerSheet;
+              logger.info('Цена печати из центральных print_prices (fallback)', {
+                technology: normalizedConfig.print_technology,
+                pricePerSheet,
+                itemsPerSheet,
+                priceForTier,
+              });
+            }
+          }
+        }
+        if (priceForTier > 0) {
           printPrice = priceForTier * effectivePrintQuantity;
           printDetails = {
-            tier: { ...tier, price: priceForTier },
+            tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
             priceForQuantity: printPrice,
           };
           logger.info('Цена печати рассчитана', {
@@ -349,17 +380,46 @@ export class SimplifiedPricingService {
             effectivePrintQuantity,
             printPrice,
           });
+        } else if (tier) {
+          logger.warn('Цена печати в шаблоне и центральных ценах равна 0', { effectivePrintQuantity });
         } else {
           logger.warn('Не найден диапазон для печати', { effectivePrintQuantity, tiers: printPriceConfig.tiers });
         }
       } else {
-        logger.warn('Не найдена конфигурация печати', {
-          available: selectedSize.print_prices.map(p => ({
-            tech: p.technology_code,
-            color: p.color_mode,
-            sides: p.sides_mode
-          }))
-        });
+        // Fallback: конфигурации нет в шаблоне — пробуем центральные print_prices
+        if (normalizedConfig.print_technology) {
+          const centralPrice = await PrintPriceService.getByTechnology(normalizedConfig.print_technology);
+          if (centralPrice?.counter_unit === 'sheets') {
+            const isDuplex = normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back';
+            const isColor = normalizedConfig.print_color_mode === 'color';
+            const pricePerSheet = isColor
+              ? (isDuplex ? centralPrice.price_color_duplex : centralPrice.price_color_single)
+              : (isDuplex ? centralPrice.price_bw_duplex : centralPrice.price_bw_single);
+            if (pricePerSheet != null && pricePerSheet > 0) {
+              const priceForTier = pricePerSheet / itemsPerSheet;
+              printPrice = priceForTier * effectivePrintQuantity;
+              printDetails = {
+                tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
+                priceForQuantity: printPrice,
+              };
+              logger.info('Цена печати из центральных print_prices (нет в шаблоне)', {
+                technology: normalizedConfig.print_technology,
+                pricePerSheet,
+                itemsPerSheet,
+                printPrice,
+              });
+            }
+          }
+        }
+        if (printPrice === 0) {
+          logger.warn('Не найдена конфигурация печати', {
+            available: selectedSize.print_prices.map(p => ({
+              tech: p.technology_code,
+              color: p.color_mode,
+              sides: p.sides_mode
+            }))
+          });
+        }
       }
     }
     
