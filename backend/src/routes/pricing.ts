@@ -1445,6 +1445,20 @@ router.put('/markup-settings/:id', asyncHandler(async (req, res) => {
 
   try {
     const db = await getDb()
+    const existing = await db.get<{ setting_name: string; setting_value: number; description: string | null; is_active: number }>(
+      'SELECT setting_name, setting_value, description, is_active FROM markup_settings WHERE id = ?',
+      id
+    )
+    if (!existing) {
+      res.status(404).json({ message: 'Настройка не найдена' })
+      return
+    }
+
+    const name = setting_name !== undefined ? String(setting_name) : existing.setting_name
+    const value = setting_value !== undefined ? Number(setting_value) : existing.setting_value
+    const desc = description !== undefined ? (description || '') : (existing.description || '')
+    const active = is_active !== undefined ? Number(is_active) : existing.is_active
+
     await db.run(`
       UPDATE markup_settings SET
         setting_name = ?,
@@ -1453,32 +1467,19 @@ router.put('/markup-settings/:id', asyncHandler(async (req, res) => {
         is_active = ?,
         updated_at = datetime('now')
       WHERE id = ?
-    `, [
-      setting_name,
-      setting_value,
-      description || '',
-      is_active !== undefined ? is_active : 1,
-      id
-    ])
+    `, [name, value, desc, active, id])
 
     res.json({
       id: parseInt(id),
-      setting_name,
-      setting_value,
-      description: description || '',
-      is_active: is_active !== undefined ? is_active : 1,
+      setting_name: name,
+      setting_value: value,
+      description: desc,
+      is_active: active,
       updated_at: new Date().toISOString()
     })
   } catch (error) {
-    console.log('Markup settings update failed, returning mock data')
-    res.json({
-      id: parseInt(id),
-      setting_name: setting_name || 'updated_setting',
-      setting_value: setting_value || 0,
-      description: description || '',
-      is_active: is_active !== undefined ? is_active : 1,
-      updated_at: new Date().toISOString()
-    })
+    console.error('Markup settings update failed:', error)
+    res.status(500).json({ message: 'Ошибка сохранения настройки' })
   }
 }))
 
