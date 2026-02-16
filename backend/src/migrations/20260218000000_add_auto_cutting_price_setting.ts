@@ -2,8 +2,8 @@ import { Database } from 'sqlite'
 
 async function addColumnIfMissing(db: Database, table: string, columnDef: string): Promise<void> {
   const [colName] = columnDef.split(' ').filter(Boolean)
-  const cols = await db.all<{ name: string }>(`PRAGMA table_info(${table})`)
-  if (cols.some((c) => c.name === colName)) return
+  const cols = (await db.all(`PRAGMA table_info(${table})`)) as Array<{ name: string }>
+  if (Array.isArray(cols) && cols.some((c) => c.name === colName)) return
   await db.exec(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`)
 }
 
