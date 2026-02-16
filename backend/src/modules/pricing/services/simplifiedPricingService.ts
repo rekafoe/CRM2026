@@ -375,7 +375,7 @@ export class SimplifiedPricingService {
         const pricePerSheet = material?.sheet_price_single ?? 0;
         materialPrice = effectivePrintQuantity * pricePerSheet;
         materialDetails = {
-          tier: { min_qty: 1, max_qty: undefined, unit_price: pricePerSheet },
+          tier: { min_qty: 1, max_qty: undefined, price: pricePerSheet },
           priceForQuantity: materialPrice,
         };
         logger.info('Цена материала со склада', {
