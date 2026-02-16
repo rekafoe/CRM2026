@@ -256,18 +256,6 @@ export class SimplifiedPricingService {
       throw new Error('Selected size not found in simplified config');
     }
 
-    const minQtyLimit = selectedSize.min_qty ?? 1;
-    const maxQtyLimit = selectedSize.max_qty;
-    if (quantity < minQtyLimit || (maxQtyLimit !== undefined && quantity > maxQtyLimit)) {
-      const err: any = new Error(
-        maxQtyLimit !== undefined
-          ? `Тираж для размера "${selectedSize.label}" должен быть от ${minQtyLimit} до ${maxQtyLimit}`
-          : `Тираж для размера "${selectedSize.label}" должен быть не меньше ${minQtyLimit}`
-      );
-      err.status = 400;
-      throw err;
-    }
-
     const productSize = { width: selectedSize.width_mm, height: selectedSize.height_mm };
 
     // Раскладка: сколько изделий на лист. Печатный лист = выбранный материал (если у материала заданы размеры), иначе SRA3/A3/A4.
@@ -294,6 +282,21 @@ export class SimplifiedPricingService {
       layoutCheck = LayoutCalculationService.findOptimalSheetSize(productSize);
     }
     const itemsPerSheet = Math.max(1, layoutCheck.itemsPerSheet || 1);
+
+    // Офисный принтер: печатают A3/A4 как есть, без раскладки — не ограничиваем мин. тираж по листу.
+    const isOfficePrint = (normalizedConfig.print_technology ?? '').toLowerCase().includes('office');
+    const minQtyLimit = selectedSize.min_qty ?? (isOfficePrint ? 1 : itemsPerSheet);
+    const maxQtyLimit = selectedSize.max_qty;
+    if (quantity < minQtyLimit || (maxQtyLimit !== undefined && quantity > maxQtyLimit)) {
+      const layoutHint = !isOfficePrint && minQtyLimit === itemsPerSheet ? ` (по раскладке: ${itemsPerSheet} шт/лист)` : '';
+      const err: any = new Error(
+        maxQtyLimit !== undefined
+          ? `Тираж для размера "${selectedSize.label}" должен быть от ${minQtyLimit} до ${maxQtyLimit}`
+          : `Тираж для размера "${selectedSize.label}" должен быть не меньше ${minQtyLimit}${layoutHint}`
+      );
+      err.status = 400;
+      throw err;
+    }
 
     const usePagesMultiplier = product.product_type === 'multi_page';
     const pagesCount = Number((configuration as any).pages);

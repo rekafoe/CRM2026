@@ -92,8 +92,9 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
     if (!Array.isArray(sizes)) return undefined;
     const selectedSize = sizes.find((s: any) => s.id === sizeId);
     if (!selectedSize) return undefined;
+    const minFromTiers = selectedSize.print_prices?.[0]?.tiers?.[0]?.min_qty;
     return {
-      min: selectedSize.min_qty ?? 1,
+      min: selectedSize.min_qty ?? (minFromTiers != null ? minFromTiers : 1),
       max: selectedSize.max_qty ?? undefined,
     };
   }, [backendProductSchema, effectiveSizes]);

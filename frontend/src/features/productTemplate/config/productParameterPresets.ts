@@ -19,9 +19,9 @@ const BASE_PARAMETERS: ParameterPreset[] = [
     key: 'print_technology',
     label: 'Технология печати',
     type: 'select',
-    options: ['laser_prof', 'laser_office', 'digital'],
+    options: [], // Опции подтягиваются из БД (раздел «Принтеры» / print_technologies)
     is_required: true,
-    help_text: 'Тип оборудования для печати',
+    help_text: 'Тип оборудования для печати. Опции загружаются из справочника технологий.',
     sort_order: 10,
   },
   {
@@ -131,9 +131,9 @@ const UNIVERSAL_PARAMETERS: ParameterPreset[] = [
     key: 'print_technology',
     label: 'Технология печати',
     type: 'select',
-    options: ['laser_prof', 'laser_office', 'digital', 'offset', 'screen'],
+    options: [], // Опции подтягиваются из БД (раздел «Принтеры» / print_technologies)
     is_required: false,
-    help_text: 'Тип оборудования для печати (если применимо)',
+    help_text: 'Тип оборудования для печати (если применимо). Опции загружаются из справочника.',
     sort_order: 10,
   },
   {

@@ -802,6 +802,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                         className="form-input form-input--compact"
                         type="number"
                         min="1"
+                        placeholder="по раскладке"
+                        title="Пусто = мин. по раскладке (1 лист). 1 = любой тираж, стоимость за полный лист."
                         value={selected.min_qty !== undefined ? String(selected.min_qty) : ''}
                         onChange={(e) =>
                           updateSize(selected.id, {
@@ -809,6 +811,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                           })
                         }
                       />
+                      <div className="text-muted text-xs mt-1">Пусто — мин. по раскладке (шт/лист). 1 — любой тираж по цене полного листа.</div>
                     </FormField>
                     <FormField label="Макс. тираж">
                       <input
@@ -848,12 +851,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                             { color_mode: 'bw', sides_mode: 'duplex' },
                           ]
                           const updated: typeof selected.print_prices = []
+                          let itemsPerSheet: number | undefined
                           for (const m of modes) {
                             try {
                               const r = await api.get('/pricing/print-prices/derive', {
                                 params: { technology_code: tech, width_mm: w, height_mm: h, color_mode: m.color_mode, sides_mode: m.sides_mode },
                               })
-                              const data = r.data as { tiers?: Array<{ min_qty: number; max_qty?: number; unit_price: number }> }
+                              const data = r.data as { items_per_sheet?: number; tiers?: Array<{ min_qty: number; max_qty?: number; unit_price: number }> }
+                              if (data?.items_per_sheet != null) itemsPerSheet = data.items_per_sheet
                               const tiers = data?.tiers ?? []
                               if (tiers.length > 0) {
                                 updated.push({
@@ -868,7 +873,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                             }
                           }
                           if (updated.length > 0) {
-                            updateSize(selected.id, { print_prices: updated })
+                            const patch: Partial<typeof selected> = { print_prices: updated }
+                            if (itemsPerSheet != null && itemsPerSheet > 0) {
+                              patch.min_qty = itemsPerSheet
+                            }
+                            updateSize(selected.id, patch)
                           }
                         }}
                       >
