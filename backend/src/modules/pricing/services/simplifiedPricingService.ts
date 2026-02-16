@@ -94,6 +94,7 @@ interface SimplifiedSizeConfig {
   height_mm: number;
   min_qty?: number;
   max_qty?: number;
+  allowed_material_ids?: number[];
   print_prices: Array<{
     technology_code: string;
     color_mode: 'color' | 'bw';
