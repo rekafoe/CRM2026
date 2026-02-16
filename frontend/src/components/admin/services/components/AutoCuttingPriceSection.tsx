@@ -22,9 +22,15 @@ export const AutoCuttingPriceSection: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<MarkupSetting[]>('/pricing/markup-settings');
-      const list = Array.isArray(res?.data) ? res.data : [];
-      const found = list.find((s) => s.setting_name === 'auto_cutting_price') ?? null;
+      let res = await api.get<MarkupSetting[]>('/pricing/markup-settings');
+      let list = Array.isArray(res?.data) ? res.data : [];
+      let found = list.find((s) => s.setting_name === 'auto_cutting_price') ?? null;
+      if (!found) {
+        await api.post('/pricing/markup-settings/ensure-defaults');
+        res = await api.get<MarkupSetting[]>('/pricing/markup-settings');
+        list = Array.isArray(res?.data) ? res.data : [];
+        found = list.find((s) => s.setting_name === 'auto_cutting_price') ?? null;
+      }
       setSetting(found ?? null);
       setValue(found ? String(found.setting_value) : '0');
     } catch (e) {
@@ -67,7 +73,31 @@ export const AutoCuttingPriceSection: React.FC = () => {
   }
 
   if (!setting) {
-    return null;
+    const handleInit = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        await api.post('/pricing/markup-settings/ensure-defaults');
+        await load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Ошибка инициализации');
+      } finally {
+        setLoading(false);
+      }
+    };
+    return (
+      <div className="auto-cutting-price-section">
+        <div className="auto-cutting-price-section__card">
+          <p className="auto-cutting-price-section__desc">
+            Настройка «Цена автоматической резки» не найдена в базе.
+          </p>
+          {error && <p className="auto-cutting-price-section__error">{error}</p>}
+          <Button variant="secondary" size="sm" onClick={handleInit}>
+            Инициализировать настройки
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
