@@ -24,6 +24,8 @@ interface ParamsSectionProps {
   } | null;
   /** Размеры текущего типа продукта (если у продукта есть типы — подставляются из модалки) */
   effectiveSizes?: Array<{ id: string; label?: string; width_mm: number; height_mm: number; min_qty?: number; max_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> }>;
+  /** Штук на листе — для подсказки «следующее изменение цены» */
+  itemsPerSheet?: number;
 }
 
 export const ParamsSection: React.FC<ParamsSectionProps> = ({
@@ -37,6 +39,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   updateSpecs,
   schema,
   effectiveSizes: effectiveSizesProp,
+  itemsPerSheet,
 }) => {
   const hasField = (name: string) => !!schema?.fields?.some(f => f.name === name);
   const getEnum = (name: string): any[] => schema?.fields?.find(f => f.name === name)?.enum || [];
@@ -227,6 +230,16 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
               Рекомендуемое количество для выбранного размера: {minQtyForSize} шт.
             </div>
           )}
+          {itemsPerSheet != null && itemsPerSheet > 1 && specs.quantity != null && specs.quantity > 0 && (() => {
+            const q = Number(specs.quantity);
+            const currentSheets = Math.ceil(q / itemsPerSheet);
+            const nextPriceChangeQty = currentSheets * itemsPerSheet + 1;
+            return (
+              <div className="text-sm text-muted mt-1">
+                Следующее изменение цены: при {nextPriceChangeQty} шт.
+              </div>
+            );
+          })()}
         </div>
 
         {/* Стороны печати */}

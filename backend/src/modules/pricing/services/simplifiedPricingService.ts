@@ -368,8 +368,11 @@ export class SimplifiedPricingService {
           }
         }
         if (priceForTier > 0) {
-          // unit_price — за изделие, умножаем на quantity
-          printPrice = priceForTier * quantity;
+          // Листовые продукты: считаем по листам (sheetsNeeded), а не по штукам.
+          // При 5 шт/лист и 6 шт — печатаем 2 листа, цена = 2 × price_per_sheet, а не 6 × unit_price.
+          // unit_price = price_per_sheet / itemsPerSheet → price_per_sheet = priceForTier * itemsPerSheet
+          const pricePerSheet = priceForTier * itemsPerSheet;
+          printPrice = usePagesMultiplier ? priceForTier * quantity : sheetsNeeded * pricePerSheet;
           printDetails = {
             tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
             priceForQuantity: printPrice,
@@ -377,6 +380,8 @@ export class SimplifiedPricingService {
           logger.info('Цена печати рассчитана', {
             priceForTier,
             quantity,
+            sheetsNeeded,
+            pricePerSheet,
             pages: effectivePages,
             sheetsPerItem,
             effectivePrintQuantity,
@@ -399,7 +404,8 @@ export class SimplifiedPricingService {
               : (isDuplex ? centralPrice.price_bw_duplex : centralPrice.price_bw_single);
             if (pricePerSheet != null && pricePerSheet > 0) {
               const priceForTier = pricePerSheet / itemsPerSheet;
-              printPrice = priceForTier * quantity;
+              // Листовые продукты: считаем по листам, не по штукам (см. пограничные значения)
+              printPrice = usePagesMultiplier ? priceForTier * quantity : sheetsNeeded * pricePerSheet;
               printDetails = {
                 tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
                 priceForQuantity: printPrice,
@@ -408,6 +414,7 @@ export class SimplifiedPricingService {
                 technology: normalizedConfig.print_technology,
                 pricePerSheet,
                 itemsPerSheet,
+                sheetsNeeded,
                 printPrice,
               });
             }

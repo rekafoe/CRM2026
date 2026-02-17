@@ -119,6 +119,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           updateSpecs={updateSpecs}
           schema={backendProductSchema}
           effectiveSizes={effectiveSizes}
+          itemsPerSheet={result?.layout?.itemsPerSheet}
         />
 
         <div className="unified-params-row">
