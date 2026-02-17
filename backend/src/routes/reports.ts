@@ -376,6 +376,67 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
   })
 }))
 
+// GET /api/reports/analytics/daily-activity — активность операторов по дням
+router.get('/analytics/daily-activity', asyncHandler(async (req, res) => {
+  const { startDate, endDate } = getAnalyticsDateRange(req.query)
+  const startStr = startDate.toISOString().slice(0, 10)
+  const endStr = endDate ? endDate.toISOString().slice(0, 10) : null
+  const oCreated = 'COALESCE(o.created_at, o.createdAt)'
+  const oDate = `substr(${oCreated}, 1, 10)`
+  const oCreatedRange = endStr ? `${oDate} >= ? AND ${oDate} <= ?` : `${oDate} >= ?`
+  const dateParams = endStr ? [startStr, endStr] : [startStr]
+
+  const db = await getDb()
+
+  // По каждому дню и оператору: заказы, сумма
+  const dailyByUser = await db.all<any>(
+    `SELECT ${oDate} as date, u.id as user_id, COALESCE(u.name, u.email, 'Без оператора') as user_name,
+       COUNT(o.id) as orders_count,
+       COALESCE(SUM(o.prepaymentAmount), 0) as total_amount
+     FROM orders o
+     LEFT JOIN users u ON o.userId = u.id
+     WHERE ${oCreatedRange} AND (o.status IS NULL OR o.status != 5)
+     GROUP BY ${oDate}, u.id, u.name, u.email
+     ORDER BY date DESC, total_amount DESC`,
+    dateParams
+  )
+
+  // Итоги по дням (все операторы)
+  const dailyTotals = await db.all<any>(
+    `SELECT ${oDate} as date,
+       COUNT(o.id) as orders_count,
+       COALESCE(SUM(o.prepaymentAmount), 0) as total_amount,
+       COUNT(DISTINCT o.userId) as operators_count
+     FROM orders o
+     WHERE ${oCreatedRange} AND (o.status IS NULL OR o.status != 5)
+     GROUP BY ${oDate}
+     ORDER BY date DESC`,
+    dateParams
+  )
+
+  // Общая сумма за период
+  const overall = await db.get<any>(
+    `SELECT COUNT(o.id) as orders_count, COALESCE(SUM(o.prepaymentAmount), 0) as total_amount
+     FROM orders o
+     WHERE ${oCreatedRange} AND (o.status IS NULL OR o.status != 5)`,
+    dateParams
+  )
+
+  res.json({
+    period: {
+      startDate: startStr,
+      endDate: endStr ?? startStr,
+      days: endStr ? Math.ceil((new Date(endStr).getTime() - new Date(startStr).getTime()) / 86400000) + 1 : 30
+    },
+    dailyByUser,
+    dailyTotals,
+    overallTotal: {
+      orders_count: Number(overall?.orders_count ?? 0),
+      total_amount: Number(overall?.total_amount ?? 0)
+    }
+  })
+}))
+
 // Пустая структура ответа ABC-аналитики материалов (при ошибке или отсутствии данных)
 const emptyMaterialsResponse = (period: { days: number; startDate: string; endDate?: string }) => ({
   period,
