@@ -538,6 +538,25 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     [selectedOrder, currentUserId, toast, logger, updateOrderInList]
   );
 
+  const handleRemovePrepayment = useCallback(
+    async (orderId: number) => {
+      if (!window.confirm('Удалить предоплату по заказу?')) return;
+      try {
+        await createPrepaymentLink(orderId, 0, 'offline');
+        toast.success('Успешно', 'Предоплата удалена');
+        updateOrderInList(orderId, {
+          prepaymentAmount: 0,
+          prepaymentStatus: undefined,
+          paymentMethod: undefined,
+        });
+      } catch (err: any) {
+        logger.error('Remove prepayment failed', err);
+        toast.error('Ошибка', err?.message ?? 'Не удалось удалить предоплату');
+      }
+    },
+    [toast, logger, updateOrderInList]
+  );
+
   if (loading) return <div className="loading-overlay">Загрузка...</div>;
   if (error) return <div className="error-message">{error}</div>;
 
@@ -717,6 +736,16 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             </div>
             <div className="order-detail-actions">
               <button onClick={() => setShowPrepaymentModal(true)}>💳 Внести предоплату</button>
+              {getOrderPrepayment(selectedOrder) > 0 && (
+                <button
+                  type="button"
+                  className="btn-remove-prepayment"
+                  onClick={() => handleRemovePrepayment(selectedOrder.id)}
+                  title="Удалить предоплату по заказу"
+                >
+                  🗑️ Удалить предоплату
+                </button>
+              )}
               {(getOrderDebt(selectedOrder) > 0 || (getOrderPrepayment(selectedOrder) >= getOrderTotal(selectedOrder) && getOrderTotal(selectedOrder) > 0)) && Number(selectedOrder.status) !== 4 && (
                 <button
                   className="btn-close-debt"

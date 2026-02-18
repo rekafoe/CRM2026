@@ -145,6 +145,17 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   // Мемоизированные колбэки для модальных окон
   const handleShowFilesModal = useCallback(() => setShowFilesModal(true), [setShowFilesModal]);
   const handleShowPrepaymentModal = useCallback(() => setShowPrepaymentModal(true), [setShowPrepaymentModal]);
+  const handleRemovePrepayment = useCallback(async (orderId: number) => {
+    if (!window.confirm('Удалить предоплату по заказу?')) return;
+    try {
+      await createPrepaymentLink(orderId, 0, 'offline');
+      toast.success('Предоплата удалена');
+      await loadOrders(undefined, true);
+    } catch (e: any) {
+      logger.error('Remove prepayment failed', e);
+      toast.error('Ошибка', e?.message ?? 'Не удалось удалить предоплату');
+    }
+  }, [loadOrders, toast, logger]);
   const handleIssueOrder = useCallback(async (orderId: number) => {
     try {
       await issueOrder(orderId);
@@ -321,6 +332,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 onLoadOrders={loadOrders}
                 onShowFilesModal={handleShowFilesModal}
                 onShowPrepaymentModal={handleShowPrepaymentModal}
+                onRemovePrepayment={handleRemovePrepayment}
                 onIssueOrder={handleIssueOrder}
                 onOpenCalculator={handleOpenCalculator}
                 onEditOrderItem={handleOpenCalculatorForEdit}

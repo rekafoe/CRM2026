@@ -18,7 +18,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
   orderId,
   orderNumber,
   currentAmount = 0,
-  currentPaymentMethod = 'online',
+  currentPaymentMethod = 'offline',
   currentEmail = '',
   totalOrderAmount = 0,
   onPrepaymentCreated

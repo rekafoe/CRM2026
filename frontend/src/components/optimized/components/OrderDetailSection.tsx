@@ -22,6 +22,7 @@ interface OrderDetailSectionProps {
   onLoadOrders: () => void;
   onShowFilesModal: () => void;
   onShowPrepaymentModal: () => void;
+  onRemovePrepayment?: (orderId: number) => Promise<void>;
   onIssueOrder?: (orderId: number) => Promise<void>;
   onOpenCalculator: () => void;
   onEditOrderItem: (orderId: number, item: any) => void;
@@ -42,6 +43,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   onLoadOrders,
   onShowFilesModal,
   onShowPrepaymentModal,
+  onRemovePrepayment,
   onIssueOrder,
   onOpenCalculator,
   onEditOrderItem,
@@ -239,6 +241,26 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               >
                 💳 Внести предоплату
               </button>
+              {prepay > 0 && onRemovePrepayment && (
+                <button 
+                  onClick={() => onRemovePrepayment(selectedOrder.id)}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Удалить предоплату по заказу"
+                >
+                  🗑️ Удалить предоплату
+                </button>
+              )}
               {onIssueOrder && (debt > 0 || (debt === 0 && total > 0)) && Number(selectedOrder.status) !== 4 && (
                 <button 
                   onClick={() => onIssueOrder(selectedOrder.id)}

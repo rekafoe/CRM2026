@@ -401,6 +401,17 @@
   box-shadow: 0 4px 12px rgba(21, 128, 61, 0.25);
 }
 
+.order-detail-actions .btn-remove-prepayment {
+  background: #dc2626;
+  color: white;
+  border: 2px solid #dc2626;
+}
+
+.order-detail-actions .btn-remove-prepayment:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
 /* Таймлайн статусов */
 .order-status-timeline {
   margin: 16px 0 20px;
