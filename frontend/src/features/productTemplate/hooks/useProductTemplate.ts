@@ -79,6 +79,8 @@ export type SimplifiedConfig = {
   typeConfigs?: Record<string, SimplifiedTypeConfig>;
   /** Включить опцию «Резка» в калькуляторе: считает резы по раскладке (sheetsNeeded × cutsPerSheet), а не по тиражу */
   cutting?: boolean;
+  /** Учитывать раскладку на лист: при false — 1 изделие на лист, без оптимизации (для крупноформатных и т.п.) */
+  use_layout?: boolean;
 }
 
 export interface TemplateState {

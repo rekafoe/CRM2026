@@ -269,9 +269,20 @@ export class SimplifiedPricingService {
 
     const productSize = { width: selectedSize.width_mm, height: selectedSize.height_mm };
 
-    // Раскладка: сколько изделий на лист. Печатный лист = выбранный материал (если у материала заданы размеры), иначе SRA3/A3/A4.
+    // Учёт раскладки: use_layout=false → 1 изделие на лист (без оптимизации, для крупноформатных и т.п.)
+    const useLayout = simplifiedConfig.use_layout !== false;
     let layoutCheck: { fitsOnSheet: boolean; itemsPerSheet: number; wastePercentage: number; recommendedSheetSize: { width: number; height: number }; layout: { rows: number; cols: number; actualItemsPerSheet: number }; cutsPerSheet: number };
-    if (normalizedConfig.material_id) {
+    if (!useLayout) {
+      layoutCheck = {
+        fitsOnSheet: true,
+        itemsPerSheet: 1,
+        wastePercentage: 0,
+        recommendedSheetSize: { width: productSize.width, height: productSize.height },
+        layout: { rows: 1, cols: 1, actualItemsPerSheet: 1 },
+        cutsPerSheet: 4,
+      };
+      logger.info('Раскладка отключена (use_layout=false): 1 изделие на лист', { productId });
+    } else if (normalizedConfig.material_id) {
       const materialSheet = await db.get<{ sheet_width: number | null; sheet_height: number | null }>(
         `SELECT sheet_width, sheet_height FROM materials WHERE id = ?`,
         [normalizedConfig.material_id]
@@ -299,7 +310,7 @@ export class SimplifiedPricingService {
     const minQtyLimit = selectedSize.min_qty ?? (isOfficePrint ? 1 : itemsPerSheet);
     const maxQtyLimit = selectedSize.max_qty;
     if (quantity < minQtyLimit || (maxQtyLimit !== undefined && quantity > maxQtyLimit)) {
-      const layoutHint = !isOfficePrint && minQtyLimit === itemsPerSheet ? ` (по раскладке: ${itemsPerSheet} шт/лист)` : '';
+      const layoutHint = useLayout && !isOfficePrint && minQtyLimit === itemsPerSheet ? ` (по раскладке: ${itemsPerSheet} шт/лист)` : '';
       const err: any = new Error(
         maxQtyLimit !== undefined
           ? `Тираж для размера "${selectedSize.label}" должен быть от ${minQtyLimit} до ${maxQtyLimit}`

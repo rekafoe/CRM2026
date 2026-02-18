@@ -641,6 +641,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           <label className="checkbox-label">
             <input
               type="checkbox"
+              checked={value.use_layout !== false}
+              onChange={(e) => onChange({ ...value, use_layout: e.target.checked })}
+            />
+            Учитывать раскладку на лист — оптимизация (несколько изделий на лист). Снять = 1 изделие на лист.
+          </label>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
               checked={!!value.cutting}
               onChange={(e) => onChange({ ...value, cutting: e.target.checked })}
             />
