@@ -10,6 +10,7 @@ import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { getLastWebsiteOrderAt } from '../utils/poolSync'
+import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 
 const router = Router()
 
@@ -332,6 +333,10 @@ router.post('/:id/duplicate', asyncHandler(OrderController.duplicateOrder))
 // Bulk operations
 router.post('/bulk/update-status', asyncHandler(OrderController.bulkUpdateStatus))
 router.post('/bulk/delete', asyncHandler(OrderController.bulkDeleteOrders))
+router.post('/cleanup-old-files', authenticate, asyncHandler(async (_req, res) => {
+  const result = await cleanupOldOrderFiles()
+  res.json({ success: true, ...result })
+}))
 
 // Export
 router.get('/export', asyncHandler(OrderController.exportOrders))

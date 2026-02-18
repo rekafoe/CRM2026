@@ -17,6 +17,7 @@
     "@sentry/node": "^7.119.0",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
+    "check-disk-space": "^3.4.0",
     "cors": "^2.8.5",
     "docxtemplater": "^3.67.6",
     "dotenv": "^17.2.2",

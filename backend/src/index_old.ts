@@ -16,6 +16,8 @@ import { StockMonitoringService } from './services/stockMonitoringService'
 import { AutoOrderService } from './services/autoOrderService'
 import { UserNotificationService } from './services/userNotificationService'
 import { EarningsService } from './services/earningsService'
+import { startOrderFilesCleanup } from './services/orderFilesCleanupService'
+import { startStorageMonitor } from './services/storageMonitorService'
 import { logger } from './utils/logger'
 import { AuthController } from './controllers'
 import { swaggerSpec } from './config/swagger'
@@ -169,6 +171,18 @@ async function startServer() {
     }
 
     EarningsService.initialize(earningsConfig)
+
+    const orderFilesCleanupConfig = {
+      enabled: process.env.ORDER_FILES_CLEANUP_ENABLED !== 'false',
+      intervalMs: parseInt(process.env.ORDER_FILES_CLEANUP_INTERVAL_HOURS || '24', 10) * 60 * 60 * 1000,
+    }
+    startOrderFilesCleanup(orderFilesCleanupConfig)
+
+    const storageMonitorConfig = {
+      enabled: process.env.STORAGE_MONITOR_ENABLED !== 'false',
+      intervalMs: parseInt(process.env.STORAGE_MONITOR_INTERVAL_MINUTES || '60', 10) * 60 * 1000,
+    }
+    startStorageMonitor(storageMonitorConfig)
     
     const port = process.env.PORT || 3001
     const documentTemplatesDir = process.env.DOCUMENT_TEMPLATES_DIR
@@ -184,6 +198,8 @@ async function startServer() {
       logger.info(`Stock monitoring: ${process.env.STOCK_MONITORING_ENABLED !== 'false' ? 'enabled' : 'disabled'}`)
       logger.info(`Auto ordering: ${process.env.AUTO_ORDER_ENABLED === 'true' ? 'enabled' : 'disabled'}`)
       logger.info(`Earnings recalculation: ${earningsConfig.enabled ? 'enabled' : 'disabled'} (${earningsConfig.intervalMinutes}m)`)
+      logger.info(`Order files cleanup: ${orderFilesCleanupConfig.enabled ? 'enabled (1.5 weeks retention)' : 'disabled'}`)
+      logger.info(`Storage monitor: ${storageMonitorConfig.enabled ? 'enabled (80% threshold)' : 'disabled'}`)
     })
   } catch (error) {
     logger.error('Failed to start server', { error })

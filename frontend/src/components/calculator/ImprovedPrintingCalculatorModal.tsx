@@ -416,6 +416,23 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     };
   }, [printTechnology, printColorMode, userInteracted, selectedProduct?.id, isValid, instantCalculate, isCustomProduct]);
 
+  // 🆕 Мгновенный пересчёт при установке material_id (упрощённые продукты)
+  // material_id выставляется асинхронно MaterialsSection после загрузки материалов,
+  // поэтому стоимость материала не учитывалась при первом рендере — пересчитываем сразу
+  const prevMaterialIdRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    prevMaterialIdRef.current = undefined; // сброс при смене продукта
+  }, [selectedProduct?.id]);
+  useEffect(() => {
+    if (!selectedProduct?.id || !specs.size_id || isCustomProduct || isPostprintProduct) return;
+    const materialId = specs.material_id;
+    const prevMaterialId = prevMaterialIdRef.current;
+    prevMaterialIdRef.current = materialId;
+    if (materialId != null && materialId !== prevMaterialId && userInteracted && isValid) {
+      instantCalculate();
+    }
+  }, [specs.material_id, specs.size_id, selectedProduct?.id, userInteracted, isValid, instantCalculate, isCustomProduct, isPostprintProduct]);
+
   useEffect(() => {
     if (!isOpen) {
       return;
