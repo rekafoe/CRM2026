@@ -418,7 +418,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   // 🆕 Мгновенный пересчёт при установке material_id (упрощённые продукты)
   // material_id выставляется асинхронно MaterialsSection после загрузки материалов,
-  // поэтому стоимость материала не учитывалась при первом рендере — пересчитываем сразу
+  // поэтому стоимость материала не учитывалась при первом рендере. Вызываем calculateCost напрямую,
+  // т.к. instantCalculate требует userInteracted, а при первом открытии он может быть ещё false.
   const prevMaterialIdRef = useRef<number | undefined>(undefined);
   useEffect(() => {
     prevMaterialIdRef.current = undefined; // сброс при смене продукта
@@ -428,10 +429,10 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     const materialId = specs.material_id;
     const prevMaterialId = prevMaterialIdRef.current;
     prevMaterialIdRef.current = materialId;
-    if (materialId != null && materialId !== prevMaterialId && userInteracted && isValid) {
-      instantCalculate();
+    if (materialId != null && materialId !== prevMaterialId && isValid) {
+      void calculateCost(false);
     }
-  }, [specs.material_id, specs.size_id, selectedProduct?.id, userInteracted, isValid, instantCalculate, isCustomProduct, isPostprintProduct]);
+  }, [specs.material_id, specs.size_id, selectedProduct?.id, isValid, calculateCost, isCustomProduct, isPostprintProduct]);
 
   useEffect(() => {
     if (!isOpen) {
