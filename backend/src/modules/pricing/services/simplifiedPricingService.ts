@@ -119,6 +119,8 @@ interface SimplifiedSizeConfig {
 
 interface SimplifiedConfig {
   sizes: SimplifiedSizeConfig[];
+  /** Учитывать раскладку на лист: false = 1 изделие на лист */
+  use_layout?: boolean;
 }
 
 export class SimplifiedPricingService {

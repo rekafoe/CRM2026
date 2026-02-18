@@ -31,10 +31,11 @@ export async function cleanupOldOrderFiles(): Promise<{ deletedFiles: number; de
     `SELECT id, orderId, filename FROM order_files WHERE datetime(uploadedAt) < datetime('now', '-${RETENTION_HOURS} hours')`
   )
 
+  const rowsArray = Array.isArray(rows) ? rows : []
   let deletedFiles = 0
   let deletedRecords = 0
 
-  for (const row of rows || []) {
+  for (const row of rowsArray) {
     const filePath = path.join(uploadsDir, String(row.filename))
     if (fs.existsSync(filePath)) {
       try {
