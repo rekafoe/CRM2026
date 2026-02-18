@@ -31,7 +31,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
   };
   const [amount, setAmount] = useState<string>(formatAmount(currentAmount));
   const [email, setEmail] = useState<string>(currentEmail);
-  const [paymentMethod, setPaymentMethod] = useState<'online' | 'offline' | 'telegram'>(currentPaymentMethod || 'online');
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'offline' | 'telegram'>(currentPaymentMethod || 'offline');
   const [assignToMe, setAssignToMe] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -49,7 +49,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
   React.useEffect(() => {
     setAmount(formatAmount(currentAmount));
     setEmail(currentEmail);
-    setPaymentMethod(currentPaymentMethod);
+    setPaymentMethod(currentPaymentMethod || 'offline');
   }, [currentAmount, currentEmail, currentPaymentMethod]);
 
   const handleSubmit = async (e: React.FormEvent) => {
