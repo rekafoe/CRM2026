@@ -14,6 +14,8 @@ interface PrintingSettingsSectionProps {
   backendProductSchema: any;
   /** Размеры текущего типа продукта (если у продукта есть типы) */
   effectiveSizes?: Array<{ id: string; print_prices?: any[]; [key: string]: any }>;
+  /** ID выбранного размера (если применимо) */
+  selectedSizeId?: string;
   /** Блок «Материал» для первой колонки (под «Тип печати») — одна линия по вертикали */
   materialInFirstColumn?: React.ReactNode;
 }
@@ -30,6 +32,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   selectedProduct,
   backendProductSchema,
   effectiveSizes: effectiveSizesProp,
+  selectedSizeId,
   materialInFirstColumn,
 }) => {
   const [printTechnologies, setPrintTechnologies] = useState<Array<{ code: string; name: string; pricing_mode: string; supports_duplex?: number | boolean }>>([]);
@@ -107,7 +110,10 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       : backendProductSchema?.template?.simplified?.sizes;
     if (sizesToCheck && Array.isArray(sizesToCheck)) {
       const techCodesFromPrintPrices = new Set<string>();
-      sizesToCheck.forEach((size: any) => {
+      const targetSizes = selectedSizeId 
+        ? sizesToCheck.filter((s: any) => s.id === selectedSizeId)
+        : sizesToCheck;
+      targetSizes.forEach((size: any) => {
         if (Array.isArray(size.print_prices)) {
           size.print_prices.forEach((priceConfig: any) => {
             const techCode = priceConfig.technology_code || priceConfig.technologyCode;
@@ -157,7 +163,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
 
     // 5) Если ничего не найдено - возвращаем пустой массив (не показываем лишние технологии)
     return [];
-  }, [printTechnologies, printers, backendProductSchema, effectiveSizesProp]);
+  }, [printTechnologies, printers, backendProductSchema, effectiveSizesProp, selectedSizeId]);
 
   // Получаем информацию о выбранной технологии печати
   const selectedPrintTechnology = useMemo(() => {
@@ -225,7 +231,10 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
         ? effectiveSizesProp
         : template?.simplified?.sizes;
       if (Array.isArray(sizesForColor)) {
-        sizesForColor.forEach((size: any) => collectFromPrintPrices(size.print_prices));
+        const targetSizes = selectedSizeId 
+          ? sizesForColor.filter((s: any) => s.id === selectedSizeId)
+          : sizesForColor;
+        targetSizes.forEach((size: any) => collectFromPrintPrices(size.print_prices));
       }
       const configData = template?.config_data || template;
       if (configData?.print_prices) collectFromPrintPrices(configData.print_prices);
@@ -238,25 +247,31 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     }
 
     return Array.from(colorModes);
-  }, [printTechnology, printers, isColorOnly, backendProductSchema, allowedPrintTechnologies, effectiveSizesProp]);
+  }, [printTechnology, printers, isColorOnly, backendProductSchema, allowedPrintTechnologies, effectiveSizesProp, selectedSizeId]);
 
   // 🆕 Устанавливаем дефолтные значения для селекторов печати
   useEffect(() => {
     if (!selectedProduct?.id || loading) return;
     
-    // Устанавливаем первый тип печати, если не выбран
-    if (allowedPrintTechnologies.length > 0 && !printTechnology) {
-      onPrintTechnologyChange(allowedPrintTechnologies[0].code);
+    if (allowedPrintTechnologies.length > 0) {
+      const isCurrentValid = printTechnology && allowedPrintTechnologies.some(t => t.code === printTechnology);
+      // Устанавливаем первый тип печати, если не выбран или выбран недопустимый
+      if (!isCurrentValid) {
+        onPrintTechnologyChange(allowedPrintTechnologies[0].code);
+      }
     }
   }, [selectedProduct?.id, loading, allowedPrintTechnologies, printTechnology, onPrintTechnologyChange]);
 
-  // 🆕 Устанавливаем первый режим цвета, если тип печати выбран, но режим не выбран
+  // 🆕 Устанавливаем первый режим цвета, если тип печати выбран, но режим не выбран или недопустим
   useEffect(() => {
     if (!printTechnology || loading) return;
     
-    if (allowedColorModes.length > 0 && !printColorMode) {
-      const firstMode = allowedColorModes[0];
-      onPrintColorModeChange(firstMode === 'bw' ? 'bw' : firstMode === 'color' ? 'color' : null);
+    if (allowedColorModes.length > 0) {
+      const isCurrentValid = printColorMode && allowedColorModes.includes(printColorMode);
+      if (!isCurrentValid) {
+        const firstMode = allowedColorModes[0];
+        onPrintColorModeChange(firstMode === 'bw' ? 'bw' : firstMode === 'color' ? 'color' : null);
+      }
     }
   }, [printTechnology, loading, allowedColorModes, printColorMode, onPrintColorModeChange]);
 
