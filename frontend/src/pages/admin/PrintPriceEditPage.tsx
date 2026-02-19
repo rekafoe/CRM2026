@@ -266,6 +266,35 @@ export const PrintPriceEditPage: React.FC = () => {
     boundary: '',
   });
   const tierModalRef = useRef<HTMLDivElement>(null);
+  const addRangeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!tierModal.isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!tierModalRef.current) return;
+      const target = e.target as HTMLElement;
+
+      if (tierModalRef.current.contains(target)) return;
+
+      const button = target.closest('button');
+      if (button) {
+        const buttonText = button.textContent || '';
+        if (buttonText.includes('Диапазон')) return;
+      }
+
+      setTierModal((prev) => ({ ...prev, isOpen: false, tierIndex: undefined }));
+    };
+
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside, true);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('click', handleClickOutside, true);
+    };
+  }, [tierModal.isOpen]);
 
   const getCommonRanges = useCallback((): SheetTier[] => {
     const allMinSheets = [...new Set(form.tiers.map((t) => t.min_sheets))].sort((a, b) => a - b)
@@ -494,7 +523,10 @@ export const PrintPriceEditPage: React.FC = () => {
                                       type="button"
                                       className="el-button remove-range el-button--text el-button--mini"
                                       style={{ color: 'red', marginRight: '-15px' }}
-                                      onClick={() => updateAllModesRanges(removeRange(commonRanges, ti))}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateAllModesRanges(removeRange(commonRanges, ti));
+                                      }}
                                     >
                                       ×
                                     </button>
@@ -507,10 +539,12 @@ export const PrintPriceEditPage: React.FC = () => {
                             <div className="cell">
                               <div className="simplified-row__add-range-wrapper">
                                 <button
+                                  ref={addRangeButtonRef}
                                   type="button"
                                   className="el-button el-button--info el-button--mini is-plain"
                                   style={{ width: '100%', marginLeft: '0px' }}
                                   onClick={(e) => {
+                                    e.stopPropagation();
                                     const button = e.currentTarget as HTMLElement
                                     setTierModal({
                                       type: 'add',
@@ -747,7 +781,10 @@ export const PrintPriceEditPage: React.FC = () => {
                             <button
                               type="button"
                               className="simplified-tier-modal__close"
-                              onClick={() => setTierModal({ type: 'add', isOpen: false, boundary: '' })}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTierModal({ type: 'add', isOpen: false, boundary: '', tierIndex: undefined });
+                              }}
                               title="Закрыть"
                             >
                               ×
@@ -772,7 +809,10 @@ export const PrintPriceEditPage: React.FC = () => {
                               <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => setTierModal({ type: 'add', isOpen: false, boundary: '' })}
+                                onClick={(e) => {
+                                  e?.stopPropagation();
+                                  setTierModal({ type: 'add', isOpen: false, boundary: '', tierIndex: undefined });
+                                }}
                               >
                                 Отменить
                               </Button>
@@ -795,7 +835,7 @@ export const PrintPriceEditPage: React.FC = () => {
                                   }
 
                                   updateAllModesRanges(newRanges)
-                                  setTierModal({ type: 'add', isOpen: false, boundary: '' })
+                                  setTierModal({ type: 'add', isOpen: false, boundary: '', tierIndex: undefined })
                                 }}
                               >
                                 {tierModal.type === 'add' ? 'Добавить' : 'Сохранить'}

@@ -371,7 +371,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       }
 
       // Закрываем модалку только если клик действительно вне её
-      setTierModal((prev) => ({ ...prev, isOpen: false, tierIdx: undefined }))
+      setTierModal((prev) => ({ ...prev, isOpen: false, tierIndex: undefined }))
     }
 
     // Используем небольшую задержку, чтобы событие от кнопки открытия не закрывало модалку
@@ -1115,8 +1115,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                                         </div>
                                       </div>
                                     </td>
-                                    {commonRanges.map(() => (
-                                      <td key={Math.random()} style={{ backgroundColor: '#f5f7fa' }}></td>
+                                    {commonRanges.map((_, ti) => (
+                                      <td key={`color-empty-${ti}`} style={{ backgroundColor: '#f5f7fa' }}></td>
                                     ))}
                                     <td style={{ backgroundColor: '#f5f7fa' }}></td>
                                   </tr>
@@ -1285,10 +1285,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   </div>
                 </div>
                                     </td>
-                                    {commonRanges.map(() => (
-                                      <td key={Math.random()} style={{ backgroundColor: '#f5f7fa' }}></td>
+                                    {commonRanges.map((_, ti) => (
+                                      <td key={`bw-empty-${ti}`} style={{ backgroundColor: '#f5f7fa' }}></td>
                                     ))}
-                                    <td style={{ backgroundColor: '#f5f7fa' }}></td>
                                     <td style={{ backgroundColor: '#f5f7fa' }}></td>
                                   </tr>
                                   
