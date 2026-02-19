@@ -121,6 +121,8 @@ interface SimplifiedConfig {
   sizes: SimplifiedSizeConfig[];
   /** Учитывать раскладку на лист: false = 1 изделие на лист */
   use_layout?: boolean;
+  /** Учитывать стоимость материалов: false = materialPrice = 0 */
+  include_material_cost?: boolean;
 }
 
 export class SimplifiedPricingService {
@@ -446,10 +448,16 @@ export class SimplifiedPricingService {
     }
     
     // 5. Рассчитываем цену материала (берём со склада — sheet_price_single, без диапазонов)
+    // Можно отключить через simplified.include_material_cost = false
     let materialPrice = 0;
     let materialDetails: SimplifiedPricingResult['materialDetails'] | undefined;
-    
-    if (normalizedConfig.material_id) {
+
+    const includeMaterialCost = simplifiedConfig.include_material_cost !== false;
+    if (!includeMaterialCost) {
+      logger.info('Стоимость материалов отключена в шаблоне (include_material_cost=false)', { productId });
+    }
+
+    if (includeMaterialCost && normalizedConfig.material_id) {
       const isAllowed = selectedSize.allowed_material_ids?.includes(normalizedConfig.material_id) ?? true;
       if (!isAllowed) {
         logger.warn('Материал не в списке разрешённых для размера', { material_id: normalizedConfig.material_id });

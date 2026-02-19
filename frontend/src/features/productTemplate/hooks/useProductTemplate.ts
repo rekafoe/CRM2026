@@ -81,6 +81,8 @@ export type SimplifiedConfig = {
   cutting?: boolean;
   /** Учитывать раскладку на лист: при false — 1 изделие на лист, без оптимизации (для крупноформатных и т.п.) */
   use_layout?: boolean;
+  /** Учитывать стоимость материалов в итоговой цене: false = materialPrice не добавляется */
+  include_material_cost?: boolean;
 }
 
 export interface TemplateState {
@@ -181,7 +183,7 @@ export function useProductTemplateInitial(): TemplateState {
     packaging: [],
     print_run: { enabled: false, min: '', max: '' },
     price_rules: [],
-    simplified: { sizes: buildDefaultSizes(), pages: { options: [] } },
+    simplified: { sizes: buildDefaultSizes(), pages: { options: [] }, include_material_cost: true },
     test: { qty: 100, params: {}, paramsJson: '{}' }
   }
 }

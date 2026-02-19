@@ -654,6 +654,17 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
             />
             Резка стопой — считать резы по раскладке (резов на лист), а не по тиражу
           </label>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={value.include_material_cost !== false}
+              onChange={(e) => onChange({ ...value, include_material_cost: e.target.checked })}
+            />
+            Учитывать стоимость материалов в расчёте
+          </label>
+          <div className="text-muted text-sm">
+            По умолчанию включено: как и раньше, стоимость материалов добавляется в итоговую цену.
+          </div>
         </div>
       </div>
 
