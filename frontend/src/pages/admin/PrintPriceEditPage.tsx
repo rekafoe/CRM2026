@@ -160,7 +160,9 @@ type TierModalState = {
 export const PrintPriceEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const isNew = id === 'new';
+  // На маршруте /print-prices/new параметр id отсутствует (undefined),
+  // поэтому это тоже режим создания.
+  const isNew = !id || id === 'new';
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
