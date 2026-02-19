@@ -31,16 +31,33 @@ export async function up(db: Database) {
        VALUES (?, ?, ?, 1, datetime('now'), datetime('now'))`,
       [s.name, s.value, s.description]
     )
-    // Если запись есть, но выключена/без описания — активируем и заполняем description
-    await db.run(
-      `UPDATE markup_settings
-       SET
-         is_active = 1,
-         description = COALESCE(description, ?),
-         updated_at = datetime('now')
-       WHERE setting_name = ? AND (is_active IS NULL OR is_active = 0)`,
-      [s.description, s.name]
-    )
+    
+    // Check if the description column exists
+    const columns = await db.all<{name: string}[]>('PRAGMA table_info(markup_settings)');
+    const hasDescription = columns.some(col => col.name === 'description');
+    
+    if (hasDescription) {
+      // Если запись есть, но выключена/без описания — активируем и заполняем description
+      await db.run(
+        `UPDATE markup_settings
+         SET
+           is_active = 1,
+           description = COALESCE(description, ?),
+           updated_at = datetime('now')
+         WHERE setting_name = ? AND (is_active IS NULL OR is_active = 0)`,
+        [s.description, s.name]
+      )
+    } else {
+      // Если колонки нет, просто активируем
+      await db.run(
+        `UPDATE markup_settings
+         SET
+           is_active = 1,
+           updated_at = datetime('now')
+         WHERE setting_name = ? AND (is_active IS NULL OR is_active = 0)`,
+        [s.name]
+      )
+    }
   }
 }
 

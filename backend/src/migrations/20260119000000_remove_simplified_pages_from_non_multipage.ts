@@ -8,6 +8,12 @@ type TemplateRow = {
 };
 
 export async function up(db: Database): Promise<void> {
+  // First check if the table exists to avoid errors
+  const tableExists = await db.get<{ name: string }>(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='product_template_configs'`
+  );
+  if (!tableExists) return;
+
   const rows = await db.all<TemplateRow[]>(
     `SELECT ptc.id, ptc.product_id, p.product_type, ptc.config_data
      FROM product_template_configs ptc
