@@ -15,7 +15,7 @@ interface PrintingSettingsSectionProps {
   /** Размеры текущего типа продукта (если у продукта есть типы) */
   effectiveSizes?: Array<{ id: string; print_prices?: any[]; [key: string]: any }>;
   /** ID выбранного размера (если применимо) */
-  selectedSizeId?: string;
+  selectedSizeId?: string | number;
   /** Блок «Материал» для первой колонки (под «Тип печати») — одна линия по вертикали */
   materialInFirstColumn?: React.ReactNode;
 }
@@ -94,24 +94,25 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     };
   }, [selectedProduct?.id]);
 
-  // Получаем разрешенные типы печати из constraints, цен печати продукта или из принтеров
+  // Получаем разрешенные типы печати из цен печати размера/продукта и constraints
   const allowedPrintTechnologies = useMemo(() => {
-    // 1) Приоритет: constraints.allowed_print_technologies (явно заданные для продукта)
     const constraints = backendProductSchema?.constraints;
-    if (constraints?.allowed_print_technologies && Array.isArray(constraints.allowed_print_technologies)) {
-      return printTechnologies.filter(tech => 
-        constraints.allowed_print_technologies.includes(tech.code)
-      );
-    }
+    const constrainedCodes = Array.isArray(constraints?.allowed_print_technologies)
+      ? new Set<string>(
+          constraints.allowed_print_technologies
+            .map((code: unknown) => String(code ?? '').trim())
+            .filter(Boolean)
+        )
+      : null;
 
-    // 2) Для упрощённых продуктов: извлекаем технологии из sizes[].print_prices[]
+    // 1) Для упрощённых продуктов: технологии из print_prices конкретно выбранного размера
     const sizesToCheck = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
       ? effectiveSizesProp
       : backendProductSchema?.template?.simplified?.sizes;
     if (sizesToCheck && Array.isArray(sizesToCheck)) {
       const techCodesFromPrintPrices = new Set<string>();
       const targetSizes = selectedSizeId 
-        ? sizesToCheck.filter((s: any) => s.id === selectedSizeId)
+        ? sizesToCheck.filter((s: any) => String(s.id) === String(selectedSizeId))
         : sizesToCheck;
       targetSizes.forEach((size: any) => {
         if (Array.isArray(size.print_prices)) {
@@ -124,12 +125,16 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
         }
       });
       if (techCodesFromPrintPrices.size > 0) {
-        return printTechnologies.filter(tech => techCodesFromPrintPrices.has(tech.code));
+        return printTechnologies.filter((tech) => {
+          const inSize = techCodesFromPrintPrices.has(tech.code);
+          if (!inSize) return false;
+          return constrainedCodes ? constrainedCodes.has(tech.code) : true;
+        });
       }
     }
     const template = backendProductSchema?.template;
 
-    // 3) Для обычных продуктов: проверяем config_data.print_prices (если есть)
+    // 2) Для обычных продуктов: проверяем config_data.print_prices (если есть)
     // На странице шаблона продукта могут быть сохранены цены печати по технологиям
     const configData = template?.config_data || template;
     if (configData?.print_prices && Array.isArray(configData.print_prices)) {
@@ -142,11 +147,15 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       });
       
       if (techCodesFromConfig.size > 0) {
-        return printTechnologies.filter(tech => techCodesFromConfig.has(tech.code));
+        return printTechnologies.filter((tech) => {
+          const inConfig = techCodesFromConfig.has(tech.code);
+          if (!inConfig) return false;
+          return constrainedCodes ? constrainedCodes.has(tech.code) : true;
+        });
       }
     }
 
-    // 4) Fallback: если есть операции печати, но нет явных настроек - используем принтеры
+    // 3) Fallback: если есть операции печати, но нет явных настроек - используем принтеры
     const operations = backendProductSchema?.operations || [];
     const hasPrintOperations = operations.some((op: any) => 
       op.operationType === 'print' || op.type === 'print' || op.operation_type === 'print'
@@ -158,7 +167,16 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
           .map(p => p.technology_code)
           .filter((code): code is string => Boolean(code))
       );
-      return printTechnologies.filter(tech => uniqueTechCodes.has(tech.code));
+      return printTechnologies.filter((tech) => {
+        const inPrinters = uniqueTechCodes.has(tech.code);
+        if (!inPrinters) return false;
+        return constrainedCodes ? constrainedCodes.has(tech.code) : true;
+      });
+    }
+
+    // 4) Если заданы constraints, но не нашли в ценах/принтерах — показываем только их
+    if (constrainedCodes && constrainedCodes.size > 0) {
+      return printTechnologies.filter((tech) => constrainedCodes.has(tech.code));
     }
 
     // 5) Если ничего не найдено - возвращаем пустой массив (не показываем лишние технологии)
@@ -232,7 +250,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
         : template?.simplified?.sizes;
       if (Array.isArray(sizesForColor)) {
         const targetSizes = selectedSizeId 
-          ? sizesForColor.filter((s: any) => s.id === selectedSizeId)
+          ? sizesForColor.filter((s: any) => String(s.id) === String(selectedSizeId))
           : sizesForColor;
         targetSizes.forEach((size: any) => collectFromPrintPrices(size.print_prices));
       }
