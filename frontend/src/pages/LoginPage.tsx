@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { createShift, getShifts, setAuthToken } from '../api';
+import { api, createShift, getShifts, setAuthToken } from '../api';
 import { APP_CONFIG } from '../types';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './LoginPage.css';
 
@@ -17,7 +16,9 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     try {
-      const res = await axios.post('/api/auth/login', { email, password });
+      // Важно: логин должен идти через общий API-клиент с baseURL из VITE_API_URL,
+      // чтобы токен выдавал тот же backend, куда затем отправляются /shifts и другие запросы.
+      const res = await api.post('/auth/login', { email, password });
       setAuthToken(res.data.token);
       localStorage.setItem(APP_CONFIG.storage.role, res.data.role || '');
       if (res.data.user_id) localStorage.setItem(APP_CONFIG.storage.userId, String(res.data.user_id));
