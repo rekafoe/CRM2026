@@ -35,6 +35,21 @@ interface Props {
 
 const uid = () => `sz_${Date.now()}_${Math.random().toString(16).slice(2)}`
 
+const cloneSizeWithNewId = (size: SimplifiedSizeConfig): SimplifiedSizeConfig => ({
+  ...size,
+  id: uid(),
+  print_prices: (size.print_prices || []).map((pp) => ({
+    ...pp,
+    tiers: (pp.tiers || []).map((t) => ({ ...t })),
+  })),
+  allowed_material_ids: [...(size.allowed_material_ids || [])],
+  material_prices: (size.material_prices || []).map((mp) => ({
+    ...mp,
+    tiers: (mp.tiers || []).map((t) => ({ ...t })),
+  })),
+  finishing: (size.finishing || []).map((f) => ({ ...f })),
+})
+
 /** Поле цены за диапазон: при вводе хранит строку, чтобы можно было набрать 3.05 (ноль не пропадает); число записывается по blur */
 const PriceCell: React.FC<{
   value: number
@@ -249,6 +264,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const [loadingLists, setLoadingLists] = useState(false)
   const [showAddSize, setShowAddSize] = useState(false)
   const [newSize, setNewSize] = useState<{ label: string; width_mm: string; height_mm: string }>({ label: '', width_mm: '', height_mm: '' })
+  const [showCopySizes, setShowCopySizes] = useState(false)
+  const [copyFromTypeId, setCopyFromTypeId] = useState<string>('')
+  const [copySelectedSizeIds, setCopySelectedSizeIds] = useState<string[]>([])
   const [selectedPaperTypeId, setSelectedPaperTypeId] = useState<string | null>(null)
   const [tierModal, setTierModal] = useState<TierRangeModalState>({
     type: 'add',
@@ -428,6 +446,57 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     setShowAddSize(false)
     setNewSize({ label: '', width_mm: '', height_mm: '' })
   }, [newSize.height_mm, newSize.label, newSize.width_mm, applyToCurrentConfig])
+
+  const availableSourceTypes = useMemo(() => {
+    if (!hasTypes || !value.types?.length) return []
+    return value.types.filter((t) => t.id !== selectedTypeId)
+  }, [hasTypes, value.types, selectedTypeId])
+
+  const copySourceSizes = useMemo(() => {
+    if (!copyFromTypeId) return []
+    return value.typeConfigs?.[copyFromTypeId]?.sizes ?? []
+  }, [value.typeConfigs, copyFromTypeId])
+
+  const openCopySizesModal = useCallback(() => {
+    if (!availableSourceTypes.length) return
+    const initialTypeId = availableSourceTypes[0]?.id ?? ''
+    const initialSizes = initialTypeId ? (value.typeConfigs?.[initialTypeId]?.sizes ?? []) : []
+    setCopyFromTypeId(initialTypeId)
+    setCopySelectedSizeIds(initialSizes.map((s) => s.id))
+    setShowCopySizes(true)
+  }, [availableSourceTypes, value.typeConfigs])
+
+  const closeCopySizesModal = useCallback(() => {
+    setShowCopySizes(false)
+    setCopyFromTypeId('')
+    setCopySelectedSizeIds([])
+  }, [])
+
+  const commitCopySizes = useCallback(() => {
+    if (!copyFromTypeId || copySelectedSizeIds.length === 0) return
+    const sourceSizes = value.typeConfigs?.[copyFromTypeId]?.sizes ?? []
+    const selectedSourceSizes = sourceSizes.filter((s) => copySelectedSizeIds.includes(s.id))
+    if (selectedSourceSizes.length === 0) return
+
+    const cloned = selectedSourceSizes.map(cloneSizeWithNewId)
+    applyToCurrentConfig((prev) => ({
+      ...prev,
+      sizes: [...(prev.sizes || []), ...cloned],
+    }))
+    setSelectedSizeId(cloned[0]?.id ?? null)
+    closeCopySizesModal()
+  }, [applyToCurrentConfig, closeCopySizesModal, copyFromTypeId, copySelectedSizeIds, setSelectedSizeId, value.typeConfigs])
+
+  useEffect(() => {
+    if (!showCopySizes || !copyFromTypeId) return
+    const sourceSizes = value.typeConfigs?.[copyFromTypeId]?.sizes ?? []
+    const sourceIds = new Set(sourceSizes.map((s) => s.id))
+    setCopySelectedSizeIds((prev) => {
+      const filtered = prev.filter((id) => sourceIds.has(id))
+      if (filtered.length > 0) return filtered
+      return sourceSizes.map((s) => s.id)
+    })
+  }, [copyFromTypeId, showCopySizes, value.typeConfigs])
 
   const techName = useCallback((code: string) => printTechs.find(t => t.code === code)?.name || code, [printTechs])
   const svcName = useCallback((id: number) => services.find(s => Number(s.id) === Number(id))?.name || `#${id}`, [services])
@@ -625,7 +694,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           <p className="text-muted text-sm">Настройка цен по размерам: печать (за изделие), материалы (за изделие) и отделка (за рез/биг/фальц).</p>
         </div>
         <div className="simplified-template__header-actions">
-          <Button variant="secondary" onClick={openAddSize}>Добавить размер</Button>
           <Button variant="primary" onClick={onSave} disabled={saving}>Сохранить</Button>
         </div>
       </div>
@@ -786,7 +854,15 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       ) : (
         <div className="simplified-template__grid">
           <div className="simplified-template__sizes">
-            <div className="simplified-template__sizes-title">Обрезные форматы</div>
+            <div className="simplified-template__sizes-header">
+              <div className="simplified-template__sizes-title">Обрезные форматы</div>
+              <div className="simplified-template__sizes-actions">
+                <Button variant="secondary" size="sm" onClick={openAddSize}>Добавить размер</Button>
+                {hasTypes && availableSourceTypes.length > 0 && (
+                  <Button variant="secondary" size="sm" onClick={openCopySizesModal}>Скопировать из типа</Button>
+                )}
+              </div>
+            </div>
             {sizes.map(s => (
               <button
                 key={s.id}
@@ -1795,6 +1871,81 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           <div className="simplified-add-size__actions">
             <Button variant="secondary" onClick={() => setShowAddSize(false)}>Отмена</Button>
             <Button variant="primary" onClick={commitAddSize} disabled={!newSize.label.trim()}>Добавить</Button>
+          </div>
+        </div>
+      </Modal>
+      <Modal isOpen={showCopySizes} onClose={closeCopySizesModal} title="Скопировать размеры из другого типа" size="md">
+        <div className="simplified-add-size">
+          <FormField label="Тип-источник" required>
+            <select
+              className="form-select"
+              value={copyFromTypeId}
+              onChange={(e) => {
+                const typeId = e.target.value
+                const sourceSizes = value.typeConfigs?.[typeId]?.sizes ?? []
+                setCopyFromTypeId(typeId)
+                setCopySelectedSizeIds(sourceSizes.map((s) => s.id))
+              }}
+            >
+              {availableSourceTypes.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Размеры для копирования">
+            {copySourceSizes.length === 0 ? (
+              <div className="text-muted text-sm">В выбранном типе нет размеров для копирования.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={copySelectedSizeIds.length === copySourceSizes.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setCopySelectedSizeIds(copySourceSizes.map((s) => s.id))
+                      } else {
+                        setCopySelectedSizeIds([])
+                      }
+                    }}
+                  />
+                  Выбрать все
+                </label>
+                <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: 8, padding: 8 }}>
+                  {copySourceSizes.map((s) => {
+                    const checked = copySelectedSizeIds.includes(s.id)
+                    return (
+                      <label key={s.id} className="checkbox-label" style={{ display: 'block', marginBottom: 6 }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setCopySelectedSizeIds((prev) => (prev.includes(s.id) ? prev : [...prev, s.id]))
+                            } else {
+                              setCopySelectedSizeIds((prev) => prev.filter((id) => id !== s.id))
+                            }
+                          }}
+                        />
+                        {s.label} ({s.width_mm}×{s.height_mm} мм)
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </FormField>
+          <div className="simplified-add-size__actions">
+            <Button variant="secondary" onClick={closeCopySizesModal}>Отмена</Button>
+            <Button
+              variant="primary"
+              onClick={commitCopySizes}
+              disabled={!copyFromTypeId || copySelectedSizeIds.length === 0}
+            >
+              Скопировать
+            </Button>
           </div>
         </div>
       </Modal>

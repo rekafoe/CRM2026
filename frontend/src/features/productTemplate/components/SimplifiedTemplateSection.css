@@ -41,6 +41,20 @@
   padding: 6px 8px;
 }
 
+.simplified-template__sizes-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.simplified-template__sizes-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 8px;
+}
+
 .simplified-size {
   text-align: left;
   border: 1px solid var(--border-color, #e5e7eb);
@@ -149,6 +163,12 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.simplified-template__type-toggle {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
 }
 
 .simplified-template__type-tab-btn:hover {

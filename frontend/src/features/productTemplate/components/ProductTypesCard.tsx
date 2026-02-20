@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Button } from '../../../components/common'
 import type { SimplifiedConfig, ProductTypeVariant } from '../hooks/useProductTemplate'
 import './SimplifiedTemplateSection.css'
@@ -42,6 +42,13 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
 }) => {
   const hasTypes = Boolean(value.types?.length)
   const types = value.types ?? []
+  const [expandedTypeId, setExpandedTypeId] = useState<string | null>(selectedTypeId)
+
+  useEffect(() => {
+    if (!types.some((t) => t.id === expandedTypeId)) {
+      setExpandedTypeId(selectedTypeId)
+    }
+  }, [expandedTypeId, selectedTypeId, types])
 
   return (
     <div className="simplified-card simplified-template__types">
@@ -67,12 +74,16 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                 <button
                   type="button"
                   className="simplified-template__type-tab-btn"
-                  onClick={() => onSelectType(t.id)}
+                  onClick={() => {
+                    onSelectType(t.id)
+                    setExpandedTypeId((prev) => (prev === t.id ? null : t.id))
+                  }}
                 >
                   <span className="simplified-template__type-tab-name">{t.name}</span>
                   {t.default && <span className="simplified-template__type-badge">по умолчанию</span>}
+                  <span className="simplified-template__type-toggle">{expandedTypeId === t.id ? 'Свернуть' : 'Развернуть'}</span>
                 </button>
-                {selectedTypeId === t.id && (
+                {expandedTypeId === t.id && (
                   <div className="simplified-template__type-panel">
                     <div className="simplified-template__type-actions">
                       <input
