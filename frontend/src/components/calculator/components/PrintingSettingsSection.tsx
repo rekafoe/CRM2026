@@ -226,8 +226,8 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       });
     })();
 
-    const supports = selectedPrintTechnology.supports_duplex;
-    const techSupportsDuplex = supports === 1 || supports === true;
+    const supports = selectedPrintTechnology?.supports_duplex;
+    const techSupportsDuplex = selectedPrintTechnology ? (supports === 1 || supports === true) : true;
 
     if (productDuplexSupport === null) return techSupportsDuplex;
     return techSupportsDuplex && productDuplexSupport;
