@@ -725,6 +725,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           <label className="checkbox-label">
             <input
               type="checkbox"
+              checked={value.duplex_as_single_x2 === true}
+              onChange={(e) => onChange({ ...value, duplex_as_single_x2: e.target.checked })}
+            />
+            Для двухсторонней печати: считать как (односторонняя + материал) ×2, но списывать материал как обычно
+          </label>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
               checked={value.include_material_cost !== false}
               onChange={(e) => onChange({ ...value, include_material_cost: e.target.checked })}
             />

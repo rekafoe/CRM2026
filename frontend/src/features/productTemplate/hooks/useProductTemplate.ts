@@ -79,6 +79,8 @@ export type SimplifiedConfig = {
   typeConfigs?: Record<string, SimplifiedTypeConfig>;
   /** Включить опцию «Резка» в калькуляторе: считает резы по раскладке (sheetsNeeded × cutsPerSheet), а не по тиражу */
   cutting?: boolean;
+  /** Для двухсторонней печати считать как (односторонняя + материал) ×2, но списание материала не удваивать */
+  duplex_as_single_x2?: boolean;
   /** Учитывать раскладку на лист: при false — 1 изделие на лист, без оптимизации (для крупноформатных и т.п.) */
   use_layout?: boolean;
   /** Учитывать стоимость материалов в итоговой цене: false = materialPrice не добавляется */
@@ -183,7 +185,7 @@ export function useProductTemplateInitial(): TemplateState {
     packaging: [],
     print_run: { enabled: false, min: '', max: '' },
     price_rules: [],
-    simplified: { sizes: buildDefaultSizes(), pages: { options: [] }, include_material_cost: true },
+    simplified: { sizes: buildDefaultSizes(), pages: { options: [] }, duplex_as_single_x2: false, include_material_cost: true },
     test: { qty: 100, params: {}, paramsJson: '{}' }
   }
 }

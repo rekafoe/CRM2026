@@ -121,6 +121,8 @@ interface SimplifiedConfig {
   sizes: SimplifiedSizeConfig[];
   /** Учитывать раскладку на лист: false = 1 изделие на лист */
   use_layout?: boolean;
+  /** Для duplex/duplex_bw_back: считать печать как single ×2 (материалы не удваиваются) */
+  duplex_as_single_x2?: boolean;
   /** Учитывать стоимость материалов: false = materialPrice = 0 */
   include_material_cost?: boolean;
 }
@@ -338,6 +340,14 @@ export class SimplifiedPricingService {
       : Math.ceil(quantity / itemsPerSheet);
     const effectivePrintQuantity = sheetsNeeded;
 
+    const isDuplexModeSelected =
+      normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back';
+    const duplexAsSingleX2 = simplifiedConfig.duplex_as_single_x2 === true;
+    // Для биллинга: если включено правило, оцениваем duplex как (single) ×2.
+    // Важно: effectivePrintQuantity/sheetsNeeded не меняем, чтобы списание материалов оставалось фактическим.
+    const pricingSidesMode = duplexAsSingleX2 && isDuplexModeSelected ? 'single' : normalizedConfig.print_sides_mode;
+    const billingModeMultiplier = duplexAsSingleX2 && isDuplexModeSelected ? 2 : 1;
+
     // 4. Рассчитываем цену печати
     let printPrice = 0;
     let printDetails: SimplifiedPricingResult['printDetails'] | undefined;
@@ -347,13 +357,16 @@ export class SimplifiedPricingService {
       const printPriceConfig = selectedSize.print_prices.find(p =>
         techNorm(p.technology_code) === techNorm(normalizedConfig.print_technology!) &&
         (p.color_mode ?? '').toLowerCase() === (normalizedConfig.print_color_mode ?? '').toLowerCase() &&
-        (p.sides_mode ?? '').toLowerCase() === (normalizedConfig.print_sides_mode ?? '').toLowerCase()
+        (p.sides_mode ?? '').toLowerCase() === (pricingSidesMode ?? '').toLowerCase()
       );
       
       logger.info('Расчет цены печати', {
         print_technology: normalizedConfig.print_technology,
         print_color_mode: normalizedConfig.print_color_mode,
         print_sides_mode: normalizedConfig.print_sides_mode,
+        pricing_sides_mode: pricingSidesMode,
+        duplex_as_single_x2: duplexAsSingleX2,
+        billing_mode_multiplier: billingModeMultiplier,
         foundConfig: !!printPriceConfig,
         tiersCount: printPriceConfig?.tiers?.length || 0
       });
@@ -366,11 +379,11 @@ export class SimplifiedPricingService {
         if (priceForTier <= 0 && normalizedConfig.print_technology) {
           const centralPrice = await PrintPriceService.getByTechnology(normalizedConfig.print_technology);
           if (centralPrice?.counter_unit === 'sheets') {
-            const isDuplex = normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back';
+            const isDuplexForPricing = pricingSidesMode === 'duplex' || pricingSidesMode === 'duplex_bw_back';
             const isColor = normalizedConfig.print_color_mode === 'color';
             const pricePerSheet = isColor
-              ? (isDuplex ? centralPrice.price_color_duplex : centralPrice.price_color_single)
-              : (isDuplex ? centralPrice.price_bw_duplex : centralPrice.price_bw_single);
+              ? (isDuplexForPricing ? centralPrice.price_color_duplex : centralPrice.price_color_single)
+              : (isDuplexForPricing ? centralPrice.price_bw_duplex : centralPrice.price_bw_single);
             if (pricePerSheet != null && pricePerSheet > 0) {
               priceForTier = pricePerSheet / itemsPerSheet;
               logger.info('Цена печати из центральных print_prices (fallback)', {
@@ -387,7 +400,8 @@ export class SimplifiedPricingService {
           // При 5 шт/лист и 6 шт — печатаем 2 листа, цена = 2 × price_per_sheet, а не 6 × unit_price.
           // unit_price = price_per_sheet / itemsPerSheet → price_per_sheet = priceForTier * itemsPerSheet
           const pricePerSheet = priceForTier * itemsPerSheet;
-          printPrice = usePagesMultiplier ? priceForTier * quantity : sheetsNeeded * pricePerSheet;
+          const basePrintPrice = usePagesMultiplier ? priceForTier * quantity : sheetsNeeded * pricePerSheet;
+          printPrice = basePrintPrice * billingModeMultiplier;
           printDetails = {
             tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
             priceForQuantity: printPrice,
@@ -400,6 +414,8 @@ export class SimplifiedPricingService {
             pages: effectivePages,
             sheetsPerItem,
             effectivePrintQuantity,
+            basePrintPrice,
+            billingModeMultiplier,
             printPrice,
           });
         } else if (tier) {
@@ -412,24 +428,28 @@ export class SimplifiedPricingService {
         if (normalizedConfig.print_technology) {
           const centralPrice = await PrintPriceService.getByTechnology(normalizedConfig.print_technology);
           if (centralPrice?.counter_unit === 'sheets') {
-            const isDuplex = normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back';
+            const isDuplexForPricing = pricingSidesMode === 'duplex' || pricingSidesMode === 'duplex_bw_back';
             const isColor = normalizedConfig.print_color_mode === 'color';
             const pricePerSheet = isColor
-              ? (isDuplex ? centralPrice.price_color_duplex : centralPrice.price_color_single)
-              : (isDuplex ? centralPrice.price_bw_duplex : centralPrice.price_bw_single);
+              ? (isDuplexForPricing ? centralPrice.price_color_duplex : centralPrice.price_color_single)
+              : (isDuplexForPricing ? centralPrice.price_bw_duplex : centralPrice.price_bw_single);
             if (pricePerSheet != null && pricePerSheet > 0) {
               const priceForTier = pricePerSheet / itemsPerSheet;
               // Листовые продукты: считаем по листам, не по штукам (см. пограничные значения)
-              printPrice = usePagesMultiplier ? priceForTier * quantity : sheetsNeeded * pricePerSheet;
+              const basePrintPrice = usePagesMultiplier ? priceForTier * quantity : sheetsNeeded * pricePerSheet;
+              printPrice = basePrintPrice * billingModeMultiplier;
               printDetails = {
                 tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
                 priceForQuantity: printPrice,
               };
               logger.info('Цена печати из центральных print_prices (нет в шаблоне)', {
                 technology: normalizedConfig.print_technology,
+                pricingSidesMode,
                 pricePerSheet,
                 itemsPerSheet,
                 sheetsNeeded,
+                basePrintPrice,
+                billingModeMultiplier,
                 printPrice,
               });
             }
@@ -467,7 +487,8 @@ export class SimplifiedPricingService {
           [normalizedConfig.material_id]
         );
         const pricePerSheet = material?.sheet_price_single ?? 0;
-        materialPrice = effectivePrintQuantity * pricePerSheet;
+        const baseMaterialPrice = effectivePrintQuantity * pricePerSheet;
+        materialPrice = baseMaterialPrice * billingModeMultiplier;
         materialDetails = {
           tier: { min_qty: 1, max_qty: undefined, price: pricePerSheet },
           priceForQuantity: materialPrice,
@@ -476,6 +497,8 @@ export class SimplifiedPricingService {
           material_id: normalizedConfig.material_id,
           pricePerSheet,
           effectivePrintQuantity,
+          baseMaterialPrice,
+          billingModeMultiplier,
           materialPrice,
         });
       }

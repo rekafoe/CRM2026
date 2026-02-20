@@ -189,12 +189,49 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     return printTechnologies.find(tech => tech.code === printTechnology) || null;
   }, [printTechnology, printTechnologies]);
 
+  const selectedSizePrintPrices = useMemo(() => {
+    const sizesToCheck = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
+      ? effectiveSizesProp
+      : backendProductSchema?.template?.simplified?.sizes;
+    if (!Array.isArray(sizesToCheck)) return [];
+
+    const targetSizes = selectedSizeId
+      ? sizesToCheck.filter((s: any) => String(s.id) === String(selectedSizeId))
+      : sizesToCheck;
+    const rows = targetSizes.flatMap((s: any) => (Array.isArray(s.print_prices) ? s.print_prices : []));
+    return Array.isArray(rows) ? rows : [];
+  }, [effectiveSizesProp, backendProductSchema, selectedSizeId]);
+
   // Проверяем, поддерживает ли технология двухстороннюю печать
+  // Приоритет: если в print_prices выбранного размера нет duplex для выбранной технологии
+  // (и выбранного цвета, если он задан) — считаем, что для продукта duplex недоступен.
   const supportsDuplex = useMemo(() => {
-    if (!selectedPrintTechnology) return true; // По умолчанию поддерживает
+    const normalize = (value: any) => String(value ?? '').trim().toLowerCase();
+
+    const productDuplexSupport = (() => {
+      if (!printTechnology) return null as boolean | null;
+      if (!selectedSizePrintPrices.length) return null as boolean | null;
+
+      const matching = selectedSizePrintPrices.filter((row: any) => {
+        const sameTech = normalize(row.technology_code ?? row.technologyCode) === normalize(printTechnology);
+        if (!sameTech) return false;
+        if (!printColorMode) return true;
+        return normalize(row.color_mode ?? row.colorMode) === normalize(printColorMode);
+      });
+
+      if (!matching.length) return false;
+      return matching.some((row: any) => {
+        const mode = normalize(row.sides_mode ?? row.sidesMode);
+        return mode === 'duplex' || mode === 'duplex_bw_back';
+      });
+    })();
+
     const supports = selectedPrintTechnology.supports_duplex;
-    return supports === 1 || supports === true;
-  }, [selectedPrintTechnology]);
+    const techSupportsDuplex = supports === 1 || supports === true;
+
+    if (productDuplexSupport === null) return techSupportsDuplex;
+    return techSupportsDuplex && productDuplexSupport;
+  }, [selectedPrintTechnology, selectedSizePrintPrices, printTechnology, printColorMode]);
 
   // Проверяем, поддерживает ли технология только цветную печать
   // Для струйных пигментных технологий обычно только цветная печать

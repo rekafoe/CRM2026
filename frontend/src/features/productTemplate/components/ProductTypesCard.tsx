@@ -45,7 +45,8 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
   const [expandedTypeId, setExpandedTypeId] = useState<string | null>(selectedTypeId)
 
   useEffect(() => {
-    if (!types.some((t) => t.id === expandedTypeId)) {
+    // Если панель свёрнута вручную (expandedTypeId === null), не раскрываем её обратно автоматически.
+    if (expandedTypeId !== null && !types.some((t) => t.id === expandedTypeId)) {
       setExpandedTypeId(selectedTypeId)
     }
   }, [expandedTypeId, selectedTypeId, types])
