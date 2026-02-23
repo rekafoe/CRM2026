@@ -277,9 +277,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const [newPageToAdd, setNewPageToAdd] = useState('')
 
   const handleSelectType = useCallback(
-    (typeId: string) => {
+    (typeId: number) => {
       setSelectedTypeId(typeId)
-      const cfg = value.typeConfigs?.[typeId]?.sizes ?? []
+      const cfg = value.typeConfigs?.[String(typeId)]?.sizes ?? []
       setSelectedSizeId(cfg[0]?.id ?? null)
     },
     [value.typeConfigs, setSelectedTypeId, setSelectedSizeId],

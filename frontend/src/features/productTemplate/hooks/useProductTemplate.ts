@@ -42,9 +42,11 @@ export type SimplifiedSizeConfig = {
   finishing: SimplifiedFinishingPrice[];
 }
 
+export type ProductTypeId = number;
+
 /** Тип продукта внутри одного продукта (например «Односторонние», «Дизайнерские») — свой набор полей и цен */
 export type ProductTypeVariant = {
-  id: string;
+  id: ProductTypeId;
   name: string;
   /** Имена полей калькулятора для этого типа (опционально; если пусто — все поля из схемы) */
   fieldNames?: string[];
@@ -85,6 +87,44 @@ export type SimplifiedConfig = {
   use_layout?: boolean;
   /** Учитывать стоимость материалов в итоговой цене: false = materialPrice не добавляется */
   include_material_cost?: boolean;
+}
+
+function toTypeConfigKey(id: ProductTypeId): string {
+  return String(id);
+}
+
+function parseLegacyTypeId(id: unknown, fallbackIndex: number): ProductTypeId {
+  if (typeof id === 'number' && Number.isFinite(id)) return Math.trunc(id);
+  if (typeof id === 'string') {
+    const numeric = Number(id);
+    if (Number.isFinite(numeric)) return Math.trunc(numeric);
+  }
+  return Date.now() + fallbackIndex;
+}
+
+function normalizeSimplifiedTypeIds(value: SimplifiedConfig): SimplifiedConfig {
+  if (!Array.isArray(value.types) || value.types.length === 0) return value;
+
+  const idMap = new Map<string, ProductTypeId>();
+  const normalizedTypes = value.types.map((t, index) => {
+    const nextId = parseLegacyTypeId((t as any).id, index + 1);
+    idMap.set(String((t as any).id), nextId);
+    return { ...t, id: nextId };
+  });
+
+  const normalizedTypeConfigs: Record<string, SimplifiedTypeConfig> = {};
+  if (value.typeConfigs && typeof value.typeConfigs === 'object') {
+    for (const [oldKey, cfg] of Object.entries(value.typeConfigs)) {
+      const mapped = idMap.get(String(oldKey));
+      normalizedTypeConfigs[mapped != null ? toTypeConfigKey(mapped) : String(oldKey)] = cfg as SimplifiedTypeConfig;
+    }
+  }
+
+  return {
+    ...value,
+    types: normalizedTypes,
+    typeConfigs: normalizedTypeConfigs,
+  };
 }
 
 export interface TemplateState {
@@ -154,7 +194,7 @@ function reducer(state: TemplateState, action: Action): TemplateState {
     case 'setRules':
       return { ...state, price_rules: action.value }
     case 'setSimplified':
-      return { ...state, simplified: action.value }
+      return { ...state, simplified: normalizeSimplifiedTypeIds(action.value) }
     case 'addRule':
       return { ...state, price_rules: [...state.price_rules, action.rule] }
     case 'updateRule':
@@ -191,15 +231,15 @@ export function useProductTemplateInitial(): TemplateState {
 }
 
 /** Конфиг текущего типа или legacy (sizes/pages из корня) */
-export function getEffectiveConfig(value: SimplifiedConfig, selectedTypeId: string | null): SimplifiedTypeConfig {
+export function getEffectiveConfig(value: SimplifiedConfig, selectedTypeId: ProductTypeId | null): SimplifiedTypeConfig {
   if (value.types?.length && value.typeConfigs && selectedTypeId) {
-    return value.typeConfigs[selectedTypeId] ?? { sizes: [], pages: value.pages }
+    return value.typeConfigs[toTypeConfigKey(selectedTypeId)] ?? { sizes: [], pages: value.pages }
   }
   return { sizes: value.sizes, pages: value.pages }
 }
 
-export function generateTypeId(): string {
-  return `type_${Date.now()}_${Math.random().toString(16).slice(2)}`
+export function generateTypeId(): ProductTypeId {
+  return Date.now() + Math.floor(Math.random() * 1000)
 }
 
 export function generateSizeId(): string {

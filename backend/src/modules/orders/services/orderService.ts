@@ -68,20 +68,23 @@ export class OrderService {
       // user_order_page_orders / user_order_pages могут отсутствовать
     }
     const allOrders = [...orders, ...assignedOrders] as Order[]
-    
+
+    // Batch loading items/photo-orders для устранения N+1.
+    const telegramIds = allOrders.filter((o) => o.paymentMethod === 'telegram').map((o) => o.id)
+    const websiteIds = allOrders.filter((o) => o.paymentMethod !== 'telegram').map((o) => o.id)
+    const [itemsByOrderId, photoOrdersById] = await Promise.all([
+      OrderRepository.getItemsByOrderIds(websiteIds),
+      OrderRepository.getPhotoOrdersByIds(telegramIds),
+    ])
     for (const order of allOrders) {
-      // Проверяем, является ли это Telegram заказом
-      const isTelegramOrder = order.paymentMethod === 'telegram';
-      
-      if (isTelegramOrder) {
-        const telegramOrder = await OrderRepository.getPhotoOrderById(order.id)
-        order.items = telegramOrder ? [mapPhotoOrderToVirtualItem(telegramOrder)] : []
+      if (order.paymentMethod === 'telegram') {
+        const photo = photoOrdersById.get(order.id)
+        order.items = photo ? [mapPhotoOrderToVirtualItem(photo)] : []
       } else {
-        // Для обычных заказов загружаем items из таблицы items
-        order.items = await OrderRepository.getItemsByOrderId(order.id)
+        order.items = itemsByOrderId.get(order.id) ?? []
       }
     }
-    
+
     return allOrders
   }
 
@@ -98,13 +101,18 @@ export class OrderService {
   }
 
   private static async attachItemsToOrders(orders: Order[]) {
+    const telegramIds = orders.filter((o) => o.paymentMethod === 'telegram').map((o) => o.id)
+    const websiteIds = orders.filter((o) => o.paymentMethod !== 'telegram').map((o) => o.id)
+    const [itemsByOrderId, photoOrdersById] = await Promise.all([
+      OrderRepository.getItemsByOrderIds(websiteIds),
+      OrderRepository.getPhotoOrdersByIds(telegramIds),
+    ])
     for (const order of orders) {
-      const isTelegramOrder = order.paymentMethod === 'telegram'
-      if (isTelegramOrder) {
-        const telegramOrder = await OrderRepository.getPhotoOrderById(order.id)
-        order.items = telegramOrder ? [mapPhotoOrderToVirtualItem(telegramOrder)] : []
+      if (order.paymentMethod === 'telegram') {
+        const photo = photoOrdersById.get(order.id)
+        order.items = photo ? [mapPhotoOrderToVirtualItem(photo)] : []
       } else {
-        order.items = await OrderRepository.getItemsByOrderId(order.id)
+        order.items = itemsByOrderId.get(order.id) ?? []
       }
     }
     return orders

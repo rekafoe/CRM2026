@@ -33,9 +33,9 @@ interface CalculatorSectionsProps {
   onOpenProductSelector: () => void;
   effectiveSizes?: Array<{ id: string; label?: string; width_mm: number; height_mm: number; [key: string]: any }>;
   effectivePages?: { options?: number[]; default?: number };
-  productTypes?: Array<{ id: string; name: string; default?: boolean }>;
-  selectedTypeId?: string | null;
-  onSelectType?: (typeId: string) => void;
+  productTypes?: Array<{ id: number; name: string; default?: boolean }>;
+  selectedTypeId?: number | null;
+  onSelectType?: (typeId: number) => void;
 }
 
 export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(({
@@ -84,7 +84,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           <div className="calculator-product-types">
             <label className="calculator-product-types__label">Тип продукта</label>
             <div className="calculator-product-types__tabs">
-              {productTypes.map((t: { id: string; name: string; default?: boolean }) => (
+              {productTypes.map((t: { id: number; name: string; default?: boolean }) => (
                 <button
                   key={t.id}
                   type="button"

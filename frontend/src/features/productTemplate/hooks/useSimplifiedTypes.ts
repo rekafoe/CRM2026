@@ -4,6 +4,7 @@ import {
   type SimplifiedSizeConfig,
   type SimplifiedTypeConfig,
   type ProductTypeVariant,
+  type ProductTypeId,
   getEffectiveConfig,
   generateTypeId,
   buildDefaultSizes,
@@ -11,8 +12,8 @@ import {
 
 export interface UseSimplifiedTypesResult {
   hasTypes: boolean
-  selectedTypeId: string | null
-  setSelectedTypeId: (id: string | null) => void
+  selectedTypeId: ProductTypeId | null
+  setSelectedTypeId: (id: ProductTypeId | null) => void
   effectiveConfig: SimplifiedTypeConfig
   sizes: SimplifiedSizeConfig[]
   selectedSizeId: string | null
@@ -24,8 +25,8 @@ export interface UseSimplifiedTypesResult {
   updateSize: (id: string, patch: Partial<SimplifiedSizeConfig>) => void
   removeSize: (id: string) => void
   addType: () => void
-  setDefaultType: (id: string) => void
-  removeType: (id: string) => void
+  setDefaultType: (id: ProductTypeId) => void
+  removeType: (id: ProductTypeId) => void
 }
 
 export function useSimplifiedTypes(
@@ -36,7 +37,7 @@ export function useSimplifiedTypes(
   const firstTypeId = value.types?.[0]?.id ?? null
   const defaultTypeId = value.types?.find(t => t.default)?.id ?? firstTypeId
 
-  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(() => defaultTypeId ?? null)
+  const [selectedTypeId, setSelectedTypeId] = useState<ProductTypeId | null>(() => defaultTypeId ?? null)
   const [selectedSizeId, setSelectedSizeId] = useState<string | null>(null)
 
   const effectiveConfig = useMemo(
@@ -73,11 +74,11 @@ export function useSimplifiedTypes(
   const applyToCurrentConfig = useCallback(
     (updater: (prev: SimplifiedTypeConfig) => SimplifiedTypeConfig) => {
       if (hasTypes && selectedTypeId) {
-        const current = value.typeConfigs?.[selectedTypeId] ?? { sizes: [], pages: value.pages }
+        const current = value.typeConfigs?.[String(selectedTypeId)] ?? { sizes: [], pages: value.pages }
         const next = updater(current)
         onChange({
           ...value,
-          typeConfigs: { ...value.typeConfigs, [selectedTypeId]: next },
+          typeConfigs: { ...value.typeConfigs, [String(selectedTypeId)]: next },
         })
       } else {
         const current: SimplifiedTypeConfig = { sizes: value.sizes, pages: value.pages }
@@ -105,14 +106,14 @@ export function useSimplifiedTypes(
       const types: ProductTypeVariant[] = [{ id, name, default: true }]
       const sizesToUse = value.sizes?.length ? value.sizes : buildDefaultSizes()
       const typeConfigs: Record<string, SimplifiedTypeConfig> = {
-        [id]: { sizes: sizesToUse, pages: value.pages },
+        [String(id)]: { sizes: sizesToUse, pages: value.pages },
       }
       onChange({ ...value, types, typeConfigs })
     } else {
       const types: ProductTypeVariant[] = [...(value.types || []), { id, name, default: false }]
       const typeConfigs: Record<string, SimplifiedTypeConfig> = {
         ...value.typeConfigs,
-        [id]: { sizes: buildDefaultSizes(), pages: effectiveConfig.pages },
+        [String(id)]: { sizes: buildDefaultSizes(), pages: effectiveConfig.pages },
       }
       onChange({ ...value, types, typeConfigs })
     }
@@ -121,7 +122,7 @@ export function useSimplifiedTypes(
   }, [value, hasTypes, effectiveConfig.pages, onChange])
 
   const setDefaultType = useCallback(
-    (id: string) => {
+    (id: ProductTypeId) => {
       if (!value.types?.length) return
       onChange({
         ...value,
@@ -132,11 +133,11 @@ export function useSimplifiedTypes(
   )
 
   const removeType = useCallback(
-    (id: string) => {
+    (id: ProductTypeId) => {
       if (!value.types || value.types.length <= 1) return
       const nextTypes = value.types.filter(t => t.id !== id)
       const nextConfigs = { ...value.typeConfigs }
-      delete nextConfigs[id]
+      delete nextConfigs[String(id)]
       const hasDefault = nextTypes.some(t => t.default)
       onChange({
         ...value,
@@ -146,7 +147,7 @@ export function useSimplifiedTypes(
       if (selectedTypeId === id) {
         const nextId = nextTypes[0]?.id ?? null
         setSelectedTypeId(nextId)
-        const cfg = nextConfigs[nextId!]
+        const cfg = nextId != null ? nextConfigs[String(nextId)] : undefined
         setSelectedSizeId(cfg?.sizes?.[0]?.id ?? null)
       }
     },

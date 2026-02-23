@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { Button } from '../../../components/common'
-import type { SimplifiedConfig, ProductTypeVariant } from '../hooks/useProductTemplate'
+import type { SimplifiedConfig, ProductTypeVariant, ProductTypeId } from '../hooks/useProductTemplate'
 import './SimplifiedTemplateSection.css'
 
 const updateType = (
   value: SimplifiedConfig,
-  typeId: string,
+  typeId: ProductTypeId,
   patch: Partial<ProductTypeVariant>
 ): SimplifiedConfig => ({
   ...value,
@@ -24,11 +24,11 @@ const textToArray = (text: string): string[] =>
 export interface ProductTypesCardProps {
   value: SimplifiedConfig
   onChange: (next: SimplifiedConfig) => void
-  selectedTypeId: string | null
-  onSelectType: (typeId: string) => void
+  selectedTypeId: ProductTypeId | null
+  onSelectType: (typeId: ProductTypeId) => void
   onAddType: () => void
-  setDefaultType: (id: string) => void
-  removeType: (id: string) => void
+  setDefaultType: (id: ProductTypeId) => void
+  removeType: (id: ProductTypeId) => void
 }
 
 export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({

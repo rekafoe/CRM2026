@@ -528,7 +528,10 @@ export const calcFlyersPrice = (payload: { format: 'A6'|'A5'|'A4'; qty: number; 
 // Enhanced Calculator with Pricing Policy (migrated to pricing module)
 export const getEnhancedProductTypes = () => api.get('/pricing/product-types');
 export const getEnhancedProductSchema = (key: string) => api.get(`/pricing/product-types/${key}/schema`);
-export const getProductSchemaById = (productId: number) => api.get(`/products/${productId}/schema`);
+export const getProductSchemaById = (productId: number, options?: { compact?: boolean }) =>
+  api.get(`/products/${productId}/schema`, {
+    params: options?.compact ? { compact: 1 } : undefined,
+  });
 export const upsertEnhancedProduct = (product: any) => api.post('/pricing/product-types', product);
 export const upsertEnhancedProductSchema = (key: string, schema: any) => api.put(`/pricing/product-types/${key}/schema`, schema);
 export const deleteEnhancedProduct = (key: string) => api.delete(`/pricing/product-types/${key}`);

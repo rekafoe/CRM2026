@@ -189,6 +189,45 @@ export class MaterialTransactionService {
   }
 
   /**
+   * Выполнить списание внутри уже открытой транзакции/сейвпоинта.
+   * Нужен для компоновки в WarehouseTransactionService без вложенных BEGIN/COMMIT.
+   */
+  static async spendInTransaction(
+    db: Awaited<ReturnType<typeof getDb>>,
+    params: {
+      materialId: number;
+      quantity: number;
+      reason: string;
+      orderId?: number;
+      userId?: number;
+      checkMinQuantity?: boolean;
+    }
+  ): Promise<{ oldQuantity: number; newQuantity: number }> {
+    return this.spendWithDb(db, params);
+  }
+
+  /**
+   * Выполнить пополнение внутри уже открытой транзакции/сейвпоинта.
+   */
+  static async addInTransaction(
+    db: Awaited<ReturnType<typeof getDb>>,
+    params: {
+      materialId: number;
+      quantity: number;
+      reason: string;
+      orderId?: number;
+      userId?: number;
+      supplierId?: number;
+      deliveryNumber?: string;
+      invoiceNumber?: string;
+      deliveryDate?: string;
+      deliveryNotes?: string;
+    }
+  ): Promise<{ oldQuantity: number; newQuantity: number }> {
+    return this.addWithDb(db, params);
+  }
+
+  /**
    * Списание материала со склада
    */
   static async spend(params: {

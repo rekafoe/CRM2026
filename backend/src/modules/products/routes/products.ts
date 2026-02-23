@@ -47,11 +47,61 @@ const toServiceLinkResponse = (link: ProductServiceLinkDTO) => ({
   isActive: link.service?.isActive ?? true,
 });
 
+function parseSubproductTypeId(raw: unknown, fallbackIndex: number): number {
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric)) return Math.trunc(numeric);
+  return fallbackIndex;
+}
+
+function normalizeSimplifiedTypeIds(simplified: any): any {
+  if (!simplified || !Array.isArray(simplified.types) || simplified.types.length === 0) return simplified || null;
+
+  const idMap = new Map<string, number>();
+  const normalizedTypes = simplified.types.map((t: any, index: number) => {
+    const nextId = parseSubproductTypeId(t?.id, index + 1);
+    idMap.set(String(t?.id), nextId);
+    return { ...t, id: nextId };
+  });
+
+  const normalizedTypeConfigs: Record<string, any> = {};
+  const sourceTypeConfigs =
+    simplified.typeConfigs && typeof simplified.typeConfigs === 'object'
+      ? simplified.typeConfigs
+      : {};
+  for (const [oldKey, cfg] of Object.entries(sourceTypeConfigs)) {
+    const mapped = idMap.get(String(oldKey));
+    normalizedTypeConfigs[String(mapped ?? oldKey)] = cfg;
+  }
+
+  return {
+    ...simplified,
+    types: normalizedTypes,
+    typeConfigs: normalizedTypeConfigs,
+  };
+}
+
+function normalizeConfigDataForPersistence(configData: any): any {
+  if (typeof configData === 'string') {
+    try {
+      const parsed = JSON.parse(configData);
+      return normalizeConfigDataForPersistence(parsed);
+    } catch {
+      return configData;
+    }
+  }
+  if (!configData || typeof configData !== 'object') return configData;
+  if (!configData.simplified) return configData;
+  return {
+    ...configData,
+    simplified: normalizeSimplifiedTypeIds(configData.simplified),
+  };
+}
+
 const mapTemplateConfig = (row: TemplateConfigRow) => ({
   id: row.id,
   product_id: row.product_id,
   name: row.name,
-  config_data: row.config_data ? JSON.parse(row.config_data) : null,
+  config_data: row.config_data ? normalizeConfigDataForPersistence(JSON.parse(row.config_data)) : null,
   constraints: row.constraints ? JSON.parse(row.constraints) : null,
   is_active: !!row.is_active,
   created_at: row.created_at,
@@ -427,6 +477,12 @@ router.get('/category/:categoryId', async (req, res) => {
  *         schema:
  *           type: integer
  *           example: 58
+ *       - in: query
+ *         name: compact
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: Возвращает компактную схему без тяжёлых блоков (fields/materials/operations и без tier-цен в simplified)
  *     responses:
  *       200:
  *         description: Схема продукта с подтипами и контентом для сайта
@@ -461,6 +517,8 @@ router.get('/category/:categoryId', async (req, res) => {
 router.get('/:productId/schema', async (req, res) => {
   try {
     const { productId } = req.params;
+    const compactMode = String(req.query.compact || '').toLowerCase();
+    const isCompact = compactMode === '1' || compactMode === 'true' || compactMode === 'yes';
     // 🆕 Явное логирование для диагностики
     console.log('🚀 [GET /products/:id/schema] Эндпоинт вызван', { productId, url: req.url, path: req.path });
     logger.info('[GET /products/:id/schema] 🚀 Эндпоинт вызван', { productId, url: req.url, path: req.path });
@@ -520,6 +578,7 @@ router.get('/:productId/schema', async (req, res) => {
           templateConfigData = typeof templateConfig.config_data === 'string'
             ? JSON.parse(templateConfig.config_data)
             : templateConfig.config_data;
+          templateConfigData = normalizeConfigDataForPersistence(templateConfigData);
         }
         
         logger.debug('[GET /products/:id/schema] Template config загружен', {
@@ -861,6 +920,53 @@ router.get('/:productId/schema', async (req, res) => {
       logger.warn('Failed to load product operations', { productId, error });
     }
     
+    const normalizedSimplified = normalizeSimplifiedTypeIds(templateConfigData?.simplified);
+
+    // Компактный режим для сайта: минимальный payload без тиражных прайсов и тяжёлых блоков.
+    const compactSimplifiedForSite = (simplified: any) => {
+      if (!simplified || typeof simplified !== 'object') return null;
+
+      const compactSize = (size: any) => ({
+        id: size?.id,
+        label: size?.label,
+        width_mm: size?.width_mm,
+        height_mm: size?.height_mm,
+        min_qty: size?.min_qty,
+        max_qty: size?.max_qty,
+      });
+
+      const compactTypes = Array.isArray(simplified.types)
+        ? simplified.types.map((t: any) => ({
+            id: t?.id,
+            name: t?.name,
+            default: !!t?.default,
+            briefDescription: t?.briefDescription,
+          }))
+        : undefined;
+
+      const compactTypeConfigs =
+        simplified.typeConfigs && typeof simplified.typeConfigs === 'object'
+          ? Object.fromEntries(
+              Object.entries(simplified.typeConfigs).map(([key, cfg]: [string, any]) => [
+                key,
+                {
+                  sizes: Array.isArray(cfg?.sizes) ? cfg.sizes.map(compactSize) : [],
+                  pages: cfg?.pages || simplified.pages || null,
+                },
+              ])
+            )
+          : undefined;
+
+      return {
+        use_layout: simplified.use_layout,
+        cutting: simplified.cutting,
+        pages: simplified.pages || null,
+        sizes: Array.isArray(simplified.sizes) ? simplified.sizes.map(compactSize) : [],
+        ...(compactTypes ? { types: compactTypes } : {}),
+        ...(compactTypeConfigs ? { typeConfigs: compactTypeConfigs } : {}),
+      };
+    };
+
     // Собираем полную schema с данными из шаблона
     const schema = {
       id: Number(productId),
@@ -879,7 +985,7 @@ router.get('/:productId/schema', async (req, res) => {
         finishing: templateConfigData?.finishing || null, // Отделка
         packaging: templateConfigData?.packaging || null, // Упаковка
         price_rules: templateConfigData?.price_rules || null, // Правила ценообразования
-        simplified: templateConfigData?.simplified || null, // 🆕 Упрощённый калькулятор (конфиг по размерам)
+        simplified: normalizedSimplified, // 🆕 Упрощённый калькулятор (конфиг по размерам)
       },
       constraints: {
         allowed_paper_types: allowedPaperTypes || null, // Разрешенные типы бумаги
@@ -930,6 +1036,24 @@ router.get('/:productId/schema', async (req, res) => {
       productOperationsCount: productOperations.length
     });
     
+    if (isCompact) {
+      const compactSchema = {
+        id: schema.id,
+        key: schema.key,
+        name: schema.name,
+        type: schema.type,
+        description: schema.description,
+        template: {
+          trim_size: schema.template.trim_size,
+          print_sheet: schema.template.print_sheet,
+          print_run: schema.template.print_run,
+          simplified: compactSimplifiedForSite(schema.template.simplified),
+        },
+        constraints: schema.constraints,
+      };
+      return res.json({ data: compactSchema, meta: { compact: true } });
+    }
+
     res.json({ data: schema });
   } catch (error) {
     logger.error('Error fetching product schema', error);
@@ -1212,6 +1336,7 @@ async function syncSimplifiedOperations(db: any, productId: number, configData: 
 router.post('/:productId/configs', asyncHandler(async (req, res) => {
   const { productId } = req.params;
   const { name, config_data, constraints, is_active } = req.body || {};
+  const normalizedConfigData = normalizeConfigDataForPersistence(config_data);
   const db = await ensureProductTemplateConfigsTable();
   const now = new Date().toISOString();
   const result = await db.run(
@@ -1219,7 +1344,7 @@ router.post('/:productId/configs', asyncHandler(async (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     Number(productId),
     name || 'template',
-    config_data ? JSON.stringify(config_data) : null,
+    normalizedConfigData ? JSON.stringify(normalizedConfigData) : null,
     constraints ? JSON.stringify(constraints) : null,
     is_active !== undefined ? (is_active ? 1 : 0) : 1,
     now,
@@ -1231,9 +1356,9 @@ router.post('/:productId/configs', asyncHandler(async (req, res) => {
   );
   
   // 🆕 Синхронизация операций для упрощённых продуктов
-  if (config_data?.simplified) {
+  if (normalizedConfigData?.simplified) {
     try {
-      await syncSimplifiedOperations(db, Number(productId), config_data);
+      await syncSimplifiedOperations(db, Number(productId), normalizedConfigData);
     } catch (error) {
       logger.warn('[POST /products/:id/configs] Ошибка синхронизации операций при создании конфига', {
         productId,
@@ -1249,6 +1374,7 @@ router.post('/:productId/configs', asyncHandler(async (req, res) => {
 router.put('/:productId/configs/:configId', asyncHandler(async (req, res) => {
   const { productId, configId } = req.params;
   const { name, config_data, constraints, is_active } = req.body || {};
+  const normalizedConfigData = normalizeConfigDataForPersistence(config_data);
   const db = await ensureProductTemplateConfigsTable();
   const now = new Date().toISOString();
   await db.run(
@@ -1260,7 +1386,7 @@ router.put('/:productId/configs/:configId', asyncHandler(async (req, res) => {
          updated_at = ?
      WHERE id = ? AND product_id = ?`,
     name ?? null,
-    config_data !== undefined ? JSON.stringify(config_data) : null,
+    normalizedConfigData !== undefined ? JSON.stringify(normalizedConfigData) : null,
     constraints !== undefined ? JSON.stringify(constraints) : null,
     is_active !== undefined ? (is_active ? 1 : 0) : null,
     now,
@@ -1278,10 +1404,9 @@ router.put('/:productId/configs/:configId', asyncHandler(async (req, res) => {
   }
   
   // 🆕 Синхронизация операций для упрощённых продуктов
-  if (config_data?.simplified) {
+  if (normalizedConfigData?.simplified) {
     try {
-      const parsedConfigData = typeof config_data === 'string' ? JSON.parse(config_data) : config_data;
-      await syncSimplifiedOperations(db, Number(productId), parsedConfigData);
+      await syncSimplifiedOperations(db, Number(productId), normalizedConfigData);
     } catch (error) {
       logger.warn('[PUT /products/:id/configs/:configId] Ошибка синхронизации операций при обновлении конфига', {
         productId,

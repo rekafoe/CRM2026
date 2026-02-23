@@ -12,16 +12,16 @@ export function getEffectiveSimplifiedConfig(
   simplified: {
     sizes?: EffectiveSimplifiedConfig['sizes'];
     pages?: EffectiveSimplifiedConfig['pages'];
-    types?: Array<{ id: string; name: string; default?: boolean }>;
+    types?: Array<{ id: number; name: string; default?: boolean }>;
     typeConfigs?: Record<string, { sizes?: any[]; pages?: any }>;
   } | null | undefined,
-  selectedTypeId: string | null
+  selectedTypeId: number | null
 ): EffectiveSimplifiedConfig {
   if (!simplified) {
     return { sizes: [], pages: undefined };
   }
   if (simplified.types?.length && simplified.typeConfigs && selectedTypeId) {
-    const typeConfig = simplified.typeConfigs[selectedTypeId];
+    const typeConfig = simplified.typeConfigs[String(selectedTypeId)];
     return {
       sizes: typeConfig?.sizes ?? [],
       pages: typeConfig?.pages ?? simplified.pages,

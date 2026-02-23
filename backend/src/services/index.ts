@@ -1,5 +1,4 @@
 export * from './authService'
-export * from './orderService'
 export * from './materialService'
 export * from './materialCategoryService'
 export * from './supplierService'

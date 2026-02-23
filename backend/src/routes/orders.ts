@@ -329,6 +329,7 @@ router.put('/:id/customer', asyncHandler(OrderController.updateOrderCustomer))
 router.put('/:id/discount', asyncHandler(OrderController.updateOrderDiscount))
 router.delete('/:id', asyncHandler(OrderController.deleteOrder))
 router.post('/:id/duplicate', asyncHandler(OrderController.duplicateOrder))
+router.post('/:id/cancel-online', asyncHandler(OrderController.cancelOnline))
 
 // Bulk operations
 router.post('/bulk/update-status', asyncHandler(OrderController.bulkUpdateStatus))

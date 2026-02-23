@@ -101,7 +101,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   // Состояние для названий типов продуктов (загружаются из API)
   const [productTypeLabels, setProductTypeLabels] = useState<Record<string, string>>({});
   // Тип продукта внутри одного продукта (односторонние, с ламинацией и т.д.)
-  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
 
   const { ui, open, close } = useCalculatorUI({ showProductSelection: !initialProductType });
   const [selectedProduct, setSelectedProduct] = useState<(Product & { resolvedProductType?: string }) | null>(null);
@@ -192,7 +192,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       const nextId = defaultTypeId ?? simplified?.types?.[0]?.id ?? null;
       setSelectedTypeId(nextId);
       const typeVariant = simplified?.types?.find((t: any) => t.id === nextId);
-      const cfg = nextId ? simplified?.typeConfigs?.[nextId] : null;
+      const cfg = nextId != null ? simplified?.typeConfigs?.[String(nextId)] : null;
       const firstSize = cfg?.sizes?.[0] as { id: string; width_mm: number; height_mm: number; min_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> } | undefined;
       const minQty = firstSize?.min_qty ?? firstSize?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
       setSpecs((prev) => ({
@@ -205,10 +205,10 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   }, [hasProductTypes, simplified?.types, simplified?.typeConfigs, defaultTypeId, selectedTypeId, setSpecs]);
 
   const handleSelectProductType = useCallback(
-    (typeId: string) => {
+    (typeId: number) => {
       setSelectedTypeId(typeId);
       const typeVariant = simplified?.types?.find((t: any) => t.id === typeId);
-      const cfg = typeId ? simplified?.typeConfigs?.[typeId] : null;
+      const cfg = typeId != null ? simplified?.typeConfigs?.[String(typeId)] : null;
       const firstSize = cfg?.sizes?.[0] as { id: string; width_mm: number; height_mm: number; min_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> } | undefined;
       const minQty = firstSize?.min_qty ?? firstSize?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
       setSpecs((prev) => ({

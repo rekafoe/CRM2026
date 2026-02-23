@@ -535,41 +535,73 @@ export const OrderRepository = {
     }
 
     const whereClause = whereConditions.join(' AND ')
-    const totalAmountSubquery = `
-      (SELECT COALESCE(SUM(i.price * i.quantity), 0) 
-       FROM items i 
-       WHERE i.orderId = o.id)
-    `
+    const hasAmountFilter = searchParams.minAmount !== undefined || searchParams.maxAmount !== undefined
+    const hasPagination = searchParams.limit !== undefined || searchParams.offset !== undefined
 
-    let query = `
-      SELECT o.* , ${totalAmountSubquery} as totalAmount
-      FROM orders o
-      WHERE ${whereClause}
-    `
-
-    if (searchParams.minAmount !== undefined || searchParams.maxAmount !== undefined) {
+    let query = ''
+    if (!hasAmountFilter && hasPagination) {
+      // Быстрый путь для UI-списка:
+      // 1) выбираем только текущую страницу заказов
+      // 2) считаем суммы только по orderId этой страницы (без full scan по items)
       query = `
-        SELECT * FROM (${query}) filtered_orders
-        WHERE 1=1
+        WITH paged_orders AS (
+          SELECT o.*
+          FROM orders o
+          WHERE ${whereClause}
+          ORDER BY COALESCE(o.created_at, o.createdAt) DESC
+          LIMIT ? OFFSET ?
+        ),
+        order_totals AS (
+          SELECT i.orderId, SUM(i.price * i.quantity) as totalAmount
+          FROM items i
+          WHERE i.orderId IN (SELECT id FROM paged_orders)
+          GROUP BY i.orderId
+        )
+        SELECT p.*, COALESCE(t.totalAmount, 0) as totalAmount
+        FROM paged_orders p
+        LEFT JOIN order_totals t ON t.orderId = p.id
+        ORDER BY COALESCE(p.created_at, p.createdAt) DESC
       `
-      if (searchParams.minAmount !== undefined) {
-        query += ' AND totalAmount >= ?'
-        params.push(searchParams.minAmount)
-      }
-      if (searchParams.maxAmount !== undefined) {
-        query += ' AND totalAmount <= ?'
-        params.push(searchParams.maxAmount)
-      }
-    }
+      params.push(searchParams.limit ?? 100, searchParams.offset ?? 0)
+    } else {
+      // Общий путь: один запрос с агрегацией totalAmount.
+      query = `
+        SELECT
+          o.*,
+          COALESCE(agg.totalAmount, 0) as totalAmount
+        FROM orders o
+        LEFT JOIN (
+          SELECT orderId, SUM(price * quantity) as totalAmount
+          FROM items
+          GROUP BY orderId
+        ) agg ON agg.orderId = o.id
+        WHERE ${whereClause}
+      `
 
-    query += ' ORDER BY o.created_at DESC'
-    if (searchParams.limit) {
-      query += ' LIMIT ?'
-      params.push(searchParams.limit)
-    }
-    if (searchParams.offset) {
-      query += ' OFFSET ?'
-      params.push(searchParams.offset)
+      if (hasAmountFilter) {
+        query = `
+          SELECT * FROM (${query}) filtered_orders
+          WHERE 1=1
+        `
+        if (searchParams.minAmount !== undefined) {
+          query += ' AND totalAmount >= ?'
+          params.push(searchParams.minAmount)
+        }
+        if (searchParams.maxAmount !== undefined) {
+          query += ' AND totalAmount <= ?'
+          params.push(searchParams.maxAmount)
+        }
+      }
+
+      query += ' ORDER BY COALESCE(created_at, createdAt) DESC'
+      if (searchParams.limit) {
+        query += ' LIMIT ?'
+        params.push(searchParams.limit)
+      }
+      if (searchParams.offset) {
+        query += ' OFFSET ?'
+        params.push(searchParams.offset)
+      }
     }
 
     const orders = await db.all<Order>(query, ...params)
@@ -597,25 +629,30 @@ export const OrderRepository = {
     if (dateTo) { whereConditions.push('DATE(o.created_at) <= ?'); params.push(dateTo) }
     const whereClause = whereConditions.join(' AND ')
     const stats = await db.get(`
-      SELECT 
+      SELECT
         COUNT(*) as totalOrders,
-        COUNT(CASE WHEN o.status = 1 THEN 1 END) as newOrders,
-        COUNT(CASE WHEN o.status = 2 THEN 1 END) as inProgressOrders,
-        COUNT(CASE WHEN o.status = 3 THEN 1 END) as readyOrders,
-        COUNT(CASE WHEN o.status = 4 THEN 1 END) as shippedOrders,
-        COUNT(CASE WHEN o.status = 5 THEN 1 END) as completedOrders,
-        COALESCE(SUM(
-          (SELECT COALESCE(SUM(i.price * i.quantity), 0) 
-           FROM items i WHERE i.orderId = o.id)
-        ), 0) as totalRevenue,
-        COALESCE(AVG(
-          (SELECT COALESCE(SUM(i.price * i.quantity), 0) 
-           FROM items i WHERE i.orderId = o.id)
-        ), 0) as averageOrderValue,
-        COUNT(CASE WHEN o.prepaymentAmount > 0 THEN 1 END) as ordersWithPrepayment,
-        COALESCE(SUM(o.prepaymentAmount), 0) as totalPrepayment
-      FROM orders o
-      WHERE ${whereClause}
+        COUNT(CASE WHEN base.status = 1 THEN 1 END) as newOrders,
+        COUNT(CASE WHEN base.status = 2 THEN 1 END) as inProgressOrders,
+        COUNT(CASE WHEN base.status = 3 THEN 1 END) as readyOrders,
+        COUNT(CASE WHEN base.status = 4 THEN 1 END) as shippedOrders,
+        COUNT(CASE WHEN base.status = 5 THEN 1 END) as completedOrders,
+        COALESCE(SUM(base.totalAmount), 0) as totalRevenue,
+        COALESCE(AVG(base.totalAmount), 0) as averageOrderValue,
+        COUNT(CASE WHEN base.prepaymentAmount > 0 THEN 1 END) as ordersWithPrepayment,
+        COALESCE(SUM(base.prepaymentAmount), 0) as totalPrepayment
+      FROM (
+        SELECT
+          o.status,
+          o.prepaymentAmount,
+          COALESCE(agg.totalAmount, 0) as totalAmount
+        FROM orders o
+        LEFT JOIN (
+          SELECT orderId, SUM(price * quantity) as totalAmount
+          FROM items
+          GROUP BY orderId
+        ) agg ON agg.orderId = o.id
+        WHERE ${whereClause}
+      ) base
     `, ...params)
     return stats as any
   },

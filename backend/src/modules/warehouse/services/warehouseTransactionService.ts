@@ -26,16 +26,31 @@ export class WarehouseTransactionService {
   static async executeTransaction(operations: TransactionOperation[]): Promise<TransactionResult[]> {
     const db = await getDb();
     const results: TransactionResult[] = [];
-    
-    await db.run('BEGIN');
+    let useSavepoint = false;
+    const savepointName = `sp_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+    try {
+      await db.run('BEGIN');
+    } catch (beginError: any) {
+      const msg = String(beginError?.message || '').toLowerCase();
+      if (msg.includes('cannot start a transaction within a transaction')) {
+        useSavepoint = true;
+        await db.run(`SAVEPOINT ${savepointName}`);
+      } else {
+        throw beginError;
+      }
+    }
     
     try {
       for (const operation of operations) {
         const result = await this.executeOperation(db, operation);
         results.push(result);
       }
-      
-      await db.run('COMMIT');
+
+      if (useSavepoint) {
+        await db.run(`RELEASE SAVEPOINT ${savepointName}`);
+      } else {
+        await db.run('COMMIT');
+      }
       logger.info('Транзакция выполнена успешно', { 
         operationsCount: operations.length,
         results: results.map(r => ({ materialId: r.materialId, success: r.success }))
@@ -43,7 +58,16 @@ export class WarehouseTransactionService {
       
       return results;
     } catch (error) {
-      await db.run('ROLLBACK');
+      if (useSavepoint) {
+        try {
+          await db.run(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          await db.run(`RELEASE SAVEPOINT ${savepointName}`);
+        } catch {
+          // ignore rollback/release errors for savepoint cleanup
+        }
+      } else {
+        await db.run('ROLLBACK');
+      }
       logger.error('Ошибка выполнения транзакции, откат', error);
       throw error;
     }
@@ -71,7 +95,7 @@ export class WarehouseTransactionService {
     
     switch (type) {
       case 'spend':
-        result = await MaterialTransactionService.spend({
+        result = await MaterialTransactionService.spendInTransaction(db, {
           materialId,
           quantity,
           reason,
@@ -82,7 +106,7 @@ export class WarehouseTransactionService {
         break;
         
       case 'add':
-        result = await MaterialTransactionService.add({
+        result = await MaterialTransactionService.addInTransaction(db, {
           materialId,
           quantity,
           reason,

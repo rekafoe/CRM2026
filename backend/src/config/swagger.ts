@@ -72,7 +72,7 @@ const options: swaggerJsdoc.Options = {
           type: 'object',
           description: 'Подтип продукта (например: Визитки стандартные цветные, Визитки ламинированные)',
           properties: {
-            id: { type: 'string', description: 'Уникальный ID подтипа' },
+            id: { type: 'integer', description: 'Уникальный числовой ID подтипа' },
             name: { type: 'string', description: 'Название подтипа' },
             default: { type: 'boolean', description: 'Подтип по умолчанию' },
             briefDescription: { type: 'string', description: 'Краткое описание для карточки на сайте' },
