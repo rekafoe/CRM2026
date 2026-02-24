@@ -4,7 +4,7 @@ import type { CalculatorMaterial } from '../../../services/calculatorMaterialSer
 import { getPaperTypesFromWarehouse, type PaperTypeForCalculator } from '../../../services/calculatorMaterialService'
 import { getPrintTechnologies } from '../../../api'
 import { api } from '../../../api'
-import type { SimplifiedConfig, SimplifiedSizeConfig, SimplifiedTypeConfig } from '../hooks/useProductTemplate'
+import type { SimplifiedConfig, SimplifiedSizeConfig, SimplifiedTypeConfig, ProductTypeId } from '../hooks/useProductTemplate'
 import { useSimplifiedTypes } from '../hooks/useSimplifiedTypes'
 import { ServicePricingTable, type ServiceItem, type ServicePricing } from './ServicePricingTable'
 import { ProductTypesCard } from './ProductTypesCard'
@@ -265,7 +265,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const [showAddSize, setShowAddSize] = useState(false)
   const [newSize, setNewSize] = useState<{ label: string; width_mm: string; height_mm: string }>({ label: '', width_mm: '', height_mm: '' })
   const [showCopySizes, setShowCopySizes] = useState(false)
-  const [copyFromTypeId, setCopyFromTypeId] = useState<string>('')
+  const [copyFromTypeId, setCopyFromTypeId] = useState<ProductTypeId | null>(null)
   const [copySelectedSizeIds, setCopySelectedSizeIds] = useState<string[]>([])
   const [selectedPaperTypeId, setSelectedPaperTypeId] = useState<string | null>(null)
   const [tierModal, setTierModal] = useState<TierRangeModalState>({
@@ -277,7 +277,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const [newPageToAdd, setNewPageToAdd] = useState('')
 
   const handleSelectType = useCallback(
-    (typeId: number) => {
+    (typeId: ProductTypeId) => {
       setSelectedTypeId(typeId)
       const cfg = value.typeConfigs?.[String(typeId)]?.sizes ?? []
       setSelectedSizeId(cfg[0]?.id ?? null)
@@ -453,14 +453,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   }, [hasTypes, value.types, selectedTypeId])
 
   const copySourceSizes = useMemo(() => {
-    if (!copyFromTypeId) return []
-    return value.typeConfigs?.[copyFromTypeId]?.sizes ?? []
+    if (copyFromTypeId == null) return []
+    return value.typeConfigs?.[String(copyFromTypeId)]?.sizes ?? []
   }, [value.typeConfigs, copyFromTypeId])
 
   const openCopySizesModal = useCallback(() => {
     if (!availableSourceTypes.length) return
-    const initialTypeId = availableSourceTypes[0]?.id ?? ''
-    const initialSizes = initialTypeId ? (value.typeConfigs?.[initialTypeId]?.sizes ?? []) : []
+    const initialTypeId = availableSourceTypes[0]?.id ?? null
+    const initialSizes = initialTypeId != null ? (value.typeConfigs?.[String(initialTypeId)]?.sizes ?? []) : []
     setCopyFromTypeId(initialTypeId)
     setCopySelectedSizeIds(initialSizes.map((s) => s.id))
     setShowCopySizes(true)
@@ -468,13 +468,13 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
 
   const closeCopySizesModal = useCallback(() => {
     setShowCopySizes(false)
-    setCopyFromTypeId('')
+    setCopyFromTypeId(null)
     setCopySelectedSizeIds([])
   }, [])
 
   const commitCopySizes = useCallback(() => {
-    if (!copyFromTypeId || copySelectedSizeIds.length === 0) return
-    const sourceSizes = value.typeConfigs?.[copyFromTypeId]?.sizes ?? []
+    if (copyFromTypeId == null || copySelectedSizeIds.length === 0) return
+    const sourceSizes = value.typeConfigs?.[String(copyFromTypeId)]?.sizes ?? []
     const selectedSourceSizes = sourceSizes.filter((s) => copySelectedSizeIds.includes(s.id))
     if (selectedSourceSizes.length === 0) return
 
@@ -488,8 +488,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   }, [applyToCurrentConfig, closeCopySizesModal, copyFromTypeId, copySelectedSizeIds, setSelectedSizeId, value.typeConfigs])
 
   useEffect(() => {
-    if (!showCopySizes || !copyFromTypeId) return
-    const sourceSizes = value.typeConfigs?.[copyFromTypeId]?.sizes ?? []
+    if (!showCopySizes || copyFromTypeId == null) return
+    const sourceSizes = value.typeConfigs?.[String(copyFromTypeId)]?.sizes ?? []
     const sourceIds = new Set(sourceSizes.map((s) => s.id))
     setCopySelectedSizeIds((prev) => {
       const filtered = prev.filter((id) => sourceIds.has(id))
@@ -1887,10 +1887,15 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           <FormField label="Тип-источник" required>
             <select
               className="form-select"
-              value={copyFromTypeId}
+              value={copyFromTypeId ?? ''}
               onChange={(e) => {
-                const typeId = e.target.value
-                const sourceSizes = value.typeConfigs?.[typeId]?.sizes ?? []
+                const typeId = Number(e.target.value)
+                if (!Number.isFinite(typeId)) {
+                  setCopyFromTypeId(null)
+                  setCopySelectedSizeIds([])
+                  return
+                }
+                const sourceSizes = value.typeConfigs?.[String(typeId)]?.sizes ?? []
                 setCopyFromTypeId(typeId)
                 setCopySelectedSizeIds(sourceSizes.map((s) => s.id))
               }}
