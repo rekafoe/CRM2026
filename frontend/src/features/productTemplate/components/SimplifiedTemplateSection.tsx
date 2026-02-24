@@ -694,7 +694,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           <p className="text-muted text-sm">Настройка цен по размерам: печать (за изделие), материалы (за изделие) и отделка (за рез/биг/фальц).</p>
         </div>
         <div className="simplified-template__header-actions">
-          <Button variant="primary" onClick={onSave} disabled={saving}>Сохранить</Button>
+          <Button
+            variant="primary"
+            onClick={onSave}
+            disabled={saving}
+            className="simplified-template__save-btn"
+          >
+            Сохранить
+          </Button>
         </div>
       </div>
 
@@ -865,9 +872,23 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
             <div className="simplified-template__sizes-header">
               <div className="simplified-template__sizes-title">Обрезные форматы</div>
               <div className="simplified-template__sizes-actions">
-                <Button variant="secondary" size="sm" onClick={openAddSize}>Добавить размер</Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={openAddSize}
+                  className="simplified-template__action-btn"
+                >
+                  Добавить размер
+                </Button>
                 {hasTypes && availableSourceTypes.length > 0 && (
-                  <Button variant="secondary" size="sm" onClick={openCopySizesModal}>Скопировать из типа</Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={openCopySizesModal}
+                    className="simplified-template__action-btn"
+                  >
+                    Скопировать из типа
+                  </Button>
                 )}
               </div>
             </div>

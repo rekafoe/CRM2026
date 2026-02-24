@@ -5,9 +5,10 @@
 }
 
 .simplified-template--pricing {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 20px;
   background: var(--bg-primary, #fff);
   border-radius: 12px;
   border: 1px solid var(--border-color, #e5e7eb);
@@ -40,6 +41,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-left: auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
 }
 
 .simplified-template__grid {
@@ -78,8 +82,24 @@
 .simplified-template__sizes-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   padding: 0 8px;
+  align-items: center;
+}
+
+.simplified-template__sizes-actions .btn {
+  flex: 0 0 auto;
+}
+
+.simplified-template__save-btn {
+  min-width: 140px;
+}
+
+.simplified-template__action-btn {
+  min-height: 34px;
+  padding-left: 12px;
+  padding-right: 12px;
+  border-radius: 8px;
 }
 
 .simplified-size {
@@ -880,6 +900,25 @@
     width: 75px;
     min-width: 65px;
     max-width: 90px;
+  }
+
+  .simplified-template__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .simplified-template__header-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  .simplified-template__sizes-actions {
+    flex-wrap: wrap;
+  }
+
+  .simplified-template__sizes-actions .btn {
+    flex: 0 0 auto;
   }
 }
 
