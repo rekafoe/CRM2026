@@ -60,8 +60,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 70vh;
-  overflow: auto;
+  min-height: 120px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
@@ -91,15 +90,45 @@
   flex: 0 0 auto;
 }
 
-.simplified-template__save-btn {
-  min-width: 140px;
+/* Кнопки в стиле админки: чистые, без тяжёлого вида */
+.simplified-template__save-btn,
+.simplified-template .simplified-template__header-actions .btn {
+  background: #3b82f6 !important;
+  color: #fff !important;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.simplified-template__save-btn:hover:not(:disabled),
+.simplified-template .simplified-template__header-actions .btn:hover:not(:disabled) {
+  background: #2563eb !important;
+}
+.simplified-template__save-btn:disabled,
+.simplified-template .simplified-template__header-actions .btn:disabled {
+  background: #94a3b8 !important;
+  cursor: not-allowed;
 }
 
-.simplified-template__action-btn {
-  min-height: 34px;
-  padding-left: 12px;
-  padding-right: 12px;
-  border-radius: 8px;
+.simplified-template__action-btn,
+.simplified-template__sizes-actions .btn {
+  background: #fff !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.simplified-template__action-btn:hover,
+.simplified-template__sizes-actions .btn:hover {
+  background: #f9fafb !important;
+  border-color: #9ca3af !important;
 }
 
 .simplified-size {
@@ -162,7 +191,7 @@
   justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid var(--border-color, #e5e7eb);
-  background: var(--bg-secondary, #f8fafc);
+  background: #fff;
   border-radius: 12px 12px 0 0;
 }
 
@@ -227,7 +256,7 @@
 }
 
 .simplified-template__type-tab-btn:hover {
-  background: var(--bg-hover, #f9fafb);
+  background: #f8fafc;
 }
 
 .simplified-template__type-tab-name {
@@ -245,7 +274,7 @@
 
 .simplified-template__type-panel {
   border-top: 1px solid var(--border-color, #e5e7eb);
-  background: var(--bg-hover, #fafafa);
+  background: #fff;
 }
 
 .simplified-template__type-actions {
@@ -599,8 +628,8 @@
 }
 
 .simplified-table thead {
-  background: var(--bg-hover, #fafafa);
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  background: #fff;
+  border-bottom: 2px solid var(--border-color, #e5e7eb);
 }
 
 .simplified-table th {
@@ -619,12 +648,13 @@
 
 /* Иерархия строк в таблице */
 .simplified-table__parent-row {
-  background-color: #f5f7fa;
+  background-color: #f8fafc;
 }
 
 .simplified-table__parent-row td {
-  background-color: #f5f7fa !important;
+  background-color: #f8fafc !important;
   font-weight: 500;
+  color: #1e293b;
 }
 
 .simplified-table__parent-cell {
