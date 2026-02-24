@@ -54,6 +54,14 @@
   box-sizing: border-box;
 }
 
+.product-template-page .admin-page-content {
+  padding: 12px;
+}
+
+.product-template--admin-layout {
+  gap: 12px;
+}
+
 /* Баннер несохранённых изменений, как в старой CRM */
 .unsaved-changes-banner {
   background: #fef3c7;

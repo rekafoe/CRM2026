@@ -15,6 +15,7 @@ import AllowedMaterialsSection from './components/AllowedMaterialsSection';
 import ParametersSection from './components/ParametersSection';
 import MetaSection from './components/MetaSection';
 import { ProductSetupStatus } from '../../components/admin/ProductSetupStatus';
+import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import './ProductTemplateLayout.css';
 import useProductTemplatePage from './hooks/useProductTemplatePage';
 import { useProductOperations } from './hooks/useProductOperations';
@@ -153,8 +154,49 @@ const ProductTemplatePage: React.FC = () => {
 
   const notFound = !loading && !product;
 
+  const pageTitle = state.meta.name || product?.name || 'Шаблон продукта';
+  const pageIcon = state.meta.icon || product?.icon || '📦';
+
   return (
-    <div className="product-template">
+    <AdminPageLayout
+      title={pageTitle}
+      icon={pageIcon}
+      onBack={() => navigate('/adminpanel/products')}
+      className="product-template-page"
+      headerExtra={(
+        <>
+          {product && (
+            <StatusBadge
+              status={product.is_active ? 'Активен' : 'Отключен'}
+              color={product.is_active ? 'success' : 'error'}
+              size="sm"
+            />
+          )}
+          {!hasUnsavedChanges && autoSaveStatus !== 'idle' && (
+            <div className="auto-save-indicator" style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+              color: autoSaveStatus === 'saved' ? '#10b981' : autoSaveStatus === 'error' ? '#ef4444' : '#64748b'
+            }}>
+              {autoSaveStatus === 'saving' && <span>💾 Сохранение...</span>}
+              {autoSaveStatus === 'saved' && <span>✅ Сохранено</span>}
+              {autoSaveStatus === 'error' && <span>⚠️ Ошибка сохранения</span>}
+            </div>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowMetaModal(true)}
+            icon={<span style={{ marginRight: '4px' }}>✏️</span>}
+          >
+            Основные поля
+          </Button>
+        </>
+      )}
+    >
+    <div className="product-template product-template--admin-layout">
       {/* Баннер несохранённых изменений, как в старой CRM */}
       {hasUnsavedChanges && (
         <div className="unsaved-changes-banner">
@@ -177,56 +219,6 @@ const ProductTemplatePage: React.FC = () => {
           </div>
         </div>
       )}
-
-      <div className="product-template__header">
-        <div className="product-template__header-left">
-          <Button 
-            variant="secondary" 
-            size="sm"
-            onClick={() => navigate('/adminpanel/products')}
-            className="mr-4"
-          >
-            ← Назад
-          </Button>
-          <div className="product-template__title">
-            <span className="product-template__icon">{state.meta.icon || product?.icon || '📦'}</span>
-            <div>
-              <h2>{state.meta.name || product?.name || 'Без названия'}</h2>
-            </div>
-          </div>
-        </div>
-        <div className="product-template__header-right">
-          {product && (
-            <StatusBadge
-              status={product.is_active ? 'Активен' : 'Отключен'}
-              color={product.is_active ? 'success' : 'error'}
-              size="sm"
-            />
-          )}
-          {/* Индикатор автосохранения (скрыт, если есть баннер) */}
-          {!hasUnsavedChanges && autoSaveStatus !== 'idle' && (
-            <div className="auto-save-indicator" style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              fontSize: '12px',
-              color: autoSaveStatus === 'saved' ? '#10b981' : autoSaveStatus === 'error' ? '#ef4444' : '#64748b'
-            }}>
-              {autoSaveStatus === 'saving' && <span>💾 Сохранение...</span>}
-              {autoSaveStatus === 'saved' && <span>✅ Сохранено</span>}
-              {autoSaveStatus === 'error' && <span>⚠️ Ошибка сохранения</span>}
-            </div>
-          )}
-          <Button 
-            variant="secondary" 
-            size="sm"
-            onClick={() => setShowMetaModal(true)}
-            icon={<span style={{ marginRight: '4px' }}>✏️</span>}
-          >
-            Основные поля
-          </Button>
-        </div>
-      </div>
 
       {product?.calculator_type === 'simplified' ? (
         <div className="product-template__body product-template__body--simplified">
@@ -547,6 +539,7 @@ const ProductTemplatePage: React.FC = () => {
         />
       </Modal>
     </div>
+    </AdminPageLayout>
   );
 };
 
