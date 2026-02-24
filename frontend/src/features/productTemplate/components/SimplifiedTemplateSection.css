@@ -131,6 +131,79 @@
   border-color: #9ca3af !important;
 }
 
+/* Все кнопки в упрощённом шаблоне: убираем серый фон с чёрным текстом */
+.simplified-template .btn-secondary,
+.simplified-template__types .btn-secondary,
+.simplified-template .btn[class*="secondary"] {
+  background: #fff !important;
+  color: #3b82f6 !important;
+  border: 1px solid #3b82f6 !important;
+}
+.simplified-template .btn-secondary:hover:not(:disabled),
+.simplified-template__types .btn-secondary:hover:not(:disabled),
+.simplified-template .btn[class*="secondary"]:hover:not(:disabled) {
+  background: #eff6ff !important;
+  border-color: #2563eb !important;
+  color: #2563eb !important;
+}
+.simplified-template .btn-secondary:disabled,
+.simplified-template__types .btn-secondary:disabled {
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.simplified-template .btn-primary,
+.simplified-template .btn[class*="primary"] {
+  background: #3b82f6 !important;
+  color: #fff !important;
+  border: none !important;
+}
+.simplified-template .btn-primary:hover:not(:disabled),
+.simplified-template .btn[class*="primary"]:hover:not(:disabled) {
+  background: #2563eb !important;
+}
+.simplified-template .btn-primary:disabled,
+.simplified-template .btn[class*="primary"]:disabled {
+  background: #94a3b8 !important;
+  color: #fff !important;
+}
+
+.simplified-template .btn-error,
+.simplified-template .btn[class*="error"] {
+  background: #dc2626 !important;
+  color: #fff !important;
+  border: none !important;
+}
+.simplified-template .btn-error:hover:not(:disabled),
+.simplified-template .btn[class*="error"]:hover:not(:disabled) {
+  background: #b91c1c !important;
+}
+
+/* Модалки внутри simplified-template (добавить размер, скопировать) */
+.simplified-add-size .btn,
+.simplified-add-size__actions .btn {
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+.simplified-add-size .btn-secondary,
+.simplified-add-size__actions .btn-secondary {
+  background: #fff !important;
+  color: #3b82f6 !important;
+  border: 1px solid #3b82f6 !important;
+}
+.simplified-add-size .btn-secondary:hover:not(:disabled),
+.simplified-add-size__actions .btn-secondary:hover:not(:disabled) {
+  background: #eff6ff !important;
+}
+.simplified-add-size .btn-primary,
+.simplified-add-size__actions .btn-primary {
+  background: #3b82f6 !important;
+  color: #fff !important;
+  border: none !important;
+}
+
 .simplified-size {
   text-align: left;
   border: 1px solid var(--border-color, #e5e7eb);
