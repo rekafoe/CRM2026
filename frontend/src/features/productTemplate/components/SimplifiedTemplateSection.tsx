@@ -687,7 +687,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   }, [services, selected, getSizeRanges, updateSize])
 
   return (
-    <div className="simplified-template">
+    <div className="simplified-template simplified-template--pricing">
       <div className="simplified-template__header">
         <div>
           <h3>Упрощённый калькулятор</h3>
