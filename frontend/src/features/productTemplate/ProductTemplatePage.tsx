@@ -2,7 +2,6 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, StatusBadge, Alert, Modal } from '../../components/common';
 import { useDebounce } from '../../hooks/useDebounce';
-import '../../components/admin/ProductManagement.css';
 import TrimSizeSection from './components/TrimSizeSection';
 import PriceRulesSection from './components/PriceRulesSection';
 import FinishingSection from './components/FinishingSection';
@@ -226,7 +225,34 @@ const ProductTemplatePage: React.FC = () => {
       )}
 
       {product?.calculator_type === 'simplified' ? (
-        <div className="product-template__body product-template__body--simplified">
+        <div className="product-template__body product-template__body--simplified-with-sidebar">
+          <aside className="product-template__sidebar">
+            <div className="template-summary-card">
+              <div className="template-summary-card__icon">{state.meta.icon || product?.icon || '📦'}</div>
+              <div className="template-summary-card__name">{state.meta.name || product?.name || 'Без названия'}</div>
+              <ul className="template-summary-card__list">
+                {summaryStats.map((item) => (
+                  <li key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </li>
+                ))}
+              </ul>
+              <div className="template-summary-card__meta">
+                Создан: {product?.created_at ? new Date(product.created_at).toLocaleDateString() : '—'}
+              </div>
+            </div>
+
+            {productId && (
+              <ProductSetupStatus
+                productId={productId}
+                onStatusChange={() => {
+                  console.log('Setup status changed');
+                }}
+              />
+            )}
+          </aside>
+
           <section className="product-template__main">
             {loading && <Alert type="info">Загружаем данные шаблона…</Alert>}
             {!loading && (
