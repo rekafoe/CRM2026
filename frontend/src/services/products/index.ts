@@ -30,6 +30,7 @@ export {
   deleteProduct,
   searchProducts,
   getProductsForCalculator,
+  uploadProductImage,
   clearProductsCache
 } from './products';
 

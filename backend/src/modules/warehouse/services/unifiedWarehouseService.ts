@@ -344,7 +344,12 @@ export class UnifiedWarehouseService {
   static async getReservationsByOrder(orderId: number): Promise<MaterialReservation[]> {
     try {
       const db = await getDb();
-      
+
+      const tableExists = await db.get(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name='material_reservations'`
+      );
+      if (!tableExists) return [];
+
       const reservations = await db.all(`
         SELECT 
           mr.*,

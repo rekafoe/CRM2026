@@ -164,7 +164,7 @@
 
 .product-template__body--simplified-with-sidebar {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 300px 1fr;
   gap: 20px;
   align-items: flex-start;
 }

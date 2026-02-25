@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../../../components/common'
 import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
 import type { SimplifiedConfig, SimplifiedTypeConfig, ProductTypeVariant, ProductTypeId, SubtypeInitialDefaults, InitialOperation } from '../hooks/useProductTemplate'
+import { uploadProductImage } from '../../../services/products'
 import './SimplifiedTemplateSection.css'
 
 const updateType = (
@@ -268,6 +269,65 @@ const TypeInitialDefaults: React.FC<{
   )
 }
 
+const SubtypeImageUploader: React.FC<{
+  imageUrl?: string;
+  onUploaded: (url: string) => void;
+}> = ({ imageUrl, onUploaded }) => {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploading(true);
+      const result = await uploadProductImage(file);
+      onUploaded(result.image_url);
+    } catch {
+      alert('Не удалось загрузить изображение');
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  if (imageUrl) {
+    return (
+      <div className="subtype-image-upload__preview">
+        <img src={imageUrl} alt="" className="subtype-image-upload__thumb" />
+        <span className="subtype-image-upload__name" title={imageUrl}>
+          {imageUrl.split('/').pop()}
+        </span>
+        <button
+          type="button"
+          className="subtype-image-upload__remove"
+          onClick={() => onUploaded('')}
+          title="Удалить"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <label className={`subtype-image-upload__zone ${uploading ? 'subtype-image-upload__zone--loading' : ''}`}>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+        onChange={handleFile}
+        disabled={uploading}
+        style={{ display: 'none' }}
+      />
+      {uploading
+        ? <span className="subtype-image-upload__loading">Загрузка...</span>
+        : <><span>📷</span><span>Загрузить фото</span></>
+      }
+    </label>
+  );
+};
+
 export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
   value,
   onChange,
@@ -360,15 +420,10 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                         Контент для сайта
                       </div>
                       <div className="simplified-template__type-website-field">
-                        <label>Изображение (URL)</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={t.image_url ?? ''}
-                          onChange={(e) =>
-                            onChange(updateType(value, t.id, { image_url: e.target.value || undefined }))
-                          }
-                          placeholder="https://example.com/image.jpg"
+                        <label>Изображение</label>
+                        <SubtypeImageUploader
+                          imageUrl={t.image_url}
+                          onUploaded={(url) => onChange(updateType(value, t.id, { image_url: url || undefined }))}
                         />
                       </div>
                       <div className="simplified-template__type-website-field">

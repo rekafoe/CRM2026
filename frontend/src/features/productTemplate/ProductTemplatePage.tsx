@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, StatusBadge, Alert, Modal } from '../../components/common';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -21,7 +21,10 @@ import { useProductOperations } from './hooks/useProductOperations';
 import { PrintTab, ProductPrintSettings } from '../../pages/admin/product-edit/PrintTab';
 import { updateProduct } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
-import { SimplifiedTemplateSection } from './components/SimplifiedTemplateSection';
+import { SimplifiedTemplateSection, type ServiceRow } from './components/SimplifiedTemplateSection';
+import { useSimplifiedTypes } from './hooks/useSimplifiedTypes';
+import { ProductTypesCard } from './components/ProductTypesCard';
+import { api } from '../../api';
 
 
 const ProductTemplatePage: React.FC = () => {
@@ -82,6 +85,41 @@ const ProductTemplatePage: React.FC = () => {
   
   // Используем безопасное значение для operations, чтобы избежать проблем с порядком хуков
   const operationsLength = operations?.productOperations?.length ?? 0;
+
+  // --- Simplified product: lifted state ---
+  const handleSimplifiedChange = useCallback(
+    (next: any) => dispatch({ type: 'setSimplified', value: next }),
+    [dispatch],
+  );
+  const simplifiedTypes = useSimplifiedTypes(state.simplified, handleSimplifiedChange);
+
+  const [simplifiedServices, setSimplifiedServices] = useState<ServiceRow[]>([]);
+  useEffect(() => {
+    if (product?.calculator_type !== 'simplified') return;
+    let cancelled = false;
+    api.get('/pricing/services').then(r => {
+      const data = (r.data as any)?.data ?? r.data ?? [];
+      const arr = Array.isArray(data) ? data : [];
+      const filtered = arr.filter((s: any) => {
+        if (!s || !s.id || !s.name) return false;
+        const excludedTypes = new Set(['print', 'printing']);
+        const opType = String(s.operation_type ?? s.operationType ?? s.type ?? s.service_type ?? '').toLowerCase();
+        if (!opType) return true;
+        return !excludedTypes.has(opType);
+      });
+      if (!cancelled) setSimplifiedServices(filtered);
+    }).catch(err => console.error('Ошибка загрузки услуг:', err));
+    return () => { cancelled = true; };
+  }, [product?.calculator_type]);
+
+  const handleSelectType = useCallback(
+    (typeId: any) => {
+      simplifiedTypes.setSelectedTypeId(typeId);
+      const cfg = state.simplified.typeConfigs?.[String(typeId)]?.sizes ?? [];
+      simplifiedTypes.setSelectedSizeId(cfg[0]?.id ?? null);
+    },
+    [state.simplified.typeConfigs, simplifiedTypes],
+  );
 
   // Автосохранение: отслеживаем изменения state с debounce
   const stateForAutoSave = useMemo(() => ({
@@ -243,14 +281,60 @@ const ProductTemplatePage: React.FC = () => {
               </div>
             </div>
 
-            {productId && (
-              <ProductSetupStatus
-                productId={productId}
-                onStatusChange={() => {
-                  console.log('Setup status changed');
-                }}
-              />
-            )}
+            <div className="simplified-card">
+              <div className="simplified-card__header">
+                <div>
+                  <strong>Опции калькулятора</strong>
+                  <div className="text-muted text-sm">Чекбоксы, доступные при расчёте.</div>
+                </div>
+              </div>
+              <div className="simplified-card__content">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={state.simplified.use_layout !== false}
+                    onChange={(e) => handleSimplifiedChange({ ...state.simplified, use_layout: e.target.checked })}
+                  />
+                  Раскладка на лист
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={!!state.simplified.cutting}
+                    onChange={(e) => handleSimplifiedChange({ ...state.simplified, cutting: e.target.checked })}
+                  />
+                  Резка стопой
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={state.simplified.duplex_as_single_x2 === true}
+                    onChange={(e) => handleSimplifiedChange({ ...state.simplified, duplex_as_single_x2: e.target.checked })}
+                  />
+                  Дуплекс как 2×односторонняя
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={state.simplified.include_material_cost !== false}
+                    onChange={(e) => handleSimplifiedChange({ ...state.simplified, include_material_cost: e.target.checked })}
+                  />
+                  Учитывать стоимость материалов
+                </label>
+              </div>
+            </div>
+
+            <ProductTypesCard
+              value={state.simplified}
+              onChange={handleSimplifiedChange}
+              selectedTypeId={simplifiedTypes.selectedTypeId}
+              onSelectType={handleSelectType}
+              onAddType={simplifiedTypes.addType}
+              setDefaultType={simplifiedTypes.setDefaultType}
+              removeType={simplifiedTypes.removeType}
+              services={simplifiedServices}
+              allMaterials={allMaterials as any}
+            />
           </aside>
 
           <section className="product-template__main">
@@ -258,11 +342,13 @@ const ProductTemplatePage: React.FC = () => {
             {!loading && (
               <SimplifiedTemplateSection
                 value={state.simplified}
-                onChange={(next) => dispatch({ type: 'setSimplified', value: next })}
+                onChange={handleSimplifiedChange}
                 onSave={() => void persistTemplateConfig('Шаблон упрощённого калькулятора сохранён')}
                 saving={saving}
                 allMaterials={allMaterials as any}
                 showPagesConfig={product?.product_type === 'multi_page'}
+                types={simplifiedTypes}
+                services={simplifiedServices}
               />
             )}
           </section>

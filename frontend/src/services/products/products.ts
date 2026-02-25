@@ -2,7 +2,7 @@
  * Сервис для работы с продуктами
  */
 
-import { api } from '../../api/client';
+import { api, apiClient } from '../../api/client';
 import { Product, ProductWithDetails } from './types';
 import { KeyedCache, SimpleCache } from './utils/cache';
 import { apiRequest, apiRequestSafe, extractData } from './utils/apiHelpers';
@@ -197,6 +197,18 @@ export async function createProductWithSetup(payload: {
   allProductsCache.clear(); // Очищаем все ключи (all и active)
   
   return extractData(response, { id: 0, name: '' });
+}
+
+/**
+ * Загрузить изображение продукта
+ */
+export async function uploadProductImage(file: File): Promise<{ image_url: string; filename: string; size: number }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const response = await apiClient.post('/products/upload-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return (response.data as any)?.data || response.data;
 }
 
 /**

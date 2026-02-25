@@ -5,6 +5,7 @@ import { ProductServiceLinkService } from '../services/serviceLinkService';
 import { logger } from '../../../utils/logger';
 import { getTableColumns, hasColumn } from '../../../utils/tableSchemaCache';
 import { invalidateCacheByPattern } from '../../../utils/dataCache';
+import { uploadMemory, saveBufferToUploads } from '../../../config/upload';
 import {
   toServiceLinkResponse,
   attachOperationsFromNorms,
@@ -14,6 +15,31 @@ import {
 } from './helpers';
 
 const router = Router();
+
+router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
+  try {
+    const file = (req as any).file;
+    if (!file) {
+      return res.status(400).json({ error: 'Файл не передан' });
+    }
+    const allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+    if (!allowedMime.includes(file.mimetype)) {
+      return res.status(400).json({ error: 'Допустимы только изображения (JPEG, PNG, WebP, GIF, SVG)' });
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Максимальный размер файла — 5 МБ' });
+    }
+    const saved = saveBufferToUploads(file.buffer, file.originalname);
+    if (!saved) {
+      return res.status(400).json({ error: 'Пустой файл' });
+    }
+    const imageUrl = `/api/uploads/${saved.filename}`;
+    res.json({ image_url: imageUrl, filename: saved.filename, size: saved.size });
+  } catch (error) {
+    logger.error('Error uploading product image', error);
+    res.status(500).json({ error: 'Ошибка загрузки изображения' });
+  }
+});
 
 /**
  * @swagger
@@ -118,18 +144,22 @@ router.post('/setup', asyncHandler(async (req, res) => {
 
   await db.exec('BEGIN TRANSACTION');
   try {
+    const setupCols = ['category_id', 'name', 'description', 'icon', 'calculator_type', 'product_type'];
+    const setupVals: any[] = [
+      productPayload.category_id ?? null,
+      productPayload.name,
+      productPayload.description ?? null,
+      productPayload.icon ?? null,
+      productPayload.calculator_type ?? 'product',
+      productPayload.product_type ?? null,
+    ];
+    if (await hasColumn('products', 'image_url')) {
+      setupCols.push('image_url');
+      setupVals.push(productPayload.image_url ?? null);
+    }
     const productInsert = await db.run(
-      `INSERT INTO products (category_id, name, description, icon, calculator_type, product_type, image_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        productPayload.category_id ?? null,
-        productPayload.name,
-        productPayload.description ?? null,
-        productPayload.icon ?? null,
-        productPayload.calculator_type ?? 'product',
-        productPayload.product_type ?? null,
-        productPayload.image_url ?? null,
-      ]
+      `INSERT INTO products (${setupCols.join(', ')}) VALUES (${setupCols.map(() => '?').join(', ')})`,
+      setupVals
     );
 
     const productId = productInsert.lastID as number;
@@ -260,9 +290,14 @@ router.post('/', async (req, res) => {
 
     const normalizedOperatorPercent = Number.isFinite(Number(operator_percent)) ? Number(operator_percent) : 0;
     const hasOperatorPercentCol = await hasColumn('products', 'operator_percent');
-    const insertColumns = ['category_id', 'name', 'description', 'icon', 'calculator_type', 'product_type', 'image_url'];
-    const insertValues: any[] = [resolvedCategoryId, name.trim(), description ?? null, icon ?? null, resolvedCalculatorType || 'product', product_type || 'sheet_single', image_url ?? null];
+    const hasImageUrlCol = await hasColumn('products', 'image_url');
+    const insertColumns = ['category_id', 'name', 'description', 'icon', 'calculator_type', 'product_type'];
+    const insertValues: any[] = [resolvedCategoryId, name.trim(), description ?? null, icon ?? null, resolvedCalculatorType || 'product', product_type || 'sheet_single'];
 
+    if (hasImageUrlCol) {
+      insertColumns.push('image_url');
+      insertValues.push(image_url ?? null);
+    }
     if (hasOperatorPercentCol) {
       insertColumns.push('operator_percent');
       insertValues.push(normalizedOperatorPercent);
@@ -299,9 +334,11 @@ router.put('/:id', async (req, res) => {
     const db = await getDb();
 
     const hasOperatorPercentCol = await hasColumn('products', 'operator_percent');
+    const hasImageUrlCol = await hasColumn('products', 'image_url');
     const allowedFields = [
-      'category_id', 'name', 'description', 'icon', 'image_url', 'is_active',
+      'category_id', 'name', 'description', 'icon', 'is_active',
       'product_type', 'calculator_type', 'setup_status', 'print_settings',
+      ...(hasImageUrlCol ? ['image_url'] : []),
       ...(hasOperatorPercentCol ? ['operator_percent'] : []),
     ];
     const setFields: string[] = [];

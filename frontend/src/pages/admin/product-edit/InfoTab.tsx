@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Button, Alert, FormField } from '../../../components/common';
 import type { ProductCategory } from '../../../services/products';
+import { uploadProductImage } from '../../../services/products';
 
 interface InfoTabProps {
   loading: boolean;
@@ -30,6 +31,29 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
   onFormChange,
   onSave,
 }) => {
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploading(true);
+      const result = await uploadProductImage(file);
+      onFormChange('image_url', result.image_url);
+    } catch (err) {
+      console.error('Ошибка загрузки изображения:', err);
+      alert('Не удалось загрузить изображение');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveImage = () => {
+    onFormChange('image_url', '');
+  };
+
   return (
     <div className="product-tab-panel">
       <Alert type="info">
@@ -51,13 +75,51 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
             onChange={(e) => onFormChange('icon', e.target.value)}
           />
         </FormField>
-        <FormField label="Изображение (URL)" help="URL изображения продукта для сайта">
-          <input
-            className="form-input form-input--full"
-            value={form.image_url || ''}
-            onChange={(e) => onFormChange('image_url', e.target.value)}
-            placeholder="https://example.com/image.jpg"
-          />
+        <FormField label="Изображение" help="Загрузите фото продукта для сайта и каталога">
+          <div className="product-image-upload">
+            {form.image_url ? (
+              <div className="product-image-upload__preview">
+                <img
+                  src={form.image_url}
+                  alt="Превью"
+                  className="product-image-upload__thumb"
+                />
+                <div className="product-image-upload__info">
+                  <span className="product-image-upload__filename" title={form.image_url}>
+                    {form.image_url.split('/').pop()}
+                  </span>
+                  <button
+                    type="button"
+                    className="product-image-upload__remove"
+                    onClick={handleRemoveImage}
+                    title="Удалить"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className={`product-image-upload__dropzone ${uploading ? 'product-image-upload__dropzone--loading' : ''}`}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                  onChange={handleImageUpload}
+                  disabled={uploading}
+                  style={{ display: 'none' }}
+                />
+                {uploading ? (
+                  <span className="product-image-upload__loading">Загрузка...</span>
+                ) : (
+                  <>
+                    <span className="product-image-upload__icon">📷</span>
+                    <span>Нажмите для загрузки</span>
+                    <span className="product-image-upload__hint">JPEG, PNG, WebP, GIF, SVG — до 5 МБ</span>
+                  </>
+                )}
+              </label>
+            )}
+          </div>
         </FormField>
         <FormField label="Тип продукции" help="Влияет на процессы и расчёты">
           <input
@@ -126,4 +188,3 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
 });
 
 InfoTab.displayName = 'InfoTab';
-

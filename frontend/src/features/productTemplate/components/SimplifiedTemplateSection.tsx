@@ -3,10 +3,8 @@ import { Button, FormField, Alert } from '../../../components/common'
 import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
 import { getPaperTypesFromWarehouse, type PaperTypeForCalculator } from '../../../services/calculatorMaterialService'
 import { getPrintTechnologies } from '../../../api'
-import { api } from '../../../api'
 import type { SimplifiedConfig, SimplifiedSizeConfig, ProductTypeId } from '../hooks/useProductTemplate'
-import { useSimplifiedTypes } from '../hooks/useSimplifiedTypes'
-import { ProductTypesCard } from './ProductTypesCard'
+import type { UseSimplifiedTypesResult } from '../hooks/useSimplifiedTypes'
 import { PrintPricesCard } from './PrintPricesCard'
 import { MaterialsCard } from './MaterialsCard'
 import { FinishingCard } from './FinishingCard'
@@ -28,6 +26,8 @@ type ServiceRow = {
   price_unit?: string 
 }
 
+export type { ServiceRow }
+
 interface Props {
   value: SimplifiedConfig
   onChange: (next: SimplifiedConfig) => void
@@ -35,6 +35,8 @@ interface Props {
   saving: boolean
   allMaterials: CalculatorMaterial[]
   showPagesConfig?: boolean
+  types: UseSimplifiedTypesResult
+  services: ServiceRow[]
 }
 
 const uid = () => `sz_${Date.now()}_${Math.random().toString(16).slice(2)}`
@@ -62,6 +64,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   saving,
   allMaterials,
   showPagesConfig = true,
+  types,
+  services,
 }) => {
   const {
     hasTypes,
@@ -79,11 +83,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     addType,
     setDefaultType,
     removeType,
-  } = useSimplifiedTypes(value, onChange)
+  } = types
 
   const [paperTypes, setPaperTypes] = useState<PaperTypeRow[]>([])
   const [printTechs, setPrintTechs] = useState<PrintTechRow[]>([])
-  const [services, setServices] = useState<ServiceRow[]>([])
   const [loadingLists, setLoadingLists] = useState(false)
   const [showAddSize, setShowAddSize] = useState(false)
   const [newSize, setNewSize] = useState<{ label: string; width_mm: string; height_mm: string }>({ label: '', width_mm: '', height_mm: '' })
@@ -114,56 +117,27 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const loadLists = useCallback(async () => {
     setLoadingLists(true)
     try {
-      const [pt, techResp, svcResp] = await Promise.all([
+      const [pt, techResp] = await Promise.all([
         getPaperTypesFromWarehouse(),
         getPrintTechnologies().then(r => (Array.isArray(r.data) ? r.data : [])),
-        api.get('/pricing/services').then(r => {
-          const data = (r.data as any)?.data ?? r.data ?? []
-          return Array.isArray(data) ? data : []
-        }).catch(err => {
-          console.error('Ошибка загрузки услуг отделки:', err)
-          return []
-        }),
       ])
       setPaperTypes(pt || [])
       setPrintTechs((techResp || []).filter((t: any) => t && t.code))
-      
-      // Загружаем все услуги - показываем все, кроме явно исключенных типов
-      const allServices = (svcResp || []).filter((s: any) => {
-        // Базовая валидация - услуга должна иметь id и name
-        if (!s || !s.id || !s.name) return false
-        
-        // Исключаем только явно ненужные типы (например, печать, если такие есть)
-        const excludedTypes = new Set(['print', 'printing'])
-        const opType = String(s.operation_type ?? s.operationType ?? s.type ?? s.service_type ?? '').toLowerCase()
-        
-        // Если тип не указан или не в списке исключенных - показываем услугу
-        if (!opType) return true
-        return !excludedTypes.has(opType)
-      })
-      
-      console.log('Все загруженные услуги:', allServices.length, allServices)
-      setServices(allServices)
-      
-      // Восстанавливаем selectedPaperTypeId из сохраненных данных (но не блокируем переключение)
-      // Если есть allowed_material_ids, определяем тип бумаги по материалам для начальной установки
+
       if (selected && selected.allowed_material_ids && selected.allowed_material_ids.length > 0 && pt && pt.length > 0 && !selectedPaperTypeId) {
-        // Ищем тип бумаги, который содержит хотя бы один из сохраненных материалов
         for (const paperType of pt) {
           const materialIds = new Set(
             paperType.densities?.map(d => d.material_id).filter(id => id && id > 0) || []
           )
-          // Проверяем, есть ли хотя бы один материал из allowed_material_ids в этом типе бумаги
           const hasMatchingMaterial = selected.allowed_material_ids.some(id => materialIds.has(id))
           if (hasMatchingMaterial && materialIds.size > 0) {
             setSelectedPaperTypeId(paperType.id)
-            hasUserInteractedWithMaterialsRef.current = true // Помечаем, что материалы уже выбраны
+            hasUserInteractedWithMaterialsRef.current = true
             break
           }
         }
       }
-      
-      // Автоматически выбираем первый тип бумаги, если он есть и еще не выбран
+
       if (pt && pt.length > 0 && !selectedPaperTypeId) {
         setSelectedPaperTypeId(pt[0].id)
       }
@@ -174,12 +148,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     }
   }, [selectedPaperTypeId, selected])
 
-  // Загружаем списки при монтировании компонента
   useEffect(() => {
-    if (!loadingLists && (paperTypes.length === 0 || printTechs.length === 0 || services.length === 0)) {
+    if (!loadingLists && (paperTypes.length === 0 || printTechs.length === 0)) {
       void loadLists()
     }
-  }, []) // Загружаем только один раз при монтировании
+  }, [])
 
   // Отслеживание размера экрана для мобильной адаптации
   useEffect(() => {
@@ -478,64 +451,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           </Button>
         </div>
       </div>
-
-      <div className="simplified-card">
-        <div className="simplified-card__header">
-          <div>
-            <strong>Опции калькулятора</strong>
-            <div className="text-muted text-sm">Дополнительные чекбоксы, которые появятся в калькуляторе при расчёте.</div>
-          </div>
-        </div>
-        <div className="simplified-card__content">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={value.use_layout !== false}
-              onChange={(e) => onChange({ ...value, use_layout: e.target.checked })}
-            />
-            Учитывать раскладку на лист — оптимизация (несколько изделий на лист). Снять = 1 изделие на лист.
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={!!value.cutting}
-              onChange={(e) => onChange({ ...value, cutting: e.target.checked })}
-            />
-            Резка стопой — считать резы по раскладке (резов на лист), а не по тиражу
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={value.duplex_as_single_x2 === true}
-              onChange={(e) => onChange({ ...value, duplex_as_single_x2: e.target.checked })}
-            />
-            Для двухсторонней печати: считать как (односторонняя + материал) ×2, но списывать материал как обычно
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={value.include_material_cost !== false}
-              onChange={(e) => onChange({ ...value, include_material_cost: e.target.checked })}
-            />
-            Учитывать стоимость материалов в расчёте
-          </label>
-          <div className="text-muted text-sm">
-            По умолчанию включено: как и раньше, стоимость материалов добавляется в итоговую цену.
-          </div>
-        </div>
-      </div>
-
-      <ProductTypesCard
-        value={value}
-        onChange={onChange}
-        selectedTypeId={selectedTypeId}
-        onSelectType={handleSelectType}
-        onAddType={addType}
-        setDefaultType={setDefaultType}
-        removeType={removeType}
-        services={services}
-        allMaterials={allMaterials}
-      />
 
       {showPagesConfig && (
         <div className="simplified-card">

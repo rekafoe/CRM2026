@@ -212,13 +212,28 @@ const ProductManagement: React.FC = () => {
 
   return (
     <div className="product-management">
-      {/* Заголовок страницы */}
+      {/* Заголовок */}
       <div className="product-management__header">
-        <div className="product-management__title-row">
-          <span className="product-management__icon">🧩</span>
-          <h1 className="product-management__title">Управление продуктами</h1>
+        <div className="product-management__header-left">
+          <Button variant="secondary" size="sm" onClick={() => navigate('/adminpanel')}>
+            ← Назад
+          </Button>
+          <div className="product-management__title-row">
+            <span className="product-management__icon">🧩</span>
+            <div>
+              <h1 className="product-management__title">Управление продуктами</h1>
+              <p className="product-management__subtitle">Создание и настройка продуктов, категорий и параметров</p>
+            </div>
+          </div>
         </div>
-        <p className="product-management__subtitle">Создание и настройка продуктов, категорий и параметров</p>
+        <div className="product-management__header-actions">
+          <Button variant="secondary" size="sm" onClick={() => setShowCategoryModal(true)}>
+            📂 Категории
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => openCreateWizard(false)}>
+            ➕ Создать продукт
+          </Button>
+        </div>
       </div>
 
       {/* Статистика */}
@@ -272,7 +287,6 @@ const ProductManagement: React.FC = () => {
       <div className="product-controls">
         <div className="product-controls__main-row">
           <div className="product-controls__search-row">
-            {/* Поиск */}
             <div className="product-controls__search">
               <span className="product-controls__search-icon">🔍</span>
               <input
@@ -283,7 +297,6 @@ const ProductManagement: React.FC = () => {
               />
             </div>
 
-            {/* Фильтр по категориям */}
             <select
               className="product-controls__select"
               value={state.selectedCategoryId || ''}
@@ -297,7 +310,6 @@ const ProductManagement: React.FC = () => {
               ))}
             </select>
 
-            {/* Фильтр только активные */}
             <button
               className={`product-controls__toggle ${state.showOnlyActive ? 'product-controls__toggle--active' : ''}`}
               onClick={() => setShowOnlyActive(!state.showOnlyActive)}
@@ -306,27 +318,8 @@ const ProductManagement: React.FC = () => {
               <span>Только активные</span>
             </button>
           </div>
-
-          {/* Действия */}
-          <div className="product-controls__actions">
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => setShowCategoryModal(true)}
-            >
-              📂 Категории
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => openCreateWizard(false)}
-            >
-              ➕ Создать продукт
-            </Button>
-          </div>
         </div>
 
-        {/* Быстрые фильтры по категориям */}
         <div className="product-quick-filters">
           <button
             className={`product-filter-chip ${!state.selectedCategoryId ? 'product-filter-chip--active' : ''}`}
@@ -355,175 +348,125 @@ const ProductManagement: React.FC = () => {
       </div>
 
       <div className="management-content">
-        <div className="tab-content">
-
-            {state.selectedProducts.size > 0 && (
-              <div className="form-section bulk-actions-bar">
-                <span className="bulk-count">Выбрано: {state.selectedProducts.size}</span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="success"
-                    onClick={handleBulkActivate}
-                  >
-                    ✅ Активировать
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="warning"
-                    onClick={handleBulkDeactivate}
-                  >
-                    ⛔ Деактивировать
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={clearSelectedProducts}
-                  >
-                    Отменить выбор
-                  </Button>
-                </div>
-              </div>
-            )}
-            <div className="list-section">
-              {isDirectoryLoading ? (
-                <div className="pm-loading">
-                  <LoadingState message="Загружаем продукты..." />
-                </div>
-              ) : (
-                <div className="products-table-wrapper">
-                  <table className="products-table">
-                    <thead>
-                      <tr>
-                        <th style={{ width: '40px' }}>
-                          <input
-                            type="checkbox"
-                            checked={state.selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
-                            onChange={toggleSelectAll}
-                          />
-                        </th>
-                        <th style={{ width: '60px' }}>Иконка</th>
-                        <th 
-                          className="sortable-header"
-                          onClick={() => toggleSort('name')}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          Название {state.sortField === 'name' && (state.sortDirection === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th 
-                          className="sortable-header"
-                          onClick={() => toggleSort('category')}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          Категория {state.sortField === 'category' && (state.sortDirection === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th>Статус</th>
-                        <th>Настройка</th>
-                        <th>Описание</th>
-                        <th style={{ width: '450px' }}>Действия</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredProducts.map((product) => (
-                        <tr key={product.id} className={state.selectedProducts.has(product.id) ? 'selected' : ''}>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={state.selectedProducts.has(product.id)}
-                              onChange={() => toggleProductSelection(product.id)}
-                            />
-                          </td>
-                          <td className="cell-icon">{product.icon || '📦'}</td>
-                          <td className="cell-name">{product.name}</td>
-                          <td>{getCategoryById(product.category_id)?.name || ''}</td>
-                          <td>
-                            <StatusBadge
-                              status={product.is_active ? 'Активен' : 'Скрыт'}
-                              color={product.is_active ? 'success' : 'warning'}
-                              size="sm"
-                            />
-                          </td>
-                          <td>
-                            <button
-                              className="btn-setup-status"
-                              onClick={() => setSetupStatusModal(product.id)}
-                              title="Проверить статус настройки"
-                            >
-                              🔧
-                            </button>
-                          </td>
-                          <td className="cell-description">{product.description}</td>
-                          <td>
-                            <div className="row-actions flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                icon={<span aria-hidden="true">📋</span>}
-                                className="flex items-center gap-2"
-                                onClick={() => navigate(`/adminpanel/products/${product.id}/edit`)}
-                              >
-                                Инфо
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                icon={<span aria-hidden="true">✏️</span>}
-                                className="flex items-center gap-2"
-                                onClick={() => navigate(`/adminpanel/products/${product.id}/template`)}
-                              >
-                                Шаблон
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                icon={<span aria-hidden="true">⚙️</span>}
-                                className="flex items-center gap-2"
-                                onClick={() => navigate(`/adminpanel/products/${product.id}/tech-process`)}
-                              >
-                                Процесс
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={product.is_active ? 'warning' : 'success'}
-                                icon={<span aria-hidden="true">{product.is_active ? '⛔' : '✅'}</span>}
-                                className="flex items-center gap-2"
-                                onClick={() => toggleProductActive(product)}
-                                loading={directoryLoading.toggleProduct}
-                              >
-                                {product.is_active ? 'Выключить' : 'Включить'}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="error"
-                                icon={<span aria-hidden="true">🗑️</span>}
-                                className="flex items-center gap-2"
-                                onClick={() => handleDeleteProduct(product)}
-                                loading={state.deletingProductId === product.id}
-                                disabled={state.deletingProductId === product.id}
-                              >
-                                Удалить
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {!filteredProducts.length && (
-                        <tr>
-                          <td colSpan={6} className="text-center text-muted py-6">
-                            Нет продуктов, удовлетворяющих условиям поиска.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+        {state.selectedProducts.size > 0 && (
+          <div className="bulk-actions-bar">
+            <span className="bulk-count">Выбрано: {state.selectedProducts.size}</span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="success" onClick={handleBulkActivate}>
+                ✅ Активировать
+              </Button>
+              <Button size="sm" variant="warning" onClick={handleBulkDeactivate}>
+                ⛔ Деактивировать
+              </Button>
+              <Button size="sm" variant="secondary" onClick={clearSelectedProducts}>
+                Отменить выбор
+              </Button>
             </div>
           </div>
+        )}
 
-        {/* секции параметров/материалов вынесены на страницы редактирования */}
-        {false && null}
-        {false && null}
+        {isDirectoryLoading ? (
+          <div className="pm-loading">
+            <LoadingState message="Загружаем продукты..." />
+          </div>
+        ) : (
+          <div className="products-table-wrapper">
+            <table className="products-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '40px' }}>
+                    <input
+                      type="checkbox"
+                      checked={state.selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                  <th style={{ width: '50px' }}></th>
+                  <th className="sortable-header" onClick={() => toggleSort('name')}>
+                    Название {state.sortField === 'name' && (state.sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th className="sortable-header" onClick={() => toggleSort('category')}>
+                    Категория {state.sortField === 'category' && (state.sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th>Статус</th>
+                  <th style={{ width: '50px' }}></th>
+                  <th>Описание</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.map((product) => (
+                  <tr key={product.id} className={state.selectedProducts.has(product.id) ? 'selected' : ''}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={state.selectedProducts.has(product.id)}
+                        onChange={() => toggleProductSelection(product.id)}
+                      />
+                    </td>
+                    <td className="cell-icon">{product.icon || '📦'}</td>
+                    <td className="cell-name">{product.name}</td>
+                    <td>{getCategoryById(product.category_id)?.name || '—'}</td>
+                    <td>
+                      <StatusBadge
+                        status={product.is_active ? 'Активен' : 'Скрыт'}
+                        color={product.is_active ? 'success' : 'warning'}
+                        size="sm"
+                      />
+                    </td>
+                    <td>
+                      <button
+                        className="btn-setup-status"
+                        onClick={() => setSetupStatusModal(product.id)}
+                        title="Проверить статус настройки"
+                      >
+                        🔧
+                      </button>
+                    </td>
+                    <td className="cell-description">{product.description}</td>
+                    <td>
+                      <div className="row-actions">
+                        <Button size="sm" variant="secondary" onClick={() => navigate(`/adminpanel/products/${product.id}/edit`)}>
+                          📋 Инфо
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => navigate(`/adminpanel/products/${product.id}/template`)}>
+                          ✏️ Шаблон
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => navigate(`/adminpanel/products/${product.id}/tech-process`)}>
+                          ⚙️ Процесс
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={product.is_active ? 'warning' : 'success'}
+                          onClick={() => toggleProductActive(product)}
+                          loading={directoryLoading.toggleProduct}
+                        >
+                          {product.is_active ? '⛔ Выкл' : '✅ Вкл'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="error"
+                          onClick={() => handleDeleteProduct(product)}
+                          loading={state.deletingProductId === product.id}
+                          disabled={state.deletingProductId === product.id}
+                        >
+                          🗑️
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!filteredProducts.length && (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+                      Нет продуктов, удовлетворяющих условиям поиска.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Мастер создания продукта */}
