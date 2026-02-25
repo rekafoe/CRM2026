@@ -400,18 +400,12 @@
   white-space: nowrap;
 }
 
-.products-table thead th::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 25%;
-  bottom: 25%;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.25);
+.products-table thead th {
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.products-table thead th:last-child::after {
-  display: none;
+.products-table thead th:last-child {
+  border-right: none;
 }
 
 .sortable-header {
@@ -445,8 +439,8 @@
   font-size: 13px;
   color: #334155;
   vertical-align: middle;
-  border-bottom: 1px solid #f1f5f9;
-  border-right: 1px solid #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
 }
 
 .products-table tbody td:last-child {
