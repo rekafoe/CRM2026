@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppIcon } from '../../ui/AppIcon';
 
 export interface ParamsSectionSpecs {
   productType: string;
@@ -78,7 +79,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
 
   return (
     <div className="form-section compact">
-      <h3>⚙️ Параметры</h3>
+      <h3><AppIcon name="settings" size="xs" /> Параметры</h3>
       <div className="params-grid compact">
         {/* 🆕 Размер изделия для упрощённых продуктов (длинные названия — подсказка + обрезка) */}
         {isSimplifiedProduct && (() => {

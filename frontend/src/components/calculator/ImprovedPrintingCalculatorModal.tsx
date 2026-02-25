@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { AppIcon } from '../ui/AppIcon';
 import { AIService } from '../../services/aiService';
 import { Product } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
@@ -825,9 +826,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
           aria-label="Закрыть"
           type="button"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <AppIcon name="x" size="lg" />
         </button>
         {/* Основной контент */}
         <div className="calculator-content">

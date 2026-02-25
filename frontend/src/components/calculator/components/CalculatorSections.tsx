@@ -1,6 +1,7 @@
 import React from 'react';
 import { ProductSpecs, CalculationResult } from '../types/calculator.types';
 import { Product } from '../../../services/products';
+import { AppIcon } from '../../ui/AppIcon';
 import { ParamsSection, type ParamsSectionSpecs } from './ParamsSection';
 import { MaterialsSection } from './MaterialsSection';
 import { PrintingSettingsSection } from './PrintingSettingsSection';
@@ -71,7 +72,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   return (
     <div className="calculator-section-group calculator-section-unified">
       <div className="section-group-header">
-        <h3>📦 Основные параметры</h3>
+        <h3><AppIcon name="package" size="xs" /> Основные параметры</h3>
       </div>
       <div className="section-group-content">
         <SelectedProductCard

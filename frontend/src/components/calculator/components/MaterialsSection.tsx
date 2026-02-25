@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { AppIcon } from '../../ui/AppIcon';
 import { checkMaterialAvailability, calculateMaterialCost } from '../../../services/calculatorMaterialService';
 import type { CalculationResult } from '../types/calculator.types';
 import { getMaterials } from '../../../api';
@@ -367,7 +368,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         {loadingMaterials ? (
           <div className="form-control" style={{ color: '#666' }}>Загрузка...</div>
         ) : allowedMaterialsForSize.length === 0 ? (
-          <div className="alert alert-warning"><small>⚠️ Для размера нет разрешённых материалов</small></div>
+          <div className="alert alert-warning"><small><AppIcon name="warning" size="xs" /> Для размера нет разрешённых материалов</small></div>
         ) : densitiesForSelectedType.length === 0 ? (
           <div className="form-control" style={{ color: '#666' }}>Нет плотностей для этого типа</div>
         ) : (
@@ -393,15 +394,15 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
 
   return (
     <div className="form-section compact">
-      <h3>📄 Материалы</h3>
+      <h3><AppIcon name="document" size="xs" /> Материалы</h3>
       {allowedPaperTypes && Array.isArray(allowedPaperTypes) && allowedPaperTypes.length > 0 && !isSimplifiedProduct && (
         <div className="alert alert-info" style={{ fontSize: '0.85em', marginBottom: '1rem' }}>
-          <small>ℹ️ Для этого продукта доступны только выбранные типы бумаги: {allowedPaperTypes.join(', ')}</small>
+          <small><AppIcon name="info" size="xs" /> Для этого продукта доступны только выбранные типы бумаги: {allowedPaperTypes.join(', ')}</small>
         </div>
       )}
       {isSimplifiedProduct && !specs.size_id && (
         <div className="alert alert-warning" style={{ fontSize: '0.85em', marginBottom: '1rem' }}>
-          <small>⚠️ Сначала выберите размер изделия в разделе "Параметры"</small>
+          <small><AppIcon name="warning" size="xs" /> Сначала выберите размер изделия в разделе "Параметры"</small>
         </div>
       )}
       <div className="materials-grid compact">
@@ -418,7 +419,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
             </div>
           ) : filteredPaperTypes.length === 0 ? (
             <div className="alert alert-warning">
-              <small>⚠️ Нет доступных типов бумаги для этого продукта</small>
+              <small><AppIcon name="warning" size="xs" /> Нет доступных типов бумаги для этого продукта</small>
             </div>
           ) : (
             <select
@@ -470,7 +471,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
           ) : (
             <div className="alert alert-warning">
               <small>
-                ⚠️ Для выбранного типа бумаги нет доступных плотностей в базе данных.
+                <AppIcon name="warning" size="xs" /> Для выбранного типа бумаги нет доступных плотностей в базе данных.
                 <br />
                 Выберите другой тип бумаги или обратитесь к администратору.
               </small>
@@ -529,7 +530,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
             {loadingMaterials ? (
               <div className="form-control" style={{ color: '#666' }}>Загрузка...</div>
             ) : allowedMaterialsForSize.length === 0 ? (
-              <div className="alert alert-warning"><small>⚠️ Для размера нет разрешённых материалов</small></div>
+              <div className="alert alert-warning"><small><AppIcon name="warning" size="xs" /> Для размера нет разрешённых материалов</small></div>
             ) : densitiesForSelectedType.length === 0 ? (
               <div className="form-control" style={{ color: '#666' }}>Нет плотностей для этого типа</div>
             ) : (
@@ -586,17 +587,17 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
                       
                       // Определяем группу по ключевым словам в названии
                       if (label.includes('matt') || label.toLowerCase().includes('полумат')) {
-                        groupName = '📄 Полуматовая';
+                        groupName = 'Полуматовая';
                       } else if (label.includes('gloss') || label.toLowerCase().includes('мелованн') || label.toLowerCase().includes('глянц')) {
-                        groupName = '✨ Мелованная';
+                        groupName = 'Мелованная';
                       } else if (label.toLowerCase().includes('дизайнерск')) {
-                        groupName = '🎨 Дизайнерская';
+                        groupName = 'Дизайнерская';
                       } else if (label.toLowerCase().includes('офсет')) {
-                        groupName = '📋 Офсетная';
+                        groupName = 'Офсетная';
                       } else if (label.toLowerCase().includes('крафт')) {
-                        groupName = '📦 Крафт';
+                        groupName = 'Крафт';
                       } else if (label.toLowerCase().includes('самоклей')) {
-                        groupName = '🏷️ Самоклеящаяся';
+                        groupName = 'Самоклеящаяся';
                       }
                       
                       if (!grouped.has(groupName)) {
@@ -643,12 +644,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       {/* Информация о доступности и стоимости материалов (только для обычных продуктов) */}
       {!isSimplifiedProduct && specs.paperType && specs.paperDensity && specs.quantity > 0 && (
         <div className="material-info-section">
-          <h4>📊 Информация о материалах</h4>
+          <h4><AppIcon name="chart-bar" size="xs" /> Информация о материалах</h4>
           
           {/* Статус проверки доступности */}
           {isCheckingAvailability && (
             <div className="alert alert-info">
-              <small>🔄 Проверяем доступность материалов...</small>
+              <small><AppIcon name="refresh" size="xs" /> Проверяем доступность материалов...</small>
             </div>
           )}
 
@@ -658,7 +659,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
               <div className="material-availability">
                 <div className="availability-status">
                   <span className="status-icon">
-                    {materialAvailability.available ? '✅' : '⚠️'}
+                    {materialAvailability.available ? <AppIcon name="check" size="sm" /> : <AppIcon name="warning" size="sm" />}
                   </span>
                   <span className="status-text">
                     {materialAvailability.available ? 'Материал доступен' : 'Материал недоступен'}

@@ -14,6 +14,8 @@ import { Product, ProductCategory } from '../../../services/products';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { useLogger } from '../../../utils/logger';
 import { useToastNotifications } from '../../Toast';
+import { AppIcon } from '../../ui/AppIcon';
+import { getProductIconName } from '../utils/productIcons';
 
 export const CUSTOM_PRODUCT_ID = -1000;
 export const POSTPRINT_PRODUCT_ID = -1001;
@@ -23,7 +25,7 @@ const customProduct: Product = {
   category_id: 0,
   name: 'Произвольный продукт',
   description: 'Свободная форма без ограничений',
-  icon: '✍️',
+  icon: 'edit',
   calculator_type: 'simplified',
   product_type: 'universal',
   operator_percent: 10,
@@ -31,7 +33,7 @@ const customProduct: Product = {
   created_at: '',
   updated_at: '',
   category_name: 'Произвольное',
-  category_icon: '✨',
+  category_icon: 'folder',
 };
 
 const postprintProduct: Product = {
@@ -39,7 +41,7 @@ const postprintProduct: Product = {
   category_id: 0,
   name: 'Послепечатные услуги',
   description: 'Выбор операций и количества',
-  icon: '🧰',
+  icon: 'wrench',
   calculator_type: 'simplified',
   product_type: 'universal',
   operator_percent: 0,
@@ -47,7 +49,7 @@ const postprintProduct: Product = {
   created_at: '',
   updated_at: '',
   category_name: 'Услуги',
-  category_icon: '🧩',
+  category_icon: 'puzzle',
 };
 
 interface DynamicProductSelectorProps {
@@ -160,19 +162,28 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
     setSearchResults([]);
   };
 
-  // Получение иконки категории
-  const getCategoryIcon = (category: ProductCategory) => {
-    return category.icon || '📦';
+  // Иконка категории: folder по умолчанию
+  const getCategoryIconName = (category: ProductCategory): 'folder' | 'package' | 'clipboard' => {
+    const icon = category.icon;
+    if (icon === 'package' || icon === 'folder' || icon === 'clipboard') return icon;
+    return 'folder';
   };
 
-  // Получение иконки продукта
-  const getProductIcon = (product: Product) => {
-    return product.icon || '📄';
+  // Иконка продукта: image_url или AppIcon по имени
+  const renderProductIcon = (product: Product) => {
+    if (product.image_url) {
+      return <img src={product.image_url} alt="" />;
+    }
+    const iconName = (product.icon && ['package', 'folder', 'clipboard', 'wrench', 'edit', 'puzzle'].includes(product.icon))
+      ? product.icon as 'package' | 'folder' | 'clipboard' | 'wrench' | 'edit' | 'puzzle'
+      : getProductIconName((product as any).resolvedProductType || product.product_type || 'package');
+    return <AppIcon name={iconName} size="lg" />;
   };
 
-  // Получение иконки категории продукта
-  const getProductCategoryIcon = (product: Product) => {
-    return product.category_icon || '📦';
+  const getProductCategoryIconName = (product: Product): 'folder' | 'package' | 'puzzle' => {
+    const icon = product.category_icon;
+    if (icon === 'package' || icon === 'folder' || icon === 'puzzle') return icon;
+    return 'folder';
   };
 
   // Проверка, выбран ли продукт
@@ -185,14 +196,14 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
       <div className="dynamic-product-selector">
         {/* Заголовок */}
         <div className="selector-header">
-          <h2>🛍️ Выбор продукта</h2>
+          <h2><AppIcon name="package" size="md" /> Выбор продукта</h2>
           <p>Выберите тип продукта для расчета стоимости</p>
           <button 
             className="close-button"
             onClick={onClose}
             aria-label="Закрыть"
           >
-            ✕
+            <AppIcon name="x" size="sm" />
           </button>
         </div>
 
@@ -233,7 +244,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
                   onClick={() => handleCategorySelect(category.id)}
                   disabled={loadingCategories}
                 >
-                  <span className="category-icon">{getCategoryIcon(category)}</span>
+                  <span className="category-icon"><AppIcon name={getCategoryIconName(category)} size="sm" /></span>
                   <span className="category-name">{category.name}</span>
                 </button>
               ))}
@@ -251,7 +262,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
 
         {categoriesError && (
           <div className="error-state">
-            <p>❌ {categoriesError}</p>
+            <p><AppIcon name="x" size="xs" /> {categoriesError}</p>
           </div>
         )}
 
@@ -264,7 +275,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
 
         {productsError && (
           <div className="error-state">
-            <p>❌ {productsError}</p>
+            <p><AppIcon name="x" size="xs" /> {productsError}</p>
           </div>
         )}
 
@@ -295,19 +306,19 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
                 className={`product-card custom-product-card ${isProductSelected(postprintProduct) ? 'selected' : ''}`}
                 onClick={() => handleProductSelect(postprintProduct)}
               >
-                <div className="product-icon">{getProductIcon(postprintProduct)}</div>
+                <div className="product-icon">{renderProductIcon(postprintProduct)}</div>
                 <div className="product-info">
                   <h4 className="product-name">{postprintProduct.name}</h4>
                   <p className="product-description">{postprintProduct.description}</p>
                   <div className="product-category">
                     <span className="category-badge">
-                      {postprintProduct.category_icon} {postprintProduct.category_name}
+                      <AppIcon name={getProductCategoryIconName(postprintProduct)} size="xs" /> {postprintProduct.category_name}
                     </span>
                   </div>
                 </div>
                 {isProductSelected(postprintProduct) && (
                   <div className="selected-indicator">
-                    ✅
+                    <AppIcon name="check" size="sm" />
                   </div>
                 )}
               </div>
@@ -315,19 +326,19 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
                 className={`product-card custom-product-card ${isProductSelected(customProduct) ? 'selected' : ''}`}
                 onClick={() => handleProductSelect(customProduct)}
               >
-                <div className="product-icon">{getProductIcon(customProduct)}</div>
+                <div className="product-icon">{renderProductIcon(customProduct)}</div>
                 <div className="product-info">
                   <h4 className="product-name">{customProduct.name}</h4>
                   <p className="product-description">{customProduct.description}</p>
                   <div className="product-category">
                     <span className="category-badge">
-                      {customProduct.category_icon} {customProduct.category_name}
+                      <AppIcon name={getProductCategoryIconName(customProduct)} size="xs" /> {customProduct.category_name}
                     </span>
                   </div>
                 </div>
                 {isProductSelected(customProduct) && (
                   <div className="selected-indicator">
-                    ✅
+                    <AppIcon name="check" size="sm" />
                   </div>
                 )}
               </div>
@@ -338,7 +349,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
                   onClick={() => handleProductSelect(product)}
                 >
                   <div className="product-icon">
-                    {getProductIcon(product)}
+                    {renderProductIcon(product)}
                   </div>
                   <div className="product-info">
                     <h4 className="product-name">{product.name}</h4>
@@ -347,13 +358,13 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
                     </p>
                     <div className="product-category">
                       <span className="category-badge">
-                        {getProductCategoryIcon(product)} {product.category_name}
+                        <AppIcon name={getProductCategoryIconName(product)} size="xs" /> {product.category_name}
                       </span>
                     </div>
                   </div>
                   {isProductSelected(product) && (
                     <div className="selected-indicator">
-                      ✅
+                      <AppIcon name="check" size="sm" />
                     </div>
                   )}
                 </div>

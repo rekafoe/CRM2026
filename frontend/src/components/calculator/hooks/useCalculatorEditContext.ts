@@ -71,6 +71,34 @@ export function useCalculatorEditContext({
     
     appliedEditContextRef.current = contextKey;
     const existingSpecs = (item.params?.specifications ?? {}) as Record<string, any>;
+    const params = (item.params ?? {}) as Record<string, any>;
+
+    // Восстанавливаем selectedOperations: приоритет params.selectedOperations (полная структура),
+    // иначе конвертируем из params.services (для старых заказов)
+    let selectedOperationsFromItem: Array<{ operationId: number; variantId?: number; subtype?: string; quantity?: number }> = [];
+    if (Array.isArray(params.selectedOperations) && params.selectedOperations.length > 0) {
+      selectedOperationsFromItem = params.selectedOperations.map((op: any) => ({
+        operationId: Number(op.operationId ?? op.operation_id),
+        ...(op.variantId != null || op.variant_id != null ? { variantId: Number(op.variantId ?? op.variant_id) } : {}),
+        ...(op.subtype ? { subtype: String(op.subtype) } : {}),
+        ...(op.quantity != null ? { quantity: Number(op.quantity) } : {}),
+      })).filter((o: any) => o.operationId);
+    } else {
+      const savedServices = Array.isArray(params.services) ? params.services : [];
+      selectedOperationsFromItem = savedServices.map((s: any) => {
+        const opId = s.operationId ?? s.operation_id ?? s.id;
+        if (!opId) return null;
+        const restored: { operationId: number; variantId?: number; subtype?: string; quantity?: number } = {
+          operationId: Number(opId),
+        };
+        if (s.variantId != null || s.variant_id != null) {
+          restored.variantId = Number(s.variantId ?? s.variant_id);
+        }
+        if (s.subtype) restored.subtype = String(s.subtype);
+        if (s.quantity != null) restored.quantity = Number(s.quantity);
+        return restored;
+      }).filter(Boolean) as Array<{ operationId: number; variantId?: number; subtype?: string; quantity?: number }>;
+    }
 
     // Используем функциональную форму setState, чтобы избежать проблем с зависимостями
     setSpecs((prev) => {
@@ -80,9 +108,10 @@ export function useCalculatorEditContext({
         (explicitProductType && prev.productType !== explicitProductType) ||
         (existingSpecs.quantity != null && prev.quantity !== existingSpecs.quantity) ||
         (existingSpecs.sides != null && prev.sides !== existingSpecs.sides) ||
-        (existingSpecs.format && existingSpecs.format !== '' && prev.format !== existingSpecs.format);
+        (existingSpecs.format && existingSpecs.format !== '' && prev.format !== existingSpecs.format) ||
+        (selectedOperationsFromItem.length > 0 && (!prev.selectedOperations || prev.selectedOperations.length === 0));
       
-      if (!needsUpdate && Object.keys(existingSpecs).length === 0) {
+      if (!needsUpdate && Object.keys(existingSpecs).length === 0 && selectedOperationsFromItem.length === 0) {
         return prev; // Не обновляем, если ничего не изменилось
       }
 
@@ -98,6 +127,12 @@ export function useCalculatorEditContext({
       }
       if (existingSpecs.format && existingSpecs.format !== '') {
         merged.format = existingSpecs.format;
+      }
+      // Восстанавливаем операции из сохранённого заказа (params.selectedOperations или params.services)
+      if (selectedOperationsFromItem.length > 0) {
+        merged.selectedOperations = selectedOperationsFromItem;
+      } else if (existingSpecs.selectedOperations && Array.isArray(existingSpecs.selectedOperations)) {
+        merged.selectedOperations = existingSpecs.selectedOperations;
       }
       return merged;
     });

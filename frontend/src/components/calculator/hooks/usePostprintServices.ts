@@ -61,7 +61,7 @@ const buildPostprintProduct = (): Product => ({
   category_id: 0,
   name: 'Послепечатные услуги',
   description: 'Выбор операций и количества',
-  icon: '🧰',
+  icon: 'wrench',
   calculator_type: 'simplified',
   product_type: 'universal',
   operator_percent: 0,
@@ -69,7 +69,7 @@ const buildPostprintProduct = (): Product => ({
   created_at: '',
   updated_at: '',
   category_name: 'Услуги',
-  category_icon: '🧩',
+  category_icon: 'puzzle',
 });
 
 export function usePostprintServices({

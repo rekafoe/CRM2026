@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppIcon } from '../../ui/AppIcon';
 
 interface ResultSectionProps {
   result: {
@@ -33,7 +34,7 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   if (!result) {
     return (
       <div className="form-section result-section compact">
-        <h3>💰 Стоимость: —</h3>
+        <h3><AppIcon name="money" size="xs" /> Стоимость: —</h3>
         <div className="result-details">
           <div className="result-item">
             <span>Заполните параметры для расчёта</span>
@@ -45,7 +46,7 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
             onClick={onAddToOrder}
             disabled={true}
           >
-            {mode === 'edit' ? '💾 Обновить позицию' : '➕ Добавить в заказ'}
+            {mode === 'edit' ? <><AppIcon name="save" size="xs" /> Обновить позицию</> : <><AppIcon name="plus" size="xs" /> Добавить в заказ</>}
           </button>
         </div>
       </div>
@@ -58,7 +59,7 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   const fitsOnSheet = result.layout?.fitsOnSheet;
   const warnings = result.warnings || [];
   const parameterSummary = result.parameterSummary || [];
-  const addButtonLabel = mode === 'edit' ? '💾 Обновить позицию' : '➕ Добавить в заказ';
+  const addButtonLabel = mode === 'edit' ? <><AppIcon name="save" size="xs" /> Обновить позицию</> : <><AppIcon name="plus" size="xs" /> Добавить в заказ</>;
   const showFormatWarning = fitsOnSheet === false || warnings.length > 0;
 
   return (
@@ -66,14 +67,14 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
       {showFormatWarning && (
         <div className="result-section__warning" role="alert">
           {fitsOnSheet === false && (
-            <p>⚠️ Выбранный формат не помещается на стандартные печатные листы (SRA3, A3, A4). Проверьте размер.</p>
+            <p><AppIcon name="warning" size="xs" /> Выбранный формат не помещается на стандартные печатные листы (SRA3, A3, A4). Проверьте размер.</p>
           )}
           {warnings.map((msg, i) => (
-            <p key={i}>⚠️ {msg}</p>
+            <p key={i}><AppIcon name="warning" size="xs" /> {msg}</p>
           ))}
         </div>
       )}
-      <h3>💰 Стоимость: {formatNumber(result.totalCost, 'BYN')}</h3>
+      <h3><AppIcon name="money" size="xs" /> Стоимость: {formatNumber(result.totalCost, 'BYN')}</h3>
       <div className="result-details">
         <div className="result-item">
           <span>За штуку:</span>
@@ -120,7 +121,7 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
       )}
       {(sheetsNeeded || itemsPerSheet || sheetSize) && (
         <div className="result-sheet-info">
-          {sheetsNeeded != null && <span>📄 Листов: {sheetsNeeded}</span>}
+          {sheetsNeeded != null && <span><AppIcon name="document" size="xs" /> Листов: {sheetsNeeded}</span>}
           {itemsPerSheet != null && <span>• На листе: {itemsPerSheet} шт.</span>}
           {sheetSize && <span>• Формат листа: {sheetSize}</span>}
         </div>

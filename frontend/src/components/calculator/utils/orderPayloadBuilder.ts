@@ -54,6 +54,8 @@ export function buildOrderPayload({
     .split('T')[0];
 
   const cleanSpecifications = { ...result.specifications };
+  // selectedOperations удаляем из specifications при сохранении, но сохраняем в params для восстановления при редактировании
+  const selectedOperationsToSave = cleanSpecifications.selectedOperations;
   delete cleanSpecifications.selectedOperations;
 
   const cleanParameterSummary = Array.isArray(parameterSummary)
@@ -117,6 +119,10 @@ export function buildOrderPayload({
     specifications: specificationsPayload,
     materials: cleanMaterials,
     services: cleanServices,
+    // Сохраняем selectedOperations для восстановления при редактировании (operationId, variantId, subtype, quantity)
+    ...(Array.isArray(selectedOperationsToSave) && selectedOperationsToSave.length > 0
+      ? { selectedOperations: selectedOperationsToSave }
+      : {}),
     productionTime: result.productionTime,
     productType: result.specifications.productType,
     urgency: result.specifications.priceType,

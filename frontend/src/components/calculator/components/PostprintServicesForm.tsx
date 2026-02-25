@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppIcon } from '../../ui/AppIcon';
 import { SelectedProductCard } from './SelectedProductCard';
 
 interface PostprintVariantOption {
@@ -55,7 +56,7 @@ export const PostprintServicesForm: React.FC<PostprintServicesFormProps> = ({
 }) => (
   <div className="calculator-section-group calculator-section-unified">
     <div className="section-group-header">
-      <h3>🧰 Послепечатные услуги</h3>
+      <h3><AppIcon name="wrench" size="xs" /> Послепечатные услуги</h3>
     </div>
     <div className="section-group-content">
       <SelectedProductCard

@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppIcon } from '../../ui/AppIcon';
 
 interface DynamicFieldsSectionProps {
   schema: any | null;
@@ -127,7 +128,7 @@ export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({ sche
 
   return (
     <div className="form-section compact">
-      <h3>🧩 Доп. параметры</h3>
+      <h3><AppIcon name="puzzle" size="xs" /> Доп. параметры</h3>
       <div className="advanced-grid compact">
         {fields.map(renderField)}
       </div>

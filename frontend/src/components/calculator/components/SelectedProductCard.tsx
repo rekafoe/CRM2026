@@ -1,5 +1,6 @@
 import React from 'react';
-import { getProductIcon } from '../utils/productIcons';
+import { AppIcon } from '../../ui/AppIcon';
+import { getProductIconName } from '../utils/productIcons';
 
 interface Props {
   productType: string;
@@ -10,7 +11,7 @@ interface Props {
 export const SelectedProductCard: React.FC<Props> = ({ productType, displayName, onOpenSelector }) => {
   return (
     <div className="form-section compact">
-      <h3>📦 {displayName}</h3>
+      <h3><AppIcon name="package" size="xs" /> {displayName}</h3>
       <div className="selected-product-info">
         <button
           type="button"
@@ -19,12 +20,12 @@ export const SelectedProductCard: React.FC<Props> = ({ productType, displayName,
           title="Изменить тип продукта"
           aria-label={`Изменить тип продукта: ${displayName}`}
         >
-          <div className="product-icon">{getProductIcon(productType)}</div>
+          <div className="product-icon"><AppIcon name={getProductIconName(productType)} size="lg" /></div>
           <div className="product-details">
             <div className="product-type">{productType}</div>
           </div>
           <span className="selected-product-change" aria-hidden="true">
-            🔄
+            <AppIcon name="refresh" size="sm" />
           </span>
         </button>
       </div>

@@ -20,7 +20,7 @@ const buildCustomProduct = (): Product => ({
   category_id: 0,
   name: 'Произвольный продукт',
   description: 'Свободная форма без ограничений',
-  icon: '✍️',
+  icon: 'edit',
   calculator_type: 'simplified',
   product_type: 'universal',
   operator_percent: 10,
@@ -28,7 +28,7 @@ const buildCustomProduct = (): Product => ({
   created_at: '',
   updated_at: '',
   category_name: 'Произвольное',
-  category_icon: '✨',
+  category_icon: 'folder',
 });
 
 export function useCustomProduct({

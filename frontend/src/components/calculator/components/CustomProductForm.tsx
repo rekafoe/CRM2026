@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppIcon } from '../../ui/AppIcon';
 import { SelectedProductCard } from './SelectedProductCard';
 
 interface CustomProductFormProps {
@@ -28,7 +29,7 @@ export const CustomProductForm: React.FC<CustomProductFormProps> = ({
 }) => (
   <div className="calculator-section-group calculator-section-unified">
     <div className="section-group-header">
-      <h3>✍️ Произвольный продукт</h3>
+      <h3><AppIcon name="edit" size="xs" /> Произвольный продукт</h3>
     </div>
     <div className="section-group-content">
       <SelectedProductCard
