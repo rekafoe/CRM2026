@@ -397,6 +397,21 @@
   min-width: 0;
 }
 
+.simplified-template__type-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.simplified-template__type-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .simplified-form-grid {
   display: grid;
   grid-template-columns: repeat(3, max-content);

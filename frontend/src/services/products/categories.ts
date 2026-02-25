@@ -2,7 +2,7 @@
  * Сервис для работы с категориями продуктов
  */
 
-import { api } from '../../api/client';
+import { api, apiClient } from '../../api/client';
 import { ProductCategory } from './types';
 import { SimpleCache } from './utils/cache';
 import { apiRequestSafe } from './utils/apiHelpers';
@@ -59,6 +59,18 @@ export async function updateProductCategory(
 ): Promise<void> {
   await api.put(`/products/categories/${id}`, data);
   categoriesCache.clear();
+}
+
+/**
+ * Загрузить изображение для категории
+ */
+export async function uploadCategoryImage(file: File): Promise<{ image_url: string; filename: string; size: number }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const response = await apiClient.post('/products/categories/upload-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return (response.data as any)?.data || response.data;
 }
 
 /**

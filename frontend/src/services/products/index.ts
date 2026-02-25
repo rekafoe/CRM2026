@@ -15,6 +15,7 @@ export {
   getProductCategories,
   createProductCategory,
   updateProductCategory,
+  uploadCategoryImage,
   clearCategoriesCache
 } from './categories';
 

@@ -184,6 +184,25 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       : cfg?.sizes?.[0];
     const firstSize = (targetSize ?? cfg?.sizes?.[0]) as SizeWithPrices | undefined;
     const autoQty = firstSize?.min_qty ?? firstSize?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
+
+    const operationsFromInitial: Array<{ operationId: number; variantId?: number; subtype?: string }> = [];
+    if (initial?.operations?.length) {
+      for (const op of initial.operations) {
+        operationsFromInitial.push({
+          operationId: op.operation_id,
+          ...(op.variant_id != null ? { variantId: op.variant_id } : {}),
+          ...(op.subtype ? { subtype: op.subtype } : {}),
+        });
+      }
+    }
+
+    if (initial?.print_technology) {
+      setPrintTechnology(initial.print_technology);
+    }
+    if (initial?.color_mode) {
+      setPrintColorMode(initial.color_mode);
+    }
+
     setSpecs((prev) => ({
       ...prev,
       typeId: typeId ?? undefined,
@@ -192,6 +211,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       quantity: initial?.quantity ?? autoQty,
       ...(initial?.material_id != null ? { material_id: initial.material_id } : {}),
       ...(initial?.sides_mode ? { sides: initial.sides_mode === 'single' ? 1 : 2 } : {}),
+      selectedOperations: operationsFromInitial,
     }));
   }, [simplified?.types, simplified?.typeConfigs, setSpecs]);
 

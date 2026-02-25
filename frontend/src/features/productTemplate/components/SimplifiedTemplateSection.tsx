@@ -533,6 +533,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         onAddType={addType}
         setDefaultType={setDefaultType}
         removeType={removeType}
+        services={services}
+        allMaterials={allMaterials}
       />
 
       {showPagesConfig && (

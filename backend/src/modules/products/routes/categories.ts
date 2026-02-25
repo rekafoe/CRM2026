@@ -3,6 +3,7 @@ import { getDb } from '../../../db';
 import { logger } from '../../../utils/logger';
 import { getCachedData, invalidateCacheByPattern } from '../../../utils/dataCache';
 import { extractMinUnitPrice } from './helpers';
+import { uploadMemory, saveBufferToUploads } from '../../../config/upload';
 
 const router = Router();
 
@@ -81,10 +82,20 @@ router.post('/', async (req, res) => {
     const { name, icon, description, sort_order, image_url } = req.body;
     const db = await getDb();
 
-    const result = await db.run(`
-      INSERT INTO product_categories (name, icon, description, sort_order, image_url)
-      VALUES (?, ?, ?, ?, ?)
-    `, [name, icon, description, sort_order || 0, image_url || null]);
+    const cols = await db.all("PRAGMA table_info('product_categories')") as any[];
+    const hasImageUrl = cols.some((c: any) => c.name === 'image_url');
+
+    const columns = ['name', 'icon', 'description', 'sort_order'];
+    const values: any[] = [name, icon, description, sort_order || 0];
+    if (hasImageUrl) {
+      columns.push('image_url');
+      values.push(image_url || null);
+    }
+
+    const result = await db.run(
+      `INSERT INTO product_categories (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
+      values
+    );
 
     invalidateCacheByPattern('product_categories');
     res.json({ id: result.lastID, name, icon, description, sort_order, image_url });
@@ -94,17 +105,58 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
+  try {
+    const file = (req as any).file;
+    if (!file) {
+      return res.status(400).json({ error: 'Файл не передан' });
+    }
+
+    const allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+    if (!allowedMime.includes(file.mimetype)) {
+      return res.status(400).json({ error: 'Допустимы только изображения (JPEG, PNG, WebP, GIF, SVG)' });
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return res.status(400).json({ error: 'Максимальный размер файла — 5 МБ' });
+    }
+
+    const saved = saveBufferToUploads(file.buffer, file.originalname);
+    if (!saved) {
+      return res.status(400).json({ error: 'Пустой файл' });
+    }
+
+    const imageUrl = `/api/uploads/${saved.filename}`;
+    res.json({ image_url: imageUrl, filename: saved.filename, size: saved.size });
+  } catch (error) {
+    logger.error('Error uploading category image', error);
+    res.status(500).json({ error: 'Ошибка загрузки изображения' });
+  }
+});
+
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name, icon, description, sort_order, is_active, image_url } = req.body;
     const db = await getDb();
 
-    await db.run(`
-      UPDATE product_categories 
-      SET name = ?, icon = ?, description = ?, sort_order = ?, is_active = ?, image_url = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `, [name, icon, description, sort_order, is_active, image_url ?? null, id]);
+    const cols = await db.all("PRAGMA table_info('product_categories')") as any[];
+    const hasImageUrl = cols.some((c: any) => c.name === 'image_url');
+
+    const setParts = ['name = ?', 'icon = ?', 'description = ?', 'sort_order = ?', 'is_active = ?'];
+    const values: any[] = [name, icon, description, sort_order, is_active];
+    if (hasImageUrl) {
+      setParts.push('image_url = ?');
+      values.push(image_url ?? null);
+    }
+    setParts.push("updated_at = datetime('now')");
+    values.push(id);
+
+    await db.run(
+      `UPDATE product_categories SET ${setParts.join(', ')} WHERE id = ?`,
+      values
+    );
 
     invalidateCacheByPattern('product_categories');
     res.json({ success: true });

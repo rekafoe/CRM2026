@@ -63,12 +63,25 @@ export type ProductTypeVariant = {
   image_url?: string;
 }
 
+/** Предвыбранная операция для подтипа */
+export type InitialOperation = {
+  operation_id: number;
+  variant_id?: number;
+  subtype?: string;
+}
+
 /** Начальные значения калькулятора для подтипа (опционально; если поле не задано — авто-определение) */
 export type SubtypeInitialDefaults = {
   size_id?: string;
   quantity?: number;
   material_id?: number;
   sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
+  /** Код технологии печати (digital_toner, offset и т.д.) */
+  print_technology?: string;
+  /** Режим цвета */
+  color_mode?: 'color' | 'bw';
+  /** Предвыбранные операции (ламинация, скругление, резка и любые другие — берутся из finishing) */
+  operations?: InitialOperation[];
 }
 
 /** Конфиг одного типа: размеры и цены (печать, материалы, отделка) */

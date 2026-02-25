@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Modal } from '../common/Modal';
 import { Button } from '../common';
 import {
   ProductCategory,
   createProductCategory,
   updateProductCategory,
+  uploadCategoryImage,
 } from '../../services/products';
 import './CategoryManagementModal.css';
 
@@ -43,7 +44,9 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<CategoryFormData>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const sortedCategories = [...categories].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
 
@@ -110,6 +113,26 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const result = await uploadCategoryImage(file);
+      setForm((prev) => ({ ...prev, image_url: result.image_url }));
+    } catch (err: any) {
+      setError(err?.response?.data?.error || err?.message || 'Ошибка загрузки изображения');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setForm((prev) => ({ ...prev, image_url: '' }));
+  };
+
   const isEditing = creating || editingId != null;
 
   return (
@@ -133,7 +156,11 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                     key={cat.id}
                     className={`cat-mgmt__item ${!cat.is_active ? 'cat-mgmt__item--inactive' : ''}`}
                   >
-                    <div className="cat-mgmt__item-icon">{cat.icon || '📁'}</div>
+                    {cat.image_url ? (
+                      <img src={cat.image_url} alt="" className="cat-mgmt__item-thumb" />
+                    ) : (
+                      <div className="cat-mgmt__item-icon">{cat.icon || '📁'}</div>
+                    )}
                     <div className="cat-mgmt__item-body">
                       <div className="cat-mgmt__item-name">
                         {cat.name}
@@ -198,14 +225,43 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                 />
               </div>
 
-              <div className="cat-mgmt__field">
-                <label className="cat-mgmt__label">URL изображения</label>
-                <input
-                  className="form-input"
-                  value={form.image_url}
-                  onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                  placeholder="https://..."
-                />
+              <div className="cat-mgmt__field cat-mgmt__field--full">
+                <label className="cat-mgmt__label">Изображение</label>
+                <div className="cat-mgmt__image-upload">
+                  {form.image_url ? (
+                    <div className="cat-mgmt__image-preview">
+                      <img src={form.image_url} alt="Превью" className="cat-mgmt__image-thumb" />
+                      <div className="cat-mgmt__image-actions">
+                        <span className="cat-mgmt__image-name" title={form.image_url}>
+                          {form.image_url.split('/').pop()}
+                        </span>
+                        <button type="button" className="cat-mgmt__image-remove" onClick={handleRemoveImage} title="Удалить">
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className={`cat-mgmt__image-dropzone ${uploading ? 'cat-mgmt__image-dropzone--loading' : ''}`}>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                        onChange={handleImageUpload}
+                        disabled={uploading}
+                        style={{ display: 'none' }}
+                      />
+                      {uploading ? (
+                        <span className="cat-mgmt__image-loading">Загрузка...</span>
+                      ) : (
+                        <>
+                          <span className="cat-mgmt__image-icon">📷</span>
+                          <span>Нажмите для загрузки</span>
+                          <span className="cat-mgmt__image-hint">JPEG, PNG, WebP, GIF, SVG — до 5 МБ</span>
+                        </>
+                      )}
+                    </label>
+                  )}
+                </div>
               </div>
 
               <div className="cat-mgmt__field">
