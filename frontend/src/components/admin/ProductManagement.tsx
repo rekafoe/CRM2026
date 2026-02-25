@@ -339,7 +339,7 @@ const ProductManagement: React.FC = () => {
                 className={`product-filter-chip ${state.selectedCategoryId === cat.id ? 'product-filter-chip--active' : ''}`}
                 onClick={() => setSelectedCategoryId(cat.id)}
               >
-                <span>{cat.icon}</span>
+                <AppIcon name="folder" size="xs" />
                 <span>{cat.name}</span>
                 <span className="product-filter-chip__count">{count}</span>
               </button>
@@ -405,7 +405,13 @@ const ProductManagement: React.FC = () => {
                         onChange={() => toggleProductSelection(product.id)}
                       />
                     </td>
-                    <td className="cell-icon">{product.icon || <AppIcon name="package" size="xs" />}</td>
+                    <td className="cell-icon">
+                      {product.image_url ? (
+                        <img src={product.image_url} alt="" className="cell-icon__img" />
+                      ) : (
+                        <AppIcon name="package" size="sm" />
+                      )}
+                    </td>
                     <td className="cell-name">{product.name}</td>
                     <td>{getCategoryById(product.category_id)?.name || '—'}</td>
                     <td>

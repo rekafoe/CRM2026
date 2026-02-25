@@ -446,16 +446,31 @@
   color: #334155;
   vertical-align: middle;
   border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+}
+
+.products-table tbody td:last-child {
+  border-right: none;
 }
 
 .products-table .cell-icon {
-  font-size: 22px;
   text-align: center;
+  width: 50px;
+  color: #475569;
+}
+
+.cell-icon__img {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
 }
 
 .products-table .cell-name {
   font-weight: 600;
   color: #0f172a;
+  white-space: nowrap;
 }
 
 .products-table .cell-description {
@@ -468,30 +483,40 @@
 
 .products-table .row-actions {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.products-table .row-actions .btn {
+  white-space: nowrap;
+  padding: 6px 10px;
+  font-size: 12px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .btn-setup-status {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
   cursor: pointer;
-  font-size: 15px;
-  transition: all 0.2s;
+  color: #475569;
+  transition: all 0.15s;
 }
 
 .btn-setup-status:hover {
-  background: #475569;
+  background: #334155;
   color: white;
-  border-color: #475569;
-  transform: scale(1.1);
+  border-color: #334155;
 }
 
 /* Пустая таблица */
@@ -523,7 +548,7 @@
 
 .template-card:hover {
   border-color: #64748b;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.12);
+  box-shadow: 0 4px 16px rgba(71, 85, 105, 0.12);
   transform: translateY(-2px);
 }
 
