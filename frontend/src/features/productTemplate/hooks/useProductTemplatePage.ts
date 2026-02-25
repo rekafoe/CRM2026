@@ -721,17 +721,30 @@ export default function useProductTemplatePage(productId: number | undefined): U
     [productId, state.test.params, dispatch]
   )
 
-  const summaryStats = useMemo(
-    () => [
+  const summaryStats = useMemo(() => {
+    const isSimplified = (product as any)?.calculator_type === 'simplified'
+    const base = [
       { label: 'ID продукта', value: productId || '—' },
       { label: 'Шаблон', value: templateConfigId ? 'Настроен' : '—' },
+    ]
+    if (isSimplified) {
+      const sizes = state.simplified?.sizes || []
+      const types = state.simplified?.types || []
+      return [
+        ...base,
+        { label: 'Размеров', value: sizes.length },
+        { label: 'Типов', value: types.length },
+        { label: 'Материалы', value: materials.length || sizes.reduce((s, sz) => s + (sz.allowed_material_ids?.length || 0), 0) },
+      ]
+    }
+    return [
+      ...base,
       { label: 'Материалы', value: materials.length },
       { label: 'Отделка', value: state.finishing.length },
       { label: 'Упаковка', value: state.packaging.length },
-      { label: 'Правила цены', value: state.price_rules.length }
-    ],
-    [productId, templateConfigId, materials.length, state.finishing.length, state.packaging.length, state.price_rules.length]
-  )
+      { label: 'Правила цены', value: state.price_rules.length },
+    ]
+  }, [productId, product, templateConfigId, materials.length, state.finishing.length, state.packaging.length, state.price_rules.length, state.simplified])
 
   const quickTestMaterials = useMemo((): ProductMaterialLink[] => {
     if (materials?.length) return materials

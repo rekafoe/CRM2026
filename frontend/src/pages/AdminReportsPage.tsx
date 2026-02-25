@@ -1,6 +1,4 @@
-// Переход на рефакторингованную архитектуру
-// Старый компонент заменен на модульную структуру в features/adminReports
-
+import React from 'react';
 import { AdminReportsPage as RefactoredAdminReportsPage } from '../features/adminReports';
 
 interface AdminReportsPageProps {

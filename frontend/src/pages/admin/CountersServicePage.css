@@ -1,0 +1,439 @@
+/* =============================================
+   Счётчики касс и принтеров — CountersServicePage
+   Стиль согласован с ProductManagement / EarningsAdminPage
+   ============================================= */
+
+.cnt-page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+  animation: cntFadeIn 0.3s ease-out;
+}
+
+@keyframes cntFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* =================================
+   Header
+   ================================= */
+.cnt-page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px 24px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.cnt-page__header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.cnt-page__title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cnt-page__icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: #f1f5f9;
+  border-radius: 12px;
+  flex-shrink: 0;
+  border: 2px solid #e2e8f0;
+}
+
+.cnt-page__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.cnt-page__subtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.cnt-page__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.cnt-date-input {
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  background: #f8fafc;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.cnt-date-input:focus {
+  outline: none;
+  border-color: #64748b;
+  box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.1);
+  background: #fff;
+}
+
+/* =================================
+   Error
+   ================================= */
+.cnt-page__error {
+  padding: 14px 20px;
+  margin-bottom: 24px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* =================================
+   Stats
+   ================================= */
+.cnt-page__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.cnt-stat-card {
+  background: #fff;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.cnt-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: #475569;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.cnt-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.cnt-stat-card:hover::before {
+  opacity: 1;
+}
+
+.cnt-stat-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.cnt-stat-card__label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cnt-stat-card__icon-box {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.cnt-stat-card__value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+  line-height: 1;
+}
+
+.cnt-stat-card__trend {
+  font-size: 12px;
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.cnt-stat-card__trend--neutral {
+  color: #64748b;
+}
+
+/* =================================
+   Grid (two columns)
+   ================================= */
+.cnt-page__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* =================================
+   Card
+   ================================= */
+.cnt-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.cnt-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cnt-card__header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cnt-card__badge {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 10px;
+  margin-left: auto;
+}
+
+.cnt-card__badge--green {
+  background: #f1f5f9;
+  color: #16a34a;
+}
+
+.cnt-card__loading {
+  padding: 48px 24px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.cnt-card__empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+/* =================================
+   Table
+   ================================= */
+.cnt-table-wrapper {
+  overflow-x: auto;
+}
+
+.cnt-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.cnt-table thead {
+  background: #475569;
+}
+
+.cnt-table thead th {
+  padding: 14px 18px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: white;
+  position: relative;
+  white-space: nowrap;
+}
+
+.cnt-table thead th::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.cnt-table thead th:last-child::after {
+  display: none;
+}
+
+.cnt-table tbody tr {
+  transition: background 0.15s;
+}
+
+.cnt-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.cnt-table tbody td {
+  padding: 12px 18px;
+  font-size: 13px;
+  color: #334155;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cnt-cell-name {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.cnt-diff {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.cnt-diff--positive {
+  color: #059669;
+  background: #ecfdf5;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+/* =================================
+   Cash list
+   ================================= */
+.cnt-cash-list {
+  padding: 8px 0;
+}
+
+.cnt-cash-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.15s;
+}
+
+.cnt-cash-item:last-child {
+  border-bottom: none;
+}
+
+.cnt-cash-item:hover {
+  background: #f8fafc;
+}
+
+.cnt-cash-item__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cnt-cash-item__avatar {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+.cnt-cash-item__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.cnt-cash-item__amount {
+  font-size: 14px;
+  font-weight: 700;
+  color: #059669;
+}
+
+/* =================================
+   Responsive
+   ================================= */
+@media (max-width: 1100px) {
+  .cnt-page__stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cnt-page__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .cnt-page {
+    padding: 16px 12px 32px;
+  }
+
+  .cnt-page__header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px 18px;
+  }
+
+  .cnt-page__header-actions {
+    width: 100%;
+  }
+
+  .cnt-date-input {
+    width: 100%;
+  }
+
+  .cnt-page__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .cnt-table thead th,
+  .cnt-table tbody td {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cnt-page__title {
+    font-size: 18px;
+  }
+
+  .cnt-stat-card__value {
+    font-size: 24px;
+  }
+}

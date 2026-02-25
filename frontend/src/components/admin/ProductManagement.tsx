@@ -8,6 +8,7 @@ import {
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import { useUIStore } from '../../stores/uiStore';
 import { Button, StatusBadge, LoadingState } from '../common';
+import { AppIcon } from '../ui/AppIcon';
 import { ProductCreateModal } from './ProductCreateModal';
 import { ProductSetupStatus } from './ProductSetupStatus';
 import { Modal } from '../common/Modal';
@@ -219,7 +220,7 @@ const ProductManagement: React.FC = () => {
             ← Назад
           </Button>
           <div className="product-management__title-row">
-            <span className="product-management__icon">🧩</span>
+            <AppIcon name="puzzle" size="lg" circle />
             <div>
               <h1 className="product-management__title">Управление продуктами</h1>
               <p className="product-management__subtitle">Создание и настройка продуктов, категорий и параметров</p>
@@ -228,10 +229,10 @@ const ProductManagement: React.FC = () => {
         </div>
         <div className="product-management__header-actions">
           <Button variant="secondary" size="sm" onClick={() => setShowCategoryModal(true)}>
-            📂 Категории
+            <AppIcon name="folder" size="xs" /> Категории
           </Button>
           <Button variant="primary" size="sm" onClick={() => openCreateWizard(false)}>
-            ➕ Создать продукт
+            <AppIcon name="plus" size="xs" /> Создать продукт
           </Button>
         </div>
       </div>
@@ -241,7 +242,7 @@ const ProductManagement: React.FC = () => {
         <div className="product-stat-card">
           <div className="product-stat-card__header">
             <span className="product-stat-card__label">Всего продуктов</span>
-            <span className="product-stat-card__icon">📦</span>
+            <span className="product-stat-card__icon"><AppIcon name="package" size="sm" /></span>
           </div>
           <div className="product-stat-card__value">{stats.total}</div>
           <div className="product-stat-card__trend product-stat-card__trend--neutral">
@@ -252,7 +253,7 @@ const ProductManagement: React.FC = () => {
         <div className="product-stat-card">
           <div className="product-stat-card__header">
             <span className="product-stat-card__label">Активных</span>
-            <span className="product-stat-card__icon">✅</span>
+            <span className="product-stat-card__icon"><AppIcon name="check" size="sm" /></span>
           </div>
           <div className="product-stat-card__value">{stats.active}</div>
           <div className="product-stat-card__trend">
@@ -263,7 +264,7 @@ const ProductManagement: React.FC = () => {
         <div className="product-stat-card">
           <div className="product-stat-card__header">
             <span className="product-stat-card__label">Неактивных</span>
-            <span className="product-stat-card__icon">⏸️</span>
+            <span className="product-stat-card__icon"><AppIcon name="ban" size="sm" /></span>
           </div>
           <div className="product-stat-card__value">{stats.inactive}</div>
           <div className="product-stat-card__trend product-stat-card__trend--negative">
@@ -274,7 +275,7 @@ const ProductManagement: React.FC = () => {
         <div className="product-stat-card">
           <div className="product-stat-card__header">
             <span className="product-stat-card__label">Категорий</span>
-            <span className="product-stat-card__icon">📂</span>
+            <span className="product-stat-card__icon"><AppIcon name="folder" size="sm" /></span>
           </div>
           <div className="product-stat-card__value">{categories.length}</div>
           <div className="product-stat-card__trend product-stat-card__trend--neutral">
@@ -288,7 +289,7 @@ const ProductManagement: React.FC = () => {
         <div className="product-controls__main-row">
           <div className="product-controls__search-row">
             <div className="product-controls__search">
-              <span className="product-controls__search-icon">🔍</span>
+              <span className="product-controls__search-icon"><AppIcon name="search" size="xs" /></span>
               <input
                 className="product-controls__search-input"
                 placeholder="Поиск по названию или описанию..."
@@ -325,7 +326,7 @@ const ProductManagement: React.FC = () => {
             className={`product-filter-chip ${!state.selectedCategoryId ? 'product-filter-chip--active' : ''}`}
             onClick={() => setSelectedCategoryId(null)}
           >
-            <span>📦</span>
+            <AppIcon name="package" size="xs" />
             <span>Все</span>
             <span className="product-filter-chip__count">{products.length}</span>
           </button>
@@ -353,10 +354,10 @@ const ProductManagement: React.FC = () => {
             <span className="bulk-count">Выбрано: {state.selectedProducts.size}</span>
             <div className="flex gap-2">
               <Button size="sm" variant="success" onClick={handleBulkActivate}>
-                ✅ Активировать
+                <AppIcon name="check" size="xs" /> Активировать
               </Button>
               <Button size="sm" variant="warning" onClick={handleBulkDeactivate}>
-                ⛔ Деактивировать
+                <AppIcon name="ban" size="xs" /> Деактивировать
               </Button>
               <Button size="sm" variant="secondary" onClick={clearSelectedProducts}>
                 Отменить выбор
@@ -404,7 +405,7 @@ const ProductManagement: React.FC = () => {
                         onChange={() => toggleProductSelection(product.id)}
                       />
                     </td>
-                    <td className="cell-icon">{product.icon || '📦'}</td>
+                    <td className="cell-icon">{product.icon || <AppIcon name="package" size="xs" />}</td>
                     <td className="cell-name">{product.name}</td>
                     <td>{getCategoryById(product.category_id)?.name || '—'}</td>
                     <td>
@@ -420,20 +421,20 @@ const ProductManagement: React.FC = () => {
                         onClick={() => setSetupStatusModal(product.id)}
                         title="Проверить статус настройки"
                       >
-                        🔧
+                        <AppIcon name="wrench" size="xs" />
                       </button>
                     </td>
                     <td className="cell-description">{product.description}</td>
                     <td>
                       <div className="row-actions">
                         <Button size="sm" variant="secondary" onClick={() => navigate(`/adminpanel/products/${product.id}/edit`)}>
-                          📋 Инфо
+                          <AppIcon name="clipboard" size="xs" /> Инфо
                         </Button>
                         <Button size="sm" variant="secondary" onClick={() => navigate(`/adminpanel/products/${product.id}/template`)}>
-                          ✏️ Шаблон
+                          <AppIcon name="edit" size="xs" /> Шаблон
                         </Button>
                         <Button size="sm" variant="secondary" onClick={() => navigate(`/adminpanel/products/${product.id}/tech-process`)}>
-                          ⚙️ Процесс
+                          <AppIcon name="cog" size="xs" /> Процесс
                         </Button>
                         <Button
                           size="sm"
@@ -441,7 +442,7 @@ const ProductManagement: React.FC = () => {
                           onClick={() => toggleProductActive(product)}
                           loading={directoryLoading.toggleProduct}
                         >
-                          {product.is_active ? '⛔ Выкл' : '✅ Вкл'}
+                          {product.is_active ? <><AppIcon name="ban" size="xs" /> Выкл</> : <><AppIcon name="check" size="xs" /> Вкл</>}
                         </Button>
                         <Button
                           size="sm"

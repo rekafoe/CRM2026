@@ -1,0 +1,558 @@
+/* =============================================
+   Проценты сотрудников — EarningsAdminPage
+   Стиль согласован с ProductManagement / ProductEditPage
+   ============================================= */
+
+.earn-admin {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+  animation: earnFadeIn 0.3s ease-out;
+}
+
+@keyframes earnFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* =================================
+   Header
+   ================================= */
+.earn-admin__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px 24px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.earn-admin__header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.earn-admin__title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.earn-admin__icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: #f1f5f9;
+  border-radius: 12px;
+  flex-shrink: 0;
+  border: 2px solid #e2e8f0;
+}
+
+.earn-admin__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.earn-admin__subtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.earn-admin__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* =================================
+   Stats
+   ================================= */
+.earn-admin__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.earn-stat-card {
+  background: #fff;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.earn-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: #475569;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.earn-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.earn-stat-card:hover::before {
+  opacity: 1;
+}
+
+.earn-stat-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.earn-stat-card__label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.earn-stat-card__icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.earn-stat-card__value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+  line-height: 1;
+}
+
+.earn-stat-card__trend {
+  font-size: 12px;
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.earn-stat-card__trend--neutral {
+  color: #64748b;
+}
+
+/* =================================
+   Filters
+   ================================= */
+.earn-admin__filters {
+  background: #fff;
+  padding: 20px 24px;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  margin-bottom: 24px;
+}
+
+.earn-admin__filters-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.earn-filter-input {
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  background: #f8fafc;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  min-width: 160px;
+}
+
+.earn-filter-input:focus {
+  outline: none;
+  border-color: #64748b;
+  box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.1);
+  background: #fff;
+}
+
+.earn-filter-input--compact {
+  padding: 6px 10px;
+  font-size: 12px;
+  min-width: 80px;
+}
+
+.earn-filter-select {
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  min-width: 180px;
+}
+
+.earn-filter-select:focus {
+  outline: none;
+  border-color: #64748b;
+  box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.1);
+}
+
+/* =================================
+   Tabs
+   ================================= */
+.earn-admin__tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.earn-tab {
+  flex: 1;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.earn-tab:hover {
+  color: #334155;
+  background: #f8fafc;
+}
+
+.earn-tab--active {
+  background: #475569;
+  color: white;
+  box-shadow: 0 2px 8px rgba(71, 85, 105, 0.15);
+}
+
+.earn-tab--active:hover {
+  background: #334155;
+  color: white;
+}
+
+/* =================================
+   Card
+   ================================= */
+.earn-admin__card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.earn-admin__card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.earn-admin__card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.earn-admin__card-badge {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+/* =================================
+   Table
+   ================================= */
+.earn-table-wrapper {
+  overflow-x: auto;
+}
+
+.earn-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.earn-table thead {
+  background: #475569;
+}
+
+.earn-table thead th {
+  padding: 14px 18px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: white;
+  position: relative;
+  white-space: nowrap;
+}
+
+.earn-table thead th::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.earn-table thead th:last-child::after {
+  display: none;
+}
+
+.earn-table tbody tr {
+  transition: background 0.15s;
+}
+
+.earn-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.earn-table tbody td {
+  padding: 12px 18px;
+  font-size: 13px;
+  color: #334155;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.earn-cell-name {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.earn-cell-money {
+  font-weight: 600;
+  color: #059669;
+}
+
+.earn-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* =================================
+   Analytics
+   ================================= */
+.earn-analytics {
+  padding: 20px 24px;
+}
+
+.earn-analytics__controls {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.earn-trend-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  min-width: 220px;
+}
+
+.earn-trend-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.earn-trend-badge--up {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.earn-trend-badge--down {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.earn-trend-badge--neutral {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.earn-trend-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.earn-trend-pct {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.earn-trend-period {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+/* =================================
+   Chart
+   ================================= */
+.earn-chart {
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fafbfc;
+  margin-bottom: 16px;
+}
+
+.earn-chart__svg {
+  width: 100%;
+  height: 140px;
+}
+
+.earn-chart__line {
+  fill: none;
+  stroke: #475569;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.earn-chart__dot {
+  fill: #475569;
+  stroke: #fff;
+  stroke-width: 1;
+}
+
+.earn-chart__labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* =================================
+   Shift form (modal)
+   ================================= */
+.earn-shift-form {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+/* =================================
+   Responsive
+   ================================= */
+@media (max-width: 1100px) {
+  .earn-admin__stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .earn-admin {
+    padding: 16px 12px 32px;
+  }
+
+  .earn-admin__header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px 18px;
+  }
+
+  .earn-admin__header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .earn-admin__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .earn-admin__filters {
+    padding: 16px;
+  }
+
+  .earn-admin__filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .earn-filter-input,
+  .earn-filter-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .earn-table thead th,
+  .earn-table tbody td {
+    padding: 10px 12px;
+  }
+
+  .earn-analytics__controls {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .earn-admin__title {
+    font-size: 18px;
+  }
+
+  .earn-stat-card__value {
+    font-size: 24px;
+  }
+
+  .earn-admin__tabs {
+    flex-direction: column;
+  }
+}

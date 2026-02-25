@@ -1,0 +1,60 @@
+/* AppIcon — dark circle style icons */
+
+.app-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.app-icon__svg {
+  display: block;
+}
+
+/* Circle variant — dark background */
+.app-icon--circle {
+  background: #1e293b;
+  border-radius: 50%;
+  border: 1.5px solid #334155;
+  color: #94a3b8;
+  transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+}
+
+.app-icon--circle:hover {
+  border-color: #475569;
+  color: #cbd5e0;
+  box-shadow: 0 0 12px rgba(148, 163, 184, 0.08);
+}
+
+/* Sizes for circle variant */
+.app-icon--circle.app-icon--xs {
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+}
+
+.app-icon--circle.app-icon--sm {
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+}
+
+.app-icon--circle.app-icon--md {
+  width: 42px;
+  height: 42px;
+  padding: 10px;
+}
+
+.app-icon--circle.app-icon--lg {
+  width: 50px;
+  height: 50px;
+  padding: 12px;
+}
+
+.app-icon--circle.app-icon--xl {
+  width: 58px;
+  height: 58px;
+  padding: 14px;
+}

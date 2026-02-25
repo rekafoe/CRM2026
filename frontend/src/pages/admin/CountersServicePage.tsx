@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '../../components/common';
+import { AppIcon } from '../../components/ui/AppIcon';
 import { api, getUsers } from '../../api';
 import { parseNumberFlexible } from '../../utils/numberInput';
-import '../../styles/admin-counters.css';
+import './CountersServicePage.css';
 
 interface PrinterCounter {
   id: number;
@@ -20,6 +22,7 @@ interface CashContribution {
 }
 
 export const CountersServicePage: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +30,7 @@ export const CountersServicePage: React.FC = () => {
   const [cashContributions, setCashContributions] = useState<CashContribution[]>([]);
   const [cashTotal, setCashTotal] = useState(0);
   const [users, setUsers] = useState<Array<{ id: number; name: string }>>([]);
+
   const previousDateLabel = useMemo(() => {
     const base = new Date(selectedDate);
     if (Number.isNaN(base.getTime())) return 'вчера';
@@ -100,94 +104,155 @@ export const CountersServicePage: React.FC = () => {
     loadData();
   }, [selectedDate, users]);
 
-  const hasCashContributions = cashContributions.length > 0;
   const sortedCounters = useMemo(
     () => [...printerCounters].sort((a, b) => a.name.localeCompare(b.name)),
     [printerCounters]
   );
 
+  const totalDifference = useMemo(
+    () => sortedCounters.reduce((s, c) => s + (c.difference ?? 0), 0),
+    [sortedCounters]
+  );
+
   return (
-    <AdminPageLayout
-      title="Счётчики касс и принтеров"
-      icon="🧾"
-      onBack={() => window.history.back()}
-      className="admin-counters-page"
-    >
-      <div className="admin-counters-controls">
-        <label>
-          Дата:
+    <div className="cnt-page">
+      {/* Header */}
+      <div className="cnt-page__header">
+        <div className="cnt-page__header-left">
+          <Button variant="secondary" size="sm" onClick={() => navigate('/adminpanel')}>
+            ← Назад
+          </Button>
+          <div className="cnt-page__title-row">
+            <AppIcon name="receipt" size="lg" circle />
+            <div>
+              <h1 className="cnt-page__title">Счётчики касс и принтеров</h1>
+              <p className="cnt-page__subtitle">Дневная статистика печати и кассовых операций</p>
+            </div>
+          </div>
+        </div>
+        <div className="cnt-page__header-actions">
           <input
             type="date"
+            className="cnt-date-input"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
           />
-        </label>
+        </div>
       </div>
 
-      {error && <div className="admin-counters-error">{error}</div>}
+      {error && <div className="cnt-page__error">{error}</div>}
 
-      <div className="admin-counters-grid">
-        <section className="admin-counters-card">
-          <h3>🖨️ Принтеры</h3>
+      {/* Stats */}
+      <div className="cnt-page__stats">
+        <div className="cnt-stat-card">
+          <div className="cnt-stat-card__header">
+            <span className="cnt-stat-card__label">Принтеров</span>
+            <span className="cnt-stat-card__icon-box"><AppIcon name="printer" size="sm" /></span>
+          </div>
+          <div className="cnt-stat-card__value">{sortedCounters.length}</div>
+          <div className="cnt-stat-card__trend cnt-stat-card__trend--neutral">С данными за день</div>
+        </div>
+        <div className="cnt-stat-card">
+          <div className="cnt-stat-card__header">
+            <span className="cnt-stat-card__label">Общая разница</span>
+            <span className="cnt-stat-card__icon-box"><AppIcon name="chart" size="sm" /></span>
+          </div>
+          <div className="cnt-stat-card__value">{totalDifference}</div>
+          <div className="cnt-stat-card__trend">Отпечатков за день</div>
+        </div>
+        <div className="cnt-stat-card">
+          <div className="cnt-stat-card__header">
+            <span className="cnt-stat-card__label">Касса за день</span>
+            <span className="cnt-stat-card__icon-box"><AppIcon name="card" size="sm" /></span>
+          </div>
+          <div className="cnt-stat-card__value">{cashTotal.toFixed(0)}</div>
+          <div className="cnt-stat-card__trend">BYN</div>
+        </div>
+        <div className="cnt-stat-card">
+          <div className="cnt-stat-card__header">
+            <span className="cnt-stat-card__label">Участников кассы</span>
+            <span className="cnt-stat-card__icon-box"><AppIcon name="users" size="sm" /></span>
+          </div>
+          <div className="cnt-stat-card__value">{cashContributions.length}</div>
+          <div className="cnt-stat-card__trend cnt-stat-card__trend--neutral">За {selectedDate}</div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="cnt-page__grid">
+        {/* Printers */}
+        <div className="cnt-card">
+          <div className="cnt-card__header">
+            <h3><AppIcon name="printer" size="xs" /> Принтеры</h3>
+            <span className="cnt-card__badge">{sortedCounters.length}</span>
+          </div>
           {loading ? (
-            <div className="admin-counters-loading">Загрузка...</div>
+            <div className="cnt-card__loading">Загрузка...</div>
           ) : (
-            <table className="admin-counters-table">
-              <thead>
-                <tr>
-                  <th>Принтер</th>
-                  <th>Счётчик вчера ({previousDateLabel})</th>
-                  <th>Счётчик сегодня ({selectedDate})</th>
-                  <th>Разница</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedCounters.map((counter) => (
-                  <tr key={counter.id}>
-                    <td>{counter.name}</td>
-                    <td>{counter.prev_value ?? '—'}</td>
-                    <td>{counter.value ?? '—'}</td>
-                    <td>{counter.difference ?? '—'}</td>
-                  </tr>
-                ))}
-                {sortedCounters.length === 0 && (
+            <div className="cnt-table-wrapper">
+              <table className="cnt-table">
+                <thead>
                   <tr>
-                    <td colSpan={4} className="admin-counters-empty">
-                      Нет данных по принтерам
-                    </td>
+                    <th>Принтер</th>
+                    <th>Вчера ({previousDateLabel})</th>
+                    <th>Сегодня ({selectedDate})</th>
+                    <th>Разница</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {sortedCounters.map((counter) => (
+                    <tr key={counter.id}>
+                      <td className="cnt-cell-name">{counter.name}</td>
+                      <td>{counter.prev_value ?? '—'}</td>
+                      <td>{counter.value ?? '—'}</td>
+                      <td>
+                        {counter.difference != null ? (
+                          <span className={`cnt-diff ${counter.difference > 0 ? 'cnt-diff--positive' : ''}`}>
+                            {counter.difference > 0 ? '+' : ''}{counter.difference}
+                          </span>
+                        ) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                  {sortedCounters.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+                        Нет данных по принтерам
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
-        </section>
+        </div>
 
-        <section className="admin-counters-card">
-          <h3>💳 Касса</h3>
+        {/* Cash */}
+        <div className="cnt-card">
+          <div className="cnt-card__header">
+            <h3><AppIcon name="card" size="xs" /> Касса</h3>
+            <span className="cnt-card__badge cnt-card__badge--green">{cashTotal.toFixed(2)} BYN</span>
+          </div>
           {loading ? (
-            <div className="admin-counters-loading">Загрузка...</div>
+            <div className="cnt-card__loading">Загрузка...</div>
+          ) : cashContributions.length > 0 ? (
+            <div className="cnt-cash-list">
+              {cashContributions.map((entry) => (
+                <div key={entry.user_id} className="cnt-cash-item">
+                  <div className="cnt-cash-item__user">
+                    <span className="cnt-cash-item__avatar"><AppIcon name="user" size="xs" /></span>
+                    <span className="cnt-cash-item__name">{entry.user_name}</span>
+                  </div>
+                  <span className="cnt-cash-item__amount">{entry.amount.toFixed(2)} BYN</span>
+                </div>
+              ))}
+            </div>
           ) : (
-            <>
-              <div className="admin-counters-cash-total">
-                Итого за день: <strong>{cashTotal.toFixed(2)} BYN</strong>
-              </div>
-              <div className="admin-counters-cash-list">
-                {hasCashContributions ? (
-                  cashContributions.map((entry) => (
-                    <div key={entry.user_id} className="admin-counters-cash-item">
-                      <span>{entry.user_name}</span>
-                      <span>{entry.amount.toFixed(2)} BYN</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="admin-counters-empty">Нет участников кассы за день</div>
-                )}
-              </div>
-            </>
+            <div className="cnt-card__empty">Нет участников кассы за день</div>
           )}
-        </section>
+        </div>
       </div>
-    </AdminPageLayout>
+    </div>
   );
 };
 

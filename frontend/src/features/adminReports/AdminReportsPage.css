@@ -1,296 +1,356 @@
-/* AdminReportsPage.css — в одном стиле с модалкой калькулятора (белая карточка, кант, скругления) */
+/* =============================================
+   Страница аналитики — AdminReportsPage
+   Серая палитра, без градиентов
+   ============================================= */
 
-/* Страница = белая карточка как блок основных параметров (тот же стиль, что и модалка калькулятора) */
 .reports-page {
-  padding: 24px;
-  max-width: 1200px;
-  margin: 20px auto;
-  background: white;
-  border: 2px solid #f1f5f9;
-  border-radius: 20px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  min-height: 0;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+  animation: rptFadeIn 0.3s ease-out;
 }
 
+@keyframes rptFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* =================================
+   Header
+   ================================= */
 .reports-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #f1f5f9;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px 24px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .reports-header-left {
   display: flex;
   align-items: center;
   gap: 16px;
+  min-width: 0;
 }
 
-.reports-back-btn {
-  padding: 10px 16px;
-  background: white;
-  border: 2px solid #e2e8f0;
+.reports-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reports-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: #f1f5f9;
   border-radius: 12px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1a202c;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.reports-back-btn:hover {
-  border-color: #cbd5e0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+  border: 2px solid #e2e8f0;
 }
 
 .reports-header-title {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
-  color: #1a202c;
-  letter-spacing: 0.025em;
+  color: #0f172a;
+  line-height: 1.2;
 }
 
 .reports-header-description {
-  margin: 6px 0 0 0;
-  font-size: 14px;
+  margin: 2px 0 0;
+  font-size: 13px;
   color: #64748b;
 }
 
 .reports-header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
-.reports-user-info {
-  font-size: 14px;
-  color: #64748b;
-}
-
-.reports-action-btn {
-  padding: 10px 16px;
-  background: white;
-  color: #1a202c;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.reports-action-btn:hover {
-  border-color: #667eea;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
-}
-
-.reports-export-btn {
-  background: var(--accent-primary, #667eea);
-  color: white;
-  border-color: var(--accent-primary, #667eea);
-}
-
-.reports-export-btn:hover {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
-}
-
-/* Статистика — карточки в стиле модалки */
+/* =================================
+   Stats
+   ================================= */
 .reports-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
 
 .reports-stat-card {
+  background: #fff;
   padding: 20px;
-  background: white;
-  border: 2px solid #f1f5f9;
   border-radius: 16px;
-  text-align: center;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.reports-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: #475569;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 
 .reports-stat-card:hover {
-  border-color: #e2e8f0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 }
 
-.reports-stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1a202c;
-  margin-bottom: 4px;
+.reports-stat-card:hover::before {
+  opacity: 1;
 }
 
-.reports-stat-label {
-  font-size: 14px;
+.reports-stat-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.reports-stat-card__label {
+  font-size: 12px;
+  color: #64748b;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reports-stat-card__icon-box {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.reports-stat-card__value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+  line-height: 1;
+}
+
+.reports-stat-card__trend {
+  font-size: 12px;
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.reports-stat-card__trend--neutral {
   color: #64748b;
 }
 
-/* Вкладки — в стиле модалки */
-.reports-tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #f1f5f9;
-}
-
-.reports-tab-btn {
-  padding: 10px 16px;
-  background: white;
-  color: #1a202c;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-
-.reports-tab-btn:hover {
-  border-color: #cbd5e0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.reports-tab-btn--active {
-  background: var(--accent-primary, #667eea);
-  color: white;
-  border-color: var(--accent-primary, #667eea);
-}
-
-.reports-tab-btn--active:hover {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
-}
-
-/* Фильтры — блок как секция в модалке */
+/* =================================
+   Filters
+   ================================= */
 .reports-filters {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-  padding: 16px 20px;
-  background: white;
-  border: 2px solid #f1f5f9;
+  background: #fff;
+  padding: 20px 24px;
   border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
+  margin-bottom: 24px;
+}
+
+.reports-filters__row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
   flex-wrap: wrap;
 }
 
 .reports-filter-group {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .reports-filter-label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
-  color: #1a202c;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .reports-filter-input {
   padding: 10px 14px;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  min-width: 150px;
-  font-size: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
   background: #f8fafc;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  min-width: 140px;
 }
 
 .reports-filter-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #64748b;
+  box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.1);
+  background: #fff;
 }
 
-.reports-filter-date {
+.reports-filter-dates {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reports-filter-sep {
+  color: #94a3b8;
+}
+
+.reports-filter-reset {
   padding: 10px 14px;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 13px;
+  cursor: pointer;
+  color: #475569;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.reports-filter-reset:hover {
+  background: #f1f5f9;
+}
+
+/* =================================
+   Tabs
+   ================================= */
+.reports-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.reports-tab-btn {
+  flex: 1;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.reports-tab-btn:hover {
+  color: #334155;
   background: #f8fafc;
 }
 
-.reports-update-btn {
-  padding: 10px 18px;
-  background: var(--accent-primary, #667eea);
+.reports-tab-btn--active {
+  background: #475569;
   color: white;
-  border: 2px solid var(--accent-primary, #667eea);
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(71, 85, 105, 0.15);
+}
+
+.reports-tab-btn--active:hover {
+  background: #334155;
+  color: white;
+}
+
+/* =================================
+   Content
+   ================================= */
+.reports-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.reports-empty {
+  text-align: center;
+  padding: 64px 24px;
+  color: #94a3b8;
   font-size: 14px;
-  opacity: 1;
-  transition: box-shadow 0.2s ease;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.reports-update-btn:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
-}
-
-.reports-update-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Блоки аналитики — карточки с кантом как в модалке */
+/* =================================
+   Chart & Metric cards (used by sub-components)
+   ================================= */
 .reports-chart {
-  background: white;
-  border: 2px solid #f1f5f9;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 20px;
-  overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: box-shadow 0.2s;
 }
 
 .reports-chart:hover {
-  border-color: #e2e8f0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .reports-chart-title {
-  margin: 0 0 12px 0;
+  margin: 0 0 12px;
   font-size: 16px;
   font-weight: 700;
-  color: #1a202c;
+  color: #0f172a;
   padding-bottom: 8px;
-  border-bottom: 2px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .reports-metrics {
-  background: white;
-  border: 2px solid #f1f5f9;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 20px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: box-shadow 0.2s;
 }
 
 .reports-metrics:hover {
-  border-color: #e2e8f0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .reports-metrics-title {
-  margin: 0 0 12px 0;
+  margin: 0 0 12px;
   font-size: 16px;
   font-weight: 700;
-  color: #1a202c;
+  color: #0f172a;
   padding-bottom: 8px;
-  border-bottom: 2px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .reports-metrics-grid {
@@ -301,21 +361,21 @@
 
 .reports-metric {
   background: #f8fafc;
-  border: 2px solid #f1f5f9;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 14px;
   text-align: center;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s;
 }
 
 .reports-metric:hover {
-  border-color: #e2e8f0;
+  border-color: #cbd5e0;
 }
 
 .reports-metric-value {
   font-size: 18px;
   font-weight: 700;
-  color: var(--accent-primary, #667eea);
+  color: #0f172a;
   margin-bottom: 4px;
 }
 
@@ -326,18 +386,18 @@
   line-height: 1.3;
 }
 
-/* Элементы списков и воронок */
+/* Product / Status items */
 .reports-product-item {
   padding: 16px 20px;
-  background: white;
-  border: 2px solid #f1f5f9;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   margin-bottom: 12px;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s;
 }
 
 .reports-product-item:hover {
-  border-color: #e2e8f0;
+  border-color: #cbd5e0;
 }
 
 .reports-status-funnel {
@@ -366,12 +426,12 @@
   background: #f1f5f9;
   border-radius: 8px;
   position: relative;
-  border: 2px solid #e2e8f0;
+  border: 1px solid #e2e8f0;
 }
 
 .reports-status-fill {
   height: 100%;
-  border-radius: 6px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -381,13 +441,14 @@
 }
 
 .reports-status-fill.completed {
-  background: var(--accent-primary, #667eea);
+  background: #475569;
 }
 
 .reports-status-fill.cancelled {
   background: #dc3545;
 }
 
+/* Hourly chart */
 .reports-hourly-chart {
   height: 200px;
   display: flex;
@@ -404,7 +465,7 @@
 }
 
 .reports-hourly-value {
-  background: var(--accent-primary, #667eea);
+  background: #475569;
   border-radius: 4px 4px 0 0;
   min-height: 4px;
   margin-bottom: 4px;
@@ -428,27 +489,79 @@
 
 .reports-time-period-card {
   padding: 20px;
-  background: white;
-  border: 2px solid #f1f5f9;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   text-align: center;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: box-shadow 0.2s;
 }
 
 .reports-time-period-card:hover {
-  border-color: #e2e8f0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .reports-time-period-count {
   font-size: 24px;
   font-weight: 700;
   margin-bottom: 8px;
-  color: #1a202c;
+  color: #0f172a;
 }
 
 .reports-time-period-label {
   font-size: 12px;
   font-weight: 600;
   color: #64748b;
+}
+
+/* =================================
+   Responsive
+   ================================= */
+@media (max-width: 1100px) {
+  .reports-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .reports-page {
+    padding: 16px 12px 32px;
+  }
+
+  .reports-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px 18px;
+  }
+
+  .reports-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .reports-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .reports-filters {
+    padding: 16px;
+  }
+
+  .reports-filters__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reports-tabs {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .reports-header-title {
+    font-size: 18px;
+  }
+
+  .reports-stat-card__value {
+    font-size: 24px;
+  }
 }

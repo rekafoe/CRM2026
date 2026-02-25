@@ -1,6 +1,5 @@
-// Основной компонент страницы аналитики отчетов
-
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAnalytics } from './hooks/useAnalytics';
 import { ProductAnalytics } from './components/ProductAnalytics';
 import { FinancialAnalytics } from './components/FinancialAnalytics';
@@ -10,6 +9,8 @@ import { MaterialsAnalytics } from './components/MaterialsAnalytics';
 import { TimeAnalytics } from './components/TimeAnalytics';
 import { AnalyticsTab } from './types';
 import { getDepartments, type Department } from '../../api';
+import { Button } from '../../components/common';
+import { AppIcon } from '../../components/ui/AppIcon';
 
 import './AdminReportsPage.css';
 
@@ -18,6 +19,7 @@ interface AdminReportsPageProps {
 }
 
 export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) => {
+  const navigate = useNavigate();
   const {
     productData,
     financialData,
@@ -81,111 +83,87 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
     loadAnalytics(activeTab, { period }, departmentId);
   };
 
+  const handleExportJSON = () => {
+    const data = { productData, financialData, orderStatusData, managerData, materialsData, timeData };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <>
-      {/* Основной контент страницы */}
-      <div className="reports-page">
-        <div className="reports-header">
-          <div className="reports-header-left">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="reports-back-btn"
-              >
-                ← Назад к заказам
-              </button>
-            )}
+    <div className="reports-page">
+      {/* Header */}
+      <div className="reports-header">
+        <div className="reports-header-left">
+          <Button variant="secondary" size="sm" onClick={onBack || (() => navigate('/adminpanel'))}>
+            ← Назад
+          </Button>
+          <div className="reports-title-row">
+            <AppIcon name="chart-bar" size="lg" circle />
             <div>
-              <h1 className="reports-header-title">
-                🛡️ Админ-панель: Расширенная аналитика
-              </h1>
-              <p className="reports-header-description">
-                Комплексная аналитика бизнеса: продукты, финансы, менеджеры, материалы, время
-              </p>
+              <h1 className="reports-header-title">Расширенная аналитика</h1>
+              <p className="reports-header-description">Продукты, финансы, менеджеры, материалы, время</p>
             </div>
-          </div>
-          <div className="reports-header-actions">
-            <div className="reports-user-info">
-              Аналитика за период
-            </div>
-            <button
-              onClick={() => window.print()}
-              className="reports-action-btn"
-              title="Распечатать аналитику"
-            >
-              🖨️ Печать
-            </button>
-            <button
-              onClick={() => {
-                const data = { productData, financialData, orderStatusData, managerData, materialsData, timeData };
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `analytics-${new Date().toISOString().split('T')[0]}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-              className="reports-action-btn reports-export-btn"
-              title="Экспортировать данные аналитики"
-            >
-              💾 Экспорт JSON
-            </button>
           </div>
         </div>
-
-        {/* Статистика */}
-        <div className="reports-stats">
-          <div className="reports-stat-card">
-            <div className="reports-stat-value">
-              {totalStats.totalOrders}
-            </div>
-            <div className="reports-stat-label">Всего заказов</div>
-          </div>
-          <div className="reports-stat-card">
-            <div className="reports-stat-value">
-              {totalStats.totalRevenue.toLocaleString('ru-RU')} BYN
-            </div>
-            <div className="reports-stat-label">Общая выручка</div>
-          </div>
-          <div className="reports-stat-card">
-            <div className="reports-stat-value">
-              {totalStats.uniqueUsers}
-            </div>
-            <div className="reports-stat-label">Активных менеджеров</div>
-          </div>
-          <div className="reports-stat-card">
-            <div className="reports-stat-value">
-              {totalStats.reportsCount}
-            </div>
-            <div className="reports-stat-label">Продуктов в анализе</div>
-          </div>
+        <div className="reports-header-actions">
+          <Button variant="secondary" size="sm" onClick={() => window.print()}>
+            <AppIcon name="printer" size="xs" /> Печать
+          </Button>
+          <Button variant="secondary" size="sm" onClick={handleExportJSON}>
+            <AppIcon name="download" size="xs" /> Экспорт
+          </Button>
+          <Button variant="primary" size="sm" onClick={refreshAnalytics} disabled={isLoading}>
+            {isLoading ? 'Загрузка…' : <><AppIcon name="refresh" size="xs" /> Обновить</>}
+          </Button>
         </div>
+      </div>
 
-        {/* Вкладки аналитики */}
-        <div className="reports-tabs">
-          {[
-            { key: 'overview', label: '📊 Обзор', icon: '📊' },
-            { key: 'managers', label: '👥 Менеджеры', icon: '👥' },
-            { key: 'materials', label: '📦 Материалы', icon: '📦' },
-            { key: 'time', label: '🕐 Время', icon: '🕐' }
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => handleTabChange(tab.key as AnalyticsTab)}
-              className={`reports-tab-btn ${activeTab === tab.key ? 'reports-tab-btn--active' : ''}`}
-            >
-              {tab.icon} {tab.label}
-            </button>
-          ))}
+      {/* Stats */}
+      <div className="reports-stats">
+        <div className="reports-stat-card">
+          <div className="reports-stat-card__header">
+            <span className="reports-stat-card__label">Всего заказов</span>
+            <span className="reports-stat-card__icon-box"><AppIcon name="clipboard" size="sm" /></span>
+          </div>
+          <div className="reports-stat-card__value">{totalStats.totalOrders}</div>
+          <div className="reports-stat-card__trend">За выбранный период</div>
         </div>
+        <div className="reports-stat-card">
+          <div className="reports-stat-card__header">
+            <span className="reports-stat-card__label">Общая выручка</span>
+            <span className="reports-stat-card__icon-box"><AppIcon name="money" size="sm" /></span>
+          </div>
+          <div className="reports-stat-card__value">{totalStats.totalRevenue.toLocaleString('ru-RU')}</div>
+          <div className="reports-stat-card__trend">BYN</div>
+        </div>
+        <div className="reports-stat-card">
+          <div className="reports-stat-card__header">
+            <span className="reports-stat-card__label">Менеджеров</span>
+            <span className="reports-stat-card__icon-box"><AppIcon name="users" size="sm" /></span>
+          </div>
+          <div className="reports-stat-card__value">{totalStats.uniqueUsers}</div>
+          <div className="reports-stat-card__trend reports-stat-card__trend--neutral">Активных</div>
+        </div>
+        <div className="reports-stat-card">
+          <div className="reports-stat-card__header">
+            <span className="reports-stat-card__label">Продуктов</span>
+            <span className="reports-stat-card__icon-box"><AppIcon name="package" size="sm" /></span>
+          </div>
+          <div className="reports-stat-card__value">{totalStats.reportsCount}</div>
+          <div className="reports-stat-card__trend reports-stat-card__trend--neutral">В анализе</div>
+        </div>
+      </div>
 
-        {/* Выбор периода и департамента для аналитики */}
-        <div className="reports-filters" style={{ marginBottom: '20px' }}>
-          <div>
-            <label className="reports-filter-label">
-              Период (дни):
-            </label>
+      {/* Filters */}
+      <div className="reports-filters">
+        <div className="reports-filters__row">
+          <div className="reports-filter-group">
+            <label className="reports-filter-label">Период</label>
             <select
               value={period}
               onChange={(e) => handlePeriodChange(Number(e.target.value))}
@@ -198,43 +176,31 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               <option value={90}>90 дней</option>
             </select>
           </div>
-          <div>
-            <label className="reports-filter-label">
-              Диапазон дат:
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div className="reports-filter-group">
+            <label className="reports-filter-label">Диапазон дат</label>
+            <div className="reports-filter-dates">
               <input
                 type="date"
                 value={dateFrom ?? ''}
                 onChange={(e) => handleDateRangeChange(e.target.value, dateTo ?? '')}
                 className="reports-filter-input"
-                style={{ minWidth: '140px' }}
               />
-              <span style={{ color: 'var(--text-secondary)' }}>—</span>
+              <span className="reports-filter-sep">—</span>
               <input
                 type="date"
                 value={dateTo ?? ''}
                 onChange={(e) => handleDateRangeChange(dateFrom ?? '', e.target.value)}
                 className="reports-filter-input"
-                style={{ minWidth: '140px' }}
               />
               {(dateFrom || dateTo) && (
-                <button
-                  type="button"
-                  onClick={clearDateRange}
-                  className="reports-filter-input"
-                  style={{ padding: '8px 12px', cursor: 'pointer' }}
-                  title="Сбросить диапазон"
-                >
+                <button type="button" onClick={clearDateRange} className="reports-filter-reset">
                   Сбросить
                 </button>
               )}
             </div>
           </div>
-          <div>
-            <label className="reports-filter-label">
-              Департамент (менеджеры):
-            </label>
+          <div className="reports-filter-group">
+            <label className="reports-filter-label">Департамент</label>
             <select
               value={departmentId ?? ''}
               onChange={(e) => handleDepartmentChange(e.target.value === '' ? '' : Number(e.target.value))}
@@ -246,66 +212,62 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               ))}
             </select>
           </div>
-          <div>
-            <button
-              onClick={refreshAnalytics}
-              disabled={isLoading}
-              className="reports-update-btn"
-            >
-              {isLoading ? '⏳ Загрузка...' : '🔄 Обновить'}
-            </button>
-          </div>
         </div>
-
-        {/* Контент аналитики */}
-        {hasData ? (
-          <>
-            {/* Обзор - показываем все основные метрики */}
-            {activeTab === 'overview' && (
-              <>
-                {productData && <ProductAnalytics data={productData} />}
-                {financialData && <FinancialAnalytics data={financialData} />}
-                {orderStatusData && <OrderStatusAnalytics data={orderStatusData} />}
-              </>
-            )}
-
-            {/* Специфические вкладки */}
-            {activeTab === 'managers' && managerData && (
-              <ManagerAnalytics data={managerData} />
-            )}
-
-            {activeTab === 'materials' && (
-              materialsData ? (
-                <MaterialsAnalytics data={materialsData} />
-              ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                  {isLoading ? 'Загрузка данных по материалам...' : (
-                    <>
-                      Не удалось загрузить отчёт по материалам.
-                      <br />
-                      <button
-                        type="button"
-                        onClick={refreshAnalytics}
-                        style={{ marginTop: 12, padding: '8px 16px', cursor: 'pointer' }}
-                      >
-                        Повторить загрузку
-                      </button>
-                    </>
-                  )}
-                </div>
-              )
-            )}
-
-            {activeTab === 'time' && timeData && (
-              <TimeAnalytics data={timeData} />
-            )}
-          </>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-            {isLoading ? 'Загрузка данных аналитики...' : 'Нет данных для отображения'}
-          </div>
-        )}
       </div>
-    </>
+
+      {/* Tabs */}
+      <div className="reports-tabs">
+        {[
+          { key: 'overview', label: 'Обзор', iconName: 'chart' as const },
+          { key: 'managers', label: 'Менеджеры', iconName: 'users' as const },
+          { key: 'materials', label: 'Материалы', iconName: 'package' as const },
+          { key: 'time', label: 'Время', iconName: 'clock' as const }
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => handleTabChange(tab.key as AnalyticsTab)}
+            className={`reports-tab-btn ${activeTab === tab.key ? 'reports-tab-btn--active' : ''}`}
+          >
+            <AppIcon name={tab.iconName} size="xs" /> {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      {hasData ? (
+        <div className="reports-content">
+          {activeTab === 'overview' && (
+            <>
+              {productData && <ProductAnalytics data={productData} />}
+              {financialData && <FinancialAnalytics data={financialData} />}
+              {orderStatusData && <OrderStatusAnalytics data={orderStatusData} />}
+            </>
+          )}
+          {activeTab === 'managers' && managerData && <ManagerAnalytics data={managerData} />}
+          {activeTab === 'materials' && (
+            materialsData ? (
+              <MaterialsAnalytics data={materialsData} />
+            ) : (
+              <div className="reports-empty">
+                {isLoading ? 'Загрузка данных по материалам...' : (
+                  <>
+                    Не удалось загрузить отчёт по материалам.
+                    <br />
+                    <button type="button" onClick={refreshAnalytics} className="reports-filter-reset" style={{ marginTop: 12 }}>
+                      Повторить загрузку
+                    </button>
+                  </>
+                )}
+              </div>
+            )
+          )}
+          {activeTab === 'time' && timeData && <TimeAnalytics data={timeData} />}
+        </div>
+      ) : (
+        <div className="reports-empty">
+          {isLoading ? 'Загрузка данных аналитики...' : 'Нет данных для отображения'}
+        </div>
+      )}
+    </div>
   );
 };
