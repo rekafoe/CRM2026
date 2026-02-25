@@ -35,36 +35,13 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   specs,
   updateSpecs,
 }) => {
-  // Получаем операции из схемы
+  // Получаем операции из схемы — показываем ВСЕ (включая обязательные),
+  // чтобы пользователь видел операции, включённые по умолчанию для подтипа (например, «биговка с фальцовкой»)
   const operations = useMemo(() => {
     if (!backendProductSchema?.operations || !Array.isArray(backendProductSchema.operations)) {
-      console.log('🔍 [OperationsSection] Нет операций в схеме', {
-        hasSchema: !!backendProductSchema,
-        operations: backendProductSchema?.operations,
-        isArray: Array.isArray(backendProductSchema?.operations)
-      });
       return [];
     }
-    
-    // Фильтруем операции: показываем все, которые НЕ обязательные
-    // (is_required !== true и !== 1)
-    const filtered = backendProductSchema.operations.filter((op: Operation) => {
-      const isRequired = op.is_required === true || op.is_required === 1;
-      return !isRequired; // Показываем только необязательные операции
-    });
-    
-    console.log('🔍 [OperationsSection] Операции после фильтрации', {
-      total: backendProductSchema.operations.length,
-      filtered: filtered.length,
-      operations: filtered.map((op: Operation) => ({
-        id: op.operation_id || op.id,
-        name: op.operation_name || op.name,
-        type: op.operation_type,
-        isRequired: op.is_required
-      }))
-    });
-    
-    return filtered;
+    return backendProductSchema.operations;
   }, [backendProductSchema?.operations]);
 
   // 🆕 Состояние для вариантов услуг (типы и подтипы)

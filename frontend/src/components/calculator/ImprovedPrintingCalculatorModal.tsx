@@ -186,14 +186,28 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     const firstSize = (targetSize ?? cfg?.sizes?.[0]) as SizeWithPrices | undefined;
     const autoQty = firstSize?.min_qty ?? firstSize?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
 
+    const opsSet = new Set<number>();
     const operationsFromInitial: Array<{ operationId: number; variantId?: number; subtype?: string }> = [];
     if (initial?.operations?.length) {
       for (const op of initial.operations) {
-        operationsFromInitial.push({
-          operationId: op.operation_id,
-          ...(op.variant_id != null ? { variantId: op.variant_id } : {}),
-          ...(op.subtype ? { subtype: op.subtype } : {}),
-        });
+        const opId = op.operation_id;
+        if (opId && !opsSet.has(opId)) {
+          opsSet.add(opId);
+          operationsFromInitial.push({
+            operationId: opId,
+            ...(op.variant_id != null ? { variantId: op.variant_id } : {}),
+            ...(op.subtype ? { subtype: op.subtype } : {}),
+          });
+        }
+      }
+    }
+    // Добавляем обязательные операции из схемы, если их ещё нет (чтобы галочки отображались)
+    const schemaOps = backendProductSchema?.operations || [];
+    for (const op of schemaOps) {
+      const opId = op.operation_id ?? op.id;
+      if (opId && (op.is_required === true || op.is_required === 1) && !opsSet.has(opId)) {
+        opsSet.add(opId);
+        operationsFromInitial.push({ operationId: opId });
       }
     }
 
@@ -214,7 +228,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       ...(initial?.sides_mode ? { sides: initial.sides_mode === 'single' ? 1 : 2 } : {}),
       selectedOperations: operationsFromInitial,
     }));
-  }, [simplified?.types, simplified?.typeConfigs, setSpecs]);
+  }, [simplified?.types, simplified?.typeConfigs, backendProductSchema?.operations, setSpecs]);
 
   useEffect(() => {
     if (!hasProductTypes) {
