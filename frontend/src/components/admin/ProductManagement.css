@@ -489,6 +489,12 @@
   font-size: 12px;
   min-width: 0;
   display: inline-flex;
+}
+
+.products-table .row-actions .row-actions__toggle-btn {
+  min-width: 72px;
+  width: 72px;
+  justify-content: center;
   align-items: center;
   gap: 4px;
 }

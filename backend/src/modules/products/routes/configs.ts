@@ -101,6 +101,35 @@ async function syncSimplifiedOperations(db: any, productId: number, configData: 
   }
 }
 
+/**
+ * @swagger
+ * /api/products/{productId}/configs:
+ *   get:
+ *     summary: Список конфигураций шаблона продукта
+ *     description: Конфигурации содержат config_data (в т.ч. simplified с types, typeConfigs, sizes)
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Массив конфигураций
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: integer }
+ *                   product_id: { type: integer }
+ *                   name: { type: string }
+ *                   config_data: { type: object }
+ *                   constraints: { type: object }
+ *                   is_active: { type: boolean }
+ */
 router.get('/:productId/configs', asyncHandler(async (req, res) => {
   const { productId } = req.params;
   const db = await ensureProductTemplateConfigsTable();
@@ -111,6 +140,33 @@ router.get('/:productId/configs', asyncHandler(async (req, res) => {
   res.json(rows.map(mapTemplateConfig));
 }));
 
+/**
+ * @swagger
+ * /api/products/{productId}/configs:
+ *   post:
+ *     summary: Создать конфигурацию шаблона (подтипы, схемы)
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string, default: template }
+ *               config_data:
+ *                 type: object
+ *                 description: "trim_size, simplified (sizes, types, typeConfigs)"
+ *               constraints: { type: object }
+ *               is_active: { type: boolean }
+ *     responses:
+ *       201: { description: Конфигурация создана }
+ */
 router.post('/:productId/configs', asyncHandler(async (req, res) => {
   const { productId } = req.params;
   const { name, config_data, constraints, is_active } = req.body || {};
@@ -143,6 +199,35 @@ router.post('/:productId/configs', asyncHandler(async (req, res) => {
   res.status(201).json(created ? mapTemplateConfig(created) : null);
 }));
 
+/**
+ * @swagger
+ * /api/products/{productId}/configs/{configId}:
+ *   put:
+ *     summary: Обновить конфигурацию шаблона
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: configId
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               config_data: { type: object }
+ *               constraints: { type: object }
+ *               is_active: { type: boolean }
+ *     responses:
+ *       200: { description: Конфигурация обновлена }
+ *       404: { description: Конфигурация не найдена }
+ */
 router.put('/:productId/configs/:configId', asyncHandler(async (req, res) => {
   const { productId, configId } = req.params;
   const { name, config_data, constraints, is_active } = req.body || {};
@@ -184,6 +269,25 @@ router.put('/:productId/configs/:configId', asyncHandler(async (req, res) => {
   res.json(mapTemplateConfig(updated));
 }));
 
+/**
+ * @swagger
+ * /api/products/{productId}/configs/{configId}:
+ *   delete:
+ *     summary: Удалить конфигурацию шаблона
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: configId
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: Конфигурация удалена }
+ *       404: { description: Конфигурация не найдена }
+ */
 router.delete('/:productId/configs/:configId', asyncHandler(async (req, res) => {
   const { productId, configId } = req.params;
   const db = await ensureProductTemplateConfigsTable();

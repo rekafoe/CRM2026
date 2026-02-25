@@ -18,19 +18,38 @@ const router = Router();
  * /api/products/{productId}/schema:
  *   get:
  *     summary: Схема продукта (калькулятор + каталог для сайта)
+ *     description: Возвращает fields, materials, operations, template (в т.ч. simplified с types и typeConfigs)
  *     tags: [Products, Website Catalog]
  *     parameters:
  *       - in: path
  *         name: productId
  *         required: true
- *         schema:
- *           type: integer
+ *         schema: { type: integer }
  *       - in: query
  *         name: compact
- *         required: false
- *         schema:
- *           type: boolean
+ *         schema: { type: string, enum: ['1', 'true', 'yes'] }
  *         description: Компактная схема без тяжёлых блоков (для каталога)
+ *     responses:
+ *       200:
+ *         description: Схема продукта
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     key: { type: string }
+ *                     name: { type: string }
+ *                     fields: { type: array }
+ *                     materials: { type: array }
+ *                     operations: { type: array }
+ *                     template: { type: object }
+ *                     constraints: { type: object }
+ *                 meta: { type: object }
+ *       404: { description: Продукт не найден }
  */
 router.get('/:productId/schema', async (req, res) => {
   try {

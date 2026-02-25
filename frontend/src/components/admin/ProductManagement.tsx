@@ -447,6 +447,7 @@ const ProductManagement: React.FC = () => {
                           variant={product.is_active ? 'warning' : 'success'}
                           onClick={() => toggleProductActive(product)}
                           loading={directoryLoading.toggleProduct}
+                          className="row-actions__toggle-btn"
                         >
                           {product.is_active ? <><AppIcon name="ban" size="xs" /> Выкл</> : <><AppIcon name="check" size="xs" /> Вкл</>}
                         </Button>

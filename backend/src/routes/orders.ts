@@ -569,9 +569,9 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   await db.run(updateSql, total, paymentId, id)
 
   // Всегда пишем debt_closed_events при выдаче (в т.ч. remainder=0), чтобы выдавший видел заказ во вкладке «Выданные заказы».
-  // Дата выдачи — локальная дата сервера (toISOString() даёт UTC и сдвигает день).
+  // Дата выдачи — UTC (как на фронте contextDate), чтобы заказы из Order Pool попадали в «Выданные заказы».
   const now = new Date()
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const today = now.toISOString().slice(0, 10)
   try {
     let hasIssuedBy = false
     try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }

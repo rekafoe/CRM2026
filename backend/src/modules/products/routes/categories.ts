@@ -16,15 +16,19 @@ const router = Router();
  *     parameters:
  *       - in: query
  *         name: activeOnly
- *         schema:
- *           type: string
- *           enum: [true, false]
+ *         schema: { type: string, enum: [true, false] }
  *       - in: query
  *         name: withMinPrice
- *         schema:
- *           type: string
- *           enum: ['1']
+ *         schema: { type: string, enum: ['1'] }
  *         description: "Добавить min_price — минимальная цена за 1 ед. среди всех продуктов категории"
+ *     responses:
+ *       200:
+ *         description: Массив категорий
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items: { $ref: '#/components/schemas/ProductCategory' }
  */
 router.get('/', async (req, res) => {
   try {
@@ -77,6 +81,29 @@ router.get('/', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/products/categories:
+ *   post:
+ *     summary: Создать категорию продуктов
+ *     tags: [Products]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name: { type: string, description: "Название категории" }
+ *               icon: { type: string, description: "Эмодзи или символ" }
+ *               description: { type: string }
+ *               sort_order: { type: integer }
+ *               image_url: { type: string, description: "URL изображения" }
+ *     responses:
+ *       200: { description: Категория создана }
+ *       500: { description: Ошибка сервера }
+ */
 router.post('/', async (req, res) => {
   try {
     const { name, icon, description, sort_order, image_url } = req.body;
@@ -105,6 +132,24 @@ router.post('/', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/products/categories/upload-image:
+ *   post:
+ *     summary: Загрузить изображение категории
+ *     tags: [Products]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image: { type: string, format: binary }
+ *     responses:
+ *       200: { description: URL загруженного файла }
+ *       400: { description: Файл не передан или неверный формат }
+ */
 router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
   try {
     const file = (req as any).file;
@@ -135,6 +180,33 @@ router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/products/categories/{id}:
+ *   put:
+ *     summary: Обновить категорию
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               icon: { type: string }
+ *               description: { type: string }
+ *               sort_order: { type: integer }
+ *               is_active: { type: boolean }
+ *               image_url: { type: string }
+ *     responses:
+ *       200: { description: Успешно }
+ *       500: { description: Ошибка сервера }
+ */
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;

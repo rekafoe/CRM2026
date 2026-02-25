@@ -16,6 +16,24 @@ import {
 
 const router = Router();
 
+/**
+ * @swagger
+ * /api/products/upload-image:
+ *   post:
+ *     summary: Загрузить изображение продукта
+ *     tags: [Products]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image: { type: string, format: binary }
+ *     responses:
+ *       200: { description: URL загруженного файла }
+ *       400: { description: Файл не передан или неверный формат }
+ */
 router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
   try {
     const file = (req as any).file;
@@ -45,8 +63,20 @@ router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
  * @swagger
  * /api/products/{productId}:
  *   get:
- *     summary: Продукт по ID
+ *     summary: Продукт по ID (с параметрами и услугами)
  *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Детали продукта
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Product' }
+ *       404: { description: Продукт не найден }
  */
 router.get('/:productId', async (req, res) => {
   try {
@@ -252,6 +282,34 @@ router.post('/setup', asyncHandler(async (req, res) => {
   }
 }));
 
+/**
+ * @swagger
+ * /api/products:
+ *   post:
+ *     summary: Создать продукт
+ *     tags: [Products]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               category_id: { type: integer, description: "ID категории" }
+ *               name: { type: string }
+ *               description: { type: string }
+ *               icon: { type: string }
+ *               image_url: { type: string }
+ *               calculator_type: { type: string, enum: [product, operation, simplified] }
+ *               product_type: { type: string, enum: [sheet_single, sheet_item, multi_page, universal] }
+ *               operator_percent: { type: number }
+ *               auto_attach_operations: { type: boolean }
+ *     responses:
+ *       200: { description: Продукт создан }
+ *       400: { description: Ошибка валидации }
+ *       500: { description: Ошибка сервера }
+ */
 router.post('/', async (req, res) => {
   try {
     const { category_id, name, description, icon, calculator_type, product_type, operator_percent, image_url } = req.body;
@@ -326,6 +384,38 @@ router.post('/', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/products/{id}:
+ *   put:
+ *     summary: Обновить продукт
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               category_id: { type: integer }
+ *               name: { type: string }
+ *               description: { type: string }
+ *               icon: { type: string }
+ *               image_url: { type: string }
+ *               is_active: { type: boolean }
+ *               product_type: { type: string }
+ *               calculator_type: { type: string }
+ *               print_settings: { type: object }
+ *               operator_percent: { type: number }
+ *     responses:
+ *       200: { description: Успешно }
+ *       400: { description: Нет полей для обновления }
+ *       500: { description: Ошибка сервера }
+ */
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -368,6 +458,21 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/products/{id}:
+ *   delete:
+ *     summary: Удалить продукт
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: Продукт удалён }
+ *       404: { description: Продукт не найден }
+ */
 router.delete('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
   const db = await getDb();

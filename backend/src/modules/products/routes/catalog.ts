@@ -29,6 +29,27 @@ router.get('/debug', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/products/parameter-presets:
+ *   get:
+ *     summary: Пресеты параметров по типу продукта
+ *     tags: [Products]
+ *     parameters:
+ *       - in: query
+ *         name: productType
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: productName
+ *         schema: { type: string }
+ *       - in: query
+ *         name: product_id
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: Массив пресетов }
+ *       400: { description: productType обязателен }
+ */
 router.get('/parameter-presets', asyncHandler(async (req, res) => {
   const { productType, productName } = req.query;
   if (!productType || typeof productType !== 'string') {
@@ -48,6 +69,27 @@ router.get('/parameter-presets', asyncHandler(async (req, res) => {
  *   get:
  *     summary: Список продуктов
  *     tags: [Products, Website Catalog]
+ *     parameters:
+ *       - in: query
+ *         name: activeOnly
+ *         schema: { type: string, enum: [true, false] }
+ *         description: Только активные продукты и категории
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Поиск по названию, описанию, категории
+ *       - in: query
+ *         name: withMinPrice
+ *         schema: { type: string, enum: ['1'] }
+ *         description: Добавить min_price для каждого продукта
+ *     responses:
+ *       200:
+ *         description: Массив продуктов
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items: { $ref: '#/components/schemas/Product' }
  */
 router.get('/', async (req, res) => {
   try {
@@ -117,6 +159,22 @@ router.get('/', async (req, res) => {
  *   get:
  *     summary: Продукты по категории
  *     tags: [Products, Website Catalog]
+ *     parameters:
+ *       - in: path
+ *         name: categoryId
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: activeOnly
+ *         schema: { type: string, enum: [true, false] }
+ *     responses:
+ *       200:
+ *         description: Массив продуктов категории
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items: { $ref: '#/components/schemas/Product' }
  */
 router.get('/category/:categoryId', async (req, res) => {
   try {
