@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Button, Alert, StatusBadge } from '../../../components/common';
+import { AppIcon, type IconName } from '../../../components/ui/AppIcon';
 import { ProductServiceLink } from '../../../services/products';
 import { PricingService } from '../../../types/pricing';
 
@@ -14,17 +15,15 @@ interface ServicesTabProps {
   onOpenAddModal: () => void;
 }
 
+const serviceIconMap: Record<string, IconName> = {
+  print: 'printer',
+  postprint: 'scissors',
+  other: 'cog',
+};
+
 const getServiceIcon = (type: string) => {
-  switch (type) {
-    case 'print':
-      return '🖨️';
-    case 'postprint':
-      return '✂️';
-    case 'other':
-      return '⚙️';
-    default:
-      return '📋';
-  }
+  const iconName = serviceIconMap[type] || 'clipboard';
+  return <AppIcon name={iconName} size="xs" />;
 };
 
 const getServiceTypeLabel = (type: string) => {

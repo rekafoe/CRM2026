@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Button, Alert, FormField } from '../../../components/common';
+import { AppIcon } from '../../../components/ui/AppIcon';
 import type { ProductCategory } from '../../../services/products';
 import { uploadProductImage } from '../../../services/products';
 
@@ -112,7 +113,7 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
                   <span className="product-image-upload__loading">Загрузка...</span>
                 ) : (
                   <>
-                    <span className="product-image-upload__icon">📷</span>
+                    <span className="product-image-upload__icon"><AppIcon name="camera" size="md" /></span>
                     <span>Нажмите для загрузки</span>
                     <span className="product-image-upload__hint">JPEG, PNG, WebP, GIF, SVG — до 5 МБ</span>
                   </>

@@ -25,6 +25,7 @@ import { SimplifiedTemplateSection, type ServiceRow } from './components/Simplif
 import { useSimplifiedTypes } from './hooks/useSimplifiedTypes';
 import { ProductTypesCard } from './components/ProductTypesCard';
 import { api } from '../../api';
+import { AppIcon } from '../../components/ui/AppIcon';
 
 
 const ProductTemplatePage: React.FC = () => {
@@ -197,7 +198,7 @@ const ProductTemplatePage: React.FC = () => {
   const notFound = !loading && !product;
 
   const pageTitle = state.meta.name || product?.name || 'Шаблон продукта';
-  const pageIcon = state.meta.icon || product?.icon || '📦';
+  const pageIcon = state.meta.icon || product?.icon || '';
 
   return (
     <AdminPageLayout
@@ -222,16 +223,16 @@ const ProductTemplatePage: React.FC = () => {
               fontSize: '12px',
               color: autoSaveStatus === 'saved' ? '#10b981' : autoSaveStatus === 'error' ? '#ef4444' : '#64748b'
             }}>
-              {autoSaveStatus === 'saving' && <span>💾 Сохранение...</span>}
-              {autoSaveStatus === 'saved' && <span>✅ Сохранено</span>}
-              {autoSaveStatus === 'error' && <span>⚠️ Ошибка сохранения</span>}
+              {autoSaveStatus === 'saving' && <span><AppIcon name="save" size="xs" /> Сохранение...</span>}
+              {autoSaveStatus === 'saved' && <span><AppIcon name="check" size="xs" /> Сохранено</span>}
+              {autoSaveStatus === 'error' && <span><AppIcon name="warning" size="xs" /> Ошибка сохранения</span>}
             </div>
           )}
           <Button
             variant="secondary"
             size="sm"
             onClick={() => setShowMetaModal(true)}
-            icon={<span style={{ marginRight: '4px' }}>✏️</span>}
+            icon={<span style={{ marginRight: '4px' }}><AppIcon name="edit" size="xs" /></span>}
           >
             Основные поля
           </Button>
@@ -266,7 +267,7 @@ const ProductTemplatePage: React.FC = () => {
         <div className="product-template__body product-template__body--simplified-with-sidebar">
           <aside className="product-template__sidebar">
             <div className="template-summary-card">
-              <div className="template-summary-card__icon">{state.meta.icon || product?.icon || '📦'}</div>
+              <div className="template-summary-card__icon">{state.meta.icon || product?.icon || <AppIcon name="package" size="md" />}</div>
               <div className="template-summary-card__name">{state.meta.name || product?.name || 'Без названия'}</div>
               <ul className="template-summary-card__list">
                 {summaryStats.map((item) => (
@@ -401,7 +402,7 @@ const ProductTemplatePage: React.FC = () => {
         <div className="product-template__body">
           <aside className="product-template__sidebar">
             <div className="template-summary-card">
-              <div className="template-summary-card__icon">{state.meta.icon || product?.icon || '📦'}</div>
+              <div className="template-summary-card__icon">{state.meta.icon || product?.icon || <AppIcon name="package" size="md" />}</div>
               <div className="template-summary-card__name">{state.meta.name || product?.name || 'Без названия'}</div>
               <ul className="template-summary-card__list">
                 {summaryStats.map((item) => (

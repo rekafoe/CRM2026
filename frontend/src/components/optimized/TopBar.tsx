@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logo } from '../Logo.tsx';
+import { AppIcon } from '../ui/AppIcon';
 import './TopBar.css';
 
 interface TopBarProps {
@@ -35,7 +36,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           title="Переключиться между страницами заказов" 
           aria-label="Переключиться между страницами заказов"
         >
-          📅 {contextDate} · 👤 {currentUserName}
+          <AppIcon name="calendar" size="xs" /> {contextDate} · <AppIcon name="user" size="xs" /> {currentUserName}
         </button>
       </div>
       <div className="topbar-actions">
@@ -45,7 +46,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           aria-label="Пул заказов" 
           className="app-icon-btn app-icon-btn--blue app-icon-btn--with-label"
         >
-          <span className="app-icon-btn__icon" aria-hidden="true">📋</span>
+          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="clipboard" size="sm" /></span>
           <span className="app-icon-btn__label">Пул заказов</span>
         </button>
         <button 
@@ -54,7 +55,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           aria-label="Счётчики принтеров и кассы" 
           className="app-icon-btn app-icon-btn--purple app-icon-btn--with-label"
         >
-          <span className="app-icon-btn__icon" aria-hidden="true">📊</span>
+          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="chart" size="sm" /></span>
           <span className="app-icon-btn__label">Счётчики</span>
         </button>
         <button
@@ -63,7 +64,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           aria-label="Мои проценты"
           className="app-icon-btn app-icon-btn--green app-icon-btn--with-label"
         >
-          <span className="app-icon-btn__icon" aria-hidden="true">💸</span>
+          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="money" size="sm" /></span>
           <span className="app-icon-btn__label">Мои проценты</span>
         </button>
         <button
@@ -72,7 +73,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           aria-label="Клиенты CRM"
           className="app-icon-btn app-icon-btn--with-label"
         >
-          <span className="app-icon-btn__icon" aria-hidden="true">👥</span>
+          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="users" size="sm" /></span>
           <span className="app-icon-btn__label">Клиенты</span>
         </button>
         {isAdmin && (
@@ -83,7 +84,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               aria-label="Аналитика и отчёты" 
               className="app-icon-btn app-icon-btn--with-label"
             >
-              <span className="app-icon-btn__icon" aria-hidden="true">📈</span>
+              <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="chart-up" size="sm" /></span>
               <span className="app-icon-btn__label">Отчёты</span>
             </button>
             <button 
@@ -92,11 +93,13 @@ export const TopBar: React.FC<TopBarProps> = ({
               aria-label="Админ панель" 
               className="app-icon-btn"
             >
-              ⚙️
+              <AppIcon name="settings" size="sm" />
             </button>
           </>
         )}
-        <button onClick={onLogout} title="Выйти" aria-label="Выйти" className="app-icon-btn">⎋</button>
+        <button onClick={onLogout} title="Выйти" aria-label="Выйти" className="app-icon-btn">
+          <AppIcon name="power" size="sm" />
+        </button>
       </div>
       
     </div>

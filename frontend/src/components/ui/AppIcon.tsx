@@ -21,7 +21,8 @@ export type IconName =
   | 'camera' | 'image'
   | 'scissors' | 'layers'
   | 'shield' | 'arrow-left'
-  | 'info' | 'warning';
+  | 'info' | 'warning'
+  | 'power';
 
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -87,6 +88,7 @@ const iconPaths: Record<IconName, string> = {
   'arrow-left': 'M19 12H5M12 19l-7-7 7-7',
   info: 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 16v-4M12 8h.01',
   warning: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01',
+  power: 'M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10',
 };
 
 export const AppIcon: React.FC<AppIconProps> = ({

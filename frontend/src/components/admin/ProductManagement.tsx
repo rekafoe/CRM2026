@@ -315,7 +315,7 @@ const ProductManagement: React.FC = () => {
               className={`product-controls__toggle ${state.showOnlyActive ? 'product-controls__toggle--active' : ''}`}
               onClick={() => setShowOnlyActive(!state.showOnlyActive)}
             >
-              <span>{state.showOnlyActive ? '✓' : '○'}</span>
+              <AppIcon name={state.showOnlyActive ? 'check' : 'ban'} size="xs" />
               <span>Только активные</span>
             </button>
           </div>
@@ -451,7 +451,7 @@ const ProductManagement: React.FC = () => {
                           loading={state.deletingProductId === product.id}
                           disabled={state.deletingProductId === product.id}
                         >
-                          🗑️
+                          <AppIcon name="trash" size="xs" />
                         </Button>
                       </div>
                     </td>

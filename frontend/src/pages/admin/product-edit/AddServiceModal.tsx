@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Modal, Button } from '../../../components/common';
+import { AppIcon, type IconName } from '../../../components/ui/AppIcon';
 import { PricingService } from '../../../types/pricing';
 
 interface AddServiceModalProps {
@@ -11,17 +12,15 @@ interface AddServiceModalProps {
   onAddService: (serviceId: number) => void;
 }
 
+const serviceIconMap: Record<string, IconName> = {
+  print: 'printer',
+  postprint: 'scissors',
+  other: 'cog',
+};
+
 const getServiceIcon = (type: string) => {
-  switch (type) {
-    case 'print':
-      return '🖨️';
-    case 'postprint':
-      return '✂️';
-    case 'other':
-      return '⚙️';
-    default:
-      return '📋';
-  }
+  const iconName = serviceIconMap[type] || 'clipboard';
+  return <AppIcon name={iconName} size="xs" />;
 };
 
 const getServiceTypeLabel = (type: string) => {

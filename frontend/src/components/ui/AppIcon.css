@@ -1,10 +1,10 @@
-/* AppIcon — dark circle style icons */
+/* AppIcon — styled SVG icons */
 
 .app-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: currentColor;
   flex-shrink: 0;
   line-height: 1;
 }
@@ -13,19 +13,19 @@
   display: block;
 }
 
-/* Circle variant — dark background */
+/* ---- Circle variant — dark background ---- */
 .app-icon--circle {
   background: #1e293b;
   border-radius: 50%;
   border: 1.5px solid #334155;
-  color: #94a3b8;
+  color: #e2e8f0;
   transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
 }
 
 .app-icon--circle:hover {
   border-color: #475569;
-  color: #cbd5e0;
-  box-shadow: 0 0 12px rgba(148, 163, 184, 0.08);
+  color: #f1f5f9;
+  box-shadow: 0 0 16px rgba(148, 163, 184, 0.12);
 }
 
 /* Sizes for circle variant */
@@ -57,4 +57,12 @@
   width: 58px;
   height: 58px;
   padding: 14px;
+}
+
+/* ---- Stat card icon boxes — contrasting standalone ---- */
+.reports-stat-card__icon-box .app-icon,
+.earn-stat-card__icon .app-icon,
+.cnt-stat-card__icon-box .app-icon,
+.product-stat-card__icon .app-icon {
+  color: #334155;
 }

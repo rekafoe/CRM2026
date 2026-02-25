@@ -8,6 +8,7 @@ import SystemFeaturesPanel from '../components/admin/SystemFeaturesPanel';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useMaterials } from '../api/hooks/useMaterials';
 import { useOrders } from '../api/hooks/useOrders';
+import { AppIcon } from '../components/ui/AppIcon';
 import '../styles/admin-panel.css';
 import '../components/notifications/NotificationsManager.css';
 import './NotificationsPage.css';
@@ -56,7 +57,7 @@ const NotificationsPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     <div className="notifications-page">
       <div className="page-header">
         <button onClick={onBack} className="back-btn">← Назад</button>
-        <h1>🔔 Управление уведомлениями</h1>
+        <h1><AppIcon name="bell" size="sm" /> Управление уведомлениями</h1>
       </div>
       <div className="page-content">
         <NotificationsManager onClose={onBack} />
@@ -94,7 +95,7 @@ const AdminPanelHome: React.FC = () => {
     return (
       <div className="admin-panel-home">
         <div className="admin-panel-header">
-          <h1>🛡️ Админ панель</h1>
+          <h1><AppIcon name="shield" size="sm" /> Админ панель</h1>
           <p>Загрузка...</p>
         </div>
       </div>
@@ -113,7 +114,7 @@ const AdminPanelHome: React.FC = () => {
             ← Назад
           </button>
           <div className="header-text">
-            <h1>🛡️ Админ панель</h1>
+            <h1><AppIcon name="shield" size="sm" /> Админ панель</h1>
             <p>Добро пожаловать в систему управления CRM</p>
           </div>
         </div>
@@ -124,43 +125,43 @@ const AdminPanelHome: React.FC = () => {
         <h3>Быстрая навигация:</h3>
         <div className="nav-buttons">
           <button onClick={() => navigate('/adminpanel/materials')} className="nav-btn">
-            📦 Материалы
+            <AppIcon name="package" size="xs" /> Материалы
           </button>
           <button onClick={() => navigate('/adminpanel/reports')} className="nav-btn">
-            📊 Отчеты
+            <AppIcon name="chart" size="xs" /> Отчеты
           </button>
           <button onClick={() => navigate('/adminpanel/products')} className="nav-btn">
-            🧩 Продукты калькулятора
+            <AppIcon name="puzzle" size="xs" /> Продукты калькулятора
           </button>
           <button onClick={() => navigate('/adminpanel/pricing')} className="nav-btn">
-            💰 Ценообразование
+            <AppIcon name="money" size="xs" /> Ценообразование
           </button>
           <button onClick={() => navigate('/adminpanel/earnings')} className="nav-btn">
-            💼 Проценты
+            <AppIcon name="briefcase" size="xs" /> Проценты
           </button>
           <button onClick={() => navigate('/adminpanel/printers')} className="nav-btn">
-            🖨️ Принтеры
+            <AppIcon name="printer" size="xs" /> Принтеры
           </button>
           <button onClick={() => navigate('/adminpanel/counters')} className="nav-btn">
-            🧾 Счётчики
+            <AppIcon name="receipt" size="xs" /> Счётчики
           </button>
           <button onClick={() => navigate('/adminpanel/services-management')} className="nav-btn">
-            🔧 Настройка операций
+            <AppIcon name="wrench" size="xs" /> Настройка операций
           </button>
           <button onClick={() => navigate('/adminpanel/clients')} className="nav-btn">
-            👥 Клиенты
+            <AppIcon name="users" size="xs" /> Клиенты
           </button>
           <button onClick={() => navigate('/adminpanel/document-templates')} className="nav-btn">
-            📋 Шаблоны документов
+            <AppIcon name="clipboard" size="xs" /> Шаблоны документов
           </button>
           <button onClick={() => navigate('/adminpanel/users')} className="nav-btn">
-            👥 Пользователи
+            <AppIcon name="users" size="xs" /> Пользователи
           </button>
           <button onClick={() => navigate('/adminpanel/settings')} className="nav-btn">
-            ⚙️ Настройки
+            <AppIcon name="settings" size="xs" /> Настройки
           </button>
           <button onClick={() => navigate('/adminpanel/notifications')} className="nav-btn">
-            🔔 Уведомления
+            <AppIcon name="bell" size="xs" /> Уведомления
           </button>
         </div>
       </div>
@@ -180,7 +181,7 @@ const AdminPanelHome: React.FC = () => {
               className="admin-link-card"
               onClick={() => navigate('/adminpanel/materials')}
             >
-              <span className="link-icon">📦</span>
+              <span className="link-icon"><AppIcon name="package" size="md" circle /></span>
               <span className="link-title">Материалы</span>
               <span className="link-desc">Полное управление материалами и складом</span>
             </button>
@@ -189,17 +190,16 @@ const AdminPanelHome: React.FC = () => {
               className="admin-link-card"
               onClick={() => navigate('/adminpanel/reports')}
             >
-              <span className="link-icon">📊</span>
+              <span className="link-icon"><AppIcon name="chart" size="md" circle /></span>
               <span className="link-title">Отчеты</span>
               <span className="link-desc">Аналитика и отчеты</span>
             </button>
             
-            {/* Ссылка устарела, ведем на продукты */}
             <button 
               className="admin-link-card"
               onClick={() => navigate('/adminpanel/products')}
             >
-              <span className="link-icon">🧮</span>
+              <span className="link-icon"><AppIcon name="puzzle" size="md" circle /></span>
               <span className="link-title">Калькулятор</span>
               <span className="link-desc">Настройки калькулятора</span>
             </button>
@@ -208,7 +208,7 @@ const AdminPanelHome: React.FC = () => {
               className="admin-link-card"
               onClick={() => navigate('/adminpanel/price-management')}
             >
-              <span className="link-icon">📈</span>
+              <span className="link-icon"><AppIcon name="chart-up" size="md" circle /></span>
               <span className="link-title">Управление ценами</span>
               <span className="link-desc">История цен, уведомления, пересчет</span>
             </button>
@@ -217,7 +217,7 @@ const AdminPanelHome: React.FC = () => {
               className="admin-link-card"
               onClick={() => navigate('/adminpanel/earnings')}
             >
-              <span className="link-icon">💼</span>
+              <span className="link-icon"><AppIcon name="briefcase" size="md" circle /></span>
               <span className="link-title">Проценты</span>
               <span className="link-desc">Начисления сотрудников и часы</span>
             </button>
@@ -226,7 +226,7 @@ const AdminPanelHome: React.FC = () => {
               className="admin-link-card"
               onClick={() => navigate('/adminpanel/notifications')}
             >
-              <span className="link-icon">🔔</span>
+              <span className="link-icon"><AppIcon name="bell" size="md" circle /></span>
               <span className="link-title">Уведомления</span>
               <span className="link-desc">Управление всеми уведомлениями системы</span>
             </button>
@@ -234,7 +234,7 @@ const AdminPanelHome: React.FC = () => {
               className="admin-link-card"
               onClick={() => navigate('/adminpanel/counters')}
             >
-              <span className="link-icon">🧾</span>
+              <span className="link-icon"><AppIcon name="receipt" size="md" circle /></span>
               <span className="link-title">Счётчики</span>
               <span className="link-desc">Касса и принтеры по дням</span>
             </button>
@@ -242,7 +242,7 @@ const AdminPanelHome: React.FC = () => {
               className="admin-link-card"
               onClick={() => navigate('/adminpanel/clients')}
             >
-              <span className="link-icon">👥</span>
+              <span className="link-icon"><AppIcon name="users" size="md" circle /></span>
               <span className="link-title">Клиенты</span>
               <span className="link-desc">База клиентов и история заказов</span>
             </button>

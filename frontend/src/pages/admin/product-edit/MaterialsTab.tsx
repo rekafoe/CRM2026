@@ -1,5 +1,6 @@
 import React from 'react';
 import { Alert } from '../../../components/common';
+import { AppIcon } from '../../../components/ui/AppIcon';
 
 interface MaterialsTabProps {
   materials: any[];
@@ -16,7 +17,7 @@ export const MaterialsTab: React.FC<MaterialsTabProps> = React.memo(({ materials
           {materials.map((m: any, idx: number) => (
             <div key={idx} className="product-material-card">
               <div className="product-material-card__header">
-                <div className="product-material-card__icon">📦</div>
+                <div className="product-material-card__icon"><AppIcon name="package" size="sm" /></div>
                 <div>
                   <div className="product-material-card__title">{m.material_name || m.name || 'Материал'}</div>
                   <div className="product-material-card__meta">{m.category_name || 'Категория не указана'}</div>
