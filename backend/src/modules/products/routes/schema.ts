@@ -10,6 +10,7 @@ import {
   loadPrintTechnologies,
   DEFAULT_COLOR_MODE_OPTIONS,
 } from './helpers';
+import { syncSimplifiedOperations } from './configs';
 
 const router = Router();
 
@@ -101,6 +102,15 @@ router.get('/:productId/schema', async (req, res) => {
             ? JSON.parse(templateConfig.config_data)
             : templateConfig.config_data;
           templateConfigData = normalizeConfigDataForPersistence(templateConfigData);
+          // Синхронизируем операции из typeConfigs (подтипы) в product_operations_link,
+          // чтобы операции «биговка с фальцовкой» и др. отображались в калькуляторе
+          if (templateConfigData?.simplified) {
+            try {
+              await syncSimplifiedOperations(db, Number(productId), templateConfigData);
+            } catch (syncErr) {
+              logger.warn('[schema] Ошибка синхронизации операций', { productId, error: (syncErr as Error).message });
+            }
+          }
         }
       }
     } catch (error) {

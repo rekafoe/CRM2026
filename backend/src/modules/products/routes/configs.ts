@@ -12,24 +12,41 @@ import {
 
 const router = Router();
 
-/** Синхронизирует операции из simplified.finishing в product_operations_link */
-async function syncSimplifiedOperations(db: any, productId: number, configData: any): Promise<void> {
-  if (!configData?.simplified?.sizes || !Array.isArray(configData.simplified.sizes)) {
+/** Собирает service_id из finishing размеров (экспорт для использования в schema) */
+export function collectServiceIdsFromSizes(sizes: any[]): Set<number> {
+  const serviceIds = new Set<number>();
+  if (!Array.isArray(sizes)) return serviceIds;
+  sizes.forEach((size: any) => {
+    if (Array.isArray(size.finishing)) {
+      size.finishing.forEach((finish: any) => {
+        if (finish.service_id && Number.isFinite(Number(finish.service_id))) {
+          serviceIds.add(Number(finish.service_id));
+        }
+      });
+    }
+  });
+  return serviceIds;
+}
+
+/** Синхронизирует операции из simplified (sizes и typeConfigs) в product_operations_link */
+export async function syncSimplifiedOperations(db: any, productId: number, configData: any): Promise<void> {
+  const simplified = configData?.simplified;
+  if (!simplified || typeof simplified !== 'object') {
     return;
   }
 
   try {
-    const simplified = configData.simplified;
     const serviceIds = new Set<number>();
-    simplified.sizes.forEach((size: any) => {
-      if (Array.isArray(size.finishing)) {
-        size.finishing.forEach((finish: any) => {
-          if (finish.service_id && Number.isFinite(Number(finish.service_id))) {
-            serviceIds.add(Number(finish.service_id));
-          }
-        });
+    // Корневые sizes (legacy / без типов)
+    const rootIds = collectServiceIdsFromSizes(simplified.sizes);
+    rootIds.forEach((id) => serviceIds.add(id));
+    // typeConfigs[typeId].sizes — для продуктов с подтипами (открытки со сложением и т.д.)
+    if (simplified.typeConfigs && typeof simplified.typeConfigs === 'object') {
+      for (const cfg of Object.values(simplified.typeConfigs) as any[]) {
+        const typeIds = collectServiceIdsFromSizes(cfg?.sizes);
+        typeIds.forEach((id) => serviceIds.add(id));
       }
-    });
+    }
 
     const serviceIdList = Array.from(serviceIds);
     logger.info('[syncSimplifiedOperations] Синхронизация операций', { productId, serviceIdsCount: serviceIds.size });
