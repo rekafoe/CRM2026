@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Button } from '../../../components/common'
-import type { SimplifiedConfig, ProductTypeVariant, ProductTypeId } from '../hooks/useProductTemplate'
+import type { SimplifiedConfig, SimplifiedTypeConfig, ProductTypeVariant, ProductTypeId, SubtypeInitialDefaults } from '../hooks/useProductTemplate'
 import './SimplifiedTemplateSection.css'
 
 const updateType = (
@@ -11,6 +11,19 @@ const updateType = (
   ...value,
   types: value.types!.map((x) => (x.id === typeId ? { ...x, ...patch } : x)),
 })
+
+const updateTypeConfig = (
+  value: SimplifiedConfig,
+  typeId: ProductTypeId,
+  patch: Partial<SimplifiedTypeConfig>
+): SimplifiedConfig => {
+  const key = String(typeId)
+  const prev = value.typeConfigs?.[key] ?? { sizes: [] }
+  return {
+    ...value,
+    typeConfigs: { ...value.typeConfigs, [key]: { ...prev, ...patch } },
+  }
+}
 
 /** Преобразует массив в текст (один пункт на строку) и обратно */
 const arrayToText = (arr: string[] | undefined): string =>
@@ -121,6 +134,18 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                         Контент для сайта
                       </div>
                       <div className="simplified-template__type-website-field">
+                        <label>Изображение (URL)</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={t.image_url ?? ''}
+                          onChange={(e) =>
+                            onChange(updateType(value, t.id, { image_url: e.target.value || undefined }))
+                          }
+                          placeholder="https://example.com/image.jpg"
+                        />
+                      </div>
+                      <div className="simplified-template__type-website-field">
                         <label>Краткое описание</label>
                         <input
                           type="text"
@@ -169,6 +194,66 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                         />
                       </div>
                     </div>
+                    {(() => {
+                      const cfg = value.typeConfigs?.[String(t.id)]
+                      const initial = cfg?.initial ?? {} as Partial<SubtypeInitialDefaults>
+                      const sizes = cfg?.sizes ?? []
+                      const updateInitial = (patch: Partial<SubtypeInitialDefaults>) => {
+                        const merged = { ...initial, ...patch }
+                        Object.keys(merged).forEach((k) => {
+                          if (merged[k as keyof SubtypeInitialDefaults] === undefined || merged[k as keyof SubtypeInitialDefaults] === '') {
+                            delete merged[k as keyof SubtypeInitialDefaults];
+                          }
+                        })
+                        onChange(updateTypeConfig(value, t.id, { initial: Object.keys(merged).length ? merged as SubtypeInitialDefaults : undefined }))
+                      }
+                      return (
+                        <div className="simplified-template__type-website-content">
+                          <div className="simplified-template__type-website-title">
+                            Начальные значения калькулятора (для сайта)
+                          </div>
+                          <div className="simplified-template__type-website-field">
+                            <label>Размер по умолчанию</label>
+                            <select
+                              className="form-input"
+                              value={initial.size_id ?? ''}
+                              onChange={(e) => updateInitial({ size_id: e.target.value || undefined })}
+                            >
+                              <option value="">Авто (первый размер)</option>
+                              {sizes.map((s: any) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.label || `${s.width_mm}×${s.height_mm}`}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="simplified-template__type-website-field">
+                            <label>Тираж по умолчанию</label>
+                            <input
+                              type="number"
+                              className="form-input"
+                              min={1}
+                              value={initial.quantity ?? ''}
+                              onChange={(e) => updateInitial({ quantity: e.target.value ? Number(e.target.value) : undefined })}
+                              placeholder="Авто (минимальный тираж)"
+                            />
+                          </div>
+                          <div className="simplified-template__type-website-field">
+                            <label>Сторонность по умолчанию</label>
+                            <select
+                              className="form-input"
+                              value={initial.sides_mode ?? ''}
+                              onChange={(e) => updateInitial({ sides_mode: (e.target.value || undefined) as SubtypeInitialDefaults['sides_mode'] })}
+                            >
+                              <option value="">Авто</option>
+                              <option value="single">Односторонняя</option>
+                              <option value="duplex">Двусторонняя</option>
+                              <option value="duplex_bw_back">Двусторонняя (ч/б оборот)</option>
+                            </select>
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>

@@ -6,6 +6,7 @@ import { updateProduct } from '../../services/products';
 import usePricingServices from '../../hooks/pricing/usePricingServices';
 import { useProductEditData } from './product-edit/useProductEditData';
 import { useProductServices } from './product-edit/useProductServices';
+import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import { InfoTab } from './product-edit/InfoTab';
 import { ServicesTab } from './product-edit/ServicesTab';
 import { MaterialsTab } from './product-edit/MaterialsTab';
@@ -28,6 +29,9 @@ const ProductEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const productId = useMemo(() => Number(id), [id]);
+
+  const categories = useProductDirectoryStore((s) => s.categories);
+  const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
 
   const [activeTab, setActiveTab] = useState<'info' | 'services' | 'materials' | 'print'>('info');
   const [savingPrintSettings, setSavingPrintSettings] = useState(false);
@@ -65,6 +69,8 @@ const ProductEditPage: React.FC = () => {
     [productServicesLinks]
   );
 
+  useEffect(() => { void initializeDirectory(); }, [initializeDirectory]);
+
   useEffect(() => {
     if (!product) return;
     setForm({
@@ -82,7 +88,7 @@ const ProductEditPage: React.FC = () => {
     if (!productId || !form.name) return;
     try {
       setSaving(true);
-      const { name, description, icon, calculator_type, product_type, operator_percent } = form;
+      const { name, description, icon, calculator_type, product_type, operator_percent, category_id } = form;
       const resolvedCalculatorType = product_type === 'multi_page' ? 'simplified' : calculator_type;
       const operatorPercentValue = operator_percent !== undefined && operator_percent !== ''
         ? Number(operator_percent)
@@ -93,6 +99,7 @@ const ProductEditPage: React.FC = () => {
         icon,
         calculator_type: resolvedCalculatorType,
         product_type,
+        category_id: category_id ?? null,
         ...(operatorPercentValue !== undefined && Number.isFinite(operatorPercentValue)
           ? { operator_percent: operatorPercentValue }
           : {}),
@@ -105,9 +112,13 @@ const ProductEditPage: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [productId, form.name, form.description, form.icon, form.calculator_type, form.product_type, form.operator_percent, reloadData]);
+  }, [productId, form.name, form.description, form.icon, form.calculator_type, form.product_type, form.operator_percent, form.category_id, reloadData]);
 
   const handleFormChange = useCallback((field: string, value: string) => {
+    if (field === 'category_id') {
+      setForm((prev) => ({ ...prev, category_id: value ? Number(value) : undefined }));
+      return;
+    }
     setForm((prev) => ({ ...prev, [field]: value }));
   }, []);
 
@@ -232,6 +243,7 @@ const ProductEditPage: React.FC = () => {
                 form={form}
                 product={product}
                 saving={saving}
+                categories={categories}
                 onFormChange={handleFormChange}
                 onSave={handleSaveProduct}
               />

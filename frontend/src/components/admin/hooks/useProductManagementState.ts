@@ -35,6 +35,7 @@ interface ProductManagementState {
   categoryForm: {
     name: string;
     icon: string;
+    image_url: string;
     description: string;
     sort_order: number;
   };
@@ -87,6 +88,7 @@ const initialState: ProductManagementState = {
   categoryForm: {
     name: '',
     icon: '',
+    image_url: '',
     description: '',
     sort_order: 0,
   },

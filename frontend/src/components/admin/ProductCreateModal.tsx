@@ -33,6 +33,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
   const [calculatorType, setCalculatorType] = useState<'product' | 'operation' | 'simplified'>('product');
   const [productType, setProductType] = useState<'sheet_single' | 'multi_page' | 'universal'>('sheet_single');
   const [operatorPercent, setOperatorPercent] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +47,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
       setCalculatorType('product');
       setProductType('sheet_single');
       setOperatorPercent('');
+      setImageUrl('');
       setError(null);
     }
   }, [visible, categories]);
@@ -71,6 +73,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
         name: name.trim(),
         description: description.trim() || undefined,
         icon: icon.trim() || undefined,
+        image_url: imageUrl.trim() || undefined,
         calculator_type: productType === 'multi_page' ? 'simplified' : calculatorType,
         product_type: productType,
         operator_percent: operatorPercent ? Number(operatorPercent) : undefined,
@@ -98,6 +101,7 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
       setCalculatorType('product');
     setProductType('sheet_single');
     setOperatorPercent('');
+    setImageUrl('');
     setError(null);
     onClose();
   };
@@ -146,6 +150,15 @@ export const ProductCreateModal: React.FC<ProductCreateModalProps> = ({
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Краткое описание продукта"
             rows={3}
+          />
+        </FormField>
+
+        <FormField label="Изображение (URL)" help="URL изображения продукта для сайта">
+          <input
+            className="form-input"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://example.com/image.jpg"
           />
         </FormField>
 

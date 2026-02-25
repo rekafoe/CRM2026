@@ -59,12 +59,23 @@ export type ProductTypeVariant = {
   characteristics?: string[];
   /** Преимущества (список) */
   advantages?: string[];
+  /** URL изображения подтипа для сайта */
+  image_url?: string;
+}
+
+/** Начальные значения калькулятора для подтипа (опционально; если поле не задано — авто-определение) */
+export type SubtypeInitialDefaults = {
+  size_id?: string;
+  quantity?: number;
+  material_id?: number;
+  sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
 }
 
 /** Конфиг одного типа: размеры и цены (печать, материалы, отделка) */
 export type SimplifiedTypeConfig = {
   sizes: SimplifiedSizeConfig[];
   pages?: SimplifiedPagesConfig;
+  initial?: SubtypeInitialDefaults;
 }
 
 /**

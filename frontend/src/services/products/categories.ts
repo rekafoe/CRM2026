@@ -34,12 +34,31 @@ export async function getProductCategories(force: boolean = false): Promise<Prod
 export async function createProductCategory(categoryData: {
   name: string;
   icon?: string;
+  image_url?: string;
   description?: string;
   sort_order?: number;
 }): Promise<{ id: number; name: string }> {
   const response = await api.post('/products/categories', categoryData);
   categoriesCache.clear(); // Инвалидируем кэш
   return (response.data as any)?.data || response.data;
+}
+
+/**
+ * Обновить категорию продукта
+ */
+export async function updateProductCategory(
+  id: number,
+  data: {
+    name: string;
+    icon?: string;
+    image_url?: string;
+    description?: string;
+    sort_order?: number;
+    is_active?: boolean;
+  }
+): Promise<void> {
+  await api.put(`/products/categories/${id}`, data);
+  categoriesCache.clear();
 }
 
 /**

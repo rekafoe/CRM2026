@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button, Alert, FormField } from '../../../components/common';
+import type { ProductCategory } from '../../../services/products';
 
 interface InfoTabProps {
   loading: boolean;
@@ -7,6 +8,7 @@ interface InfoTabProps {
     name: string;
     description?: string;
     icon?: string;
+    image_url?: string;
     calculator_type?: string;
     product_type?: string;
     category_id?: number;
@@ -14,6 +16,7 @@ interface InfoTabProps {
   };
   product: any;
   saving: boolean;
+  categories?: ProductCategory[];
   onFormChange: (field: string, value: string) => void;
   onSave: () => void;
 }
@@ -23,6 +26,7 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
   form,
   product,
   saving,
+  categories = [],
   onFormChange,
   onSave,
 }) => {
@@ -45,6 +49,14 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
             className="form-input form-input--full"
             value={form.icon || ''}
             onChange={(e) => onFormChange('icon', e.target.value)}
+          />
+        </FormField>
+        <FormField label="Изображение (URL)" help="URL изображения продукта для сайта">
+          <input
+            className="form-input form-input--full"
+            value={form.image_url || ''}
+            onChange={(e) => onFormChange('image_url', e.target.value)}
+            placeholder="https://example.com/image.jpg"
           />
         </FormField>
         <FormField label="Тип продукции" help="Влияет на процессы и расчёты">
@@ -70,8 +82,19 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
             <option value="simplified">simplified</option>
           </select>
         </FormField>
-        <FormField label="Категория" help="ID категории (только чтение)">
-          <input className="form-input" value={form.category_id ?? product?.category_id ?? ''} disabled />
+        <FormField label="Категория" help="Выберите категорию продукта">
+          <select
+            className="form-select"
+            value={form.category_id ?? product?.category_id ?? ''}
+            onChange={(e) => onFormChange('category_id', e.target.value)}
+          >
+            <option value="">— Без категории —</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+              </option>
+            ))}
+          </select>
         </FormField>
         <FormField label="Процент оператора" help="Процент от суммы позиции заказа">
           <input

@@ -14,6 +14,7 @@ import { clearProductsCache as _clearProductsCache } from './products';
 export {
   getProductCategories,
   createProductCategory,
+  updateProductCategory,
   clearCategoriesCache
 } from './categories';
 

@@ -7,6 +7,7 @@ export interface ProductCategory {
   name: string;
   icon?: string;
   description?: string;
+  image_url?: string;
   sort_order: number;
   is_active: boolean;
   created_at: string;

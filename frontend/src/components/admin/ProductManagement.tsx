@@ -2,7 +2,6 @@ import React, { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Product,
-  createProductCategory,
   deleteProduct,
   clearProductCache,
 } from '../../services/products';
@@ -13,11 +12,13 @@ import { ProductCreateModal } from './ProductCreateModal';
 import { ProductSetupStatus } from './ProductSetupStatus';
 import { Modal } from '../common/Modal';
 import { useProductManagementState } from './hooks/useProductManagementState';
+import { CategoryManagementModal } from './CategoryManagementModal';
 import { getAxiosErrorMessage } from '../../utils/errorUtils';
 import './ProductManagement.css';
 
 const ProductManagement: React.FC = () => {
   const navigate = useNavigate();
+  const [showCategoryModal, setShowCategoryModal] = React.useState(false);
   const categories = useProductDirectoryStore((state) => state.categories);
   const products = useProductDirectoryStore((state) => state.products);
   const directoryLoading = useProductDirectoryStore((state) => state.loading);
@@ -45,8 +46,6 @@ const ProductManagement: React.FC = () => {
     closeWizard,
     setSetupStatusModal,
     setDeletingProductId,
-    setCategoryForm,
-    resetCategoryForm,
     setProductForm,
     resetProductForm,
   } = useProductManagementState();
@@ -128,19 +127,6 @@ const ProductManagement: React.FC = () => {
     }
     clearSelectedProducts();
     showToast(`Деактивировано продуктов: ${state.selectedProducts.size}`, 'success');
-  };
-
-  const handleCreateCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await createProductCategory(state.categoryForm);
-      resetCategoryForm();
-      await fetchCategories(true);
-      showToast('Категория создана', 'success');
-    } catch (error) {
-      console.error('Error creating category:', error);
-      showToast('Ошибка создания категории', 'error');
-    }
   };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
@@ -323,6 +309,13 @@ const ProductManagement: React.FC = () => {
 
           {/* Действия */}
           <div className="product-controls__actions">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => setShowCategoryModal(true)}
+            >
+              📂 Категории
+            </Button>
             <Button
               variant="primary"
               size="md"
@@ -550,6 +543,14 @@ const ProductManagement: React.FC = () => {
           />
         </Modal>
       )}
+
+      {/* Управление категориями */}
+      <CategoryManagementModal
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        categories={categories}
+        onCategoriesChanged={() => fetchCategories(true)}
+      />
     </div>
   );
 };

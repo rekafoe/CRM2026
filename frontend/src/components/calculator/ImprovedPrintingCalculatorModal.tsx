@@ -14,7 +14,6 @@ import { ResultSection } from './components/ResultSection';
 import { DynamicFieldsSection } from './components/DynamicFieldsSection';
 import { useCalculatorUI } from './hooks/useCalculatorUI';
 import { AdvancedSettingsSection } from './components/AdvancedSettingsSection';
-import { SelectedProductCard } from './components/SelectedProductCard';
 import { DynamicProductSelector, CUSTOM_PRODUCT_ID, POSTPRINT_PRODUCT_ID } from './components/DynamicProductSelector';
 import { PrintingSettingsSection } from './components/PrintingSettingsSection';
 import { getProductionTimeLabel, getProductionDaysByPriceType, getProductionTimeLabelFromDays } from './utils/time';
@@ -26,22 +25,12 @@ import { useAutoCalculate } from './hooks/useAutoCalculate'; // 🆕 Автоп�
 import { getEnhancedProductTypes } from '../../api';
 import { buildParameterSummary, type BuildSummaryOptions } from './utils/summaryBuilder';
 import { CalculatorSections } from './components/CalculatorSections';
+import { CustomProductForm } from './components/CustomProductForm';
+import { PostprintServicesForm } from './components/PostprintServicesForm';
 import { usePostprintServices } from './hooks/usePostprintServices';
 import { useCustomProduct } from './hooks/useCustomProduct';
 import { useProductSelection } from './hooks/useProductSelection';
-
-/** Коэффициенты типа цены (как на бэкенде для заказов с сайта): 4 варианта + стандарт. */
-const PRICE_TYPE_MULTIPLIERS: Record<string, number> = {
-  standard: 1,
-  urgent: 1.5,
-  online: 0.85,
-  promo: 0.7,
-  special: 0.55,
-};
-
-function getPriceTypeMultiplier(priceType: string): number {
-  return PRICE_TYPE_MULTIPLIERS[priceType] ?? 1;
-}
+import { getPriceTypeMultiplier, buildOrderPayload, buildAITrainingData } from './utils/orderPayloadBuilder';
 
 const createInitialSpecs = (initialProductType?: string): ProductSpecs => ({
   productType: initialProductType || 'flyers',
@@ -182,6 +171,30 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const effectiveSizes = effectiveConfig.sizes;
   const effectivePagesOptions = effectiveConfig.pages?.options;
 
+  type SizeWithPrices = { id: string; width_mm: number; height_mm: number; min_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> };
+
+  const applyProductTypeConfig = useCallback((typeId: number | null) => {
+    if (typeId == null) return;
+    const typeVariant = simplified?.types?.find((t: any) => t.id === typeId);
+    const cfg = simplified?.typeConfigs?.[String(typeId)];
+    const initial = cfg?.initial;
+    const initialSizeId = initial?.size_id;
+    const targetSize = initialSizeId
+      ? cfg?.sizes?.find((s: any) => s.id === initialSizeId)
+      : cfg?.sizes?.[0];
+    const firstSize = (targetSize ?? cfg?.sizes?.[0]) as SizeWithPrices | undefined;
+    const autoQty = firstSize?.min_qty ?? firstSize?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
+    setSpecs((prev) => ({
+      ...prev,
+      typeId: typeId ?? undefined,
+      typeName: typeVariant?.name ?? undefined,
+      ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}` } : {}),
+      quantity: initial?.quantity ?? autoQty,
+      ...(initial?.material_id != null ? { material_id: initial.material_id } : {}),
+      ...(initial?.sides_mode ? { sides: initial.sides_mode === 'single' ? 1 : 2 } : {}),
+    }));
+  }, [simplified?.types, simplified?.typeConfigs, setSpecs]);
+
   useEffect(() => {
     if (!hasProductTypes) {
       if (selectedTypeId !== null) setSelectedTypeId(null);
@@ -191,34 +204,16 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     if (!valid) {
       const nextId = defaultTypeId ?? simplified?.types?.[0]?.id ?? null;
       setSelectedTypeId(nextId);
-      const typeVariant = simplified?.types?.find((t: any) => t.id === nextId);
-      const cfg = nextId != null ? simplified?.typeConfigs?.[String(nextId)] : null;
-      const firstSize = cfg?.sizes?.[0] as { id: string; width_mm: number; height_mm: number; min_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> } | undefined;
-      const minQty = firstSize?.min_qty ?? firstSize?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
-      setSpecs((prev) => ({
-        ...prev,
-        typeId: nextId ?? undefined,
-        typeName: typeVariant?.name ?? undefined,
-        ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}`, quantity: minQty } : {}),
-      }));
+      applyProductTypeConfig(nextId);
     }
-  }, [hasProductTypes, simplified?.types, simplified?.typeConfigs, defaultTypeId, selectedTypeId, setSpecs]);
+  }, [hasProductTypes, simplified?.types, simplified?.typeConfigs, defaultTypeId, selectedTypeId, applyProductTypeConfig]);
 
   const handleSelectProductType = useCallback(
     (typeId: number) => {
       setSelectedTypeId(typeId);
-      const typeVariant = simplified?.types?.find((t: any) => t.id === typeId);
-      const cfg = typeId != null ? simplified?.typeConfigs?.[String(typeId)] : null;
-      const firstSize = cfg?.sizes?.[0] as { id: string; width_mm: number; height_mm: number; min_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> } | undefined;
-      const minQty = firstSize?.min_qty ?? firstSize?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
-      setSpecs((prev) => ({
-        ...prev,
-        typeId,
-        typeName: typeVariant?.name ?? undefined,
-        ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}`, quantity: minQty } : {}),
-      }));
+      applyProductTypeConfig(typeId);
     },
-    [simplified?.types, simplified?.typeConfigs, setSpecs]
+    [applyProductTypeConfig]
   );
 
   const { resolveProductType } = useCalculatorEditContext({
@@ -416,23 +411,30 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     };
   }, [printTechnology, printColorMode, userInteracted, selectedProduct?.id, isValid, instantCalculate, isCustomProduct]);
 
-  // 🆕 Мгновенный пересчёт при установке material_id (упрощённые продукты)
+  // Автопересчёт при установке/смене material_id или при смене подтипа (typeId).
   // material_id выставляется асинхронно MaterialsSection после загрузки материалов,
   // поэтому стоимость материала не учитывалась при первом рендере. Вызываем calculateCost напрямую,
   // т.к. instantCalculate требует userInteracted, а при первом открытии он может быть ещё false.
-  const prevMaterialIdRef = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    prevMaterialIdRef.current = undefined; // сброс при смене продукта
-  }, [selectedProduct?.id]);
+  const prevCalcTriggerRef = useRef<{ materialId?: number; typeId?: number; productId?: number | null }>({});
   useEffect(() => {
     if (!selectedProduct?.id || !specs.size_id || isCustomProduct || isPostprintProduct) return;
-    const materialId = specs.material_id;
-    const prevMaterialId = prevMaterialIdRef.current;
-    prevMaterialIdRef.current = materialId;
-    if (materialId != null && materialId !== prevMaterialId && isValid) {
+    const current = { materialId: specs.material_id, typeId: specs.typeId, productId: selectedProduct.id };
+    const prev = prevCalcTriggerRef.current;
+
+    if (prev.productId !== current.productId) {
+      prevCalcTriggerRef.current = current;
+      return;
+    }
+
+    const materialChanged = current.materialId != null && current.materialId !== prev.materialId;
+    const typeChanged = current.typeId != null && current.typeId !== prev.typeId && prev.typeId != null;
+
+    prevCalcTriggerRef.current = current;
+
+    if ((materialChanged || typeChanged) && isValid) {
       void calculateCost(false);
     }
-  }, [specs.material_id, specs.size_id, selectedProduct?.id, isValid, calculateCost, isCustomProduct, isPostprintProduct]);
+  }, [specs.material_id, specs.typeId, specs.size_id, selectedProduct?.id, isValid, calculateCost, isCustomProduct, isPostprintProduct]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -712,152 +714,21 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     async (customDescription?: string) => {
       if (!result) return;
 
-      const layoutSheets = result.layout?.sheetsNeeded ?? undefined;
-      const itemsPerSheet = result.layout?.itemsPerSheet ?? undefined;
-      const computedSheets =
-        layoutSheets ??
-        (itemsPerSheet
-          ? Math.ceil(result.specifications.quantity / Math.max(itemsPerSheet, 1))
-          : undefined);
-      const parameterSummary = result.parameterSummary ?? [];
-      const summaryText = parameterSummary.length
-        ? parameterSummary.map((param) => `${param.label}: ${param.value}`).join(' • ')
-        : `${result.specifications.quantity} шт.`;
-      const fallbackName = selectedProduct?.name || result.productName;
-      const description =
-        customDescription ||
-        `${fallbackName} • ${summaryText}`;
-      const estimatedDelivery = new Date(
-        Date.now() + getProductionDays() * 24 * 60 * 60 * 1000
-      )
-        .toISOString()
-        .split('T')[0];
-
-      // 🆕 Очищаем specifications от потенциально проблемных данных перед сериализацией
-      const cleanSpecifications = { ...result.specifications };
-      // Удаляем selectedOperations из specifications (они не нужны в сохраненных данных)
-      delete cleanSpecifications.selectedOperations;
-      
-      // 🆕 Очищаем parameterSummary и formatInfo для безопасной сериализации
-      const cleanParameterSummary = Array.isArray(parameterSummary)
-        ? parameterSummary.map((p: any) => ({
-            label: String(p.label || ''),
-            value: String(p.value || ''),
-          }))
-        : [];
-      
-      const cleanFormatInfo = result.formatInfo
-        ? (typeof result.formatInfo === 'string'
-            ? result.formatInfo
-            : JSON.parse(JSON.stringify(result.formatInfo)))
-        : undefined;
-      
-      const specificationsPayload = {
-        ...cleanSpecifications,
-        formatInfo: cleanFormatInfo,
-        parameterSummary: cleanParameterSummary,
-        sheetsNeeded: computedSheets,
-        piecesPerSheet: itemsPerSheet,
-        layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined, // 🆕 Глубокая копия для избежания циклических ссылок
-        customFormat: isCustomFormat ? customFormat : undefined,
-        // Сохраняем тип печати и режим цвета
-        print_technology: printTechnology || undefined,
-        printTechnology: printTechnology || undefined,
-        print_color_mode: printColorMode || undefined,
-        printColorMode: printColorMode || undefined,
-        // 🆕 Сохраняем material_id и size_id для упрощённых продуктов
-        ...(result.specifications.material_id ? { material_id: result.specifications.material_id } : {}),
-        ...(result.specifications.size_id ? { size_id: result.specifications.size_id } : {}),
-      };
-
-      // 🆕 Очищаем данные для безопасной сериализации
-      const cleanMaterials = result.materials ? result.materials.map((m: any) => ({
-        materialId: m.materialId,
-        materialName: m.materialName,
-        quantity: m.quantity,
-        unitPrice: m.unitPrice,
-        totalCost: m.totalCost,
-        density: m.density,
-        paper_type_name: m.paper_type_name,
-      })) : [];
-      
-      const cleanServices = result.services ? result.services.map((s: any) => ({
-        operationId: s.operationId,
-        operationName: s.operationName,
-        operationType: s.operationType,
-        priceUnit: s.priceUnit,
-        unitPrice: s.unitPrice,
-        quantity: s.quantity,
-        totalCost: s.totalCost,
-      })) : [];
-      
-      const priceTypeMult = getPriceTypeMultiplier(result.specifications.priceType || 'standard');
-      const effectivePricePerItem = Math.round(result.pricePerItem * priceTypeMult * 100) / 100;
-      const effectiveTotalCost = Math.round(result.totalCost * priceTypeMult * 100) / 100;
-
-      const paramsPayload = {
-        description,
-        specifications: specificationsPayload,
-        materials: cleanMaterials,
-        services: cleanServices,
-        productionTime: result.productionTime,
-        productType: result.specifications.productType,
-        urgency: result.specifications.priceType,
-        priceType: result.specifications.priceType,
-        customerType: result.specifications.customerType,
-        estimatedDelivery,
-        sheetsNeeded: computedSheets,
-        piecesPerSheet: itemsPerSheet,
-        formatInfo: cleanFormatInfo,
-        parameterSummary: cleanParameterSummary,
-        productId: selectedProduct?.id,
-        productName: selectedProduct?.name,
-        ...(result.specifications.typeId != null ? { typeId: result.specifications.typeId } : {}),
-        ...(result.specifications.typeName != null ? { type: result.specifications.typeName } : {}),
-        ...(selectedProduct?.operator_percent !== undefined
-          ? { operator_percent: Number(selectedProduct.operator_percent) }
-          : {}),
-        layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined, // 🆕 Глубокая копия
-        customFormat: isCustomFormat ? customFormat : undefined,
-      };
-
-      const components =
-        result.materials
-          .filter((m) => m.materialId)
-          .map((m) => ({
-            materialId: m.materialId as number,
-            qtyPerItem:
-              result.specifications.quantity > 0
-                ? Number((m.quantity / result.specifications.quantity).toFixed(6))
-                : Number(m.quantity),
-          })) ?? [];
-
-      const clicks =
-        (computedSheets ?? 0) * ((result.specifications.sides ?? 1) * 2);
-
-      const apiItem = {
-        type: fallbackName,
-        params: paramsPayload,
-        price: effectivePricePerItem,
-        quantity: result.specifications.quantity,
-        sides: result.specifications.sides ?? 1,
-        sheets: computedSheets ?? 0,
-        waste: result.specifications.waste ?? 0,
-        clicks,
-        components,
-      };
-
-      trainAIOnOrder({
-        productType: result.specifications.productType,
-        format: result.specifications.format,
-        quantity: result.specifications.quantity,
-        paperType: result.specifications.paperType,
-        paperDensity: result.specifications.paperDensity,
-        lamination: result.specifications.lamination,
-        urgency: result.specifications.priceType,
-        customerType: result.specifications.customerType,
-        finalPrice: effectivePricePerItem,
+      const { apiItem, effectivePricePerItem } = buildOrderPayload({
+        result,
+        selectedProduct,
+        getProductionDays,
+        isCustomFormat,
+        customFormat,
+        printTechnology,
+        printColorMode,
       });
+
+      if (customDescription) {
+        apiItem.params.description = customDescription;
+      }
+
+      trainAIOnOrder(buildAITrainingData(result, effectivePricePerItem));
 
       try {
         if (isEditMode && editContext && onSubmitExisting) {
@@ -879,20 +750,18 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         onClose();
       } catch (error: any) {
         logger.error('Ошибка при сохранении позиции заказа', error);
-        
-        // 🆕 Улучшенная обработка ошибок: различаем бизнес-ошибки (недостаток материалов) и системные
+
         let errorMessage = 'Не удалось сохранить позицию заказа';
         if (error?.response?.data?.error) {
           errorMessage = error.response.data.error;
-          // Если это ошибка недостатка материалов, делаем сообщение более заметным
-          if (errorMessage.includes('Недостаточно материала') || 
+          if (errorMessage.includes('Недостаточно материала') ||
               error?.response?.data?.code === 'INSUFFICIENT_MATERIAL') {
             errorMessage = `⚠️ ${errorMessage}\n\nПожалуйста, пополните склад или выберите другой материал.`;
           }
         } else if (error?.message) {
           errorMessage = error.message;
         }
-        
+
         toast.error('Не удалось сохранить позицию заказа', errorMessage);
       }
     },
@@ -902,6 +771,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       getProductionDays,
       isCustomFormat,
       customFormat,
+      printTechnology,
+      printColorMode,
       trainAIOnOrder,
       isEditMode,
       editContext,
@@ -961,352 +832,24 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
               </div>
             )}
             {isCustomProduct ? (
-              <div className="calculator-section-group calculator-section-unified">
-                <div className="section-group-header">
-                  <h3>✍️ Произвольный продукт</h3>
-                </div>
-                <div className="section-group-content">
-                  <SelectedProductCard
-                    productType="universal"
-                    displayName={selectedProduct?.name || 'Произвольный продукт'}
-                    onOpenSelector={handleOpenProductSelector}
-                  />
-                  <div className="form-section custom-product-form">
-                    <div className="custom-product-grid">
-                      <label className="custom-product-field">
-                        <span className="custom-product-label">Наименование</span>
-                        <input
-                          type="text"
-                          className="custom-product-input"
-                          value={customProductForm.name}
-                          onChange={(e) => setCustomProductForm(prev => ({ ...prev, name: e.target.value }))}
-                          placeholder="Например: Табличка 30×20"
-                        />
-                      </label>
-                      <label className="custom-product-field">
-                        <span className="custom-product-label">Тираж</span>
-                        <input
-                          type="number"
-                          className="custom-product-input"
-                          value={customProductForm.quantity}
-                          min={1}
-                          onChange={(e) => setCustomProductForm(prev => ({ ...prev, quantity: e.target.value }))}
-                        />
-                      </label>
-                      <label className="custom-product-field">
-                        <span className="custom-product-label">Срок изготовления (дн.)</span>
-                        <input
-                          type="number"
-                          className="custom-product-input"
-                          value={customProductForm.productionDays}
-                          min={1}
-                          onChange={(e) => setCustomProductForm(prev => ({ ...prev, productionDays: e.target.value }))}
-                        />
-                        <span className="custom-product-hint">Можно оставить 1 день по умолчанию</span>
-                      </label>
-                      <label className="custom-product-field">
-                        <span className="custom-product-label">Цена за штуку (BYN)</span>
-                        <input
-                          type="number"
-                          className="custom-product-input"
-                          value={customProductForm.pricePerItem}
-                          min={0}
-                          step="0.01"
-                          onChange={(e) => setCustomProductForm(prev => ({ ...prev, pricePerItem: e.target.value }))}
-                          placeholder="Например: 12.50"
-                        />
-                      </label>
-                      <label className="custom-product-field custom-product-field--full">
-                        <span className="custom-product-label">Характеристики</span>
-                        <textarea
-                          className="custom-product-textarea"
-                          value={customProductForm.characteristics}
-                          onChange={(e) => setCustomProductForm(prev => ({ ...prev, characteristics: e.target.value }))}
-                          placeholder="Материал, цвет, комментарии..."
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <CustomProductForm
+                selectedProductName={selectedProduct?.name || ''}
+                customProductForm={customProductForm}
+                setCustomProductForm={setCustomProductForm}
+                onOpenProductSelector={handleOpenProductSelector}
+              />
             ) : isPostprintProduct ? (
-              <div className="calculator-section-group calculator-section-unified">
-                <div className="section-group-header">
-                  <h3>🧰 Послепечатные услуги</h3>
-                </div>
-                <div className="section-group-content">
-                  <SelectedProductCard
-                    productType="postprint"
-                    displayName={selectedProduct?.name || 'Послепечатные услуги'}
-                    onOpenSelector={handleOpenProductSelector}
-                  />
-                  <div className="form-section postprint-services-form">
-                    {postprintLoading && (
-                      <div className="postprint-services-loading">
-                        Загрузка операций...
-                      </div>
-                    )}
-                    {postprintError && !postprintLoading && (
-                      <div className="postprint-services-error">
-                        {postprintError}
-                      </div>
-                    )}
-                    {!postprintLoading && !postprintError && (
-                      <div className="postprint-services-list">
-                        {postprintServices.length === 0 ? (
-                          <div className="postprint-services-empty">
-                            Нет доступных операций
-                          </div>
-                        ) : (
-                          postprintByCategory.map((group) => (
-                            <div key={group.categoryName} className="postprint-category-group">
-                              <h3 className="postprint-category-group__title">{group.categoryName}</h3>
-                              {group.services.map((service) => {
-                            const serviceKey = String(service.serviceId);
-                            const serviceKeyPrefix = `${service.serviceId}:`;
-                            const selectedVariantKey = Object.keys(postprintSelections).find((key) =>
-                              key.startsWith(serviceKeyPrefix)
-                            );
-                            const selectedVariant =
-                              service.variants.find((variant) => variant.key === selectedVariantKey) ||
-                              service.variants[0];
-                            const variantTypes = service.variants.reduce<Record<string, typeof service.variants>>(
-                              (acc, variant) => {
-                                const typeLabel = String(
-                                  variant.parameters?.type || variant.label || 'Вариант'
-                                ).trim();
-                                if (!acc[typeLabel]) acc[typeLabel] = [];
-                                acc[typeLabel].push(variant);
-                                return acc;
-                              },
-                              {}
-                            );
-                            const typeOptions = Object.keys(variantTypes);
-                            const selectedType =
-                              selectedVariant?.parameters?.type ||
-                              typeOptions[0] ||
-                              '';
-                            const subtypeOptions =
-                              typeOptions.length > 0
-                                ? (variantTypes[selectedType] || variantTypes[typeOptions[0]] || [])
-                                : service.variants;
-                            const selectedSubtype =
-                              subtypeOptions.find((variant) => variant.key === selectedVariantKey) ||
-                              subtypeOptions[0];
-                            const currentKey = service.variants.length > 0 ? selectedSubtype?.key : serviceKey;
-                            const rawQty = currentKey ? postprintSelections[currentKey] : undefined;
-                            const qty = Number(rawQty || 0);
-                            const isChecked = service.variants.length > 0 ? Boolean(selectedVariantKey) : qty > 0;
-                            const priceTiers =
-                              service.variants.length > 0 ? selectedSubtype?.tiers || [] : service.tiers;
-                            const minQuantity = service.minQuantity ?? 1;
-                            const maxQuantity = service.maxQuantity;
-                            const clampQuantity = (value: number) => {
-                              let next = Math.max(minQuantity, Number.isFinite(value) ? value : minQuantity);
-                              if (typeof maxQuantity === 'number' && !Number.isNaN(maxQuantity)) {
-                                next = Math.min(next, maxQuantity);
-                              }
-                              return next;
-                            };
-                            const unitPrice = getOperationUnitPrice(
-                              {
-                                key: currentKey || serviceKey,
-                                serviceId: service.serviceId,
-                                variantId: selectedSubtype?.variantId,
-                                name: service.name,
-                                unit: service.unit,
-                                priceUnit: service.priceUnit,
-                                rate: service.rate,
-                                tiers: priceTiers,
-                              },
-                              clampQuantity(qty || minQuantity)
-                            );
-                            return (
-                              <div key={serviceKey} className="postprint-service-card">
-                                <div className="postprint-service-row">
-                                  <div className="postprint-service-left">
-                                    <label className="postprint-service-checkbox">
-                                      <input
-                                        type="checkbox"
-                                        checked={isChecked}
-                                        onChange={(event) => {
-                                          const checked = event.target.checked;
-                                          setPostprintSelections((prev) => {
-                                            const next = { ...prev };
-                                            Object.keys(next).forEach((key) => {
-                                              if (key === serviceKey || key.startsWith(serviceKeyPrefix)) {
-                                                delete next[key];
-                                              }
-                                            });
-                                            if (checked) {
-                                              const preferredKey =
-                                                service.variants.length > 0
-                                                  ? (selectedVariant?.key || service.variants[0]?.key)
-                                                  : serviceKey;
-                                              if (preferredKey) {
-                                                const baseQty = prev[preferredKey] || minQuantity;
-                                                next[preferredKey] = clampQuantity(baseQty);
-                                              }
-                                            }
-                                            return next;
-                                          });
-                                        }}
-                                      />
-                                      <span className="postprint-service-name">{service.name}</span>
-                                    </label>
-                                  </div>
-                                  <div className="postprint-service-meta">
-                                    <span className="postprint-service-price">
-                                      {unitPrice.toFixed(2)} BYN / {service.priceUnit || service.unit || 'шт'}
-                                    </span>
-                                  </div>
-                                </div>
-                                {isChecked && service.variants.length > 0 && (
-                                  <div className="postprint-variant-row">
-                                    <div className="postprint-service-left">
-                                      {typeOptions.length > 1 && (
-                                        <label className="postprint-variant-field">
-                                          <span className="postprint-variant-label">Тип ламинации</span>
-                                          <select
-                                            className="postprint-variant-select"
-                                            value={selectedType}
-                                            onChange={(event) => {
-                                              const nextType = event.target.value;
-                                              const nextVariant = (variantTypes[nextType] || [])[0];
-                                              setPostprintSelections((prev) => {
-                                                const next = { ...prev };
-                                                const prevQty = selectedVariantKey ? prev[selectedVariantKey] : 1;
-                                                Object.keys(next).forEach((key) => {
-                                                  if (key === serviceKey || key.startsWith(serviceKeyPrefix)) {
-                                                    delete next[key];
-                                                  }
-                                                });
-                                                if (nextVariant?.key) {
-                                                next[nextVariant.key] = clampQuantity(prevQty || minQuantity);
-                                                }
-                                                return next;
-                                              });
-                                            }}
-                                          >
-                                            {typeOptions.map((type) => (
-                                              <option key={type} value={type}>
-                                                {type}
-                                              </option>
-                                            ))}
-                                          </select>
-                                        </label>
-                                      )}
-                                      {subtypeOptions.length > 1 && (
-                                        <label className="postprint-variant-field">
-                                          <span className="postprint-variant-label">Плотность</span>
-                                          <select
-                                            className="postprint-variant-select"
-                                            value={selectedSubtype?.key || ''}
-                                            onChange={(event) => {
-                                              const nextKey = event.target.value;
-                                              setPostprintSelections((prev) => {
-                                                const next = { ...prev };
-                                                const prevQty = selectedVariantKey ? prev[selectedVariantKey] : 1;
-                                                Object.keys(next).forEach((key) => {
-                                                  if (key === serviceKey || key.startsWith(serviceKeyPrefix)) {
-                                                    delete next[key];
-                                                  }
-                                                });
-                                                if (nextKey) {
-                                                next[nextKey] = clampQuantity(prevQty || minQuantity);
-                                                }
-                                                return next;
-                                              });
-                                            }}
-                                          >
-                                            {subtypeOptions.map((variant) => {
-                                              const subtypeLabel = String(
-                                                variant.parameters?.subType ||
-                                                  variant.parameters?.density ||
-                                                  variant.label ||
-                                                  'Вариант'
-                                              ).trim();
-                                              return (
-                                                <option key={variant.key} value={variant.key}>
-                                                  {subtypeLabel}
-                                                </option>
-                                              );
-                                            })}
-                                          </select>
-                                        </label>
-                                      )}
-                                    </div>
-                                    <div className="postprint-quantity-spacer" aria-hidden="true" />
-                                  </div>
-                                )}
-                                {isChecked && (
-                                  <div className="postprint-quantity-row">
-                                    <div className="postprint-service-left">
-                                      <div className="quantity-controls">
-                                        <button
-                                          type="button"
-                                          className="quantity-btn quantity-btn-minus"
-                                          onClick={() => {
-                                            const nextQty = clampQuantity(qty - 1);
-                                            setPostprintSelections((prev) => ({
-                                              ...prev,
-                                              [currentKey || serviceKey]: nextQty,
-                                            }));
-                                          }}
-                                        >
-                                          -
-                                        </button>
-                                        <input
-                                          type="number"
-                                          min={minQuantity}
-                                          max={typeof maxQuantity === 'number' ? maxQuantity : undefined}
-                                          value={rawQty ?? ''}
-                                          placeholder="Кол-во"
-                                          className="quantity-input"
-                                          onChange={(event) => {
-                                            const raw = event.target.value;
-                                            setPostprintSelections((prev) => {
-                                              const next = { ...prev };
-                                              const targetKey = currentKey || serviceKey;
-                                              if (!targetKey) return next;
-                                              if (raw === '') {
-                                                delete next[targetKey];
-                                                return next;
-                                              }
-                                              next[targetKey] = clampQuantity(Number(raw));
-                                              return next;
-                                            });
-                                          }}
-                                        />
-                                        <button
-                                          type="button"
-                                          className="quantity-btn quantity-btn-plus"
-                                          onClick={() => {
-                                            const nextQty = clampQuantity(qty + 1);
-                                            setPostprintSelections((prev) => ({
-                                              ...prev,
-                                              [currentKey || serviceKey]: nextQty,
-                                            }));
-                                          }}
-                                        >
-                                          +
-                                        </button>
-                                      </div>
-                                    </div>
-                                    <div className="postprint-quantity-spacer" aria-hidden="true" />
-                                  </div>
-                                )}
-                              </div>
-                            );
-                              })}
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <PostprintServicesForm
+                selectedProductName={selectedProduct?.name || ''}
+                onOpenProductSelector={handleOpenProductSelector}
+                postprintLoading={postprintLoading}
+                postprintError={postprintError}
+                postprintServices={postprintServices}
+                postprintByCategory={postprintByCategory}
+                postprintSelections={postprintSelections}
+                setPostprintSelections={setPostprintSelections}
+                getOperationUnitPrice={getOperationUnitPrice}
+              />
             ) : (
               <CalculatorSections
                 specs={specs}
