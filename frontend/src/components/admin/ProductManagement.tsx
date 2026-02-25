@@ -458,6 +458,15 @@ const ProductManagement: React.FC = () => {
                               <Button
                                 size="sm"
                                 variant="secondary"
+                                icon={<span aria-hidden="true">📋</span>}
+                                className="flex items-center gap-2"
+                                onClick={() => navigate(`/adminpanel/products/${product.id}/edit`)}
+                              >
+                                Инфо
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
                                 icon={<span aria-hidden="true">✏️</span>}
                                 className="flex items-center gap-2"
                                 onClick={() => navigate(`/adminpanel/products/${product.id}/template`)}
