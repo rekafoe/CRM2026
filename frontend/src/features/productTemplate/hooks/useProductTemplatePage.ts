@@ -158,18 +158,15 @@ export default function useProductTemplatePage(productId: number | undefined): U
         const details = await getProductDetails(productId)
         if (details) {
           setProduct(details)
-          dispatch({ type: 'setMeta', patch: { name: details.name || '' } })
-          dispatch({ type: 'setMeta', patch: { description: details.description || '' } })
-          dispatch({ type: 'setMeta', patch: { icon: details.icon || '' } })
-          dispatch({
-            type: 'setMeta',
-            patch: {
-              operator_percent:
-                (details as any)?.operator_percent !== undefined
-                  ? String((details as any)?.operator_percent)
-                  : '',
-            },
-          })
+          dispatch({ type: 'setMeta', patch: {
+            name: details.name || '',
+            description: details.description || '',
+            icon: details.icon || '',
+            operator_percent: (details as any)?.operator_percent !== undefined
+              ? String((details as any)?.operator_percent)
+              : '',
+            category_id: (details as any)?.category_id ?? undefined,
+          } })
           void loadParameterPresets(details)
         } else {
           setProduct(null)
@@ -524,6 +521,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
         name: state.meta.name,
         description: state.meta.description,
         icon: state.meta.icon,
+        category_id: state.meta.category_id ?? 0,
         ...(operatorPercentValue !== undefined && Number.isFinite(operatorPercentValue)
           ? { operator_percent: operatorPercentValue }
           : {})
@@ -535,7 +533,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
     } finally {
       setSaving(false)
     }
-  }, [productId, state.meta.name, state.meta.description, state.meta.icon, state.meta.operator_percent])
+  }, [productId, state.meta.name, state.meta.description, state.meta.icon, state.meta.operator_percent, state.meta.category_id])
 
   const refreshMaterials = useCallback(async (id: number) => {
     const fresh = await getProductMaterials(id)

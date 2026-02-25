@@ -21,6 +21,7 @@ import useProductTemplatePage from './hooks/useProductTemplatePage';
 import { useProductOperations } from './hooks/useProductOperations';
 import { PrintTab, ProductPrintSettings } from '../../pages/admin/product-edit/PrintTab';
 import { updateProduct } from '../../services/products';
+import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import { SimplifiedTemplateSection } from './components/SimplifiedTemplateSection';
 
 
@@ -29,6 +30,10 @@ const ProductTemplatePage: React.FC = () => {
   const parsedProductId = id ? Number(id) : NaN;
   const productId = Number.isFinite(parsedProductId) ? parsedProductId : undefined;
   const navigate = useNavigate();
+  const categories = useProductDirectoryStore((s) => s.categories);
+  const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
+
+  useEffect(() => { initializeDirectory() }, [initializeDirectory]);
 
   // Все useState хуки должны быть объявлены ДО вызова кастомных хуков
   const [showMetaModal, setShowMetaModal] = useState(false);
@@ -530,6 +535,8 @@ const ProductTemplatePage: React.FC = () => {
           description={state.meta.description}
           icon={state.meta.icon}
           operator_percent={state.meta.operator_percent}
+          category_id={state.meta.category_id}
+          categories={categories}
           saving={saving}
           onChange={(patch) => dispatch({ type: 'setMeta', patch })}
           onSave={async () => {

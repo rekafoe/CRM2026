@@ -152,7 +152,7 @@ function normalizeSimplifiedTypeIds(value: SimplifiedConfig): SimplifiedConfig {
 }
 
 export interface TemplateState {
-  meta: { name: string; description: string; icon: string; operator_percent: string }
+  meta: { name: string; description: string; icon: string; operator_percent: string; category_id?: number }
   trim_size: { width: string; height: string }
   print_sheet: { preset: 'SRA3' | 'A3' | 'А4' | '' ; width: string; height: string }
   constraints: {

@@ -1,17 +1,20 @@
 import React from 'react';
 import { Button, FormField, Alert } from '../../../../components/common';
+import type { ProductCategory } from '../../../../services/products';
 
 interface MetaSectionProps {
   name: string;
   description: string;
   icon: string;
   operator_percent: string;
+  category_id?: number;
+  categories?: ProductCategory[];
   saving: boolean;
-  onChange: (patch: Partial<{ name: string; description: string; icon: string; operator_percent: string }>) => void;
+  onChange: (patch: Partial<{ name: string; description: string; icon: string; operator_percent: string; category_id?: number }>) => void;
   onSave: () => Promise<void> | void;
 }
 
-const MetaSection: React.FC<MetaSectionProps> = ({ name, description, icon, operator_percent, saving, onChange, onSave }) => {
+const MetaSection: React.FC<MetaSectionProps> = ({ name, description, icon, operator_percent, category_id, categories = [], saving, onChange, onSave }) => {
   const hasChanges = name.trim().length > 0;
 
   return (
@@ -63,6 +66,21 @@ const MetaSection: React.FC<MetaSectionProps> = ({ name, description, icon, oper
             onChange={(e) => onChange({ operator_percent: e.target.value })}
             placeholder="Например: 10"
           />
+        </FormField>
+
+        <FormField label="Категория" help="Категория для группировки в каталоге">
+          <select
+            className="form-input"
+            value={category_id ?? ''}
+            onChange={(e) => onChange({ category_id: e.target.value ? Number(e.target.value) : undefined })}
+          >
+            <option value="">— Без категории —</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+              </option>
+            ))}
+          </select>
         </FormField>
 
         {!hasChanges && (
