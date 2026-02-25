@@ -620,10 +620,10 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               <option value={120}>120 сек</option>
             </select>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => window.print()} title="Распечатать аналитику">
+          <Button variant="secondary" size="sm" onClick={() => window.print()}>
             <AppIcon name="printer" size="xs" /> Печать
           </Button>
-          <Button variant="secondary" size="sm" onClick={handleExportJSON} title="Экспортировать данные аналитики">
+          <Button variant="secondary" size="sm" onClick={handleExportJSON}>
             <AppIcon name="download" size="xs" /> Экспорт JSON
           </Button>
           <Button
@@ -631,7 +631,6 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
             size="sm"
             onClick={handleExportXlsx}
             disabled={isExportingXlsx}
-            title="Экспортировать текущую аналитику в XLSX"
           >
             {isExportingXlsx ? '⏳ Экспорт...' : <><AppIcon name="chart-bar" size="xs" /> Экспорт XLSX</>}
           </Button>
