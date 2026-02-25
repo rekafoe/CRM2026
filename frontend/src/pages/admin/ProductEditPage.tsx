@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Alert, StatusBadge } from '../../components/common';
-import '../../components/admin/ProductManagement.css';
+import './product-edit/ProductEditPage.css';
 import { updateProduct } from '../../services/products';
 import usePricingServices from '../../hooks/pricing/usePricingServices';
 import { useProductEditData } from './product-edit/useProductEditData';

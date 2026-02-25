@@ -125,238 +125,98 @@ export const PrintTab: React.FC<PrintTabProps> = React.memo(({
 
   if (loading) {
     return (
-      <div className="template-sections-list">
+      <div className="product-tab-panel">
         <Alert type="info">Загружаем технологии печати…</Alert>
       </div>
     );
   }
 
   return (
-    <div className="template-sections-list">
-      {/* Секция: Настройки печати */}
-      <div className="template-section" id="section-print">
-        <div className="template-section__header">
-          <h3 className="template-section__title">Настройки печати</h3>
-          <p className="template-section__description">
-            Настройте разрешенные типы печати, цветности и стороны для этого продукта. Эти настройки будут использоваться в калькуляторе для фильтрации доступных опций.
-          </p>
+    <div className="product-tab-panel">
+      <div className="print-settings__group">
+        <span className="print-settings__group-title">Разрешенные технологии печати</span>
+        <span className="print-settings__group-hint">
+          Выберите технологии, которые можно использовать для этого продукта
+        </span>
+        <div className="print-settings__options">
+          {technologies.length === 0 ? (
+            <p className="print-settings__empty">Нет доступных технологий печати</p>
+          ) : (
+            technologies.map((tech) => (
+              <label
+                key={tech.code}
+                className={`print-settings__option ${settings.allowedTechnologies.includes(tech.code) ? 'print-settings__option--active' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.allowedTechnologies.includes(tech.code)}
+                  onChange={() => handleTechnologyToggle(tech.code)}
+                />
+                <span className="print-settings__option-label">{tech.name}</span>
+              </label>
+            ))
+          )}
         </div>
-        <div className="template-section__content">
-          {/* Технологии печати */}
-          <div style={{ marginBottom: 32 }}>
-            <div style={{ marginBottom: 12 }}>
-              <label className="form-label" style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
-                Разрешенные технологии печати
-              </label>
-              <p className="text-muted text-sm" style={{ marginTop: 4, marginBottom: 12, fontSize: 13, color: '#666' }}>
-                Выберите технологии, которые можно использовать для этого продукта
-              </p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {technologies.length === 0 ? (
-                <p style={{ color: '#666', fontSize: 14 }}>Нет доступных технологий печати</p>
-              ) : (
-                technologies.map((tech) => (
-                  <label
-                    key={tech.code}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '10px 14px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: 6,
-                      cursor: 'pointer',
-                      backgroundColor: settings.allowedTechnologies.includes(tech.code) ? '#e8f5e9' : '#fff',
-                      transition: 'background-color 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!settings.allowedTechnologies.includes(tech.code)) {
-                        e.currentTarget.style.backgroundColor = '#f9fafb';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!settings.allowedTechnologies.includes(tech.code)) {
-                        e.currentTarget.style.backgroundColor = '#fff';
-                      }
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={settings.allowedTechnologies.includes(tech.code)}
-                      onChange={() => handleTechnologyToggle(tech.code)}
-                      style={{ cursor: 'pointer', width: 18, height: 18 }}
-                    />
-                    <span style={{ fontSize: 14 }}>{tech.name}</span>
-                  </label>
-                ))
-              )}
-            </div>
-          </div>
+      </div>
 
-          {/* Цветности */}
-          <div style={{ marginBottom: 32 }}>
-            <div style={{ marginBottom: 12 }}>
-              <label className="form-label" style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
-                Разрешенные цветности
-              </label>
-              <p className="text-muted text-sm" style={{ marginTop: 4, marginBottom: 12, fontSize: 13, color: '#666' }}>
-                Выберите цветности, которые можно использовать для этого продукта
-              </p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 14px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  backgroundColor: settings.allowedColorModes.includes('bw') ? '#e8f5e9' : '#fff',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!settings.allowedColorModes.includes('bw')) {
-                    e.currentTarget.style.backgroundColor = '#f9fafb';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!settings.allowedColorModes.includes('bw')) {
-                    e.currentTarget.style.backgroundColor = '#fff';
-                  }
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={settings.allowedColorModes.includes('bw')}
-                  onChange={() => handleColorModeToggle('bw')}
-                  style={{ cursor: 'pointer', width: 18, height: 18 }}
-                />
-                <span style={{ fontSize: 14 }}>Чёрно-белая</span>
-              </label>
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 14px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  backgroundColor: settings.allowedColorModes.includes('color') ? '#e8f5e9' : '#fff',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!settings.allowedColorModes.includes('color')) {
-                    e.currentTarget.style.backgroundColor = '#f9fafb';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!settings.allowedColorModes.includes('color')) {
-                    e.currentTarget.style.backgroundColor = '#fff';
-                  }
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={settings.allowedColorModes.includes('color')}
-                  onChange={() => handleColorModeToggle('color')}
-                  style={{ cursor: 'pointer', width: 18, height: 18 }}
-                />
-                <span style={{ fontSize: 14 }}>Цветная</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Стороны */}
-          <div style={{ marginBottom: 32 }}>
-            <div style={{ marginBottom: 12 }}>
-              <label className="form-label" style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
-                Разрешенные стороны печати
-              </label>
-              <p className="text-muted text-sm" style={{ marginTop: 4, marginBottom: 12, fontSize: 13, color: '#666' }}>
-                Выберите, каким может быть продукт - односторонним и/или двухсторонним
-              </p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 14px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  backgroundColor: settings.allowedSides.includes(1) ? '#e8f5e9' : '#fff',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!settings.allowedSides.includes(1)) {
-                    e.currentTarget.style.backgroundColor = '#f9fafb';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!settings.allowedSides.includes(1)) {
-                    e.currentTarget.style.backgroundColor = '#fff';
-                  }
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={settings.allowedSides.includes(1)}
-                  onChange={() => handleSidesToggle(1)}
-                  style={{ cursor: 'pointer', width: 18, height: 18 }}
-                />
-                <span style={{ fontSize: 14 }}>Односторонняя</span>
-              </label>
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 14px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  backgroundColor: settings.allowedSides.includes(2) ? '#e8f5e9' : '#fff',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!settings.allowedSides.includes(2)) {
-                    e.currentTarget.style.backgroundColor = '#f9fafb';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!settings.allowedSides.includes(2)) {
-                    e.currentTarget.style.backgroundColor = '#fff';
-                  }
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={settings.allowedSides.includes(2)}
-                  onChange={() => handleSidesToggle(2)}
-                  style={{ cursor: 'pointer', width: 18, height: 18 }}
-                />
-                <span style={{ fontSize: 14 }}>Двухсторонняя</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Кнопка сохранения */}
-          <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #e5e7eb' }}>
-            <Button 
-              variant="primary" 
-              onClick={handleSave} 
-              disabled={saving || !hasChanges}
-            >
-              {saving ? 'Сохранение…' : 'Сохранить настройки печати'}
-            </Button>
-          </div>
+      <div className="print-settings__group">
+        <span className="print-settings__group-title">Разрешенные цветности</span>
+        <span className="print-settings__group-hint">
+          Выберите цветности, которые можно использовать для этого продукта
+        </span>
+        <div className="print-settings__options">
+          <label className={`print-settings__option ${settings.allowedColorModes.includes('bw') ? 'print-settings__option--active' : ''}`}>
+            <input
+              type="checkbox"
+              checked={settings.allowedColorModes.includes('bw')}
+              onChange={() => handleColorModeToggle('bw')}
+            />
+            <span className="print-settings__option-label">Чёрно-белая</span>
+          </label>
+          <label className={`print-settings__option ${settings.allowedColorModes.includes('color') ? 'print-settings__option--active' : ''}`}>
+            <input
+              type="checkbox"
+              checked={settings.allowedColorModes.includes('color')}
+              onChange={() => handleColorModeToggle('color')}
+            />
+            <span className="print-settings__option-label">Цветная</span>
+          </label>
         </div>
+      </div>
+
+      <div className="print-settings__group">
+        <span className="print-settings__group-title">Разрешенные стороны печати</span>
+        <span className="print-settings__group-hint">
+          Выберите, каким может быть продукт — односторонним и/или двухсторонним
+        </span>
+        <div className="print-settings__options">
+          <label className={`print-settings__option ${settings.allowedSides.includes(1) ? 'print-settings__option--active' : ''}`}>
+            <input
+              type="checkbox"
+              checked={settings.allowedSides.includes(1)}
+              onChange={() => handleSidesToggle(1)}
+            />
+            <span className="print-settings__option-label">Односторонняя</span>
+          </label>
+          <label className={`print-settings__option ${settings.allowedSides.includes(2) ? 'print-settings__option--active' : ''}`}>
+            <input
+              type="checkbox"
+              checked={settings.allowedSides.includes(2)}
+              onChange={() => handleSidesToggle(2)}
+            />
+            <span className="print-settings__option-label">Двухсторонняя</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="print-settings__actions">
+        <Button
+          variant="primary"
+          onClick={handleSave}
+          disabled={saving || !hasChanges}
+        >
+          {saving ? 'Сохранение…' : 'Сохранить настройки печати'}
+        </Button>
       </div>
     </div>
   );
