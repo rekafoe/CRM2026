@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Button, Alert, Modal } from '../../common';
+import { AppIcon } from '../../ui/AppIcon';
 import { PricingService } from '../../../types/pricing';
 import { ServiceFormState } from './components/ServiceForm';
 import usePricingServices from '../../../hooks/pricing/usePricingServices';
@@ -272,20 +273,20 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
   const renderActions = useCallback((service: PricingService) => (
     <div className="services-table__actions">
       <Button variant="info" size="sm" onClick={() => openEditService(service)}>
-        ✏️ Редактировать
+        <AppIcon name="edit" size="xs" /> Редактировать
       </Button>
       <Button
         variant="warning"
         size="sm"
         onClick={() => serviceOperationsRef.current.updateService(service.id, { isActive: !service.isActive })}
       >
-        {service.isActive ? '⏸️ Деактивировать' : '▶️ Активировать'}
+        {service.isActive ? <><AppIcon name="ban" size="xs" /> Деактивировать</> : <><AppIcon name="check" size="xs" /> Активировать</>}
       </Button>
       <Button variant="secondary" size="sm" onClick={() => handleToggleVolumeTiers(service.id)}>
-        📈 Диапазоны
+        <AppIcon name="chart" size="xs" /> Диапазоны
       </Button>
       <Button variant="error" size="sm" onClick={() => handleServiceDelete(service.id, service.name)}>
-        🗑️
+        <AppIcon name="trash" size="xs" />
       </Button>
     </div>
   ), [openEditService, handleToggleVolumeTiers, handleServiceDelete]); // serviceOperations через ref
@@ -334,7 +335,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
 
       {/* Ошибки и успех */}
       {combinedError && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+        <div className="svc-error-banner">
           {combinedError}
         </div>
       )}
@@ -372,14 +373,9 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
             onCreateService={() => setShowCreateService(true)}
           />
 
-          <Alert type="info">
-            <div className="flex items-start gap-2">
-              <span>💡</span>
-              <div>
-                <strong>Как это работает:</strong> Создайте услугу с единицей измерения и базовой ценой. Услуги привязываются к продуктам при их создании.
-              </div>
-            </div>
-          </Alert>
+          <div className="svc-info-banner">
+            <strong>Как это работает:</strong> Создайте услугу с единицей измерения и базовой ценой. Услуги привязываются к продуктам при их создании.
+          </div>
 
           {/* Таблица услуг по категориям */}
           {filteredServices.length > 0 ? (
@@ -410,7 +406,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
             </>
           ) : (
             <div className="services-empty">
-              <div className="services-empty__icon">📋</div>
+              <div className="services-empty__icon"><AppIcon name="clipboard" size="lg" /></div>
               <h3 className="services-empty__title">
                 {state.serviceSearch || state.typeFilter !== 'all' ? 'Ничего не найдено' : 'Нет услуг'}
               </h3>

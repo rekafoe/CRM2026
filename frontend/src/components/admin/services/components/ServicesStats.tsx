@@ -1,5 +1,6 @@
 import React from 'react';
 import { PricingService } from '../../../../types/pricing';
+import { AppIcon } from '../../../ui/AppIcon';
 
 interface ServicesStatsProps {
   services: PricingService[];
@@ -22,7 +23,7 @@ export const ServicesStats: React.FC<ServicesStatsProps> = ({ services }) => {
       <div className="stat-card">
         <div className="stat-card__header">
           <span className="stat-card__label">Всего услуг</span>
-          <span className="stat-card__icon">📋</span>
+          <span className="stat-card__icon"><AppIcon name="clipboard" size="sm" /></span>
         </div>
         <div className="stat-card__value">{stats.total}</div>
         <div className="stat-card__trend">+{stats.types} типов</div>
@@ -31,7 +32,7 @@ export const ServicesStats: React.FC<ServicesStatsProps> = ({ services }) => {
       <div className="stat-card">
         <div className="stat-card__header">
           <span className="stat-card__label">Активных</span>
-          <span className="stat-card__icon">✅</span>
+          <span className="stat-card__icon"><AppIcon name="check" size="sm" /></span>
         </div>
         <div className="stat-card__value">{stats.active}</div>
         <div className="stat-card__trend">
@@ -44,7 +45,7 @@ export const ServicesStats: React.FC<ServicesStatsProps> = ({ services }) => {
       <div className="stat-card">
         <div className="stat-card__header">
           <span className="stat-card__label">Неактивных</span>
-          <span className="stat-card__icon">⏸️</span>
+          <span className="stat-card__icon"><AppIcon name="ban" size="sm" /></span>
         </div>
         <div className="stat-card__value">{stats.inactive}</div>
         <div className="stat-card__trend stat-card__trend--negative">
@@ -55,7 +56,7 @@ export const ServicesStats: React.FC<ServicesStatsProps> = ({ services }) => {
       <div className="stat-card">
         <div className="stat-card__header">
           <span className="stat-card__label">Средняя цена</span>
-          <span className="stat-card__icon">💵</span>
+          <span className="stat-card__icon"><AppIcon name="card" size="sm" /></span>
         </div>
         <div className="stat-card__value">
           {(stats.totalValue / stats.total || 0).toFixed(2)}

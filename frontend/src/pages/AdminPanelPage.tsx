@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { NotificationsManager } from '../components/notifications/NotificationsManager';
 import { AdminProductManager } from '../components/calculator/AdminProductManager';
 import AdminDashboard from '../components/admin/AdminDashboard';
+import { ServicesManagementPage } from './admin/ServicesManagementPage';
 import { DailyActivityOverview } from '../components/admin/DailyActivityOverview';
 import SystemFeaturesPanel from '../components/admin/SystemFeaturesPanel';
 import { useCurrentUser } from '../hooks/useCurrentUser';
@@ -289,7 +290,7 @@ export const AdminPanelPage: React.FC = () => {
           {/* Ценообразование */}
           <Route path="/pricing" element={<PricingPage onBack={() => window.history.back()} />} />
           <Route path="/cost-calculation" element={<Navigate to="/adminpanel/pricing" replace />} />
-          <Route path="/services-management" element={<AdminDashboard />} />
+          <Route path="/services-management" element={<ServicesManagementPage />} />
           <Route path="/discounts" element={<PricingPage onBack={() => window.history.back()} />} />
           <Route path="/earnings" element={<EarningsAdminPage />} />
           <Route path="/printers" element={<PrintersPage />} />

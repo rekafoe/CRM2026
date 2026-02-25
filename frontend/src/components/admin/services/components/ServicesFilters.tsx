@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from '../../../common';
+import { AppIcon } from '../../../ui/AppIcon';
 import { PricingService } from '../../../../types/pricing';
 import { getServiceIcon, getServiceTypeLabel } from '../utils/serviceFormatters';
 
@@ -37,7 +38,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
         <div className="services-controls__filters">
           {/* Поиск */}
           <div className="services-controls__search">
-            <span className="services-controls__search-icon">🔍</span>
+            <span className="services-controls__search-icon"><AppIcon name="search" size="xs" /></span>
             <input
               className="services-controls__search-input"
               placeholder="Поиск по названию или типу..."
@@ -94,7 +95,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
           }`}
           onClick={() => onTypeFilterChange('all')}
         >
-          <span>📋</span>
+          <AppIcon name="clipboard" size="xs" />
           <span>Все ({services.length})</span>
         </button>
         {availableTypes.map((type) => (
