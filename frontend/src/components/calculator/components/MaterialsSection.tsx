@@ -297,11 +297,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   }, [isSimplifiedProduct, specs.size_id, materialTypesFromMaterials, specs.material_id, allowedMaterialsForSize, selectedMaterialType, densitiesForSelectedType]);
 
   // При смене типа — ставим первую плотность этого типа (или сбрасываем, если у типа нет плотностей)
+  // Не сбрасываем material_id, если allowedMaterialsForSize ещё пуст (загрузка) — иначе затираем initial из подтипа
   useEffect(() => {
     if (!isSimplifiedProduct || !specs.size_id) return;
     if (densitiesForSelectedType.length === 0) {
       setSelectedDensity('');
-      if (specs.material_id != null) {
+      if (specs.material_id != null && allowedMaterialsForSize.length > 0) {
         updateSpecs({ material_id: undefined }, true);
       }
       return;
@@ -311,9 +312,10 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     } else if (!densitiesForSelectedType.includes(selectedDensity as number)) {
       setSelectedDensity(densitiesForSelectedType[0]);
     }
-  }, [selectedMaterialType, densitiesForSelectedType, selectedDensity, isSimplifiedProduct, specs.size_id, specs.material_id, updateSpecs]);
+  }, [selectedMaterialType, densitiesForSelectedType, selectedDensity, isSimplifiedProduct, specs.size_id, specs.material_id, allowedMaterialsForSize.length, updateSpecs]);
 
   // По выбранным типу и плотности выставляем material_id и materialType (только при изменении — иначе рекурсия)
+  // Не перезаписываем material_id, если он задан из initial и материал в разрешённых — ждём синхронизацию selectedMaterialType/selectedDensity из effect выше
   useEffect(() => {
     if (!isSimplifiedProduct || !specs.size_id) return;
     const material = materialByTypeAndDensity;
@@ -324,11 +326,15 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     const nextMaterialType = paperType ? paperType.name : undefined;
     const alreadyEqual = Number(specs.material_id) === Number(material.id) && (!nextMaterialType || specs.materialType === nextMaterialType);
     if (alreadyEqual) return;
+    if (!userChoseTypeRef.current && specs.material_id != null && Number(material.id) !== Number(specs.material_id) && allowedMaterialsForSize.some(m => Number(m.id) === specs.material_id)) {
+      return;
+    }
+    userChoseTypeRef.current = false;
     updateSpecs({
       material_id: material.id,
       ...(nextMaterialType ? { materialType: nextMaterialType as any } : {}),
     }, true);
-  }, [materialByTypeAndDensity, isSimplifiedProduct, specs.size_id, specs.material_id, specs.materialType, warehousePaperTypes, updateSpecs]);
+  }, [materialByTypeAndDensity, isSimplifiedProduct, specs.size_id, specs.material_id, specs.materialType, allowedMaterialsForSize, warehousePaperTypes, updateSpecs]);
 
 
   // Продукт без материалов (нет paperType в схеме и не упрощённый с размерами/материалами) — не показываем секцию
@@ -374,7 +380,10 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         ) : (
           <select
             value={selectedDensity}
-            onChange={(e) => setSelectedDensity(e.target.value ? Number(e.target.value) : '')}
+            onChange={(e) => {
+              userChoseTypeRef.current = true;
+              setSelectedDensity(e.target.value ? Number(e.target.value) : '');
+            }}
             className="form-control"
             required
             title={selectedDensity ? `${selectedDensity} г/м²` : undefined}
