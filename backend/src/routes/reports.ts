@@ -5,6 +5,51 @@ import { hasColumn } from '../utils/tableSchemaCache'
 
 const router = Router()
 
+const DEFAULT_REASON_PRESETS: Record<string, string[]> = {
+  delete: [
+    'Ошибочный заказ',
+    'Дубликат заказа',
+    'Клиент отказался',
+    'Невозможно выполнить заказ',
+    'Техническая ошибка',
+  ],
+  status_cancel: [
+    'Клиент отменил заказ',
+    'Не подтверждена предоплата',
+    'Нет материалов в наличии',
+    'Нарушены сроки выполнения',
+    'Ошибочное оформление заказа',
+  ],
+  online_cancel: [
+    'Клиент не вышел на связь',
+    'Клиент отказался от заказа',
+    'Не подтверждена предоплата',
+    'Обнаружена ошибка в заказе',
+    'Дубликат онлайн-заказа',
+  ],
+}
+
+async function ensureReasonPresetsSettingsTable(db: any): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS reason_presets_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      setting_key TEXT NOT NULL UNIQUE,
+      presets_json TEXT NOT NULL,
+      updated_by INTEGER,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+}
+
+function normalizePresets(input: unknown, fallback: string[]): string[] {
+  const arr = Array.isArray(input) ? input : fallback
+  const normalized = arr
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+    .map((v) => v.slice(0, 120))
+  return Array.from(new Set(normalized))
+}
+
 /** Парсит period (дни) или date_from/date_to в диапазон для аналитики */
 function getAnalyticsDateRange(query: Record<string, unknown>): {
   startDate: Date
@@ -258,11 +303,83 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
     FROM orders WHERE ${dateFilter('')} AND prepaymentAmount > 0
   `, dateParams)
 
+  const createdExpr = 'COALESCE(o.createdAt, o.created_at)'
+  const currentRangeCondition = endDate
+    ? `${createdExpr} >= ? AND ${createdExpr} <= ?`
+    : `${createdExpr} >= ?`
+  const currentRangeParams = endDate ? [startDate.toISOString(), endDate.toISOString()] : [startDate.toISOString()]
+
+  const avgCheckTrend = await db.all<any>(`
+    WITH order_totals AS (
+      SELECT
+        o.id as order_id,
+        DATE(${createdExpr}) as date,
+        (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(i.price * i.quantity), 0) as order_total
+      FROM orders o
+      LEFT JOIN items i ON i.orderId = o.id
+      WHERE ${currentRangeCondition}
+      GROUP BY o.id, DATE(${createdExpr})
+    )
+    SELECT
+      date,
+      COUNT(order_id) as orders_count,
+      COALESCE(SUM(order_total), 0) as total_revenue,
+      COALESCE(AVG(order_total), 0) as avg_check
+    FROM order_totals
+    GROUP BY date
+    ORDER BY date
+  `, currentRangeParams)
+
+  const currentAvgRow = await db.get<any>(`
+    WITH order_totals AS (
+      SELECT
+        o.id as order_id,
+        (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(i.price * i.quantity), 0) as order_total
+      FROM orders o
+      LEFT JOIN items i ON i.orderId = o.id
+      WHERE ${currentRangeCondition}
+      GROUP BY o.id
+    )
+    SELECT COALESCE(AVG(order_total), 0) as avg_check, COUNT(order_id) as orders_count
+    FROM order_totals
+  `, currentRangeParams)
+
+  const compareEnd = endDate ? new Date(endDate) : new Date()
+  const compareSpanMs = Math.max(24 * 60 * 60 * 1000, compareEnd.getTime() - startDate.getTime())
+  const prevEnd = new Date(startDate.getTime() - 1)
+  const prevStart = new Date(prevEnd.getTime() - compareSpanMs)
+  const prevRangeParams = [prevStart.toISOString(), prevEnd.toISOString()]
+  const prevAvgRow = await db.get<any>(`
+    WITH order_totals AS (
+      SELECT
+        o.id as order_id,
+        (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(i.price * i.quantity), 0) as order_total
+      FROM orders o
+      LEFT JOIN items i ON i.orderId = o.id
+      WHERE ${createdExpr} >= ? AND ${createdExpr} <= ?
+      GROUP BY o.id
+    )
+    SELECT COALESCE(AVG(order_total), 0) as avg_check, COUNT(order_id) as orders_count
+    FROM order_totals
+  `, prevRangeParams)
+
+  const currentAvgCheck = Number(currentAvgRow?.avg_check ?? 0)
+  const previousAvgCheck = Number(prevAvgRow?.avg_check ?? 0)
+  const trendPercent = previousAvgCheck > 0 ? ((currentAvgCheck - previousAvgCheck) / previousAvgCheck) * 100 : null
+
   res.json({
     period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
     productProfitability,
     paymentAnalysis,
-    prepaymentAnalysis
+    prepaymentAnalysis,
+    avgCheckTrend,
+    avgCheckSummary: {
+      current_avg_check: currentAvgCheck,
+      current_orders_count: Number(currentAvgRow?.orders_count ?? 0),
+      previous_avg_check: previousAvgCheck,
+      previous_orders_count: Number(prevAvgRow?.orders_count ?? 0),
+      trend_percent: trendPercent
+    }
   })
 }))
 
@@ -305,6 +422,301 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
     avgProcessingTime: avgProcessingTime[0],
     cancellationReasons: cancellationReasons[0]
   })
+}))
+
+// GET /api/reports/analytics/orders/list — первичка заказов для drill-down из KPI
+router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
+  const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const db = await getDb()
+
+  const statusFilter = req.query.status ? String(req.query.status) : 'all'
+  const reasonFilter = req.query.reason_filter ? String(req.query.reason_filter) : ''
+  const departmentIdParam = req.query.department_id ? Number(req.query.department_id) : undefined
+  const departmentId = Number.isFinite(departmentIdParam) ? Number(departmentIdParam) : undefined
+  const limitRaw = Number(req.query.limit ?? 200)
+  const limit = Math.min(1000, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 200))
+
+  const where: string[] = [dateFilter('o')]
+  const params: any[] = [...dateParams]
+
+  if (departmentId !== undefined) {
+    where.push('u.department_id = ?')
+    params.push(departmentId)
+  }
+
+  if (statusFilter && statusFilter !== 'all') {
+    if (statusFilter === 'paid') {
+      where.push(`o.prepaymentStatus IN ('paid','successful')`)
+    } else if (statusFilter === 'pending_payment') {
+      where.push(`COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
+    } else if (statusFilter === 'completed') {
+      where.push('o.status = 4')
+    } else if (statusFilter === 'cancelled') {
+      where.push('o.status = 5')
+    } else if (statusFilter === 'created') {
+      where.push('o.status = 0')
+    } else {
+      const numericStatus = Number(statusFilter)
+      if (Number.isFinite(numericStatus)) {
+        where.push('o.status = ?')
+        params.push(numericStatus)
+      }
+    }
+  }
+
+  const ageHoursExpr = `(JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24`
+  if (reasonFilter) {
+    if (reasonFilter === 'cancellation_no_prepayment') {
+      where.push('o.status = 5 AND COALESCE(o.prepaymentAmount, 0) = 0')
+    } else if (reasonFilter === 'cancellation_unpaid_prepayment') {
+      where.push(`o.status = 5 AND COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
+    } else if (reasonFilter === 'cancellation_after_paid') {
+      where.push(`o.status = 5 AND o.prepaymentStatus IN ('paid','successful')`)
+    } else if (reasonFilter === 'delay_waiting_payment') {
+      where.push(`o.status IN (0,1,2,3) AND COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') AND ${ageHoursExpr} > 24`)
+    } else if (reasonFilter === 'delay_long_production') {
+      where.push(`o.status IN (2,3) AND ${ageHoursExpr} > 48`)
+    } else if (reasonFilter === 'delay_initial_stuck') {
+      where.push(`o.status IN (0,1) AND ${ageHoursExpr} > 24`)
+    } else {
+      const hasCancellationEvents = !!(await db.get(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='order_cancellation_events'"
+      ))
+      if (hasCancellationEvents) {
+        where.push(`EXISTS (
+          SELECT 1 FROM order_cancellation_events e
+          WHERE e.order_id = o.id AND e.reason_code = ?
+        )`)
+        params.push(reasonFilter)
+      }
+    }
+  }
+
+  const rows = await db.all<any>(`
+    SELECT
+      o.id,
+      o.number,
+      o.status,
+      COALESCE(o.createdAt, o.created_at) as created_at,
+      o.prepaymentStatus as prepayment_status,
+      o.paymentMethod as payment_method,
+      COALESCE(o.prepaymentAmount, 0) as prepayment_amount,
+      COALESCE(o.discount_percent, 0) as discount_percent,
+      u.id as user_id,
+      COALESCE(u.name, u.email, 'Без оператора') as user_name,
+      COALESCE(i_totals.raw_total, 0) * (1 - COALESCE(o.discount_percent, 0) / 100.0) as order_total
+    FROM orders o
+    LEFT JOIN users u ON u.id = o.userId
+    LEFT JOIN (
+      SELECT i.orderId as order_id, SUM(i.price * i.quantity) as raw_total
+      FROM items i
+      GROUP BY i.orderId
+    ) i_totals ON i_totals.order_id = o.id
+    WHERE ${where.join(' AND ')}
+    ORDER BY COALESCE(o.createdAt, o.created_at) DESC
+    LIMIT ?
+  `, [...params, limit])
+
+  const summary = rows.reduce((acc: { total_orders: number; total_revenue: number }, row: any) => {
+    acc.total_orders += 1
+    acc.total_revenue += Number(row.order_total || 0)
+    return acc
+  }, { total_orders: 0, total_revenue: 0 })
+
+  res.json({
+    period: {
+      startDate: startDate.toISOString(),
+      endDate: endDate?.toISOString() ?? undefined
+    },
+    filters: {
+      status: statusFilter,
+      reason_filter: reasonFilter || null,
+      department_id: departmentId ?? null,
+      limit
+    },
+    summary,
+    orders: rows
+  })
+}))
+
+// GET /api/reports/analytics/orders/reasons — топ причин отмен и задержек (эвристики)
+router.get('/analytics/orders/reasons', asyncHandler(async (req, res) => {
+  const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
+  const db = await getDb()
+  const departmentIdParam = req.query.department_id ? Number(req.query.department_id) : undefined
+  const departmentId = Number.isFinite(departmentIdParam) ? Number(departmentIdParam) : undefined
+
+  const baseWhere: string[] = [dateFilter('o')]
+  const baseParams: any[] = [...dateParams]
+  if (departmentId !== undefined) {
+    baseWhere.push('u.department_id = ?')
+    baseParams.push(departmentId)
+  }
+
+  const hasCancellationEvents = !!(await db.get(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='order_cancellation_events'"
+  ))
+
+  let cancellationRows: any[] = []
+  if (hasCancellationEvents) {
+    const eventWhere: string[] = []
+    const eventParams: any[] = []
+    if (endDate) {
+      eventWhere.push("e.created_at >= ? AND e.created_at <= ?")
+      eventParams.push(startDate.toISOString(), endDate.toISOString())
+    } else {
+      eventWhere.push("e.created_at >= ?")
+      eventParams.push(startDate.toISOString())
+    }
+    if (departmentId !== undefined) {
+      eventWhere.push('u.department_id = ?')
+      eventParams.push(departmentId)
+    }
+    cancellationRows = await db.all<any>(`
+      SELECT
+        COALESCE(e.reason, 'Не указано') as reason,
+        COALESCE(e.reason_code, 'unspecified') as reason_code,
+        COUNT(*) as count
+      FROM order_cancellation_events e
+      LEFT JOIN users u ON u.id = e.user_id
+      WHERE ${eventWhere.join(' AND ')}
+      GROUP BY reason, reason_code
+      ORDER BY count DESC
+      LIMIT 10
+    `, eventParams)
+  } else {
+    cancellationRows = await db.all<any>(`
+      SELECT
+        CASE
+          WHEN COALESCE(o.prepaymentAmount, 0) = 0 THEN 'Без предоплаты'
+          WHEN o.prepaymentStatus IN ('paid','successful') THEN 'После оплаченной предоплаты'
+          WHEN COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') THEN 'Неоплаченная предоплата'
+          ELSE 'Прочие'
+        END as reason,
+        CASE
+          WHEN COALESCE(o.prepaymentAmount, 0) = 0 THEN 'cancellation_no_prepayment'
+          WHEN o.prepaymentStatus IN ('paid','successful') THEN 'cancellation_after_paid'
+          WHEN COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') THEN 'cancellation_unpaid_prepayment'
+          ELSE 'cancellation_other'
+        END as reason_code,
+        COUNT(*) as count
+      FROM orders o
+      LEFT JOIN users u ON u.id = o.userId
+      WHERE ${baseWhere.join(' AND ')} AND o.status = 5
+      GROUP BY reason, reason_code
+      ORDER BY count DESC
+      LIMIT 10
+    `, baseParams)
+  }
+
+  const delayedRows = await db.all<any>(`
+    SELECT
+      CASE
+        WHEN COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24 THEN 'Ожидание предоплаты >24ч'
+        WHEN o.status IN (2,3) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 48 THEN 'Длительное производство >48ч'
+        WHEN o.status IN (0,1) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24 THEN 'Долго в начальных статусах >24ч'
+        ELSE 'Прочие задержки'
+      END as reason,
+      CASE
+        WHEN COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24 THEN 'delay_waiting_payment'
+        WHEN o.status IN (2,3) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 48 THEN 'delay_long_production'
+        WHEN o.status IN (0,1) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24 THEN 'delay_initial_stuck'
+        ELSE 'delay_other'
+      END as reason_code,
+      COUNT(*) as count
+    FROM orders o
+    LEFT JOIN users u ON u.id = o.userId
+    WHERE ${baseWhere.join(' AND ')}
+      AND o.status IN (0,1,2,3)
+      AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24
+    GROUP BY reason, reason_code
+    ORDER BY count DESC
+    LIMIT 10
+  `, baseParams)
+
+  const cancellationTotal = cancellationRows.reduce((s, r) => s + Number(r.count || 0), 0)
+  const delayedTotal = delayedRows.reduce((s, r) => s + Number(r.count || 0), 0)
+
+  const withPercent = (rows: any[], total: number) =>
+    rows.map((r) => ({
+      reason: r.reason,
+      reason_code: r.reason_code,
+      count: Number(r.count || 0),
+      percent: total > 0 ? (Number(r.count || 0) / total) * 100 : 0
+    }))
+
+  res.json({
+    period: { startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
+    department_id: departmentId ?? null,
+    cancellation_total: cancellationTotal,
+    delayed_total: delayedTotal,
+    cancellation_reasons: withPercent(cancellationRows, cancellationTotal),
+    delay_reasons: withPercent(delayedRows, delayedTotal),
+    notes: hasCancellationEvents
+      ? 'Причины отмен: фактические (из журнала). Причины задержек: эвристические.'
+      : 'Причины рассчитаны эвристически по данным статуса, предоплаты и времени в заказе.'
+  })
+}))
+
+// GET /api/reports/analytics/reason-presets — пресеты причин для UI отмены/удаления
+router.get('/analytics/reason-presets', asyncHandler(async (_req, res) => {
+  const db = await getDb()
+  await ensureReasonPresetsSettingsTable(db)
+
+  const rows = await db.all<{ setting_key: string; presets_json: string }[]>(
+    'SELECT setting_key, presets_json FROM reason_presets_settings WHERE setting_key IN (?, ?, ?)',
+    ['delete', 'status_cancel', 'online_cancel']
+  )
+
+  const data: Record<string, string[]> = { ...DEFAULT_REASON_PRESETS }
+  for (const row of rows as any[]) {
+    try {
+      const parsed = JSON.parse(row.presets_json)
+      data[row.setting_key] = normalizePresets(parsed, DEFAULT_REASON_PRESETS[row.setting_key] || [])
+    } catch {
+      // ignore broken JSON and keep defaults
+    }
+  }
+
+  res.json({
+    delete: data.delete || DEFAULT_REASON_PRESETS.delete,
+    status_cancel: data.status_cancel || DEFAULT_REASON_PRESETS.status_cancel,
+    online_cancel: data.online_cancel || DEFAULT_REASON_PRESETS.online_cancel,
+  })
+}))
+
+// PUT /api/reports/analytics/reason-presets — сохранить пресеты (только admin)
+router.put('/analytics/reason-presets', asyncHandler(async (req, res) => {
+  const user = (req as any).user as { id?: number; role?: string } | undefined
+  if (!user?.id || user.role !== 'admin') {
+    res.status(403).json({ error: 'Forbidden' })
+    return
+  }
+
+  const db = await getDb()
+  await ensureReasonPresetsSettingsTable(db)
+
+  const body = (req.body || {}) as Record<string, unknown>
+  const payload: Record<string, string[]> = {
+    delete: normalizePresets(body.delete, DEFAULT_REASON_PRESETS.delete),
+    status_cancel: normalizePresets(body.status_cancel, DEFAULT_REASON_PRESETS.status_cancel),
+    online_cancel: normalizePresets(body.online_cancel, DEFAULT_REASON_PRESETS.online_cancel),
+  }
+
+  for (const [key, presets] of Object.entries(payload)) {
+    const json = JSON.stringify(presets)
+    await db.run(
+      `INSERT INTO reason_presets_settings (setting_key, presets_json, updated_by, updated_at)
+       VALUES (?, ?, ?, datetime('now'))
+       ON CONFLICT(setting_key) DO UPDATE SET
+         presets_json = excluded.presets_json,
+         updated_by = excluded.updated_by,
+         updated_at = datetime('now')`,
+      [key, json, user.id]
+    )
+  }
+
+  res.json(payload)
 }))
 
 // GET /api/reports/analytics/managers/efficiency — эффективность менеджеров

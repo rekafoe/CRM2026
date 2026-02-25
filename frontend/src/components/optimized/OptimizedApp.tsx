@@ -36,6 +36,7 @@ import { useOptimizedAppData, type OrdersListTab } from './hooks/useOptimizedApp
 import { useModalState } from './hooks/useModalState';
 import { useOrderHandlers } from './hooks/useOrderHandlers';
 import { OrderDetailSection } from './components/OrderDetailSection';
+import { useReasonPrompt } from '../common/useReasonPrompt';
 
 interface OptimizedAppProps {
   onClose?: () => void;
@@ -71,6 +72,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
 
   // Хук для состояния модальных окон
   const modalState = useModalState();
+  const { requestReason, ReasonPromptModalElement } = useReasonPrompt();
 
   // Хук для обработчиков заказов
   const orderHandlers = useOrderHandlers({
@@ -81,6 +83,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
     contextDate,
     loadOrders,
     closeCalculator: modalState.closeCalculator,
+    requestReason,
   });
 
   // Деструктуризация modalState для удобства
@@ -730,6 +733,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
         isVisible={showPageSwitcher}
         onClose={() => setShowPageSwitcher(false)}
       />
+      {ReasonPromptModalElement}
     </div>
   );
 };

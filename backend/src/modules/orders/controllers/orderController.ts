@@ -86,7 +86,13 @@ export class OrderController {
   static async cancelOnline(req: Request, res: Response) {
     try {
       const id = Number(req.params.id)
-      await OrderService.deleteOrder(id)
+      const authUser = (req as any).user as { id: number } | undefined
+      const cancelReason = String((req.body as any)?.cancel_reason || '').trim()
+      if (!cancelReason) {
+        res.status(400).json({ error: 'Необходимо указать причину отмены' })
+        return
+      }
+      await OrderService.deleteOrder(id, authUser?.id, cancelReason)
       res.json({ id, softCancelled: true })
     } catch (error: any) {
       res.status(400).json({ error: error.message })
@@ -368,10 +374,11 @@ export class OrderController {
   static async updateOrderStatus(req: Request, res: Response) {
     try {
       const id = Number(req.params.id)
-      const { status } = req.body as { status: number }
+      const { status, cancel_reason } = req.body as { status: number; cancel_reason?: string }
+      const authUser = (req as any).user as { id: number } | undefined
       
       logger.info(`Updating order ${id} status to ${status}`)
-      const updated = await OrderService.updateOrderStatus(id, status)
+      const updated = await OrderService.updateOrderStatus(id, status, authUser?.id, cancel_reason)
       logger.info(`Order ${id} status updated successfully`)
       res.json(updated)
     } catch (error: any) {
@@ -419,8 +426,13 @@ export class OrderController {
     try {
       const id = Number(req.params.id)
       const authUser = (req as any).user as { id: number } | undefined
+      const deleteReason = String((req.body as any)?.delete_reason || (req.query as any)?.delete_reason || '').trim()
+      if (!deleteReason) {
+        res.status(400).json({ error: 'Необходимо указать причину удаления/отмены заказа' })
+        return
+      }
       
-      await OrderService.deleteOrder(id, authUser?.id)
+      await OrderService.deleteOrder(id, authUser?.id, deleteReason)
       res.status(204).end()
     } catch (error: any) {
       res.status(500).json({ error: error.message })
@@ -535,14 +547,19 @@ export class OrderController {
         return 
       }
       
-      const { orderIds } = req.body
+      const { orderIds, delete_reason } = req.body
       
       if (!Array.isArray(orderIds) || orderIds.length === 0) {
         res.status(400).json({ error: 'orderIds must be a non-empty array' })
         return
       }
+      const reasonText = String(delete_reason || '').trim()
+      if (!reasonText) {
+        res.status(400).json({ error: 'Необходимо указать причину удаления/отмены заказов' })
+        return
+      }
       
-      const result = await OrderService.bulkDeleteOrders(orderIds, authUser.id)
+      const result = await OrderService.bulkDeleteOrders(orderIds, authUser.id, reasonText)
       res.json(result)
     } catch (error: any) {
       logger.error('Error bulk deleting orders', error)

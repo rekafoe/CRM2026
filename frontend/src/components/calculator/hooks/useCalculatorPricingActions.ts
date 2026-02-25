@@ -906,7 +906,7 @@ export function useCalculatorPricingActions({
 
     const timeoutId = setTimeout(() => {
       void calculateCost(false);
-    }, 1000);
+    }, 120);
 
     return () => clearTimeout(timeoutId);
   }, [userInteracted, specs, isValid, validationErrors, calculateCost]);

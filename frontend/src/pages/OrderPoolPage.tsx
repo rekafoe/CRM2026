@@ -13,6 +13,8 @@ import { PrepaymentModal } from '../components/PrepaymentModal';
 import { PrepaymentDetailsModal } from '../components/PrepaymentDetailsModal';
 import { useToastNotifications } from '../components/Toast';
 import { useLogger } from '../utils/logger';
+import { useReasonPrompt } from '../components/common/useReasonPrompt';
+import { useReasonPresets } from '../components/common/useReasonPresets';
 import '../styles/order-pool.css';
 
 interface OrderPoolPageProps {
@@ -196,6 +198,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const navigate = useNavigate();
   const toast = useToastNotifications();
   const logger = useLogger('OrderPoolPage');
+  const { requestReason, ReasonPromptModalElement } = useReasonPrompt();
+  const { getPresets } = useReasonPresets();
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -504,7 +508,15 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const handleCancelOnline = useCallback(
     async (orderId: number) => {
       try {
-        await cancelOnlineOrder(orderId);
+        const reason = await requestReason({
+          title: 'Причина отмены онлайн-заказа',
+          placeholder: 'Укажите причину отмены онлайн-заказа',
+          presets: getPresets('online_cancel'),
+          confirmText: 'Отменить заказ',
+          rememberKey: 'order_online_cancel_reason',
+        });
+        if (!reason) return;
+        await cancelOnlineOrder(orderId, reason);
         toast.success('Заказ отменен!', `Онлайн-заказ ${orderId} отменен и перемещен в пул.`);
         updateOrderInList(orderId, { is_cancelled: 1 });
       } catch (err) {
@@ -512,7 +524,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         toast.error('Ошибка отмены', (err as Error).message);
       }
     },
-    [toast, logger, updateOrderInList]
+    [toast, logger, updateOrderInList, requestReason, getPresets]
   );
 
   const handlePrepaymentCreated = useCallback(
@@ -847,6 +859,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           onOpenPrepaymentModal={() => setShowPrepaymentModal(true)}
         />
       )}
+      {ReasonPromptModalElement}
     </div>
   );
 };

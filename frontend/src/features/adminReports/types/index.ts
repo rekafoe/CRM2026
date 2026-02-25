@@ -75,6 +75,19 @@ export interface FinancialAnalyticsData {
   productProfitability: ProductProfitability[];
   paymentAnalysis: PaymentAnalysis;
   prepaymentAnalysis: PrepaymentAnalysis;
+  avgCheckTrend?: Array<{
+    date: string;
+    orders_count: number;
+    total_revenue: number;
+    avg_check: number;
+  }>;
+  avgCheckSummary?: {
+    current_avg_check: number;
+    current_orders_count: number;
+    previous_avg_check: number;
+    previous_orders_count: number;
+    trend_percent: number | null;
+  };
 }
 
 // === ТИПЫ СТАТУСОВ ЗАКАЗОВ ===

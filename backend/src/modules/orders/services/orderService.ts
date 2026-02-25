@@ -20,6 +20,50 @@ const WEBSITE_PRICE_TYPE_MULTIPLIERS: Record<string, number> = {
 }
 
 export class OrderService {
+  private static normalizeReasonCode(reason: string): string {
+    return String(reason || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_а-яё-]/g, '')
+      .slice(0, 80);
+  }
+
+  private static async recordCancellationEvent(
+    db: any,
+    payload: {
+      orderId?: number | null;
+      orderNumber?: string | null;
+      orderSource?: string | null;
+      statusBefore?: number | null;
+      eventType: 'delete' | 'soft_cancel' | 'status_cancel';
+      reason: string;
+      userId?: number;
+    }
+  ) {
+    const exists = await db.get(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='order_cancellation_events'"
+    );
+    if (!exists) return;
+    const reasonText = String(payload.reason || '').trim();
+    if (!reasonText) return;
+    await db.run(
+      `INSERT INTO order_cancellation_events
+      (order_id, order_number, order_source, status_before, event_type, reason, reason_code, user_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [
+        payload.orderId ?? null,
+        payload.orderNumber ?? null,
+        payload.orderSource ?? null,
+        payload.statusBefore ?? null,
+        payload.eventType,
+        reasonText,
+        this.normalizeReasonCode(reasonText),
+        payload.userId ?? null
+      ]
+    );
+  }
+
   private static buildDefaultReadyDate(baseDate?: string) {
     const date = baseDate ? new Date(baseDate) : new Date()
     if (isNaN(date.getTime())) {
@@ -487,7 +531,7 @@ export class OrderService {
     return { ...(updated as any as Order), items: [] }
   }
 
-  static async updateOrderStatus(id: number, status: number) {
+  static async updateOrderStatus(id: number, status: number, userId?: number, cancelReason?: string) {
     const db = await getDb()
     
     // Сначала проверяем, есть ли заказ в таблице photo_orders (Telegram заказы)
@@ -509,6 +553,26 @@ export class OrderService {
       const orderInOrders = await db.get('SELECT id FROM orders WHERE id = ?', [id])
       
       if (orderInOrders) {
+        if (Number(status) === 5) {
+          const reasonText = String(cancelReason || '').trim();
+          if (!reasonText) {
+            throw new Error('Для отмены заказа необходимо указать причину')
+          }
+          const ord = await db.get<{ number?: string | null; source?: string | null; status?: number | null }>(
+            'SELECT number, source, status FROM orders WHERE id = ?',
+            [id]
+          );
+          await this.recordCancellationEvent(db, {
+            orderId: id,
+            orderNumber: ord?.number ?? null,
+            orderSource: ord?.source ?? null,
+            statusBefore: Number(ord?.status ?? 0),
+            eventType: 'status_cancel',
+            reason: reasonText,
+            userId
+          });
+        }
+
         // Обновляем обычный заказ
         try {
           await db.run('UPDATE orders SET status = ?, updatedAt = datetime(\"now\") WHERE id = ?', [status, id])
@@ -564,9 +628,13 @@ export class OrderService {
     return { id: row.id, userId: targetUserId }
   }
 
-  static async deleteOrder(id: number, userId?: number) {
+  static async deleteOrder(id: number, userId?: number, reason?: string) {
     // Собираем все позиции заказа и их состав
     const db = await getDb()
+    const reasonText = String(reason || '').trim()
+    if (!reasonText) {
+      throw new Error('Для удаления/отмены заказа необходимо указать причину')
+    }
     const items = (await db.all<{
       id: number
       type: string
@@ -614,13 +682,22 @@ export class OrderService {
     await db.run('BEGIN')
     try {
       // Узнаем источник заказа (для онлайн/телеграм делаем мягкую отмену)
-      const ord = await db.get<{ source?: string; status?: number; created_date?: string }>(
-        'SELECT source, status, COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
+      const ord = await db.get<{ source?: string; status?: number; created_date?: string; number?: string }>(
+        'SELECT source, status, number, COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
         [id]
       )
 
       // Если онлайн/телеграм — не удаляем, а переводим в пул: статус 0, снимаем привязку и ставим is_cancelled=1
       if (ord && (ord.source === 'website' || ord.source === 'telegram')) {
+        await this.recordCancellationEvent(db, {
+          orderId: id,
+          orderNumber: ord?.number ?? null,
+          orderSource: ord?.source ?? null,
+          statusBefore: Number(ord?.status ?? 0),
+          eventType: 'soft_cancel',
+          reason: reasonText,
+          userId
+        })
         await db.run('UPDATE orders SET status = 0, userId = NULL, is_cancelled = 1, updatedAt = datetime("now") WHERE id = ?', [id])
         await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
         await db.run('COMMIT')
@@ -646,6 +723,16 @@ export class OrderService {
       }
 
       await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
+
+      await this.recordCancellationEvent(db, {
+        orderId: id,
+        orderNumber: ord?.number ?? null,
+        orderSource: ord?.source ?? null,
+        statusBefore: Number(ord?.status ?? 0),
+        eventType: 'delete',
+        reason: reasonText,
+        userId
+      })
 
       // Удаляем заказ (позиции удалятся каскадно)
       await db.run('DELETE FROM orders WHERE id = ?', [id])
@@ -821,7 +908,7 @@ export class OrderService {
     return { updatedCount: orderIds.length, newStatus }
   }
 
-  static async bulkDeleteOrders(orderIds: number[], userId?: number) {
+  static async bulkDeleteOrders(orderIds: number[], userId?: number, reason?: string) {
     const db = await getDb()
     
     if (orderIds.length === 0) {
@@ -833,7 +920,7 @@ export class OrderService {
     await db.run('BEGIN')
     try {
       for (const orderId of orderIds) {
-        await OrderService.deleteOrder(orderId, userId)
+        await OrderService.deleteOrder(orderId, userId, reason)
         deletedCount++
       }
       await db.run('COMMIT')

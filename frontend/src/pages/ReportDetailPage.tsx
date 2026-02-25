@@ -3,6 +3,8 @@ import { getFullDailyReport, updateOrderStatus, deleteOrder, getOrderStatuses, d
 import { Order, DailyReport } from '../types';
 import { ProgressBar } from '../components/order/ProgressBar';
 import { OrderItem } from '../components/OrderItem';
+import { useReasonPrompt } from '../components/common/useReasonPrompt';
+import { useReasonPresets } from '../components/common/useReasonPresets';
 
 interface ReportDetailPageProps {
   reportDate: string;
@@ -19,6 +21,8 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
   const [statuses, setStatuses] = useState<Array<{ id: number; name: string; color?: string; sort_order: number }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const { requestReason, ReasonPromptModalElement } = useReasonPrompt();
+  const { getPresets } = useReasonPresets();
 
   useEffect(() => {
     loadReportData();
@@ -43,7 +47,18 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
 
   const handleStatusChange = async (orderId: number, newStatusId: number) => {
     try {
-      await updateOrderStatus(orderId, newStatusId);
+      let cancelReason: string | undefined;
+      if (Number(newStatusId) === 5) {
+        cancelReason = (await requestReason({
+          title: 'Причина отмены заказа',
+          placeholder: 'Укажите причину отмены заказа',
+          presets: getPresets('status_cancel'),
+          confirmText: 'Отменить заказ',
+          rememberKey: 'order_status_cancel_reason',
+        })) || undefined;
+        if (!cancelReason) return;
+      }
+      await updateOrderStatus(orderId, newStatusId, cancelReason);
       await loadReportData();
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -53,9 +68,17 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
 
   const handleDeleteOrder = async (orderId: number) => {
     if (!confirm('Вы уверены, что хотите удалить этот заказ?')) return;
+    const reason = await requestReason({
+      title: 'Причина удаления/отмены заказа',
+      placeholder: 'Опишите причину удаления или отмены заказа',
+      presets: getPresets('delete'),
+      confirmText: 'Удалить/отменить',
+      rememberKey: 'order_delete_reason',
+    });
+    if (!reason) return;
 
     try {
-      await deleteOrder(orderId);
+      await deleteOrder(orderId, reason);
       await loadReportData();
       alert('Заказ успешно удалён');
     } catch (error) {
@@ -361,6 +384,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
           </div>
         )}
       </div>
+      {ReasonPromptModalElement}
     </div>
   );
 };

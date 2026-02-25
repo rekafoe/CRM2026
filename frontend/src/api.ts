@@ -65,8 +65,8 @@ export const getOrders = (params?: { all?: boolean; issued_on?: string }) => {
 export const getOrderPoolSync = () =>
   api.get<{ lastWebsiteOrderAt: number }>('/orders/pool-sync');
 export const createOrder = (date?: string) => api.post<Order>('/orders', { date });
-export const updateOrderStatus = (id: number, status: number) =>
-  api.put<Order>(`/orders/${id}/status`, { status });
+export const updateOrderStatus = (id: number, status: number, cancelReason?: string) =>
+  api.put<Order>(`/orders/${id}/status`, { status, ...(cancelReason ? { cancel_reason: cancelReason } : {}) });
 export const updateOrderCustomer = (id: number, customer_id: number | null) =>
   api.put<Order>(`/orders/${id}/customer`, { customer_id });
 /** Скидка на заказ: 0, 5, 10, 15, 20, 25 (%) */
@@ -77,8 +77,8 @@ export const updateOrderDiscount = (orderId: number, discount_percent: number) =
 export const reassignOrderByNumber = (number: string, userId: number) =>
   api.post(`/orders/reassign/${encodeURIComponent(number)}`, { userId });
 
-export const cancelOnlineOrder = (id: number) =>
-  api.post(`/orders/${id}/cancel-online`, {});
+export const cancelOnlineOrder = (id: number, cancelReason: string) =>
+  api.post(`/orders/${id}/cancel-online`, { cancel_reason: cancelReason });
 
 /** Выдать заказ: 100% остатка → предоплата, debt_closed, статус 4 */
 export const issueOrder = (id: number) =>
@@ -87,7 +87,8 @@ export const issueOrder = (id: number) =>
 export const addOrderItem = (id: number, item: Omit<Item, 'id'>) =>
   api.post<Item>(`/orders/${id}/items`, item);
 
-export const deleteOrder = (id: number) => api.delete(`/orders/${id}`);
+export const deleteOrder = (id: number, deleteReason: string) =>
+  api.delete(`/orders/${id}`, { data: { delete_reason: deleteReason } });
 export const deleteOrderItem = (orderId: number, itemId: number) =>
   api.delete(`/orders/${orderId}/items/${itemId}`);
 export const updateOrderItem = (orderId: number, itemId: number, data: Partial<Item>) =>
@@ -255,6 +256,19 @@ export const getFinancialProfitabilityAnalytics = (params?: AnalyticsPeriodParam
       total_pending_prepayment: number;
       avg_paid_prepayment: number;
     };
+    avgCheckTrend?: Array<{
+      date: string;
+      orders_count: number;
+      total_revenue: number;
+      avg_check: number;
+    }>;
+    avgCheckSummary?: {
+      current_avg_check: number;
+      current_orders_count: number;
+      previous_avg_check: number;
+      previous_orders_count: number;
+      trend_percent: number | null;
+    };
   }>('/reports/analytics/financial/profitability', { params });
 
 // === АНАЛИТИКА СТАТУСОВ ЗАКАЗОВ ===
@@ -285,6 +299,51 @@ export const getOrderStatusFunnelAnalytics = (params?: AnalyticsPeriodParams) =>
       cancelled_amount: number;
     };
   }>('/reports/analytics/orders/status-funnel', { params });
+
+export const getAnalyticsOrdersList = (params?: AnalyticsPeriodParams & { status?: string; reason_filter?: string; department_id?: number; limit?: number }) =>
+  api.get<{
+    period: { startDate: string; endDate?: string };
+    filters: { status: string; reason_filter?: string | null; department_id: number | null; limit: number };
+    summary: { total_orders: number; total_revenue: number };
+    orders: Array<{
+      id: number;
+      number: string;
+      status: number;
+      created_at: string;
+      prepayment_status?: string | null;
+      payment_method?: string | null;
+      prepayment_amount: number;
+      discount_percent: number;
+      user_id?: number | null;
+      user_name?: string | null;
+      order_total: number;
+    }>;
+  }>('/reports/analytics/orders/list', { params });
+
+export const getAnalyticsOrderReasons = (params?: AnalyticsPeriodParams & { department_id?: number }) =>
+  api.get<{
+    period: { startDate: string; endDate?: string };
+    department_id: number | null;
+    cancellation_total: number;
+    delayed_total: number;
+    cancellation_reasons: Array<{ reason: string; reason_code: string; count: number; percent: number }>;
+    delay_reasons: Array<{ reason: string; reason_code: string; count: number; percent: number }>;
+    notes?: string;
+  }>('/reports/analytics/orders/reasons', { params });
+
+export const getReasonPresetsSettings = () =>
+  api.get<{
+    delete: string[];
+    status_cancel: string[];
+    online_cancel: string[];
+  }>('/reports/analytics/reason-presets');
+
+export const updateReasonPresetsSettings = (payload: {
+  delete: string[];
+  status_cancel: string[];
+  online_cancel: string[];
+}) =>
+  api.put('/reports/analytics/reason-presets', payload);
 
 // === АНАЛИТИКА ЭФФЕКТИВНОСТИ МЕНЕДЖЕРОВ ===
 export const getManagerEfficiencyAnalytics = (params?: AnalyticsPeriodParams & { department_id?: number }) =>

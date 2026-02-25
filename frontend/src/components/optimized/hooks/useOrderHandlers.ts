@@ -4,6 +4,7 @@ import { Order } from '../../../types';
 import { createOrder, deleteOrder, addOrderItem, deleteOrderItem, updateOrderStatus } from '../../../api';
 import { useToastNotifications } from '../../Toast';
 import { useLogger } from '../../../utils/logger';
+import { useReasonPresets } from '../../common/useReasonPresets';
 
 interface UseOrderHandlersProps {
   orders: Order[];
@@ -13,6 +14,7 @@ interface UseOrderHandlersProps {
   contextDate: string;
   loadOrders: (date?: string, force?: boolean) => void;
   closeCalculator: () => void;
+  requestReason: (options: { title: string; placeholder?: string; presets?: string[]; confirmText?: string; rememberKey?: string }) => Promise<string | null>;
 }
 
 export const useOrderHandlers = ({
@@ -23,9 +25,11 @@ export const useOrderHandlers = ({
   contextDate,
   loadOrders,
   closeCalculator,
+  requestReason,
 }: UseOrderHandlersProps) => {
   const toast = useToastNotifications();
   const logger = useLogger('OptimizedApp');
+  const { getPresets } = useReasonPresets();
 
   const handleCreateOrder = useCallback(async () => {
     const res = await createOrder(contextDate);
@@ -38,13 +42,21 @@ export const useOrderHandlers = ({
 
   const handleDeleteOrder = useCallback(async (orderId: number) => {
     try {
-      await deleteOrder(orderId);
+      const reason = await requestReason({
+        title: 'Причина удаления/отмены заказа',
+        placeholder: 'Опишите причину удаления или отмены заказа',
+        presets: getPresets('delete'),
+        confirmText: 'Удалить/отменить',
+        rememberKey: 'order_delete_reason',
+      });
+      if (!reason) return;
+      await deleteOrder(orderId, reason);
       setSelectedId(null);
       loadOrders();
     } catch (e: any) {
       alert('Не удалось удалить заказ. Возможно нужна авторизация.');
     }
-  }, [setSelectedId, loadOrders]);
+  }, [setSelectedId, loadOrders, requestReason, getPresets]);
 
   const handleAddToOrder = useCallback(
     async (item: any) => {
@@ -153,6 +165,17 @@ export const useOrderHandlers = ({
 
   const handleStatusChange = useCallback(async (orderId: number, newStatus: number) => {
     try {
+      let cancelReason: string | undefined;
+      if (Number(newStatus) === 5) {
+        cancelReason = (await requestReason({
+          title: 'Причина отмены заказа',
+          placeholder: 'Укажите причину отмены заказа',
+          presets: getPresets('status_cancel'),
+          confirmText: 'Отменить заказ',
+          rememberKey: 'order_status_cancel_reason',
+        })) || undefined;
+        if (!cancelReason) return;
+      }
       // Сначала оптимистично обновляем локальное состояние
       setOrders((prev: Order[]) =>
         prev.map((order: Order) =>
@@ -161,13 +184,13 @@ export const useOrderHandlers = ({
       );
 
       // Затем отправляем запрос на бэкенд
-      await updateOrderStatus(orderId, newStatus);
+      await updateOrderStatus(orderId, newStatus, cancelReason);
     } catch (err) {
       alert('Не удалось обновить статус. Возможно нужна авторизация.');
       // В случае ошибки можно перезагрузить заказы, чтобы вернуть корректное состояние
       loadOrders();
     }
-  }, [setOrders, loadOrders]);
+  }, [setOrders, loadOrders, requestReason, getPresets]);
 
   return {
     handleCreateOrder,
