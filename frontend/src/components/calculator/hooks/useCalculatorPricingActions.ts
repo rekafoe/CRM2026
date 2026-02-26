@@ -513,13 +513,13 @@ export function useCalculatorPricingActions({
           technologyCode: s.technologyCode
         }));
 
-        // Анализ материалов
+        // Анализ материалов (?? чтобы 0 не превращался в undefined)
         const materialsFlat = materials.map((m: any) => ({
           id: m.materialId || m.id,
           name: m.materialName || m.name,
-          unitPrice: m.unitPrice || m.price,
+          unitPrice: m.unitPrice ?? m.unit_price ?? m.price ?? 0,
           quantity: m.quantity,
-          totalCost: m.totalCost || m.total
+          totalCost: m.totalCost ?? m.total ?? 0
         }));
 
         console.log('🧾 === ПОДРОБНЫЙ АНАЛИЗ МАТЕРИАЛОВ ===');
