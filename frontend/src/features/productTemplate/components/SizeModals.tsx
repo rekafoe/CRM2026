@@ -45,8 +45,8 @@ interface CopySizesModalProps {
   copyFromTypeId: ProductTypeId | null
   setCopyFromTypeId: (id: ProductTypeId | null) => void
   copySourceSizes: SimplifiedSizeConfig[]
-  copySelectedSizeIds: string[]
-  setCopySelectedSizeIds: React.Dispatch<React.SetStateAction<string[]>>
+  copySelectedSizeIds: (number | string)[]
+  setCopySelectedSizeIds: React.Dispatch<React.SetStateAction<(number | string)[]>>
   typeConfigs: Record<string, { sizes: SimplifiedSizeConfig[] }> | undefined
   onCommit: () => void
 }
@@ -109,7 +109,7 @@ export const CopySizesModal: React.FC<CopySizesModalProps> = ({
             </label>
             <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: 8, padding: 8 }}>
               {copySourceSizes.map((s) => {
-                const checked = copySelectedSizeIds.includes(s.id)
+                const checked = copySelectedSizeIds.some((id) => String(id) === String(s.id))
                 return (
                   <label key={s.id} className="checkbox-label" style={{ display: 'block', marginBottom: 6 }}>
                     <input
@@ -117,9 +117,9 @@ export const CopySizesModal: React.FC<CopySizesModalProps> = ({
                       checked={checked}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setCopySelectedSizeIds((prev) => (prev.includes(s.id) ? prev : [...prev, s.id]))
+                          setCopySelectedSizeIds((prev) => (prev.some((id) => String(id) === String(s.id)) ? prev : [...prev, s.id]))
                         } else {
-                          setCopySelectedSizeIds((prev) => prev.filter((id) => id !== s.id))
+                          setCopySelectedSizeIds((prev) => prev.filter((id) => String(id) !== String(s.id)))
                         }
                       }}
                     />

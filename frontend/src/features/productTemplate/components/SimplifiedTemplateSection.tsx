@@ -39,7 +39,7 @@ interface Props {
   services: ServiceRow[]
 }
 
-const uid = () => `sz_${Date.now()}_${Math.random().toString(16).slice(2)}`
+const uid = () => Date.now() + Math.floor(Math.random() * 1000)
 
 const cloneSizeWithNewId = (size: SimplifiedSizeConfig): SimplifiedSizeConfig => ({
   ...size,
@@ -49,6 +49,7 @@ const cloneSizeWithNewId = (size: SimplifiedSizeConfig): SimplifiedSizeConfig =>
     tiers: (pp.tiers || []).map((t) => ({ ...t })),
   })),
   allowed_material_ids: [...(size.allowed_material_ids || [])],
+  allowed_base_material_ids: [...(size.allowed_base_material_ids || [])],
   material_prices: (size.material_prices || []).map((mp) => ({
     ...mp,
     tiers: (mp.tiers || []).map((t) => ({ ...t })),
@@ -92,7 +93,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const [newSize, setNewSize] = useState<{ label: string; width_mm: string; height_mm: string }>({ label: '', width_mm: '', height_mm: '' })
   const [showCopySizes, setShowCopySizes] = useState(false)
   const [copyFromTypeId, setCopyFromTypeId] = useState<ProductTypeId | null>(null)
-  const [copySelectedSizeIds, setCopySelectedSizeIds] = useState<string[]>([])
+  const [copySelectedSizeIds, setCopySelectedSizeIds] = useState<(number | string)[]>([])
   const [selectedPaperTypeId, setSelectedPaperTypeId] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [newPageToAdd, setNewPageToAdd] = useState('')
@@ -241,9 +242,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   useEffect(() => {
     if (!showCopySizes || copyFromTypeId == null) return
     const sourceSizes = value.typeConfigs?.[String(copyFromTypeId)]?.sizes ?? []
-    const sourceIds = new Set(sourceSizes.map((s) => s.id))
     setCopySelectedSizeIds((prev) => {
-      const filtered = prev.filter((id) => sourceIds.has(id))
+      const filtered = prev.filter((id) => sourceSizes.some((s) => String(s.id) === String(id)))
       if (filtered.length > 0) return filtered
       return sourceSizes.map((s) => s.id)
     })
@@ -258,8 +258,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   }, [])
 
   // Обновить диапазоны только в печати (материалы имеют фиксированные стандартные диапазоны SRA3)
-  const updateSizeRanges = useCallback((sizeId: string, newRanges: Tier[]) => {
-    const size = sizes.find(s => s.id === sizeId)
+  const updateSizeRanges = useCallback((sizeId: number | string, newRanges: Tier[]) => {
+    const size = sizes.find(s => String(s.id) === String(sizeId))
     if (!size) return
 
     const updatedPrintPrices = size.print_prices.map(pp => {
@@ -383,7 +383,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
 
   // Отслеживание взаимодействия пользователя с услугами для каждого размера отдельно
   // Ключ - ID размера, значение - был ли пользователь взаимодействовал с услугами
-  const hasUserInteractedWithServicesRef = useRef<Map<string, boolean>>(new Map())
+  const hasUserInteractedWithServicesRef = useRef<Map<string | number, boolean>>(new Map())
   
   // Восстанавливаем флаг взаимодействия при смене размера
   useEffect(() => {
@@ -587,7 +587,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
               <button
                 key={s.id}
                 type="button"
-                className={`simplified-size ${selectedSizeId === s.id ? 'simplified-size--active' : ''}`}
+                className={`simplified-size ${String(selectedSizeId) === String(s.id) ? 'simplified-size--active' : ''}`}
                 onClick={() => setSelectedSizeId(s.id)}
               >
                 <div className="simplified-size__label">{s.label}</div>
@@ -681,6 +681,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   paperTypes={paperTypes}
                   materialsForSelectedPaperType={materialsForSelectedPaperType}
                   allMaterialsFromAllPaperTypes={allMaterialsFromAllPaperTypes}
+                  allMaterials={allMaterials}
                   hasUserInteractedWithMaterialsRef={hasUserInteractedWithMaterialsRef}
                   updateSize={updateSize}
                 />

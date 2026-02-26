@@ -37,6 +37,7 @@ export interface ProductConfig {
   name: string;
   description?: string;
   config_data: Record<string, any>;
+  constraints?: Record<string, any>;
   is_active: boolean;
   created_at: string;
   updated_at: string;

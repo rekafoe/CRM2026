@@ -29,7 +29,7 @@ export type SimplifiedPagesConfig = {
   default?: number;
 }
 export type SimplifiedSizeConfig = {
-  id: string;
+  id: number | string;
   label: string;
   width_mm: number;
   height_mm: number;
@@ -38,6 +38,8 @@ export type SimplifiedSizeConfig = {
   default_print?: Partial<SimplifiedPrintKey>;
   print_prices: SimplifiedPrintPrice[];
   allowed_material_ids: number[];
+  /** Материалы-основы (заготовки): футболки, кружки и т.п. — расход 1 шт на изделие */
+  allowed_base_material_ids?: number[];
   material_prices: SimplifiedMaterialPrice[];
   finishing: SimplifiedFinishingPrice[];
 }
@@ -72,9 +74,11 @@ export type InitialOperation = {
 
 /** Начальные значения калькулятора для подтипа (опционально; если поле не задано — авто-определение) */
 export type SubtypeInitialDefaults = {
-  size_id?: string;
+  size_id?: number | string;
   quantity?: number;
   material_id?: number;
+  /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
+  base_material_id?: number;
   sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
   /** Код технологии печати (digital_toner, offset и т.д.) */
   print_technology?: string;
@@ -266,8 +270,8 @@ export function generateTypeId(): ProductTypeId {
   return Date.now() + Math.floor(Math.random() * 1000)
 }
 
-export function generateSizeId(): string {
-  return `sz_${Date.now()}_${Math.random().toString(16).slice(2)}`
+export function generateSizeId(): number {
+  return Date.now() + Math.floor(Math.random() * 1000)
 }
 
 /** Стандартные диапазоны тиража: 1, 5, 10, 50, 100, 500, 1000 */

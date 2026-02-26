@@ -225,6 +225,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}` } : {}),
       quantity: initial?.quantity ?? autoQty,
       ...(initial?.material_id != null ? { material_id: initial.material_id } : {}),
+      ...(initial?.base_material_id != null ? { base_material_id: initial.base_material_id } : {}),
       ...(initial?.sides_mode ? { sides: initial.sides_mode === 'single' ? 1 : 2 } : {}),
       selectedOperations: operationsFromInitial,
     }));

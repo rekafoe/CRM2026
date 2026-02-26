@@ -6,7 +6,7 @@ export interface ParamsSectionSpecs {
   format: string;
   quantity: number;
   sides: 1 | 2;
-  size_id?: string;
+  size_id?: number | string;
   pages?: number;
 }
 
@@ -55,8 +55,8 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
     : schema?.template?.simplified?.sizes;
   const isSimplifiedProduct = simplifiedSizes && simplifiedSizes.length > 0;
 
-  const selectedSizeId = specs.size_id || (simplifiedSizes?.length ? simplifiedSizes[0].id : '');
-  const selectedSize = simplifiedSizes?.find((s: any) => s.id === selectedSizeId);
+  const selectedSizeId = specs.size_id ?? (simplifiedSizes?.length ? simplifiedSizes[0].id : undefined);
+  const selectedSize = simplifiedSizes?.find((s: any) => String(s.id) === String(selectedSizeId));
   const minQtyForSize = selectedSize
     ? ((selectedSize as any).min_qty ?? (selectedSize as any).print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1)
     : 1;
@@ -64,7 +64,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   // 🆕 Устанавливаем первый размер и мин. количество для упрощённых продуктов
   React.useEffect(() => {
     if (isSimplifiedProduct && simplifiedSizes.length > 0) {
-      const isValidSizeId = specs.size_id && simplifiedSizes.some((s: any) => s.id === specs.size_id);
+      const isValidSizeId = specs.size_id != null && simplifiedSizes.some((s: any) => String(s.id) === String(specs.size_id));
       if (!isValidSizeId) {
         const first = simplifiedSizes[0] as any;
         const minQty = first.min_qty ?? first.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;

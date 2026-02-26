@@ -12,8 +12,10 @@ interface MaterialsCardProps {
   paperTypes: PaperTypeForCalculator[]
   materialsForSelectedPaperType: CalculatorMaterial[]
   allMaterialsFromAllPaperTypes: CalculatorMaterial[]
+  /** Все материалы (для выбора материалов-основ: заготовки, футболки, кружки) */
+  allMaterials?: CalculatorMaterial[]
   hasUserInteractedWithMaterialsRef: React.MutableRefObject<boolean>
-  updateSize: (sizeId: string, patch: Partial<SimplifiedSizeConfig>) => void
+  updateSize: (sizeId: number | string, patch: Partial<SimplifiedSizeConfig>) => void
 }
 
 export const MaterialsCard: React.FC<MaterialsCardProps> = ({
@@ -24,9 +26,13 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
   paperTypes,
   materialsForSelectedPaperType,
   allMaterialsFromAllPaperTypes,
+  allMaterials = [],
   hasUserInteractedWithMaterialsRef,
   updateSize,
-}) => (
+}) => {
+  const allowedBaseIds = selected.allowed_base_material_ids ?? []
+  const baseMaterialsList = allMaterials.length > 0 ? allMaterials : allMaterialsFromAllPaperTypes
+  return (
   <div className="simplified-card">
     <div className="simplified-card__header">
       <div>
@@ -145,6 +151,52 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
       {selectedPaperTypeId && materialsForSelectedPaperType.length === 0 && !loadingLists && (
         <Alert type="info" className="mt-3">Нет материалов для выбранного типа бумаги.</Alert>
       )}
+
+      {/* Материалы-основы (заготовки): футболки, кружки — 1 шт на изделие */}
+      <div className="mt-4 pt-4" style={{ borderTop: '1px solid #e5e7eb' }}>
+        <div className="text-sm font-medium mb-2">Материалы-основы (заготовки)</div>
+        <div className="text-muted text-sm mb-2">Для сувенирки, сублимации: футболки, кружки и т.п. Расход: 1 шт на изделие.</div>
+        {baseMaterialsList.length === 0 ? (
+          <div className="text-muted text-sm">Нет материалов на складе.</div>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+            {baseMaterialsList.map(m => {
+              const isAllowed = allowedBaseIds.includes(Number(m.id))
+              return (
+                <label
+                  key={m.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    backgroundColor: isAllowed ? '#f0fdf4' : 'transparent',
+                    border: isAllowed ? '1px solid #22c55e' : '1px solid #e5e7eb'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isAllowed}
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      updateSize(selected.id, {
+                        allowed_base_material_ids: checked
+                          ? [...allowedBaseIds, Number(m.id)]
+                          : allowedBaseIds.filter(id => id !== Number(m.id))
+                      })
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>{m.name}</span>
+                </label>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   </div>
-)
+  )
+}

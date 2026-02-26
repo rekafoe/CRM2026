@@ -8,7 +8,7 @@ import {
   createProductParameter,
   updateProductParameter,
   deleteProductParameter,
-  getProductConfigs,
+  getProductTemplateConfig,
   getProductDetails,
   getProductMaterials,
   getProductParameterPresets,
@@ -174,13 +174,11 @@ export default function useProductTemplatePage(productId: number | undefined): U
         }
 
         setLoadingLists(true)
-        const [configs, productMaterials, warehouseMaterials] = await Promise.all([
-          getProductConfigs(productId),
+        const [templateConfig, productMaterials, warehouseMaterials] = await Promise.all([
+          getProductTemplateConfig(productId),
           getProductMaterials(productId),
           getAllWarehouseMaterials()
         ])
-
-        const templateConfig = (configs || []).find((cfg) => cfg.name === 'template')
         if (templateConfig) {
           setTemplateConfigId(templateConfig.id)
           const cfgData = templateConfig.config_data || {}

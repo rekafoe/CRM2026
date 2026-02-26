@@ -20,9 +20,9 @@ interface PrintPricesCardProps {
   printTechs: PrintTechRow[]
   loadingLists: boolean
   isMobile: boolean
-  updateSize: (sizeId: string, patch: Partial<SimplifiedSizeConfig>) => void
+  updateSize: (sizeId: number | string, patch: Partial<SimplifiedSizeConfig>) => void
   getSizeRanges: (size: SimplifiedSizeConfig) => Tier[]
-  updateSizeRanges: (sizeId: string, newRanges: Tier[]) => void
+  updateSizeRanges: (sizeId: number | string, newRanges: Tier[]) => void
 }
 
 export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({

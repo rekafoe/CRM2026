@@ -24,9 +24,10 @@ export class MaterialTransactionService {
       id: number; 
       name: string; 
       quantity: number; 
-      min_quantity: number | null 
+      min_quantity: number | null;
+      unit?: string | null;
     }>(
-      'SELECT id, name, quantity, min_quantity FROM materials WHERE id = ?',
+      'SELECT id, name, quantity, min_quantity, unit FROM materials WHERE id = ?',
       materialId
     );
 
@@ -34,7 +35,12 @@ export class MaterialTransactionService {
       throw new Error(`Материал с ID ${materialId} не найден`);
     }
 
-    const roundedQty = Math.ceil(Number(quantity));
+    // Для материалов в пог. м — округляем до 2 знаков, иначе ceil (листы, шт.)
+    const unit = (material.unit ?? '').toLowerCase();
+    const isMeters = unit === 'м' || unit === 'пог.м' || unit === 'пог. м' || unit.includes('метр');
+    const roundedQty = isMeters
+      ? Math.round(Number(quantity) * 100) / 100
+      : Math.ceil(Number(quantity));
     const oldQuantity = Number(material.quantity);
     const newQuantity = oldQuantity - roundedQty;
 

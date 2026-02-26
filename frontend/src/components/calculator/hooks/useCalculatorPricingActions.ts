@@ -287,9 +287,10 @@ export function useCalculatorPricingActions({
           printTechnology,
           print_color_mode: printColorMode,
           printColorMode,
-          // 🆕 Для упрощённых продуктов передаем size_id и material_id
+          // 🆕 Для упрощённых продуктов передаем size_id, material_id и base_material_id
           ...(specs.size_id ? { size_id: specs.size_id } : {}),
           ...(specs.material_id ? { material_id: specs.material_id } : {}),
+          ...(specs.base_material_id ? { base_material_id: specs.base_material_id } : {}),
           // 🆕 Передаем выбранные операции (для обратной совместимости и отладки)
           ...(specs.selectedOperations && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0
             ? { selectedOperations: specs.selectedOperations }

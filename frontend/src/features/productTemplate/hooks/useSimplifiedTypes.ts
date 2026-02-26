@@ -16,14 +16,14 @@ export interface UseSimplifiedTypesResult {
   setSelectedTypeId: (id: ProductTypeId | null) => void
   effectiveConfig: SimplifiedTypeConfig
   sizes: SimplifiedSizeConfig[]
-  selectedSizeId: string | null
-  setSelectedSizeId: (id: string | null) => void
+  selectedSizeId: number | string | null
+  setSelectedSizeId: (id: number | string | null) => void
   selected: SimplifiedSizeConfig | null
   pagesConfig: NonNullable<SimplifiedConfig['pages']> & { options: number[] }
   applyToCurrentConfig: (updater: (prev: SimplifiedTypeConfig) => SimplifiedTypeConfig) => void
   updatePagesConfig: (patch: Partial<NonNullable<SimplifiedConfig['pages']>>) => void
-  updateSize: (id: string, patch: Partial<SimplifiedSizeConfig>) => void
-  removeSize: (id: string) => void
+  updateSize: (id: number | string, patch: Partial<SimplifiedSizeConfig>) => void
+  removeSize: (id: number | string) => void
   addType: () => void
   setDefaultType: (id: ProductTypeId) => void
   removeType: (id: ProductTypeId) => void
@@ -38,7 +38,7 @@ export function useSimplifiedTypes(
   const defaultTypeId = value.types?.find(t => t.default)?.id ?? firstTypeId
 
   const [selectedTypeId, setSelectedTypeId] = useState<ProductTypeId | null>(() => defaultTypeId ?? null)
-  const [selectedSizeId, setSelectedSizeId] = useState<string | null>(null)
+  const [selectedSizeId, setSelectedSizeId] = useState<number | string | null>(null)
 
   const effectiveConfig = useMemo(
     () => getEffectiveConfig(value, hasTypes ? selectedTypeId : null),
@@ -47,12 +47,12 @@ export function useSimplifiedTypes(
   const sizes = effectiveConfig.sizes
 
   const selected = useMemo(
-    () => sizes.find(s => s.id === selectedSizeId) || null,
+    () => sizes.find(s => String(s.id) === String(selectedSizeId)) || null,
     [sizes, selectedSizeId],
   )
 
   useEffect(() => {
-    if (sizes.length > 0 && (!selectedSizeId || !sizes.some(s => s.id === selectedSizeId))) {
+    if (sizes.length > 0 && (!selectedSizeId || !sizes.some(s => String(s.id) === String(selectedSizeId)))) {
       setSelectedSizeId(sizes[0].id)
     } else if (sizes.length === 0) setSelectedSizeId(null)
   }, [sizes, selectedSizeId])
@@ -155,20 +155,20 @@ export function useSimplifiedTypes(
   )
 
   const updateSize = useCallback(
-    (id: string, patch: Partial<SimplifiedSizeConfig>) => {
+    (id: number | string, patch: Partial<SimplifiedSizeConfig>) => {
       applyToCurrentConfig(prev => ({
         ...prev,
-        sizes: (prev.sizes || []).map(s => (s.id === id ? { ...s, ...patch } : s)),
+        sizes: (prev.sizes || []).map(s => (String(s.id) === String(id) ? { ...s, ...patch } : s)),
       }))
     },
     [applyToCurrentConfig],
   )
 
   const removeSize = useCallback(
-    (id: string) => {
+    (id: number | string) => {
       applyToCurrentConfig(prev => {
-        const nextSizes = (prev.sizes || []).filter(s => s.id !== id)
-        if (selectedSizeId === id) setSelectedSizeId(nextSizes[0]?.id ?? null)
+        const nextSizes = (prev.sizes || []).filter(s => String(s.id) !== String(id))
+        if (String(selectedSizeId) === String(id)) setSelectedSizeId(nextSizes[0]?.id ?? null)
         return { ...prev, sizes: nextSizes }
       })
     },

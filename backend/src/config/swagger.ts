@@ -94,7 +94,7 @@ const options: swaggerJsdoc.Options = {
           type: 'object',
           description: 'Начальные значения калькулятора для подтипа (переопределение авто-значений)',
           properties: {
-            size_id: { type: 'string', description: 'ID размера по умолчанию' },
+            size_id: { type: 'number', description: 'ID размера по умолчанию' },
             quantity: { type: 'integer', description: 'Тираж по умолчанию' },
             material_id: { type: 'integer', description: 'ID материала по умолчанию' },
             sides_mode: { type: 'string', enum: ['single', 'duplex', 'duplex_bw_back'], description: 'Сторонность по умолчанию' },

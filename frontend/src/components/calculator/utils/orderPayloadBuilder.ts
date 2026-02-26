@@ -84,6 +84,7 @@ export function buildOrderPayload({
     print_color_mode: printColorMode || undefined,
     printColorMode: printColorMode || undefined,
     ...(result.specifications.material_id ? { material_id: result.specifications.material_id } : {}),
+    ...(result.specifications.base_material_id ? { base_material_id: result.specifications.base_material_id } : {}),
     ...(result.specifications.size_id ? { size_id: result.specifications.size_id } : {}),
   };
 

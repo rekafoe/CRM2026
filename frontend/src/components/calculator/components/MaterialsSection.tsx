@@ -11,7 +11,8 @@ interface MaterialsSectionProps {
     lamination: 'none' | 'matte' | 'glossy';
     quantity: number;
     material_id?: number; // 🆕 ID материала из схемы
-    size_id?: string; // 🆕 ID размера для упрощённых продуктов
+    base_material_id?: number; // 🆕 Материал-основа (заготовка)
+    size_id?: number | string; // 🆕 ID размера для упрощённых продуктов
     [key: string]: any; // Для других полей
   };
   warehousePaperTypes: Array<{ 
@@ -53,7 +54,7 @@ interface MaterialsSectionProps {
   /** Только блок «Материал» для упрощённых продуктов (в одну колонку с «Тип печати») */
   renderMaterialOnly?: boolean;
   /** Размеры текущего типа продукта (если у продукта есть типы) */
-  effectiveSizes?: Array<{ id: string; allowed_material_ids?: number[]; [key: string]: any }>;
+  effectiveSizes?: Array<{ id: string; allowed_material_ids?: number[]; allowed_base_material_ids?: number[]; [key: string]: any }>;
 }
 
 export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
@@ -231,6 +232,15 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     return allMaterials.filter(m => selectedSize.allowed_material_ids!.includes(Number(m.id)));
   }, [isSimplifiedProduct, specs.size_id, simplifiedSizesSource, allMaterials]);
 
+  // 🆕 Разрешённые материалы-основы (заготовки) для выбранного размера
+  const allowedBaseMaterialsForSize = useMemo(() => {
+    if (!isSimplifiedProduct || !specs.size_id) return [];
+    const selectedSize = simplifiedSizesSource?.find((s: any) => s.id === specs.size_id) as { allowed_base_material_ids?: number[] } | undefined;
+    const ids = selectedSize?.allowed_base_material_ids;
+    if (!ids || ids.length === 0) return [];
+    return allMaterials.filter(m => ids.includes(Number(m.id)));
+  }, [isSimplifiedProduct, specs.size_id, simplifiedSizesSource, allMaterials]);
+
   // Уникальные типы материала (paper_type_name) из разрешённых материалов — для фильтра
   const materialTypesFromMaterials = useMemo(() => {
     const names = allowedMaterialsForSize
@@ -269,6 +279,16 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       }
     }
   }, [isSimplifiedProduct, specs.size_id, specs.material_id, allowedMaterialsForSize, updateSpecs]);
+
+  // Сбрасываем base_material_id, если он не входит в разрешённые для выбранного размера
+  useEffect(() => {
+    if (isSimplifiedProduct && specs.size_id && specs.base_material_id && allowedBaseMaterialsForSize.length > 0) {
+      const isAllowed = allowedBaseMaterialsForSize.some(m => Number(m.id) === specs.base_material_id);
+      if (!isAllowed) {
+        updateSpecs({ base_material_id: undefined }, true);
+      }
+    }
+  }, [isSimplifiedProduct, specs.size_id, specs.base_material_id, allowedBaseMaterialsForSize, updateSpecs]);
 
   // Инициализация типа и плотности по текущему материалу (из разрешённых для продукта)
   // Не перезаписываем, если пользователь выбрал тип без плотностей — иначе «не даёт выбрать»
@@ -343,6 +363,24 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     return null;
   }
 
+  // Блок «Материал-основа» (заготовка) — показываем, если у размера есть allowed_base_material_ids
+  const hasBaseMaterials = allowedBaseMaterialsForSize.length > 0;
+  const baseMaterialBlock = isSimplifiedProduct && specs.size_id && hasBaseMaterials ? (
+    <div className="param-group param-group--narrow">
+      <label>Материал-основа (заготовка)</label>
+      <select
+        value={specs.base_material_id ?? ''}
+        onChange={(e) => updateSpecs({ base_material_id: e.target.value ? Number(e.target.value) : undefined }, true)}
+        className="form-control"
+      >
+        <option value="">— Не выбрано —</option>
+        {allowedBaseMaterialsForSize.map(m => (
+          <option key={m.id} value={m.id}>{m.name}</option>
+        ))}
+      </select>
+    </div>
+  ) : null;
+
   // Блок «Тип материала» + «Плотность» в одну строку (типы и плотности из разрешённых для продукта материалов)
   const materialBlock = isSimplifiedProduct && specs.size_id ? (
     <div className="material-type-density-row">
@@ -394,6 +432,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
           </select>
         )}
       </div>
+      {baseMaterialBlock}
     </div>
   ) : null;
 
@@ -506,6 +545,23 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
             <option value="glossy">Глянцевая</option>
           </select>
         </div>
+        )}
+
+        {/* Материал-основа (заготовка) — для продуктов с allowed_base_material_ids */}
+        {hasBaseMaterials && isSimplifiedProduct && specs.size_id && (
+          <div className="param-group param-group--narrow">
+            <label>Материал-основа (заготовка)</label>
+            <select
+              value={specs.base_material_id ?? ''}
+              onChange={(e) => updateSpecs({ base_material_id: e.target.value ? Number(e.target.value) : undefined }, true)}
+              className="form-control"
+            >
+              <option value="">— Не выбрано —</option>
+              {allowedBaseMaterialsForSize.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
         )}
 
         {/* Тип материала + Плотность в одну строку (из разрешённых для продукта материалов) */}

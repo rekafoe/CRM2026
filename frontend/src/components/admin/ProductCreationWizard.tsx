@@ -4,7 +4,7 @@ import {
   PostProcessingOperation,
   getProductDetails,
   getProductMaterials,
-  getProductConfigs,
+  getProductTemplateConfig,
   ProductWithDetails,
   getProductParameterPresets,
   ProductParameterPreset,
@@ -200,19 +200,15 @@ export const ProductCreationWizard: React.FC<ProductCreationWizardProps> = ({
       try {
         setPrefillLoading(true)
         setPrefillError(null)
-        const [details, linkedMaterials, configs] = await Promise.all([
+        const [details, linkedMaterials, templateConfig] = await Promise.all([
           getProductDetails(initialProductId),
           getProductMaterials(initialProductId),
-          getProductConfigs(initialProductId),
+          getProductTemplateConfig(initialProductId),
         ])
 
         if (!details) {
           throw new Error('Не удалось загрузить данные продукта')
         }
-
-        const templateConfig = (Array.isArray(configs)
-          ? configs.find((cfg: any) => cfg.name === 'template')
-          : null) as any
         const configData = templateConfig?.config_data || {}
         const constraints = templateConfig?.constraints || {}
         const trimSize = configData?.trim_size || {}

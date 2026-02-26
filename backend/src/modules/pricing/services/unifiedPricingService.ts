@@ -23,6 +23,7 @@ export interface UnifiedPricingResult {
   productSize: ProductSize;
   layout: any;
   sheetsNeeded?: number; // 📄 Количество листов для печати
+  metersNeeded?: number; // 📏 Погонные метры для рулонной печати
   itemsPerSheet?: number; // 📐 Укладка: сколько изделий на лист
   cutsPerSheet?: number; // 🔪 Количество резов на лист
   numberOfStacks?: number; // 📚 Количество стоп для резки
@@ -349,20 +350,31 @@ export class UnifiedPricingService {
         fitsOnSheet: result.layout.fitsOnSheet,
         itemsPerSheet: result.layout.itemsPerSheet,
         sheetsNeeded: result.layout.sheetsNeeded,
+        metersNeeded: result.layout.metersNeeded,
         wastePercentage: result.layout.wastePercentage,
         recommendedSheetSize: result.layout.recommendedSheetSize,
       } : {},
       sheetsNeeded: result.layout?.sheetsNeeded,
+      metersNeeded: result.layout?.metersNeeded,
       warnings: result.warnings,
-      materials: result.selectedMaterial ? [{
-        materialId: result.selectedMaterial.material_id,
-        materialName: result.selectedMaterial.material_name,
-        quantity: result.layout?.sheetsNeeded ?? result.quantity,
-        unitPrice: result.materialDetails?.tier.price || 0,
-        totalCost: result.materialPrice,
-        density: result.selectedMaterial.density,
-        paper_type_name: result.selectedMaterial.paper_type_name,
-      }] : [],
+      materials: [
+        ...(result.selectedMaterial ? [{
+          materialId: result.selectedMaterial.material_id,
+          materialName: result.selectedMaterial.material_name,
+          quantity: result.layout?.metersNeeded ?? result.layout?.sheetsNeeded ?? result.quantity,
+          unitPrice: result.materialDetails?.tier.price || 0,
+          totalCost: result.materialDetails?.priceForQuantity ?? result.materialPrice,
+          density: result.selectedMaterial.density,
+          paper_type_name: result.selectedMaterial.paper_type_name,
+        }] : []),
+        ...(result.selectedBaseMaterial ? [{
+          materialId: result.selectedBaseMaterial.material_id,
+          materialName: result.selectedBaseMaterial.material_name,
+          quantity: result.quantity,
+          unitPrice: result.baseMaterialDetails?.tier.price || 0,
+          totalCost: result.baseMaterialDetails?.priceForQuantity ?? 0,
+        }] : []),
+      ],
       operations: [
         ...(result.printDetails ? [{
           operationId: 0,

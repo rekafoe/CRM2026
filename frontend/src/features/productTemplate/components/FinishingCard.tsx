@@ -21,9 +21,9 @@ interface FinishingCardProps {
   services: ServiceRow[]
   loadLists: () => void
   getSizeRanges: (size: SimplifiedSizeConfig) => Tier[]
-  updateSizeRanges: (sizeId: string, newRanges: Tier[]) => void
-  updateSize: (sizeId: string, patch: Partial<SimplifiedSizeConfig>) => void
-  hasUserInteractedWithServicesRef: React.MutableRefObject<Map<string, boolean>>
+  updateSizeRanges: (sizeId: number | string, newRanges: Tier[]) => void
+  updateSize: (sizeId: number | string, patch: Partial<SimplifiedSizeConfig>) => void
+  hasUserInteractedWithServicesRef: React.MutableRefObject<Map<string | number, boolean>>
   isMobile: boolean
 }
 

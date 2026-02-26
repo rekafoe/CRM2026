@@ -116,6 +116,19 @@ const TypeInitialDefaults: React.FC<{
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [sizes, allMaterials])
 
+  const availableBaseMaterials = useMemo(() => {
+    const idSet = new Set<number>()
+    for (const s of sizes) {
+      for (const mid of s.allowed_base_material_ids || []) idSet.add(mid)
+    }
+    return Array.from(idSet)
+      .map(id => {
+        const mat = allMaterials.find(m => m.id === id)
+        return { id, name: mat ? `${mat.name}` : `Материал #${id}` }
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [sizes, allMaterials])
+
   const availablePrintTechs = useMemo(() => {
     const techSet = new Set<string>()
     for (const s of sizes) {
@@ -163,8 +176,11 @@ const TypeInitialDefaults: React.FC<{
         <label>Размер по умолчанию</label>
         <select
           className="form-input"
-          value={initial.size_id ?? ''}
-          onChange={(e) => updateInitial({ size_id: e.target.value || undefined })}
+          value={String(initial.size_id ?? '')}
+          onChange={(e) => {
+            const v = e.target.value;
+            updateInitial({ size_id: v ? (Number(v) || v) : undefined });
+          }}
         >
           <option value="">Авто (первый размер)</option>
           {sizes.map((s: any) => (
@@ -238,6 +254,21 @@ const TypeInitialDefaults: React.FC<{
           >
             <option value="">Авто (первый доступный)</option>
             {availableMaterials.map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {availableBaseMaterials.length > 0 && (
+        <div className="simplified-template__type-website-field">
+          <label>Материал-основа по умолчанию</label>
+          <select
+            className="form-input"
+            value={initial.base_material_id ?? ''}
+            onChange={(e) => updateInitial({ base_material_id: e.target.value ? Number(e.target.value) : undefined })}
+          >
+            <option value="">Не выбрано</option>
+            {availableBaseMaterials.map((m) => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>

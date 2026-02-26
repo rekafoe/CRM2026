@@ -120,6 +120,40 @@ export async function syncSimplifiedOperations(db: any, productId: number, confi
 
 /**
  * @swagger
+ * /api/products/{productId}/config:
+ *   get:
+ *     summary: Активная конфигурация шаблона (один объект)
+ *     description: Возвращает только активный config с name=template. Удобно, когда нужен один шаблон.
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Конфигурация или null
+ *       404:
+ *         description: Конфигурация не найдена
+ */
+router.get('/:productId/config', asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  const db = await ensureProductTemplateConfigsTable();
+  const row = await db.get<TemplateConfigRow>(
+    `SELECT * FROM product_template_configs 
+     WHERE product_id = ? AND name = 'template' AND is_active = 1 
+     ORDER BY id LIMIT 1`,
+    Number(productId)
+  );
+  if (!row) {
+    res.status(404).json({ error: 'Template config not found' });
+    return;
+  }
+  res.json(mapTemplateConfig(row));
+}));
+
+/**
+ * @swagger
  * /api/products/{productId}/configs:
  *   get:
  *     summary: Список конфигураций шаблона продукта
@@ -149,11 +183,18 @@ export async function syncSimplifiedOperations(db: any, productId: number, confi
  */
 router.get('/:productId/configs', asyncHandler(async (req, res) => {
   const { productId } = req.params;
+  const { template: onlyTemplate, active: onlyActive } = req.query;
   const db = await ensureProductTemplateConfigsTable();
-  const rows = await db.all<TemplateConfigRow[]>(
-    `SELECT * FROM product_template_configs WHERE product_id = ? ORDER BY id`,
-    Number(productId)
-  );
+  let query = `SELECT * FROM product_template_configs WHERE product_id = ?`;
+  const params: (number | string)[] = [Number(productId)];
+  if (onlyTemplate === '1' || onlyTemplate === 'true') {
+    query += ` AND name = 'template'`;
+  }
+  if (onlyActive === '1' || onlyActive === 'true') {
+    query += ` AND is_active = 1`;
+  }
+  query += ` ORDER BY id`;
+  const rows = await db.all<TemplateConfigRow[]>(query, params);
   res.json(rows.map(mapTemplateConfig));
 }));
 

@@ -58,6 +58,7 @@ export {
 // Конфигурации и параметры
 export {
   getProductConfigs,
+  getProductTemplateConfig,
   createProductConfig,
   updateProductConfig,
   getProductParameterPresets,

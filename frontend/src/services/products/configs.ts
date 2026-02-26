@@ -11,21 +11,60 @@ const configsCache = new KeyedCache<ProductConfig[]>(5 * 60 * 1000);
 
 /**
  * Получить конфигурации продукта
+ * @param productId - ID продукта
+ * @param options.template - если true, вернуть только config с name='template'
+ * @param options.active - если true, вернуть только активные config
  */
-export async function getProductConfigs(productId: number): Promise<ProductConfig[]> {
-  const cacheKey = `product_${productId}`;
+export async function getProductConfigs(
+  productId: number,
+  options?: { template?: boolean; active?: boolean }
+): Promise<ProductConfig[]> {
+  const cacheKey = `product_${productId}_${options?.template ? 't' : ''}${options?.active ? 'a' : ''}`;
   
   const cached = configsCache.get(cacheKey);
   if (cached) return cached;
 
+  const params = new URLSearchParams();
+  if (options?.template) params.set('template', '1');
+  if (options?.active) params.set('active', '1');
+  const query = params.toString();
+
   const configs = await apiRequestSafe<ProductConfig[]>(
-    () => api.get(`/products/${productId}/configs`),
+    () => api.get(`/products/${productId}/configs${query ? `?${query}` : ''}`),
     `загрузки конфигураций продукта ${productId}`,
     []
   );
 
   configsCache.set(cacheKey, configs);
   return configs;
+}
+
+/**
+ * Получить только активный шаблон продукта (один объект)
+ * Удобно, когда нужен только template — меньше трафика, чем полный список configs
+ */
+export async function getProductTemplateConfig(productId: number): Promise<ProductConfig | null> {
+  const cacheKey = `product_${productId}_template`;
+  const cached = configsCache.get(cacheKey);
+  if (cached && Array.isArray(cached) && cached.length > 0) return cached[0];
+  if (cached && Array.isArray(cached) && cached.length === 0) return null;
+
+  try {
+    const response = await api.get(`/products/${productId}/config`);
+    const data = (response as any)?.data ?? response;
+    if (data && !data.error) {
+      configsCache.set(cacheKey, [data]);
+      return data;
+    }
+    configsCache.set(cacheKey, []);
+    return null;
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      configsCache.set(cacheKey, []);
+      return null;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -36,7 +75,7 @@ export async function createProductConfig(
   configData: { name: string; description?: string; config_data: Record<string, any> }
 ): Promise<ProductConfig> {
   const response = await api.post(`/products/${productId}/configs`, configData);
-  configsCache.clear(`product_${productId}`);
+  configsCache.clear();
   return extractData(response, null as any);
 }
 
@@ -49,7 +88,7 @@ export async function updateProductConfig(
   data: Partial<ProductConfig>
 ): Promise<ProductConfig> {
   const response = await api.put(`/products/${productId}/configs/${configId}`, data);
-  configsCache.clear(`product_${productId}`);
+  configsCache.clear();
   return extractData(response, null as any);
 }
 

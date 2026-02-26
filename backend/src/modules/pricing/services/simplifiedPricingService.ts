@@ -18,7 +18,7 @@ export interface SimplifiedPricingResult {
   
   // Выбранная конфигурация
   selectedSize?: {
-    id: string;
+    id: number | string;
     label: string;
     width_mm: number;
     height_mm: number;
@@ -33,6 +33,11 @@ export interface SimplifiedPricingResult {
     material_name: string;
     density?: number; // 🆕 Плотность материала
     paper_type_name?: string; // 🆕 display_name типа бумаги для установки materialType на фронтенде
+  };
+  /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
+  selectedBaseMaterial?: {
+    material_id: number;
+    material_name: string;
   };
   selectedFinishing?: Array<{
     service_id: number;
@@ -58,6 +63,11 @@ export interface SimplifiedPricingResult {
     tier: { min_qty: number; max_qty?: number; price: number };
     priceForQuantity: number;
   };
+  /** Детали материала-основы (заготовка) — 1 шт на изделие */
+  baseMaterialDetails?: {
+    tier: { min_qty: number; max_qty?: number; price: number };
+    priceForQuantity: number;
+  };
   finishingDetails?: Array<{
     service_id: number;
     service_name: string;
@@ -73,6 +83,8 @@ export interface SimplifiedPricingResult {
     fitsOnSheet: boolean;
     itemsPerSheet: number;
     sheetsNeeded: number;
+    /** Для рулонной печати: пог. м к списанию */
+    metersNeeded?: number;
     wastePercentage?: number;
     recommendedSheetSize?: { width: number; height: number };
   };
@@ -89,13 +101,15 @@ interface SimplifiedQtyTier {
 }
 
 interface SimplifiedSizeConfig {
-  id: string;
+  id: number | string;
   label: string;
   width_mm: number;
   height_mm: number;
   min_qty?: number;
   max_qty?: number;
   allowed_material_ids?: number[];
+  /** Материалы-основы (заготовки): футболки, кружки — расход 1 шт на изделие */
+  allowed_base_material_ids?: number[];
   print_prices: Array<{
     technology_code: string;
     color_mode: 'color' | 'bw';
@@ -134,12 +148,14 @@ export class SimplifiedPricingService {
   static async calculatePrice(
     productId: number,
     configuration: {
-      size_id?: string;
+      size_id?: number | string;
       trim_size?: { width: number; height: number };
       print_technology?: string;
       print_color_mode?: 'color' | 'bw';
       print_sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
       material_id?: number;
+      /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
+      base_material_id?: number;
       finishing?: Array<{
         service_id: number;
         price_unit?: 'per_cut' | 'per_item';
@@ -260,7 +276,7 @@ export class SimplifiedPricingService {
     let selectedSize: SimplifiedSizeConfig | null = null;
     
     if (normalizedConfig.size_id) {
-      selectedSize = sizesToUse.find(s => s.id === normalizedConfig.size_id) || null;
+      selectedSize = sizesToUse.find(s => String(s.id) === String(normalizedConfig.size_id)) || null;
     } else if (normalizedConfig.trim_size) {
       // Ищем по размерам (примерное совпадение с допуском ±1мм)
       selectedSize = sizesToUse.find(s => 
@@ -311,9 +327,15 @@ export class SimplifiedPricingService {
     }
     const itemsPerSheet = Math.max(1, layoutCheck.itemsPerSheet || 1);
 
-    // Офисный принтер: печатают A3/A4 как есть, без раскладки — не ограничиваем мин. тираж по листу.
+    // Проверяем, рулонная ли печать (counter_unit=meters) — для неё другая логика
+    const centralPriceForRoll = normalizedConfig.print_technology
+      ? await PrintPriceService.getByTechnology(normalizedConfig.print_technology)
+      : undefined;
+    const isRollPrint = centralPriceForRoll?.counter_unit === 'meters';
+
+    // Офисный принтер или рулонная печать: не ограничиваем мин. тираж по раскладке листов.
     const isOfficePrint = (normalizedConfig.print_technology ?? '').toLowerCase().includes('office');
-    const minQtyLimit = selectedSize.min_qty ?? (isOfficePrint ? 1 : itemsPerSheet);
+    const minQtyLimit = selectedSize.min_qty ?? (isOfficePrint || isRollPrint ? 1 : itemsPerSheet);
     const maxQtyLimit = selectedSize.max_qty;
     if (quantity < minQtyLimit || (maxQtyLimit !== undefined && quantity > maxQtyLimit)) {
       const layoutHint = useLayout && !isOfficePrint && minQtyLimit === itemsPerSheet ? ` (по раскладке: ${itemsPerSheet} шт/лист)` : '';
@@ -335,10 +357,14 @@ export class SimplifiedPricingService {
         ? Math.max(1, Math.ceil(effectivePages / 2))
         : Math.max(1, effectivePages);
     // Листов к списанию: многостраничные — quantity * листов_на_экземпляр; листовые — ceil(quantity / вместимость_на_лист)
+    // Для рулонной печати: пог. м = (длина_изделия_м) × quantity
     const sheetsNeeded = usePagesMultiplier
       ? Math.max(1, quantity * sheetsPerItem)
       : Math.ceil(quantity / itemsPerSheet);
-    const effectivePrintQuantity = sheetsNeeded;
+    // Длина в направлении подачи: меньшая сторона (594×420 → 0.42 м, т.к. 420 мм вдоль рулона)
+    const metersPerItem = isRollPrint ? Math.min(productSize.width, productSize.height) / 1000 : 0;
+    const metersNeeded = isRollPrint ? metersPerItem * quantity : 0;
+    const effectivePrintQuantity = isRollPrint ? metersNeeded : sheetsNeeded;
 
     const isDuplexModeSelected =
       normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back';
@@ -353,6 +379,35 @@ export class SimplifiedPricingService {
     let printDetails: SimplifiedPricingResult['printDetails'] | undefined;
     
     if (normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode) {
+      // Рулонная печать (counter_unit=meters): цена за пог. м × ширина × метры
+      if (isRollPrint && centralPriceForRoll) {
+        // Ширина по рулону (большая сторона) — для расчёта цены за пог. м
+        const widthMeters = Math.max(productSize.width, productSize.height) / 1000;
+        const isColor = normalizedConfig.print_color_mode === 'color';
+        const perMeter = isColor ? centralPriceForRoll.price_color_per_meter : centralPriceForRoll.price_bw_per_meter;
+        if (perMeter != null && perMeter > 0) {
+          const unitPricePerMeter = perMeter * widthMeters;
+          printPrice = unitPricePerMeter * metersNeeded;
+          const pricePerItem = metersNeeded > 0 ? printPrice / quantity : 0;
+          printDetails = {
+            tier: { min_qty: 1, max_qty: undefined, price: pricePerItem },
+            priceForQuantity: printPrice,
+          };
+          logger.info('Цена печати (рулонная, пог. м)', {
+            technology: normalizedConfig.print_technology,
+            widthMeters,
+            metersNeeded,
+            perMeter,
+            unitPricePerMeter,
+            printPrice,
+          });
+        } else {
+          logger.warn('Цена за пог. м не указана для рулонной технологии', {
+            technology: normalizedConfig.print_technology,
+            isColor,
+          });
+        }
+      } else {
       const techNorm = (s: string) => (s ?? '').trim().toLowerCase();
       const printPriceConfig = selectedSize.print_prices.find(p =>
         techNorm(p.technology_code) === techNorm(normalizedConfig.print_technology!) &&
@@ -465,6 +520,7 @@ export class SimplifiedPricingService {
           });
         }
       }
+      }
     }
     
     // 5. Рассчитываем цену материала (берём со склада — sheet_price_single, без диапазонов)
@@ -501,6 +557,42 @@ export class SimplifiedPricingService {
           billingModeMultiplier,
           materialPrice,
         });
+      }
+    }
+
+    // Материал-основа (заготовка): футболка, кружка — 1 шт на изделие, цена за штуку
+    let baseMaterialPrice = 0;
+    let selectedBaseMaterialName: string | undefined;
+    let baseMaterialDetails: SimplifiedPricingResult['baseMaterialDetails'];
+    if (includeMaterialCost && normalizedConfig.base_material_id) {
+      const allowedBase = selectedSize.allowed_base_material_ids ?? [];
+      const isAllowed = allowedBase.length === 0 || allowedBase.includes(normalizedConfig.base_material_id);
+      if (!isAllowed) {
+        logger.warn('Материал-основа не в списке разрешённых для размера', { base_material_id: normalizedConfig.base_material_id });
+      } else {
+        const baseMat = await db.get<{ name: string; sheet_price_single: number | null; unit?: string | null }>(
+          `SELECT name, sheet_price_single, unit FROM materials WHERE id = ? AND is_active = 1`,
+          [normalizedConfig.base_material_id]
+        );
+        if (baseMat) {
+          selectedBaseMaterialName = baseMat.name;
+          const pricePerItem = baseMat.sheet_price_single ?? 0;
+          baseMaterialPrice = pricePerItem * quantity;
+          materialPrice += baseMaterialPrice;
+          baseMaterialDetails = {
+            tier: { min_qty: 1, max_qty: undefined, price: pricePerItem },
+            priceForQuantity: baseMaterialPrice,
+          };
+          logger.info('Цена материала-основы (заготовка)', {
+            base_material_id: normalizedConfig.base_material_id,
+            material_name: baseMat.name,
+            pricePerItem,
+            quantity,
+            baseMaterialPrice,
+          });
+        } else {
+          logger.warn('Материал-основа не найден', { base_material_id: normalizedConfig.base_material_id });
+        }
       }
     }
     
@@ -830,12 +922,13 @@ export class SimplifiedPricingService {
     const layoutResult: SimplifiedPricingResult['layout'] = {
       fitsOnSheet: layoutCheck.fitsOnSheet,
       itemsPerSheet: layoutCheck.itemsPerSheet,
-      sheetsNeeded,
+      sheetsNeeded: isRollPrint ? 0 : sheetsNeeded,
+      ...(isRollPrint && { metersNeeded }),
       wastePercentage: layoutCheck.wastePercentage,
       recommendedSheetSize: layoutCheck.recommendedSheetSize,
     };
     const warnings: string[] = [];
-    if (!layoutCheck.fitsOnSheet) {
+    if (!isRollPrint && !layoutCheck.fitsOnSheet) {
       warnings.push(
         `Формат ${selectedSize.width_mm}×${selectedSize.height_mm} мм не помещается на стандартные печатные листы (SRA3, A3, A4). Проверьте размер.`
       );
@@ -862,6 +955,10 @@ export class SimplifiedPricingService {
         density: materialDensity, // 🆕 Добавляем плотность материала
         paper_type_name: materialPaperTypeName, // 🆕 Добавляем display_name типа бумаги для установки materialType
       } : undefined,
+      selectedBaseMaterial: normalizedConfig.base_material_id && selectedBaseMaterialName ? {
+        material_id: normalizedConfig.base_material_id,
+        material_name: selectedBaseMaterialName,
+      } : undefined,
       selectedFinishing: finishingDetails.map(d => {
         const finConfig = selectedSize.finishing.find(f => f.service_id === d.service_id);
         return {
@@ -879,6 +976,7 @@ export class SimplifiedPricingService {
       pricePerUnit,
       printDetails,
       materialDetails,
+      baseMaterialDetails,
       finishingDetails: finishingDetails.length > 0 ? finishingDetails : undefined,
       calculatedAt: new Date().toISOString(),
       calculationMethod: 'simplified',
