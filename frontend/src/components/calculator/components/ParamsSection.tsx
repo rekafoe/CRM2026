@@ -93,7 +93,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                 value={selectedSizeId}
                 onChange={(e) => {
                   const id = e.target.value;
-                  const size = simplifiedSizes.find((s: any) => s.id === id) as any;
+                  const size = simplifiedSizes.find((s: any) => String(s.id) === String(id)) as any;
                   const minQty = size?.min_qty ?? size?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
                   updateSpecs({
                     size_id: id,

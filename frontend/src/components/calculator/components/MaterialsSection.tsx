@@ -223,7 +223,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   const allowedMaterialsForSize = useMemo(() => {
     if (!isSimplifiedProduct || !specs.size_id) return [];
     
-    const selectedSize = simplifiedSizesSource?.find((s: any) => s.id === specs.size_id);
+    const selectedSize = simplifiedSizesSource?.find((s: any) => String(s.id) === String(specs.size_id));
     if (!selectedSize || !selectedSize.allowed_material_ids || selectedSize.allowed_material_ids.length === 0) {
       return [];
     }
@@ -235,7 +235,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   // 🆕 Разрешённые материалы-основы (заготовки) для выбранного размера
   const allowedBaseMaterialsForSize = useMemo(() => {
     if (!isSimplifiedProduct || !specs.size_id) return [];
-    const selectedSize = simplifiedSizesSource?.find((s: any) => s.id === specs.size_id) as { allowed_base_material_ids?: number[] } | undefined;
+    const selectedSize = simplifiedSizesSource?.find((s: any) => String(s.id) === String(specs.size_id)) as { allowed_base_material_ids?: number[] } | undefined;
     const ids = selectedSize?.allowed_base_material_ids;
     if (!ids || ids.length === 0) return [];
     return allMaterials.filter(m => ids.includes(Number(m.id)));
