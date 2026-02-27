@@ -341,6 +341,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 onEditOrderItem={handleOpenCalculatorForEdit}
                 onGetDailyReportByDate={handleGetDailyReportByDate}
                 onCreateDailyReport={handleCreateDailyReport}
+                onOrderPatch={(id, patch) => setOrders(prev => prev.map(o => o.id === id ? { ...o, ...patch } : o))}
               />
             ) : (
               <div style={{ padding: '20px', textAlign: 'center' }}>

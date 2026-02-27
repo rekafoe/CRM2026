@@ -5,7 +5,7 @@ import { OrderTotal } from '../../order/OrderTotal';
 import { MemoizedOrderItem } from '../MemoizedOrderItem';
 import { OrderDates } from '../../order/OrderDates';
 import { useToast } from '../../Toast';
-import { generateOrderBlankPdf, generateCommodityReceiptPdf, generateCommodityReceiptBlankPdf, updateOrderDiscount, updateOrderPaymentChannel } from '../../../api';
+import { generateOrderBlankPdf, generateCommodityReceiptPdf, generateCommodityReceiptBlankPdf, updateOrderDiscount, updateOrderPaymentChannel, updateOrderNotes } from '../../../api';
 import { parseNumberFlexible } from '../../../utils/numberInput';
 import { CustomerSelector } from '../../customers/CustomerSelector';
 
@@ -28,6 +28,8 @@ interface OrderDetailSectionProps {
   onEditOrderItem: (orderId: number, item: any) => void;
   onGetDailyReportByDate: (date: string) => Promise<any>;
   onCreateDailyReport: (params: { report_date: string; user_id: number }) => Promise<any>;
+  /** Обновить заказ в списке (для мгновенного отображения после API) */
+  onOrderPatch?: (orderId: number, patch: Partial<Order>) => void;
 }
 
 export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(({
@@ -49,6 +51,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   onEditOrderItem,
   onGetDailyReportByDate,
   onCreateDailyReport,
+  onOrderPatch,
 }) => {
   const { addToast } = useToast();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -218,18 +221,40 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
     try {
       setPaymentChannelMenuOpen(false);
       await updateOrderPaymentChannel(selectedOrder.id, ch);
+      onOrderPatch?.(selectedOrder.id, { payment_channel: ch });
       onLoadOrders();
       const label = PAYMENT_CHANNELS.find((p) => p.value === ch)?.label ?? ch;
       addToast({ type: 'success', title: 'Успешно', message: `Канал оплаты: ${label}` });
     } catch (error: any) {
       addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось изменить канал оплаты' });
     }
-  }, [selectedOrder.id, onLoadOrders, addToast]);
+  }, [selectedOrder.id, onLoadOrders, onOrderPatch, addToast]);
+
+  const [notesValue, setNotesValue] = useState(selectedOrder.notes ?? '');
+  const notesSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    setNotesValue(selectedOrder.notes ?? '');
+  }, [selectedOrder.id, selectedOrder.notes]);
+  const handleNotesChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const v = e.target.value;
+    setNotesValue(v);
+    if (notesSaveRef.current) clearTimeout(notesSaveRef.current);
+    notesSaveRef.current = setTimeout(async () => {
+      notesSaveRef.current = null;
+      try {
+        await updateOrderNotes(selectedOrder.id, v.trim() || null);
+        onOrderPatch?.(selectedOrder.id, { notes: v.trim() || undefined });
+      } catch (err: any) {
+        addToast({ type: 'error', title: 'Ошибка', message: err.message || 'Не удалось сохранить примечания' });
+      }
+    }, 500);
+  }, [selectedOrder.id, onOrderPatch, addToast]);
+  useEffect(() => () => { if (notesSaveRef.current) clearTimeout(notesSaveRef.current); }, []);
 
   return (
     <>
-      <div className="detail-header" style={{ alignItems: 'flex-start' }}>
-        <div>
+      <div className="detail-header" style={{ alignItems: 'flex-start', display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between' }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
             <h2 style={{ margin: 0 }}>{selectedOrder.number}</h2>
             {(selectedOrder.issued_by_me === true || selectedOrder.issued_by_me === 1) && (
@@ -547,6 +572,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             orderId={selectedOrder.id}
             currentCustomerId={selectedOrder.customer_id}
             onCustomerChange={onLoadOrders}
+            onOrderPatch={onOrderPatch}
           />
           
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -601,6 +627,23 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             onUpdate={onLoadOrders}
             onSuccess={(msg) => addToast({ type: 'success', title: 'Успешно', message: msg })}
             onError={(msg) => addToast({ type: 'error', title: 'Ошибка', message: msg })}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 200, maxWidth: 320 }}>
+          <label style={{ fontSize: 12, color: '#666' }}>Примечания</label>
+          <textarea
+            value={notesValue}
+            onChange={handleNotesChange}
+            placeholder="Описание, примечания по заказу..."
+            rows={3}
+            style={{
+              padding: 8,
+              fontSize: 12,
+              border: '1px solid #ddd',
+              borderRadius: 4,
+              resize: 'vertical',
+              fontFamily: 'inherit'
+            }}
           />
         </div>
         <div className="detail-actions">

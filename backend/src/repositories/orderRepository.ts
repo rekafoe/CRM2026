@@ -93,10 +93,13 @@ export const OrderRepository = {
   async listUserOrders(userId: number): Promise<Order[]> {
     const db = await getDb()
     let hasPaymentChannel = false
+    let hasNotes = false
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasNotes = await hasColumn('orders', 'notes')
     } catch { /* ignore */ }
     const paymentChannelSel = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel"
+    const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const orders = await db.all<any>(
       `SELECT 
         o.id, 
@@ -108,6 +111,7 @@ export const OrderRepository = {
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
         o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
         ${paymentChannelSel},
+        ${notesSel},
         c.id as customer__id,
         c.first_name as customer__first_name,
         c.last_name as customer__last_name,
@@ -154,10 +158,13 @@ export const OrderRepository = {
     const db = await getDb()
     const d = dateYmd.slice(0, 10)
     let hasPaymentChannel = false
+    let hasNotes = false
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasNotes = await hasColumn('orders', 'notes')
     } catch { /* ignore */ }
     const paymentChannelSel = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel"
+    const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const orders = await db.all<any>(
       `SELECT 
         o.id, 
@@ -166,6 +173,7 @@ export const OrderRepository = {
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
         o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
         ${paymentChannelSel},
+        ${notesSel},
         c.id as customer__id, c.first_name as customer__first_name, c.last_name as customer__last_name,
         c.middle_name as customer__middle_name, c.company_name as customer__company_name,
         c.legal_name as customer__legal_name, c.authorized_person as customer__authorized_person,
@@ -203,10 +211,13 @@ export const OrderRepository = {
       return OrderRepository.listUserOrdersIssuedOn(userId, dateYmd)
     }
     let hasPaymentChannel = false
+    let hasNotes = false
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasNotes = await hasColumn('orders', 'notes')
     } catch { /* ignore */ }
     const paymentChannelSel = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel"
+    const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const orders = await db.all<any>(
       `SELECT 
         o.id, 
@@ -215,6 +226,7 @@ export const OrderRepository = {
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
         o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
         ${paymentChannelSel},
+        ${notesSel},
         c.id as customer__id, c.first_name as customer__first_name, c.last_name as customer__last_name,
         c.middle_name as customer__middle_name, c.company_name as customer__company_name,
         c.legal_name as customer__legal_name, c.authorized_person as customer__authorized_person,
@@ -254,10 +266,13 @@ export const OrderRepository = {
     const db = await getDb()
     const d = dateYmd.slice(0, 10)
     let hasPaymentChannel = false
+    let hasNotes = false
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasNotes = await hasColumn('orders', 'notes')
     } catch { /* ignore */ }
     const paymentChannelSel = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel"
+    const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const orders = await db.all<any>(
       `SELECT 
         o.id, 
@@ -266,6 +281,7 @@ export const OrderRepository = {
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
         o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
         ${paymentChannelSel},
+        ${notesSel},
         c.id as customer__id, c.first_name as customer__first_name, c.last_name as customer__last_name,
         c.middle_name as customer__middle_name, c.company_name as customer__company_name,
         c.legal_name as customer__legal_name, c.authorized_person as customer__authorized_person,
@@ -310,12 +326,15 @@ export const OrderRepository = {
     const db = await getDb()
     let hasIsCancelled = false
     let hasPaymentChannel = false
+    let hasNotes = false
     try {
       hasIsCancelled = await hasColumn('orders', 'is_cancelled')
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasNotes = await hasColumn('orders', 'notes')
     } catch { /* ignore */ }
     const isCancelledSel = hasIsCancelled ? 'o.is_cancelled' : '0 as is_cancelled'
     const paymentChannelSel = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel"
+    const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const orders = await db.all<any>(
       `SELECT 
         o.id, 
@@ -324,6 +343,7 @@ export const OrderRepository = {
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
         o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
         ${paymentChannelSel},
+        ${notesSel},
         ${isCancelledSel},
         c.id as customer__id,
         c.first_name as customer__first_name,

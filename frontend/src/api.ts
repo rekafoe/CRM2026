@@ -75,9 +75,12 @@ export const updateOrderCustomer = (id: number, customer_id: number | null) =>
 /** Скидка на заказ: 0, 5, 10, 15, 20, 25 (%) */
 export const updateOrderDiscount = (orderId: number, discount_percent: number) =>
   api.put<Order>(`/orders/${orderId}/discount`, { discount_percent });
-/** Канал оплаты: cash (касса), invoice (счёт), not_cashed (не пробивался) */
+/** Канал оплаты: cash (касса), invoice (счёт), not_cashed */
 export const updateOrderPaymentChannel = (orderId: number, payment_channel: 'cash' | 'invoice' | 'not_cashed') =>
   api.put<Order>(`/orders/${orderId}/payment-channel`, { payment_channel });
+/** Примечания к заказу */
+export const updateOrderNotes = (orderId: number, notes: string | null) =>
+  api.put<Order>(`/orders/${orderId}/notes`, { notes });
 
 // Order Pool helpers
 export const reassignOrderByNumber = (number: string, userId: number) =>

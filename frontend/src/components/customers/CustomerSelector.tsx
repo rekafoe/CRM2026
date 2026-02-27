@@ -8,12 +8,14 @@ interface CustomerSelectorProps {
   orderId: number;
   currentCustomerId?: number | null;
   onCustomerChange?: () => void;
+  onOrderPatch?: (orderId: number, patch: { payment_channel?: 'cash' | 'invoice' | 'not_cashed' }) => void;
 }
 
 export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   orderId,
   currentCustomerId,
   onCustomerChange,
+  onOrderPatch,
 }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -66,8 +68,10 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
         const c = customer ?? customers.find((x) => x.id === customerId);
         if (c?.type === 'legal') {
           await updateOrderPaymentChannel(orderId, 'invoice');
+          onOrderPatch?.(orderId, { payment_channel: 'invoice' });
         } else if (c?.type === 'individual') {
           await updateOrderPaymentChannel(orderId, 'cash');
+          onOrderPatch?.(orderId, { payment_channel: 'cash' });
         }
       }
       addToast({
@@ -83,7 +87,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
         message: error.message || 'Не удалось обновить клиента заказа'
       });
     }
-  }, [orderId, onCustomerChange, addToast, customers]);
+  }, [orderId, onCustomerChange, onOrderPatch, addToast, customers]);
 
   // Получить отображаемое имя клиента
   const getCustomerDisplayName = (customer: Customer): string => {

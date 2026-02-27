@@ -439,6 +439,22 @@ export class OrderController {
     }
   }
 
+  static async updateOrderNotes(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id)
+      const { notes } = req.body as { notes?: string | null }
+      if (isNaN(id)) {
+        res.status(400).json({ error: 'Неверный ID заказа' })
+        return
+      }
+      const updated = await OrderService.updateOrderNotes(id, notes ?? null)
+      res.json(updated)
+    } catch (error: any) {
+      const status = error.message?.includes('не найден') ? 404 : 400
+      res.status(status).json({ error: error.message })
+    }
+  }
+
   static async deleteOrder(req: Request, res: Response) {
     try {
       const id = Number(req.params.id)

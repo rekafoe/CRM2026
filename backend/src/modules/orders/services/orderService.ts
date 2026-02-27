@@ -502,6 +502,30 @@ export class OrderService {
     return updated as Order;
   }
 
+  /** Обновить примечания заказа */
+  static async updateOrderNotes(id: number, notes: string | null): Promise<Order> {
+    const db = await getDb();
+    const order = await db.get<Order>('SELECT id FROM orders WHERE id = ?', [id]);
+    if (!order) {
+      throw new Error('Заказ не найден');
+    }
+    let hasNotes = false;
+    try {
+      hasNotes = await hasColumn('orders', 'notes');
+    } catch {
+      hasNotes = false;
+    }
+    if (!hasNotes) {
+      throw new Error('Колонка notes ещё не добавлена. Примените миграции.');
+    }
+    await db.run(
+      'UPDATE orders SET notes = ?, updated_at = datetime("now") WHERE id = ?',
+      [notes ?? null, id]
+    );
+    const updated = await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id]);
+    return updated as Order;
+  }
+
   /**
    * Обновить скидку на заказ (процент от итоговой суммы).
    * Если оплата offline и предоплата была «в синке» с итогом — пересчитываем предоплату под новый итог.
