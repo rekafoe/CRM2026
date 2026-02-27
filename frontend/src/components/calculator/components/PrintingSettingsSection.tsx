@@ -370,8 +370,20 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     );
   }
 
-  // Продукт без печати — не показываем секцию (пустой селект «Тип печати *» не нужен)
+  // Продукт без печати — не показываем селекты печати, но показываем материалы (если есть)
+  // Иначе при смене размера материалы не обновляются, т.к. MaterialsSection не рендерится
   if (allowedPrintTechnologies.length === 0) {
+    if (materialInFirstColumn) {
+      return (
+        <div className="form-section compact" style={{ padding: 0, border: 'none', background: 'transparent' }}>
+          <div className="printing-settings-row">
+            <div className="printing-first-column">
+              {materialInFirstColumn}
+            </div>
+          </div>
+        </div>
+      );
+    }
     return null;
   }
 
