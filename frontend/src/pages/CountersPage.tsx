@@ -174,7 +174,11 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         ? ordersResponse.data.orders
         : [];
       const contributionsByUser = new Map<number, number>();
+      // В кассу учитываем только заказы с payment_channel === 'cash' (касса)
+      // Счёт (invoice) и не пробивавшиеся (not_cashed) — не в кассу
       const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
+        const channel = (order.payment_channel || 'cash').toLowerCase();
+        if (channel !== 'cash') return sum;
         const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
         const orderAmount = prepayment > 0 ? prepayment : 0;
         const rawUserId = order.userId ?? order.user_id ?? null;

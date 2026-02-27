@@ -188,12 +188,18 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
     ? "COALESCE(o.prepaymentUpdatedAt, o.created_at, o.createdAt)"
     : "COALESCE(o.created_at, o.createdAt)"
   const prepaymentUpdatedAtSelect = hasPrepaymentUpdatedAt ? 'o.prepaymentUpdatedAt' : 'NULL as prepaymentUpdatedAt'
+  let hasPaymentChannel = false;
+  try {
+    hasPaymentChannel = await hasColumn('orders', 'payment_channel');
+  } catch { /* ignore */ }
+  const paymentChannelSelect = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel";
   const orders = await db.all<any>(
     `SELECT o.id, o.number, o.status,
             COALESCE(o.created_at, o.createdAt) as created_at,
             ${prepaymentUpdatedAtSelect},
             o.customerName, o.customerPhone, o.customerEmail,
-            o.prepaymentAmount, o.prepaymentStatus, o.paymentMethod, o.userId
+            o.prepaymentAmount, o.prepaymentStatus, o.paymentMethod, o.userId,
+            ${paymentChannelSelect}
        FROM orders o
       WHERE substr(${dateExpr},1,10) = ?
       ORDER BY o.id DESC`,

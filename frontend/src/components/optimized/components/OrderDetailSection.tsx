@@ -5,7 +5,7 @@ import { OrderTotal } from '../../order/OrderTotal';
 import { MemoizedOrderItem } from '../MemoizedOrderItem';
 import { OrderDates } from '../../order/OrderDates';
 import { useToast } from '../../Toast';
-import { generateOrderBlankPdf, generateCommodityReceiptPdf, generateCommodityReceiptBlankPdf, updateOrderDiscount } from '../../../api';
+import { generateOrderBlankPdf, generateCommodityReceiptPdf, generateCommodityReceiptBlankPdf, updateOrderDiscount, updateOrderPaymentChannel } from '../../../api';
 import { parseNumberFlexible } from '../../../utils/numberInput';
 import { CustomerSelector } from '../../customers/CustomerSelector';
 
@@ -57,6 +57,8 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   const receiptMenuRef = useRef<HTMLDivElement>(null);
   const [discountMenuOpen, setDiscountMenuOpen] = useState(false);
   const discountMenuRef = useRef<HTMLDivElement>(null);
+  const [paymentChannelMenuOpen, setPaymentChannelMenuOpen] = useState(false);
+  const paymentChannelMenuRef = useRef<HTMLDivElement>(null);
 
   const items = selectedOrder.items ?? [];
   const subtotal = React.useMemo(() => {
@@ -94,6 +96,17 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
     document.addEventListener('click', onOutside, true);
     return () => document.removeEventListener('click', onOutside, true);
   }, [discountMenuOpen]);
+
+  useEffect(() => {
+    if (!paymentChannelMenuOpen) return;
+    const onOutside = (e: MouseEvent) => {
+      if (paymentChannelMenuRef.current && !paymentChannelMenuRef.current.contains(e.target as Node)) {
+        setPaymentChannelMenuOpen(false);
+      }
+    };
+    document.addEventListener('click', onOutside, true);
+    return () => document.removeEventListener('click', onOutside, true);
+  }, [paymentChannelMenuOpen]);
   
   const handleStatusChange = useCallback(async (newStatus: number) => {
     try {
@@ -192,6 +205,24 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       });
     } catch (error: any) {
       addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось применить скидку' });
+    }
+  }, [selectedOrder.id, onLoadOrders, addToast]);
+
+  const PAYMENT_CHANNELS = [
+    { value: 'cash' as const, label: 'Касса', desc: 'Учитывается в кассе' },
+    { value: 'invoice' as const, label: 'Счёт', desc: 'Безнал, не в кассе' },
+    { value: 'not_cashed' as const, label: '—', desc: '' },
+  ];
+  const paymentChannel = (selectedOrder.payment_channel || 'cash') as 'cash' | 'invoice' | 'not_cashed';
+  const handleSetPaymentChannel = useCallback(async (ch: 'cash' | 'invoice' | 'not_cashed') => {
+    try {
+      setPaymentChannelMenuOpen(false);
+      await updateOrderPaymentChannel(selectedOrder.id, ch);
+      onLoadOrders();
+      const label = PAYMENT_CHANNELS.find((p) => p.value === ch)?.label ?? ch;
+      addToast({ type: 'success', title: 'Успешно', message: `Канал оплаты: ${label}` });
+    } catch (error: any) {
+      addToast({ type: 'error', title: 'Ошибка', message: error.message || 'Не удалось изменить канал оплаты' });
     }
   }, [selectedOrder.id, onLoadOrders, addToast]);
 
@@ -438,6 +469,72 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                         role="menuitem"
                       >
                         {p === 0 ? 'Без скидки' : `${p}%`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div ref={paymentChannelMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPaymentChannelMenuOpen((v) => !v);
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: paymentChannel === 'invoice' ? '#0d6efd' : paymentChannel === 'not_cashed' ? '#6c757d' : '#198754',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Канал оплаты"
+                >
+                  {paymentChannel === 'cash' && '💰 Касса ▼'}
+                  {paymentChannel === 'invoice' && '📄 Счёт ▼'}
+                  {paymentChannel === 'not_cashed' && '— ▼'}
+                </button>
+                {paymentChannelMenuOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: 4,
+                      background: '#fff',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      zIndex: 1000,
+                      minWidth: '180px'
+                    }}
+                    role="menu"
+                  >
+                    {PAYMENT_CHANNELS.map((p) => (
+                      <button
+                        key={p.value}
+                        type="button"
+                        onClick={() => handleSetPaymentChannel(p.value)}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          padding: '8px 12px',
+                          textAlign: 'left',
+                          border: 'none',
+                          background: p.value === paymentChannel ? '#e7e7ff' : 'none',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          borderTop: p.value === 'cash' ? 'none' : '1px solid #eee'
+                        }}
+                        role="menuitem"
+                      >
+                        <span style={{ fontWeight: 500 }}>{p.label}</span>
+                        <span style={{ display: 'block', fontSize: 11, color: '#666' }}>{p.desc}</span>
                       </button>
                     ))}
                   </div>

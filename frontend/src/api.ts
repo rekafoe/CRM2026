@@ -64,7 +64,10 @@ export const getOrders = (params?: { all?: boolean; issued_on?: string }) => {
 /** Маркер «последний заказ с сайта»: при обращении к orderpool API с printcore.by бэкенд обновляет значение; при изменении — принудительно обновляем список в Order Pool */
 export const getOrderPoolSync = () =>
   api.get<{ lastWebsiteOrderAt: number }>('/orders/pool-sync');
-export const createOrder = (date?: string) => api.post<Order>('/orders', { date });
+export const createOrder = (dateOrParams?: string | { date?: string; payment_channel?: 'cash' | 'invoice' | 'not_cashed' }) => {
+  const body = typeof dateOrParams === 'string' ? { date: dateOrParams } : (dateOrParams ?? {});
+  return api.post<Order>('/orders', body);
+};
 export const updateOrderStatus = (id: number, status: number, cancelReason?: string) =>
   api.put<Order>(`/orders/${id}/status`, { status, ...(cancelReason ? { cancel_reason: cancelReason } : {}) });
 export const updateOrderCustomer = (id: number, customer_id: number | null) =>
@@ -72,6 +75,9 @@ export const updateOrderCustomer = (id: number, customer_id: number | null) =>
 /** Скидка на заказ: 0, 5, 10, 15, 20, 25 (%) */
 export const updateOrderDiscount = (orderId: number, discount_percent: number) =>
   api.put<Order>(`/orders/${orderId}/discount`, { discount_percent });
+/** Канал оплаты: cash (касса), invoice (счёт), not_cashed (не пробивался) */
+export const updateOrderPaymentChannel = (orderId: number, payment_channel: 'cash' | 'invoice' | 'not_cashed') =>
+  api.put<Order>(`/orders/${orderId}/payment-channel`, { payment_channel });
 
 // Order Pool helpers
 export const reassignOrderByNumber = (number: string, userId: number) =>

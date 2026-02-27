@@ -327,6 +327,7 @@ router.post('/with-auto-deduction', asyncHandler(OrderController.createOrderWith
 router.put('/:id/status', asyncHandler(OrderController.updateOrderStatus))
 router.put('/:id/customer', asyncHandler(OrderController.updateOrderCustomer))
 router.put('/:id/discount', asyncHandler(OrderController.updateOrderDiscount))
+router.put('/:id/payment-channel', asyncHandler(OrderController.updateOrderPaymentChannel))
 router.delete('/:id', asyncHandler(OrderController.deleteOrder))
 router.post('/:id/duplicate', asyncHandler(OrderController.duplicateOrder))
 router.post('/:id/cancel-online', asyncHandler(OrderController.cancelOnline))

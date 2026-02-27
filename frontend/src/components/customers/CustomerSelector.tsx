@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Customer } from '../../types';
-import { getCustomers, updateOrderCustomer, createCustomer } from '../../api';
+import { getCustomers, updateOrderCustomer, createCustomer, updateOrderPaymentChannel } from '../../api';
 import { useToast } from '../Toast';
 import './CustomerSelector.css';
 
@@ -56,11 +56,20 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
     setSelectedCustomerId(currentCustomerId || null);
   }, [currentCustomerId]);
 
-  // Обработка изменения клиента
-  const handleCustomerChange = useCallback(async (customerId: number | null) => {
+  // Обработка изменения клиента. customer — для автоподстановки канала оплаты (юрлицо → счёт).
+  const handleCustomerChange = useCallback(async (customerId: number | null, customer?: Customer | null) => {
     try {
       await updateOrderCustomer(orderId, customerId);
       setSelectedCustomerId(customerId);
+      // Безналичный клиент (юрлицо) → автоматически «Счёт»; физлицо/без клиента → «Касса»
+      if (customerId) {
+        const c = customer ?? customers.find((x) => x.id === customerId);
+        if (c?.type === 'legal') {
+          await updateOrderPaymentChannel(orderId, 'invoice');
+        } else if (c?.type === 'individual') {
+          await updateOrderPaymentChannel(orderId, 'cash');
+        }
+      }
       addToast({
         type: 'success',
         title: 'Успешно',
@@ -74,7 +83,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
         message: error.message || 'Не удалось обновить клиента заказа'
       });
     }
-  }, [orderId, onCustomerChange, addToast]);
+  }, [orderId, onCustomerChange, addToast, customers]);
 
   // Получить отображаемое имя клиента
   const getCustomerDisplayName = (customer: Customer): string => {
@@ -100,7 +109,9 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
           value={selectedCustomerId || ''}
           onChange={(e) => {
             const value = e.target.value;
-            handleCustomerChange(value ? Number(value) : null);
+            const id = value ? Number(value) : null;
+            const c = id ? customers.find((x) => x.id === id) : undefined;
+            handleCustomerChange(id, c);
           }}
           className="customer-selector__select"
         >
@@ -133,7 +144,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
                     type="button"
                     className="customer-selector__suggestion"
                     onClick={() => {
-                      handleCustomerChange(customer.id);
+                      handleCustomerChange(customer.id, customer);
                       setSearchQuery('');
                     }}
                   >
@@ -181,7 +192,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
           onClose={() => setShowCreateModal(false)}
           onCreated={async (customer) => {
             await loadCustomers();
-            await handleCustomerChange(customer.id);
+            await handleCustomerChange(customer.id, customer);
             setShowCreateModal(false);
           }}
         />

@@ -102,7 +102,7 @@ export class OrderController {
   static async createOrder(req: Request, res: Response) {
     try {
       const authUser = (req as any).user as { id: number } | undefined
-      const { customerName, customerPhone, customerEmail, prepaymentAmount, date, customer_id } = req.body || {}
+      const { customerName, customerPhone, customerEmail, prepaymentAmount, date, customer_id, payment_channel } = req.body || {}
       
       const order = await OrderService.createOrder(
         customerName,
@@ -112,7 +112,8 @@ export class OrderController {
         authUser?.id,
         date,
         undefined,
-        customer_id
+        customer_id,
+        payment_channel
       )
       
       res.status(201).json(order)
@@ -419,6 +420,22 @@ export class OrderController {
       res.json(updated)
     } catch (error: any) {
       res.status(500).json({ error: error.message })
+    }
+  }
+
+  static async updateOrderPaymentChannel(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id)
+      const { payment_channel } = req.body as { payment_channel: string }
+      if (isNaN(id)) {
+        res.status(400).json({ error: 'Неверный ID заказа' })
+        return
+      }
+      const updated = await OrderService.updateOrderPaymentChannel(id, payment_channel)
+      res.json(updated)
+    } catch (error: any) {
+      const status = error.message?.includes('не найден') ? 404 : 400
+      res.status(status).json({ error: error.message })
     }
   }
 

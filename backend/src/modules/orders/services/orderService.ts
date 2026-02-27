@@ -182,7 +182,7 @@ export class OrderService {
     return orders
   }
 
-  static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm', customerId?: number) {
+  static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm', customerId?: number, paymentChannel?: 'cash' | 'invoice' | 'not_cashed') {
     const dateOnly = date ? String(date).trim().slice(0, 10) : null
     const isToday = dateOnly && dateOnly === getTodayString()
     const createdAt = dateOnly && !isToday ? `${dateOnly}T12:00:00.000Z` : getCurrentTimestamp()
@@ -209,39 +209,30 @@ export class OrderService {
 
     const initialPrepay = Number(prepaymentAmount || 0)
     let hasPrepaymentUpdatedAt = false
+    let hasPaymentChannel = false
     try {
       hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
+      hasPaymentChannel = await hasColumn('orders', 'payment_channel')
     } catch {
       hasPrepaymentUpdatedAt = false
+      hasPaymentChannel = false
     }
+    const channel = paymentChannel && OrderService.ALLOWED_PAYMENT_CHANNELS.has(paymentChannel) ? paymentChannel : 'cash'
     const insertRes = hasPrepaymentUpdatedAt
       ? await db.run(
-          'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentUpdatedAt, userId, source, customer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentUpdatedAt, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''})`,
           [
-            defaultStatusId, // FK -> order_statuses.id (обычно "Новый")
-            createdAt,
-            customerName || null,
-            customerPhone || null,
-            customerEmail || null,
-            initialPrepay,
-            initialPrepay > 0 ? createdAt : null,
-            userId ?? null,
-            source || 'crm',
-            customerId || null
+            defaultStatusId, createdAt, customerName || null, customerPhone || null, customerEmail || null,
+            initialPrepay, initialPrepay > 0 ? createdAt : null, userId ?? null, source || 'crm', customerId || null,
+            ...(hasPaymentChannel ? [channel] : [])
           ]
         )
       : await db.run(
-          'INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source, customer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''})`,
           [
-            defaultStatusId,
-            createdAt,
-            customerName || null,
-            customerPhone || null,
-            customerEmail || null,
-            initialPrepay,
-            userId ?? null,
-            source || 'crm',
-            customerId || null
+            defaultStatusId, createdAt, customerName || null, customerPhone || null, customerEmail || null,
+            initialPrepay, userId ?? null, source || 'crm', customerId || null,
+            ...(hasPaymentChannel ? [channel] : [])
           ]
         )
     const id = (insertRes as any).lastID!
@@ -478,6 +469,38 @@ export class OrderService {
 
   /** Допустимые значения скидки: 0, 5, 10, 15, 20, 25 (%) */
   private static readonly ALLOWED_DISCOUNT_PERCENTS = new Set([0, 5, 10, 15, 20, 25]);
+
+  /** Допустимые значения payment_channel */
+  private static readonly ALLOWED_PAYMENT_CHANNELS = new Set(['cash', 'invoice', 'not_cashed']);
+
+  /**
+   * Обновить канал оплаты заказа (учёт в кассе).
+   * cash — учитывается в кассе, invoice — счёт (не в кассе), not_cashed — не пробивался.
+   */
+  static async updateOrderPaymentChannel(id: number, paymentChannel: string): Promise<Order> {
+    const db = await getDb();
+    const ch = String(paymentChannel || 'cash').toLowerCase();
+    if (!OrderService.ALLOWED_PAYMENT_CHANNELS.has(ch)) {
+      throw new Error('payment_channel должен быть cash, invoice или not_cashed');
+    }
+    const order = await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id]);
+    if (!order) {
+      throw new Error('Заказ не найден');
+    }
+    let hasPaymentChannel = false;
+    try {
+      hasPaymentChannel = await hasColumn('orders', 'payment_channel');
+    } catch { /* ignore */ }
+    if (!hasPaymentChannel) {
+      throw new Error('Колонка payment_channel ещё не добавлена. Примените миграции.');
+    }
+    await db.run(
+      'UPDATE orders SET payment_channel = ?, updated_at = datetime("now") WHERE id = ?',
+      [ch, id]
+    );
+    const updated = await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id]);
+    return updated as Order;
+  }
 
   /**
    * Обновить скидку на заказ (процент от итоговой суммы).
