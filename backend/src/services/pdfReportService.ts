@@ -438,14 +438,18 @@ export class PDFReportService {
         console.error('Error formatting ready date:', e);
       }
 
-      // Вычисляем общую сумму из позиций
-      const calculatedTotalAmount = Array.isArray(items) && items.length > 0
+      // Вычисляем промежуточную сумму из позиций (до скидки)
+      const subtotal = Array.isArray(items) && items.length > 0
         ? items.reduce((sum: number, item: any) => {
             const itemPrice = Number(item.price) || 0;
             const itemQuantity = Number(item.quantity) || 1;
             return sum + (itemPrice * itemQuantity);
           }, 0)
         : 0;
+
+      // Применяем скидку заказа
+      const discountPercent = Number(order.discount_percent) || 0;
+      const calculatedTotalAmount = Math.round(subtotal * (1 - discountPercent / 100) * 100) / 100;
 
       // Вычисляем предоплату и долг
       const rawPrepayment = order.prepaymentAmount ?? order.prepayment_amount ?? order.prepaymentamount ?? 0;
@@ -565,10 +569,12 @@ export class PDFReportService {
             });
           }
           
+          const rawPrice = Number(item.price) || 0;
+          const discountedPrice = Math.round(rawPrice * (1 - discountPercent / 100) * 100) / 100;
           return {
             type: item.type || 'Товар',
             quantity: Number(item.quantity) || 1,
-            price: Number(item.price) || 0,
+            price: discountedPrice,
             parameters: paramParts.join(' | ') || ''
           };
         }),
@@ -1285,19 +1291,16 @@ export class PDFReportService {
 
       const receiptNumber = String(order.number || orderId);
       const orderNumber = String(order.number || orderId);
-      const totalAmount = (items || []).reduce((s: number, it: any) => {
-        const q = Number(it.quantity) || 1;
-        const p = Number(it.price) || 0;
-        return s + q * p;
-      }, 0);
-
+      const discountPercent = Number(order.discount_percent) || 0;
       const rows = (items || []).map((it: any, idx: number) => {
         const q = Number(it.quantity) || 1;
-        const p = Number(it.price) || 0;
+        const rawP = Number(it.price) || 0;
+        const p = Math.round(rawP * (1 - discountPercent / 100) * 100) / 100;
         const sum = Math.round(q * p * 100) / 100;
         const name = this.getCommodityReceiptItemName(it);
         return { num: idx + 1, name, quantity: q, price: p, sum };
       });
+      const totalAmount = rows.reduce((s: number, r: any) => s + r.sum, 0);
 
       const company = this.getCompanyForReceipt();
       const manager = order.executedByName || executedBy || '';
@@ -1495,14 +1498,44 @@ export class PDFReportService {
         ORDER BY id
       `, [orderId]);
 
-      // Вычисляем общую сумму
-      const totalAmount = Array.isArray(items) && items.length > 0
-        ? items.reduce((sum: number, item: any) => {
-            const itemPrice = Number(item.price) || 0;
-            const itemQuantity = Number(item.quantity) || 1;
-            return sum + (itemPrice * itemQuantity);
-          }, 0)
-        : 0;
+      const discountPercent = Number(order.discount_percent) || 0;
+
+      // Формируем список товаров с упрощенными названиями и ценами со скидкой
+      const receiptItems = (Array.isArray(items) ? items : []).map((item, index) => {
+        let params: any = {};
+        try {
+          if (item.params) {
+            params = typeof item.params === 'string' ? JSON.parse(item.params) : (item.params || {});
+          }
+        } catch (e) {
+          params = {};
+        }
+        
+        // Упрощенное название товара (как в примере)
+        let itemName = item.type || 'Товар';
+        
+        // Если есть productName в params, используем его
+        if (params.productName) {
+          itemName = params.productName;
+        } else if (params.description) {
+          // Берем только основную часть описания
+          itemName = params.description.split('.')[0] || itemName;
+        }
+        
+        const qty = Number(item.quantity) || 1;
+        const rawPrice = Number(item.price) || 0;
+        const price = Math.round(rawPrice * (1 - discountPercent / 100) * 100) / 100;
+        const amount = Math.round(qty * price * 100) / 100;
+        return {
+          number: index + 1,
+          name: itemName,
+          quantity: qty,
+          price,
+          amount
+        };
+      });
+
+      const totalAmount = receiptItems.reduce((sum, it) => sum + it.amount, 0);
 
       // Форматируем дату
       let createdDate = '';
@@ -1530,37 +1563,6 @@ export class PDFReportService {
 
       // Генерируем номер чека (если не передан, используем ID заказа)
       const receiptNum = receiptNumber || orderId;
-
-      // Формируем список товаров с упрощенными названиями
-      const receiptItems = (Array.isArray(items) ? items : []).map((item, index) => {
-        let params: any = {};
-        try {
-          if (item.params) {
-            params = typeof item.params === 'string' ? JSON.parse(item.params) : (item.params || {});
-          }
-        } catch (e) {
-          params = {};
-        }
-        
-        // Упрощенное название товара (как в примере)
-        let itemName = item.type || 'Товар';
-        
-        // Если есть productName в params, используем его
-        if (params.productName) {
-          itemName = params.productName;
-        } else if (params.description) {
-          // Берем только основную часть описания
-          itemName = params.description.split('.')[0] || itemName;
-        }
-        
-        return {
-          number: index + 1,
-          name: itemName,
-          quantity: Number(item.quantity) || 1,
-          price: Number(item.price) || 0,
-          amount: (Number(item.quantity) || 1) * (Number(item.price) || 0)
-        };
-      });
 
       // Генерируем HTML товарного чека
       const managerName = order.managerName || 'Менеджер';

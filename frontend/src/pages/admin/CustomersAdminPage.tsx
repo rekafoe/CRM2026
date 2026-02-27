@@ -26,9 +26,16 @@ const getCustomerDisplayName = (customer: Customer) => {
   return parts.join(' ') || `Клиент #${customer.id}`;
 };
 
+/** Итог заказа с учётом скидки (для отображения и документов). */
 const getOrderTotal = (order: Order) => {
   const anyOrder = order as any;
-  return Number(order.totalAmount ?? anyOrder.total_amount ?? 0);
+  const subtotal = Number(order.totalAmount ?? anyOrder.total_amount ?? 0) ||
+    (Array.isArray(anyOrder.items) ? anyOrder.items.reduce(
+      (s: number, i: any) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
+      0
+    ) : 0);
+  const pct = Number(anyOrder.discount_percent) || 0;
+  return Math.round(subtotal * (1 - pct / 100) * 100) / 100;
 };
 
 const formatDateValue = (value?: string) => {
@@ -357,6 +364,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
       
       for (const order of filteredOrders) {
         const orderItems = (order as any).items || [];
+        const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
           // Формируем упрощенное наименование
           const itemName = buildSimplifiedItemName(item);
@@ -370,7 +378,9 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
           }
           
           const quantity = Number(item.quantity) || 1;
-          const price = Number(item.price) || 0;
+          const rawPrice = Number(item.price) || 0;
+          // Применяем скидку заказа к цене позиции (для актов/счетов — цены со скидкой)
+          const price = Math.round(rawPrice * (1 - discountPct / 100) * 100) / 100;
           const amount = Math.round(price * quantity * 100) / 100; // Округляем до копеек
           
           // Для НДС можно добавить логику позже
@@ -383,7 +393,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
             name: itemName,
             unit: unit,
             quantity: quantity,
-            price: Math.round(price * 100) / 100, // Округляем до копеек
+            price: price,
             amount: amount,
             vatRate: vatRate,
             vatAmount: vatAmount,
@@ -541,6 +551,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
       let itemNumber = 1;
       for (const order of filteredOrders) {
         const orderItems = (order as any).items || [];
+        const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
           // Используем упрощенное название
           const itemName = buildSimplifiedItemName(item);
@@ -551,7 +562,9 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
           }
           
           const quantity = Number(item.quantity) || 1;
-          const price = Number(item.price) || 0;
+          const rawPrice = Number(item.price) || 0;
+          // Применяем скидку заказа к цене позиции (для счетов — цены со скидкой)
+          const price = Math.round(rawPrice * (1 - discountPct / 100) * 100) / 100;
           const amount = Math.round(price * quantity * 100) / 100;
           
           allOrderItems.push({
@@ -559,7 +572,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
             name: itemName,
             unit: unit,
             quantity: quantity,
-            price: Math.round(price * 100) / 100,
+            price: price,
             amount: amount,
             vatRate: 'Без НДС',
             vatAmount: 0,
