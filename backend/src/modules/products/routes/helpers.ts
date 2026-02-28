@@ -229,18 +229,62 @@ export function extractMinUnitPrice(configDataRaw: string | null | undefined): n
   }
 }
 
+/** Компактный print_price: только структура для UI, без цен (technology_code, color_mode, sides_mode). */
+function compactPrintPrice(pp: any) {
+  if (!pp || typeof pp !== 'object') return null;
+  const tech = pp.technology_code ?? pp.technologyCode;
+  const color = pp.color_mode ?? pp.colorMode;
+  const sides = pp.sides_mode ?? pp.sidesMode;
+  if (!tech) return null;
+  return {
+    technology_code: String(tech),
+    color_mode: color ?? 'color',
+    sides_mode: sides ?? 'single',
+  };
+}
+
+/** Компактный finishing: service_id, price_unit, units_per_item, variant_id — без tiers. */
+function compactFinishingItem(f: any) {
+  if (!f || typeof f.service_id !== 'number') return null;
+  return {
+    service_id: f.service_id,
+    price_unit: f.price_unit ?? 'per_item',
+    units_per_item: f.units_per_item ?? 1,
+    ...(f.variant_id != null ? { variant_id: f.variant_id } : {}),
+  };
+}
+
 /** Строит компактный simplified для сайта: без тиражных прайсов и тяжёлых блоков. */
 export function compactSimplifiedForSite(simplified: any) {
   if (!simplified || typeof simplified !== 'object') return null;
 
-  const compactSize = (size: any) => ({
-    id: size?.id,
-    label: size?.label,
-    width_mm: size?.width_mm,
-    height_mm: size?.height_mm,
-    min_qty: size?.min_qty,
-    max_qty: size?.max_qty,
-  });
+  const compactSize = (size: any) => {
+    const base: Record<string, any> = {
+      id: size?.id,
+      label: size?.label,
+      width_mm: size?.width_mm,
+      height_mm: size?.height_mm,
+      min_qty: size?.min_qty,
+      max_qty: size?.max_qty,
+    };
+    if (Array.isArray(size?.allowed_material_ids) && size.allowed_material_ids.length > 0) {
+      base.allowed_material_ids = size.allowed_material_ids;
+    }
+    if (Array.isArray(size?.allowed_base_material_ids) && size.allowed_base_material_ids.length > 0) {
+      base.allowed_base_material_ids = size.allowed_base_material_ids;
+    }
+    if (Array.isArray(size?.print_prices) && size.print_prices.length > 0) {
+      base.print_prices = size.print_prices
+        .map(compactPrintPrice)
+        .filter(Boolean);
+    }
+    if (Array.isArray(size?.finishing) && size.finishing.length > 0) {
+      base.finishing = size.finishing
+        .map(compactFinishingItem)
+        .filter(Boolean);
+    }
+    return base;
+  };
 
   const compactTypes = Array.isArray(simplified.types)
     ? simplified.types.map((t: any) => {

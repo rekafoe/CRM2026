@@ -311,6 +311,7 @@ router.get('/:productId/schema', async (req, res) => {
           simplified: compactSimplifiedForSite(schema.template.simplified),
         },
         constraints: schema.constraints,
+        operations: productOperations || [],
       };
       return res.json({ data: compactSchema, meta: { compact: true } });
     }
