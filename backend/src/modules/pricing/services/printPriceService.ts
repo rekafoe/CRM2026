@@ -29,13 +29,14 @@ export class PrintPriceService {
       );
       if (!pp) return null;
 
-      const tiers = await db.all<{ min_sheets: number; max_sheets: number | null; price_per_sheet: number }>(
+      const tiersRaw = await db.all<{ min_sheets: number; max_sheets: number | null; price_per_sheet: number }>(
         `SELECT min_sheets, max_sheets, price_per_sheet FROM print_price_tiers
          WHERE print_price_id = ? AND price_mode = ?
          ORDER BY min_sheets DESC`,
         [pp.id, priceMode]
       );
-      if (!tiers || tiers.length === 0) return null;
+      const tiers = Array.isArray(tiersRaw) ? tiersRaw : [];
+      if (tiers.length === 0) return null;
 
       for (const t of tiers) {
         if (sheetsNeeded >= t.min_sheets && (t.max_sheets == null || sheetsNeeded <= t.max_sheets)) {

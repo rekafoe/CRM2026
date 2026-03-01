@@ -356,7 +356,7 @@ router.get('/:productId/schema', async (req, res) => {
         const qdRows = await db.all<{ min_quantity: number; max_quantity: number | null; discount_percent: number }>(
           `SELECT min_quantity, max_quantity, discount_percent FROM quantity_discounts WHERE is_active = 1 ORDER BY min_quantity`
         );
-        quantityDiscounts = qdRows.map((r) => [
+        quantityDiscounts = (Array.isArray(qdRows) ? qdRows : []).map((r) => [
           r.min_quantity,
           r.max_quantity ?? 0,
           r.discount_percent,

@@ -743,8 +743,7 @@ export class FlexiblePricingService {
 
       const isDuplex = configuration.sides === 2 || configuration.sides === '2';
       const isColor = configuration.print_color_mode === 'color';
-      const priceMode: 'bw_single' | 'bw_duplex' | 'color_single' | 'color_duplex' =
-        (isColor ? 'color' : 'bw') + '_' + (isDuplex ? 'duplex' : 'single');
+      const priceMode = ((isColor ? 'color' : 'bw') + '_' + (isDuplex ? 'duplex' : 'single')) as 'bw_single' | 'bw_duplex' | 'color_single' | 'color_duplex';
 
       let price: number | null = null;
       const priceRow = await PrintPriceService.getByTechnology(configuration.print_technology);
