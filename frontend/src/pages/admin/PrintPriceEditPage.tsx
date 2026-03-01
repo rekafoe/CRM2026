@@ -174,10 +174,6 @@ export const PrintPriceEditPage: React.FC = () => {
     counter_unit: 'sheets' as 'sheets' | 'meters',
     sheet_width_mm: 320,
     sheet_height_mm: 450,
-    price_bw_single: 0,
-    price_bw_duplex: 0,
-    price_color_single: 0,
-    price_color_duplex: 0,
     price_bw_per_meter: null as number | null,
     price_color_per_meter: null as number | null,
     tiers: [] as PrintPriceTier[],
@@ -201,10 +197,6 @@ export const PrintPriceEditPage: React.FC = () => {
           counter_unit: (item.counter_unit as 'sheets' | 'meters') || 'sheets',
           sheet_width_mm: (item as any).sheet_width_mm ?? 320,
           sheet_height_mm: (item as any).sheet_height_mm ?? 450,
-          price_bw_single: item.price_bw_single ?? 0,
-          price_bw_duplex: item.price_bw_duplex ?? 0,
-          price_color_single: item.price_color_single ?? 0,
-          price_color_duplex: item.price_color_duplex ?? 0,
           price_bw_per_meter: item.price_bw_per_meter ?? null,
           price_color_per_meter: item.price_color_per_meter ?? null,
           tiers: loadedTiers.length > 0 ? loadedTiers : PRICE_MODES.flatMap((m) => buildDefaultTiers(m.key)),
@@ -852,52 +844,6 @@ export const PrintPriceEditPage: React.FC = () => {
           </div>
         )}
 
-        {form.counter_unit === 'sheets' && (
-          <div className="data-card mt-4">
-            <div className="card-header">
-              <h4>Плоские цены (запасной вариант)</h4>
-              <p className="text-muted text-sm">Используются, если диапазоны не заданы</p>
-            </div>
-            <div className="card-content form-grid">
-              <FormField label="ЧБ, односторонняя">
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  value={form.price_bw_single}
-                  onChange={(e) => updateForm({ price_bw_single: parseFloat(e.target.value) || 0 })}
-                />
-              </FormField>
-              <FormField label="ЧБ, двусторонняя">
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  value={form.price_bw_duplex}
-                  onChange={(e) => updateForm({ price_bw_duplex: parseFloat(e.target.value) || 0 })}
-                />
-              </FormField>
-              <FormField label="Цвет, односторонняя">
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  value={form.price_color_single}
-                  onChange={(e) => updateForm({ price_color_single: parseFloat(e.target.value) || 0 })}
-                />
-              </FormField>
-              <FormField label="Цвет, двусторонняя">
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  value={form.price_color_duplex}
-                  onChange={(e) => updateForm({ price_color_duplex: parseFloat(e.target.value) || 0 })}
-                />
-              </FormField>
-            </div>
-          </div>
-        )}
       </div>
     </AdminPageLayout>
   );

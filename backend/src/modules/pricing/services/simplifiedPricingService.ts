@@ -429,27 +429,7 @@ export class SimplifiedPricingService {
       if (printPriceConfig) {
         // unit_price в шаблоне — «цена за изделие» (UI), tiers.min_qty — в штуках. Ищем по quantity.
         const tier = this.findTierForQuantity(printPriceConfig.tiers, quantity);
-        let priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
-        // Fallback: если в шаблоне цены 0 — берём из центральных print_prices
-        if (priceForTier <= 0 && normalizedConfig.print_technology) {
-          const centralPrice = await PrintPriceService.getByTechnology(normalizedConfig.print_technology);
-          if (centralPrice?.counter_unit === 'sheets') {
-            const isDuplexForPricing = pricingSidesMode === 'duplex' || pricingSidesMode === 'duplex_bw_back';
-            const isColor = normalizedConfig.print_color_mode === 'color';
-            const pricePerSheet = isColor
-              ? (isDuplexForPricing ? centralPrice.price_color_duplex : centralPrice.price_color_single)
-              : (isDuplexForPricing ? centralPrice.price_bw_duplex : centralPrice.price_bw_single);
-            if (pricePerSheet != null && pricePerSheet > 0) {
-              priceForTier = pricePerSheet / itemsPerSheet;
-              logger.info('Цена печати из центральных print_prices (fallback)', {
-                technology: normalizedConfig.print_technology,
-                pricePerSheet,
-                itemsPerSheet,
-                priceForTier,
-              });
-            }
-          }
-        }
+        const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (priceForTier > 0) {
           // Листовые продукты: считаем по листам (sheetsNeeded), а не по штукам.
           // При 5 шт/лист и 6 шт — печатаем 2 листа, цена = 2 × price_per_sheet, а не 6 × unit_price.
@@ -474,51 +454,18 @@ export class SimplifiedPricingService {
             printPrice,
           });
         } else if (tier) {
-          logger.warn('Цена печати в шаблоне и центральных ценах равна 0', { quantity });
+          logger.warn('Цена печати в шаблоне равна 0', { quantity });
         } else {
           logger.warn('Не найден диапазон для печати', { quantity, tiers: printPriceConfig.tiers });
         }
       } else {
-        // Fallback: конфигурации нет в шаблоне — пробуем центральные print_prices
-        if (normalizedConfig.print_technology) {
-          const centralPrice = await PrintPriceService.getByTechnology(normalizedConfig.print_technology);
-          if (centralPrice?.counter_unit === 'sheets') {
-            const isDuplexForPricing = pricingSidesMode === 'duplex' || pricingSidesMode === 'duplex_bw_back';
-            const isColor = normalizedConfig.print_color_mode === 'color';
-            const pricePerSheet = isColor
-              ? (isDuplexForPricing ? centralPrice.price_color_duplex : centralPrice.price_color_single)
-              : (isDuplexForPricing ? centralPrice.price_bw_duplex : centralPrice.price_bw_single);
-            if (pricePerSheet != null && pricePerSheet > 0) {
-              const priceForTier = pricePerSheet / itemsPerSheet;
-              // Листовые продукты: считаем по листам, не по штукам (см. пограничные значения)
-              const basePrintPrice = usePagesMultiplier ? priceForTier * quantity : sheetsNeeded * pricePerSheet;
-              printPrice = basePrintPrice * billingModeMultiplier;
-              printDetails = {
-                tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
-                priceForQuantity: printPrice,
-              };
-              logger.info('Цена печати из центральных print_prices (нет в шаблоне)', {
-                technology: normalizedConfig.print_technology,
-                pricingSidesMode,
-                pricePerSheet,
-                itemsPerSheet,
-                sheetsNeeded,
-                basePrintPrice,
-                billingModeMultiplier,
-                printPrice,
-              });
-            }
-          }
-        }
-        if (printPrice === 0) {
-          logger.warn('Не найдена конфигурация печати', {
-            available: selectedSize.print_prices.map(p => ({
-              tech: p.technology_code,
-              color: p.color_mode,
-              sides: p.sides_mode
-            }))
-          });
-        }
+        logger.warn('Не найдена конфигурация печати', {
+          available: selectedSize.print_prices.map(p => ({
+            tech: p.technology_code,
+            color: p.color_mode,
+            sides: p.sides_mode
+          }))
+        });
       }
       }
     }

@@ -741,19 +741,15 @@ export class FlexiblePricingService {
         );
       }
 
-      const priceRow = await PrintPriceService.getByTechnology(configuration.print_technology);
-      if (!priceRow) {
-        throw new Error(
-          `❌ Ошибка расчета: цена печати для технологии "${configuration.print_technology}" не найдена. ` +
-          `Добавьте цену в /adminpanel (вкладка print-prices) и повторите расчет.`
-        );
-      }
-
       const isDuplex = configuration.sides === 2 || configuration.sides === '2';
       const isColor = configuration.print_color_mode === 'color';
-      let price: number | null = null;
+      const priceMode: 'bw_single' | 'bw_duplex' | 'color_single' | 'color_duplex' =
+        (isColor ? 'color' : 'bw') + '_' + (isDuplex ? 'duplex' : 'single');
 
-      if (priceRow.counter_unit === 'meters') {
+      let price: number | null = null;
+      const priceRow = await PrintPriceService.getByTechnology(configuration.print_technology);
+
+      if (priceRow?.counter_unit === 'meters') {
         const widthMeters = productSize.width / 1000;
         pricingKey = isColor ? 'price_color_per_meter' : 'price_bw_per_meter';
         const perMeter = isColor ? priceRow.price_color_per_meter : priceRow.price_bw_per_meter;
@@ -766,33 +762,32 @@ export class FlexiblePricingService {
           unitPriceComputed: price,
         });
       } else {
-        if (isColor) {
-          pricingKey = isDuplex ? 'price_color_duplex' : 'price_color_single';
-          price = isDuplex ? priceRow.price_color_duplex : priceRow.price_color_single;
-        } else {
-          pricingKey = isDuplex ? 'price_bw_duplex' : 'price_bw_single';
-          price = isDuplex ? priceRow.price_bw_duplex : priceRow.price_bw_single;
+        const tierResult = await PrintPriceService.getPricePerSheetFromTiers(
+          configuration.print_technology,
+          priceMode,
+          sheetsNeeded
+        );
+        if (tierResult && tierResult.pricePerSheet > 0) {
+          price = tierResult.pricePerSheet;
+          pricingKey = `tier_${priceMode}`;
         }
       }
 
       if (price === null || price <= 0) {
-        const priceType = isColor 
-          ? (isDuplex ? 'price_color_duplex' : 'price_color_single')
-          : (isDuplex ? 'price_bw_duplex' : 'price_bw_single');
         throw new Error(
-          `❌ Ошибка расчета: цена "${priceType}" для технологии "${configuration.print_technology}" не указана или равна 0. ` +
-          `Заполните цены в /adminpanel (print-prices) и повторите расчет.`
+          `❌ Ошибка расчета: для технологии "${configuration.print_technology}" не найдены диапазоны цен (print_price_tiers) или они пусты. ` +
+          `Добавьте диапазоны тиража в /adminpanel (print-prices) и повторите расчет.`
         );
       }
 
       unitPrice = price;
-      logger.info('✅ Используем цену печати из print_prices', {
+      logger.info('✅ Используем цену печати из централизованных диапазонов (print_price_tiers)', {
         operationId: operation.id,
         operationName: operation.name,
         technologyCode: configuration.print_technology,
         colorMode: configuration.print_color_mode,
         isDuplex,
-        counterUnit: priceRow.counter_unit,
+        priceMode,
         pricingKey,
         unitPrice,
         sheetsNeeded,

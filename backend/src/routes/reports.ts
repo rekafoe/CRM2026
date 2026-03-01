@@ -224,6 +224,47 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
   res.json({ date: d, orders })
 }))
 
+// GET /api/reports/daily-cash-by-month — касса по дням за месяц (month=YYYY-MM)
+router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
+  const month = String((req.query as any)?.month || '').slice(0, 7)
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+    res.status(400).json({ message: 'month=YYYY-MM required' })
+    return
+  }
+  const db = await getDb()
+  let hasPrepaymentUpdatedAt = false
+  try {
+    hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
+  } catch {
+    hasPrepaymentUpdatedAt = false
+  }
+  const dateExpr = hasPrepaymentUpdatedAt
+    ? "COALESCE(o.prepaymentUpdatedAt, o.created_at, o.createdAt)"
+    : "COALESCE(o.created_at, o.createdAt)"
+  const orders = await db.all<any>(
+    `SELECT substr(${dateExpr},1,10) as date,
+            o.userId as user_id,
+            COALESCE(o.prepaymentAmount, 0) as prepayment
+       FROM orders o
+      WHERE substr(${dateExpr},1,7) = ?
+        AND COALESCE(o.prepaymentAmount, 0) > 0`,
+    month
+  )
+  const byDate: Record<string, { total: number; contributions: Array<{ user_id: number; amount: number }> }> = {}
+  for (const o of orders) {
+    const d = String(o.date || '').slice(0, 10)
+    if (!d) continue
+    if (!byDate[d]) byDate[d] = { total: 0, contributions: [] }
+    const amt = Number(o.prepayment) || 0
+    byDate[d].total += amt
+    const uid = o.user_id != null ? Number(o.user_id) : 0
+    const existing = byDate[d].contributions.find((c: any) => c.user_id === uid)
+    if (existing) existing.amount += amt
+    else byDate[d].contributions.push({ user_id: uid, amount: amt })
+  }
+  res.json({ month, byDate })
+}))
+
 // GET /api/reports/analytics/products/popularity — популярность продуктов
 router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
   const { limit = '10' } = req.query

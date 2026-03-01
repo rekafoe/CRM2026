@@ -586,6 +586,8 @@ export const getPrinters = (params?: { technology_code?: string }) =>
 export const getPrintTechnologies = () => api.get('/printing-technologies');
 export const submitPrinterCounter = (printerId: number, data: { counter_date: string; value: number }) => api.post(`/printers/${printerId}/counters`, data);
 export const getPrinterCountersByDate = (date: string) => api.get(`/printers/counters`, { params: { date } });
+export const getPrinterCountersByMonth = (month: string) => api.get(`/printers/counters`, { params: { month } });
+export const getDailyCashByMonth = (month: string) => api.get(`/reports/daily-cash-by-month`, { params: { month } });
 export const getDailySummary = (date: string) => api.get(`/reports/daily/${date}/summary`);
 
 // Calculators (MVP)

@@ -134,9 +134,6 @@ const AdminPanelHome: React.FC = () => {
           <button onClick={() => navigate('/adminpanel/products')} className="nav-btn">
             <AppIcon name="puzzle" size="xs" /> Продукты калькулятора
           </button>
-          <button onClick={() => navigate('/adminpanel/pricing')} className="nav-btn">
-            <AppIcon name="money" size="xs" /> Ценообразование
-          </button>
           <button onClick={() => navigate('/adminpanel/earnings')} className="nav-btn">
             <AppIcon name="briefcase" size="xs" /> Проценты
           </button>

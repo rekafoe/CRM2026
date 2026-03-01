@@ -354,6 +354,38 @@ export function collectMaterialIdsFromSimplified(simplified: any): number[] {
   return Array.from(ids);
 }
 
+/** Собирает уникальные min_qty из tiers (print_prices, material_prices) — для отображения «от X шт». */
+export function collectTierBoundariesFromSimplified(simplified: any): number[] {
+  if (!simplified || typeof simplified !== 'object') return [];
+  const values = new Set<number>();
+
+  const addFromTiers = (tiers: any[]) => {
+    if (!Array.isArray(tiers)) return;
+    tiers.forEach((t: any) => {
+      const m = t?.min_qty ?? t?.minQty;
+      if (m != null && Number.isFinite(Number(m))) values.add(Number(m));
+    });
+  };
+
+  const scanSize = (size: any) => {
+    if (Array.isArray(size?.print_prices)) {
+      size.print_prices.forEach((pp: any) => addFromTiers(pp?.tiers));
+    }
+    if (Array.isArray(size?.material_prices)) {
+      size.material_prices.forEach((mp: any) => addFromTiers(mp?.tiers));
+    }
+  };
+
+  if (Array.isArray(simplified.sizes)) simplified.sizes.forEach(scanSize);
+  if (simplified.typeConfigs && typeof simplified.typeConfigs === 'object') {
+    for (const cfg of Object.values(simplified.typeConfigs) as any[]) {
+      if (Array.isArray(cfg?.sizes)) cfg.sizes.forEach(scanSize);
+    }
+  }
+
+  return Array.from(values).sort((a, b) => a - b);
+}
+
 /** Собирает уникальные service_id из finishing (по всем размерам simplified). */
 export function collectServiceIdsFromSimplified(simplified: any): number[] {
   if (!simplified || typeof simplified !== 'object') return [];

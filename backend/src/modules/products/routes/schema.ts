@@ -8,6 +8,7 @@ import {
   compactSimplifiedForSite,
   collectMaterialIdsFromSimplified,
   collectServiceIdsFromSimplified,
+  collectTierBoundariesFromSimplified,
   parseParameterOptions,
   loadPrintTechnologies,
   DEFAULT_COLOR_MODE_OPTIONS,
@@ -350,6 +351,20 @@ router.get('/:productId/schema', async (req, res) => {
           logger.warn('[schema] Не удалось загрузить варианты услуг для compact', { error: (err as Error).message });
         }
       }
+      let quantityDiscounts: Array<[number, number, number]> = [];
+      try {
+        const qdRows = await db.all<{ min_quantity: number; max_quantity: number | null; discount_percent: number }>(
+          `SELECT min_quantity, max_quantity, discount_percent FROM quantity_discounts WHERE is_active = 1 ORDER BY min_quantity`
+        );
+        quantityDiscounts = qdRows.map((r) => [
+          r.min_quantity,
+          r.max_quantity ?? 0,
+          r.discount_percent,
+        ]);
+      } catch (err) {
+        logger.warn('[schema] Не удалось загрузить quantity_discounts для compact', { error: (err as Error).message });
+      }
+      const tierBoundaries = collectTierBoundariesFromSimplified(schema.template.simplified);
       const compactSchema = {
         id: schema.id, key: schema.key, name: schema.name, type: schema.type, description: schema.description,
         template: {
@@ -361,6 +376,8 @@ router.get('/:productId/schema', async (req, res) => {
         operations: productOperations || [],
         ...(compactMaterials.length > 0 ? { materials: compactMaterials } : {}),
         ...(Object.keys(serviceVariants).length > 0 ? { service_variants: serviceVariants } : {}),
+        ...(quantityDiscounts.length > 0 ? { quantity_discounts: quantityDiscounts } : {}),
+        ...(tierBoundaries.length > 0 ? { tier_boundaries: tierBoundaries } : {}),
       };
       return res.json({ data: compactSchema, meta: { compact: true } });
     }

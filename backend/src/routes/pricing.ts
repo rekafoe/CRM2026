@@ -385,7 +385,7 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
       ORDER BY min_sheets
     `, [pp.id, priceMode])
     if (tiers.length === 0) {
-      res.json({ items_per_sheet: itemsPerSheet, tiers: [], message: 'Нет диапазонов — используйте плоские цены или добавьте диапазоны' })
+      res.json({ items_per_sheet: itemsPerSheet, tiers: [], message: 'Добавьте диапазоны тиража в настройках цен печати' })
       return
     }
     const derivedTiers = tiers.map((t: any) => {
