@@ -323,3 +323,59 @@ export function compactSimplifiedForSite(simplified: any) {
     ...(compactTypeConfigs ? { typeConfigs: compactTypeConfigs } : {}),
   };
 }
+
+/** Собирает уникальные ID материалов из simplified (allowed_material_ids, allowed_base_material_ids). */
+export function collectMaterialIdsFromSimplified(simplified: any): number[] {
+  if (!simplified || typeof simplified !== 'object') return [];
+  const ids = new Set<number>();
+
+  const addFromSize = (size: any) => {
+    if (Array.isArray(size?.allowed_material_ids)) {
+      size.allowed_material_ids.forEach((id: number) => {
+        if (Number.isFinite(Number(id))) ids.add(Number(id));
+      });
+    }
+    if (Array.isArray(size?.allowed_base_material_ids)) {
+      size.allowed_base_material_ids.forEach((id: number) => {
+        if (Number.isFinite(Number(id))) ids.add(Number(id));
+      });
+    }
+  };
+
+  if (Array.isArray(simplified.sizes)) {
+    simplified.sizes.forEach(addFromSize);
+  }
+  if (simplified.typeConfigs && typeof simplified.typeConfigs === 'object') {
+    for (const cfg of Object.values(simplified.typeConfigs) as any[]) {
+      if (Array.isArray(cfg?.sizes)) cfg.sizes.forEach(addFromSize);
+    }
+  }
+
+  return Array.from(ids);
+}
+
+/** Собирает уникальные service_id из finishing (по всем размерам simplified). */
+export function collectServiceIdsFromSimplified(simplified: any): number[] {
+  if (!simplified || typeof simplified !== 'object') return [];
+  const ids = new Set<number>();
+
+  const addFromSize = (size: any) => {
+    if (Array.isArray(size?.finishing)) {
+      size.finishing.forEach((f: any) => {
+        const sid = f?.service_id;
+        if (sid != null && Number.isFinite(Number(sid))) ids.add(Number(sid));
+      });
+    }
+  };
+
+  if (Array.isArray(simplified.sizes)) {
+    simplified.sizes.forEach(addFromSize);
+  }
+  if (simplified.typeConfigs && typeof simplified.typeConfigs === 'object') {
+    for (const cfg of Object.values(simplified.typeConfigs) as any[]) {
+      if (Array.isArray(cfg?.sizes)) cfg.sizes.forEach(addFromSize);
+    }
+  }
+
+  return Array.from(ids);
+}

@@ -6,6 +6,8 @@ import {
   normalizeConfigDataForPersistence,
   normalizeSimplifiedTypeIds,
   compactSimplifiedForSite,
+  collectMaterialIdsFromSimplified,
+  collectServiceIdsFromSimplified,
   parseParameterOptions,
   loadPrintTechnologies,
   DEFAULT_COLOR_MODE_OPTIONS,
@@ -302,15 +304,63 @@ router.get('/:productId/schema', async (req, res) => {
     };
 
     if (isCompact) {
+      const compactSimplified = compactSimplifiedForSite(schema.template.simplified);
+      const materialIds = collectMaterialIdsFromSimplified(schema.template.simplified);
+      let compactMaterials: Array<{ id: number; name: string; density?: number; paper_type_name?: string; unit?: string }> = [];
+      if (materialIds.length > 0) {
+        const placeholders = materialIds.map(() => '?').join(',');
+        const rows = await db.all<any>(
+          `SELECT m.id, m.name, m.density, m.unit, pt.display_name as paper_type_name
+           FROM materials m
+           LEFT JOIN paper_types pt ON pt.id = m.paper_type_id
+           WHERE m.id IN (${placeholders}) AND m.is_active = 1`,
+          materialIds
+        );
+        compactMaterials = rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          ...(r.density != null ? { density: r.density } : {}),
+          ...(r.paper_type_name ? { paper_type_name: r.paper_type_name } : {}),
+          ...(r.unit ? { unit: r.unit } : {}),
+        }));
+      }
+      const serviceIds = collectServiceIdsFromSimplified(schema.template.simplified);
+      let serviceVariants: Record<string, Array<{ id: number; variantName: string; parameters?: Record<string, unknown>; sortOrder?: number }>> = {};
+      if (serviceIds.length > 0) {
+        try {
+          const placeholders = serviceIds.map(() => '?').join(',');
+          const variantRows = await db.all<any>(
+            `SELECT id, service_id, variant_name, parameters, sort_order
+             FROM service_variants
+             WHERE service_id IN (${placeholders}) AND (is_active = 1 OR is_active IS NULL)
+             ORDER BY sort_order, id`,
+            serviceIds
+          );
+          for (const row of variantRows) {
+            const sid = String(row.service_id);
+            if (!serviceVariants[sid]) serviceVariants[sid] = [];
+            serviceVariants[sid].push({
+              id: row.id,
+              variantName: row.variant_name,
+              ...(row.parameters ? { parameters: typeof row.parameters === 'string' ? JSON.parse(row.parameters) : row.parameters } : {}),
+              ...(row.sort_order != null ? { sortOrder: row.sort_order } : {}),
+            });
+          }
+        } catch (err) {
+          logger.warn('[schema] Не удалось загрузить варианты услуг для compact', { error: (err as Error).message });
+        }
+      }
       const compactSchema = {
         id: schema.id, key: schema.key, name: schema.name, type: schema.type, description: schema.description,
         template: {
           trim_size: schema.template.trim_size,
           print_sheet: schema.template.print_sheet,
           print_run: schema.template.print_run,
-          simplified: compactSimplifiedForSite(schema.template.simplified),
+          simplified: compactSimplified,
         },
         operations: productOperations || [],
+        ...(compactMaterials.length > 0 ? { materials: compactMaterials } : {}),
+        ...(Object.keys(serviceVariants).length > 0 ? { service_variants: serviceVariants } : {}),
       };
       return res.json({ data: compactSchema, meta: { compact: true } });
     }
