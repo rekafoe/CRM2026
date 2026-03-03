@@ -201,10 +201,15 @@ export async function createProductWithSetup(payload: {
 
 /**
  * Загрузить изображение продукта
+ * @param subtypeName — название подтипа для имени файла (напр. "Визитки стандартные" → vizitki-standartnye-xxx.png)
  */
-export async function uploadProductImage(file: File): Promise<{ image_url: string; filename: string; size: number }> {
+export async function uploadProductImage(
+  file: File,
+  subtypeName?: string
+): Promise<{ image_url: string; filename: string; size: number }> {
   const formData = new FormData();
   formData.append('image', file);
+  if (subtypeName) formData.append('subtypeName', subtypeName);
   const response = await apiClient.post('/products/upload-image', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });

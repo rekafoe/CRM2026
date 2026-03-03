@@ -6,7 +6,11 @@ export function compressionMiddleware(req: Request, res: Response, next: NextFun
   if (req.path.startsWith('/api-docs')) {
     return next()
   }
-  // Не сжимаем скачивание файлов — отдаём бинарные данные как есть
+  // Не сжимаем изображения и файлы — PNG/JPEG уже сжаты, повторное gzip ломает отображение
+  if (req.path.startsWith('/api/uploads') || req.path.startsWith('/uploads')) {
+    return next()
+  }
+  // Не сжимаем скачивание файлов заказов — отдаём бинарные данные как есть
   if (/\/orders\/[^/]+\/files\/[^/]+\/download$/.test(req.path)) {
     return next()
   }
