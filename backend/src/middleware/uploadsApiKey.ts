@@ -11,6 +11,10 @@ import { isWebsiteOrderApiKeyValid } from './websiteOrderApiKey'
 const API_KEY_QUERY = 'api_key'
 
 export async function uploadsApiKeyMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
+  // UPLOADS_PUBLIC=true — картинки доступны всем (сайт, img src без ключа)
+  if (process.env.UPLOADS_PUBLIC === 'true' || process.env.UPLOADS_PUBLIC === '1') {
+    return next()
+  }
   const envKey = process.env.WEBSITE_ORDER_API_KEY || ''
   // Если ключ не настроен — открытый доступ (для dev / обратная совместимость)
   if (!envKey.trim()) {
