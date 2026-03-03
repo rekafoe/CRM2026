@@ -10,9 +10,13 @@ export const uploadsDir = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
   : path.resolve(__dirname, '../uploads')
 
-// Ensure uploads directory exists
+// Файлы заказов (макеты клиентов) — в отдельной папке, НЕ отдаются через /api/uploads (безопасность)
+export const orderFilesDir = path.join(uploadsDir, 'orders')
+
+// Ensure directories exist
 try {
   fs.mkdirSync(uploadsDir, { recursive: true })
+  fs.mkdirSync(orderFilesDir, { recursive: true })
 } catch {}
 
 export const storage = multer.diskStorage({
@@ -30,9 +34,8 @@ export const upload = multer({ storage })
 export const uploadMemory = multer({ storage: multer.memoryStorage() })
 
 /**
- * Записать буфер загруженного файла на диск. Используется после uploadMemory.
+ * Записать буфер на диск (публичные картинки — продукты, категории, подтипы).
  * @returns { filename, size, originalName } или null если буфер пустой.
- * originalName — имя для отображения (то, что пришло от клиента, или fallback).
  */
 export function saveBufferToUploads(
   buffer: Buffer | undefined,
@@ -43,6 +46,24 @@ export function saveBufferToUploads(
   const ext = path.extname(raw) || ''
   const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`
   const filePath = path.join(uploadsDir, unique)
+  fs.writeFileSync(filePath, buffer)
+  const displayName = raw || (ext ? `document${ext}` : `file-${unique}`)
+  return { filename: unique, size: buffer.length, originalName: displayName }
+}
+
+/**
+ * Записать файл заказа (макет клиента) в защищённую папку orders/.
+ * НЕ отдаётся через /api/uploads — только через GET /api/orders/:id/files/:fileId/download (с авторизацией).
+ */
+export function saveBufferToOrderFiles(
+  buffer: Buffer | undefined,
+  originalName?: string
+): { filename: string; size: number; originalName: string } | null {
+  if (!buffer || buffer.length === 0) return null
+  const raw = (originalName || '').trim()
+  const ext = path.extname(raw) || ''
+  const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`
+  const filePath = path.join(orderFilesDir, unique)
   fs.writeFileSync(filePath, buffer)
   const displayName = raw || (ext ? `document${ext}` : `file-${unique}`)
   return { filename: unique, size: buffer.length, originalName: displayName }

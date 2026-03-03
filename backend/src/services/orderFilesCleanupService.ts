@@ -6,7 +6,7 @@
 import path from 'path'
 import fs from 'fs'
 import { getDb } from '../config/database'
-import { uploadsDir } from '../config/upload'
+import { orderFilesDir, uploadsDir } from '../config/upload'
 import { logger } from '../utils/logger'
 
 /** 1.5 недели в часах для SQLite datetime */
@@ -36,13 +36,16 @@ export async function cleanupOldOrderFiles(): Promise<{ deletedFiles: number; de
   let deletedRecords = 0
 
   for (const row of rowsArray) {
-    const filePath = path.join(uploadsDir, String(row.filename))
-    if (fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath)
-        deletedFiles++
-      } catch (err: any) {
-        logger.warn('OrderFilesCleanup: не удалось удалить файл', { path: filePath, error: err?.message })
+    const candidates = [path.join(orderFilesDir, String(row.filename)), path.join(uploadsDir, String(row.filename))]
+    for (const filePath of candidates) {
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath)
+          deletedFiles++
+        } catch (err: any) {
+          logger.warn('OrderFilesCleanup: не удалось удалить файл', { path: filePath, error: err?.message })
+        }
+        break
       }
     }
     try {

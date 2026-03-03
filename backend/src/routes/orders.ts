@@ -5,7 +5,7 @@ import { OrderController } from '../modules/orders/controllers/orderController'
 import { OrderItemController } from '../modules/orders/controllers/orderItemController'
 import { asyncHandler, authenticate } from '../middleware'
 import { requireWebsiteOrderApiKey, isWebsiteOrderApiKeyValid } from '../middleware/websiteOrderApiKey'
-import { upload, uploadMemory, saveBufferToUploads, uploadsDir } from '../config/upload'
+import { upload, uploadMemory, saveBufferToOrderFiles, orderFilesDir, uploadsDir } from '../config/upload'
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
 import { hasColumn } from '../utils/tableSchemaCache'
@@ -109,7 +109,7 @@ router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, uploadMem
     res.status(400).json({ message: 'Файл не получен' })
     return
   }
-  const saved = saveBufferToUploads(f.buffer, (f as any).originalname ?? (f as any).originalName)
+  const saved = saveBufferToOrderFiles(f.buffer, (f as any).originalname ?? (f as any).originalName)
   if (!saved) {
     res.status(400).json({ message: 'Файл пустой (0 байт). Проверьте отправку на клиенте.' })
     return
@@ -158,7 +158,7 @@ router.post('/:id/files', (req, res, next) => {
     })
     return
   }
-  const saved = saveBufferToUploads(buf, (f as any).originalname ?? (f as any).originalName)
+  const saved = saveBufferToOrderFiles(buf, (f as any).originalname ?? (f as any).originalName)
   if (!saved) {
     res.status(400).json({ message: 'Файл пустой (0 байт). Проверьте отправку на клиенте.' })
     return
@@ -491,10 +491,14 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
     res.status(404).json({ message: 'Файл не найден' })
     return
   }
-  const filePath = path.join(uploadsDir, String(row.filename))
+  let filePath = path.join(orderFilesDir, String(row.filename))
   if (!fs.existsSync(filePath)) {
-    res.status(404).json({ message: 'Файл не найден на диске' })
-    return
+    const fallback = path.join(uploadsDir, String(row.filename))
+    if (fs.existsSync(fallback)) filePath = fallback
+    else {
+      res.status(404).json({ message: 'Файл не найден на диске' })
+      return
+    }
   }
   const buffer = fs.readFileSync(filePath)
   const displayName = (row.originalName || row.filename).trim() || row.filename
@@ -507,14 +511,16 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
 router.delete('/:orderId/files/:fileId', asyncHandler(async (req, res) => {
   const orderId = Number(req.params.orderId)
   const fileId = Number(req.params.fileId)
-  const { uploadsDir } = await import('../config/upload')
+  const { orderFilesDir, uploadsDir } = await import('../config/upload')
   const path = await import('path')
   const fs = await import('fs')
   const db = await getDb()
   const row = await db.get<any>('SELECT filename FROM order_files WHERE id = ? AND orderId = ?', fileId, orderId)
   if (row && row.filename) {
-    const p = path.join(uploadsDir, String(row.filename))
-    try { fs.unlinkSync(p) } catch {}
+    for (const dir of [orderFilesDir, uploadsDir]) {
+      const p = path.join(dir, String(row.filename))
+      try { fs.unlinkSync(p); break } catch {}
+    }
   }
   await db.run('DELETE FROM order_files WHERE id = ? AND orderId = ?', fileId, orderId)
   res.status(204).end()

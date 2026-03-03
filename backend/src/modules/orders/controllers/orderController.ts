@@ -3,7 +3,7 @@ import { OrderService } from '../services/orderService'
 import { asyncHandler } from '../../../middleware'
 import { logger } from '../../../utils/logger'
 import { getDb } from '../../../config/database'
-import { saveBufferToUploads } from '../../../config/upload'
+import { saveBufferToOrderFiles } from '../../../config/upload'
 import { setLastWebsiteOrderAt } from '../../../utils/poolSync'
 
 /** Приводит item.params к объекту: JSON-строка парсится, объект возвращается как есть, чтобы в CRM попадали все поля (printSize, paperType, withWhiteBorders и т.д.) */
@@ -304,7 +304,7 @@ export class OrderController {
         const db = await getDb()
         for (const f of files) {
           const nameFromClient = f.originalname ?? (f as any).originalName
-          const saved = saveBufferToUploads(f.buffer, nameFromClient)
+          const saved = saveBufferToOrderFiles(f.buffer, nameFromClient)
           if (!saved) {
             logger.warn('createOrderFromWebsiteWithFiles: пропущен пустой файл', { originalname: nameFromClient })
             continue

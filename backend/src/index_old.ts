@@ -99,10 +99,18 @@ app.use(performanceLoggingMiddleware) // Логирование производ
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
-// Static files (два префикса: фронт с Vercel ходит на /api/uploads/*, локально может /uploads/*)
-// Доступ по WEBSITE_ORDER_API_KEY (X-API-Key, ?api_key=, Bearer) или по токену CRM
-app.use('/uploads', asyncHandler(uploadsApiKeyMiddleware), express.static(uploadsDir))
-app.use('/api/uploads', asyncHandler(uploadsApiKeyMiddleware), express.static(uploadsDir))
+// Static files — только публичные картинки (продукты, категории, подтипы).
+// Файлы заказов (orders/) НЕ отдаются — только через GET /api/orders/:id/files/:fileId/download
+const blockOrdersPath = (_req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const p = (_req.path || '').replace(/^\/+/, '')
+  if (p.startsWith('orders/') || p.startsWith('orders\\')) {
+    res.status(404).json({ error: 'Not Found' })
+    return
+  }
+  next()
+}
+app.use('/uploads', blockOrdersPath, asyncHandler(uploadsApiKeyMiddleware), express.static(uploadsDir))
+app.use('/api/uploads', blockOrdersPath, asyncHandler(uploadsApiKeyMiddleware), express.static(uploadsDir))
 
 // Health check (before auth middleware)
 app.get('/health', (req, res) => {
