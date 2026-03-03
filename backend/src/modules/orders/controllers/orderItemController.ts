@@ -229,19 +229,27 @@ export class OrderItemController {
           quantity: Math.max(1, Number(quantity) || 1),
           paramsJsonLength: paramsJson.length
         })
-        
+
+        let hasExecutorUserId = false
+        let hasOrderResponsible = false
+        try {
+          hasExecutorUserId = await hasColumn('items', 'executor_user_id')
+          hasOrderResponsible = await hasColumn('orders', 'responsible_user_id')
+        } catch { /* ignore */ }
+        let defaultExecutor: number | null = null
+        if (hasExecutorUserId) {
+          const sel = hasOrderResponsible ? 'responsible_user_id, userId' : 'userId'
+          const orderRow = await db.get<any>(`SELECT ${sel} FROM orders WHERE id = ?`, [orderId])
+          defaultExecutor = (hasOrderResponsible ? orderRow?.responsible_user_id : null) ?? orderRow?.userId ?? null
+        }
+
         const insertItem = await db.run(
-          'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          orderId,
-          type,
-          paramsJson,
-          price,
-          Math.max(1, Number(quantity) || 1),
-          printerId || null,
-          Math.max(1, Number(sides) || 1),
-          Math.max(0, Number(sheets) || 0),
-          Math.max(0, Number(waste) || 0),
-          clicks
+          hasExecutorUserId
+            ? 'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, executor_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            : 'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          hasExecutorUserId
+            ? [orderId, type, paramsJson, price, Math.max(1, Number(quantity) || 1), printerId || null, Math.max(1, Number(sides) || 1), Math.max(0, Number(sheets) || 0), Math.max(0, Number(waste) || 0), clicks, defaultExecutor]
+            : [orderId, type, paramsJson, price, Math.max(1, Number(quantity) || 1), printerId || null, Math.max(1, Number(sides) || 1), Math.max(0, Number(sheets) || 0), Math.max(0, Number(waste) || 0), clicks]
         )
         const itemId = insertItem.lastID!
 
@@ -513,6 +521,7 @@ export class OrderItemController {
         sides: number
         sheets: number
         waste: number
+        executor_user_id: number | null
       }>
       const db = await getDb()
 
@@ -628,6 +637,15 @@ export class OrderItemController {
           }>('SELECT prepaymentAmount, paymentMethod, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id = ?', [orderId])
         }
 
+        let hasExecutorUserId = false
+        try {
+          hasExecutorUserId = await hasColumn('items', 'executor_user_id')
+        } catch { /* ignore */ }
+        const executorClause = hasExecutorUserId && body.executor_user_id !== undefined
+          ? 'executor_user_id = ?,' : ''
+        const executorVal = hasExecutorUserId && body.executor_user_id !== undefined
+          ? [body.executor_user_id ?? null] : []
+
         await db.run(
           `UPDATE items SET 
               ${body.price != null ? 'price = ?,' : ''}
@@ -636,6 +654,7 @@ export class OrderItemController {
               ${body.sides != null ? 'sides = ?,' : ''}
               ${body.sheets != null ? 'sheets = ?,' : ''}
               ${body.waste != null ? 'waste = ?,' : ''}
+              ${executorClause}
               clicks = ?
            WHERE id = ? AND orderId = ?`,
           ...([body.price != null ? Number(body.price) : []] as any),
@@ -644,6 +663,7 @@ export class OrderItemController {
           ...([body.sides != null ? nextSides : []] as any),
           ...([body.sheets != null ? nextSheets : []] as any),
           ...([body.waste != null ? Math.max(0, Number(body.waste) || 0) : []] as any),
+          ...executorVal,
           clicks,
           itemId,
           orderId
@@ -688,7 +708,7 @@ export class OrderItemController {
         throw e
       }
 
-      const updated = await db.get<any>('SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks FROM items WHERE id = ? AND orderId = ?', itemId, orderId)
+      const updated = await db.get<any>('SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, executor_user_id FROM items WHERE id = ? AND orderId = ?', itemId, orderId)
       res.json({
         id: updated.id,
         orderId: updated.orderId,
@@ -700,7 +720,8 @@ export class OrderItemController {
         sides: updated.sides,
         sheets: updated.sheets,
         waste: updated.waste,
-        clicks: updated.clicks
+        clicks: updated.clicks,
+        executor_user_id: updated?.executor_user_id ?? undefined
       })
     } catch (error: any) {
       const status = error.status || 500

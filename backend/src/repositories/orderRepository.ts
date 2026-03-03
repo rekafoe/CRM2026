@@ -153,7 +153,7 @@ export const OrderRepository = {
     }) as unknown as Order[]
   },
 
-  /** Заказы пользователя, выданные в указанную дату (status = 4). Дата выдачи — только debt_closed_events.closed_date. */
+  /** Заказы пользователя, выданные в указанную дату (status = 7 Завершён). Дата выдачи — только debt_closed_events.closed_date. */
   async listUserOrdersIssuedOn(userId: number, dateYmd: string): Promise<Order[]> {
     const db = await getDb()
     const d = dateYmd.slice(0, 10)
@@ -184,7 +184,7 @@ export const OrderRepository = {
         SELECT 1 FROM user_order_page_orders uopo
         JOIN user_order_pages uop ON uopo.page_id = uop.id
         WHERE uopo.order_id = o.id AND uopo.order_type = 'website' AND uop.user_id = ?
-      )) AND o.status = 4
+      )) AND o.status = 7
         AND EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ?)
       ORDER BY o.id DESC`,
       userId,
@@ -237,7 +237,7 @@ export const OrderRepository = {
         ) AS issued_by_me
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.status = 4
+      WHERE o.status = 7
         AND EXISTS (SELECT 1 FROM debt_closed_events d3 WHERE d3.order_id = o.id AND d3.closed_date = ?)
         AND (
           o.userId = ?
@@ -288,7 +288,7 @@ export const OrderRepository = {
         c.phone as customer__phone, c.email as customer__email
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.status = 4
+      WHERE o.status = 7
         AND EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ?)
       ORDER BY o.id DESC`,
       d
@@ -327,20 +327,28 @@ export const OrderRepository = {
     let hasIsCancelled = false
     let hasPaymentChannel = false
     let hasNotes = false
+    let hasContactUserId = false
+    let hasResponsibleUserId = false
     try {
       hasIsCancelled = await hasColumn('orders', 'is_cancelled')
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
       hasNotes = await hasColumn('orders', 'notes')
+      hasContactUserId = await hasColumn('orders', 'contact_user_id')
+      hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id')
     } catch { /* ignore */ }
     const isCancelledSel = hasIsCancelled ? 'o.is_cancelled' : '0 as is_cancelled'
     const paymentChannelSel = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel"
     const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
+    const contactUserIdSel = hasContactUserId ? 'o.contact_user_id' : 'NULL as contact_user_id'
+    const responsibleUserIdSel = hasResponsibleUserId ? 'o.responsible_user_id' : 'NULL as responsible_user_id'
     const orders = await db.all<any>(
       `SELECT 
         o.id, 
         o.number,
         o.status, COALESCE(o.created_at, o.createdAt) as created_at, o.customerName, o.customerPhone, o.customerEmail, 
         o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.paymentMethod, o.userId,
+        ${contactUserIdSel},
+        ${responsibleUserIdSel},
         o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
         ${paymentChannelSel},
         ${notesSel},
@@ -682,7 +690,7 @@ export const OrderRepository = {
         COUNT(CASE WHEN base.status = 1 THEN 1 END) as newOrders,
         COUNT(CASE WHEN base.status = 2 THEN 1 END) as inProgressOrders,
         COUNT(CASE WHEN base.status = 3 THEN 1 END) as readyOrders,
-        COUNT(CASE WHEN base.status = 4 THEN 1 END) as shippedOrders,
+        COUNT(CASE WHEN base.status = 7 THEN 1 END) as shippedOrders,
         COUNT(CASE WHEN base.status = 5 THEN 1 END) as completedOrders,
         COALESCE(SUM(base.totalAmount), 0) as totalRevenue,
         COALESCE(AVG(base.totalAmount), 0) as averageOrderValue,

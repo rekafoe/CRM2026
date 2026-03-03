@@ -12,6 +12,26 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json(users)
 }))
 
+// GET /api/users/operators-today?date=YYYY-MM-DD — операторы, работающие в указанную дату (по user_shifts)
+router.get('/operators-today', asyncHandler(async (req, res) => {
+  const date = String((req.query as any)?.date ?? '').trim().slice(0, 10)
+  const targetDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+    res.status(400).json({ message: 'date=YYYY-MM-DD required' })
+    return
+  }
+  const db = await getDb()
+  const rows = await db.all<any>(
+    `SELECT u.id, u.name
+     FROM user_shifts s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.work_date = ?
+     ORDER BY u.name`,
+    targetDate
+  )
+  res.json(rows)
+}))
+
 // GET /api/users/all — полный список пользователей с деталями
 router.get('/all', asyncHandler(async (req, res) => {
   const db = await getDb()

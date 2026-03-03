@@ -58,6 +58,8 @@ export interface Item {
   sheets: number; // Убираем optional
   waste: number; // Убираем optional
   clicks: number; // Убираем optional
+  /** Исполнитель — оператор, выполняющий эту позицию */
+  executor_user_id?: number | null;
   // Информация о листах SRA3
   sheetsNeeded?: number;
   piecesPerSheet?: number;
@@ -72,6 +74,10 @@ export interface Order {
   status: number;
   created_at: string;
   userId?: number;
+  /** Контактёр — создал заказ, общался с клиентом */
+  contact_user_id?: number | null;
+  /** Ответственный — оператор, выполняющий заказ */
+  responsible_user_id?: number | null;
   // Источник заказа
   source?: 'crm' | 'website' | 'telegram';
   // Customer information

@@ -123,7 +123,7 @@ export const useOptimizedAppData = (
             return extractDate(rawDate) === targetDate;
           })
           .filter(o => uid == null ? true : ((o as any).userId == null || (o as any).userId === uid));
-        // Выданные (status 4) не скрываем — заказ создателя не пропадает, если его выдал коллега.
+        // Выданные (status 7) не скрываем — заказ создателя не пропадает, если его выдал коллега.
       }
       const uniqueOrders = list.filter((order, index, self) => 
         index === self.findIndex(o => o.id === order.id)

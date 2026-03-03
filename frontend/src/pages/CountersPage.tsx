@@ -177,6 +177,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
       // В кассу учитываем только заказы с payment_channel === 'cash' (касса)
       // Счёт (invoice) и не пробивавшиеся (not_cashed) — не в кассу
       const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
+        if (Number(order.status) === 1) return sum; // Ожидающий — не в кассу
         const channel = (order.payment_channel || 'cash').toLowerCase();
         if (channel !== 'cash') return sum;
         const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);

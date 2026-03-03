@@ -76,6 +76,7 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
         return orderDate === date && (order.userId === userId || order.userId === null);
       });
       const calculatedCash = ordersForDate.reduce((sum: number, order: any) => {
+        if (Number(order.status) === 1) return sum; // Ожидающий — не в кассу
         return sum + (order.prepaymentAmount || 0);
       }, 0);
 

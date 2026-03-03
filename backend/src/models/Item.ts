@@ -10,4 +10,6 @@ export interface Item {
   sheets?: number; // SRA3 sheets printed
   waste?: number;  // defective sheets
   clicks?: number; // computed clicks for printers
+  /** Исполнитель — оператор, выполняющий эту позицию */
+  executor_user_id?: number | null;
 }

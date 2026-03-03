@@ -8,6 +8,10 @@ interface OrderContentProps {
   onEditOrderItem?: (orderId: number, item: Item) => void;
   /** В режиме пула заказов: только просмотр, без редактирования/удаления/принтера */
   readOnly?: boolean;
+  /** Операторы за сегодня (для выбора исполнителя) */
+  operatorsToday?: Array<{ id: number; name: string }>;
+  /** Обновить исполнителя позиции */
+  onExecutorChange?: (orderId: number, itemId: number, executor_user_id: number | null) => void;
 }
 
 export const OrderContent: React.FC<OrderContentProps> = ({
@@ -15,6 +19,8 @@ export const OrderContent: React.FC<OrderContentProps> = ({
   onLoadOrders,
   onEditOrderItem,
   readOnly,
+  operatorsToday = [],
+  onExecutorChange,
 }) => {
   const items = order.items ?? [];
   return (
@@ -32,6 +38,8 @@ export const OrderContent: React.FC<OrderContentProps> = ({
           onUpdate={onLoadOrders}
           onEditParameters={onEditOrderItem}
           readOnly={readOnly}
+          operatorsToday={operatorsToday}
+          onExecutorChange={onExecutorChange}
         />
       ))}
     </div>

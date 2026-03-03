@@ -299,7 +299,7 @@ router.get('/full/:date', asyncHandler(async (req, res) => {
         `SELECT o.id, o.number, o.status, o.createdAt, o.customerName, o.customerPhone, o.customerEmail, o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId
          FROM orders o
          WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
-            OR (o.status = 4 AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?)
+            OR (o.status = 7 AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?)
          ORDER BY o.id DESC`,
         d,
         d
@@ -308,7 +308,7 @@ router.get('/full/:date', asyncHandler(async (req, res) => {
         `SELECT o.id, o.number, o.status, o.createdAt, o.customerName, o.customerPhone, o.customerEmail, o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId
          FROM orders o
          WHERE (substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ? AND o.userId = ?)
-            OR (o.status = 4 AND o.userId = ? AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?)
+            OR (o.status = 7 AND o.userId = ? AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?)
          ORDER BY o.id DESC`,
         d,
         targetUserId,

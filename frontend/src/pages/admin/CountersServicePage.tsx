@@ -87,6 +87,7 @@ export const CountersServicePage: React.FC = () => {
       );
       const contributionsByUser = new Map<number, number>();
       const total = ordersForDate.reduce((sum: number, order: any) => {
+        if (Number(order.status) === 1) return sum; // Ожидающий — не в кассу
         const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
         const orderAmount = prepayment > 0 ? prepayment : 0;
         const rawUserId = order.userId ?? order.user_id ?? null;

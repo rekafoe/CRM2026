@@ -148,7 +148,8 @@ export class OrderManagementController {
         });
       }
 
-      const order = await OrderManagementService.issueOrder(Number(orderId), String(orderType));
+      const authUser = (req as any).user as { id: number } | undefined;
+      const order = await OrderManagementService.issueOrder(Number(orderId), String(orderType), authUser?.id ?? null);
       if (!order) {
         return res.status(404).json({
           success: false,
