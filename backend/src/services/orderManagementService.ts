@@ -441,8 +441,9 @@ export class OrderManagementService {
 
   /**
    * Выдача заказа/закрытие долга. Website: status 7 (Завершён = выдан), debt_closed_events. Telegram: status 7.
+   * issuedOn — дата выдачи YYYY-MM-DD (из фронта), чтобы заказ попал в «Выданные заказы» за выбранный день.
    */
-  static async issueOrder(orderId: number, orderType: string, issuerId?: number | null): Promise<UnifiedOrder | null> {
+  static async issueOrder(orderId: number, orderType: string, issuerId?: number | null, issuedOn?: string | null): Promise<UnifiedOrder | null> {
     try {
       const db = await getDb();
       await db.run('BEGIN');
@@ -486,7 +487,10 @@ export class OrderManagementService {
 
           // debt_closed_events — чтобы заказ попал в «Выданные заказы» и в кассу (debt_closed_issued_by_me)
           const issuer = issuerId ?? null;
-          const closedDate = new Date().toISOString().slice(0, 10);
+          const isValidIssuedOn = issuedOn && /^\d{4}-\d{2}-\d{2}$/.test(String(issuedOn).slice(0, 10));
+          const closedDate = isValidIssuedOn
+            ? String(issuedOn).slice(0, 10)
+            : ((await db.get<{ d: string }>("SELECT date('now','localtime') as d"))?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
           try {
             const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id');
             if (hasIssuedBy) {
