@@ -7,6 +7,7 @@ import { initDB } from './config/database'
 import { config } from './config/app'
 import { uploadsDir } from './config/upload'
 import { authMiddleware, errorHandler, asyncHandler } from './middleware'
+import { uploadsApiKeyMiddleware } from './middleware/uploadsApiKey'
 import { performanceMiddleware, performanceLoggingMiddleware } from './middleware/performance'
 import { compressionMiddleware } from './middleware/compression'
 import { cachePresets } from './middleware/httpCache'
@@ -99,8 +100,9 @@ app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
 // Static files (два префикса: фронт с Vercel ходит на /api/uploads/*, локально может /uploads/*)
-app.use('/uploads', express.static(uploadsDir))
-app.use('/api/uploads', express.static(uploadsDir))
+// Доступ по WEBSITE_ORDER_API_KEY (X-API-Key, ?api_key=, Bearer) или по токену CRM
+app.use('/uploads', asyncHandler(uploadsApiKeyMiddleware), express.static(uploadsDir))
+app.use('/api/uploads', asyncHandler(uploadsApiKeyMiddleware), express.static(uploadsDir))
 
 // Health check (before auth middleware)
 app.get('/health', (req, res) => {
@@ -190,6 +192,9 @@ async function startServer() {
       logger.info(`Document templates: using persistent dir (DOCUMENT_TEMPLATES_DIR) = ${require('path').resolve(documentTemplatesDir)}`)
     } else {
       logger.warn('Document templates: DOCUMENT_TEMPLATES_DIR not set — uploaded templates will be lost on redeploy. Set DOCUMENT_TEMPLATES_DIR to a volume path (e.g. /data/document-templates) on Railway.')
+    }
+    if (!process.env.UPLOADS_DIR) {
+      logger.warn('UPLOADS_DIR not set — images (products, categories, subtypes) will be lost on redeploy. Create a Railway Volume, mount it (e.g. /data/uploads), set UPLOADS_DIR=/data/uploads.')
     }
     app.listen(port, () => {
       logger.info(`Server running on port ${port}`)

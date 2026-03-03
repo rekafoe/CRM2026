@@ -301,6 +301,41 @@ curl -X POST "https://api.printcore.by/api/orders/from-website" \
 
 ---
 
+## Доступ к файлам (картинки продуктов, категорий, подтипов)
+
+Картинки хранятся в `/api/uploads/*` (например `/api/uploads/cat-123.png`). Если в env задан **`WEBSITE_ORDER_API_KEY`**, доступ к файлам требует авторизации — тот же ключ, что и для API заказов.
+
+**Способы передачи ключа:**
+
+| Способ | Когда использовать |
+|--------|--------------------|
+| **`X-API-Key`** или **`Authorization: Bearer <key>`** | Для `fetch()` и других запросов, где можно задать заголовки |
+| **`?api_key=<key>`** в URL | Для `<img src="...">` — браузер не передаёт заголовки при загрузке картинок |
+
+**Пример для сайта (img src):**
+
+API возвращает `image_url: "/api/uploads/product-58.png"`. Сайт должен добавить ключ к URL:
+
+```javascript
+const API_BASE = 'https://api.printcore.by'
+const API_KEY = process.env.NEXT_PUBLIC_WEBSITE_ORDER_API_KEY // или из конфига
+
+function imageUrl(path) {
+  if (!path) return null
+  const base = path.startsWith('http') ? '' : API_BASE
+  const url = base + path
+  return API_KEY ? `${url}${url.includes('?') ? '&' : '?'}api_key=${API_KEY}` : url
+}
+
+// Использование
+<img src={imageUrl(category.image_url)} alt={category.name} />
+<img src={imageUrl(product.image_url)} alt={product.name} />
+```
+
+**Если `WEBSITE_ORDER_API_KEY` не задан** — доступ к uploads открыт (для dev / обратная совместимость).
+
+---
+
 ## Каталог продуктов для сайта (описания подтипов)
 
 API продуктов возвращает данные для отображения каталога на сайте. Swagger: `/api-docs` (тег **Website Catalog**).

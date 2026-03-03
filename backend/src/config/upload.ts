@@ -2,7 +2,13 @@ import path from 'path'
 import fs from 'fs'
 import multer from 'multer'
 
-export const uploadsDir = path.resolve(__dirname, '../uploads')
+// Загружаем .env до чтения UPLOADS_DIR (на Railway env уже заданы платформой)
+try { require('dotenv').config() } catch {}
+
+/** Путь к uploads: UPLOADS_DIR (volume на Railway) или dist/uploads. Без UPLOADS_DIR файлы теряются при редеплое. */
+export const uploadsDir = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.resolve(__dirname, '../uploads')
 
 // Ensure uploads directory exists
 try {
