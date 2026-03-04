@@ -276,6 +276,7 @@ export function useCalculatorPricingActions({
           ...specs,
           productType: resolvedType,
           format: specs.format, // ✅ Явно передаем формат
+          ...(specs.typeId != null ? { type_id: specs.typeId } : {}), // ✅ Явно type_id для продуктов с подтипами (открытки и т.д.)
           urgency: specs.priceType,
           paperDensity: specs.paperDensity,
           customerType: specs.customerType,

@@ -1577,7 +1577,70 @@ router.get('/operations', asyncHandler(async (req, res) => {
   }
 }))
 
-// POST /api/pricing/calculate - расчет цены продукта
+/**
+ * @swagger
+ * /api/pricing/calculate:
+ *   post:
+ *     summary: Расчёт цены продукта (унифицированный)
+ *     description: |
+ *       Рассчитывает цену по productId и конфигурации. Поддерживает configuration и specifications.
+ *       В ответе data содержит finalPrice, pricePerUnit, tier_prices и др.
+ *     tags: [Pricing]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [productId, quantity]
+ *             properties:
+ *               productId: { type: integer }
+ *               quantity: { type: integer, description: Тираж (шт) }
+ *               qty: { type: integer, description: Альтернатива quantity }
+ *               configuration:
+ *                 type: object
+ *                 description: Параметры конфигурации (size_id, material_id, print_*, finishing и т.д.)
+ *                 properties:
+ *                   quantity: { type: integer }
+ *                   size_id: { type: integer, description: ID размера или строка-ключ }
+ *                   type_id: { type: integer }
+ *                   trim_size: { type: object, properties: { width: { type: number }, height: { type: number } } }
+ *                   material_id: { type: integer }
+ *                   base_material_id: { type: integer }
+ *                   print_technology: { type: string }
+ *                   print_color_mode: { type: string, enum: [color, bw] }
+ *                   print_sides_mode: { type: string, enum: [single, duplex, duplex_bw_back] }
+ *                   sides: { type: integer, enum: [1, 2] }
+ *                   cutting: { type: boolean }
+ *                   pages: { type: integer }
+ *                   finishing:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         service_id: { type: integer }
+ *                         variant_id: { type: integer }
+ *                         price_unit: { type: string, enum: [per_cut, per_item] }
+ *                         units_per_item: { type: number }
+ *               specifications: { type: object, description: Альтернатива configuration (legacy) }
+ *     responses:
+ *       200:
+ *         description: Результат расчёта
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     finalPrice: { type: number }
+ *                     pricePerUnit: { type: number }
+ *                     tier_prices: { type: array, items: { type: object } }
+ *       400: { description: Неверные параметры }
+ *       500: { description: Ошибка расчёта }
+ */
 router.post('/calculate', asyncHandler(async (req, res) => {
   // Перенаправляем на существующий calculateProductPrice из модуля pricing
   const { PricingController } = await import('../modules/pricing/controllers/pricingController')

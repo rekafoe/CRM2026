@@ -203,11 +203,27 @@ export class SimplifiedPricingService {
     // Для продуктов с типами (typeConfigs) размеры берём из typeConfigs[typeId].sizes
     const typeId = (configuration as any).typeId ?? (configuration as any).type_id;
     const typeConfigs = (configData.simplified as any)?.typeConfigs;
+    const sizeIdFromConfig = (configuration as any).size_id;
     let sizesToUse: SimplifiedSizeConfig[] = simplifiedConfig.sizes ?? [];
     
     if (typeId && typeConfigs?.[typeId]?.sizes?.length) {
       sizesToUse = typeConfigs[typeId].sizes;
       logger.info('Используем размеры из typeConfigs', { typeId, sizesCount: sizesToUse.length });
+    } else if (!typeId && typeConfigs && sizeIdFromConfig != null) {
+      // Fallback: type_id не передан, но size_id есть — ищем размер во всех typeConfigs
+      // (типично для «открытки дизайнерские» при выборе размера до/без явного выбора подтипа)
+      for (const [tid, cfg] of Object.entries(typeConfigs) as [string, any][]) {
+        const typeSizes = cfg?.sizes;
+        if (Array.isArray(typeSizes) && typeSizes.some((s: any) => String(s.id) === String(sizeIdFromConfig))) {
+          sizesToUse = typeSizes;
+          logger.info('Найден size_id в typeConfigs (type_id не был передан)', {
+            inferredTypeId: tid,
+            size_id: sizeIdFromConfig,
+            sizesCount: sizesToUse.length,
+          });
+          break;
+        }
+      }
     }
     
     if (!sizesToUse || sizesToUse.length === 0) {

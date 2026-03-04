@@ -41,13 +41,26 @@ const validateRateLimit = rateLimiter.middleware({
  *             required: [quantity]
  *             properties:
  *               quantity: { type: integer, description: Тираж (шт) }
- *               size_id: { type: integer, description: ID размера из simplified }
+ *               size_id: { type: integer, description: ID размера из simplified (или строка для кастомного ключа) }
  *               type_id: { type: integer, description: ID подтипа (для продуктов с typeConfigs) }
- *               material_id: { type: integer }
- *               print_technology: { type: string }
+ *               trim_size: { type: object, properties: { width: { type: number }, height: { type: number } }, description: Размер в мм (альтернатива size_id) }
+ *               material_id: { type: integer, description: ID материала }
+ *               base_material_id: { type: integer, description: ID материала-основы (заготовка) }
+ *               print_technology: { type: string, description: Код технологии (digital_toner и т.д.) }
  *               print_color_mode: { type: string, enum: [color, bw] }
  *               print_sides_mode: { type: string, enum: [single, duplex, duplex_bw_back] }
- *               finishing: { type: array, items: { type: object, properties: { service_id: { type: integer }, variant_id: { type: integer } } } }
+ *               sides: { type: integer, enum: [1, 2], description: 1=односторонняя, 2=двусторонняя }
+ *               cutting: { type: boolean, description: Резка стопой по раскладке }
+ *               pages: { type: integer, description: Количество страниц (multi_page) }
+ *               finishing:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     service_id: { type: integer }
+ *                     variant_id: { type: integer, description: ID варианта (ламинация и др.) }
+ *                     price_unit: { type: string, enum: [per_cut, per_item] }
+ *                     units_per_item: { type: number, description: Кол-во операций на изделие }
  *     responses:
  *       200:
  *         description: Результат расчёта

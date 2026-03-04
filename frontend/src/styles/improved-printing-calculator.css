@@ -864,10 +864,16 @@
   max-width: 280px;
 }
 /* Второй блок (Плотность) — компактный */
-.material-type-density-row > .param-group:last-child {
+.material-type-density-row > .param-group:nth-child(2) {
   flex: 0 0 auto;
   min-width: 100px;
   max-width: 160px;
+}
+/* Третий блок (Имя материала) — читаемый, может растягиваться */
+.material-type-density-row > .param-group:nth-child(3) {
+  flex: 1 1 auto;
+  min-width: 120px;
+  max-width: 240px;
 }
 /* Длинные названия в селекте: обрезка с многоточием, полный текст при открытии списка */
 .material-type-density-row select.form-control {
@@ -893,6 +899,12 @@
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-control--readonly {
+  background: var(--bg-secondary, #f7fafc);
+  cursor: default;
+  border-color: #e2e8f0;
 }
 
 /* Расширенные настройки */

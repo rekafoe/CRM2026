@@ -381,7 +381,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     </div>
   ) : null;
 
-  // Блок «Тип материала» + «Плотность» в одну строку (типы и плотности из разрешённых для продукта материалов)
+  // Блок «Тип материала» + «Плотность» + «Имя материала» в одну строку
   const materialBlock = isSimplifiedProduct && specs.size_id ? (
     <div className="material-type-density-row">
       <div className="param-group param-group--narrow">
@@ -431,6 +431,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
             ))}
           </select>
         )}
+      </div>
+      <div className="param-group param-group--narrow">
+        <label>Материал</label>
+        <div className="form-control form-control--readonly" style={{ minHeight: '38px', display: 'flex', alignItems: 'center' }}>
+          {materialByTypeAndDensity ? (materialByTypeAndDensity as any).name : '—'}
+        </div>
       </div>
       {baseMaterialBlock}
     </div>
@@ -564,7 +570,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
           </div>
         )}
 
-        {/* Тип материала + Плотность в одну строку (из разрешённых для продукта материалов) */}
+        {/* Тип материала + Плотность + Имя материала в одну строку (из разрешённых для продукта материалов) */}
         {isSimplifiedProduct && specs.size_id && (
           <div className="material-type-density-row" style={{ gridColumn: '1 / -1' }}>
             <div className="param-group param-group--narrow">
@@ -601,7 +607,10 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
             ) : (
               <select
                 value={selectedDensity}
-                onChange={(e) => setSelectedDensity(e.target.value ? Number(e.target.value) : '')}
+                onChange={(e) => {
+                  userChoseTypeRef.current = true;
+                  setSelectedDensity(e.target.value ? Number(e.target.value) : '');
+                }}
                 className="form-control"
                 required
                 title={selectedDensity ? `${selectedDensity} г/м²` : undefined}
@@ -611,6 +620,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
                 ))}
               </select>
             )}
+            </div>
+            <div className="param-group param-group--narrow">
+              <label>Материал</label>
+              <div className="form-control form-control--readonly" style={{ minHeight: '38px', display: 'flex', alignItems: 'center' }}>
+                {materialByTypeAndDensity ? (materialByTypeAndDensity as any).name : '—'}
+              </div>
             </div>
           </div>
         )}
