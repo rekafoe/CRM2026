@@ -144,7 +144,7 @@ export interface UseProductsReturn {
   // Действия
   loadCategories: () => Promise<void>;
   loadProductsByCategory: (categoryId: number) => Promise<void>;
-  loadAllProducts: () => Promise<void>;
+  loadAllProducts: (activeOnly?: boolean) => Promise<void>;
   loadProductDetails: (productId: number) => Promise<void>;
   searchProducts: (query: string) => Promise<Product[]>;
   clearCache: () => void;
