@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import type { SimplifiedSizeConfig } from '../hooks/useProductTemplate'
 import { ServicePricingTable, type ServiceItem, type ServicePricing } from './ServicePricingTable'
 import type { Tier } from '../utils/tierManagement'
@@ -37,13 +37,16 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
   updateSize,
   hasUserInteractedWithServicesRef,
   isMobile,
-}) => (
-  <div className="simplified-card">
-    <div className="simplified-card__header">
+}) => {
+  const [expanded, setExpanded] = useState(false)
+  return (
+  <div className={`simplified-card simplified-card--collapsible ${!expanded ? 'simplified-card--collapsed' : ''}`}>
+    <div className="simplified-card__header" onClick={() => setExpanded((v) => !v)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setExpanded((v) => !v)}>
       <div>
         <strong>Отделка (послепечатные услуги)</strong>
         <div className="text-muted text-sm">Выберите услуги из списка. Цены загружаются из services-management. Отметьте услуги, которые нужно добавить в продукт.</div>
       </div>
+      <span className="simplified-card__header-toggle">{expanded ? 'Свернуть' : 'Развернуть'}</span>
     </div>
     <div className="simplified-card__content">
       {loadingLists ? (
@@ -116,4 +119,5 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
       })()}
     </div>
   </div>
-)
+  )
+}

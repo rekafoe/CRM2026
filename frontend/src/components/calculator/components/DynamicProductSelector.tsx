@@ -74,6 +74,7 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
     categoriesError,
     productsError,
     loadProductsByCategory,
+    loadAllProducts,
     searchProducts,
     getProductsByCategoryId,
     getProductById
@@ -155,11 +156,12 @@ export const DynamicProductSelector: React.FC<DynamicProductSelectorProps> = ({
     logger.info('Выбран продукт', { productId: product.id, productName: product.name });
   };
 
-  // Обработка сброса фильтров
+  // Обработка сброса фильтров (Все категории)
   const handleClearFilters = () => {
     setSelectedCategoryId(null);
     setSearchQuery('');
     setSearchResults([]);
+    loadAllProducts(true);
   };
 
   // Иконка категории: folder по умолчанию

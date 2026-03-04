@@ -275,6 +275,54 @@
   padding: 16px;
 }
 
+/* Сворачиваемые карточки (по умолчанию свёрнуты) */
+.simplified-card--collapsible .simplified-card__header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.simplified-card--collapsible .simplified-card__header:hover {
+  background: #f8fafc;
+}
+
+.simplified-card--collapsible .simplified-card__header-toggle {
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+  flex-shrink: 0;
+}
+
+.simplified-card--collapsible.simplified-card--collapsed .simplified-card__header {
+  border-bottom: none;
+  border-radius: 12px;
+}
+
+.simplified-card--collapsible.simplified-card--collapsed .simplified-card__content {
+  display: none;
+}
+
+/* Сворачиваемая подсекция внутри карточки */
+.simplified-subsection--collapsible .simplified-subsection__header {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.simplified-subsection--collapsible .simplified-subsection__header:hover {
+  color: var(--text-primary, #111827);
+}
+
+.simplified-subsection--collapsible.simplified-subsection--collapsed .simplified-subsection__content {
+  display: none;
+}
+
+.simplified-subsection__header-toggle {
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+}
+
 .simplified-card .checkbox-label {
   display: flex;
   align-items: center;

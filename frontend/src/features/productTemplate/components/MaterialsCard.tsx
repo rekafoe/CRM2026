@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { FormField, Alert } from '../../../components/common'
 import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
 import type { PaperTypeForCalculator } from '../../../services/calculatorMaterialService'
@@ -153,13 +153,38 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
       )}
 
       {/* Материалы-основы (заготовки): футболки, кружки — 1 шт на изделие */}
-      <div className="mt-4 pt-4" style={{ borderTop: '1px solid #e5e7eb' }}>
-        <div className="text-sm font-medium mb-2">Материалы-основы (заготовки)</div>
-        <div className="text-muted text-sm mb-2">Для сувенирки, сублимации: футболки, кружки и т.п. Расход: 1 шт на изделие.</div>
+      <BaseMaterialsCollapsible
+        baseMaterialsList={baseMaterialsList}
+        allowedBaseIds={allowedBaseIds}
+        selected={selected}
+        updateSize={updateSize}
+      />
+    </div>
+  </div>
+  )
+}
+
+const BaseMaterialsCollapsible: React.FC<{
+  baseMaterialsList: CalculatorMaterial[]
+  allowedBaseIds: number[]
+  selected: SimplifiedSizeConfig
+  updateSize: (sizeId: number | string, patch: Partial<SimplifiedSizeConfig>) => void
+}> = ({ baseMaterialsList, allowedBaseIds, selected, updateSize }) => {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div className={`simplified-subsection simplified-subsection--collapsible mt-4 pt-4 ${!expanded ? 'simplified-subsection--collapsed' : ''}`} style={{ borderTop: '1px solid #e5e7eb' }}>
+      <div className="simplified-subsection__header" onClick={() => setExpanded((v) => !v)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setExpanded((v) => !v)}>
+        <div>
+          <div className="text-sm font-medium">Материалы-основы (заготовки)</div>
+          <div className="text-muted text-sm">Для сувенирки, сублимации: футболки, кружки и т.п. Расход: 1 шт на изделие.</div>
+        </div>
+        <span className="simplified-subsection__header-toggle">{expanded ? 'Свернуть' : 'Развернуть'}</span>
+      </div>
+      <div className="simplified-subsection__content">
         {baseMaterialsList.length === 0 ? (
           <div className="text-muted text-sm">Нет материалов на складе.</div>
         ) : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: 8 }}>
             {baseMaterialsList.map(m => {
               const isAllowed = allowedBaseIds.includes(Number(m.id))
               return (
@@ -197,6 +222,5 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
         )}
       </div>
     </div>
-  </div>
   )
 }

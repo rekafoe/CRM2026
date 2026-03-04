@@ -4,9 +4,12 @@
    ============================================= */
 
 .product-edit {
+  display: flex;
+  flex-direction: column;
   max-width: 1200px;
   margin: 0 auto;
   padding: 24px 16px;
+  min-height: 100vh;
   animation: peditFadeIn 0.3s ease-out;
 }
 
@@ -17,6 +20,7 @@
 
 /* --- Header --- */
 .product-edit__header {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -85,18 +89,20 @@
   flex-shrink: 0;
 }
 
-/* --- Body grid: sidebar + main --- */
+/* --- Body grid: sidebar + main (независимый скролл) --- */
 .product-edit__body {
   display: grid;
   grid-template-columns: 260px 1fr;
   gap: 24px;
-  align-items: start;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* --- Sidebar summary card --- */
+/* --- Sidebar summary card (скролл отдельно) --- */
 .product-edit__sidebar {
-  position: sticky;
-  top: 24px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .product-summary-card {
@@ -178,12 +184,14 @@
   text-align: center;
 }
 
-/* --- Main section --- */
+/* --- Main section (скролл отдельно) --- */
 .product-edit__main {
   display: flex;
   flex-direction: column;
   gap: 0;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* --- Tabs --- */

@@ -44,6 +44,7 @@ const ProductTemplatePage: React.FC = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [activeTab, setActiveTab] = useState<'main' | 'materials' | 'run' | 'operations' | 'print'>('main');
   const [savingPrintSettings, setSavingPrintSettings] = useState(false);
+  const [calcOptionsExpanded, setCalcOptionsExpanded] = useState(false);
   const isInitialLoadRef = useRef(true);
   const lastSavedStateRef = useRef<string>('');
   const autoSaveInProgressRef = useRef(false);
@@ -282,12 +283,13 @@ const ProductTemplatePage: React.FC = () => {
               </div>
             </div>
 
-            <div className="simplified-card">
-              <div className="simplified-card__header">
+            <div className={`simplified-card simplified-card--collapsible ${!calcOptionsExpanded ? 'simplified-card--collapsed' : ''}`}>
+              <div className="simplified-card__header" onClick={() => setCalcOptionsExpanded((v) => !v)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCalcOptionsExpanded((v) => !v)}>
                 <div>
                   <strong>Опции калькулятора</strong>
                   <div className="text-muted text-sm">Чекбоксы, доступные при расчёте.</div>
                 </div>
+                <span className="simplified-card__header-toggle">{calcOptionsExpanded ? 'Свернуть' : 'Развернуть'}</span>
               </div>
               <div className="simplified-card__content">
                 <label className="checkbox-label">
