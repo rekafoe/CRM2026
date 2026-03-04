@@ -294,6 +294,9 @@ export function compactSimplifiedForSite(simplified: any) {
           name: t?.name,
           default: !!t?.default,
           briefDescription: t?.briefDescription,
+          fullDescription: t?.fullDescription,
+          characteristics: Array.isArray(t?.characteristics) ? t.characteristics : undefined,
+          advantages: Array.isArray(t?.advantages) ? t.advantages : undefined,
           image_url: t?.image_url || undefined,
           min_unit_price: cfg?.sizes ? minUnitPriceForSizes(cfg.sizes) : null,
         };
