@@ -5,7 +5,7 @@ import { OrderController } from '../modules/orders/controllers/orderController'
 import { OrderItemController } from '../modules/orders/controllers/orderItemController'
 import { asyncHandler, authenticate } from '../middleware'
 import { requireWebsiteOrderApiKey, isWebsiteOrderApiKeyValid } from '../middleware/websiteOrderApiKey'
-import { upload, uploadMemory, saveBufferToUploads, uploadsDir } from '../config/upload'
+import { upload, uploadMemory, saveBufferToOrderFiles, orderFilesDir, uploadsDir } from '../config/upload'
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
 import { hasColumn } from '../utils/tableSchemaCache'
@@ -109,7 +109,7 @@ router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, uploadMem
     res.status(400).json({ message: 'Файл не получен' })
     return
   }
-  const saved = saveBufferToUploads(f.buffer, (f as any).originalname ?? (f as any).originalName)
+  const saved = saveBufferToOrderFiles(f.buffer, (f as any).originalname ?? (f as any).originalName)
   if (!saved) {
     res.status(400).json({ message: 'Файл пустой (0 байт). Проверьте отправку на клиенте.' })
     return
@@ -158,7 +158,7 @@ router.post('/:id/files', (req, res, next) => {
     })
     return
   }
-  const saved = saveBufferToUploads(buf, (f as any).originalname ?? (f as any).originalName)
+  const saved = saveBufferToOrderFiles(buf, (f as any).originalname ?? (f as any).originalName)
   if (!saved) {
     res.status(400).json({ message: 'Файл пустой (0 байт). Проверьте отправку на клиенте.' })
     return
@@ -329,6 +329,7 @@ router.put('/:id/customer', asyncHandler(OrderController.updateOrderCustomer))
 router.put('/:id/discount', asyncHandler(OrderController.updateOrderDiscount))
 router.put('/:id/payment-channel', asyncHandler(OrderController.updateOrderPaymentChannel))
 router.put('/:id/notes', asyncHandler(OrderController.updateOrderNotes))
+router.put('/:id/assignees', asyncHandler(OrderController.updateOrderAssignees))
 router.delete('/:id', asyncHandler(OrderController.deleteOrder))
 router.post('/:id/duplicate', asyncHandler(OrderController.duplicateOrder))
 router.post('/:id/cancel-online', asyncHandler(OrderController.cancelOnline))
@@ -434,7 +435,7 @@ router.post('/:id/items', asyncHandler(OrderItemController.addItem))
 router.delete('/:orderId/items/:itemId', asyncHandler(OrderItemController.deleteItem))
 router.patch('/:orderId/items/:itemId', asyncHandler(OrderItemController.updateItem))
 
-// Order reassignment: по номеру (ORD-XXXX) или по site-ord-<id> для заказов с сайта
+// Order reassignment: по номеру (ORD-XXXX) или по site-ord-<id> для заказов с сайта. Только при status=1 (ожидающий).
 router.post('/reassign/:number', asyncHandler(async (req, res) => {
   const param = req.params.number;
   const { userId } = req.body;
@@ -445,15 +446,15 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
   }
 
   const db = await getDb();
-  let order: { id: number; number?: string } | undefined;
+  let order: { id: number; number?: string; status?: number } | undefined;
 
   const siteOrderMatch = /^site-ord-(\d+)$/i.exec(param);
   if (siteOrderMatch) {
     const orderId = parseInt(siteOrderMatch[1], 10);
-    order = await db.get('SELECT id, number FROM orders WHERE id = ? AND source = ?', orderId, 'website');
+    order = await db.get('SELECT id, number, status FROM orders WHERE id = ? AND source = ?', orderId, 'website');
   }
   if (!order) {
-    order = await db.get('SELECT id, number FROM orders WHERE number = ?', param);
+    order = await db.get('SELECT id, number, status FROM orders WHERE number = ?', param);
   }
   
   if (!order) {
@@ -461,8 +462,22 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
     return;
   }
 
+  const status = Number(order.status);
+  if (status !== 1) {
+    res.status(400).json({ message: 'Переназначить заказ можно только при статусе «Ожидает» (1)' });
+    return;
+  }
+
   const currentDate = new Date().toISOString();
-  await db.run('UPDATE orders SET userId = ?, created_at = ? WHERE id = ?', userId, currentDate, order.id);
+  let hasResponsible = false;
+  try {
+    hasResponsible = await hasColumn('orders', 'responsible_user_id');
+  } catch { /* ignore */ }
+  if (hasResponsible) {
+    await db.run('UPDATE orders SET userId = ?, responsible_user_id = ?, created_at = ?, updated_at = datetime(\'now\') WHERE id = ?', userId, userId, currentDate, order.id);
+  } else {
+    await db.run('UPDATE orders SET userId = ?, created_at = ? WHERE id = ?', userId, currentDate, order.id);
+  }
   res.json({ success: true, message: 'Order reassigned successfully' });
 }));
 
@@ -491,10 +506,14 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
     res.status(404).json({ message: 'Файл не найден' })
     return
   }
-  const filePath = path.join(uploadsDir, String(row.filename))
+  let filePath = path.join(orderFilesDir, String(row.filename))
   if (!fs.existsSync(filePath)) {
-    res.status(404).json({ message: 'Файл не найден на диске' })
-    return
+    const fallback = path.join(uploadsDir, String(row.filename))
+    if (fs.existsSync(fallback)) filePath = fallback
+    else {
+      res.status(404).json({ message: 'Файл не найден на диске' })
+      return
+    }
   }
   const buffer = fs.readFileSync(filePath)
   const displayName = (row.originalName || row.filename).trim() || row.filename
@@ -507,14 +526,16 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
 router.delete('/:orderId/files/:fileId', asyncHandler(async (req, res) => {
   const orderId = Number(req.params.orderId)
   const fileId = Number(req.params.fileId)
-  const { uploadsDir } = await import('../config/upload')
+  const { orderFilesDir, uploadsDir } = await import('../config/upload')
   const path = await import('path')
   const fs = await import('fs')
   const db = await getDb()
   const row = await db.get<any>('SELECT filename FROM order_files WHERE id = ? AND orderId = ?', fileId, orderId)
   if (row && row.filename) {
-    const p = path.join(uploadsDir, String(row.filename))
-    try { fs.unlinkSync(p) } catch {}
+    for (const dir of [orderFilesDir, uploadsDir]) {
+      const p = path.join(dir, String(row.filename))
+      try { fs.unlinkSync(p); break } catch {}
+    }
   }
   await db.run('DELETE FROM order_files WHERE id = ? AND orderId = ?', fileId, orderId)
   res.status(204).end()
@@ -548,7 +569,7 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const db = await getDb()
   const order = await db.get<any>('SELECT id, status, prepaymentAmount, discount_percent FROM orders WHERE id = ?', id)
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
-  if (Number(order.status) === 4) {
+  if (Number(order.status) === 7) {
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
     res.json(updated)
     return
@@ -566,14 +587,17 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const paymentId = `ISSUE-${Date.now()}-${id}`
   // datetime('now','localtime') — чтобы заказ попадал в «Выданные заказы» за текущий день (SQLite datetime('now') = UTC).
   const updateSql = hasPrepaymentUpdatedAt
-    ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = datetime(\'now\',\'localtime\'), updated_at = datetime(\'now\',\'localtime\'), status = 4 WHERE id = ?'
-    : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = datetime(\'now\',\'localtime\'), status = 4 WHERE id = ?'
+    ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = datetime(\'now\',\'localtime\'), updated_at = datetime(\'now\',\'localtime\'), status = 7 WHERE id = ?'
+    : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = datetime(\'now\',\'localtime\'), status = 7 WHERE id = ?'
   await db.run(updateSql, total, paymentId, id)
 
   // Всегда пишем debt_closed_events при выдаче (в т.ч. remainder=0), чтобы выдавший видел заказ во вкладке «Выданные заказы».
-  // Дата выдачи — UTC (как на фронте contextDate), чтобы заказы из Order Pool попадали в «Выданные заказы».
-  const now = new Date()
-  const today = now.toISOString().slice(0, 10)
+  // Дата выдачи: из body.issued_on (дата, выбранная пользователем) или date('now','localtime').
+  const bodyDate = (req.body as any)?.issued_on
+  const isValidBodyDate = bodyDate && /^\d{4}-\d{2}-\d{2}$/.test(String(bodyDate).slice(0, 10))
+  const today = isValidBodyDate
+    ? String(bodyDate).slice(0, 10)
+    : ((await db.get<{ d: string }>("SELECT date('now','localtime') as d"))?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
   try {
     let hasIssuedBy = false
     try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }

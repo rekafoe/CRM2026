@@ -60,9 +60,13 @@ interface OrderItemProps {
   onEditParameters?: (orderId: number, item: Item) => void;
   /** Режим пула заказов: только информация, без принтера/редактирования/удаления */
   readOnly?: boolean;
+  /** Операторы за сегодня (для выбора исполнителя) */
+  operatorsToday?: Array<{ id: number; name: string }>;
+  /** Обновить исполнителя позиции */
+  onExecutorChange?: (orderId: number, itemId: number, executor_user_id: number | null) => void;
 }
 
-export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUpdate, onEditParameters, readOnly }) => {
+export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUpdate, onEditParameters, readOnly, operatorsToday = [], onExecutorChange }) => {
   const { addToast } = useToast();
   const [editing, setEditing] = useState(false);
   const [qty, setQty] = useState<NumberInputValue>(item.quantity ?? 1);
@@ -299,6 +303,23 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
         )}
       </div>
       {/* Показываем только те параметры, которых нет в горизонтальной строке и которые реально нужны отдельно */}
+      {operatorsToday.length > 0 && onExecutorChange && (
+        <label className="order-item-executor" style={{ marginLeft: 8, fontSize: 12 }}>
+          Исполнитель:
+          <select
+            value={item.executor_user_id ?? (order as any)?.responsible_user_id ?? (order as any)?.userId ?? ''}
+            onChange={(e) => {
+              const v = e.target.value;
+              onExecutorChange(orderId, item.id, v === '' ? null : Number(v));
+            }}
+          >
+            <option value="">—</option>
+            {operatorsToday.map((u) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+        </label>
+      )}
       {parameterSummary.length > 0 && (
         <div className="order-parameter-summary">
           {parameterSummary

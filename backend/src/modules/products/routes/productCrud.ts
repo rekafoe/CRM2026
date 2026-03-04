@@ -30,6 +30,7 @@ const router = Router();
  *             type: object
  *             properties:
  *               image: { type: string, format: binary }
+ *               subtypeName: { type: string, description: 'Название подтипа для имени файла (напр. Визитки стандартные)' }
  *     responses:
  *       200: { description: URL загруженного файла }
  *       400: { description: Файл не передан или неверный формат }
@@ -47,7 +48,8 @@ router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
     if (file.size > 5 * 1024 * 1024) {
       return res.status(400).json({ error: 'Максимальный размер файла — 5 МБ' });
     }
-    const saved = saveBufferToUploads(file.buffer, file.originalname);
+    const subtypeName = (req.body?.subtypeName as string)?.trim() || undefined;
+    const saved = saveBufferToUploads(file.buffer, file.originalname, subtypeName);
     if (!saved) {
       return res.status(400).json({ error: 'Пустой файл' });
     }

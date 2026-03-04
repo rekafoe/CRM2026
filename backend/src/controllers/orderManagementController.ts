@@ -140,7 +140,7 @@ export class OrderManagementController {
    */
   static async issueOrder(req: Request, res: Response) {
     try {
-      const { orderId, orderType } = req.body;
+      const { orderId, orderType, issued_on: issuedOn } = req.body;
       if (!orderId || !orderType) {
         return res.status(400).json({
           success: false,
@@ -148,7 +148,8 @@ export class OrderManagementController {
         });
       }
 
-      const order = await OrderManagementService.issueOrder(Number(orderId), String(orderType));
+      const authUser = (req as any).user as { id: number } | undefined;
+      const order = await OrderManagementService.issueOrder(Number(orderId), String(orderType), authUser?.id ?? null, issuedOn ?? null);
       if (!order) {
         return res.status(404).json({
           success: false,

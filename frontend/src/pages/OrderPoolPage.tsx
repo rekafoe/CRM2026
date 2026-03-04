@@ -317,6 +317,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     getOrderStatuses().then(res => setOrderStatuses(res.data ?? [])).catch(err => logger.error('Failed to load order statuses', err));
   }, [isInitialized, loadOrders, logger]);
 
+
   /** Опрос маркера «заказ с сайта»: при обращении к orderpool API с printcore.by бэкенд обновляет lastWebsiteOrderAt — принудительно обновляем список */
   const poolSyncRef = useRef<number>(0);
   useEffect(() => {
@@ -442,13 +443,18 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
 
   const handleAssignToMe = useCallback(
     async (orderNumber: string) => {
+      const ord = orders.find((o) => o.number === orderNumber);
+      if (ord && Number(ord.status) !== 1) {
+        toast.error('Нельзя переназначить', 'Переназначить можно только заказ со статусом «Ожидает» (1).');
+        return;
+      }
       try {
         await reassignOrderByNumber(orderNumber, currentUserId);
         toast.success('Заказ назначен вам!', `Заказ ${orderNumber} успешно назначен.`);
         setOrders((prev) => {
-          const ord = prev.find((o) => o.number === orderNumber);
-          if (!ord) return prev;
-          return prev.map((o) => (o.id === ord.id ? { ...o, userId: currentUserId } : o));
+          const o = prev.find((x) => x.number === orderNumber);
+          if (!o) return prev;
+          return prev.map((x) => (x.id === o.id ? { ...x, userId: currentUserId } : x));
         });
         setSelectedOrder((prev) => {
           if (!prev || prev.number !== orderNumber) return prev;
@@ -459,17 +465,22 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         toast.error('Ошибка назначения', (err as Error).message);
       }
     },
-    [currentUserId, toast, logger]
+    [currentUserId, orders, toast, logger]
   );
 
   const handleReassignTo = useCallback(
     async (orderNumber: string, userId: number) => {
+      const ord = orders.find((o) => o.number === orderNumber);
+      if (ord && Number(ord.status) !== 1) {
+        toast.error('Нельзя переназначить', 'Переназначить можно только заказ со статусом «Ожидает» (1).');
+        return;
+      }
       try {
         await reassignOrderByNumber(orderNumber, userId);
         const name = allUsers.find((u) => u.id === userId)?.name ?? 'оператору';
         toast.success('Заказ переназначен', `Заказ ${orderNumber} назначен ${name}.`);
-        const ord = orders.find((o) => o.number === orderNumber);
-        if (ord) updateOrderInList(ord.id, { userId });
+        const o = orders.find((x) => x.number === orderNumber);
+        if (o) updateOrderInList(o.id, { userId });
       } catch (err) {
         logger.error('Failed to reassign order', err);
         toast.error('Ошибка переназначения', (err as Error).message);
@@ -477,6 +488,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     },
     [allUsers, orders, toast, logger, updateOrderInList]
   );
+
 
   const issuingRef = useRef(false);
   const handleIssueOrder = useCallback(
@@ -489,7 +501,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         toast.success('Заказ выдан', 'Долг закрыт, заказ переведён в «Выдан»');
         const total = orderMetrics.get(orderId)?.total ?? 0;
         updateOrderInList(orderId, {
-          status: 4 as any,
+          status: 7 as any,
           prepaymentAmount: total,
           prepaymentStatus: 'paid',
           paymentMethod: 'offline',
@@ -727,6 +739,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                     if (uid === selectedOrder.userId) return;
                     handleReassignTo(selectedOrder.number!, uid);
                   }}
+                  disabled={Number(selectedOrder.status) !== 1}
+                  title={Number(selectedOrder.status) !== 1 ? 'Переназначить можно только при статусе «Ожидает» (1)' : undefined}
                 >
                   <option value="">— Не назначен</option>
                   {allUsers.map((u) => (
@@ -734,8 +748,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   ))}
                 </select>
               </label>
-              {(Number(selectedOrder.status) === 0 || Number(selectedOrder.status) === 1) &&
-                selectedOrder.userId !== currentUserId && (
+              {Number(selectedOrder.status) === 1 && selectedOrder.userId !== currentUserId && (
                 <button
                   type="button"
                   className="btn-assign-responsible"
@@ -758,7 +771,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   🗑️ Удалить предоплату
                 </button>
               )}
-              {(getOrderDebt(selectedOrder) > 0 || (getOrderPrepayment(selectedOrder) >= getOrderTotal(selectedOrder) && getOrderTotal(selectedOrder) > 0)) && Number(selectedOrder.status) !== 4 && (
+              {(getOrderDebt(selectedOrder) > 0 || (getOrderPrepayment(selectedOrder) >= getOrderTotal(selectedOrder) && getOrderTotal(selectedOrder) > 0)) && Number(selectedOrder.status) !== 7 && (
                 <button
                   className="btn-close-debt"
                   onClick={() => handleIssueOrder(selectedOrder.id)}

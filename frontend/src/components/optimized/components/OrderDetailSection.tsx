@@ -16,6 +16,9 @@ interface OrderDetailSectionProps {
   contextUserId: number | null;
   currentUser: { id: number; name: string; role: string } | null;
   allUsers: Array<{ id: number; name: string }>;
+  operatorsToday?: Array<{ id: number; name: string }>;
+  onAssigneesChange?: (orderId: number, patch: { contact_user_id?: number | null; responsible_user_id?: number | null }) => void;
+  onExecutorChange?: (orderId: number, itemId: number, executor_user_id: number | null) => void;
   onDateChange: (date: string) => void;
   onUserIdChange: (userId: number | null) => void;
   onStatusChange: (orderId: number, status: number) => Promise<void>;
@@ -39,6 +42,9 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   contextUserId,
   currentUser,
   allUsers,
+  operatorsToday = [],
+  onAssigneesChange,
+  onExecutorChange,
   onDateChange,
   onUserIdChange,
   onStatusChange,
@@ -317,7 +323,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                   🗑️ Удалить предоплату
                 </button>
               )}
-              {onIssueOrder && (debt > 0 || (debt === 0 && total > 0)) && Number(selectedOrder.status) !== 4 && (
+              {onIssueOrder && (debt > 0 || (debt === 0 && total > 0)) && Number(selectedOrder.status) !== 7 && (
                 <button 
                   onClick={() => onIssueOrder(selectedOrder.id)}
                   style={{
@@ -575,6 +581,42 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             onOrderPatch={onOrderPatch}
           />
           
+          {operatorsToday.length > 0 && onAssigneesChange && (
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div>
+                <label style={{ fontSize: 12, color: '#666' }}>Контактёр</label>
+                <select
+                  value={selectedOrder.contact_user_id ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onAssigneesChange(selectedOrder.id, { contact_user_id: v === '' ? null : Number(v) });
+                  }}
+                  style={{ marginLeft: 8 }}
+                >
+                  <option value="">—</option>
+                  {operatorsToday.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: '#666' }}>Ответственный</label>
+                <select
+                  value={(selectedOrder.responsible_user_id ?? selectedOrder.userId) ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onAssigneesChange(selectedOrder.id, { responsible_user_id: v === '' ? null : Number(v) });
+                  }}
+                  style={{ marginLeft: 8 }}
+                >
+                  <option value="">—</option>
+                  {operatorsToday.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
               <label style={{ fontSize: 12, color: '#666' }}>Дата</label>
@@ -688,6 +730,8 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             order={selectedOrder}
             onUpdate={onLoadOrders}
             onEditParameters={onEditOrderItem}
+            operatorsToday={operatorsToday}
+            onExecutorChange={onExecutorChange}
           />
         ))}
       </div>

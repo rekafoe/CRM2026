@@ -50,7 +50,8 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
   const [searching, setSearching] = useState(false);
   const [issuingOrder, setIssuingOrder] = useState(false);
 
-  const today = new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   useEffect(() => {
     loadOrderPool();
@@ -105,7 +106,8 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
       setSearchError(null);
       const response = await api.post('/order-management/issue', {
         orderId: order.id,
-        orderType: order.type
+        orderType: order.type,
+        issued_on: today
       });
       if (response.data?.success) {
         setSearchResult(response.data.data);

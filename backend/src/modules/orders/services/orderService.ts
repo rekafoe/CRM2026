@@ -210,29 +210,46 @@ export class OrderService {
     const initialPrepay = Number(prepaymentAmount || 0)
     let hasPrepaymentUpdatedAt = false
     let hasPaymentChannel = false
+    let hasContactUserId = false
+    let hasResponsibleUserId = false
     try {
       hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasContactUserId = await hasColumn('orders', 'contact_user_id')
+      hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id')
     } catch {
       hasPrepaymentUpdatedAt = false
       hasPaymentChannel = false
+      hasContactUserId = false
+      hasResponsibleUserId = false
     }
+    const creatorId = userId ?? null
+    const contactResponsible = (hasContactUserId || hasResponsibleUserId)
+      ? `${hasContactUserId ? ', contact_user_id' : ''}${hasResponsibleUserId ? ', responsible_user_id' : ''}`
+      : ''
+    const contactResponsibleVals = (hasContactUserId || hasResponsibleUserId)
+      ? `${hasContactUserId ? ', ?' : ''}${hasResponsibleUserId ? ', ?' : ''}`
+      : ''
     const channel = paymentChannel && OrderService.ALLOWED_PAYMENT_CHANNELS.has(paymentChannel) ? paymentChannel : 'cash'
     const insertRes = hasPrepaymentUpdatedAt
       ? await db.run(
-          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentUpdatedAt, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''})`,
+          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentUpdatedAt, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}${contactResponsible}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''}${contactResponsibleVals})`,
           [
             defaultStatusId, createdAt, customerName || null, customerPhone || null, customerEmail || null,
-            initialPrepay, initialPrepay > 0 ? createdAt : null, userId ?? null, source || 'crm', customerId || null,
-            ...(hasPaymentChannel ? [channel] : [])
+            initialPrepay, initialPrepay > 0 ? createdAt : null, creatorId, source || 'crm', customerId || null,
+            ...(hasPaymentChannel ? [channel] : []),
+            ...(hasContactUserId ? [creatorId] : []),
+            ...(hasResponsibleUserId ? [creatorId] : [])
           ]
         )
       : await db.run(
-          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''})`,
+          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}${contactResponsible}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''}${contactResponsibleVals})`,
           [
             defaultStatusId, createdAt, customerName || null, customerPhone || null, customerEmail || null,
-            initialPrepay, userId ?? null, source || 'crm', customerId || null,
-            ...(hasPaymentChannel ? [channel] : [])
+            initialPrepay, creatorId, source || 'crm', customerId || null,
+            ...(hasPaymentChannel ? [channel] : []),
+            ...(hasContactUserId ? [creatorId] : []),
+            ...(hasResponsibleUserId ? [creatorId] : [])
           ]
         )
     const id = (insertRes as any).lastID!
@@ -500,6 +517,40 @@ export class OrderService {
     );
     const updated = await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id]);
     return updated as Order;
+  }
+
+  /** Обновить контактёра и/или ответственного заказа */
+  static async updateOrderAssignees(id: number, contact_user_id?: number | null, responsible_user_id?: number | null): Promise<Order> {
+    const db = await getDb();
+    const order = await db.get<Order>('SELECT id FROM orders WHERE id = ?', [id]);
+    if (!order) {
+      throw new Error('Заказ не найден');
+    }
+    const updates: string[] = [];
+    const values: (number | null)[] = [];
+    let hasContact = false;
+    let hasResponsible = false;
+    try {
+      hasContact = await hasColumn('orders', 'contact_user_id');
+      hasResponsible = await hasColumn('orders', 'responsible_user_id');
+    } catch { /* ignore */ }
+    if (hasContact && contact_user_id !== undefined) {
+      updates.push('contact_user_id = ?');
+      values.push(contact_user_id ?? null);
+    }
+    if (hasResponsible && responsible_user_id !== undefined) {
+      updates.push('responsible_user_id = ?');
+      values.push(responsible_user_id ?? null);
+    }
+    if (updates.length === 0) {
+      return (await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
+    }
+    values.push(id);
+    await db.run(
+      `UPDATE orders SET ${updates.join(', ')}, updated_at = datetime("now") WHERE id = ?`,
+      values
+    );
+    return (await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
   }
 
   /** Обновить примечания заказа */

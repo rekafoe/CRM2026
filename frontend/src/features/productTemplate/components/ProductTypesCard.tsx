@@ -302,8 +302,9 @@ const TypeInitialDefaults: React.FC<{
 
 const SubtypeImageUploader: React.FC<{
   imageUrl?: string;
+  subtypeName?: string;
   onUploaded: (url: string) => void;
-}> = ({ imageUrl, onUploaded }) => {
+}> = ({ imageUrl, subtypeName, onUploaded }) => {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -312,7 +313,7 @@ const SubtypeImageUploader: React.FC<{
     if (!file) return;
     try {
       setUploading(true);
-      const result = await uploadProductImage(file);
+      const result = await uploadProductImage(file, subtypeName);
       onUploaded(result.image_url);
     } catch {
       alert('Не удалось загрузить изображение');
@@ -454,6 +455,7 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                         <label>Изображение</label>
                         <SubtypeImageUploader
                           imageUrl={t.image_url}
+                          subtypeName={t.name}
                           onUploaded={(url) => onChange(updateType(value, t.id, { image_url: url || undefined }))}
                         />
                       </div>

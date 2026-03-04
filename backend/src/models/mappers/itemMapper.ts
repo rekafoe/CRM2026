@@ -12,9 +12,10 @@ export type ItemRow = {
   sheets: number
   waste: number
   clicks: number
+  executor_user_id?: number | null
 }
 
-export const itemRowSelect = 'id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks'
+export const itemRowSelect = 'id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, executor_user_id'
 
 export function mapItemRowToItem(row: ItemRow): Item {
   let parsedParams: Item['params']
@@ -40,6 +41,7 @@ export function mapItemRowToItem(row: ItemRow): Item {
     sheets: row.sheets,
     waste: row.waste,
     clicks: row.clicks,
+    executor_user_id: row.executor_user_id ?? undefined,
   }
 }
 

@@ -8,6 +8,8 @@ import {
   updateOrderStatus,
   updateOrderItem,
   addOrderItem,
+  getOperatorsToday,
+  updateOrderAssignees,
 } from "../../api";
 import { useNavigate } from 'react-router-dom';
 import AddItemModal from "../AddItemModal";
@@ -48,7 +50,10 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [prepayAmount, setPrepayAmount] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<string>('orders');
-  const [contextDate, setContextDate] = useState<string>(() => new Date().toISOString().slice(0,10));
+  const [contextDate, setContextDate] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [contextUserId, setContextUserId] = useState<number | null>(null);
   const [orderManagementTab, setOrderManagementTab] = useState<'pool' | 'page'>('pool');
   const [ordersListTab, setOrdersListTab] = useState<OrdersListTab>('orders');
@@ -70,6 +75,11 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
     loadOrders,
   } = useOptimizedAppData(contextDate, contextUserId, selectedId, ordersListTab);
 
+  const [operatorsToday, setOperatorsToday] = useState<Array<{ id: number; name: string }>>([]);
+  useEffect(() => {
+    getOperatorsToday(contextDate).then(res => setOperatorsToday(res.data ?? [])).catch(() => setOperatorsToday([]));
+  }, [contextDate]);
+
   // Хук для состояния модальных окон
   const modalState = useModalState();
   const { requestReason, ReasonPromptModalElement } = useReasonPrompt();
@@ -85,6 +95,30 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
     closeCalculator: modalState.closeCalculator,
     requestReason,
   });
+
+  const handleAssigneesChange = useCallback(
+    async (orderId: number, patch: { contact_user_id?: number | null; responsible_user_id?: number | null }) => {
+      try {
+        await updateOrderAssignees(orderId, patch);
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch } : o));
+      } catch (err: any) {
+        toast.error('Ошибка', err?.message ?? 'Не удалось обновить');
+      }
+    },
+    [setOrders, toast]
+  );
+
+  const handleExecutorChange = useCallback(
+    async (orderId: number, itemId: number, executor_user_id: number | null) => {
+      try {
+        await updateOrderItem(orderId, itemId, { executor_user_id });
+        loadOrders();
+      } catch (err: any) {
+        toast.error('Ошибка', err?.message ?? 'Не удалось обновить исполнителя');
+      }
+    },
+    [loadOrders, toast]
+  );
 
   // Деструктуризация modalState для удобства
   const {
@@ -161,14 +195,14 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   }, [loadOrders, toast, logger]);
   const handleIssueOrder = useCallback(async (orderId: number) => {
     try {
-      await issueOrder(orderId);
+      await issueOrder(orderId, contextDate);
       await loadOrders(undefined, true);
       toast.success('Заказ выдан', 'Долг закрыт, заказ переведён в «Выдан»');
     } catch (e: any) {
       logger.error('Issue order failed', e);
       toast.error('Ошибка', e?.message ?? 'Не удалось выдать заказ');
     }
-  }, [loadOrders, toast, logger]);
+  }, [loadOrders, toast, logger, contextDate]);
 
   // Мемоизированные обёртки для API функций
   const handleGetDailyReportByDate = useCallback(async (date: string) => {
@@ -328,7 +362,10 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 contextDate={contextDate}
                 contextUserId={contextUserId}
                 currentUser={currentUser}
-              allUsers={activeUsers}
+                allUsers={activeUsers}
+                operatorsToday={operatorsToday}
+                onAssigneesChange={handleAssigneesChange}
+                onExecutorChange={handleExecutorChange}
                 onDateChange={handleDateChange}
                 onUserIdChange={setContextUserId}
                 onStatusChange={orderHandlers.handleStatusChange}

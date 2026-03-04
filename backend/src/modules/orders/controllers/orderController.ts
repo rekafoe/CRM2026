@@ -3,7 +3,7 @@ import { OrderService } from '../services/orderService'
 import { asyncHandler } from '../../../middleware'
 import { logger } from '../../../utils/logger'
 import { getDb } from '../../../config/database'
-import { saveBufferToUploads } from '../../../config/upload'
+import { saveBufferToOrderFiles } from '../../../config/upload'
 import { setLastWebsiteOrderAt } from '../../../utils/poolSync'
 
 /** Приводит item.params к объекту: JSON-строка парсится, объект возвращается как есть, чтобы в CRM попадали все поля (printSize, paperType, withWhiteBorders и т.д.) */
@@ -304,7 +304,7 @@ export class OrderController {
         const db = await getDb()
         for (const f of files) {
           const nameFromClient = f.originalname ?? (f as any).originalName
-          const saved = saveBufferToUploads(f.buffer, nameFromClient)
+          const saved = saveBufferToOrderFiles(f.buffer, nameFromClient)
           if (!saved) {
             logger.warn('createOrderFromWebsiteWithFiles: пропущен пустой файл', { originalname: nameFromClient })
             continue
@@ -448,6 +448,22 @@ export class OrderController {
         return
       }
       const updated = await OrderService.updateOrderNotes(id, notes ?? null)
+      res.json(updated)
+    } catch (error: any) {
+      const status = error.message?.includes('не найден') ? 404 : 400
+      res.status(status).json({ error: error.message })
+    }
+  }
+
+  static async updateOrderAssignees(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id)
+      const { contact_user_id, responsible_user_id } = req.body as { contact_user_id?: number | null; responsible_user_id?: number | null }
+      if (isNaN(id)) {
+        res.status(400).json({ error: 'Неверный ID заказа' })
+        return
+      }
+      const updated = await OrderService.updateOrderAssignees(id, contact_user_id, responsible_user_id)
       res.json(updated)
     } catch (error: any) {
       const status = error.message?.includes('не найден') ? 404 : 400

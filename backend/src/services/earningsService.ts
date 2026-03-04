@@ -81,6 +81,7 @@ export class EarningsService {
       FROM items i
       JOIN orders o ON o.id = i.orderId
       WHERE date(COALESCE(o.createdAt, o.created_at)) = date(?)
+        AND (o.status IS NULL OR o.status != 1)
       `,
       [date]
     );

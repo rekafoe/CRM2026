@@ -210,9 +210,14 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
     d
   )
 
+  let hasExecutorUserId = false
+  try {
+    hasExecutorUserId = await hasColumn('items', 'executor_user_id')
+  } catch { /* ignore */ }
+  const itemExecutorSel = hasExecutorUserId ? 'executor_user_id' : 'NULL as executor_user_id'
   for (const order of orders) {
     const items = await db.all<any>(
-      'SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks FROM items WHERE orderId = ?',
+      `SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, ${itemExecutorSel} FROM items WHERE orderId = ?`,
       order.id
     )
     order.items = items.map((item: any) => ({
@@ -247,7 +252,8 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
             COALESCE(o.prepaymentAmount, 0) as prepayment
        FROM orders o
       WHERE substr(${dateExpr},1,7) = ?
-        AND COALESCE(o.prepaymentAmount, 0) > 0`,
+        AND COALESCE(o.prepaymentAmount, 0) > 0
+        AND (o.status IS NULL OR o.status != 1)`,
     month
   )
   const byDate: Record<string, { total: number; contributions: Array<{ user_id: number; amount: number }> }> = {}
@@ -442,7 +448,7 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
 
   const statusFunnel = await db.all<any>(`
     SELECT CASE WHEN status = 0 THEN 'Создан' WHEN status = 1 THEN 'Подтвержден' WHEN status = 2 THEN 'В работе'
-      WHEN status = 3 THEN 'Готов' WHEN status = 4 THEN 'Выдан' WHEN status = 5 THEN 'Отменен' ELSE 'Неизвестный' END as status_name,
+      WHEN status = 3 THEN 'Выполнен' WHEN status = 4 THEN 'Передан в ПВЗ' WHEN status = 5 THEN 'Отменен' WHEN status = 7 THEN 'Завершён' ELSE 'Неизвестный' END as status_name,
       status, COUNT(*) as count, SUM(COALESCE(prepaymentAmount, 0)) as total_amount, AVG(COALESCE(prepaymentAmount, 0)) as avg_amount
     FROM orders WHERE ${dateFilter('')}
     GROUP BY status, status_name ORDER BY status
@@ -451,14 +457,14 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
   const statusConversion = await db.all<any>(`
     SELECT DATE(createdAt) as date, COUNT(CASE WHEN status >= 1 THEN 1 END) as confirmed_orders,
       COUNT(CASE WHEN status >= 2 THEN 1 END) as in_progress_orders, COUNT(CASE WHEN status >= 3 THEN 1 END) as ready_orders,
-      COUNT(CASE WHEN status >= 4 THEN 1 END) as completed_orders, COUNT(*) as total_created
+      COUNT(CASE WHEN status >= 7 THEN 1 END) as completed_orders, COUNT(*) as total_created
     FROM orders WHERE ${dateFilter('')}
     GROUP BY DATE(createdAt) ORDER BY date DESC
   `, dateParams)
 
   const avgProcessingTime = await db.all<any>(`
     SELECT AVG(JULIANDAY(updatedAt) - JULIANDAY(createdAt)) * 24 as avg_hours_to_complete, COUNT(*) as completed_orders
-    FROM orders WHERE status = 4 AND ${dateFilter('')} AND updatedAt > createdAt
+    FROM orders WHERE status = 7 AND ${dateFilter('')} AND updatedAt > createdAt
   `, dateParams)
 
   const cancellationReasons = await db.all<any>(`
@@ -501,7 +507,7 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
     } else if (statusFilter === 'pending_payment') {
       where.push(`COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
     } else if (statusFilter === 'completed') {
-      where.push('o.status = 4')
+      where.push('o.status = 7')
     } else if (statusFilter === 'cancelled') {
       where.push('o.status = 5')
     } else if (statusFilter === 'created') {

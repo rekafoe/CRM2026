@@ -440,9 +440,10 @@ export class OrderManagementService {
   }
 
   /**
-   * Выдача заказа/закрытие долга с переводом в статус 7
+   * Выдача заказа/закрытие долга. Website: status 7 (Завершён = выдан), debt_closed_events. Telegram: status 7.
+   * issuedOn — дата выдачи YYYY-MM-DD (из фронта), чтобы заказ попал в «Выданные заказы» за выбранный день.
    */
-  static async issueOrder(orderId: number, orderType: string): Promise<UnifiedOrder | null> {
+  static async issueOrder(orderId: number, orderType: string, issuerId?: number | null, issuedOn?: string | null): Promise<UnifiedOrder | null> {
     try {
       const db = await getDb();
       await db.run('BEGIN');
@@ -459,7 +460,7 @@ export class OrderManagementService {
         } else {
           const order = await db.get<any>(
             `
-            SELECT id, source, prepaymentAmount, prepaymentStatus, paymentMethod
+            SELECT id, source, prepaymentAmount, prepaymentStatus, paymentMethod, discount_percent
             FROM orders WHERE id = ?
           `,
             [orderId],
@@ -469,46 +470,43 @@ export class OrderManagementService {
             return null;
           }
 
-          const totals = await db.get<{ total_amount: number }>(
-            'SELECT COALESCE(SUM(price * quantity), 0) as total_amount FROM items WHERE orderId = ?',
-            [orderId],
-          );
-          const totalAmount = Number(totals?.total_amount || 0);
+          const items = await db.all<any>('SELECT price, quantity FROM items WHERE orderId = ?', [orderId]);
+          const subtotal = items.reduce((s: number, i: any) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
+          const discount = Number(order.discount_percent) || 0;
+          const totalAmount = Math.round((1 - discount / 100) * subtotal * 100) / 100;
           const prepaymentAmount = Number(order.prepaymentAmount || 0);
+          const remainder = Math.round((totalAmount - prepaymentAmount) * 100) / 100;
 
-          if (totalAmount > 0 && prepaymentAmount < totalAmount) {
-            let hasPrepaymentUpdatedAt = false
-            try {
-              hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
-            } catch {
-              hasPrepaymentUpdatedAt = false
+          let hasPrepaymentUpdatedAt = false;
+          try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt'); } catch { /* ignore */ }
+          const paymentId = `ISSUE-${Date.now()}-${orderId}`;
+          const updateSql = hasPrepaymentUpdatedAt
+            ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime'), status = 7 WHERE id = ?`
+            : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentUrl = NULL, paymentId = ?, paymentMethod = 'offline', updated_at = datetime('now','localtime'), status = 7 WHERE id = ?`;
+          await db.run(updateSql, totalAmount, paymentId, orderId);
+
+          // debt_closed_events — чтобы заказ попал в «Выданные заказы» и в кассу (debt_closed_issued_by_me)
+          const issuer = issuerId ?? null;
+          const isValidIssuedOn = issuedOn && /^\d{4}-\d{2}-\d{2}$/.test(String(issuedOn).slice(0, 10));
+          const closedDate = isValidIssuedOn
+            ? String(issuedOn).slice(0, 10)
+            : ((await db.get<{ d: string }>("SELECT date('now','localtime') as d"))?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
+          try {
+            const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id');
+            if (hasIssuedBy) {
+              await db.run(
+                'INSERT INTO debt_closed_events (order_id, closed_date, amount, issued_by_user_id) VALUES (?, ?, ?, ?)',
+                orderId, closedDate, remainder, issuer
+              );
+            } else {
+              await db.run(
+                'INSERT INTO debt_closed_events (order_id, closed_date, amount) VALUES (?, ?, ?)',
+                orderId, closedDate, remainder
+              );
             }
-            // datetime('now','localtime') — чтобы предоплата при выдаче попадала в кассу текущего дня (datetime('now') в SQLite — UTC)
-            const updateSql = hasPrepaymentUpdatedAt
-              ? `
-              UPDATE orders
-              SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime')
-              WHERE id = ?
-            `
-              : `
-              UPDATE orders
-              SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'offline', updated_at = datetime('now','localtime')
-              WHERE id = ?
-            `
-            await db.run(
-              updateSql,
-              [totalAmount, orderId],
-            );
+          } catch (e) {
+            console.warn('[OrderManagementService.issueOrder] debt_closed_events insert failed:', (e as Error)?.message);
           }
-
-          await db.run(
-            `
-            UPDATE orders
-            SET status = 7, updated_at = datetime('now','localtime')
-            WHERE id = ?
-          `,
-            [orderId],
-          );
         }
 
         await db.run(

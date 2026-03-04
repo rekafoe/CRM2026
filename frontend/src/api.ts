@@ -81,6 +81,12 @@ export const updateOrderPaymentChannel = (orderId: number, payment_channel: 'cas
 /** Примечания к заказу */
 export const updateOrderNotes = (orderId: number, notes: string | null) =>
   api.put<Order>(`/orders/${orderId}/notes`, { notes });
+/** Контактёр и ответственный */
+export const updateOrderAssignees = (orderId: number, data: { contact_user_id?: number | null; responsible_user_id?: number | null }) =>
+  api.put<Order>(`/orders/${orderId}/assignees`, data);
+/** Операторы, работающие в указанную дату (по user_shifts) */
+export const getOperatorsToday = (date?: string) =>
+  api.get<Array<{ id: number; name: string }>>('/users/operators-today', { params: date ? { date } : {} });
 
 // Order Pool helpers
 export const reassignOrderByNumber = (number: string, userId: number) =>
@@ -89,9 +95,9 @@ export const reassignOrderByNumber = (number: string, userId: number) =>
 export const cancelOnlineOrder = (id: number, cancelReason: string) =>
   api.post(`/orders/${id}/cancel-online`, { cancel_reason: cancelReason });
 
-/** Выдать заказ: 100% остатка → предоплата, debt_closed, статус 4 */
-export const issueOrder = (id: number) =>
-  api.post<Order>(`/orders/${id}/issue`, {});
+/** Выдать заказ: 100% остатка → предоплата, debt_closed, статус 7. issued_on — дата выдачи (YYYY-MM-DD), чтобы заказ попал в «Выданные заказы» за выбранный день. */
+export const issueOrder = (id: number, issuedOn?: string) =>
+  api.post<Order>(`/orders/${id}/issue`, issuedOn ? { issued_on: issuedOn.slice(0, 10) } : {});
 
 export const addOrderItem = (id: number, item: Omit<Item, 'id'>) =>
   api.post<Item>(`/orders/${id}/items`, item);
