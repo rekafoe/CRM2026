@@ -4,6 +4,15 @@ import { checkMaterialAvailability, calculateMaterialCost } from '../../../servi
 import type { CalculationResult } from '../types/calculator.types';
 import { getMaterials } from '../../../api';
 
+/** Плотность материала: из поля density или из названия (например «300 г», «300 г/м²») */
+function getMaterialDensity(m: any): number | null {
+  const d = m?.density ?? m?.density_g_sm;
+  if (d != null && Number(d) > 0) return Number(d);
+  const name = (m?.name ?? '').toString();
+  const match = name.match(/(\d{2,4})\s*(?:г\/?м²|г\/м2|г)/i);
+  return match ? Number(match[1]) : null;
+}
+
 interface MaterialsSectionProps {
   specs: {
     paperType: string;
@@ -241,6 +250,10 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     return allMaterials.filter(m => ids.includes(Number(m.id)));
   }, [isSimplifiedProduct, specs.size_id, simplifiedSizesSource, allMaterials]);
 
+  // Нормализация для сравнения (без учёта регистра и пробелов)
+  const normalizeForCompare = (s: string | null | undefined) =>
+    (s ?? '').toString().trim().toLowerCase();
+
   // Уникальные типы материала (paper_type_name) из разрешённых материалов — для фильтра
   const materialTypesFromMaterials = useMemo(() => {
     const names = allowedMaterialsForSize
@@ -250,23 +263,29 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   }, [allowedMaterialsForSize]);
 
   // Материалы выбранного типа (из разрешённых для продукта)
+  // Сравнение без учёта регистра — «Дизайнерская» и «дизайнерская» считаются одним типом
   const allowedMaterialsByType = useMemo(() => {
     if (!selectedMaterialType) return allowedMaterialsForSize;
-    return allowedMaterialsForSize.filter(m => (m as any).paper_type_name === selectedMaterialType);
+    const normSelected = normalizeForCompare(selectedMaterialType);
+    return allowedMaterialsForSize.filter(m => {
+      const ptName = (m as any).paper_type_name;
+      return normSelected && normalizeForCompare(ptName) === normSelected;
+    });
   }, [allowedMaterialsForSize, selectedMaterialType]);
 
   // Плотности для выбранного типа (из разрешённых для продукта материалов этого типа)
   const densitiesForSelectedType = useMemo(() => {
     const values = allowedMaterialsByType
-      .map(m => (m as any).density)
-      .filter((d): d is number => d != null && Number(d) > 0);
+      .map(m => getMaterialDensity(m))
+      .filter((d): d is number => d != null && d > 0);
     return [...new Set(values)].sort((a, b) => a - b);
   }, [allowedMaterialsByType]);
 
   // По выбранному типу + плотности находим материал (первый подходящий из разрешённых)
   const materialByTypeAndDensity = useMemo(() => {
     if (selectedDensity === '') return undefined;
-    return allowedMaterialsByType.find(m => (m as any).density === selectedDensity);
+    const targetDensity = Number(selectedDensity);
+    return allowedMaterialsByType.find(m => getMaterialDensity(m) === targetDensity);
   }, [allowedMaterialsByType, selectedDensity]);
 
   // Сбрасываем material_id, если он не входит в разрешённые для выбранного размера
@@ -301,8 +320,9 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     }
     const currentMaterial = allowedMaterialsForSize.find(m => Number(m.id) === specs.material_id);
     const typeFromCurrent = currentMaterial ? (currentMaterial as any).paper_type_name : undefined;
-    const densityFromCurrent = currentMaterial ? (currentMaterial as any).density : undefined;
-    if (typeFromCurrent && materialTypesFromMaterials.includes(typeFromCurrent)) {
+    const densityFromCurrent = currentMaterial ? getMaterialDensity(currentMaterial) : undefined;
+    const typeMatches = typeFromCurrent && materialTypesFromMaterials.some(t => normalizeForCompare(t) === normalizeForCompare(typeFromCurrent));
+    if (typeFromCurrent && typeMatches) {
       if (!userChoseTypeRef.current) {
         setSelectedMaterialType(prev => (prev !== typeFromCurrent ? typeFromCurrent : prev));
       } else {
