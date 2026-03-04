@@ -78,6 +78,8 @@ export interface SimplifiedPricingResult {
   
   calculatedAt: string;
   calculationMethod: 'simplified';
+  /** Цены за единицу по диапазонам тиража для выбранной конфигурации (от min_qty шт) */
+  tier_prices?: Array<{ min_qty: number; max_qty?: number; unit_price: number }>;
   /** Проверка вместимости формата на печатный лист (SRA3/A3/A4); sheetsNeeded — листов к списанию */
   layout?: {
     fitsOnSheet: boolean;
@@ -549,7 +551,9 @@ export class SimplifiedPricingService {
     //    а в simplified-конфиге используем только ссылки на service_id и конфиг units_per_item/price_unit.
     let finishingPrice = 0;
     const finishingDetails: SimplifiedPricingResult['finishingDetails'] = [];
-    
+    let serviceTiersMap: Map<string, SimplifiedQtyTier[]> = new Map();
+    let serviceTypesMap: Map<number, string> = new Map();
+
     if (normalizedConfig.finishing && normalizedConfig.finishing.length > 0) {
       logger.info('🔧 [SimplifiedPricingService] Получена конфигурация finishing из фронтенда', {
         productId,
@@ -576,12 +580,12 @@ export class SimplifiedPricingService {
           uniqueServiceIds
         );
         const serviceNamesMap = new Map(services.map(s => [s.id, s.name]));
-        const serviceTypesMap = new Map(services.map(s => [s.id, s.operation_type || '']));
+        serviceTypesMap = new Map(services.map(s => [s.id, s.operation_type || '']));
         const serviceLimitsMap = new Map(services.map(s => [s.id, { min: s.min_quantity ?? 1, max: s.max_quantity ?? undefined }]));
 
         // Загружаем тарифы из service_volume_prices / service_variant_prices через репозиторий
         // 🆕 Для услуг с вариантами используем тарифы варианта, иначе базовые тарифы услуги
-        const serviceTiersMap = new Map<string, SimplifiedQtyTier[]>(); // Ключ: "serviceId" или "serviceId:variantId"
+        serviceTiersMap = new Map<string, SimplifiedQtyTier[]>(); // Ключ: "serviceId" или "serviceId:variantId"
         
         for (const finConfig of normalizedConfig.finishing) {
           const serviceId = finConfig.service_id;
@@ -694,26 +698,18 @@ export class SimplifiedPricingService {
           const priceUnit = finConfig.price_unit ?? 'per_item';
           const unitsPerItem = finConfig.units_per_item ?? 1;
           
-          // 🆕 Определяем, является ли операция ламинацией по строгому типу
           const operationType = serviceTypesMap.get(finConfig.service_id) || '';
-          const isLamination = operationType === 'laminate';
+          // Операции «на изделие»: кол-во = тираж × units_per_item (1 фальцовка = 1 изделие, 2 сгиба = 2 на изделие)
+          const isPerProductOp = ['laminate', 'fold', 'score'].includes(operationType);
           
           let servicePrice = 0;
           let totalUnits = quantity;
-          if (priceUnit === 'per_cut') {
-            // Цена за единицу операции (рез/биг/фальц) — считаем общее количество операций
-            // units_per_item = количество резов на одно изделие, умножаем на тираж
-            totalUnits = quantity * unitsPerItem;
-            servicePrice = priceForTier * totalUnits;
-          } else if (isLamination) {
-            // 🆕 Для ламинации: цена за одно изделие, умножаем на тираж
-            // units_per_item обычно = 1 (одна ламинация на одно изделие)
+          if (priceUnit === 'per_cut' || isPerProductOp) {
+            // per_cut или fold/score/laminate: units_per_item = кол-во операций на одно изделие
             totalUnits = quantity * unitsPerItem;
             servicePrice = priceForTier * totalUnits;
           } else {
-            // ✅ Цена за изделие (per_item): units_per_item означает "общее количество единиц услуги на весь заказ"
-            // Например, для "Упаковка в файл": если пользователь ввёл "Количество" = 1, то это 1 файл на весь заказ
-            // Цена = unit_price * 1 (не умножаем на тираж!)
+            // per_item (фикс на заказ): units_per_item = общее кол-во на весь заказ (напр. 1 файл)
             totalUnits = unitsPerItem;
             servicePrice = priceForTier * totalUnits;
           }
@@ -723,7 +719,7 @@ export class SimplifiedPricingService {
             productId,
             service_id: finConfig.service_id,
             operationType,
-            isLamination,
+            isPerProductOp,
             priceUnit,
             unitsPerItem,
             quantity,
@@ -836,6 +832,42 @@ export class SimplifiedPricingService {
         }
       });
     }
+
+    // 7.5. Цены по диапазонам тиража для выбранной конфигурации
+    const printPriceConfigForTiers = !isRollPrint && normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode
+      ? selectedSize.print_prices.find((p: any) =>
+          (p.technology_code ?? '').toLowerCase() === (normalizedConfig.print_technology ?? '').toLowerCase() &&
+          (p.color_mode ?? '').toLowerCase() === (normalizedConfig.print_color_mode ?? '').toLowerCase() &&
+          (p.sides_mode ?? '').toLowerCase() === (pricingSidesMode ?? '').toLowerCase()
+        )
+      : undefined;
+    const materialPricePerSheet = includeMaterialCost && normalizedConfig.material_id
+      ? ((await db.get<{ sheet_price_single: number }>('SELECT sheet_price_single FROM materials WHERE id = ?', [normalizedConfig.material_id]))?.sheet_price_single ?? 0)
+      : 0;
+    const baseMaterialPricePerItem = normalizedConfig.base_material_id
+      ? ((await db.get<{ sheet_price_single: number }>('SELECT sheet_price_single FROM materials WHERE id = ?', [normalizedConfig.base_material_id]))?.sheet_price_single ?? 0)
+      : 0;
+    const cuttingPricePerCut = configCutting && (layoutCheck.cutsPerSheet ?? 0) > 0
+      ? (finishingDetails.find((d: any) => (serviceTypesMap.get(d.service_id) || '').toLowerCase() === 'cut')?.tier?.price ?? 0)
+      : 0;
+    const tierPricesResult = this.buildTierPricesForConfig({
+      printPriceConfig: printPriceConfigForTiers,
+      materialPricePerSheet,
+      baseMaterialPricePerItem,
+      serviceTiersMap: serviceTiersMap ?? new Map(),
+      finishingConfig: normalizedConfig.finishing ?? [],
+      selectedSize,
+      layoutCheck,
+      itemsPerSheet,
+      usePagesMultiplier,
+      effectivePages,
+      sheetsPerItem,
+      billingModeMultiplier,
+      configCutting,
+      cuttingPricePerCut,
+      cutsPerSheet: layoutCheck.cutsPerSheet ?? 0,
+      serviceTypesMap: serviceTypesMap ?? new Map(),
+    });
     
     // 8. Загружаем названия, плотность и тип бумаги материалов
     let materialName = `Material #${normalizedConfig.material_id}`;
@@ -925,6 +957,7 @@ export class SimplifiedPricingService {
       materialDetails,
       baseMaterialDetails,
       finishingDetails: finishingDetails.length > 0 ? finishingDetails : undefined,
+      ...(tierPricesResult.length > 0 ? { tier_prices: tierPricesResult } : {}),
       calculatedAt: new Date().toISOString(),
       calculationMethod: 'simplified',
       layout: layoutResult,
@@ -932,6 +965,102 @@ export class SimplifiedPricingService {
     };
   }
   
+  /**
+   * Строит цены за единицу по диапазонам тиража для выбранной конфигурации
+   */
+  private static buildTierPricesForConfig(ctx: {
+    printPriceConfig: any;
+    materialPricePerSheet: number;
+    baseMaterialPricePerItem: number;
+    serviceTiersMap: Map<string, SimplifiedQtyTier[]>;
+    finishingConfig: Array<{ service_id: number; variant_id?: number; price_unit?: string; units_per_item?: number }>;
+    selectedSize: SimplifiedSizeConfig;
+    layoutCheck: any;
+    itemsPerSheet: number;
+    usePagesMultiplier: boolean;
+    effectivePages: number;
+    sheetsPerItem: number;
+    billingModeMultiplier: number;
+    configCutting: boolean;
+    cuttingPricePerCut: number;
+    cutsPerSheet: number;
+    serviceTypesMap: Map<number, string>;
+  }): Array<{ min_qty: number; max_qty?: number; unit_price: number }> {
+    const boundaries = new Set<number>([1]);
+    if (ctx.printPriceConfig?.tiers?.length) {
+      ctx.printPriceConfig.tiers.forEach((t: SimplifiedQtyTier) => {
+        if (t.min_qty != null && Number.isFinite(t.min_qty)) boundaries.add(t.min_qty);
+      });
+    }
+    ctx.finishingConfig.forEach((f) => {
+      const mapKey = f.variant_id ? `${f.service_id}:${f.variant_id}` : String(f.service_id);
+      const tiers = ctx.serviceTiersMap.get(mapKey);
+      tiers?.forEach((t) => {
+        if (t.min_qty != null && Number.isFinite(t.min_qty)) boundaries.add(t.min_qty);
+      });
+    });
+    const sorted = Array.from(boundaries).sort((a, b) => a - b);
+    const result: Array<{ min_qty: number; max_qty?: number; unit_price: number }> = [];
+
+    for (let i = 0; i < sorted.length; i++) {
+      const q = sorted[i];
+      const nextQ = sorted[i + 1];
+      const maxQty = nextQ != null ? nextQ - 1 : undefined;
+
+      let printPrice = 0;
+      if (ctx.printPriceConfig?.tiers?.length) {
+        const tier = this.findTierForQuantity(ctx.printPriceConfig.tiers, q);
+        const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
+        if (priceForTier > 0) {
+          const sheetsNeeded = ctx.usePagesMultiplier ? Math.max(1, q * ctx.sheetsPerItem) : Math.ceil(q / ctx.itemsPerSheet);
+          const pricePerSheet = priceForTier * ctx.itemsPerSheet;
+          const basePrintPrice = ctx.usePagesMultiplier ? priceForTier * q : sheetsNeeded * pricePerSheet;
+          printPrice = basePrintPrice * ctx.billingModeMultiplier;
+        }
+      }
+
+      let materialPrice = 0;
+      if (ctx.materialPricePerSheet > 0) {
+        const sheetsNeeded = ctx.usePagesMultiplier
+          ? Math.max(1, q * ctx.sheetsPerItem)
+          : Math.ceil(q / ctx.itemsPerSheet);
+        materialPrice = sheetsNeeded * ctx.materialPricePerSheet * ctx.billingModeMultiplier;
+      }
+      if (ctx.baseMaterialPricePerItem > 0) {
+        materialPrice += ctx.baseMaterialPricePerItem * q;
+      }
+
+      let finishingPrice = 0;
+      for (const finConfig of ctx.finishingConfig) {
+        const mapKey = finConfig.variant_id ? `${finConfig.service_id}:${finConfig.variant_id}` : String(finConfig.service_id);
+        const tiers = ctx.serviceTiersMap.get(mapKey);
+        if (!tiers?.length) continue;
+        const tier = this.findTierForQuantity(tiers, q);
+        if (!tier) continue;
+        const priceForTier = this.getPriceForQuantityTier(tier);
+        const priceUnit = finConfig.price_unit ?? 'per_item';
+        const unitsPerItem = finConfig.units_per_item ?? 1;
+        const operationType = ctx.serviceTypesMap.get(finConfig.service_id) || '';
+        const isPerProductOp = ['laminate', 'fold', 'score'].includes(operationType);
+        if (priceUnit === 'per_cut' || isPerProductOp) {
+          finishingPrice += priceForTier * (q * unitsPerItem);
+        } else {
+          finishingPrice += priceForTier * unitsPerItem;
+        }
+      }
+
+      let cuttingPrice = 0;
+      if (ctx.configCutting && ctx.cutsPerSheet > 0 && ctx.cuttingPricePerCut > 0) {
+        cuttingPrice = ctx.cutsPerSheet * ctx.cuttingPricePerCut;
+      }
+
+      const total = printPrice + materialPrice + finishingPrice + cuttingPrice;
+      const unitPrice = q > 0 ? total / q : 0;
+      result.push({ min_qty: q, max_qty: maxQty, unit_price: Math.round(unitPrice * 100) / 100 });
+    }
+    return result;
+  }
+
   /**
    * Находит подходящий диапазон тиража для заданного количества
    */

@@ -526,6 +526,7 @@
 
 | Метод | Путь | Описание |
 |-------|------|----------|
+| GET | `/api/products/:productId/tier-prices` | Цены по диапазонам тиража (print_prices, material_prices, finishing с tiers) |
 | GET | `/api/products/:productId/materials` | Материалы продукта |
 | POST | `/api/products/:productId/materials` | Добавить материал |
 | POST | `/api/products/:productId/materials/bulk` | Массовое добавление материалов |

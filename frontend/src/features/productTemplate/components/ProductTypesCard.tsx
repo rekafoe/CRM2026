@@ -274,6 +274,44 @@ const TypeInitialDefaults: React.FC<{
           </select>
         </div>
       )}
+      <div className="simplified-template__type-website-field">
+        <label>Резка, фальцовка, скругление</label>
+        <div className="simplified-template__type-checkboxes">
+          <label className="simplified-template__type-checkbox-label">
+            <input
+              type="checkbox"
+              checked={!!initial.cutting || !!initial.cutting_required}
+              disabled={!!initial.cutting_required}
+              onChange={(e) => updateInitial({ cutting: e.target.checked })}
+            />
+            Резка по умолчанию
+          </label>
+          <label className="simplified-template__type-checkbox-label">
+            <input
+              type="checkbox"
+              checked={!!initial.cutting_required}
+              onChange={(e) => updateInitial({ cutting_required: e.target.checked, cutting: e.target.checked ? true : initial.cutting })}
+            />
+            Резка обязательна
+          </label>
+          <label className="simplified-template__type-checkbox-label">
+            <input
+              type="checkbox"
+              checked={!!initial.folding}
+              onChange={(e) => updateInitial({ folding: e.target.checked })}
+            />
+            Фальцовка по умолчанию
+          </label>
+          <label className="simplified-template__type-checkbox-label">
+            <input
+              type="checkbox"
+              checked={!!initial.roundCorners}
+              onChange={(e) => updateInitial({ roundCorners: e.target.checked })}
+            />
+            Скругление по умолчанию
+          </label>
+        </div>
+      </div>
       {finishingServices.length > 0 && (
         <div className="simplified-template__type-website-field">
           <label>Операции включённые по умолчанию</label>

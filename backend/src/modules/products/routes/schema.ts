@@ -9,11 +9,13 @@ import {
   collectMaterialIdsFromSimplified,
   collectServiceIdsFromSimplified,
   collectTierBoundariesFromSimplified,
+  extractTierPricesFromSimplified,
   parseParameterOptions,
   loadPrintTechnologies,
   DEFAULT_COLOR_MODE_OPTIONS,
 } from './helpers';
 import { syncSimplifiedOperations } from './configs';
+import { PricingServiceRepository } from '../../pricing/repositories/serviceRepository';
 
 const router = Router();
 
@@ -55,6 +57,127 @@ const router = Router();
  *                 meta: { type: object }
  *       404: { description: Продукт не найден }
  */
+/**
+ * @swagger
+ * /api/products/{productId}/tier-prices:
+ *   get:
+ *     summary: Цены по диапазонам тиража
+ *     description: Возвращает цены по тиражам (print_prices, material_prices, finishing) для продукта. Используется для отображения прайс-листа на сайте.
+ *     tags: [Products, Website Catalog]
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema: { type: integer }
+ *         description: ID продукта
+ *     responses:
+ *       200:
+ *         description: Цены по диапазонам тиража
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     product_id: { type: integer }
+ *                     product_name: { type: string }
+ *                     tier_boundaries: { type: array, items: { type: integer } }
+ *                     sizes:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           size_id: { type: integer }
+ *                           label: { type: string }
+ *                           print_prices: { type: array }
+ *                           material_prices: { type: array }
+ *                           finishing: { type: array }
+ *                     type_configs: { type: object }
+ *       404: { description: Продукт не найден }
+ */
+router.get('/:productId/tier-prices', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const db = await getDb();
+
+    const product = await db.get('SELECT id, name FROM products WHERE id = ?', [productId]);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const templateConfig = await db.get(
+      `SELECT config_data FROM product_template_configs WHERE product_id = ? AND name = 'template' AND is_active = 1 ORDER BY id DESC LIMIT 1`,
+      [productId]
+    );
+
+    let configData: any = null;
+    if (templateConfig?.config_data) {
+      configData = typeof templateConfig.config_data === 'string' ? JSON.parse(templateConfig.config_data) : templateConfig.config_data;
+    }
+
+    const simplified = configData?.simplified;
+    if (!simplified) {
+      return res.json({ data: { product_id: Number(productId), product_name: (product as any).name, tier_boundaries: [], sizes: [], type_configs: {} } });
+    }
+
+    const normalized = normalizeSimplifiedTypeIds(simplified);
+    const extracted = extractTierPricesFromSimplified(normalized);
+    if (!extracted) {
+      return res.json({ data: { product_id: Number(productId), product_name: (product as any).name, tier_boundaries: [], sizes: [], type_configs: {} } });
+    }
+
+    const enrichFinishingWithTiers = async (sizes: typeof extracted.sizes) => {
+      const result: typeof sizes = [];
+      for (const size of sizes) {
+        const finishingEnriched: Array<{ service_id: number; variant_id?: number; tiers: Array<{ min_qty: number; max_qty?: number; unit_price: number }> }> = [];
+        for (const f of size.finishing) {
+          let tiers: Array<{ min_qty: number; max_qty?: number; unit_price: number }> = [];
+          try {
+            const svcTiers = await PricingServiceRepository.listServiceTiers(f.service_id, f.variant_id);
+            if (svcTiers && svcTiers.length > 0) {
+              const sorted = [...svcTiers].sort((a, b) => a.minQuantity - b.minQuantity);
+              tiers = sorted.map((t, idx) => ({
+                min_qty: t.minQuantity,
+                max_qty: idx < sorted.length - 1 ? sorted[idx + 1].minQuantity - 1 : undefined,
+                unit_price: t.rate,
+              }));
+            }
+          } catch {
+            tiers = [];
+          }
+          finishingEnriched.push({ ...f, tiers });
+        }
+        result.push({ ...size, finishing: finishingEnriched });
+      }
+      return result;
+    };
+
+    const sizes = await enrichFinishingWithTiers(extracted.sizes);
+    let type_configs = extracted.type_configs;
+    if (type_configs) {
+      type_configs = {};
+      for (const [key, cfg] of Object.entries(extracted.type_configs!)) {
+        type_configs[key] = { sizes: await enrichFinishingWithTiers(cfg.sizes) };
+      }
+    }
+
+    const data = {
+      product_id: Number(productId),
+      product_name: (product as any).name,
+      tier_boundaries: extracted.tier_boundaries,
+      sizes,
+      ...(type_configs && Object.keys(type_configs).length > 0 ? { type_configs } : {}),
+    };
+
+    return res.json({ data });
+  } catch (error) {
+    logger.error('Error fetching tier prices', error);
+    res.status(500).json({ error: 'Failed to fetch tier prices' });
+  }
+});
+
 router.get('/:productId/schema', async (req, res) => {
   try {
     const { productId } = req.params;
@@ -351,19 +474,6 @@ router.get('/:productId/schema', async (req, res) => {
           logger.warn('[schema] Не удалось загрузить варианты услуг для compact', { error: (err as Error).message });
         }
       }
-      let quantityDiscounts: Array<[number, number, number]> = [];
-      try {
-        const qdRows = await db.all<{ min_quantity: number; max_quantity: number | null; discount_percent: number }>(
-          `SELECT min_quantity, max_quantity, discount_percent FROM quantity_discounts WHERE is_active = 1 ORDER BY min_quantity`
-        );
-        quantityDiscounts = (Array.isArray(qdRows) ? qdRows : []).map((r) => [
-          r.min_quantity,
-          r.max_quantity ?? 0,
-          r.discount_percent,
-        ]);
-      } catch (err) {
-        logger.warn('[schema] Не удалось загрузить quantity_discounts для compact', { error: (err as Error).message });
-      }
       const tierBoundaries = collectTierBoundariesFromSimplified(schema.template.simplified);
       const compactSchema = {
         id: schema.id, key: schema.key, name: schema.name, type: schema.type, description: schema.description,
@@ -376,7 +486,6 @@ router.get('/:productId/schema', async (req, res) => {
         operations: productOperations || [],
         ...(compactMaterials.length > 0 ? { materials: compactMaterials } : {}),
         ...(Object.keys(serviceVariants).length > 0 ? { service_variants: serviceVariants } : {}),
-        ...(quantityDiscounts.length > 0 ? { quantity_discounts: quantityDiscounts } : {}),
         ...(tierBoundaries.length > 0 ? { tier_boundaries: tierBoundaries } : {}),
       };
       return res.json({ data: compactSchema, meta: { compact: true } });

@@ -357,6 +357,120 @@ export function collectMaterialIdsFromSimplified(simplified: any): number[] {
   return Array.from(ids);
 }
 
+/** Извлекает цены по тиражам из simplified: print_prices, material_prices (с tiers). Finishing — только service_id/variant_id, tiers подгружаются отдельно. */
+export function extractTierPricesFromSimplified(simplified: any): {
+  tier_boundaries: number[];
+  sizes: Array<{
+    size_id: number;
+    label: string;
+    print_prices: Array<{
+      technology_code: string;
+      color_mode: string;
+      sides_mode: string;
+      tiers: Array<{ min_qty: number; max_qty?: number; unit_price: number }>;
+    }>;
+    material_prices: Array<{
+      material_id: number;
+      tiers: Array<{ min_qty: number; max_qty?: number; unit_price: number }>;
+    }>;
+    finishing: Array<{ service_id: number; variant_id?: number }>;
+  }>;
+  type_configs?: Record<string, { sizes: ReturnType<typeof extractTierPricesFromSimplified>['sizes'] }>;
+} | null {
+  if (!simplified || typeof simplified !== 'object') return null;
+
+  const normalizeTier = (t: any, nextMin?: number) => {
+    const min = t?.min_qty ?? t?.minQty;
+    const price = t?.unit_price ?? t?.unitPrice ?? t?.price;
+    if (min == null || !Number.isFinite(Number(min)) || price == null || !Number.isFinite(Number(price))) return null;
+    const max = t?.max_qty ?? t?.maxQty ?? (nextMin != null ? nextMin - 1 : undefined);
+    return { min_qty: Number(min), max_qty: max, unit_price: Number(price) };
+  };
+
+  const normalizeTiers = (tiers: any[]) => {
+    if (!Array.isArray(tiers)) return [];
+    const sorted = [...tiers].sort((a, b) => (a?.min_qty ?? a?.minQty ?? 0) - (b?.min_qty ?? b?.minQty ?? 0));
+    return sorted
+      .map((t, idx) => normalizeTier(t, sorted[idx + 1]?.min_qty ?? sorted[idx + 1]?.minQty))
+      .filter(Boolean);
+  };
+
+  const extractSize = (size: any) => {
+    const print_prices: Array<{ technology_code: string; color_mode: string; sides_mode: string; tiers: any[] }> = [];
+    if (Array.isArray(size?.print_prices)) {
+      for (const pp of size.print_prices) {
+        const tiers = normalizeTiers(pp?.tiers ?? []);
+        if (tiers.length > 0) {
+          print_prices.push({
+            technology_code: String(pp.technology_code ?? pp.technologyCode ?? ''),
+            color_mode: String(pp.color_mode ?? pp.colorMode ?? 'color'),
+            sides_mode: String(pp.sides_mode ?? pp.sidesMode ?? 'single'),
+            tiers,
+          });
+        }
+      }
+    }
+
+    const material_prices: Array<{ material_id: number; tiers: any[] }> = [];
+    if (Array.isArray(size?.material_prices)) {
+      for (const mp of size.material_prices) {
+        const mid = mp?.material_id ?? mp?.materialId;
+        if (mid == null || !Number.isFinite(Number(mid))) continue;
+        const tiers = normalizeTiers(mp?.tiers ?? []);
+        if (tiers.length > 0) {
+          material_prices.push({ material_id: Number(mid), tiers });
+        }
+      }
+    }
+
+    const finishing: Array<{ service_id: number; variant_id?: number }> = [];
+    if (Array.isArray(size?.finishing)) {
+      for (const f of size.finishing) {
+        const sid = f?.service_id;
+        if (sid != null && Number.isFinite(Number(sid))) {
+          finishing.push({
+            service_id: Number(sid),
+            ...(f.variant_id != null ? { variant_id: Number(f.variant_id) } : {}),
+          });
+        }
+      }
+    }
+
+    return {
+      size_id: size?.id ?? 0,
+      label: size?.label ?? '',
+      print_prices,
+      material_prices,
+      finishing,
+    };
+  };
+
+  const scanSizes = (sizes: any[]) => {
+    if (!Array.isArray(sizes)) return [];
+    return sizes.map(extractSize).filter((s) => s.print_prices.length > 0 || s.material_prices.length > 0 || s.finishing.length > 0);
+  };
+
+  const sizes = scanSizes(simplified.sizes ?? []);
+  let type_configs: Record<string, { sizes: any[] }> | undefined;
+  if (simplified.typeConfigs && typeof simplified.typeConfigs === 'object') {
+    type_configs = {};
+    for (const [key, cfg] of Object.entries(simplified.typeConfigs) as [string, any][]) {
+      const cfgSizes = scanSizes(cfg?.sizes ?? []);
+      if (cfgSizes.length > 0) type_configs[key] = { sizes: cfgSizes };
+    }
+  }
+
+  const tier_boundaries = collectTierBoundariesFromSimplified(simplified);
+
+  if (sizes.length === 0 && (!type_configs || Object.keys(type_configs).length === 0)) return null;
+
+  return {
+    tier_boundaries,
+    sizes,
+    ...(type_configs && Object.keys(type_configs).length > 0 ? { type_configs } : {}),
+  };
+}
+
 /** Собирает уникальные min_qty из tiers (print_prices, material_prices) — для отображения «от X шт». */
 export function collectTierBoundariesFromSimplified(simplified: any): number[] {
   if (!simplified || typeof simplified !== 'object') return [];

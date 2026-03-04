@@ -73,11 +73,12 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
             </label>
           )}
           {(backendProductSchema?.fields || []).some((f: any) => f.name === 'cutting') && (
-            <label>
+            <label title={specs.cutting_required ? 'Резка обязательна для этого подтипа' : undefined}>
               <input
                 type="checkbox"
                 checked={!!specs.cutting}
-                onChange={(e) => updateSpecs({ cutting: e.target.checked }, true)} // 🆕 instant
+                disabled={!!specs.cutting_required}
+                onChange={(e) => !specs.cutting_required && updateSpecs({ cutting: e.target.checked }, true)}
               />
               Резка
             </label>

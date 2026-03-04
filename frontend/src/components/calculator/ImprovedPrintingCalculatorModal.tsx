@@ -228,6 +228,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       ...(initial?.base_material_id != null ? { base_material_id: initial.base_material_id } : {}),
       ...(initial?.sides_mode ? { sides: initial.sides_mode === 'single' ? 1 : 2 } : {}),
       selectedOperations: operationsFromInitial,
+      ...(initial?.cutting_required ? { cutting: true, cutting_required: true } : initial?.cutting !== undefined ? { cutting: initial.cutting } : {}),
+      ...(initial?.folding !== undefined ? { folding: initial.folding } : {}),
+      ...(initial?.roundCorners !== undefined ? { roundCorners: initial.roundCorners } : {}),
     }));
   }, [simplified?.types, simplified?.typeConfigs, backendProductSchema?.operations, setSpecs]);
 

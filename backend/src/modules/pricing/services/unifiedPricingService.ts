@@ -62,6 +62,8 @@ export interface UnifiedPricingResult {
   
   finalPrice: number;
   pricePerUnit: number;
+  /** Цены за единицу по диапазонам тиража для выбранной конфигурации */
+  tier_prices?: Array<{ min_qty: number; max_qty?: number; unit_price: number }>;
   
   // Метаданные
   calculatedAt: string;
@@ -408,6 +410,7 @@ export class UnifiedPricingService {
       discountAmount: 0,
       finalPrice: result.finalPrice,
       pricePerUnit: result.pricePerUnit,
+      ...(result.tier_prices && result.tier_prices.length > 0 ? { tier_prices: result.tier_prices } : {}),
       calculatedAt: result.calculatedAt,
       calculationMethod: 'simplified',
     };
