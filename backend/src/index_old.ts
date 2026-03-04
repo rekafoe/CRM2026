@@ -100,6 +100,19 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
 // Static files (два префикса: фронт с Vercel ходит на /api/uploads/*, локально может /uploads/*)
 app.use('/uploads', express.static(uploadsDir))
+// GET /api/uploads/ без имени файла — подсказка (иначе "Cannot GET")
+app.get('/api/uploads', (req, res) => {
+  res.status(400).json({
+    error: 'Filename required',
+    message: 'Use /api/uploads/{filename} — e.g. /api/uploads/photo-123.jpg',
+  })
+})
+app.get('/api/uploads/', (req, res) => {
+  res.status(400).json({
+    error: 'Filename required',
+    message: 'Use /api/uploads/{filename} — e.g. /api/uploads/photo-123.jpg',
+  })
+})
 app.use('/api/uploads', express.static(uploadsDir))
 
 // Health check (before auth middleware)
