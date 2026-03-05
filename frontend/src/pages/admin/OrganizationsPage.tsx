@@ -203,7 +203,7 @@ export const OrganizationsPage: React.FC = () => {
           )}
         </div>
 
-        <Modal open={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title={templateType === 'receipt' ? `Товарный чек: ${templateOrg?.name || ''}` : `Бланк заказа: ${templateOrg?.name || ''}`}>
+        <Modal isOpen={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title={templateType === 'receipt' ? `Товарный чек: ${templateOrg?.name || ''}` : `Бланк заказа: ${templateOrg?.name || ''}`}>
           <div className="receipt-template-editor">
             <p className="template-help">
               Плейсхолдеры: {(templateType === 'receipt' ? RECEIPT_PLACEHOLDERS : ORDER_BLANK_PLACEHOLDERS).join(', ')}
@@ -227,3 +227,5 @@ export const OrganizationsPage: React.FC = () => {
     </AdminPageLayout>
   );
 };
+
+export default OrganizationsPage;
