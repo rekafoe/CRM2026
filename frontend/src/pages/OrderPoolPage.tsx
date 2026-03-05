@@ -497,7 +497,9 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       issuingRef.current = true;
       setIssuingOrderId(orderId);
       try {
-        await issueOrder(orderId);
+        const d = new Date();
+        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        await issueOrder(orderId, today);
         toast.success('Заказ выдан', 'Долг закрыт, заказ переведён в «Выдан»');
         const total = orderMetrics.get(orderId)?.total ?? 0;
         updateOrderInList(orderId, {

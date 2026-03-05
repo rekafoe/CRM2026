@@ -11,6 +11,8 @@ type EarningsRow = {
   itemId: number;
   orderId: number;
   userId: number | null;
+  executorUserId: number | null;
+  responsibleUserId: number | null;
   price: number;
   quantity: number;
   params: string;
@@ -69,12 +71,24 @@ export class EarningsService {
   static async recalculateForDate(date: string) {
     const db = await getDb();
 
+    let hasExecutorUserId = false;
+    let hasResponsibleUserId = false;
+    try {
+      hasExecutorUserId = await hasColumn('items', 'executor_user_id');
+      hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id');
+    } catch { /* ignore */ }
+
+    const executorSel = hasExecutorUserId ? 'i.executor_user_id as executorUserId' : 'NULL as executorUserId';
+    const responsibleSel = hasResponsibleUserId ? 'o.responsible_user_id as responsibleUserId' : 'NULL as responsibleUserId';
+
     const rows = await db.all<EarningsRow[]>(
       `
       SELECT
         i.id as itemId,
         i.orderId as orderId,
         o.userId as userId,
+        ${executorSel},
+        ${responsibleSel},
         i.price as price,
         i.quantity as quantity,
         i.params as params
@@ -132,15 +146,21 @@ export class EarningsService {
 
     const productPercentMap = new Map<number, number>();
     if (productIds.size > 0) {
-      const ids = Array.from(productIds);
-      const placeholders = ids.map(() => '?').join(',');
-      const productRows = await db.all<Array<{ id: number; operator_percent: number }>>(
-        `SELECT id, operator_percent FROM products WHERE id IN (${placeholders})`,
-        ids
-      );
-      productRows.forEach((row) => {
-        productPercentMap.set(Number(row.id), Number(row.operator_percent) || 0);
-      });
+      let hasProductOperatorPercent = true;
+      try {
+        hasProductOperatorPercent = await hasColumn('products', 'operator_percent');
+      } catch { /* ignore */ }
+      if (hasProductOperatorPercent) {
+        const ids = Array.from(productIds);
+        const placeholders = ids.map(() => '?').join(',');
+        const productRows = await db.all<Array<{ id: number; operator_percent?: number | null }>>(
+          `SELECT id, operator_percent FROM products WHERE id IN (${placeholders})`,
+          ids
+        );
+        productRows.forEach((row) => {
+          productPercentMap.set(Number(row.id), (row.operator_percent != null && Number.isFinite(Number(row.operator_percent)) ? Number(row.operator_percent) : 0));
+        });
+      }
     }
 
     // Получаем проценты из операций (всегда подтягиваем operator_percent из БД)
@@ -170,7 +190,11 @@ export class EarningsService {
       await db.run('DELETE FROM order_item_earnings WHERE earned_date = ?', [date]);
 
       for (const row of rows) {
-        if (!row.userId) continue;
+        // Исполнитель позиции: executor_user_id > responsible_user_id > userId заказа
+        const effectiveUserId: number | null = (row.executorUserId != null && Number.isFinite(Number(row.executorUserId)) ? Number(row.executorUserId)
+          : (row.responsibleUserId != null && Number.isFinite(Number(row.responsibleUserId)) ? Number(row.responsibleUserId)
+          : row.userId));
+        if (effectiveUserId == null || !Number.isFinite(effectiveUserId)) continue;
 
         let params: any = {};
         try {
@@ -230,7 +254,7 @@ export class EarningsService {
           [
             row.orderId,
             row.itemId,
-            row.userId,
+            effectiveUserId,
             itemTotal,
             percent,
             amount,

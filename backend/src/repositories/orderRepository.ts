@@ -254,6 +254,8 @@ export const OrderRepository = {
       ORDER BY o.id DESC`,
       d,
       userId,
+      d,
+      userId,
       userId,
       d,
       userId
