@@ -726,11 +726,12 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
     setSpecs(prev => ({ ...prev, ...normalizedUpdates }));
     setUserInteracted(true); // Отмечаем, что пользователь взаимодействовал с калькулятором
-    
-    // ❌ УБРАНО: Мгновенный расчет здесь
-    // useAutoCalculate уже автоматически пересчитывает при изменении specs
-    // Дополнительный вызов instantCalculate приводит к двойному/тройному расчету
-  }, [setSpecs, setUserInteracted]);
+
+    // Для select (материал, формат и т.д.) — мгновенный пересчёт без debounce
+    if (instant) {
+      setTimeout(() => instantCalculate(), 0);
+    }
+  }, [setSpecs, setUserInteracted, instantCalculate]);
 
 
   // getProductionDays передаётся выше через useCalculatorPricingActions / handleAddToOrder
