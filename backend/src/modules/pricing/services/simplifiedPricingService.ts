@@ -1008,15 +1008,30 @@ export class SimplifiedPricingService {
     /** Текущее количество — добавляем в boundaries, чтобы «Цена» для выбранного тиража совпадала с итогом */
     currentQuantity?: number;
   }): Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price: number }> {
-    const boundaries = new Set<number>([1]);
+    const boundaries = new Set<number>();
+
+    // 1. Текущее количество — отдельная строка над таблицей (чтобы «Цена» совпадала с итогом)
     if (ctx.currentQuantity != null && Number.isFinite(ctx.currentQuantity) && ctx.currentQuantity > 0) {
       boundaries.add(ctx.currentQuantity);
     }
+
+    // 2. Диапазоны из схемы: print_prices для выбранного размера (наследуют от принтера при «Запросить цены»)
     if (ctx.printPriceConfig?.tiers?.length) {
       ctx.printPriceConfig.tiers.forEach((t: SimplifiedQtyTier) => {
         if (t.min_qty != null && Number.isFinite(t.min_qty)) boundaries.add(t.min_qty);
       });
     }
+
+    // 3. Диапазоны из material_prices для выбранного размера
+    if (ctx.selectedSize?.material_prices?.length) {
+      ctx.selectedSize.material_prices.forEach((mp: { material_id: number; tiers?: SimplifiedQtyTier[] }) => {
+        mp.tiers?.forEach((t: SimplifiedQtyTier) => {
+          if (t.min_qty != null && Number.isFinite(t.min_qty)) boundaries.add(t.min_qty);
+        });
+      });
+    }
+
+    // 4. Диапазоны из finishing
     ctx.finishingConfig.forEach((f) => {
       const mapKey = f.variant_id ? `${f.service_id}:${f.variant_id}` : String(f.service_id);
       const tiers = ctx.serviceTiersMap.get(mapKey);
@@ -1024,6 +1039,13 @@ export class SimplifiedPricingService {
         if (t.min_qty != null && Number.isFinite(t.min_qty)) boundaries.add(t.min_qty);
       });
     });
+
+    // Fallback: если в схеме нет диапазонов — минимум itemsPerSheet (рекомендуемое кол-во)
+    if (boundaries.size === 0) {
+      const ips = Math.max(1, ctx.itemsPerSheet || 1);
+      boundaries.add(ips);
+    }
+
     const sorted = Array.from(boundaries).sort((a, b) => a - b);
     const result: Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price: number }> = [];
 
@@ -1089,6 +1111,15 @@ export class SimplifiedPricingService {
         unit_price: Math.round(unitPrice * 100) / 100,
         total_price: totalRounded,
       });
+    }
+    // Строка с текущим количеством — первой (над таблицей)
+    const cq = ctx.currentQuantity;
+    if (cq != null && Number.isFinite(cq) && cq > 0) {
+      const idx = result.findIndex((r) => r.min_qty === cq);
+      if (idx > 0) {
+        const [row] = result.splice(idx, 1);
+        result.unshift(row);
+      }
     }
     return result;
   }
