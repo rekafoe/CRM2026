@@ -12,6 +12,7 @@ import { getTableColumns } from '../../../utils/tableSchemaCache';
 import { LayoutCalculationService, ProductSize, LayoutResult } from './layoutCalculationService';
 import { logger } from '../../../utils/logger';
 import { PrintPriceService } from './printPriceService';
+import { PricingServiceRepository } from '../repositories/serviceRepository';
 
 /** Категория материалов «Рулонная бумага» — для неё не учитывается раскладка (расход по количеству изделий, не по листам). */
 const ROLL_PAPER_CATEGORY_NAME = 'Рулонная бумага';
@@ -794,17 +795,47 @@ export class FlexiblePricingService {
         totalSheets: Math.ceil(quantity / (layout?.itemsPerSheet || 1))
       });
     } else {
-      // Для не-печатных операций используем базовую цену с учетом множителей
-      const operationMultiplier = markupSettings.operation_price_multiplier || 1.0;
-      unitPrice = operation.price * (operation.price_multiplier || 1.0) * operationMultiplier;
-      logger.info('ℹ️ Используем базовую цену операции (не печать)', {
-        operationId: operation.id,
-        operationName: operation.name,
-        basePrice: operation.price,
-        multiplier: operation.price_multiplier || 1.0,
-        finalPrice: unitPrice,
-        note: 'Операция не определена как печать. Проверьте operation_type="print" или добавьте "печать"/"print" в название.'
-      });
+      // Для не-печатных операций: проверяем цены вариантов (сложные операции — ламинация и т.п.)
+      const variantId = this.getVariantIdForOperation(operation.id, configuration);
+      if (variantId != null && Number.isFinite(variantId)) {
+        try {
+          const tiers = await PricingServiceRepository.listServiceTiers(operation.id, variantId);
+          if (tiers && tiers.length > 0) {
+            const sorted = [...tiers].sort((a, b) => a.minQuantity - b.minQuantity);
+            const tier = this.findTierForEffectiveQuantity(sorted, effectiveQuantity);
+            if (tier && tier.rate > 0) {
+              unitPrice = tier.rate * (operation.price_multiplier || 1.0) * (markupSettings.operation_price_multiplier || 1.0);
+              pricingKey = `variant_${variantId}`;
+              logger.info('✅ Используем цену варианта операции (сложная операция)', {
+                operationId: operation.id,
+                operationName: operation.name,
+                variantId,
+                tierRate: tier.rate,
+                effectiveQuantity,
+                unitPrice,
+              });
+            }
+          }
+        } catch (tierErr) {
+          logger.warn('Не удалось загрузить тарифы варианта, используем базовую цену', {
+            operationId: operation.id,
+            variantId,
+            error: (tierErr as Error)?.message,
+          });
+        }
+      }
+      if (unitPrice === undefined || unitPrice <= 0) {
+        const operationMultiplier = markupSettings.operation_price_multiplier || 1.0;
+        unitPrice = operation.price * (operation.price_multiplier || 1.0) * operationMultiplier;
+        logger.info('ℹ️ Используем базовую цену операции (не печать)', {
+          operationId: operation.id,
+          operationName: operation.name,
+          basePrice: operation.price,
+          multiplier: operation.price_multiplier || 1.0,
+          finalPrice: unitPrice,
+          note: 'Операция не определена как печать. Проверьте operation_type="print" или добавьте "печать"/"print" в название.'
+        });
+      }
     }
     
     // Применяем правила ценообразования
@@ -859,6 +890,40 @@ export class FlexiblePricingService {
       pricingKey: isPrintOperation ? (pricingKey ?? undefined) : undefined,
       technologyCode: isPrintOperation ? configuration.print_technology : undefined,
     };
+  }
+
+  /**
+   * Извлекает variant_id для операции из конфигурации (finishing или selectedOperations)
+   */
+  private static getVariantIdForOperation(operationId: number, configuration: any): number | undefined {
+    const finishing = configuration?.finishing;
+    if (Array.isArray(finishing)) {
+      const entry = finishing.find((f: any) => Number(f?.service_id) === operationId);
+      const vid = entry?.variant_id;
+      if (vid != null && Number.isFinite(Number(vid))) return Number(vid);
+    }
+    const selected = configuration?.selectedOperations;
+    if (Array.isArray(selected)) {
+      const entry = selected.find((s: any) => Number(s?.operationId) === operationId);
+      const vid = entry?.variantId ?? entry?.variant_id;
+      if (vid != null && Number.isFinite(Number(vid))) return Number(vid);
+    }
+    return undefined;
+  }
+
+  /**
+   * Находит подходящий тариф по количеству (аналогично SimplifiedPricingService.findTierForQuantity)
+   */
+  private static findTierForEffectiveQuantity(
+    tiers: Array<{ minQuantity: number; rate: number }>,
+    quantity: number
+  ): { minQuantity: number; rate: number } | null {
+    if (!tiers || tiers.length === 0) return null;
+    const sorted = [...tiers].sort((a, b) => b.minQuantity - a.minQuantity);
+    for (const tier of sorted) {
+      if (quantity >= tier.minQuantity) return tier;
+    }
+    return tiers[0] ?? null;
   }
 
   /**

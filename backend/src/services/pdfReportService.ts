@@ -459,18 +459,9 @@ export class PDFReportService {
       const prepaymentAmount = Number.isFinite(normalizedPrepayment) ? normalizedPrepayment : 0;
       const debt = Math.max(0, calculatedTotalAmount - prepaymentAmount);
 
-      // Генерируем HTML бланка
       const resolvedExecutedBy = order.executedByName || executedBy || undefined;
-      const html = this.generateOrderBlankHTML({
-        orderNumber: order.number || `ORD-${order.id}`,
-        createdDate,
-        readyDate: readyDateFormatted,
-        customerName: order.customerName || '',
-        customerPhone: order.customerPhone || '',
-        cost: calculatedTotalAmount,
-        prepaymentAmount: prepaymentAmount,
-        debt: debt,
-        items: (Array.isArray(items) ? items : []).map(item => {
+      const orderNumber = order.number || `ORD-${order.id}`;
+      const mappedItems = (Array.isArray(items) ? items : []).map(item => {
           let params: any = {};
           try {
             if (item.params) {
@@ -577,11 +568,84 @@ export class PDFReportService {
             price: discountedPrice,
             parameters: paramParts.join(' | ') || ''
           };
-        }),
-        totalAmount: calculatedTotalAmount,
-        companyPhone: companyPhones[0] || '+375 33 336 56 78',
-        executedBy: resolvedExecutedBy
-      });
+        });
+
+      const companyPhone = companyPhones[0] || '+375 33 336 56 78';
+      let html: string;
+
+      // Пробуем шаблон из организации (если есть) — иначе fallback на встроенный HTML
+      try {
+        const org = await this.getOrganizationForReceipt(order.organization_id);
+        const templateRow = await db.get<{ html_content: string }>('SELECT html_content FROM order_blank_templates WHERE organization_id = ?', org.id);
+        if (templateRow?.html_content) {
+          const companyPhoneVal = org.phone || companyPhone;
+          const companyAddress = org.legal_address || 'г. Минск, пр-т Дзержинского, 3Б';
+          const companySchedule = org.work_schedule || 'пн-пт: 9:00 - 20:00, сб-вс: 10:00-19:00';
+          const itemsTable = mappedItems.map((item, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td><strong>${this.escapeHtml(item.type)}</strong></td>
+              <td style="font-size: 7px; color: #555;">${this.escapeHtml(item.parameters || '')}</td>
+              <td style="text-align: center;">${item.quantity}</td>
+              <td style="text-align: right;"><strong>${(item.price * item.quantity).toFixed(2)}</strong></td>
+            </tr>
+          `).join('');
+          html = templateRow.html_content
+            .replace(/\{\{companyName\}\}/g, this.escapeHtml(org.name))
+            .replace(/\{\{companyPhone\}\}/g, this.escapeHtml(companyPhoneVal))
+            .replace(/\{\{companyAddress\}\}/g, this.escapeHtml(companyAddress))
+            .replace(/\{\{companySchedule\}\}/g, this.escapeHtml(companySchedule))
+            .replace(/\{\{orderNumber\}\}/g, this.escapeHtml(orderNumber))
+            .replace(/\{\{createdDate\}\}/g, this.escapeHtml(createdDate))
+            .replace(/\{\{readyDate\}\}/g, this.escapeHtml(readyDateFormatted))
+            .replace(/\{\{customerName\}\}/g, this.escapeHtml(order.customerName || ''))
+            .replace(/\{\{customerPhone\}\}/g, this.escapeHtml(order.customerPhone || ''))
+            .replace(/\{\{cost\}\}/g, calculatedTotalAmount.toFixed(2))
+            .replace(/\{\{prepaymentAmount\}\}/g, prepaymentAmount.toFixed(2))
+            .replace(/\{\{debt\}\}/g, debt.toFixed(2))
+            .replace(/\{\{totalAmount\}\}/g, calculatedTotalAmount.toFixed(2))
+            .replace(/\{\{itemsTable\}\}/g, itemsTable)
+            .replace(/\{\{executedBy\}\}/g, resolvedExecutedBy ? this.escapeHtml(resolvedExecutedBy) : '');
+        } else {
+          // Fallback: встроенный HTML с данными существующей организации
+          const companyPhoneVal = org.phone || companyPhone;
+          const companyAddress = org.legal_address || 'г. Минск, пр-т Дзержинского, 3Б';
+          const companySchedule = org.work_schedule || 'пн-пт: 9:00 - 20:00, сб-вс: 10:00-19:00';
+          html = this.generateOrderBlankHTML({
+            orderNumber,
+            createdDate,
+            readyDate: readyDateFormatted,
+            customerName: order.customerName || '',
+            customerPhone: order.customerPhone || '',
+            cost: calculatedTotalAmount,
+            prepaymentAmount,
+            debt,
+            items: mappedItems,
+            totalAmount: calculatedTotalAmount,
+            companyPhone: companyPhoneVal,
+            companyName: org.name,
+            companyAddress,
+            companySchedule,
+            executedBy: resolvedExecutedBy
+          });
+        }
+      } catch (_) {
+        // Fallback при ошибке (таблица отсутствует и т.п.): встроенный HTML с дефолтами
+        html = this.generateOrderBlankHTML({
+          orderNumber,
+          createdDate,
+          readyDate: readyDateFormatted,
+          customerName: order.customerName || '',
+          customerPhone: order.customerPhone || '',
+          cost: calculatedTotalAmount,
+          prepaymentAmount,
+          debt,
+          items: mappedItems,
+          totalAmount: calculatedTotalAmount,
+          companyPhone,
+          executedBy: resolvedExecutedBy
+        });
+      }
 
       // Конвертируем HTML в PDF
       const pdfBuffer = await this.convertHTMLToPDF(html, {
@@ -621,10 +685,15 @@ export class PDFReportService {
     }>;
     totalAmount: number;
     companyPhone: string;
+    companyName?: string;
+    companyAddress?: string;
+    companySchedule?: string;
     executedBy?: string;
   }): string {
-    const { orderNumber, createdDate, readyDate, customerName, customerPhone, cost, prepaymentAmount, debt, items, totalAmount, companyPhone: companyPhoneValue, executedBy } = data;
+    const { orderNumber, createdDate, readyDate, customerName, customerPhone, cost, prepaymentAmount, debt, items, totalAmount, companyPhone: companyPhoneValue, companyName: companyNameVal, companyAddress: companyAddressVal, companySchedule: companyScheduleVal, executedBy } = data;
     const companyPhone = companyPhoneValue;
+    const companyAddress = companyAddressVal || 'г. Минск, пр-т Дзержинского, 3Б';
+    const companySchedule = companyScheduleVal || 'пн-пт: 9:00 - 20:00, сб-вс: 10:00-19:00';
     const logoSvg = `
       <svg class="logo-svg" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 8000 3000" width="150" height="56">
         <defs>
@@ -949,10 +1018,10 @@ export class PDFReportService {
                 <div class="tear-off-logo">${logoSvg}</div>
                 <div class="tear-off-contact">
                     <strong>Контактная информация:</strong>
+                    ${companyNameVal ? `Организация: ${this.escapeHtml(companyNameVal)}<br>` : ''}
                     Телефон: ${companyPhone}<br>
-                    Адрес: г. Минск, пр-т Дзержинского, 3Б<br>
-                    (ст. метро Юбилейная Площадь, ст. м Грушевка)<br>
-                    График работы: пн-пт: 9:00 - 20:00, сб-вс: 10:00-19:00
+                    Адрес: ${this.escapeHtml(companyAddress)}<br>
+                    График работы: ${this.escapeHtml(companySchedule)}
                 </div>
             </div>
             <div class="tear-off-summary-right">
@@ -1140,7 +1209,38 @@ export class PDFReportService {
     return html;
   }
 
-  /** Реквизиты организации для товарного чека (env или значения по умолчанию) */
+  /** Реквизиты организации для товарного чека: из БД (organizations) или env fallback */
+  private static async getOrganizationForReceipt(organizationId?: number | null): Promise<{ id: number; name: string; unp: string; legal_address?: string; phone?: string; email?: string; bank_details?: string; work_schedule?: string }> {
+    try {
+      const db = await getDb();
+      let org: any = null;
+      const sel = 'SELECT id, name, unp, legal_address, phone, email, bank_details FROM organizations';
+      if (organizationId && Number.isFinite(organizationId)) {
+        org = await db.get(`${sel} WHERE id = ?`, organizationId);
+      }
+      if (!org) {
+        org = await db.get(`${sel} WHERE is_default = 1 LIMIT 1`);
+      }
+      if (!org) {
+        org = await db.get(`${sel} ORDER BY id LIMIT 1`);
+      }
+      if (org) {
+        let work_schedule: string | undefined;
+        try {
+          const ws = await db.get<{ work_schedule?: string }>('SELECT work_schedule FROM organizations WHERE id = ?', org.id);
+          work_schedule = ws?.work_schedule ?? undefined;
+        } catch { work_schedule = undefined; }
+        return { id: org.id, name: org.name || '', unp: org.unp || '', legal_address: org.legal_address, phone: org.phone, email: org.email, bank_details: org.bank_details, work_schedule };
+      }
+    } catch (_) { /* таблица organizations может отсутствовать до миграции */ }
+    return {
+      id: 0,
+      name: process.env.COMPANY_NAME || 'ООО "Светлан Эстетикс"',
+      unp: process.env.COMPANY_UNP || '193679900'
+    };
+  }
+
+  /** Fallback для обратной совместимости (синхронный) */
   private static getCompanyForReceipt(): { name: string; unp: string } {
     return {
       name: process.env.COMPANY_NAME || 'ООО "Светлан Эстетикс"',
@@ -1249,7 +1349,8 @@ export class PDFReportService {
   }
 
   /**
-   * Генерация PDF товарного чека по заказу (заполненный)
+   * Генерация PDF товарного чека по заказу (заполненный).
+   * Использует шаблон из receipt_templates для организации заказа (или организации по умолчанию).
    */
   static async generateCommodityReceipt(
     orderId: number,
@@ -1301,22 +1402,52 @@ export class PDFReportService {
         return { num: idx + 1, name, quantity: q, price: p, sum };
       });
       const totalAmount = rows.reduce((s: number, r: any) => s + r.sum, 0);
-
-      const company = this.getCompanyForReceipt();
+      const amountInWords = this.amountInWordsBel(totalAmount);
       const manager = order.executedByName || executedBy || '';
 
-      const html = this.generateCommodityReceiptHTML({
-        receiptNumber,
-        orderNumber,
-        orderDate,
-        companyName: company.name,
-        unp: company.unp,
-        rows,
-        totalAmount,
-        amountInWords: this.amountInWordsBel(totalAmount),
-        manager,
-        isBlank: false
-      });
+      const org = await this.getOrganizationForReceipt(order.organization_id);
+      const fmt = (n: number) => n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const itemsTable = rows.map((r) => `
+        <tr>
+          <td>${r.num}</td>
+          <td>${this.escapeHtml(r.name)}</td>
+          <td>${r.quantity} шт.</td>
+          <td>${fmt(r.price)}</td>
+          <td>${fmt(r.sum)}</td>
+        </tr>
+      `).join('');
+      const summaryLine = `Всего наименований ${rows.length}, на сумму ${fmt(totalAmount)} бел. руб. ${amountInWords}`;
+      const managerLine = manager ? `Менеджер: ${this.escapeHtml(manager)}` : 'Менеджер: ________________';
+
+      const templateRow = await db.get<{ html_content: string }>('SELECT html_content FROM receipt_templates WHERE organization_id = ?', org.id);
+      let html: string;
+      if (templateRow?.html_content) {
+        html = templateRow.html_content
+          .replace(/\{\{companyName\}\}/g, this.escapeHtml(org.name))
+          .replace(/\{\{unp\}\}/g, this.escapeHtml(org.unp))
+          .replace(/\{\{legalAddress\}\}/g, this.escapeHtml(org.legal_address || ''))
+          .replace(/\{\{phone\}\}/g, this.escapeHtml(org.phone || ''))
+          .replace(/\{\{receiptNumber\}\}/g, this.escapeHtml(receiptNumber))
+          .replace(/\{\{orderNumber\}\}/g, this.escapeHtml(orderNumber))
+          .replace(/\{\{orderDate\}\}/g, this.escapeHtml(orderDate))
+          .replace(/\{\{itemsTable\}\}/g, itemsTable)
+          .replace(/\{\{totalStr\}\}/g, fmt(totalAmount))
+          .replace(/\{\{summaryLine\}\}/g, summaryLine)
+          .replace(/\{\{manager\}\}/g, managerLine);
+      } else {
+        html = this.generateCommodityReceiptHTML({
+          receiptNumber,
+          orderNumber,
+          orderDate,
+          companyName: org.name,
+          unp: org.unp,
+          rows,
+          totalAmount,
+          amountInWords,
+          manager,
+          isBlank: false
+        });
+      }
 
       const pdfBuffer = await this.convertHTMLToPDF(html, { headerTemplate: '', footerTemplate: '' });
       return pdfBuffer;
@@ -1327,24 +1458,51 @@ export class PDFReportService {
   }
 
   /**
-   * Генерация PDF бланка товарного чека (пустая форма)
+   * Генерация PDF бланка товарного чека (пустая форма).
+   * organizationId — опционально, иначе организация по умолчанию.
    */
-  static async generateCommodityReceiptBlank(): Promise<Buffer> {
+  static async generateCommodityReceiptBlank(organizationId?: number | null): Promise<Buffer> {
     try {
       console.log(`📄 Generating commodity receipt blank...`);
-      const company = this.getCompanyForReceipt();
-      const html = this.generateCommodityReceiptHTML({
-        receiptNumber: '______',
-        orderNumber: '______',
-        orderDate: '________________',
-        companyName: company.name,
-        unp: company.unp,
-        rows: [],
-        totalAmount: 0,
-        amountInWords: '',
-        manager: '',
-        isBlank: true
-      });
+      const org = await this.getOrganizationForReceipt(organizationId);
+      const db = await getDb();
+      const templateRow = await db.get<{ html_content: string }>('SELECT html_content FROM receipt_templates WHERE organization_id = ?', org.id);
+      let html: string;
+      if (templateRow?.html_content) {
+        const emptyRows = `
+        <tr><td>1</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>2</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>3</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>4</td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>5</td><td></td><td></td><td></td><td></td></tr>
+      `;
+        const summaryLine = 'Всего наименований ______, на сумму ________________ бел. руб. _________________________________________';
+        html = templateRow.html_content
+          .replace(/\{\{companyName\}\}/g, this.escapeHtml(org.name))
+          .replace(/\{\{unp\}\}/g, this.escapeHtml(org.unp))
+          .replace(/\{\{legalAddress\}\}/g, this.escapeHtml(org.legal_address || ''))
+          .replace(/\{\{phone\}\}/g, this.escapeHtml(org.phone || ''))
+          .replace(/\{\{receiptNumber\}\}/g, '______')
+          .replace(/\{\{orderNumber\}\}/g, '______')
+          .replace(/\{\{orderDate\}\}/g, '________________')
+          .replace(/\{\{itemsTable\}\}/g, emptyRows)
+          .replace(/\{\{totalStr\}\}/g, '')
+          .replace(/\{\{summaryLine\}\}/g, summaryLine)
+          .replace(/\{\{manager\}\}/g, 'Менеджер: ________________');
+      } else {
+        html = this.generateCommodityReceiptHTML({
+          receiptNumber: '______',
+          orderNumber: '______',
+          orderDate: '________________',
+          companyName: org.name,
+          unp: org.unp,
+          rows: [],
+          totalAmount: 0,
+          amountInWords: '',
+          manager: '',
+          isBlank: true
+        });
+      }
       const pdfBuffer = await this.convertHTMLToPDF(html, { headerTemplate: '', footerTemplate: '' });
       return pdfBuffer;
     } catch (error: any) {

@@ -44,6 +44,7 @@ const CustomersAdminPage = lazy(() =>
   import('./admin/CustomersAdminPage').then((m) => ({ default: m.default }))
 );
 const DocumentTemplatesPage = lazy(() => import('./admin/DocumentTemplatesPage'));
+const OrganizationsPage = lazy(() => import('./admin/OrganizationsPage'));
 const SettingsPage = lazy(() =>
   import('./admin/SettingsPage').then((m) => ({ default: m.SettingsPage }))
 );
@@ -151,6 +152,9 @@ const AdminPanelHome: React.FC = () => {
           </button>
           <button onClick={() => navigate('/adminpanel/document-templates')} className="nav-btn">
             <AppIcon name="clipboard" size="xs" /> Шаблоны документов
+          </button>
+          <button onClick={() => navigate('/adminpanel/organizations')} className="nav-btn">
+            <AppIcon name="receipt" size="xs" /> Организации и чеки
           </button>
           <button onClick={() => navigate('/adminpanel/users')} className="nav-btn">
             <AppIcon name="users" size="xs" /> Пользователи
@@ -296,6 +300,7 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/counters" element={<CountersServicePage />} />
           <Route path="/clients" element={<CustomersAdminPage />} />
           <Route path="/document-templates" element={<DocumentTemplatesPage />} />
+          <Route path="/organizations" element={<OrganizationsPage />} />
           
           {/* Настройки */}
           <Route path="/settings" element={<SettingsPage onBack={() => window.history.back()} />} />

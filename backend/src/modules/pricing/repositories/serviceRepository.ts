@@ -512,11 +512,9 @@ export class PricingServiceRepository {
     const params: any[] = [serviceId];
     
     if (variantId !== undefined && variantId !== null) {
-      // Для варианта возвращаем только его tiers
       query += ` AND variant_id = ?`;
       params.push(variantId);
     } else {
-      // Для услуги без варианта возвращаем только общие tiers
       query += ` AND variant_id IS NULL`;
     }
     
@@ -524,13 +522,43 @@ export class PricingServiceRepository {
     
     try {
       const rows = await db.all<RawTierRow[]>(query, ...params);
-      return rows.map(this.mapTier);
+      const result = rows.map(this.mapTier);
+      // Если для варианта нет цен в service_volume_prices — пробуем service_variant_prices (новая структура)
+      if (result.length === 0 && variantId != null && Number.isFinite(variantId)) {
+        const fromNew = await this.listServiceTiersFromVariantPrices(serviceId, variantId);
+        if (fromNew.length > 0) return fromNew;
+      }
+      return result;
     } catch (error: any) {
       console.error('Error in listServiceTiers:', error);
       console.error('Query:', query);
       console.error('Params:', params);
       throw error;
     }
+  }
+
+  /** Тарифы варианта из service_variant_prices + service_range_boundaries (новая структура) */
+  private static async listServiceTiersFromVariantPrices(serviceId: number, variantId: number): Promise<ServiceVolumeTierDTO[]> {
+    const db = await this.getConnection();
+    const hasNew = await db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='service_range_boundaries'`);
+    if (!hasNew) return [];
+    const rows = await db.all<any[]>(
+      `SELECT svp.id, svp.variant_id, srb.service_id, srb.min_quantity, svp.price_per_unit, svp.is_active
+       FROM service_variant_prices svp
+       JOIN service_range_boundaries srb ON svp.range_id = srb.id
+       WHERE srb.service_id = ? AND svp.variant_id = ?
+       ORDER BY srb.min_quantity`,
+      serviceId,
+      variantId
+    );
+    return (rows || []).map((r) => ({
+      id: r.id,
+      serviceId: r.service_id,
+      variantId: r.variant_id ? Number(r.variant_id) : undefined,
+      minQuantity: r.min_quantity,
+      rate: r.price_per_unit,
+      isActive: !!r.is_active,
+    }));
   }
 
   /**

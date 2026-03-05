@@ -848,3 +848,34 @@ export const getTemplateFieldMapping = (id: number) =>
   api.get<FieldMapping[]>(`/document-templates/${id}/mapping`);
 export const saveTemplateFieldMapping = (id: number, mappings: FieldMapping[]) => 
   api.post<FieldMapping[]>(`/document-templates/${id}/mapping`, { mappings });
+
+// Organizations API (реквизиты для товарного чека)
+export interface Organization {
+  id: number;
+  name: string;
+  unp?: string;
+  legal_address?: string;
+  phone?: string;
+  email?: string;
+  bank_details?: string;
+  logo_url?: string;
+  work_schedule?: string;
+  is_default?: number;
+  sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const getOrganizations = () => api.get<Organization[]>('/organizations');
+export const getOrganization = (id: number) => api.get<Organization>(`/organizations/${id}`);
+export const createOrganization = (data: Partial<Organization>) => api.post<Organization>('/organizations', data);
+export const updateOrganization = (id: number, data: Partial<Organization>) => api.put<Organization>(`/organizations/${id}`, data);
+export const deleteOrganization = (id: number) => api.delete(`/organizations/${id}`);
+export const getReceiptTemplate = (organizationId: number) =>
+  api.get<{ organization_id: number; html_content: string }>(`/organizations/${organizationId}/receipt-template`);
+export const saveReceiptTemplate = (organizationId: number, html_content: string) =>
+  api.put<{ organization_id: number; html_content: string }>(`/organizations/${organizationId}/receipt-template`, { html_content });
+export const getOrderBlankTemplate = (organizationId: number) =>
+  api.get<{ organization_id: number; html_content: string }>(`/organizations/${organizationId}/order-blank-template`);
+export const saveOrderBlankTemplate = (organizationId: number, html_content: string) =>
+  api.put<{ organization_id: number; html_content: string }>(`/organizations/${organizationId}/order-blank-template`, { html_content });

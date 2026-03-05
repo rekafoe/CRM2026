@@ -345,10 +345,11 @@ router.post('/cleanup-old-files', authenticate, asyncHandler(async (_req, res) =
 // Export
 router.get('/export', asyncHandler(OrderController.exportOrders))
 
-// PDF бланк товарного чека (пустая форма, без заказа)
-router.get('/commodity-receipt-blank-pdf', asyncHandler(async (_req, res) => {
+// PDF бланк товарного чека (пустая форма, без заказа). ?organization_id=1 — для выбора организации
+router.get('/commodity-receipt-blank-pdf', asyncHandler(async (req, res) => {
   try {
-    const pdfBuffer = await PDFReportService.generateCommodityReceiptBlank();
+    const orgId = req.query.organization_id != null ? Number(req.query.organization_id) : undefined;
+    const pdfBuffer = await PDFReportService.generateCommodityReceiptBlank(orgId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="commodity-receipt-blank.pdf"');
     res.setHeader('Content-Length', pdfBuffer.length);

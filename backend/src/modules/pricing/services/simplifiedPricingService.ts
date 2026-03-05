@@ -79,7 +79,7 @@ export interface SimplifiedPricingResult {
   calculatedAt: string;
   calculationMethod: 'simplified';
   /** Цены за единицу по диапазонам тиража для выбранной конфигурации (от min_qty шт) */
-  tier_prices?: Array<{ min_qty: number; max_qty?: number; unit_price: number }>;
+  tier_prices?: Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price?: number }>;
   /** Проверка вместимости формата на печатный лист (SRA3/A3/A4); sheetsNeeded — листов к списанию */
   layout?: {
     fitsOnSheet: boolean;
@@ -569,16 +569,21 @@ export class SimplifiedPricingService {
     let serviceTiersMap: Map<string, SimplifiedQtyTier[]> = new Map();
     let serviceTypesMap: Map<number, string> = new Map();
 
-    if (normalizedConfig.finishing && normalizedConfig.finishing.length > 0) {
-      logger.info('🔧 [SimplifiedPricingService] Получена конфигурация finishing из фронтенда', {
+    // Источник finishing: приоритет у configuration.finishing (выбор пользователя), иначе — selectedSize.finishing (из шаблона размера)
+    const finishingToUse = (normalizedConfig.finishing && normalizedConfig.finishing.length > 0)
+      ? normalizedConfig.finishing
+      : (Array.isArray(selectedSize.finishing) && selectedSize.finishing.length > 0 ? selectedSize.finishing : []);
+
+    if (finishingToUse.length > 0) {
+      logger.info('🔧 [SimplifiedPricingService] Используем finishing', {
         productId,
         quantity,
-        finishing: normalizedConfig.finishing,
+        finishing: finishingToUse,
+        source: normalizedConfig.finishing?.length ? 'configuration' : 'selectedSize',
       });
-      // Загружаем названия услуг и централизованные тарифы
       const uniqueServiceIds = Array.from(
         new Set(
-          normalizedConfig.finishing
+          finishingToUse
             .map(f => f.service_id)
             .filter((id): id is number => typeof id === 'number' && Number.isFinite(id))
         )
@@ -602,7 +607,7 @@ export class SimplifiedPricingService {
         // 🆕 Для услуг с вариантами используем тарифы варианта, иначе базовые тарифы услуги
         serviceTiersMap = new Map<string, SimplifiedQtyTier[]>(); // Ключ: "serviceId" или "serviceId:variantId"
         
-        for (const finConfig of normalizedConfig.finishing) {
+        for (const finConfig of finishingToUse) {
           const serviceId = finConfig.service_id;
           const variantId = (finConfig as any).variant_id as number | undefined;
           const mapKey = variantId ? `${serviceId}:${variantId}` : String(serviceId);
@@ -670,8 +675,7 @@ export class SimplifiedPricingService {
           serviceIds: Array.from(serviceTiersMap.keys()),
         });
 
-        for (const finConfig of normalizedConfig.finishing) {
-          // 🆕 Используем ключ с variantId, если он есть
+        for (const finConfig of finishingToUse) {
           const variantId = (finConfig as any).variant_id as number | undefined;
           const mapKey = variantId ? `${finConfig.service_id}:${variantId}` : String(finConfig.service_id);
           const limits = serviceLimitsMap.get(finConfig.service_id);
@@ -829,7 +833,7 @@ export class SimplifiedPricingService {
       pricePerUnit,
       hasPrintConfig: !!(normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode),
       hasMaterialConfig: !!normalizedConfig.material_id,
-      hasFinishingConfig: !!(normalizedConfig.finishing && normalizedConfig.finishing.length > 0)
+      hasFinishingConfig: finishingToUse.length > 0
     });
     
     if (finalPrice === 0) {
@@ -870,7 +874,7 @@ export class SimplifiedPricingService {
       materialPricePerSheet,
       baseMaterialPricePerItem,
       serviceTiersMap: serviceTiersMap ?? new Map(),
-      finishingConfig: normalizedConfig.finishing ?? [],
+      finishingConfig: finishingToUse,
       selectedSize,
       layoutCheck,
       itemsPerSheet,
@@ -882,6 +886,7 @@ export class SimplifiedPricingService {
       cuttingPricePerCut,
       cutsPerSheet: layoutCheck.cutsPerSheet ?? 0,
       serviceTypesMap: serviceTypesMap ?? new Map(),
+      currentQuantity: quantity,
     });
     
     // 8. Загружаем названия, плотность и тип бумаги материалов
@@ -1000,8 +1005,13 @@ export class SimplifiedPricingService {
     cuttingPricePerCut: number;
     cutsPerSheet: number;
     serviceTypesMap: Map<number, string>;
-  }): Array<{ min_qty: number; max_qty?: number; unit_price: number }> {
+    /** Текущее количество — добавляем в boundaries, чтобы «Цена» для выбранного тиража совпадала с итогом */
+    currentQuantity?: number;
+  }): Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price: number }> {
     const boundaries = new Set<number>([1]);
+    if (ctx.currentQuantity != null && Number.isFinite(ctx.currentQuantity) && ctx.currentQuantity > 0) {
+      boundaries.add(ctx.currentQuantity);
+    }
     if (ctx.printPriceConfig?.tiers?.length) {
       ctx.printPriceConfig.tiers.forEach((t: SimplifiedQtyTier) => {
         if (t.min_qty != null && Number.isFinite(t.min_qty)) boundaries.add(t.min_qty);
@@ -1015,7 +1025,7 @@ export class SimplifiedPricingService {
       });
     });
     const sorted = Array.from(boundaries).sort((a, b) => a - b);
-    const result: Array<{ min_qty: number; max_qty?: number; unit_price: number }> = [];
+    const result: Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price: number }> = [];
 
     for (let i = 0; i < sorted.length; i++) {
       const q = sorted[i];
@@ -1070,8 +1080,15 @@ export class SimplifiedPricingService {
       }
 
       const total = printPrice + materialPrice + finishingPrice + cuttingPrice;
-      const unitPrice = q > 0 ? total / q : 0;
-      result.push({ min_qty: q, max_qty: maxQty, unit_price: Math.round(unitPrice * 100) / 100 });
+      const totalRounded = Math.round(total * 100) / 100;
+      const unitPrice = q > 0 ? totalRounded / q : 0;
+      // total_price — фактическая сумма (как в main calculation), чтобы «Цена» в таблице совпадала с основной суммой
+      result.push({
+        min_qty: q,
+        max_qty: maxQty,
+        unit_price: Math.round(unitPrice * 100) / 100,
+        total_price: totalRounded,
+      });
     }
     return result;
   }

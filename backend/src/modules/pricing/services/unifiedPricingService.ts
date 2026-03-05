@@ -62,8 +62,8 @@ export interface UnifiedPricingResult {
   
   finalPrice: number;
   pricePerUnit: number;
-  /** Цены за единицу по диапазонам тиража для выбранной конфигурации */
-  tier_prices?: Array<{ min_qty: number; max_qty?: number; unit_price: number }>;
+  /** Цены по диапазонам тиража для выбранной конфигурации. total_price — фактическая сумма (совпадает с finalPrice для текущего qty) */
+  tier_prices?: Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price?: number }>;
   
   // Метаданные
   calculatedAt: string;
