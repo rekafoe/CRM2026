@@ -6,6 +6,7 @@
  */
 
 import { getDb } from '../../../db';
+import { getTableColumns } from '../../../utils/tableSchemaCache';
 import { logger } from '../../../utils/logger';
 import { PricingServiceRepository } from '../repositories/serviceRepository';
 import { LayoutCalculationService } from './layoutCalculationService';
@@ -570,9 +571,51 @@ export class SimplifiedPricingService {
     let serviceTypesMap: Map<number, string> = new Map();
 
     // Источник finishing: приоритет у configuration.finishing (выбор пользователя), иначе — selectedSize.finishing (из шаблона размера)
-    const finishingToUse = (normalizedConfig.finishing && normalizedConfig.finishing.length > 0)
-      ? normalizedConfig.finishing
-      : (Array.isArray(selectedSize.finishing) && selectedSize.finishing.length > 0 ? selectedSize.finishing : []);
+    // При fallback на selectedSize.finishing фильтруем по is_default/is_required: только операции с галочкой «вкл по умолчанию» участвуют в расчёте
+    let finishingToUse: Array<{ service_id: number; variant_id?: number; price_unit?: string; units_per_item?: number }>;
+    if (normalizedConfig.finishing && normalizedConfig.finishing.length > 0) {
+      finishingToUse = normalizedConfig.finishing;
+    } else if (Array.isArray(selectedSize.finishing) && selectedSize.finishing.length > 0) {
+      const sizeFinishing = selectedSize.finishing;
+      const cols = await getTableColumns('product_operations_link');
+      const hasIsDefault = cols.has('is_default');
+      if (hasIsDefault) {
+        const serviceIds = sizeFinishing.map((f: any) => Number(f?.service_id)).filter((id: number) => Number.isFinite(id));
+        if (serviceIds.length > 0) {
+          const allowed = (await db.all(
+            `SELECT operation_id FROM product_operations_link 
+             WHERE product_id = ? AND operation_id IN (${serviceIds.map(() => '?').join(',')}) 
+             AND (is_required = 1 OR is_default = 1)`,
+            [productId, ...serviceIds]
+          )) as Array<{ operation_id: number }>;
+          const allowedIds = new Set(allowed.map((r) => Number(r.operation_id)));
+          finishingToUse = sizeFinishing.filter((f: any) => allowedIds.has(Number(f?.service_id)));
+        } else {
+          finishingToUse = [];
+        }
+      } else {
+        finishingToUse = sizeFinishing;
+      }
+    } else {
+      finishingToUse = [];
+    }
+
+    // При fallback: исключаем операции с min_quantity > quantity (пользователь не выбирал их явно)
+    const isFallbackFinishing = !(normalizedConfig.finishing && normalizedConfig.finishing.length > 0) && finishingToUse.length > 0;
+    if (isFallbackFinishing && finishingToUse.length > 0) {
+      const ids = [...new Set(finishingToUse.map((f: any) => Number(f?.service_id)).filter((id: number) => Number.isFinite(id)))];
+      if (ids.length > 0) {
+        const limits = (await db.all(
+          `SELECT id, min_quantity FROM post_processing_services WHERE id IN (${ids.map(() => '?').join(',')})`,
+          ids
+        )) as Array<{ id: number; min_quantity?: number | null }>;
+        const minByService = new Map(limits.map((r) => [Number(r.id), Number(r.min_quantity ?? 1)]));
+        finishingToUse = finishingToUse.filter((f: any) => {
+          const minQ = minByService.get(Number(f?.service_id)) ?? 1;
+          return quantity >= minQ;
+        });
+      }
+    }
 
     if (finishingToUse.length > 0) {
       logger.info('🔧 [SimplifiedPricingService] Используем finishing', {
