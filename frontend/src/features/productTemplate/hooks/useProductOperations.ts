@@ -164,7 +164,7 @@ export function useProductOperations(
         operation_id: operationsState.selectedOperationId,
         sequence: operationsState.productOperations.length + 1,
         is_required: true,
-        is_default: true,
+        is_default: false,
         price_multiplier: 1.0
       });
       

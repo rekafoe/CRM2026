@@ -33,6 +33,8 @@ const BulkOperationsModal: React.FC<BulkOperationsModalProps> = ({
   onRequiredChange,
   onAdd
 }) => {
+  const [defaultMap, setDefaultMap] = React.useState<Record<number, boolean>>({});
+
   const handleSelectAll = () => {
     const all = new Set(availableOperations.map((op) => Number(op.id)));
     onSelectedChange(all);
@@ -54,9 +56,14 @@ const BulkOperationsModal: React.FC<BulkOperationsModalProps> = ({
       next.delete(operationId);
       const { [operationId]: _, ...rest } = required;
       onRequiredChange(rest);
+      setDefaultMap((prev) => {
+        const { [operationId]: __, ...rest } = prev;
+        return rest;
+      });
     } else {
       next.add(operationId);
       onRequiredChange({ ...required, [operationId]: true });
+      setDefaultMap((prev) => ({ ...prev, [operationId]: false }));
     }
     onSelectedChange(next);
   };
@@ -64,13 +71,16 @@ const BulkOperationsModal: React.FC<BulkOperationsModalProps> = ({
   const handleAdd = async () => {
     if (selected.size === 0) return;
     try {
-      const payload = Array.from(selected).map((operationId, index) => ({
-        operation_id: operationId,
-        sequence: productOperations.length + index + 1,
-        is_required: required[operationId] !== false,
-        is_default: true,
-        price_multiplier: 1.0
-      }));
+      const payload = Array.from(selected).map((operationId, index) => {
+        const isReq = required[operationId] !== false;
+        return {
+          operation_id: operationId,
+          sequence: productOperations.length + index + 1,
+          is_required: isReq,
+          is_default: isReq ? true : (defaultMap[operationId] ?? false),
+          price_multiplier: 1.0
+        };
+      });
       await onAdd(payload);
       onClose();
     } catch (error) {
@@ -110,7 +120,7 @@ const BulkOperationsModal: React.FC<BulkOperationsModalProps> = ({
                     key={operationId}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'auto 1fr auto',
+                      gridTemplateColumns: 'auto 1fr auto auto',
                       gap: 12,
                       alignItems: 'center',
                       padding: 12,
@@ -131,17 +141,31 @@ const BulkOperationsModal: React.FC<BulkOperationsModalProps> = ({
                       )}
                     </div>
                     {isSelected && (
-                      <select
-                        value={required[operationId] !== false ? '1' : '0'}
-                        onChange={(e) =>
-                          onRequiredChange({ ...required, [operationId]: e.target.value === '1' })
-                        }
-                        className="form-select"
-                        style={{ width: 100 }}
-                      >
-                        <option value="1">Обязат.</option>
-                        <option value="0">Опц.</option>
-                      </select>
+                      <>
+                        <select
+                          value={required[operationId] !== false ? '1' : '0'}
+                          onChange={(e) => {
+                            const isReq = e.target.value === '1';
+                            onRequiredChange({ ...required, [operationId]: isReq });
+                            if (!isReq) setDefaultMap((prev) => ({ ...prev, [operationId]: prev[operationId] ?? false }));
+                          }}
+                          className="form-select"
+                          style={{ width: 100 }}
+                        >
+                          <option value="1">Обязат.</option>
+                          <option value="0">Опц.</option>
+                        </select>
+                        {required[operationId] === false && (
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                            <input
+                              type="checkbox"
+                              checked={defaultMap[operationId] ?? false}
+                              onChange={(e) => setDefaultMap((prev) => ({ ...prev, [operationId]: e.target.checked }))}
+                            />
+                            По умолч.
+                          </label>
+                        )}
+                      </>
                     )}
                   </div>
                 );

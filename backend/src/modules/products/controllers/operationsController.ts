@@ -297,7 +297,7 @@ export class OperationsController {
     try {
       const db = await getDb();
       const { productId, linkId } = req.params;
-      const { is_required, conditions, linked_parameter_name } = req.body;
+      const { is_required, is_default, conditions, linked_parameter_name } = req.body;
 
       // Проверяем существование связи
       const link = await db.get(
@@ -337,6 +337,12 @@ export class OperationsController {
         values.push(linked_parameter_name || null);
       }
 
+      const hasIsDefault = cols.has('is_default');
+      if (hasIsDefault && is_default !== undefined) {
+        updates.push('is_default = ?');
+        values.push(is_default ? 1 : 0);
+      }
+
       if (updates.length === 0) {
         res.status(400).json({
           success: false,
@@ -360,7 +366,7 @@ export class OperationsController {
       logger.info('Связь операции с продуктом обновлена', { 
         linkId, 
         productId, 
-        updates: { is_required, conditions, linked_parameter_name } 
+        updates: { is_required, is_default, conditions, linked_parameter_name } 
       });
 
       res.json({

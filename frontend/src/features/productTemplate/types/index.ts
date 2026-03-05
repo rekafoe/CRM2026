@@ -11,7 +11,7 @@ export interface ProductOperation {
   unit: string;
   price_unit?: string;
   is_required: boolean;
-  is_default?: boolean;
+  is_default?: boolean | number;
   price_multiplier?: number;
   sequence?: number;
   sort_order?: number;

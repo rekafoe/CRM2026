@@ -186,6 +186,11 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
                   <td style={{ padding: 8, textAlign: 'center' }}>
                     <div className="flex flex-col items-center gap-1">
                       <div>{op.is_required ? '✅ Обяз.' : '⭕ Опц.'}</div>
+                      {!op.is_required && (
+                        <span className="text-xs text-secondary">
+                          {(op.is_default === true || op.is_default === 1) ? '✓ По умолч.' : '— Выкл.'}
+                        </span>
+                      )}
                       {(op.linked_parameter_name || (op.conditions && Object.keys(op.conditions).length > 0)) ? (
                         <span className="text-xs text-warning">🔀 Условная</span>
                       ) : (

@@ -378,7 +378,7 @@ export const ProductCreationWizard: React.FC<ProductCreationWizardProps> = ({
       addOperation({
         operation_id: operation.id,
         is_required: true,
-        is_default: true,
+        is_default: false,
         price_multiplier: 1,
       })
     }

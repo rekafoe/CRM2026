@@ -10,6 +10,7 @@ interface OperationEditModalProps {
   materials?: Array<{ id: number; name: string; category_name?: string; finish?: string | null; density?: number | null }>;
   onSave: (operationId: number, updates: {
     is_required?: boolean;
+    is_default?: boolean;
     conditions?: Record<string, any>;
     linked_parameter_name?: string | null;
   }) => Promise<void>;
@@ -24,6 +25,7 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
   onSave
 }) => {
   const [isRequired, setIsRequired] = useState(true);
+  const [isDefault, setIsDefault] = useState(true);
   const [conditionMode, setConditionMode] = useState<'always' | 'parameter'>('always');
   const [linkedParameter, setLinkedParameter] = useState<string>('');
   const [parameterValue, setParameterValue] = useState<string>('');
@@ -32,6 +34,7 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
   useEffect(() => {
     if (operation) {
       setIsRequired(operation.is_required ?? true);
+      setIsDefault(operation.is_default === true || operation.is_default === 1);
       
       // Проверяем, есть ли conditions или linked_parameter_name
       const conditionsObj = operation.conditions ?? {};
@@ -84,7 +87,8 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
     setSaving(true);
     try {
       const updates: any = {
-        is_required: isRequired
+        is_required: isRequired,
+        ...(!isRequired && { is_default: isDefault })
       };
 
       if (conditionMode === 'parameter' && linkedParameter) {
@@ -265,6 +269,27 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
             </span>
           </div>
         </FormField>
+
+        {/* Включено по умолчанию — только для опциональных операций */}
+        {!isRequired && (
+          <FormField label="Начальное значение в калькуляторе">
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isDefault}
+                  onChange={(e) => setIsDefault(e.target.checked)}
+                />
+                <span>Включено по умолчанию</span>
+              </label>
+              <span className="text-sm text-secondary">
+                {isDefault 
+                  ? 'В калькуляторе чекбокс этой операции будет отмечен при открытии'
+                  : 'В калькуляторе чекбокс будет снят при открытии'}
+              </span>
+            </div>
+          </FormField>
+        )}
 
         {/* Кнопки */}
         <div className="flex justify-end gap-3">

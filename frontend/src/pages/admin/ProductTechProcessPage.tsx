@@ -95,7 +95,7 @@ const ProductTechProcessPage: React.FC = () => {
         operation_id: selectedOperationId,
         sequence: productOperations.length + 1,
         is_required: true,
-        is_default: true,
+        is_default: false,
         price_multiplier: 1.0
       });
       await loadProductOperations();

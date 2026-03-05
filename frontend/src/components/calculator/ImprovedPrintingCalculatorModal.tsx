@@ -247,6 +247,25 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     }
   }, [hasProductTypes, simplified?.types, simplified?.typeConfigs, defaultTypeId, selectedTypeId, applyProductTypeConfig]);
 
+  // Для продуктов без типов: начальные операции из schema.operations (is_required или is_default)
+  useEffect(() => {
+    if (!selectedProduct?.id || hasProductTypes) return;
+    const ops = backendProductSchema?.operations;
+    if (!Array.isArray(ops) || ops.length === 0) return;
+    const toInclude = ops.filter((op: any) => op.is_required === true || op.is_required === 1 || op.is_default === true || op.is_default === 1);
+    if (toInclude.length === 0) return;
+    setSpecs((prev) => {
+      const current = prev.selectedOperations ?? [];
+      if (current.length > 0) return prev;
+      const initial = toInclude.map((op: any) => ({
+        operationId: op.operation_id ?? op.id,
+        ...(op.variant_id != null ? { variantId: op.variant_id } : {}),
+        ...(op.subtype ? { subtype: op.subtype } : {}),
+      }));
+      return { ...prev, selectedOperations: initial };
+    });
+  }, [selectedProduct?.id, hasProductTypes, backendProductSchema?.operations, setSpecs]);
+
   const handleSelectProductType = useCallback(
     (typeId: number) => {
       setSelectedTypeId(typeId);
