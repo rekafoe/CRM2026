@@ -99,8 +99,8 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   const handleAssigneesChange = useCallback(
     async (orderId: number, patch: { contact_user_id?: number | null; responsible_user_id?: number | null }) => {
       try {
-        await updateOrderAssignees(orderId, patch);
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch } : o));
+        const { data } = await updateOrderAssignees(orderId, patch);
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch, ...data } : o));
       } catch (err: any) {
         toast.error('Ошибка', err?.message ?? 'Не удалось обновить');
       }

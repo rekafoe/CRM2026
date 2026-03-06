@@ -569,6 +569,8 @@ export class SimplifiedPricingService {
     const finishingDetails: SimplifiedPricingResult['finishingDetails'] = [];
     let serviceTiersMap: Map<string, SimplifiedQtyTier[]> = new Map();
     let serviceTypesMap: Map<number, string> = new Map();
+    let servicePriceUnitMap: Map<number, string> = new Map();
+    let serviceLimitsMap: Map<number, { min?: number; max?: number }> = new Map();
 
     // Источник finishing: приоритет у configuration.finishing (выбор пользователя), иначе — selectedSize.finishing (из шаблона размера)
     // При fallback на selectedSize.finishing фильтруем по is_default/is_required: только операции с галочкой «вкл по умолчанию» участвуют в расчёте
@@ -638,13 +640,14 @@ export class SimplifiedPricingService {
       });
 
       if (uniqueServiceIds.length > 0) {
-        const services = await db.all<Array<{ id: number; name: string; operation_type: string | null; min_quantity?: number | null; max_quantity?: number | null }>>(
-          `SELECT id, name, operation_type, min_quantity, max_quantity FROM post_processing_services WHERE id IN (${uniqueServiceIds.map(() => '?').join(',')})`,
+        const services = await db.all<Array<{ id: number; name: string; operation_type: string | null; price_unit: string | null; min_quantity?: number | null; max_quantity?: number | null }>>(
+          `SELECT id, name, operation_type, price_unit, min_quantity, max_quantity FROM post_processing_services WHERE id IN (${uniqueServiceIds.map(() => '?').join(',')})`,
           uniqueServiceIds
         );
         const serviceNamesMap = new Map(services.map(s => [s.id, s.name]));
         serviceTypesMap = new Map(services.map(s => [s.id, s.operation_type || '']));
-        const serviceLimitsMap = new Map(services.map(s => [s.id, { min: s.min_quantity ?? 1, max: s.max_quantity ?? undefined }]));
+        servicePriceUnitMap = new Map(services.map(s => [s.id, (s.price_unit || 'per_item').toLowerCase()]));
+        serviceLimitsMap = new Map(services.map(s => [s.id, { min: s.min_quantity ?? 1, max: s.max_quantity ?? undefined }]));
 
         // Загружаем тарифы из service_volume_prices / service_variant_prices через репозиторий
         // 🆕 Для услуг с вариантами используем тарифы варианта, иначе базовые тарифы услуги
@@ -721,16 +724,27 @@ export class SimplifiedPricingService {
         for (const finConfig of finishingToUse) {
           const variantId = (finConfig as any).variant_id as number | undefined;
           const mapKey = variantId ? `${finConfig.service_id}:${variantId}` : String(finConfig.service_id);
+          const operationType = serviceTypesMap.get(finConfig.service_id) || '';
           const limits = serviceLimitsMap.get(finConfig.service_id);
+          const priceUnitFromDb = servicePriceUnitMap.get(finConfig.service_id) ?? (finConfig.price_unit ?? 'per_item').toLowerCase();
+
+          // Операции с price_unit=per_sheet: считаем по листам печати (или пог. м для рулонной). До резки обрабатываем целые листы.
+          const isPerSheetOp = priceUnitFromDb === 'per_sheet';
+          const perSheetUnits = isPerSheetOp
+            ? (isRollPrint ? metersNeeded : sheetsNeeded)
+            : 0;
+
           if (limits) {
             const minLimit = limits.min ?? 1;
             const maxLimit = limits.max;
-            if (quantity < minLimit || (maxLimit !== undefined && quantity > maxLimit)) {
+            const checkQty = isPerSheetOp ? perSheetUnits : quantity;
+            if (checkQty < minLimit || (maxLimit !== undefined && checkQty > maxLimit)) {
               const serviceName = serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`;
+              const unitLabel = isPerSheetOp ? (isRollPrint ? 'пог. м' : 'листов') : 'шт';
               const err: any = new Error(
                 maxLimit !== undefined
-                  ? `Тираж для операции "${serviceName}" должен быть от ${minLimit} до ${maxLimit}`
-                  : `Тираж для операции "${serviceName}" должен быть не меньше ${minLimit}`
+                  ? `Тираж для операции "${serviceName}" должен быть от ${minLimit} до ${maxLimit} ${unitLabel}`
+                  : `Тираж для операции "${serviceName}" должен быть не меньше ${minLimit} ${unitLabel}`
               );
               err.status = 400;
               throw err;
@@ -745,33 +759,35 @@ export class SimplifiedPricingService {
             continue;
           }
 
-          const tier = this.findTierForQuantity(tiers, quantity);
+          const priceUnit = priceUnitFromDb;
+          const unitsPerItem = finConfig.units_per_item ?? 1;
+          const tierQty = isPerSheetOp ? perSheetUnits : quantity;
+          const tier = this.findTierForQuantity(tiers, tierQty);
           if (!tier) {
             logger.warn('Не найден диапазон для услуги отделки', {
               productId,
               serviceId: finConfig.service_id,
-              quantity,
+              quantity: tierQty,
               tiers,
             });
             continue;
           }
 
           const priceForTier = this.getPriceForQuantityTier(tier);
-          const priceUnit = finConfig.price_unit ?? 'per_item';
-          const unitsPerItem = finConfig.units_per_item ?? 1;
-          
-          const operationType = serviceTypesMap.get(finConfig.service_id) || '';
-          // Операции «на изделие»: кол-во = тираж × units_per_item (1 фальцовка = 1 изделие, 2 сгиба = 2 на изделие)
-          const isPerProductOp = ['laminate', 'fold', 'score'].includes(operationType);
-          
+          const serviceMinQty = limits?.min ?? 0;
+          // Операции «на изделие»: fold/score — кол-во = тираж × units_per_item
+          // per_sheet: кол-во = листов печати (или пог. м), с учётом минимального тиража
+          const isPerProductOp = ['fold', 'score'].includes(operationType);
+
           let servicePrice = 0;
-          let totalUnits = quantity;
-          if (priceUnit === 'per_cut' || isPerProductOp) {
-            // per_cut или fold/score/laminate: units_per_item = кол-во операций на одно изделие
+          let totalUnits: number;
+          if (isPerSheetOp) {
+            totalUnits = Math.max(perSheetUnits, serviceMinQty);
+            servicePrice = priceForTier * totalUnits;
+          } else if (priceUnit === 'per_cut' || isPerProductOp) {
             totalUnits = quantity * unitsPerItem;
             servicePrice = priceForTier * totalUnits;
           } else {
-            // per_item (фикс на заказ): units_per_item = общее кол-во на весь заказ (напр. 1 файл)
             totalUnits = unitsPerItem;
             servicePrice = priceForTier * totalUnits;
           }
@@ -781,7 +797,10 @@ export class SimplifiedPricingService {
             productId,
             service_id: finConfig.service_id,
             operationType,
-            isPerProductOp,
+            isPerSheetOp,
+            perSheetUnits: isPerSheetOp ? perSheetUnits : undefined,
+            sheetsNeeded: isPerSheetOp && !isRollPrint ? sheetsNeeded : undefined,
+            metersNeeded: isPerSheetOp && isRollPrint ? metersNeeded : undefined,
             priceUnit,
             unitsPerItem,
             quantity,
@@ -917,6 +936,7 @@ export class SimplifiedPricingService {
       materialPricePerSheet,
       baseMaterialPricePerItem,
       serviceTiersMap: serviceTiersMap ?? new Map(),
+      serviceLimitsMap: serviceLimitsMap ?? new Map(),
       finishingConfig: finishingToUse,
       selectedSize,
       layoutCheck,
@@ -929,7 +949,10 @@ export class SimplifiedPricingService {
       cuttingPricePerCut,
       cutsPerSheet: layoutCheck.cutsPerSheet ?? 0,
       serviceTypesMap: serviceTypesMap ?? new Map(),
+      servicePriceUnitMap: servicePriceUnitMap ?? new Map(),
       currentQuantity: quantity,
+      isRollPrint,
+      metersPerItem,
     });
     
     // 8. Загружаем названия, плотность и тип бумаги материалов
@@ -1036,6 +1059,7 @@ export class SimplifiedPricingService {
     materialPricePerSheet: number;
     baseMaterialPricePerItem: number;
     serviceTiersMap: Map<string, SimplifiedQtyTier[]>;
+    serviceLimitsMap?: Map<number, { min?: number; max?: number }>;
     finishingConfig: Array<{ service_id: number; variant_id?: number; price_unit?: string; units_per_item?: number }>;
     selectedSize: SimplifiedSizeConfig;
     layoutCheck: any;
@@ -1048,8 +1072,11 @@ export class SimplifiedPricingService {
     cuttingPricePerCut: number;
     cutsPerSheet: number;
     serviceTypesMap: Map<number, string>;
+    servicePriceUnitMap?: Map<number, string>;
     /** Текущее количество — добавляем в boundaries, чтобы «Цена» для выбранного тиража совпадала с итогом */
     currentQuantity?: number;
+    isRollPrint?: boolean;
+    metersPerItem?: number;
   }): Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price: number }> {
     const boundaries = new Set<number>();
 
@@ -1121,18 +1148,28 @@ export class SimplifiedPricingService {
       }
 
       let finishingPrice = 0;
+      const sheetsForQ = ctx.usePagesMultiplier ? Math.max(1, q * ctx.sheetsPerItem) : Math.ceil(q / ctx.itemsPerSheet);
+      const metersForQ = ctx.isRollPrint && (ctx.metersPerItem ?? 0) > 0 ? (ctx.metersPerItem! * q) : 0;
       for (const finConfig of ctx.finishingConfig) {
         const mapKey = finConfig.variant_id ? `${finConfig.service_id}:${finConfig.variant_id}` : String(finConfig.service_id);
         const tiers = ctx.serviceTiersMap.get(mapKey);
         if (!tiers?.length) continue;
-        const tier = this.findTierForQuantity(tiers, q);
+        const operationType = ctx.serviceTypesMap.get(finConfig.service_id) || '';
+        const priceUnitFromDb = (ctx.servicePriceUnitMap?.get(finConfig.service_id) ?? finConfig.price_unit ?? 'per_item').toLowerCase();
+        const isPerSheetOp = priceUnitFromDb === 'per_sheet';
+        const perSheetUnits = isPerSheetOp ? (ctx.isRollPrint ? metersForQ : sheetsForQ) : 0;
+        const tierQty = isPerSheetOp ? perSheetUnits : q;
+        const tier = this.findTierForQuantity(tiers, tierQty);
         if (!tier) continue;
         const priceForTier = this.getPriceForQuantityTier(tier);
-        const priceUnit = finConfig.price_unit ?? 'per_item';
+        const priceUnit = priceUnitFromDb;
         const unitsPerItem = finConfig.units_per_item ?? 1;
-        const operationType = ctx.serviceTypesMap.get(finConfig.service_id) || '';
-        const isPerProductOp = ['laminate', 'fold', 'score'].includes(operationType);
-        if (priceUnit === 'per_cut' || isPerProductOp) {
+        const serviceMinQty = ctx.serviceLimitsMap?.get(finConfig.service_id)?.min ?? 0;
+        const isPerProductOp = ['fold', 'score'].includes(operationType);
+        if (isPerSheetOp) {
+          const totalUnits = Math.max(perSheetUnits, serviceMinQty);
+          finishingPrice += priceForTier * totalUnits;
+        } else if (priceUnit === 'per_cut' || isPerProductOp) {
           finishingPrice += priceForTier * (q * unitsPerItem);
         } else {
           finishingPrice += priceForTier * unitsPerItem;

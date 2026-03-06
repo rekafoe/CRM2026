@@ -581,7 +581,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             onOrderPatch={onOrderPatch}
           />
           
-          {operatorsToday.length > 0 && onAssigneesChange && (
+          {((operatorsToday.length > 0 || allUsers.length > 0) && onAssigneesChange) ? (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <div>
                 <label style={{ fontSize: 12, color: '#666' }}>Контактёр</label>
@@ -594,7 +594,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                   style={{ marginLeft: 8 }}
                 >
                   <option value="">—</option>
-                  {operatorsToday.map((u) => (
+                  {(operatorsToday.length > 0 ? operatorsToday : allUsers).map((u) => (
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>
@@ -610,13 +610,13 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                   style={{ marginLeft: 8 }}
                 >
                   <option value="">—</option>
-                  {operatorsToday.map((u) => (
+                  {(operatorsToday.length > 0 ? operatorsToday : allUsers).map((u) => (
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>
               </div>
             </div>
-          )}
+          ) : null}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
               <label style={{ fontSize: 12, color: '#666' }}>Дата</label>

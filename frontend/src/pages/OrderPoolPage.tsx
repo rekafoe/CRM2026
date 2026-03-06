@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useReducer, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order } from '../types';
-import { getOrders, getOrderPoolSync, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder, getOrderStatuses } from '../api';
+import { getOrders, getOrderPoolSync, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder, getOrderStatuses, getOperatorsToday, updateOrderItem } from '../api';
 import { parseNumberFlexible } from '../utils/numberInput';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { OrderHeader } from '../components/optimized/OrderHeader';
@@ -211,6 +211,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [showPrepaymentDetailsModal, setShowPrepaymentDetailsModal] = useState(false);
   const [issuingOrderId, setIssuingOrderId] = useState<number | null>(null);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
+  const [operatorsToday, setOperatorsToday] = useState<Array<{ id: number; name: string }>>([]);
   const [orderStatuses, setOrderStatuses] = useState<Array<{ id: number; name: string; color?: string; sort_order: number }>>([]);
   const [filters, dispatchFilters] = useReducer(filtersReducer, initialFilters);
   const orderIdsRef = useRef<Set<number>>(new Set());
@@ -316,6 +317,26 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     getUsers().then(res => setAllUsers(res.data)).catch(err => logger.error('Failed to load users', err));
     getOrderStatuses().then(res => setOrderStatuses(res.data ?? [])).catch(err => logger.error('Failed to load order statuses', err));
   }, [isInitialized, loadOrders, logger]);
+
+  const today = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+  useEffect(() => {
+    getOperatorsToday(today).then(res => setOperatorsToday(res.data ?? [])).catch(() => setOperatorsToday([]));
+  }, [today]);
+
+  const handleExecutorChange = useCallback(
+    async (orderId: number, itemId: number, executor_user_id: number | null) => {
+      try {
+        await updateOrderItem(orderId, itemId, { executor_user_id });
+        loadOrders();
+      } catch (err: any) {
+        toast.error('Ошибка', err?.message ?? 'Не удалось обновить исполнителя');
+      }
+    },
+    [loadOrders, toast]
+  );
 
 
   /** Опрос маркера «заказ с сайта»: при обращении к orderpool API с printcore.by бэкенд обновляет lastWebsiteOrderAt — принудительно обновляем список */
@@ -444,8 +465,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const handleAssignToMe = useCallback(
     async (orderNumber: string) => {
       const ord = orders.find((o) => o.number === orderNumber);
-      if (ord && Number(ord.status) !== 1) {
-        toast.error('Нельзя переназначить', 'Переназначить можно только заказ со статусом «Ожидает» (1).');
+      if (ord && Number(ord.status) !== 0 && Number(ord.status) !== 1) {
+        toast.error('Нельзя переназначить', 'Переназначить можно только заказ со статусом «Ожидает» (0 или 1).');
         return;
       }
       try {
@@ -471,8 +492,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const handleReassignTo = useCallback(
     async (orderNumber: string, userId: number) => {
       const ord = orders.find((o) => o.number === orderNumber);
-      if (ord && Number(ord.status) !== 1) {
-        toast.error('Нельзя переназначить', 'Переназначить можно только заказ со статусом «Ожидает» (1).');
+      if (ord && Number(ord.status) !== 0 && Number(ord.status) !== 1) {
+        toast.error('Нельзя переназначить', 'Переназначить можно только заказ со статусом «Ожидает» (0 или 1).');
         return;
       }
       try {
@@ -741,8 +762,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                     if (uid === selectedOrder.userId) return;
                     handleReassignTo(selectedOrder.number!, uid);
                   }}
-                  disabled={Number(selectedOrder.status) !== 1}
-                  title={Number(selectedOrder.status) !== 1 ? 'Переназначить можно только при статусе «Ожидает» (1)' : undefined}
+                  disabled={Number(selectedOrder.status) !== 0 && Number(selectedOrder.status) !== 1}
+                  title={(Number(selectedOrder.status) !== 0 && Number(selectedOrder.status) !== 1) ? 'Переназначить можно только при статусе «Ожидает» (0 или 1)' : undefined}
                 >
                   <option value="">— Не назначен</option>
                   {allUsers.map((u) => (
@@ -750,7 +771,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   ))}
                 </select>
               </label>
-              {Number(selectedOrder.status) === 1 && selectedOrder.userId !== currentUserId && (
+              {(Number(selectedOrder.status) === 0 || Number(selectedOrder.status) === 1) && selectedOrder.userId !== currentUserId && (
                 <button
                   type="button"
                   className="btn-assign-responsible"
@@ -819,7 +840,13 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                 hasItems={(selectedOrder.items?.length ?? 0) > 0}
               />
             )}
-            <OrderContent order={selectedOrder} onLoadOrders={loadOrders} readOnly />
+            <OrderContent
+              order={selectedOrder}
+              onLoadOrders={loadOrders}
+              readOnly
+              operatorsToday={operatorsToday.length > 0 ? operatorsToday : allUsers}
+              onExecutorChange={handleExecutorChange}
+            />
             <OrderTotal
               items={selectedItems.map(item => ({
                 id: item.id,

@@ -464,8 +464,8 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
   }
 
   const status = Number(order.status);
-  if (status !== 1) {
-    res.status(400).json({ message: 'Переназначить заказ можно только при статусе «Ожидает» (1)' });
+  if (status !== 0 && status !== 1) {
+    res.status(400).json({ message: 'Переназначить заказ можно только при статусе «Ожидает» (0 или 1)' });
     return;
   }
 
