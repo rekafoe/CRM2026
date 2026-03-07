@@ -235,7 +235,45 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
     }))
   }
 
-  res.json({ date: d, orders })
+  let issuedOrdersTotal = 0
+  let issuedByOperators: Array<{ user_id: number; user_name: string; amount: number }> = []
+  if (hasDebtClosed) {
+    try {
+      const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id')
+      const row = await db.get<{ s: number }>(
+        'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ?',
+        d
+      )
+      issuedOrdersTotal = Number(row?.s ?? 0)
+      if (hasIssuedBy) {
+        const rows = await db.all<{ user_id: number; user_name: string; amount: number }>(
+          `SELECT d.issued_by_user_id as user_id, COALESCE(u.name, u.email, 'Без оператора') as user_name, SUM(d.amount) as amount
+           FROM debt_closed_events d
+           LEFT JOIN users u ON u.id = d.issued_by_user_id
+           WHERE d.closed_date = ? AND d.issued_by_user_id IS NOT NULL
+           GROUP BY d.issued_by_user_id
+           ORDER BY amount DESC`,
+          d
+        )
+        issuedByOperators = rows.map((r) => ({
+          user_id: Number(r.user_id),
+          user_name: r.user_name || `ID ${r.user_id}`,
+          amount: Number(r.amount ?? 0)
+        }))
+        // События без issued_by_user_id (старые записи)
+        const nullRow = await db.get<{ s: number }>(
+          'SELECT COALESCE(SUM(amount), 0) AS s FROM debt_closed_events WHERE closed_date = ? AND issued_by_user_id IS NULL',
+          d
+        )
+        const nullAmount = Number(nullRow?.s ?? 0)
+        if (nullAmount > 0) {
+          issuedByOperators.push({ user_id: 0, user_name: 'Без оператора', amount: nullAmount })
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  res.json({ date: d, orders, issued_orders_total: issuedOrdersTotal, issued_by_operators: issuedByOperators })
 }))
 
 // GET /api/reports/daily-cash-by-month — касса по дням за месяц (month=YYYY-MM)

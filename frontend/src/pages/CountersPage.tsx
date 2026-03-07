@@ -26,6 +26,10 @@ interface CashData {
   difference: number;
   dailyRevenue?: number;
   previousActual?: number | null;
+  /** Общая сумма выданных заказов за день (debt_closed_events) */
+  issuedOrdersTotal?: number;
+  /** Выдано по операторам: user_id, user_name, amount */
+  issuedByOperators?: Array<{ user_id: number; user_name: string; amount: number }>;
 }
 
 interface CashContribution {
@@ -173,6 +177,10 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
       const ordersForDate = Array.isArray(ordersResponse.data?.orders)
         ? ordersResponse.data.orders
         : [];
+      const issuedOrdersTotal = Number(ordersResponse.data?.issued_orders_total ?? 0);
+      const issuedByOperators = Array.isArray(ordersResponse.data?.issued_by_operators)
+        ? ordersResponse.data.issued_by_operators
+        : [];
       const contributionsByUser = new Map<number, number>();
       // В кассу учитываем только заказы с payment_channel === 'cash' (касса)
       // Счёт (invoice) и не пробивавшиеся (not_cashed) — не в кассу
@@ -257,7 +265,9 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         calculated: calculatedCash,
         difference,
         dailyRevenue,
-        previousActual: previousActualCash
+        previousActual: previousActualCash,
+        issuedOrdersTotal,
+        issuedByOperators
       });
 
     } catch (error: any) {
@@ -267,7 +277,9 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         calculated: 0,
         difference: 0,
         dailyRevenue: 0,
-        previousActual: null
+        previousActual: null,
+        issuedOrdersTotal: 0,
+        issuedByOperators: []
       });
       setCashContributions([]);
       setCashContributionsTotal(0);
@@ -516,6 +528,25 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
               <div className="cash-label">Выручка за день (CRM):</div>
               <div className="cash-value">{(cashData.dailyRevenue ?? 0).toFixed(2)} BYN</div>
             </div>
+
+            <div className="cash-row">
+              <div className="cash-label">Выдано за день (общая сумма):</div>
+              <div className="cash-value">{(cashData.issuedOrdersTotal ?? 0).toFixed(2)} BYN</div>
+            </div>
+
+            {(cashData.issuedByOperators?.length ?? 0) > 0 && (
+              <div className="cash-contributions">
+                <div className="cash-contributions-header">Выдано по операторам:</div>
+                <div className="cash-contributions-list">
+                  {cashData.issuedByOperators!.map((op, idx) => (
+                    <div key={`${op.user_id}-${op.user_name}-${idx}`} className="cash-contribution-row">
+                      <span className="cash-contribution-user">{op.user_name}</span>
+                      <span className="cash-contribution-amount">{op.amount.toFixed(2)} BYN</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="cash-row">
               <div className="cash-label">Расчётный счётчик (CRM):</div>
