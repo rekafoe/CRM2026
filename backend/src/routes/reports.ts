@@ -246,7 +246,7 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
       )
       issuedOrdersTotal = Number(row?.s ?? 0)
       if (hasIssuedBy) {
-        const rows = await db.all<{ user_id: number; user_name: string; amount: number }>(
+        const rows = (await db.all(
           `SELECT d.issued_by_user_id as user_id, COALESCE(u.name, u.email, 'Без оператора') as user_name, SUM(d.amount) as amount
            FROM debt_closed_events d
            LEFT JOIN users u ON u.id = d.issued_by_user_id
@@ -254,7 +254,7 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
            GROUP BY d.issued_by_user_id
            ORDER BY amount DESC`,
           d
-        )
+        )) as Array<{ user_id: number; user_name: string; amount: number }>
         issuedByOperators = rows.map((r) => ({
           user_id: Number(r.user_id),
           user_name: r.user_name || `ID ${r.user_id}`,
