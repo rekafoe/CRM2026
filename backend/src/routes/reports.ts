@@ -196,6 +196,15 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
   } catch { /* ignore */ }
   const paymentChannelSelect = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel";
   const notesSelect = hasNotes ? 'o.notes' : 'NULL as notes';
+  // Заказы за дату: созданные/обновлённые в этот день ИЛИ выданные в этот день (debt_closed_events.closed_date).
+  // Выданные заказы должны попадать в счётчики принтеров по дате выдачи.
+  let hasDebtClosed = false
+  try {
+    hasDebtClosed = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
+  } catch { /* ignore */ }
+  const issuedFilter = hasDebtClosed
+    ? `OR EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ?)`
+    : ''
   const orders = await db.all<any>(
     `SELECT o.id, o.number, o.status,
             COALESCE(o.created_at, o.createdAt) as created_at,
@@ -205,9 +214,9 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
             ${paymentChannelSelect},
             ${notesSelect}
        FROM orders o
-      WHERE substr(${dateExpr},1,10) = ?
+      WHERE substr(${dateExpr},1,10) = ? ${issuedFilter}
       ORDER BY o.id DESC`,
-    d
+    hasDebtClosed ? [d, d] : [d]
   )
 
   let hasExecutorUserId = false

@@ -582,23 +582,30 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   const prepay = Number(order.prepaymentAmount ?? 0)
   const remainder = Math.round((total - prepay) * 100) / 100
 
-  let hasPrepaymentUpdatedAt = false
-  try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt') } catch { /* ignore */ }
-
-  const paymentId = `ISSUE-${Date.now()}-${id}`
-  // datetime('now','localtime') — чтобы заказ попадал в «Выданные заказы» за текущий день (SQLite datetime('now') = UTC).
-  const updateSql = hasPrepaymentUpdatedAt
-    ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = datetime(\'now\',\'localtime\'), updated_at = datetime(\'now\',\'localtime\'), status = 7 WHERE id = ?'
-    : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = datetime(\'now\',\'localtime\'), status = 7 WHERE id = ?'
-  await db.run(updateSql, total, paymentId, id)
-
-  // Всегда пишем debt_closed_events при выдаче (в т.ч. remainder=0), чтобы выдавший видел заказ во вкладке «Выданные заказы».
   // Дата выдачи: из body.issued_on (дата, выбранная пользователем) или date('now','localtime').
   const bodyDate = (req.body as any)?.issued_on
   const isValidBodyDate = bodyDate && /^\d{4}-\d{2}-\d{2}$/.test(String(bodyDate).slice(0, 10))
   const today = isValidBodyDate
     ? String(bodyDate).slice(0, 10)
     : ((await db.get<{ d: string }>("SELECT date('now','localtime') as d"))?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
+
+  let hasPrepaymentUpdatedAt = false
+  try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt') } catch { /* ignore */ }
+  const paymentId = `ISSUE-${Date.now()}-${id}`
+  // prepaymentUpdatedAt = дата выдачи (today), чтобы заказ попадал в отчёты и счётчики принтеров по этой дате
+  const issueDateTime = `${today} 12:00:00`
+  if (hasPrepaymentUpdatedAt) {
+    await db.run(
+      'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', prepaymentUpdatedAt = ?, updated_at = ?, status = 7 WHERE id = ?',
+      total, paymentId, issueDateTime, issueDateTime, id
+    )
+  } else {
+    await db.run(
+      'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = \'paid\', paymentUrl = NULL, paymentId = ?, paymentMethod = \'offline\', updated_at = ?, status = 7 WHERE id = ?',
+      total, paymentId, issueDateTime, id
+    )
+  }
+
   try {
     let hasIssuedBy = false
     try { hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id') } catch { /* ignore */ }
