@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { hasColumn, invalidateTableSchemaCache } from '../utils/tableSchemaCache'
 import { ServiceManagementService } from '../modules/pricing/services/serviceManagementService'
+import { PriceTypeService } from '../modules/pricing/services/priceTypeService'
 import { PricingServiceRepository } from '../modules/pricing/repositories/serviceRepository'
 
 console.log('Loading pricing routes...')
@@ -543,6 +544,48 @@ router.put('/service-categories/:id', asyncHandler(async (req, res) => {
 }))
 router.delete('/service-categories/:id', asyncHandler(async (req, res) => {
   await ServiceManagementService.deleteServiceCategory(Number(req.params.id))
+  res.json({ success: true })
+}))
+
+// --- Типы цен (price types) — управление скидками/наценками ---
+router.get('/price-types', asyncHandler(async (req, res) => {
+  const activeOnly = req.query.active === '1' || req.query.active === 'true'
+  const list = await PriceTypeService.list(activeOnly)
+  res.json(list)
+}))
+router.get('/price-types/:id', asyncHandler(async (req, res) => {
+  const pt = await PriceTypeService.getById(Number(req.params.id))
+  if (!pt) { res.status(404).json({ error: 'Price type not found' }); return }
+  res.json(pt)
+}))
+router.post('/price-types', asyncHandler(async (req, res) => {
+  const { key, name, multiplier, production_days, productionDays, description, sort_order, sortOrder } = req.body
+  const created = await PriceTypeService.create({
+    key: String(key ?? '').trim(),
+    name: String(name ?? '').trim(),
+    multiplier: Number(multiplier ?? 1),
+    productionDays: Number(production_days ?? productionDays ?? 3),
+    description: description != null ? String(description) : undefined,
+    sortOrder: Number(sort_order ?? sortOrder ?? 0),
+  })
+  res.status(201).json(created)
+}))
+router.put('/price-types/:id', asyncHandler(async (req, res) => {
+  const id = Number(req.params.id)
+  const { name, multiplier, production_days, productionDays, description, sort_order, sortOrder, is_active, isActive } = req.body
+  const updated = await PriceTypeService.update(id, {
+    name: name != null ? String(name).trim() : undefined,
+    multiplier: multiplier !== undefined ? Number(multiplier) : undefined,
+    productionDays: production_days !== undefined ? Number(production_days) : productionDays !== undefined ? Number(productionDays) : undefined,
+    description: description !== undefined ? (description ? String(description).trim() : null) : undefined,
+    sortOrder: sort_order !== undefined ? Number(sort_order) : sortOrder !== undefined ? Number(sortOrder) : undefined,
+    isActive: is_active !== undefined ? !!is_active : isActive !== undefined ? !!isActive : undefined,
+  })
+  if (!updated) { res.status(404).json({ error: 'Price type not found' }); return }
+  res.json(updated)
+}))
+router.delete('/price-types/:id', asyncHandler(async (req, res) => {
+  await PriceTypeService.delete(Number(req.params.id))
   res.json({ success: true })
 }))
 

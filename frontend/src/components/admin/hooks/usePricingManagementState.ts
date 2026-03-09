@@ -68,7 +68,7 @@ export interface PricingManagementState {
   loading: boolean
   error: string | null
   successMessage: string | null
-  activeTab: 'tech' | 'printers' | 'print' | 'services' | 'markup' | 'discounts'
+  activeTab: 'tech' | 'printers' | 'print' | 'services' | 'markup' | 'discounts' | 'price-types'
   editingItem: EditingItem
   editingValues: EditingValues
   searchTerm: string
@@ -161,7 +161,7 @@ export const usePricingManagementState = (initialTab: PricingManagementState['ac
     dispatch({ type: 'SET_SUCCESS', payload: message })
   }, [])
 
-  const setActiveTab = useCallback((tab: 'tech' | 'printers' | 'print' | 'services' | 'markup' | 'discounts') => {
+  const setActiveTab = useCallback((tab: 'tech' | 'printers' | 'print' | 'services' | 'markup' | 'discounts' | 'price-types') => {
     dispatch({ type: 'SET_ACTIVE_TAB', payload: tab })
   }, [])
 

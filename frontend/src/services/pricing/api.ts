@@ -1,6 +1,7 @@
 import { api } from '../../api/client';
 import {
   PricingService,
+  PriceType,
   ServiceCategory,
   ServiceVolumeTier,
   ServiceVolumeTierPayload,
@@ -109,6 +110,44 @@ export async function updatePricingService(id: number, payload: UpdatePricingSer
 
 export async function deletePricingService(id: number): Promise<void> {
   await api.delete(`/pricing/services/${id}`);
+}
+
+// --- Типы цен (price types) ---
+export async function getPriceTypes(activeOnly = false): Promise<PriceType[]> {
+  const response = await api.get('/pricing/price-types', { params: activeOnly ? { active: '1' } : {} });
+  const payload: any = (response.data as any)?.data ?? response.data ?? [];
+  return Array.isArray(payload) ? payload : [];
+}
+
+export async function createPriceType(payload: { key: string; name: string; multiplier: number; productionDays?: number; description?: string; sortOrder?: number }): Promise<PriceType> {
+  const response = await api.post('/pricing/price-types', {
+    key: payload.key.trim(),
+    name: payload.name.trim(),
+    multiplier: Number(payload.multiplier ?? 1),
+    production_days: payload.productionDays ?? 3,
+    description: payload.description ?? null,
+    sort_order: payload.sortOrder ?? 0,
+  });
+  return (response.data as any)?.data ?? response.data;
+}
+
+export async function updatePriceType(id: number, data: { name?: string; multiplier?: number; productionDays?: number; description?: string | null; sortOrder?: number; isActive?: boolean }): Promise<PriceType> {
+  const response = await api.put(`/pricing/price-types/${id}`, {
+    name: data.name?.trim(),
+    multiplier: data.multiplier,
+    production_days: data.productionDays,
+    productionDays: data.productionDays,
+    description: data.description,
+    sort_order: data.sortOrder,
+    sortOrder: data.sortOrder,
+    is_active: data.isActive,
+    isActive: data.isActive,
+  });
+  return (response.data as any)?.data ?? response.data;
+}
+
+export async function deletePriceType(id: number): Promise<void> {
+  await api.delete(`/pricing/price-types/${id}`);
 }
 
 // --- Категории послепечатных услуг ---

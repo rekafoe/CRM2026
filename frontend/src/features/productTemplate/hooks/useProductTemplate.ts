@@ -178,6 +178,7 @@ export interface TemplateState {
     overrides: {
       includeIds: number[] // Старое поле для обратной совместимости
       allowedPaperTypes: string[] // Новое поле для типов бумаги из склада
+      allowedPriceTypes: string[] // Разрешённые типы цен (standard, online и др.)
     }
   }
   finishing: Array<{ name: string }>
@@ -255,7 +256,7 @@ export function useProductTemplateInitial(): TemplateState {
     print_sheet: { preset: '', width: '', height: '' },
     constraints: {
       materials: { allowedCategoriesCsv: '', densityMin: '', densityMax: '', finishesCsv: '', onlyPaper: true },
-      overrides: { includeIds: [], allowedPaperTypes: [] }
+      overrides: { includeIds: [], allowedPaperTypes: [], allowedPriceTypes: ['standard', 'online'] }
     },
     finishing: [],
     packaging: [],

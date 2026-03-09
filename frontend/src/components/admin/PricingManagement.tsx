@@ -23,6 +23,7 @@ const PrintPricesTab = lazy(() => import('./pricing/tabs/PrintPricesTab').then(m
 const ServicesTab = lazy(() => import('./pricing/tabs/ServicesTab').then(m => ({ default: m.ServicesTab })));
 const MarkupTab = lazy(() => import('./pricing/tabs/MarkupTab').then(m => ({ default: m.MarkupTab })));
 const DiscountsTab = lazy(() => import('./pricing/tabs/DiscountsTab').then(m => ({ default: m.DiscountsTab })));
+const PriceTypesTab = lazy(() => import('./pricing/tabs/PriceTypesTab').then(m => ({ default: m.PriceTypesTab })));
 
 type PricingMode = 'per_sheet' | 'per_meter';
 
@@ -60,7 +61,7 @@ interface PrinterRow {
 }
 
 interface PricingManagementProps {
-  initialTab?: 'tech' | 'printers' | 'print' | 'services' | 'markup' | 'discounts';
+  initialTab?: 'tech' | 'printers' | 'print' | 'services' | 'markup' | 'discounts' | 'price-types';
   mode?: 'full' | 'printing';
 }
 
@@ -471,6 +472,12 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
         >
           🎯 Скидки за объем печати
         </button>
+        <button 
+          className={`tab ${activeTab === 'price-types' ? 'active' : ''}`}
+          onClick={() => setActiveTab('price-types')}
+        >
+          💰 Типы цен
+        </button>
           </>
         )}
       </div>
@@ -559,6 +566,16 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
                 onAddNew={handleAddQuantityDiscount}
                 getEditingValue={getEditingValue}
                 updateEditingValue={updateEditingValue}
+              />
+            )}
+            {mode === 'full' && activeTab === 'price-types' && (
+              <PriceTypesTab
+                searchTerm={debouncedSearchTerm}
+                onError={setError}
+                onSuccess={(msg) => {
+                  setSuccessMessage(msg);
+                  setTimeout(() => setSuccessMessage(null), 2000);
+                }}
               />
             )}
           </Suspense>

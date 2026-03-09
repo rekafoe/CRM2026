@@ -13,6 +13,7 @@ import {
   saveOrderBlankTemplate,
   type Organization,
 } from '../../api';
+import { ReceiptTemplateEditor } from '../../components/admin/ReceiptTemplateEditor';
 import './OrganizationsPage.css';
 
 const RECEIPT_PLACEHOLDERS = [
@@ -203,25 +204,17 @@ export const OrganizationsPage: React.FC = () => {
           )}
         </div>
 
-        <Modal isOpen={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title={templateType === 'receipt' ? `Товарный чек: ${templateOrg?.name || ''}` : `Бланк заказа: ${templateOrg?.name || ''}`}>
-          <div className="receipt-template-editor">
-            <p className="template-help">
-              Плейсхолдеры: {(templateType === 'receipt' ? RECEIPT_PLACEHOLDERS : ORDER_BLANK_PLACEHOLDERS).join(', ')}
-            </p>
-            <textarea
-              value={templateContent}
-              onChange={(e) => setTemplateContent(e.target.value)}
-              rows={20}
-              className="template-textarea"
-              spellCheck={false}
-            />
-            <div className="template-actions">
-              <Button onClick={handleSaveTemplate} disabled={templateSaving}>
-                {templateSaving ? 'Сохранение...' : 'Сохранить шаблон'}
-              </Button>
-              <Button variant="secondary" onClick={() => setTemplateModalOpen(false)}>Закрыть</Button>
-            </div>
-          </div>
+        <Modal isOpen={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title={templateType === 'receipt' ? `Товарный чек: ${templateOrg?.name || ''}` : `Бланк заказа: ${templateOrg?.name || ''}`} size="xl">
+          <ReceiptTemplateEditor
+            htmlContent={templateContent}
+            onChange={setTemplateContent}
+            placeholders={templateType === 'receipt' ? RECEIPT_PLACEHOLDERS : ORDER_BLANK_PLACEHOLDERS}
+            templateType={templateType}
+            organizationData={templateOrg}
+            onSave={handleSaveTemplate}
+            saving={templateSaving}
+            onClose={() => setTemplateModalOpen(false)}
+          />
         </Modal>
       </div>
     </AdminPageLayout>

@@ -1,0 +1,21 @@
+.allowed-price-types-section .apt-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-bottom: 12px;
+}
+
+.allowed-price-types-section .apt-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.allowed-price-types-section .apt-item input {
+  cursor: pointer;
+}
+
+.allowed-price-types-section .apt-label {
+  font-size: 0.95em;
+}

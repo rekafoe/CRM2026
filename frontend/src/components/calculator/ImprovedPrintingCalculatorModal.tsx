@@ -32,6 +32,7 @@ import { usePostprintServices } from './hooks/usePostprintServices';
 import { useCustomProduct } from './hooks/useCustomProduct';
 import { useProductSelection } from './hooks/useProductSelection';
 import { getPriceTypeMultiplier, buildOrderPayload, buildAITrainingData } from './utils/orderPayloadBuilder';
+import { usePriceTypeMultipliers } from '../../hooks/pricing/usePriceTypeMultipliers';
 
 const createInitialSpecs = (initialProductType?: string): ProductSpecs => ({
   productType: initialProductType || 'flyers',
@@ -75,6 +76,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 }) => {
   const logger = useLogger('ImprovedPrintingCalculatorModal');
   const toast = useToastNotifications();
+  const priceTypeMultipliers = usePriceTypeMultipliers();
   const fetchProducts = useProductDirectoryStore((state) => state.fetchProducts);
   const getProductById = useProductDirectoryStore((state) => state.getProductById);
   const isEditMode = Boolean(editContext);
@@ -833,6 +835,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       customFormat,
       printTechnology,
       printColorMode,
+      priceTypeMultipliers,
       trainAIOnOrder,
       isEditMode,
       editContext,
@@ -967,8 +970,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
               result
                 ? {
                     ...result,
-                    pricePerItem: Math.round(result.pricePerItem * getPriceTypeMultiplier(specs.priceType || 'standard') * 100) / 100,
-                    totalCost: Math.round(result.totalCost * getPriceTypeMultiplier(specs.priceType || 'standard') * 100) / 100,
+                    pricePerItem: Math.round(result.pricePerItem * getPriceTypeMultiplier(specs.priceType || 'standard', priceTypeMultipliers) * 100) / 100,
+                    totalCost: Math.round(result.totalCost * getPriceTypeMultiplier(specs.priceType || 'standard', priceTypeMultipliers) * 100) / 100,
                   }
                 : null
             }

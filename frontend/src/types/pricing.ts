@@ -1,5 +1,19 @@
 export type PricingServiceType = 'print' | 'postprint' | 'other' | 'generic' | string;
 
+export interface PriceType {
+  id: number;
+  key: string;
+  name: string;
+  multiplier: number;
+  productionDays: number;
+  description?: string | null;
+  sortOrder: number;
+  isSystem: boolean;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface ServiceCategory {
   id: number;
   name: string;

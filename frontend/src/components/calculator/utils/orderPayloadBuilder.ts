@@ -1,15 +1,16 @@
 import { CalculationResult } from '../types/calculator.types';
 
-const PRICE_TYPE_MULTIPLIERS: Record<string, number> = {
+const DEFAULT_PRICE_TYPE_MULTIPLIERS: Record<string, number> = {
   standard: 1,
   urgent: 1.5,
-  online: 0.85,
+  online: 0.825,
   promo: 0.7,
   special: 0.55,
 };
 
-export function getPriceTypeMultiplier(priceType: string): number {
-  return PRICE_TYPE_MULTIPLIERS[priceType] ?? 1;
+export function getPriceTypeMultiplier(priceType: string, multiplierMap?: Record<string, number> | null): number {
+  const map = multiplierMap ?? DEFAULT_PRICE_TYPE_MULTIPLIERS;
+  return map[priceType] ?? 1;
 }
 
 interface BuildOrderPayloadParams {
@@ -20,6 +21,8 @@ interface BuildOrderPayloadParams {
   customFormat: { width: string; height: string };
   printTechnology: string;
   printColorMode: 'bw' | 'color' | null;
+  /** Множители типов цен из API (key -> multiplier). Если не передан — используются дефолтные. */
+  priceTypeMultipliers?: Record<string, number> | null;
 }
 
 export function buildOrderPayload({
@@ -30,6 +33,7 @@ export function buildOrderPayload({
   customFormat,
   printTechnology,
   printColorMode,
+  priceTypeMultipliers,
 }: BuildOrderPayloadParams) {
   const layoutSheets = result.layout?.sheetsNeeded ?? undefined;
   const itemsPerSheet = result.layout?.itemsPerSheet ?? undefined;
@@ -112,7 +116,7 @@ export function buildOrderPayload({
       }))
     : [];
 
-  const priceTypeMult = getPriceTypeMultiplier(result.specifications.priceType || 'standard');
+  const priceTypeMult = getPriceTypeMultiplier(result.specifications.priceType || 'standard', priceTypeMultipliers);
   const effectivePricePerItem = Math.round(result.pricePerItem * priceTypeMult * 100) / 100;
 
   const paramsPayload = {

@@ -11,6 +11,7 @@ import MaterialsSection from './components/MaterialsSection';
 import OperationsSection from './components/OperationsSection/OperationsSection';
 import PrintSheetSection from './components/PrintSheetSection';
 import AllowedMaterialsSection from './components/AllowedMaterialsSection';
+import { AllowedPriceTypesSection } from './components/AllowedPriceTypesSection';
 import ParametersSection from './components/ParametersSection';
 import MetaSection from './components/MetaSection';
 import { ProductSetupStatus } from '../../components/admin/ProductSetupStatus';
@@ -548,6 +549,13 @@ const ProductTemplatePage: React.FC = () => {
                           saving={saving}
                           onChange={(paperTypes) => dispatch({ type: 'setOverrides', patch: { allowedPaperTypes: paperTypes } })}
                           onSave={() => void persistTemplateConfig('Разрешённые типы бумаги сохранены')}
+                        />
+                        <h4 className="materials-column__title" style={{ marginTop: '24px' }}>Разрешенные типы цен</h4>
+                        <AllowedPriceTypesSection
+                          selectedKeys={state.constraints.overrides.allowedPriceTypes ?? ['standard', 'online']}
+                          saving={saving}
+                          onChange={(keys) => dispatch({ type: 'setOverrides', patch: { allowedPriceTypes: keys } })}
+                          onSave={() => void persistTemplateConfig('Разрешённые типы цен сохранены')}
                         />
                       </div>
                       <div className="materials-column">

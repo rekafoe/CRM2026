@@ -10,14 +10,7 @@ import { OrderRepository } from '../../../repositories/orderRepository'
 import { itemRowSelect, mapItemRowToItem } from '../../../models/mappers/itemMapper'
 import { EarningsService } from '../../../services/earningsService'
 import { mapPhotoOrderToOrder, mapPhotoOrderToVirtualItem } from '../../../models/mappers/telegramPhotoOrderMapper'
-
-/** Коэффициенты типов цен для заказов с сайта (от базовой цены продукта). */
-const WEBSITE_PRICE_TYPE_MULTIPLIERS: Record<string, number> = {
-  urgent: 1.5,      // срочно: +50%
-  online: 0.85,     // онлайн: -15%
-  promo: 0.7,       // промо: -30%
-  special: 0.55,    // спец.предложение: -45%
-}
+import { PriceTypeService } from '../../pricing/services/priceTypeService'
 
 export class OrderService {
   private static normalizeReasonCode(reason: string): string {
@@ -412,11 +405,11 @@ export class OrderService {
         const priceType = (item as any).priceType ?? (item as any).price_type ?? paramsObj.priceType ?? paramsObj.price_type
         if (isWebsite && priceType && typeof priceType === 'string') {
           const key = priceType.toLowerCase().trim()
-          const mult = WEBSITE_PRICE_TYPE_MULTIPLIERS[key]
-          if (mult != null) {
+          const mult = await PriceTypeService.getMultiplier(key)
+          if (mult !== 1) {
             finalPrice = Math.round(finalPrice * mult * 100) / 100
-            paramsObj.priceType = key
           }
+          paramsObj.priceType = key
         }
         await db.run(
           'INSERT INTO items (orderId, type, params, price, quantity) VALUES (?, ?, ?, ?, ?)',

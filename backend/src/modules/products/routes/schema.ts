@@ -424,6 +424,11 @@ router.get('/:productId/schema', async (req, res) => {
         allowed_print_technologies: Array.isArray(productPrintSettings?.allowedTechnologies) ? productPrintSettings.allowedTechnologies : null,
         allowed_color_modes: Array.isArray(productPrintSettings?.allowedColorModes) ? productPrintSettings.allowedColorModes : null,
         allowed_sides: Array.isArray(productPrintSettings?.allowedSides) ? productPrintSettings.allowedSides : null,
+        allowed_price_types: Array.isArray(templateConstraints?.allowed_price_types)
+          ? templateConstraints.allowed_price_types
+          : Array.isArray(templateConstraints?.overrides?.allowed_price_types)
+            ? templateConstraints.overrides.allowed_price_types
+            : ['standard', 'online'],
       },
     };
 
@@ -483,6 +488,7 @@ router.get('/:productId/schema', async (req, res) => {
           print_run: schema.template.print_run,
           simplified: compactSimplified,
         },
+        constraints: schema.constraints,
         operations: productOperations || [],
         ...(compactMaterials.length > 0 ? { materials: compactMaterials } : {}),
         ...(Object.keys(serviceVariants).length > 0 ? { service_variants: serviceVariants } : {}),

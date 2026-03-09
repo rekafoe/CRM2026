@@ -1,5 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getProductionDaysByPriceType, getProductionTimeLabelFromDays } from '../utils/time';
+import { getPriceTypes } from '../../services/pricing';
+import type { PriceType } from '../../types/pricing';
+
+const formatMultiplier = (m: number) => {
+  if (m >= 1) return `×${m} (+${((m - 1) * 100).toFixed(0)}%)`;
+  return `×${m} (−${((1 - m) * 100).toFixed(1)}%)`;
+};
 
 interface Props {
   specs: { priceType: string; customerType: string; pages?: number; productionDays?: number } & Record<string, any>;
@@ -8,6 +15,43 @@ interface Props {
 }
 
 export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, backendProductSchema }) => {
+  const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
+
+  const allowedKeys = useMemo(() => {
+    const arr = backendProductSchema?.constraints?.allowed_price_types;
+    return Array.isArray(arr) && arr.length > 0 ? arr : ['standard', 'online'];
+  }, [backendProductSchema?.constraints?.allowed_price_types]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPriceTypes(true)
+      .then((list) => { if (!cancelled) setPriceTypes(list); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const priceTypeOptions = useMemo(() => {
+    const byKey = new Map(priceTypes.map((pt) => [pt.key, pt]));
+    return allowedKeys
+      .map((key) => {
+        const pt = byKey.get(key);
+        return pt ? { key: pt.key, label: `${pt.name} (${formatMultiplier(pt.multiplier)})` } : { key, label: key };
+      })
+      .filter((o) => o);
+  }, [priceTypes, allowedKeys]);
+
+  const currentPriceType = specs.priceType || 'standard';
+  const isValidPriceType = allowedKeys.includes(currentPriceType);
+  const effectivePriceType = isValidPriceType ? currentPriceType : allowedKeys[0] ?? 'standard';
+  const prevEffectiveRef = useRef(effectivePriceType);
+
+  useEffect(() => {
+    if (!isValidPriceType && currentPriceType !== effectivePriceType && prevEffectiveRef.current !== effectivePriceType) {
+      prevEffectiveRef.current = effectivePriceType;
+      updateSpecs({ priceType: effectivePriceType }, true);
+    }
+  }, [isValidPriceType, currentPriceType, effectivePriceType, updateSpecs]);
+
   return (
     <div className="form-section advanced-settings compact">
       <h3>🔧 Настройки</h3>
@@ -15,15 +59,13 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
         <div className="param-group param-group--narrow">
           <label>Тип цены</label>
           <select
-            value={specs.priceType || 'standard'}
+            value={effectivePriceType}
             onChange={(e) => updateSpecs({ priceType: e.target.value }, true)}
             className="form-control"
           >
-            <option value="standard">Стандартная (×1)</option>
-            <option value="urgent">Срочно (+50%)</option>
-            <option value="online">Онлайн (−15%)</option>
-            <option value="promo">Промо (−30%)</option>
-            <option value="special">Спец.предложение (−45%)</option>
+            {priceTypeOptions.map((opt) => (
+              <option key={opt.key} value={opt.key}>{opt.label}</option>
+            ))}
           </select>
         </div>
 
