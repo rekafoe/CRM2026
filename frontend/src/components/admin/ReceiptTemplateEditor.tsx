@@ -137,51 +137,107 @@ const DEFAULT_ORDER_BLANK_TEMPLATE = `<!DOCTYPE html>
   <meta charset="UTF-8">
   <title>Бланк заказа {{orderNumber}}</title>
   <style>
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #333; margin: 16px; line-height: 1.35; }
-    .header { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #333; }
-    .company { font-weight: bold; font-size: 13px; margin-bottom: 4px; }
-    .contact { font-size: 10px; color: #555; margin-bottom: 2px; }
-    .order-info { display: flex; gap: 24px; margin: 12px 0; padding: 8px; background: #f5f5f5; border-radius: 4px; }
-    .order-info div { flex: 1; }
-    .order-info label { font-size: 9px; color: #555; display: block; }
-    .order-info span { font-weight: bold; }
-    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-    th, td { border: 1px solid #333; padding: 4px 6px; text-align: left; }
-    th { background: #eee; font-weight: bold; }
-    .totals { margin-top: 12px; }
-    .totals div { margin: 4px 0; }
-    .executed { margin-top: 16px; }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 10px; color: #333; padding: 10px; line-height: 1.3; }
+    .tear-off-section { border-bottom: 2px dashed #666; padding-bottom: 15px; margin-bottom: 15px; }
+    .section-header { display: flex; justify-content: space-between; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #999; }
+    .logo-area { width: 150px; min-height: 50px; display: flex; align-items: center; }
+    .logo-area img { max-width: 150px; max-height: 60px; object-fit: contain; }
+    .contact-block { flex: 1; padding-left: 15px; font-size: 9px; line-height: 1.4; }
+    .contact-block strong { display: block; margin-bottom: 3px; font-size: 10px; color: #000; }
+    .summary-right { width: 180px; padding-left: 15px; border-left: 1px solid #999; font-size: 9px; }
+    .summary-item { margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px solid #ddd; }
+    .summary-item:last-child { border-bottom: none; }
+    .summary-label { color: #555; font-size: 8px; display: block; margin-bottom: 2px; }
+    .summary-value { font-weight: bold; color: #000; font-size: 10px; display: block; }
+    .dates-block { display: flex; justify-content: space-between; margin-bottom: 10px; padding: 8px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; font-size: 9px; }
+    .dates-item { flex: 1; text-align: center; }
+    .dates-label { color: #555; font-size: 8px; margin-bottom: 2px; }
+    .dates-value { font-weight: bold; color: #000; font-size: 9px; }
+    .items-title { font-weight: bold; font-size: 10px; margin-bottom: 5px; color: #000; }
+    .items-table { width: 100%; border-collapse: collapse; font-size: 8px; }
+    .items-table th { background-color: #666; color: white; padding: 4px 3px; text-align: left; font-weight: bold; font-size: 7px; }
+    .items-table td { padding: 3px; border-bottom: 1px solid #ddd; font-size: 8px; }
+    .items-table tr:nth-child(even) { background-color: #f5f5f5; }
+    .notes-block { margin-top: 10px; padding: 6px; font-size: 7px; color: #555; line-height: 1.3; }
+    .notes-block p { margin: 2px 0; }
+    .main-section { margin-top: 15px; }
+    .total-row { margin-top: 10px; padding: 8px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: right; }
+    .executed-row { margin-top: 8px; text-align: right; font-size: 8px; color: #555; padding-top: 6px; border-top: 1px solid #999; }
   </style>
 </head>
 <body>
-  <div class="header">
-    {{logo}}
-    <div class="company">{{companyName}}</div>
-    <div class="contact">Тел.: {{companyPhone}}</div>
-    <div class="contact">Адрес: {{companyAddress}}</div>
-    <div class="contact">Режим работы: {{companySchedule}}</div>
+  <!-- Отрывной талон -->
+  <div class="tear-off-section">
+    <div class="section-header">
+      <div style="display: flex; flex: 1;">
+        <div class="logo-area">{{logo}}</div>
+        <div class="contact-block">
+          <strong>Контактная информация:</strong>
+          Организация: {{companyName}}<br>
+          Телефон: {{companyPhone}}<br>
+          Адрес: {{companyAddress}}<br>
+          График работы: {{companySchedule}}
+        </div>
+      </div>
+      <div class="summary-right">
+        <div class="summary-item"><span class="summary-label">Заказ №:</span><span class="summary-value">{{orderNumber}}</span></div>
+        <div class="summary-item"><span class="summary-label">Стоимость:</span><span class="summary-value">{{cost}} руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Предоплата:</span><span class="summary-value">{{prepaymentAmount}} руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Долг:</span><span class="summary-value">{{debt}} руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Выполнил:</span><span class="summary-value">{{executedBy}}</span></div>
+      </div>
+    </div>
+    <div class="dates-block">
+      <div class="dates-item"><div class="dates-label">Заказ поступил:</div><div class="dates-value">{{createdDate}}</div></div>
+      <div class="dates-item"><div class="dates-label">Готовность:</div><div class="dates-value">{{readyDate}}</div></div>
+      <div class="dates-item"><div class="dates-label">Клиент:</div><div class="dates-value">{{customerName}}</div></div>
+      <div class="dates-item"><div class="dates-label">Телефон:</div><div class="dates-value">{{customerPhone}}</div></div>
+    </div>
+    <div class="items-title">Позиции заказа:</div>
+    <table class="items-table">
+      <thead><tr><th style="width:5%">№</th><th style="width:35%">Наименование</th><th style="width:40%">Параметры</th><th style="width:8%;text-align:center">Кол-во</th><th style="width:12%;text-align:right">Сумма</th></tr></thead>
+      <tbody>{{itemsTable}}</tbody>
+    </table>
+    <div class="notes-block">
+      <p>• Выдача заказов производится только при наличии чека и данного отрывного талона</p>
+      <p>• Исполнитель гарантирует хранение выполненных заказов в течение 1 месяца. Заказ утилизируется по истечении указанного срока.</p>
+    </div>
   </div>
-  <div class="order-info">
-    <div><label>Дата создания</label><span>{{createdDate}}</span></div>
-    <div><label>Дата готовности</label><span>{{readyDate}}</span></div>
-    <div><label>Заказ №</label><span>{{orderNumber}}</span></div>
-    <div><label>Клиент</label><span>{{customerName}}</span></div>
-    <div><label>Телефон</label><span>{{customerPhone}}</span></div>
+
+  <!-- Основной бланк (копия для клиента) -->
+  <div class="main-section">
+    <div class="section-header">
+      <div style="display: flex; flex: 1;">
+        <div class="logo-area">{{logo}}</div>
+        <div class="contact-block">
+          <strong>Контактная информация:</strong>
+          Организация: {{companyName}}<br>
+          Телефон: {{companyPhone}}<br>
+          Адрес: {{companyAddress}}<br>
+          График работы: {{companySchedule}}
+        </div>
+      </div>
+      <div class="summary-right">
+        <div class="summary-item"><span class="summary-label">Заказ №:</span><span class="summary-value">{{orderNumber}}</span></div>
+        <div class="summary-item"><span class="summary-label">Стоимость:</span><span class="summary-value">{{cost}} руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Предоплата:</span><span class="summary-value">{{prepaymentAmount}} руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Долг:</span><span class="summary-value">{{debt}} руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Выполнил:</span><span class="summary-value">{{executedBy}}</span></div>
+      </div>
+    </div>
+    <div class="dates-block">
+      <div class="dates-item"><div class="dates-label">Заказ принят:</div><div class="dates-value">{{createdDate}}</div></div>
+      <div class="dates-item"><div class="dates-label">Готово к:</div><div class="dates-value">{{readyDate}}</div></div>
+    </div>
+    <div class="items-title">Позиции заказа:</div>
+    <table class="items-table">
+      <thead><tr><th style="width:5%">№</th><th style="width:35%">Наименование</th><th style="width:40%">Параметры</th><th style="width:8%;text-align:center">Кол-во</th><th style="width:12%;text-align:right">Сумма</th></tr></thead>
+      <tbody>{{itemsTable}}</tbody>
+    </table>
+    <div class="total-row">ИТОГО: {{totalAmount}} BYN</div>
+    <div class="executed-row">Выполнил: {{executedBy}}</div>
   </div>
-  <table>
-    <thead>
-      <tr><th>№</th><th>Наименование</th><th>Кол-во</th><th>Сумма</th></tr>
-    </thead>
-    <tbody>{{itemsTable}}</tbody>
-  </table>
-  <div class="totals">
-    <div>Стоимость: {{cost}}</div>
-    <div>Предоплата: {{prepaymentAmount}}</div>
-    <div>К оплате: {{debt}}</div>
-    <div><strong>Итого: {{totalAmount}}</strong></div>
-  </div>
-  <div class="executed">Выполнил: {{executedBy}}</div>
 </body>
 </html>`;
 

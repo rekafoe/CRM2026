@@ -72,7 +72,7 @@ export async function getProductTemplateConfig(productId: number): Promise<Produ
  */
 export async function createProductConfig(
   productId: number,
-  configData: { name: string; description?: string; config_data: Record<string, any> }
+  configData: { name: string; description?: string; config_data?: Record<string, any>; constraints?: Record<string, any> }
 ): Promise<ProductConfig> {
   const response = await api.post(`/products/${productId}/configs`, configData);
   configsCache.clear();

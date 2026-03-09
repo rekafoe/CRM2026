@@ -11,6 +11,7 @@ import { InfoTab } from './product-edit/InfoTab';
 import { ServicesTab } from './product-edit/ServicesTab';
 import { MaterialsTab } from './product-edit/MaterialsTab';
 import { PrintTab, ProductPrintSettings } from './product-edit/PrintTab';
+import { PriceTypesTab } from './product-edit/PriceTypesTab';
 import { AddServiceModal } from './product-edit/AddServiceModal';
 
 interface ProductDto {
@@ -33,7 +34,7 @@ const ProductEditPage: React.FC = () => {
   const categories = useProductDirectoryStore((s) => s.categories);
   const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
 
-  const [activeTab, setActiveTab] = useState<'info' | 'services' | 'materials' | 'print'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'services' | 'materials' | 'print' | 'priceTypes'>('info');
   const [savingPrintSettings, setSavingPrintSettings] = useState(false);
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   const [form, setForm] = useState<{ name: string; description?: string; icon?: string; image_url?: string; calculator_type?: string; product_type?: string; category_id?: number; operator_percent?: string }>({ name: '' });
@@ -151,6 +152,7 @@ const ProductEditPage: React.FC = () => {
     { key: 'info' as const, label: 'Основное' },
     { key: 'services' as const, label: `Услуги (${productServicesLinks.length})` },
     { key: 'materials' as const, label: `Материалы (${materials.length})` },
+    { key: 'priceTypes' as const, label: 'Типы цен' },
     { key: 'print' as const, label: 'Печать' }
   ]), [productServicesLinks.length, materials.length]);
 
@@ -264,6 +266,9 @@ const ProductEditPage: React.FC = () => {
             )}
             {activeTab === 'materials' && (
               <MaterialsTab materials={materials} />
+            )}
+            {activeTab === 'priceTypes' && (
+              <PriceTypesTab productId={productId} />
             )}
             {activeTab === 'print' && (
               <PrintTab
