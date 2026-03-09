@@ -393,7 +393,7 @@ export class UnifiedPricingService {
           operationId: f.service_id,
           operationName: f.service_name,
           operationType: ((f as any).operation_type || 'other') as any,
-          priceUnit: (f as any).price_unit ?? result.selectedFinishing?.find((sf: any) => sf.service_id === f.service_id)?.price_unit || 'per_item' as const,
+          priceUnit: ((f as any).price_unit ?? result.selectedFinishing?.find((sf: any) => sf.service_id === f.service_id)?.price_unit) || 'per_item' as const,
           unitPrice: f.tier.price,
           quantity: f.units_needed,
           setupCost: 0,
