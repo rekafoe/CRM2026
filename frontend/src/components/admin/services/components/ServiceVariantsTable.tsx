@@ -221,17 +221,19 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
     try {
       if (tierModal.tierModal.type === 'add') {
-        localChanges.addRangeBoundary(boundary);
+        await operations.addRangeBoundary(boundary);
       } else if (tierModal.tierModal.type === 'edit' && tierModal.tierModal.tierIndex !== undefined) {
-        localChanges.editRangeBoundary(tierModal.tierModal.tierIndex, boundary);
+        await operations.editRangeBoundary(tierModal.tierModal.tierIndex, boundary);
       }
       tierModal.closeModal();
       setError(null);
+      invalidateCache();
+      await reload();
     } catch (err) {
       console.error('Error in handleSaveRange:', err);
       setError('Не удалось сохранить диапазон');
     }
-  }, [tierModal, localChanges, setError]);
+  }, [tierModal, operations, setError, reload, invalidateCache]);
 
   if (loading) {
     return <div className="p-4 text-center text-gray-500">Загрузка вариантов...</div>;

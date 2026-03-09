@@ -846,10 +846,11 @@ router.post('/services', asyncHandler(async (req, res) => {
 
 router.put('/services/:id', asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { name, service_type, type, unit, price_unit, priceUnit, rate, is_active, isActive, min_quantity, max_quantity, operator_percent, category_id, categoryId } = req.body
+  const { name, service_type, type, operation_type, unit, price_unit, priceUnit, rate, is_active, isActive, min_quantity, max_quantity, operator_percent, category_id, categoryId } = req.body
   const updated = await ServiceManagementService.updateService(Number(id), {
     name,
-    type: service_type ?? type,
+    type: operation_type ?? service_type ?? type,
+    operationType: operation_type ?? service_type ?? type,
     unit,
     priceUnit: price_unit ?? priceUnit,
     rate: rate !== undefined ? Number(rate) : undefined,
