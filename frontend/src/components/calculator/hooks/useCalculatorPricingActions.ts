@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Product } from '../../../services/products';
 import { calculatePrice as unifiedCalculatePrice } from '../../../services/pricing';
 import { parseFormatToTrimSize } from '../../../utils/formatUtils';
@@ -33,6 +33,8 @@ interface UseCalculatorPricingActionsParams {
   printColorMode?: 'bw' | 'color' | null;
   /** Размеры текущего типа продукта (для продуктов с типами) */
   effectiveSizes?: any[];
+  /** setSpecs для синхронизации quantity операций per_sheet с бэкендом (ламинация по листам) */
+  setSpecs?: React.Dispatch<React.SetStateAction<ProductSpecs>>;
   toast: { success: Function; error: Function };
   logger: { info: Function; error: Function };
 }
@@ -87,6 +89,7 @@ export function useCalculatorPricingActions({
   printTechnology,
   printColorMode,
   effectiveSizes,
+  setSpecs: setSpecsFromParent,
   toast,
   logger,
 }: UseCalculatorPricingActionsParams): UseCalculatorPricingActionsReturn {
@@ -807,6 +810,40 @@ export function useCalculatorPricingActions({
           total: s.totalCost || s.total,
         }));
 
+        // 🆕 Синхронизируем quantity операций per_sheet (ламинация и т.д.) с бэкендом
+        // Бэкенд считает по листам печати, фронт должен показывать это значение
+        if (setSpecsFromParent && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0 && services.length > 0) {
+          const backendByOpId = new Map(
+            services.map((s: any) => [(s.operationId ?? s.operation_id ?? s.id) as number, s])
+          );
+          let hasChanges = false;
+          const updatedOps = specs.selectedOperations.map((sel: any) => {
+            const backendOp = backendByOpId.get(sel.operationId);
+            if (!backendOp || backendOp.quantity == null || !Number.isFinite(Number(backendOp.quantity))) return sel;
+            const priceUnit = String(backendOp.priceUnit ?? backendOp.price_unit ?? '').toLowerCase();
+            const opType = String(backendOp.operationType ?? backendOp.operation_type ?? '').toLowerCase();
+            const opName = String(backendOp.operationName ?? backendOp.operation_name ?? backendOp.service ?? '').toLowerCase();
+            const isLaminate = opType === 'laminate' || opName.includes('ламин') || opName.includes('lamination');
+            // per_sheet: всегда берём quantity с бэкенда (листы печати)
+            // laminate: ламинация обычно per_sheet — берём quantity с бэкенда (кол-во листов)
+            const isPerSheet = priceUnit === 'per_sheet' || isLaminate;
+            if (isPerSheet) {
+              const backendQty = Number(backendOp.quantity);
+              if (sel.quantity !== backendQty) {
+                hasChanges = true;
+                return { ...sel, quantity: backendQty };
+              }
+            }
+            return sel;
+          });
+          if (hasChanges) {
+            setSpecsFromParent((prev) => ({ ...prev, selectedOperations: updatedOps }));
+            logger.info('🔄 Синхронизированы quantity операций per_sheet с бэкендом', {
+              updated: updatedOps.filter((o: any, i: number) => (specs.selectedOperations?.[i]?.quantity ?? null) !== (o.quantity ?? null)),
+            });
+          }
+        }
+
         // ✅ Используем ТОЛЬКО цену от бэкенда - скидки должны применяться на бэкенде
         const finalTotalCost = backendResult.finalPrice as number;
         const finalPricePerItem = backendResult.pricePerUnit as number;
@@ -895,6 +932,7 @@ export function useCalculatorPricingActions({
       printColorMode,
       resolveProductType,
       selectedProduct,
+      setSpecsFromParent,
       specs,
       toast,
       validationErrors,

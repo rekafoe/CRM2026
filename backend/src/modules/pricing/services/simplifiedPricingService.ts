@@ -75,6 +75,8 @@ export interface SimplifiedPricingResult {
     tier: { min_qty: number; max_qty?: number; price: number };
     units_needed: number;
     priceForQuantity: number;
+    price_unit?: string;
+    operation_type?: string;
   }>;
   
   calculatedAt: string;
@@ -815,6 +817,8 @@ export class SimplifiedPricingService {
             tier: { ...tier, price: priceForTier },
             units_needed: totalUnits,
             priceForQuantity: servicePrice,
+            price_unit: priceUnit,
+            operation_type: operationType,
           });
         }
       }

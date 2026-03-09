@@ -346,6 +346,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     printTechnology,
     printColorMode,
     effectiveSizes: effectiveSizes?.length ? effectiveSizes : undefined,
+    setSpecs,
     toast,
     logger,
   });
