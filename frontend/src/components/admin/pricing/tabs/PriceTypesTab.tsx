@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button, FormField, StatusBadge, EmptyState } from '../../../common';
-import { getPriceTypes, updatePriceType, createPriceType, deletePriceType } from '../../../services/pricing';
-import type { PriceType } from '../../../types/pricing';
+import { getPriceTypes, updatePriceType, createPriceType, deletePriceType } from '../../../../services/pricing';
+import type { PriceType } from '../../../../types/pricing';
 
 const formatMultiplier = (m: number) => {
   if (m >= 1) return `×${m} (+${((m - 1) * 100).toFixed(0)}%)`;

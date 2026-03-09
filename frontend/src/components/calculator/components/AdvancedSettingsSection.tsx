@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getProductionDaysByPriceType, getProductionTimeLabelFromDays } from '../utils/time';
-import { getPriceTypes } from '../../services/pricing';
-import type { PriceType } from '../../types/pricing';
+import { getPriceTypes } from '../../../services/pricing';
+import type { PriceType } from '../../../types/pricing';
 
 const formatMultiplier = (m: number) => {
   if (m >= 1) return `×${m} (+${((m - 1) * 100).toFixed(0)}%)`;
@@ -25,7 +25,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
   useEffect(() => {
     let cancelled = false;
     getPriceTypes(true)
-      .then((list) => { if (!cancelled) setPriceTypes(list); })
+      .then((list: PriceType[]) => { if (!cancelled) setPriceTypes(list); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);

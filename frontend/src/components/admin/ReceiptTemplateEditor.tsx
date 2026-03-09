@@ -147,38 +147,42 @@ export const ReceiptTemplateEditor: React.FC<ReceiptTemplateEditorProps> = ({
     : ORDER_BLANK_SAMPLE;
 
   const orgData = organizationData || {};
-  const subs = useMemo((): Record<string, string> => templateType === 'receipt'
-    ? {
-        companyName: escapeHtml(orgData.name || sampleData.companyName),
-        unp: escapeHtml(orgData.unp || sampleData.unp),
-        legalAddress: escapeHtml(orgData.legal_address || sampleData.legalAddress),
-        phone: escapeHtml(orgData.phone || sampleData.phone),
-        receiptNumber: sampleData.receiptNumber,
-        orderNumber: sampleData.orderNumber,
-        orderDate: sampleData.orderDate,
-        itemsTable: sampleData.itemsTable,
-        totalStr: sampleData.totalStr,
-        summaryLine: sampleData.summaryLine,
-        manager: sampleData.manager,
-      }
-    : {
-        companyName: escapeHtml(orgData.name || sampleData.companyName),
-        companyPhone: escapeHtml(orgData.phone || sampleData.companyPhone),
-        companyAddress: escapeHtml(orgData.legal_address || sampleData.companyAddress),
-        companySchedule: sampleData.companySchedule,
-        orderNumber: sampleData.orderNumber,
-        createdDate: sampleData.createdDate,
-        readyDate: sampleData.readyDate,
-        customerName: sampleData.customerName,
-        customerPhone: sampleData.customerPhone,
-        cost: sampleData.cost,
-        prepaymentAmount: sampleData.prepaymentAmount,
-        debt: sampleData.debt,
-        totalAmount: sampleData.totalAmount,
-        itemsTable: sampleData.itemsTable,
-        executedBy: sampleData.executedBy,
-      },
-  [templateType, orgData.name, orgData.unp, orgData.legal_address, orgData.phone, sampleData, previewMode]);
+  const subs = useMemo((): Record<string, string> => {
+    if (templateType === 'receipt') {
+      const sd = previewMode === 'filled' ? SAMPLE_DATA_RECEIPT : SAMPLE_DATA_BLANK;
+      return {
+        companyName: escapeHtml(orgData.name || sd.companyName),
+        unp: escapeHtml(orgData.unp || sd.unp),
+        legalAddress: escapeHtml(orgData.legal_address || sd.legalAddress),
+        phone: escapeHtml(orgData.phone || sd.phone),
+        receiptNumber: sd.receiptNumber,
+        orderNumber: sd.orderNumber,
+        orderDate: sd.orderDate,
+        itemsTable: sd.itemsTable,
+        totalStr: sd.totalStr,
+        summaryLine: sd.summaryLine,
+        manager: sd.manager,
+      };
+    }
+    const ob = ORDER_BLANK_SAMPLE;
+    return {
+      companyName: escapeHtml(orgData.name || ob.companyName),
+      companyPhone: escapeHtml(orgData.phone || ob.companyPhone),
+      companyAddress: escapeHtml(orgData.legal_address || ob.companyAddress),
+      companySchedule: ob.companySchedule,
+      orderNumber: ob.orderNumber,
+      createdDate: ob.createdDate,
+      readyDate: ob.readyDate,
+      customerName: ob.customerName,
+      customerPhone: ob.customerPhone,
+      cost: ob.cost,
+      prepaymentAmount: ob.prepaymentAmount,
+      debt: ob.debt,
+      totalAmount: ob.totalAmount,
+      itemsTable: ob.itemsTable,
+      executedBy: ob.executedBy,
+    };
+  }, [templateType, orgData.name, orgData.unp, orgData.legal_address, orgData.phone, previewMode]);
 
   const htmlForPreview = useMemo(() => {
     let out = htmlContent;
