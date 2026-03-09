@@ -590,6 +590,9 @@ export class PDFReportService {
               <td style="text-align: right;"><strong>${(item.price * item.quantity).toFixed(2)}</strong></td>
             </tr>
           `).join('');
+          const logoImgOrder = org.logo_url && (org.logo_url.startsWith('data:') || org.logo_url.startsWith('http'))
+            ? `<img src="${org.logo_url.replace(/"/g, '&quot;')}" alt="Logo" style="max-width:150px;max-height:60px;object-fit:contain;" />`
+            : '';
           html = templateRow.html_content
             .replace(/\{\{companyName\}\}/g, this.escapeHtml(org.name))
             .replace(/\{\{companyPhone\}\}/g, this.escapeHtml(companyPhoneVal))
@@ -605,7 +608,8 @@ export class PDFReportService {
             .replace(/\{\{debt\}\}/g, debt.toFixed(2))
             .replace(/\{\{totalAmount\}\}/g, calculatedTotalAmount.toFixed(2))
             .replace(/\{\{itemsTable\}\}/g, itemsTable)
-            .replace(/\{\{executedBy\}\}/g, resolvedExecutedBy ? this.escapeHtml(resolvedExecutedBy) : '');
+            .replace(/\{\{executedBy\}\}/g, resolvedExecutedBy ? this.escapeHtml(resolvedExecutedBy) : '')
+            .replace(/\{\{logo\}\}/g, logoImgOrder);
         } else {
           // Fallback: встроенный HTML с данными существующей организации
           const companyPhoneVal = org.phone || companyPhone;
@@ -1210,11 +1214,11 @@ export class PDFReportService {
   }
 
   /** Реквизиты организации для товарного чека: из БД (organizations) или env fallback */
-  private static async getOrganizationForReceipt(organizationId?: number | null): Promise<{ id: number; name: string; unp: string; legal_address?: string; phone?: string; email?: string; bank_details?: string; work_schedule?: string }> {
+  private static async getOrganizationForReceipt(organizationId?: number | null): Promise<{ id: number; name: string; unp: string; legal_address?: string; phone?: string; email?: string; bank_details?: string; work_schedule?: string; logo_url?: string }> {
     try {
       const db = await getDb();
       let org: any = null;
-      const sel = 'SELECT id, name, unp, legal_address, phone, email, bank_details FROM organizations';
+      const sel = 'SELECT id, name, unp, legal_address, phone, email, bank_details, logo_url FROM organizations';
       if (organizationId && Number.isFinite(organizationId)) {
         org = await db.get(`${sel} WHERE id = ?`, organizationId);
       }
@@ -1230,7 +1234,7 @@ export class PDFReportService {
           const ws = await db.get<{ work_schedule?: string }>('SELECT work_schedule FROM organizations WHERE id = ?', org.id);
           work_schedule = ws?.work_schedule ?? undefined;
         } catch { work_schedule = undefined; }
-        return { id: org.id, name: org.name || '', unp: org.unp || '', legal_address: org.legal_address, phone: org.phone, email: org.email, bank_details: org.bank_details, work_schedule };
+        return { id: org.id, name: org.name || '', unp: org.unp || '', legal_address: org.legal_address, phone: org.phone, email: org.email, bank_details: org.bank_details, work_schedule, logo_url: org.logo_url };
       }
     } catch (_) { /* таблица organizations может отсутствовать до миграции */ }
     return {
@@ -1422,6 +1426,9 @@ export class PDFReportService {
       const templateRow = await db.get<{ html_content: string }>('SELECT html_content FROM receipt_templates WHERE organization_id = ?', org.id);
       let html: string;
       if (templateRow?.html_content) {
+        const logoImg = org.logo_url && (org.logo_url.startsWith('data:') || org.logo_url.startsWith('http'))
+          ? `<img src="${org.logo_url.replace(/"/g, '&quot;')}" alt="Logo" style="max-width:150px;max-height:60px;object-fit:contain;" />`
+          : '';
         html = templateRow.html_content
           .replace(/\{\{companyName\}\}/g, this.escapeHtml(org.name))
           .replace(/\{\{unp\}\}/g, this.escapeHtml(org.unp))
@@ -1433,7 +1440,8 @@ export class PDFReportService {
           .replace(/\{\{itemsTable\}\}/g, itemsTable)
           .replace(/\{\{totalStr\}\}/g, fmt(totalAmount))
           .replace(/\{\{summaryLine\}\}/g, summaryLine)
-          .replace(/\{\{manager\}\}/g, managerLine);
+          .replace(/\{\{manager\}\}/g, managerLine)
+          .replace(/\{\{logo\}\}/g, logoImg);
       } else {
         html = this.generateCommodityReceiptHTML({
           receiptNumber,
@@ -1477,6 +1485,9 @@ export class PDFReportService {
         <tr><td>5</td><td></td><td></td><td></td><td></td></tr>
       `;
         const summaryLine = 'Всего наименований ______, на сумму ________________ бел. руб. _________________________________________';
+        const logoImgBlank = org.logo_url && (org.logo_url.startsWith('data:') || org.logo_url.startsWith('http'))
+          ? `<img src="${org.logo_url.replace(/"/g, '&quot;')}" alt="Logo" style="max-width:150px;max-height:60px;object-fit:contain;" />`
+          : '';
         html = templateRow.html_content
           .replace(/\{\{companyName\}\}/g, this.escapeHtml(org.name))
           .replace(/\{\{unp\}\}/g, this.escapeHtml(org.unp))
@@ -1488,7 +1499,8 @@ export class PDFReportService {
           .replace(/\{\{itemsTable\}\}/g, emptyRows)
           .replace(/\{\{totalStr\}\}/g, '')
           .replace(/\{\{summaryLine\}\}/g, summaryLine)
-          .replace(/\{\{manager\}\}/g, 'Менеджер: ________________');
+          .replace(/\{\{manager\}\}/g, 'Менеджер: ________________')
+          .replace(/\{\{logo\}\}/g, logoImgBlank);
       } else {
         html = this.generateCommodityReceiptHTML({
           receiptNumber: '______',

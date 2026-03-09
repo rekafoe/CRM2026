@@ -17,12 +17,12 @@ import { ReceiptTemplateEditor } from '../../components/admin/ReceiptTemplateEdi
 import './OrganizationsPage.css';
 
 const RECEIPT_PLACEHOLDERS = [
-  '{{companyName}}', '{{unp}}', '{{legalAddress}}', '{{phone}}',
+  '{{logo}}', '{{companyName}}', '{{unp}}', '{{legalAddress}}', '{{phone}}',
   '{{receiptNumber}}', '{{orderNumber}}', '{{orderDate}}',
   '{{itemsTable}}', '{{totalStr}}', '{{summaryLine}}', '{{manager}}',
 ];
 const ORDER_BLANK_PLACEHOLDERS = [
-  '{{companyName}}', '{{companyPhone}}', '{{companyAddress}}', '{{companySchedule}}',
+  '{{logo}}', '{{companyName}}', '{{companyPhone}}', '{{companyAddress}}', '{{companySchedule}}',
   '{{orderNumber}}', '{{createdDate}}', '{{readyDate}}', '{{customerName}}', '{{customerPhone}}',
   '{{cost}}', '{{prepaymentAmount}}', '{{debt}}', '{{totalAmount}}', '{{itemsTable}}', '{{executedBy}}',
 ];
@@ -132,6 +132,17 @@ export const OrganizationsPage: React.FC = () => {
     }
   };
 
+  const handleLogoChange = useCallback(async (logoUrl: string | null) => {
+    if (!templateOrg) return;
+    try {
+      await updateOrganization(templateOrg.id, { logo_url: logoUrl ?? undefined });
+      setTemplateOrg((prev) => (prev ? { ...prev, logo_url: logoUrl ?? undefined } : null));
+      await loadOrganizations();
+    } catch (err: any) {
+      setError(err?.message || 'Не удалось обновить логотип');
+    }
+  }, [templateOrg, loadOrganizations]);
+
   return (
     <AdminPageLayout title="Организации" icon="🏢" onBack={() => navigate('/adminpanel')}>
       <div className="organizations-page">
@@ -145,6 +156,28 @@ export const OrganizationsPage: React.FC = () => {
           <div className="organizations-form-card">
             <h3>{editingOrg ? 'Редактировать' : 'Новая организация'}</h3>
             <div className="form-grid">
+              <label>Логотип</label>
+              <div className="org-logo-upload">
+                {(form.logo_url || editingOrg?.logo_url) ? (
+                  <div className="org-logo-preview">
+                    <img src={form.logo_url || editingOrg?.logo_url} alt="Логотип" style={{ maxWidth: 120, maxHeight: 50, objectFit: 'contain' }} />
+                    <button type="button" className="btn-link danger" onClick={() => setForm({ ...form, logo_url: '' })}>Удалить</button>
+                  </div>
+                ) : null}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => setForm({ ...form, logo_url: reader.result as string });
+                    reader.readAsDataURL(file);
+                    e.target.value = '';
+                  }}
+                />
+                <span className="org-logo-hint">PNG, JPG до 200 KB. В шаблоне используйте {'{{logo}}'}</span>
+              </div>
               <label>Название *</label>
               <input value={form.name || ''} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="ООО «Название»" />
               <label>УНП</label>
@@ -214,6 +247,7 @@ export const OrganizationsPage: React.FC = () => {
             onSave={handleSaveTemplate}
             saving={templateSaving}
             onClose={() => setTemplateModalOpen(false)}
+            onLogoChange={handleLogoChange}
           />
         </Modal>
       </div>

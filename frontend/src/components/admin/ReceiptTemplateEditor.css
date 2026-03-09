@@ -6,6 +6,53 @@
   max-width: 100%;
 }
 
+.rte-logo-block {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: var(--bg-secondary, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+}
+
+.rte-logo-preview {
+  flex-shrink: 0;
+  width: 120px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-color, #d1d5db);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.rte-logo-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.rte-logo-placeholder {
+  font-size: 11px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.rte-logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rte-logo-hint {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  margin-left: 4px;
+}
+
 .rte-toolbar {
   display: flex;
   flex-wrap: wrap;
