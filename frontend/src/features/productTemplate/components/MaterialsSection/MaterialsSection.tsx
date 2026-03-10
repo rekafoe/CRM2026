@@ -45,13 +45,13 @@ const DEFAULT_QTY = 1
 const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMaterials, productId, allowedPaperTypes = [], trimSize, printSheet, testQty, defaultPages, defaultSides, productType, onAdd, onUpdate, onBulkAdd, onRemove }) => {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedMaterialId, setSelectedMaterialId] = useState<number | null>(null)
-  const [newQtyPerSheet, setNewQtyPerSheet] = useState(DEFAULT_QTY)
+  const [newQtyPerSheet, setNewQtyPerSheet] = useState<string | number>(DEFAULT_QTY)
   const [isRequired, setIsRequired] = useState(true)
-  const [editingQty, setEditingQty] = useState<Record<number, number>>({})
+  const [editingQty, setEditingQty] = useState<Record<number, number | string>>({})
   const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set())
-  const [bulkQty, setBulkQty] = useState<Record<number, number>>({})
+  const [bulkQty, setBulkQty] = useState<Record<number, number | string>>({})
   const [bulkRequired, setBulkRequired] = useState<Record<number, boolean>>({})
   const [bulkAdding, setBulkAdding] = useState(false)
   const [paperTypes, setPaperTypes] = useState<Array<{ id: number; name: string }>>([]) // 🆕 Типы бумаги для фильтрации
@@ -217,10 +217,10 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
   }
 
   const handleAddMaterial = async () => {
-    if (!selectedMaterialId || newQtyPerSheet <= 0) return
+    if (!selectedMaterialId || Number(newQtyPerSheet) <= 0) return
     await onAdd({
       material_id: selectedMaterialId,
-      qty_per_sheet: newQtyPerSheet,
+      qty_per_sheet: Number(newQtyPerSheet) || DEFAULT_QTY,
       is_required: isRequired
     })
     resetNewMaterialForm()
@@ -230,7 +230,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
     const materialId = Number(material.material_id ?? material.id)
     if (!materialId) return
     const currentQty = Number(material.qty_per_sheet ?? DEFAULT_QTY)
-    const nextQty = Number(editingQty[materialId] ?? currentQty)
+    const nextQty = Number(editingQty[materialId] ?? currentQty) || currentQty
     if (!Number.isFinite(nextQty) || nextQty <= 0 || nextQty === currentQty) return
     try {
       setUpdatingId(materialId)
@@ -246,7 +246,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
       setBulkAdding(true)
       const payload = Array.from(bulkSelected).map((materialId) => ({
         material_id: materialId,
-        qty_per_sheet: bulkQty[materialId] || DEFAULT_QTY,
+        qty_per_sheet: Number(bulkQty[materialId]) || DEFAULT_QTY,
         is_required: bulkRequired[materialId] !== false
       }))
       await onBulkAdd(payload)
@@ -467,6 +467,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                 const materialId = Number(material.material_id ?? material.id)
                 const option = allMaterials.find((m) => Number(m.id) === materialId)
                 const qtyValue = editingQty[materialId] ?? Number(material.qty_per_sheet ?? DEFAULT_QTY)
+                const displayValue = qtyValue === '' || (typeof qtyValue === 'number' && qtyValue === 0) ? '' : qtyValue
                 const required = Boolean(material.is_required ?? true)
                 return (
                   <tr key={materialId} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -480,10 +481,10 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                         type="number"
                         min={0.01}
                         step={0.01}
-                        value={qtyValue}
+                        value={displayValue}
                         onChange={(event) => {
-                          const next = Number(event.target.value)
-                          setEditingQty((prev) => ({ ...prev, [materialId]: next }))
+                          const v = event.target.value
+                          setEditingQty((prev) => ({ ...prev, [materialId]: v === '' ? '' : Number(v) }))
                         }}
                         onBlur={() => void handleQtyBlur(material)}
                         style={{ width: 100, textAlign: 'center' }}
@@ -536,7 +537,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                   if (option) {
                     const existing = materials.find((m) => Number(m.material_id ?? m.id) === value)
                     const defaultQty = existing?.qty_per_sheet ?? DEFAULT_QTY
-                    setNewQtyPerSheet(Number(defaultQty))
+                    setNewQtyPerSheet(String(defaultQty))
                   }
                 }}
                 style={{ marginTop: 8 }}
@@ -570,7 +571,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                 step={0.01}
                 className="form-input form-input--compact"
                 value={newQtyPerSheet}
-                onChange={(event) => setNewQtyPerSheet(Number(event.target.value))}
+                onChange={(event) => setNewQtyPerSheet(event.target.value === '' ? '' : Number(event.target.value))}
                 title={productType === 'multi_page' 
                   ? 'Для многостраничных изделий: на одном печатном листе может быть 4, 8, 16 страниц. Учитывайте это при расчете расхода материалов.'
                   : productType === 'sheet_single'
@@ -596,7 +597,7 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
               <button
                 className="btn-primary"
                 onClick={() => void handleAddMaterial()}
-                disabled={!selectedMaterialId || newQtyPerSheet <= 0}
+                disabled={!selectedMaterialId || newQtyPerSheet === '' || Number(newQtyPerSheet) <= 0}
               >
                 Добавить
               </button>
@@ -701,10 +702,11 @@ const MaterialsSection: React.FC<MaterialsSectionProps> = ({ materials, allMater
                                   type="number"
                                   min={0.01}
                                   step={0.01}
-                                  value={bulkQty[materialId] || DEFAULT_QTY}
-                                  onChange={(e) =>
-                                    setBulkQty((prev) => ({ ...prev, [materialId]: Number(e.target.value) }))
-                                  }
+                                  value={bulkQty[materialId] === '' || bulkQty[materialId] === 0 ? '' : (bulkQty[materialId] ?? DEFAULT_QTY)}
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    setBulkQty((prev) => ({ ...prev, [materialId]: v === '' ? '' : Number(v) }))
+                                  }}
                                   className="form-input form-input--compact"
                                   style={{ width: 100, textAlign: 'center' }}
                                   placeholder="шт/лист"
