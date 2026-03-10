@@ -480,6 +480,11 @@ router.get('/:productId/schema', async (req, res) => {
         }
       }
       const tierBoundaries = collectTierBoundariesFromSimplified(schema.template.simplified);
+      // Для simplified продуктов в compact — только allowed_price_types (остальное не используется)
+      const hasSimplified = !!(schema.template.simplified?.sizes?.length || schema.template.simplified?.typeConfigs);
+      const compactConstraints = hasSimplified
+        ? { allowed_price_types: schema.constraints.allowed_price_types }
+        : schema.constraints;
       const compactSchema = {
         id: schema.id, key: schema.key, name: schema.name, type: schema.type, description: schema.description,
         template: {
@@ -488,7 +493,7 @@ router.get('/:productId/schema', async (req, res) => {
           print_run: schema.template.print_run,
           simplified: compactSimplified,
         },
-        constraints: schema.constraints,
+        constraints: compactConstraints,
         operations: productOperations || [],
         ...(compactMaterials.length > 0 ? { materials: compactMaterials } : {}),
         ...(Object.keys(serviceVariants).length > 0 ? { service_variants: serviceVariants } : {}),

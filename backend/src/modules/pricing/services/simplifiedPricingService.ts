@@ -1084,7 +1084,7 @@ export class SimplifiedPricingService {
   }): Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price: number }> {
     const boundaries = new Set<number>();
 
-    // 1. Текущее количество — отдельная строка над таблицей (чтобы «Цена» совпадала с итогом)
+    // 1. Текущее количество — в границах, строка в своей позиции между диапазонами
     if (ctx.currentQuantity != null && Number.isFinite(ctx.currentQuantity) && ctx.currentQuantity > 0) {
       boundaries.add(ctx.currentQuantity);
     }
@@ -1195,15 +1195,6 @@ export class SimplifiedPricingService {
         unit_price: Math.round(unitPrice * 100) / 100,
         total_price: totalRounded,
       });
-    }
-    // Строка с текущим количеством — первой (над таблицей)
-    const cq = ctx.currentQuantity;
-    if (cq != null && Number.isFinite(cq) && cq > 0) {
-      const idx = result.findIndex((r) => r.min_qty === cq);
-      if (idx > 0) {
-        const [row] = result.splice(idx, 1);
-        result.unshift(row);
-      }
     }
     return result;
   }
