@@ -252,11 +252,27 @@ export default function AddItemModal({ order, onSave, onClose, initialCategory, 
             </label>
             <label>
               Листы SRA3:
-              <input type="number" value={sheets} min={0} onChange={e => setSheets(Math.max(0, Number(e.target.value) || 0))} />
+              <input
+                type="number"
+                value={sheets === 0 ? '' : sheets}
+                min={0}
+                onChange={e => {
+                  const v = e.target.value;
+                  setSheets(v === '' ? 0 : Math.max(0, Number(v) || 0));
+                }}
+              />
             </label>
             <label>
               Брак (листы):
-              <input type="number" value={waste} min={0} onChange={e => setWaste(Math.max(0, Number(e.target.value) || 0))} />
+              <input
+                type="number"
+                value={waste === 0 ? '' : waste}
+                min={0}
+                onChange={e => {
+                  const v = e.target.value;
+                  setWaste(v === '' ? 0 : Math.max(0, Number(v) || 0));
+                }}
+              />
             </label>
           </div>
         </div>

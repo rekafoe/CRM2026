@@ -405,8 +405,12 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <label>Количество *</label>
               <input
                 type="number"
-                value={formData.quantity || 0}
-                onChange={(e) => handleChange('quantity', parseInt(e.target.value) || 0)}
+                value={formData.quantity === 0 ? '' : (formData.quantity ?? '')}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const num = v === '' ? 0 : (parseInt(v, 10) || 0);
+                  handleChange('quantity', num);
+                }}
                 required
                 min="0"
                 step="1"
@@ -416,9 +420,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <label>Цена за единицу (BYN) *</label>
               <input
                 type="number"
-                value={formData.price || 0}
+                value={formData.price === 0 ? '' : (formData.price ?? '')}
                 onChange={(e) => {
-                  const price = parseFloat(e.target.value) || 0;
+                  const v = e.target.value;
+                  const price = v === '' ? 0 : (parseFloat(v) || 0);
                   handleChange('price', price);
                   handleChange('sheet_price_single', price); // Синхронизируем с backend полем
                 }}
@@ -434,8 +439,11 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <label>Минимальный запас</label>
               <input
                 type="number"
-                value={formData.min_stock_level || 0}
-                onChange={(e) => handleChange('min_stock_level', parseInt(e.target.value) || 0)}
+                value={formData.min_stock_level === 0 ? '' : (formData.min_stock_level ?? '')}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  handleChange('min_stock_level', v === '' ? 0 : (parseInt(v, 10) || 0));
+                }}
                 min="0"
                 step="1"
               />
@@ -444,8 +452,11 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <label>Максимальный запас</label>
               <input
                 type="number"
-                value={formData.max_stock_level || 100}
-                onChange={(e) => handleChange('max_stock_level', parseInt(e.target.value) || 100)}
+                value={formData.max_stock_level === 0 ? '' : (formData.max_stock_level ?? '')}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  handleChange('max_stock_level', v === '' ? 0 : (parseInt(v, 10) || 100));
+                }}
                 min="0"
                 step="1"
               />

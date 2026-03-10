@@ -105,11 +105,14 @@ const MaterialReservationModal: React.FC<MaterialReservationModalProps> = ({
             <label>Количество *</label>
             <input
               type="number"
-              value={reservationData.quantity_reserved}
-              onChange={(e) => setReservationData({
-                ...reservationData,
-                quantity_reserved: parseFloat(e.target.value) || 0
-              })}
+              value={reservationData.quantity_reserved === 0 ? '' : reservationData.quantity_reserved}
+              onChange={(e) => {
+                const v = e.target.value;
+                setReservationData({
+                  ...reservationData,
+                  quantity_reserved: v === '' ? 0 : (parseFloat(v) || 0)
+                });
+              }}
               required
               min="0.01"
               step="0.01"
