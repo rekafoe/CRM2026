@@ -1,8 +1,8 @@
 import { Database } from 'sqlite';
 
 /**
- * Пересоздание items с корректным FK на orders.
- * Убирает любые ссылки на orders_old. Идемпотентно: если FK уже на orders — пропускаем.
+ * Безусловное пересоздание items с FK на orders.
+ * Всегда пересоздаёт items — гарантированно убирает orders_old.
  */
 export async function up(db: Database): Promise<void> {
   const ordersExists = await db.get(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='orders'`);
@@ -10,23 +10,6 @@ export async function up(db: Database): Promise<void> {
   if (!ordersExists || !itemsExists) return;
 
   await db.exec('PRAGMA foreign_keys = OFF');
-
-  const schemaRow = await db.get<{ sql?: string }>(`SELECT sql FROM sqlite_master WHERE type='table' AND name='items'`);
-  const sql = schemaRow?.sql || '';
-  let refsOrdersOld = sql.includes('orders_old');
-  if (!refsOrdersOld) {
-    try {
-      const fkList = (await db.all(`PRAGMA foreign_key_list(items)`)) as Array<{ table?: string; TABLE?: string }>;
-      const tbl = (fk: any) => String(fk?.table ?? fk?.TABLE ?? '').toLowerCase();
-      refsOrdersOld = (fkList || []).some((fk) => tbl(fk) === 'orders_old');
-    } catch {
-      refsOrdersOld = true;
-    }
-  }
-  if (!refsOrdersOld) {
-    await db.exec('PRAGMA foreign_keys = ON');
-    return;
-  }
 
   const cols = (await db.all(`PRAGMA table_info(items)`)) as Array<{
     name: string;

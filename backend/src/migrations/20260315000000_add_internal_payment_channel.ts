@@ -22,10 +22,15 @@ export async function up(db: Database): Promise<void> {
   }
 
   // Исправление битых FK: items может ссылаться на orders_old (после RENAME + DROP)
-  const fkList = (await db.all(`PRAGMA foreign_key_list(items)`)) as Array<{ table?: string }>;
-  const refsOrdersOld = (fkList || []).some((fk) => fk.table === 'orders_old');
+  await db.exec('PRAGMA foreign_keys = OFF');
+  let refsOrdersOld = false;
+  try {
+    const fkList = (await db.all(`PRAGMA foreign_key_list(items)`)) as Array<{ table?: string }>;
+    refsOrdersOld = (fkList || []).some((fk) => String(fk.table || '').toLowerCase() === 'orders_old');
+  } catch {
+    refsOrdersOld = true;
+  }
   if (refsOrdersOld) {
-    await db.exec('PRAGMA foreign_keys = OFF');
     const itemsInfo = (await db.all(`PRAGMA table_info(items)`)) as Array<{ name: string; type: string; notnull?: number; dflt_value?: string; pk?: number }>;
     const cols = itemsInfo.map((c) => `"${c.name}" ${c.type} ${c.notnull ? 'NOT NULL' : ''} ${c.dflt_value != null ? `DEFAULT ${c.dflt_value}` : ''} ${c.pk ? 'PRIMARY KEY' : ''}`).filter(Boolean).join(', ');
     await db.exec(`CREATE TABLE items_new (${cols}, FOREIGN KEY(orderId) REFERENCES orders(id) ON DELETE CASCADE)`);
