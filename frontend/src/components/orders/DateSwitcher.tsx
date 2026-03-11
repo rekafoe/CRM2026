@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
+
+const DAYS_PER_PAGE = 14;
 
 interface DateSwitcherProps {
   currentDate: string;
@@ -13,8 +15,19 @@ export const DateSwitcher: React.FC<DateSwitcherProps> = ({
   onClose,
   userDates
 }) => {
+  const [currentPage, setCurrentPage] = useState(0);
+
   // Сортируем даты пользователя по убыванию (новые сначала)
-  const sortedUserDates = [...userDates].sort((a, b) => b.date.localeCompare(a.date));
+  const sortedUserDates = useMemo(
+    () => [...userDates].sort((a, b) => b.date.localeCompare(a.date)),
+    [userDates]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(sortedUserDates.length / DAYS_PER_PAGE));
+  const paginatedDates = useMemo(() => {
+    const start = currentPage * DAYS_PER_PAGE;
+    return sortedUserDates.slice(start, start + DAYS_PER_PAGE);
+  }, [sortedUserDates, currentPage]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -46,7 +59,7 @@ export const DateSwitcher: React.FC<DateSwitcherProps> = ({
 
       <div className="date-switcher-grid">
         {sortedUserDates.length > 0 ? (
-          sortedUserDates.map(({ date, orderCount }) => (
+          paginatedDates.map(({ date, orderCount }) => (
             <button
               key={date}
               onClick={() => handleDateSelect(date)}
@@ -69,6 +82,32 @@ export const DateSwitcher: React.FC<DateSwitcherProps> = ({
           </div>
         )}
       </div>
+
+      {sortedUserDates.length > DAYS_PER_PAGE && (
+        <div className="date-switcher-pagination">
+          <button
+            type="button"
+            className="date-switcher-pagination__btn"
+            onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+            disabled={currentPage === 0}
+            aria-label="Предыдущая страница"
+          >
+            ← Назад
+          </button>
+          <span className="date-switcher-pagination__info">
+            {currentPage + 1} / {totalPages}
+          </span>
+          <button
+            type="button"
+            className="date-switcher-pagination__btn"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={currentPage >= totalPages - 1}
+            aria-label="Следующая страница"
+          >
+            Вперёд →
+          </button>
+        </div>
+      )}
 
       <div className="date-switcher-footer">
         <button

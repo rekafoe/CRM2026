@@ -17,11 +17,49 @@
    color: var(--text-primary, #111827);
  }
  
- .date-switcher-grid {
-   display: grid;
-   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-   gap: 10px;
- }
+.date-switcher-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.date-switcher-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.date-switcher-pagination__btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-secondary, #f8f9fa);
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.date-switcher-pagination__btn:hover:not(:disabled) {
+  background: var(--bg-primary, #ffffff);
+  border-color: rgba(var(--primary-rgb), 0.35);
+  color: var(--primary, #2563eb);
+}
+
+.date-switcher-pagination__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.date-switcher-pagination__info {
+  font-size: 13px;
+  color: var(--text-muted, #6b7280);
+}
  
  .date-switcher-option {
    border-radius: 10px;
