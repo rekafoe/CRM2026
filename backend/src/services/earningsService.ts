@@ -90,12 +90,7 @@ export class EarningsService {
     }
 
     try {
-      await db.exec('PRAGMA foreign_keys = OFF');
-      try {
-        await this.doRecalculateForDate(db, date);
-      } finally {
-        await db.exec('PRAGMA foreign_keys = ON');
-      }
+      await this.doRecalculateForDate(db, date);
     } catch (error) {
       logger.error('EarningsService recalculateForDate failed', {
         date,
