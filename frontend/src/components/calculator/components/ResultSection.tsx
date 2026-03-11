@@ -10,6 +10,7 @@ interface ResultSectionProps {
     parameterSummary?: Array<{ label: string; value: string }>;
     layout?: { sheetsNeeded?: number; itemsPerSheet?: number; sheetSize?: string; fitsOnSheet?: boolean };
     warnings?: string[];
+    tier_prices?: Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price?: number }>;
   } | null;
   isValid: boolean;
   onAddToOrder: () => void;
@@ -125,6 +126,33 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
           {itemsPerSheet != null && <span>• На листе: {itemsPerSheet} шт.</span>}
           {sheetSize && <span>• Формат листа: {sheetSize}</span>}
         </div>
+      )}
+      {result.tier_prices && result.tier_prices.length > 0 && (
+        <details className="result-tier-prices">
+          <summary>Тиражные скидки</summary>
+          <table className="tier-prices-table">
+            <thead>
+              <tr>
+                <th>Количество</th>
+                <th>За 1 ед.</th>
+                <th>Цена</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.tier_prices.map((t, i) => {
+                const qty = result.specifications?.quantity ?? 0;
+                const isCurrent = qty >= t.min_qty && (t.max_qty == null || qty <= t.max_qty);
+                return (
+                  <tr key={i} className={isCurrent ? 'tier-prices-row--current' : ''}>
+                    <td>{t.max_qty != null ? `${t.min_qty}–${t.max_qty}` : t.min_qty}</td>
+                    <td>{typeof t.unit_price === 'number' ? t.unit_price.toFixed(2) : '—'} BYN</td>
+                    <td>{t.total_price != null ? `${Number(t.total_price).toFixed(2)} BYN` : '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </details>
       )}
       <div className="result-actions">
         <button 

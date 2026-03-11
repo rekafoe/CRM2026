@@ -221,9 +221,10 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
     { value: 'cash' as const, label: 'Касса', desc: 'Учитывается в кассе' },
     { value: 'invoice' as const, label: 'Счёт', desc: 'Безнал, не в кассе' },
     { value: 'not_cashed' as const, label: '—', desc: '' },
+    { value: 'internal' as const, label: 'Внутренние работы', desc: 'Не в кассе и не в ЗП' },
   ];
-  const paymentChannel = (selectedOrder.payment_channel || 'cash') as 'cash' | 'invoice' | 'not_cashed';
-  const handleSetPaymentChannel = useCallback(async (ch: 'cash' | 'invoice' | 'not_cashed') => {
+  const paymentChannel = (selectedOrder.payment_channel || 'cash') as 'cash' | 'invoice' | 'not_cashed' | 'internal';
+  const handleSetPaymentChannel = useCallback(async (ch: 'cash' | 'invoice' | 'not_cashed' | 'internal') => {
     try {
       setPaymentChannelMenuOpen(false);
       await updateOrderPaymentChannel(selectedOrder.id, ch);

@@ -73,13 +73,16 @@ export class EarningsService {
 
     let hasExecutorUserId = false;
     let hasResponsibleUserId = false;
+    let hasPaymentChannel = false;
     try {
       hasExecutorUserId = await hasColumn('items', 'executor_user_id');
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id');
+      hasPaymentChannel = await hasColumn('orders', 'payment_channel');
     } catch { /* ignore */ }
 
     const executorSel = hasExecutorUserId ? 'i.executor_user_id as executorUserId' : 'NULL as executorUserId';
     const responsibleSel = hasResponsibleUserId ? 'o.responsible_user_id as responsibleUserId' : 'NULL as responsibleUserId';
+    const excludeInternal = hasPaymentChannel ? "AND COALESCE(o.payment_channel, 'cash') != 'internal'" : '';
 
     const rows = await db.all<EarningsRow[]>(
       `
@@ -96,6 +99,7 @@ export class EarningsService {
       JOIN orders o ON o.id = i.orderId
       WHERE date(COALESCE(o.createdAt, o.created_at)) = date(?)
         AND (o.status IS NULL OR o.status != 1)
+        ${excludeInternal}
       `,
       [date]
     );

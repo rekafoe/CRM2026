@@ -92,7 +92,7 @@ export interface Order {
   /** Скидка на заказ (%): 0, 5, 10, 15, 20, 25 */
   discount_percent?: number;
   /** Канал оплаты: cash (касса), invoice (счёт), not_cashed (не пробивался) */
-  payment_channel?: 'cash' | 'invoice' | 'not_cashed';
+  payment_channel?: 'cash' | 'invoice' | 'not_cashed' | 'internal';
   paymentUrl?: string;
   paymentId?: string;
   paymentMethod?: PaymentMethod;

@@ -31,8 +31,7 @@ import { PostprintServicesForm } from './components/PostprintServicesForm';
 import { usePostprintServices } from './hooks/usePostprintServices';
 import { useCustomProduct } from './hooks/useCustomProduct';
 import { useProductSelection } from './hooks/useProductSelection';
-import { getPriceTypeMultiplier, buildOrderPayload, buildAITrainingData } from './utils/orderPayloadBuilder';
-import { usePriceTypeMultipliers } from '../../hooks/pricing/usePriceTypeMultipliers';
+import { buildOrderPayload, buildAITrainingData } from './utils/orderPayloadBuilder';
 
 const createInitialSpecs = (initialProductType?: string): ProductSpecs => ({
   productType: initialProductType || 'flyers',
@@ -76,7 +75,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 }) => {
   const logger = useLogger('ImprovedPrintingCalculatorModal');
   const toast = useToastNotifications();
-  const priceTypeMultipliers = usePriceTypeMultipliers();
   const fetchProducts = useProductDirectoryStore((state) => state.fetchProducts);
   const getProductById = useProductDirectoryStore((state) => state.getProductById);
   const isEditMode = Boolean(editContext);
@@ -358,7 +356,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     specs,
     selectedProduct,
     isValid,
-    enabled: userInteracted && selectedProduct?.id != null && !isCustomProduct && !isPostprintProduct, // Автопересчет только после первого взаимодействия и выбора продукта
+    enabled: (userInteracted || !!editContext?.item) && selectedProduct?.id != null && !isCustomProduct && !isPostprintProduct, // В режиме редактирования включаем автопересчёт сразу
     onCalculate: calculateCost,
     debounceMs: 500,
     customFormat, // ✅ Передаем кастомный формат для отслеживания изменений
@@ -455,8 +453,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       clearTimeout(calculationTimeoutRef.current);
     }
     
-    // Вызываем расчет только если все условия выполнены
-    if (userInteracted && selectedProduct?.id != null && isValid && !isCustomProduct) {
+    // Вызываем расчет только если все условия выполнены (включая режим редактирования)
+    if ((userInteracted || !!editContext?.item) && selectedProduct?.id != null && isValid && !isCustomProduct) {
       // Debounce для избежания множественных вызовов
       calculationTimeoutRef.current = setTimeout(() => {
         instantCalculate();
@@ -470,7 +468,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         calculationTimeoutRef.current = null;
       }
     };
-  }, [printTechnology, printColorMode, userInteracted, selectedProduct?.id, isValid, instantCalculate, isCustomProduct]);
+  }, [printTechnology, printColorMode, userInteracted, editContext?.item, selectedProduct?.id, isValid, instantCalculate, isCustomProduct]);
 
   // Автопересчёт при установке/смене material_id или при смене подтипа (typeId).
   // material_id выставляется асинхронно MaterialsSection после загрузки материалов,
@@ -497,6 +495,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     }
   }, [specs.material_id, specs.typeId, specs.size_id, selectedProduct?.id, isValid, calculateCost, isCustomProduct, isPostprintProduct]);
 
+  const editModeCalculatedRef = useRef(false);
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -504,6 +503,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     if (editContext?.item) {
       setResult(null);
       setUserInteracted(false);
+      editModeCalculatedRef.current = false;
       // Загружаем тип печати и режим цвета из editContext
       const itemSpecs = editContext.item.params?.specifications || {};
       if (itemSpecs.print_technology || itemSpecs.printTechnology) {
@@ -514,6 +514,19 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       }
     }
   }, [isOpen, editContext, setResult, setUserInteracted]);
+
+  // 🆕 При открытии в режиме редактирования — запускаем расчёт после загрузки продукта и параметров
+  useEffect(() => {
+    if (!isOpen || !editContext?.item || !selectedProduct?.id || !isValid || isCustomProduct || isPostprintProduct) {
+      return;
+    }
+    if (editModeCalculatedRef.current) return;
+    editModeCalculatedRef.current = true;
+    const t = setTimeout(() => {
+      instantCalculate();
+    }, 150);
+    return () => clearTimeout(t);
+  }, [isOpen, editContext?.item, selectedProduct?.id, isValid, isCustomProduct, isPostprintProduct, instantCalculate]);
 
   // 🆕 useEffect для загрузки данных при открытии (однократно на открытие)
   const didOpenInitRef = useRef(false);
@@ -835,7 +848,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       customFormat,
       printTechnology,
       printColorMode,
-      priceTypeMultipliers,
       trainAIOnOrder,
       isEditMode,
       editContext,
@@ -966,15 +978,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
           />
         ) : (
           <ResultSection
-            result={
-              result
-                ? {
-                    ...result,
-                    pricePerItem: Math.round(result.pricePerItem * getPriceTypeMultiplier(specs.priceType || 'standard', priceTypeMultipliers) * 100) / 100,
-                    totalCost: Math.round(result.totalCost * getPriceTypeMultiplier(specs.priceType || 'standard', priceTypeMultipliers) * 100) / 100,
-                  }
-                : null
-            }
+            result={result}
             isValid={isValid}
             onAddToOrder={() => handleAddToOrder()}
             mode={isEditMode ? 'edit' : 'create'}

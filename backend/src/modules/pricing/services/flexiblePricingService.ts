@@ -13,6 +13,7 @@ import { LayoutCalculationService, ProductSize, LayoutResult } from './layoutCal
 import { logger } from '../../../utils/logger';
 import { PrintPriceService } from './printPriceService';
 import { PricingServiceRepository } from '../repositories/serviceRepository';
+import { PriceTypeService } from './priceTypeService';
 
 /** Категория материалов «Рулонная бумага» — для неё не учитывается раскладка (расход по количеству изделий, не по листам). */
 const ROLL_PAPER_CATEGORY_NAME = 'Рулонная бумага';
@@ -396,11 +397,11 @@ export class FlexiblePricingService {
         quantity,
         sheetsNeeded
       );
-      const totalMaterialCost = materialCosts.reduce((sum, m) => sum + m.totalCost, 0);
+      let totalMaterialCost = materialCosts.reduce((sum, m) => sum + m.totalCost, 0);
       logger.info('✅ Материалы рассчитаны', { materialCostsCount: materialCosts.length, totalMaterialCost });
 
       // 6. Промежуточная сумма
-      const subtotal = totalMaterialCost + totalOperationsCost + totalSetupCost;
+      let subtotal = totalMaterialCost + totalOperationsCost + totalSetupCost;
 
       // 7. Применяем наценку
       const markup = await this.getBaseMarkup();
@@ -412,7 +413,7 @@ export class FlexiblePricingService {
         ((layout.recommendedSheetSize.width === 320 && layout.recommendedSheetSize.height === 450) ||
           (layout.recommendedSheetSize.width === 450 && layout.recommendedSheetSize.height === 320));
       const discountPercent = await this.getQuantityDiscount(sheetsNeeded, quantity, productType, isSra3 ? 'SRA3' : undefined);
-      const discountAmount = priceWithMarkup * (discountPercent / 100);
+      let discountAmount = priceWithMarkup * (discountPercent / 100);
       let finalPrice = priceWithMarkup - discountAmount;
       let pricePerUnit = finalPrice / quantity;
 
@@ -430,6 +431,30 @@ export class FlexiblePricingService {
         // Для quantity экземпляров: финальная цена = стоимость одного экземпляра × quantity
         pricePerUnit = finalPrice; // Цена за один экземпляр (sheetsNeeded листов)
         finalPrice = finalPrice * quantity; // Цена за все экземпляры
+      }
+
+      // 10. Множитель типа цены (priceType)
+      const priceTypeKey = String(
+        configuration?.priceType ?? configuration?.price_type ?? configuration?.urgency ?? 'standard'
+      ).trim().toLowerCase() || 'standard';
+      const priceTypeMult = await PriceTypeService.getMultiplier(priceTypeKey);
+      if (priceTypeMult !== 1) {
+        logger.info('FlexiblePricingService: применяем множитель типа цены', { priceTypeKey, multiplier: priceTypeMult });
+        finalPrice *= priceTypeMult;
+        pricePerUnit *= priceTypeMult;
+        totalMaterialCost *= priceTypeMult;
+        totalOperationsCost *= priceTypeMult;
+        totalSetupCost *= priceTypeMult;
+        discountAmount *= priceTypeMult;
+        subtotal *= priceTypeMult;
+        materialCosts.forEach((m) => {
+          m.unitPrice *= priceTypeMult;
+          m.totalCost *= priceTypeMult;
+        });
+        operationCosts.forEach((o) => {
+          o.unitPrice *= priceTypeMult;
+          o.totalCost *= priceTypeMult;
+        });
       }
 
       return {

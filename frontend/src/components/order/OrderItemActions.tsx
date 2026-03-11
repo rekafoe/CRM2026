@@ -11,7 +11,6 @@ interface OrderItemActionsProps {
   item: Item;
   onSave: () => void;
   onCancel: () => void;
-  onEdit: () => void;
   onDelete: () => void;
   onPrinterFocus: () => void;
   onPrinterChange: (printerId: number | '') => void;
@@ -27,7 +26,6 @@ export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(({
   item,
   onSave,
   onCancel,
-  onEdit,
   onDelete,
   onPrinterFocus,
   onPrinterChange,
@@ -109,19 +107,6 @@ export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(({
           Редактировать
         </button>
       )}
-      <button 
-        onClick={onEdit}
-        style={{ 
-          padding: '6px 12px', 
-          backgroundColor: '#0ea5e9', 
-          color: 'white', 
-          border: 'none', 
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }}
-      >
-        Изменить цену
-      </button>
       <button
         className="btn-danger"
         onClick={onDelete}

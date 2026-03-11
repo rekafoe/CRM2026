@@ -94,6 +94,8 @@ export interface CalculationResult {
   };
   /** Предупреждения от бэкенда (например: формат не помещается на печатный лист) */
   warnings?: string[];
+  /** Цены по диапазонам тиража (уже с учётом priceType) */
+  tier_prices?: Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price?: number }>;
 }
 
 export interface CalculatorModalProps {

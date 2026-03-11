@@ -1026,6 +1026,54 @@
   margin-bottom: 6px;
 }
 
+/* Тиражные скидки (диапазоны) */
+.result-tier-prices {
+  margin: 8px 0;
+  font-size: 12px;
+}
+
+.result-tier-prices summary {
+  cursor: pointer;
+  padding: 4px 0;
+  color: var(--text-secondary, #64748b);
+  font-weight: 500;
+}
+
+.result-tier-prices[open] summary {
+  margin-bottom: 6px;
+}
+
+.tier-prices-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.tier-prices-table th,
+.tier-prices-table td {
+  padding: 4px 8px;
+  text-align: right;
+}
+
+.tier-prices-table th:first-child,
+.tier-prices-table td:first-child {
+  text-align: left;
+}
+
+.tier-prices-table th {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tier-prices-table td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tier-prices-row--current td {
+  background: rgba(14, 165, 233, 0.25);
+  font-weight: 600;
+}
+
 .parameter-chip {
   display: flex;
   gap: 4px;

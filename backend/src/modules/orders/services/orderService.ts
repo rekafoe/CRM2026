@@ -481,7 +481,7 @@ export class OrderService {
   private static readonly ALLOWED_DISCOUNT_PERCENTS = new Set([0, 5, 10, 15, 20, 25]);
 
   /** Допустимые значения payment_channel */
-  private static readonly ALLOWED_PAYMENT_CHANNELS = new Set(['cash', 'invoice', 'not_cashed']);
+  private static readonly ALLOWED_PAYMENT_CHANNELS = new Set(['cash', 'invoice', 'not_cashed', 'internal']);
 
   /**
    * Обновить канал оплаты заказа (учёт в кассе).
@@ -491,7 +491,7 @@ export class OrderService {
     const db = await getDb();
     const ch = String(paymentChannel || 'cash').toLowerCase();
     if (!OrderService.ALLOWED_PAYMENT_CHANNELS.has(ch)) {
-      throw new Error('payment_channel должен быть cash, invoice или not_cashed');
+      throw new Error('payment_channel должен быть cash, invoice, not_cashed или internal');
     }
     const order = await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id]);
     if (!order) {

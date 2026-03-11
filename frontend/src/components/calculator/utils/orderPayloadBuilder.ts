@@ -1,16 +1,12 @@
 import { CalculationResult } from '../types/calculator.types';
 
-const DEFAULT_PRICE_TYPE_MULTIPLIERS: Record<string, number> = {
-  standard: 1,
-  urgent: 1.5,
-  online: 0.825,
-  promo: 0.7,
-  special: 0.55,
-};
-
+/**
+ * Множитель типа цены. Источник истины — API getPriceTypes().
+ * Если multiplierMap не передан — возвращает 1 (без наценки/скидки).
+ */
 export function getPriceTypeMultiplier(priceType: string, multiplierMap?: Record<string, number> | null): number {
-  const map = multiplierMap ?? DEFAULT_PRICE_TYPE_MULTIPLIERS;
-  return map[priceType] ?? 1;
+  if (!multiplierMap) return 1;
+  return multiplierMap[priceType] ?? 1;
 }
 
 interface BuildOrderPayloadParams {
@@ -21,8 +17,6 @@ interface BuildOrderPayloadParams {
   customFormat: { width: string; height: string };
   printTechnology: string;
   printColorMode: 'bw' | 'color' | null;
-  /** Множители типов цен из API (key -> multiplier). Если не передан — используются дефолтные. */
-  priceTypeMultipliers?: Record<string, number> | null;
 }
 
 export function buildOrderPayload({
@@ -33,7 +27,6 @@ export function buildOrderPayload({
   customFormat,
   printTechnology,
   printColorMode,
-  priceTypeMultipliers,
 }: BuildOrderPayloadParams) {
   const layoutSheets = result.layout?.sheetsNeeded ?? undefined;
   const itemsPerSheet = result.layout?.itemsPerSheet ?? undefined;
@@ -116,8 +109,8 @@ export function buildOrderPayload({
       }))
     : [];
 
-  const priceTypeMult = getPriceTypeMultiplier(result.specifications.priceType || 'standard', priceTypeMultipliers);
-  const effectivePricePerItem = Math.round(result.pricePerItem * priceTypeMult * 100) / 100;
+  // Бэкенд уже применяет множитель priceType при расчёте
+  const effectivePricePerItem = Math.round(result.pricePerItem * 100) / 100;
 
   const paramsPayload = {
     description,

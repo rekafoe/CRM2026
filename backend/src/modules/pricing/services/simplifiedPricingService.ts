@@ -11,6 +11,7 @@ import { logger } from '../../../utils/logger';
 import { PricingServiceRepository } from '../repositories/serviceRepository';
 import { LayoutCalculationService } from './layoutCalculationService';
 import { PrintPriceService } from './printPriceService';
+import { PriceTypeService } from './priceTypeService';
 
 export interface SimplifiedPricingResult {
   productId: number;
@@ -884,9 +885,9 @@ export class SimplifiedPricingService {
     }
     
     // 7. Рассчитываем итоги
-    const subtotal = printPrice + materialPrice + finishingPrice;
-    const finalPrice = subtotal; // В упрощённом калькуляторе не применяем наценки (они уже учтены в ценах)
-    const pricePerUnit = quantity > 0 ? finalPrice / quantity : 0;
+    let subtotal = printPrice + materialPrice + finishingPrice;
+    let finalPrice = subtotal; // В упрощённом калькуляторе не применяем наценки (они уже учтены в ценах)
+    let pricePerUnit = quantity > 0 ? finalPrice / quantity : 0;
     
     logger.info('Итоговый расчет упрощенного калькулятора', {
       productId,
@@ -1001,6 +1002,44 @@ export class SimplifiedPricingService {
       warnings.push(
         `Формат ${selectedSize.width_mm}×${selectedSize.height_mm} мм не помещается на стандартные печатные листы (SRA3, A3, A4). Проверьте размер.`
       );
+    }
+
+    // 9. Множитель типа цены (priceType): standard, online, urgent, promo, special
+    const priceTypeKey = String(
+      (configuration as any).priceType ??
+      (configuration as any).price_type ??
+      (configuration as any).urgency ??
+      'standard'
+    ).trim().toLowerCase() || 'standard';
+    const priceTypeMult = await PriceTypeService.getMultiplier(priceTypeKey);
+    if (priceTypeMult !== 1) {
+      logger.info('Применяем множитель типа цены', { priceTypeKey, multiplier: priceTypeMult });
+      printPrice *= priceTypeMult;
+      materialPrice *= priceTypeMult;
+      finishingPrice *= priceTypeMult;
+      subtotal *= priceTypeMult;
+      finalPrice *= priceTypeMult;
+      pricePerUnit *= priceTypeMult;
+      if (printDetails) {
+        printDetails.tier = { ...printDetails.tier, price: printDetails.tier.price * priceTypeMult };
+        printDetails.priceForQuantity *= priceTypeMult;
+      }
+      if (materialDetails) {
+        materialDetails.tier = { ...materialDetails.tier, price: materialDetails.tier.price * priceTypeMult };
+        materialDetails.priceForQuantity *= priceTypeMult;
+      }
+      if (baseMaterialDetails) {
+        baseMaterialDetails.tier = { ...baseMaterialDetails.tier, price: baseMaterialDetails.tier.price * priceTypeMult };
+        baseMaterialDetails.priceForQuantity *= priceTypeMult;
+      }
+      finishingDetails.forEach((d) => {
+        d.tier = { ...d.tier, price: d.tier.price * priceTypeMult };
+        d.priceForQuantity *= priceTypeMult;
+      });
+      tierPricesResult.forEach((t) => {
+        t.unit_price *= priceTypeMult;
+        if (t.total_price != null) t.total_price *= priceTypeMult;
+      });
     }
     
     return {

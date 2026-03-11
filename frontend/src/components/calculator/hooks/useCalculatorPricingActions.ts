@@ -101,11 +101,12 @@ export function useCalculatorPricingActions({
   const calculatePriceViaBackend = useCallback(
     async (productId: number, configuration: any, quantity: number): Promise<any> => {
       try {
+        const priceType = configuration?.priceType ?? configuration?.urgency ?? 'standard';
         const backendResult = await unifiedCalculatePrice({
           product_id: productId,
           quantity,
           params: configuration,
-          channel: 'online',
+          channel: priceType,
         } as any);
         return backendResult as any;
       } catch (err) {
@@ -216,8 +217,9 @@ export function useCalculatorPricingActions({
           finishingConfig = specs.selectedOperations
             .map((sel: any) => {
               const op = backendOps.find((o) => {
-                const opId = o.operation_id ?? o.id;
-                return opId === sel.operationId;
+                const opId = Number(o.operation_id ?? o.id);
+                const selId = Number(sel.operationId);
+                return Number.isFinite(opId) && Number.isFinite(selId) && opId === selId;
               });
 
               if (!op) {
@@ -863,6 +865,7 @@ export function useCalculatorPricingActions({
           parameterSummary,
           formatInfo,
           warnings: Array.isArray(backendResult.warnings) ? backendResult.warnings : undefined,
+          tier_prices: Array.isArray(backendResult.tier_prices) ? backendResult.tier_prices : undefined,
         };
 
         setResult(calculationResult);

@@ -361,7 +361,6 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
           item={item}
           onSave={handleSave}
           onCancel={() => setEditing(false)}
-          onEdit={() => setEditing(true)}
           onDelete={() => setShowDeleteConfirm(true)}
           onPrinterFocus={loadPrintersIfNeeded}
           onPrinterChange={handleQuickPrinterChange}

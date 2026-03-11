@@ -8,7 +8,7 @@ interface CustomerSelectorProps {
   orderId: number;
   currentCustomerId?: number | null;
   onCustomerChange?: () => void;
-  onOrderPatch?: (orderId: number, patch: { payment_channel?: 'cash' | 'invoice' | 'not_cashed' }) => void;
+  onOrderPatch?: (orderId: number, patch: { payment_channel?: 'cash' | 'invoice' | 'not_cashed' | 'internal' }) => void;
 }
 
 export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
