@@ -24,17 +24,12 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
+        // Все node_modules в один chunk — иначе react-query и др. загружались до React,
+        // вызывая "useLayoutEffect of undefined" и белый экран после логина.
         manualChunks(id) {
-          if (!id.includes('node_modules')) return;
-
-          // React и все зависимые от него библиотеки — в один chunk (избегаем useLayoutEffect of undefined)
-          if (id.includes('react') || id.includes('react-konva') || id.includes('use-image') || id.includes('@tanstack')) return 'react';
-          if (id.includes('react-router')) return 'router';
-          if (id.includes('axios')) return 'axios';
-
-          return 'vendor';
-        }
-      }
-    }
+          if (id.includes('node_modules')) return 'vendor';
+        },
+      },
+    },
   }
 });

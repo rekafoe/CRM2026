@@ -9,7 +9,9 @@ import { ToastProvider } from './components/Toast';
 import './index.css';
 import './styles/themes.css';
 import './styles/utilities.css';
+import './styles/skeleton.css';
 import { APP_CONFIG } from './types';
+import { ErrorBoundary } from './components/optimized/ErrorBoundary';
 
 const LoadingFallback: React.FC = () => (
   <div className="loading-overlay">Загрузка...</div>
@@ -85,10 +87,11 @@ if (!root) {
 }
 
 root.render(
-  <QueryProvider>
-    <ToastProvider>
-      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-        <Routes>
+  <ErrorBoundary>
+    <QueryProvider>
+      <ToastProvider>
+        <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+          <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route
             path="/"
@@ -141,8 +144,9 @@ root.render(
               </RequireAuth>
             }
           />
-        </Routes>
-      </BrowserRouter>
-    </ToastProvider>
-  </QueryProvider>
+          </Routes>
+        </BrowserRouter>
+      </ToastProvider>
+    </QueryProvider>
+  </ErrorBoundary>
 );
