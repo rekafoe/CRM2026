@@ -21,9 +21,8 @@ export async function up(db: Database): Promise<void> {
   const ordersExistsNow = await db.get(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='orders'`);
   if (!ordersExistsNow) return;
 
-  const hasIsInternal = await db.get<{ name: string }>(
-    `SELECT name FROM pragma_table_info('orders') WHERE name = 'is_internal'`
-  );
+  const cols = (await db.all(`PRAGMA table_info('orders')`)) as Array<{ name: string }>;
+  const hasIsInternal = (cols || []).some((c) => c.name === 'is_internal');
   if (!hasIsInternal) {
     await db.exec('ALTER TABLE orders ADD COLUMN is_internal INTEGER DEFAULT 0');
   }
