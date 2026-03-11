@@ -175,7 +175,7 @@ export class OrderService {
     return orders
   }
 
-  static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm', customerId?: number, paymentChannel?: 'cash' | 'invoice' | 'not_cashed') {
+  static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm', customerId?: number, paymentChannel?: 'cash' | 'invoice' | 'not_cashed' | 'internal') {
     const dateOnly = date ? String(date).trim().slice(0, 10) : null
     const isToday = dateOnly && dateOnly === getTodayString()
     const createdAt = dateOnly && !isToday ? `${dateOnly}T12:00:00.000Z` : getCurrentTimestamp()
@@ -203,16 +203,19 @@ export class OrderService {
     const initialPrepay = Number(prepaymentAmount || 0)
     let hasPrepaymentUpdatedAt = false
     let hasPaymentChannel = false
+    let hasIsInternal = false
     let hasContactUserId = false
     let hasResponsibleUserId = false
     try {
       hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasIsInternal = await hasColumn('orders', 'is_internal')
       hasContactUserId = await hasColumn('orders', 'contact_user_id')
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id')
     } catch {
       hasPrepaymentUpdatedAt = false
       hasPaymentChannel = false
+      hasIsInternal = false
       hasContactUserId = false
       hasResponsibleUserId = false
     }
@@ -223,24 +226,30 @@ export class OrderService {
     const contactResponsibleVals = (hasContactUserId || hasResponsibleUserId)
       ? `${hasContactUserId ? ', ?' : ''}${hasResponsibleUserId ? ', ?' : ''}`
       : ''
-    const channel = paymentChannel && OrderService.ALLOWED_PAYMENT_CHANNELS.has(paymentChannel) ? paymentChannel : 'cash'
+    const channelRaw = paymentChannel && OrderService.ALLOWED_PAYMENT_CHANNELS.has(paymentChannel) ? paymentChannel : 'cash'
+    const isInternal = channelRaw === 'internal'
+    const channel = isInternal ? 'not_cashed' : channelRaw
+    const isInternalCol = hasIsInternal ? ', is_internal' : ''
+    const isInternalVal = hasIsInternal ? ', ?' : ''
     const insertRes = hasPrepaymentUpdatedAt
       ? await db.run(
-          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentUpdatedAt, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}${contactResponsible}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''}${contactResponsibleVals})`,
+          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentUpdatedAt, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}${isInternalCol}${contactResponsible}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''}${isInternalVal}${contactResponsibleVals})`,
           [
             defaultStatusId, createdAt, customerName || null, customerPhone || null, customerEmail || null,
             initialPrepay, initialPrepay > 0 ? createdAt : null, creatorId, source || 'crm', customerId || null,
             ...(hasPaymentChannel ? [channel] : []),
+            ...(hasIsInternal ? [isInternal ? 1 : 0] : []),
             ...(hasContactUserId ? [creatorId] : []),
             ...(hasResponsibleUserId ? [creatorId] : [])
           ]
         )
       : await db.run(
-          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}${contactResponsible}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''}${contactResponsibleVals})`,
+          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}${isInternalCol}${contactResponsible}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''}${isInternalVal}${contactResponsibleVals})`,
           [
             defaultStatusId, createdAt, customerName || null, customerPhone || null, customerEmail || null,
             initialPrepay, creatorId, source || 'crm', customerId || null,
             ...(hasPaymentChannel ? [channel] : []),
+            ...(hasIsInternal ? [isInternal ? 1 : 0] : []),
             ...(hasContactUserId ? [creatorId] : []),
             ...(hasResponsibleUserId ? [creatorId] : [])
           ]
@@ -249,12 +258,9 @@ export class OrderService {
     const number = `ORD-${String(id).padStart(4, '0')}`
     await db.run('UPDATE orders SET number = ? WHERE id = ?', [number, id])
 
-    const raw = await db.get<Order>(
-      'SELECT * FROM orders WHERE id = ?',
-      [id]
-    )
-    const order: Order = { ...(raw as any as Order), items: [] }
-    return order
+    const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
+    const order: Order = { ...(raw as any), items: [] }
+    return OrderService.orderForApi(order) as Order
   }
 
   // Создание заказа с резервированием материалов
@@ -473,19 +479,25 @@ export class OrderService {
       [customerId, id]
     )
 
-    const updated = await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id])
-    return { ...(updated as any as Order), items: [] }
+    const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
+    return OrderService.orderForApi({ ...(updated as any), items: [] }) as Order
   }
 
   /** Допустимые значения скидки: 0, 5, 10, 15, 20, 25 (%) */
   private static readonly ALLOWED_DISCOUNT_PERCENTS = new Set([0, 5, 10, 15, 20, 25]);
 
-  /** Допустимые значения payment_channel */
+  /** Допустимые значения payment_channel (internal хранится в is_internal) */
   private static readonly ALLOWED_PAYMENT_CHANNELS = new Set(['cash', 'invoice', 'not_cashed', 'internal']);
+
+  /** payment_channel='internal' когда is_internal=1 (для API) */
+  private static orderForApi<T extends { is_internal?: number; payment_channel?: string }>(o: T | null | undefined): T | null | undefined {
+    if (!o) return o
+    return (o.is_internal ? { ...o, payment_channel: 'internal' } : o) as T
+  }
 
   /**
    * Обновить канал оплаты заказа (учёт в кассе).
-   * cash — учитывается в кассе, invoice — счёт (не в кассе), not_cashed — не пробивался.
+   * internal — хранится в is_internal=1, payment_channel='not_cashed' (CHECK не поддерживает internal).
    */
   static async updateOrderPaymentChannel(id: number, paymentChannel: string): Promise<Order> {
     const db = await getDb();
@@ -498,18 +510,29 @@ export class OrderService {
       throw new Error('Заказ не найден');
     }
     let hasPaymentChannel = false;
+    let hasIsInternal = false;
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel');
+      hasIsInternal = await hasColumn('orders', 'is_internal');
     } catch { /* ignore */ }
     if (!hasPaymentChannel) {
       throw new Error('Колонка payment_channel ещё не добавлена. Примените миграции.');
     }
-    await db.run(
-      'UPDATE orders SET payment_channel = ?, updated_at = datetime("now") WHERE id = ?',
-      [ch, id]
-    );
-    const updated = await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id]);
-    return updated as Order;
+    const isInternal = ch === 'internal';
+    const storedChannel = isInternal ? 'not_cashed' : ch;
+    if (hasIsInternal) {
+      await db.run(
+        'UPDATE orders SET payment_channel = ?, is_internal = ?, updated_at = datetime("now") WHERE id = ?',
+        [storedChannel, isInternal ? 1 : 0, id]
+      );
+    } else {
+      await db.run(
+        'UPDATE orders SET payment_channel = ?, updated_at = datetime("now") WHERE id = ?',
+        [storedChannel, id]
+      );
+    }
+    const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id]);
+    return OrderService.orderForApi(updated) as Order;
   }
 
   /** Обновить контактёра и/или ответственного заказа */
@@ -536,14 +559,14 @@ export class OrderService {
       values.push(responsible_user_id ?? null);
     }
     if (updates.length === 0) {
-      return (await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
+      return OrderService.orderForApi(await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
     }
     values.push(id);
     await db.run(
       `UPDATE orders SET ${updates.join(', ')}, updated_at = datetime("now") WHERE id = ?`,
       values
     );
-    return (await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
+    return OrderService.orderForApi(await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
   }
 
   /** Обновить примечания заказа */
@@ -566,8 +589,8 @@ export class OrderService {
       'UPDATE orders SET notes = ?, updated_at = datetime("now") WHERE id = ?',
       [notes ?? null, id]
     );
-    const updated = await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id]);
-    return updated as Order;
+    const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id]);
+    return OrderService.orderForApi(updated) as Order;
   }
 
   /**
@@ -618,8 +641,8 @@ export class OrderService {
       await db.run(updateSql, newTotal, id)
     }
 
-    const updated = await db.get<Order>('SELECT * FROM orders WHERE id = ?', [id])
-    return { ...(updated as any as Order), items: [] }
+    const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
+    return OrderService.orderForApi({ ...(updated as any), items: [] }) as Order
   }
 
   static async updateOrderStatus(id: number, status: number, userId?: number, cancelReason?: string) {
@@ -684,12 +707,9 @@ export class OrderService {
           }
         }
         
-        const raw = await db.get<Order>(
-          'SELECT * FROM orders WHERE id = ?',
-          [id]
-        )
+        const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
         const updated: Order = { ...(raw as Order), items: [] }
-        return updated
+        return OrderService.orderForApi(updated) as Order
       } else {
         throw new Error(`Заказ с ID ${id} не найден`)
       }
@@ -901,14 +921,14 @@ export class OrderService {
     // Получаем созданный заказ с позициями
     const newOrder = await db.get<any>('SELECT * FROM orders WHERE id = ?', [newOrderId])
     const newItems = await db.all<any>('SELECT * FROM items WHERE orderId = ?', [newOrderId])
-    
+
     if (newOrder) {
       newOrder.items = newItems.map((item: any) => ({
         ...item,
         params: typeof item.params === 'string' ? JSON.parse(item.params) : item.params
       }))
+      return OrderService.orderForApi(newOrder)
     }
-
     return newOrder
   }
 

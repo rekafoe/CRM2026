@@ -189,12 +189,16 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
     : "COALESCE(o.created_at, o.createdAt)"
   const prepaymentUpdatedAtSelect = hasPrepaymentUpdatedAt ? 'o.prepaymentUpdatedAt' : 'NULL as prepaymentUpdatedAt'
   let hasPaymentChannel = false;
+  let hasIsInternal = false;
   let hasNotes = false;
   try {
     hasPaymentChannel = await hasColumn('orders', 'payment_channel');
+    hasIsInternal = await hasColumn('orders', 'is_internal');
     hasNotes = await hasColumn('orders', 'notes');
   } catch { /* ignore */ }
-  const paymentChannelSelect = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel";
+  const paymentChannelSelect = hasPaymentChannel
+    ? (hasIsInternal ? "CASE WHEN COALESCE(o.is_internal,0)=1 THEN 'internal' ELSE COALESCE(o.payment_channel, 'cash') END as payment_channel" : "COALESCE(o.payment_channel, 'cash') as payment_channel")
+    : "'cash' as payment_channel";
   const notesSelect = hasNotes ? 'o.notes' : 'NULL as notes';
   // Заказы за дату: созданные/обновлённые в этот день ИЛИ выданные в этот день (debt_closed_events.closed_date).
   // Выданные заказы должны попадать в счётчики принтеров по дате выдачи.

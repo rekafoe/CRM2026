@@ -15,5 +15,6 @@ export interface Order {
   paymentId?: string;
   paymentMethod?: 'online' | 'offline' | 'telegram';
   userId?: number;
+  payment_channel?: 'cash' | 'invoice' | 'not_cashed' | 'internal';
   items: Item[];
 }

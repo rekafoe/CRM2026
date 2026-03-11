@@ -14,6 +14,12 @@ import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 
 const router = Router()
 
+/** payment_channel='internal' когда is_internal=1 (для API) */
+function orderForApi(order: any): any {
+  if (!order) return order
+  return order.is_internal ? { ...order, payment_channel: 'internal' } : order
+}
+
 /**
  * @swagger
  * /api/orders/from-website:
@@ -572,7 +578,7 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   if (!order) { res.status(404).json({ message: 'Заказ не найден' }); return }
   if (Number(order.status) === 7) {
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
-    res.json(updated)
+    res.json(orderForApi(updated))
     return
   }
   const items = await db.all<any>('SELECT price, quantity FROM items WHERE orderId = ?', id)
@@ -630,7 +636,7 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   }
 
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
-  res.json(updated)
+  res.json(orderForApi(updated))
 }))
 
 // Prepayment routes — любой авторизованный пользователь может вносить предоплату / закрывать долг по любому заказу (в т.ч. коллег)
@@ -668,7 +674,7 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
          WHERE id = ?`
     await db.run(clearSql, id)
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
-    res.json(updated)
+    res.json(orderForApi(updated))
     return
   }
 
@@ -693,7 +699,7 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   await db.run(updateSql, amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, id)
 
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
-  res.json(updated)
+  res.json(orderForApi(updated))
 }))
 
 // Admin utility: normalize item prices

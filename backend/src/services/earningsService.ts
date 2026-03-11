@@ -73,16 +73,22 @@ export class EarningsService {
 
     let hasExecutorUserId = false;
     let hasResponsibleUserId = false;
+    let hasIsInternal = false;
     let hasPaymentChannel = false;
     try {
       hasExecutorUserId = await hasColumn('items', 'executor_user_id');
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id');
+      hasIsInternal = await hasColumn('orders', 'is_internal');
       hasPaymentChannel = await hasColumn('orders', 'payment_channel');
     } catch { /* ignore */ }
 
     const executorSel = hasExecutorUserId ? 'i.executor_user_id as executorUserId' : 'NULL as executorUserId';
     const responsibleSel = hasResponsibleUserId ? 'o.responsible_user_id as responsibleUserId' : 'NULL as responsibleUserId';
-    const excludeInternal = hasPaymentChannel ? "AND COALESCE(o.payment_channel, 'cash') != 'internal'" : '';
+    const excludeInternal = hasIsInternal
+      ? 'AND COALESCE(o.is_internal, 0) = 0'
+      : hasPaymentChannel
+        ? "AND COALESCE(o.payment_channel, 'cash') != 'internal'"
+        : '';
 
     const rows = await db.all<EarningsRow[]>(
       `

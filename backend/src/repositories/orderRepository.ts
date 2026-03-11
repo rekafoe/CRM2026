@@ -93,12 +93,16 @@ export const OrderRepository = {
   async listUserOrders(userId: number): Promise<Order[]> {
     const db = await getDb()
     let hasPaymentChannel = false
+    let hasIsInternal = false
     let hasNotes = false
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasIsInternal = await hasColumn('orders', 'is_internal')
       hasNotes = await hasColumn('orders', 'notes')
     } catch { /* ignore */ }
-    const paymentChannelSel = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel"
+    const paymentChannelSel = hasPaymentChannel
+      ? (hasIsInternal ? "CASE WHEN COALESCE(o.is_internal,0)=1 THEN 'internal' ELSE COALESCE(o.payment_channel, 'cash') END as payment_channel" : "COALESCE(o.payment_channel, 'cash') as payment_channel")
+      : "'cash' as payment_channel"
     const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const orders = await db.all<any>(
       `SELECT 
@@ -158,12 +162,16 @@ export const OrderRepository = {
     const db = await getDb()
     const d = dateYmd.slice(0, 10)
     let hasPaymentChannel = false
+    let hasIsInternal = false
     let hasNotes = false
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasIsInternal = await hasColumn('orders', 'is_internal')
       hasNotes = await hasColumn('orders', 'notes')
     } catch { /* ignore */ }
-    const paymentChannelSel = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel"
+    const paymentChannelSel = hasPaymentChannel
+      ? (hasIsInternal ? "CASE WHEN COALESCE(o.is_internal,0)=1 THEN 'internal' ELSE COALESCE(o.payment_channel, 'cash') END as payment_channel" : "COALESCE(o.payment_channel, 'cash') as payment_channel")
+      : "'cash' as payment_channel"
     const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const orders = await db.all<any>(
       `SELECT 
@@ -211,12 +219,16 @@ export const OrderRepository = {
       return OrderRepository.listUserOrdersIssuedOn(userId, dateYmd)
     }
     let hasPaymentChannel = false
+    let hasIsInternal = false
     let hasNotes = false
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasIsInternal = await hasColumn('orders', 'is_internal')
       hasNotes = await hasColumn('orders', 'notes')
     } catch { /* ignore */ }
-    const paymentChannelSel = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel"
+    const paymentChannelSel = hasPaymentChannel
+      ? (hasIsInternal ? "CASE WHEN COALESCE(o.is_internal,0)=1 THEN 'internal' ELSE COALESCE(o.payment_channel, 'cash') END as payment_channel" : "COALESCE(o.payment_channel, 'cash') as payment_channel")
+      : "'cash' as payment_channel"
     const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const orders = await db.all<any>(
       `SELECT 
@@ -268,12 +280,16 @@ export const OrderRepository = {
     const db = await getDb()
     const d = dateYmd.slice(0, 10)
     let hasPaymentChannel = false
+    let hasIsInternal = false
     let hasNotes = false
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasIsInternal = await hasColumn('orders', 'is_internal')
       hasNotes = await hasColumn('orders', 'notes')
     } catch { /* ignore */ }
-    const paymentChannelSel = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel"
+    const paymentChannelSel = hasPaymentChannel
+      ? (hasIsInternal ? "CASE WHEN COALESCE(o.is_internal,0)=1 THEN 'internal' ELSE COALESCE(o.payment_channel, 'cash') END as payment_channel" : "COALESCE(o.payment_channel, 'cash') as payment_channel")
+      : "'cash' as payment_channel"
     const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const orders = await db.all<any>(
       `SELECT 
@@ -328,18 +344,22 @@ export const OrderRepository = {
     const db = await getDb()
     let hasIsCancelled = false
     let hasPaymentChannel = false
+    let hasIsInternal = false
     let hasNotes = false
     let hasContactUserId = false
     let hasResponsibleUserId = false
     try {
       hasIsCancelled = await hasColumn('orders', 'is_cancelled')
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
+      hasIsInternal = await hasColumn('orders', 'is_internal')
       hasNotes = await hasColumn('orders', 'notes')
       hasContactUserId = await hasColumn('orders', 'contact_user_id')
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id')
     } catch { /* ignore */ }
     const isCancelledSel = hasIsCancelled ? 'o.is_cancelled' : '0 as is_cancelled'
-    const paymentChannelSel = hasPaymentChannel ? "COALESCE(o.payment_channel, 'cash') as payment_channel" : "'cash' as payment_channel"
+    const paymentChannelSel = hasPaymentChannel
+      ? (hasIsInternal ? "CASE WHEN COALESCE(o.is_internal,0)=1 THEN 'internal' ELSE COALESCE(o.payment_channel, 'cash') END as payment_channel" : "COALESCE(o.payment_channel, 'cash') as payment_channel")
+      : "'cash' as payment_channel"
     const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const contactUserIdSel = hasContactUserId ? 'o.contact_user_id' : 'NULL as contact_user_id'
     const responsibleUserIdSel = hasResponsibleUserId ? 'o.responsible_user_id' : 'NULL as responsible_user_id'
@@ -662,8 +682,16 @@ export const OrderRepository = {
       }
     }
 
-    const orders = await db.all<Order>(query, ...params)
-    return orders as unknown as Order[]
+    const orders = await db.all<any>(query, ...params)
+    return OrderRepository.mapPaymentChannelForInternal(orders) as unknown as Order[]
+  },
+
+  /** payment_channel='internal' когда is_internal=1 (для API) */
+  mapPaymentChannelForInternal(rows: any[]): any[] {
+    return rows.map((r) => {
+      if (r?.is_internal) return { ...r, payment_channel: 'internal' }
+      return r
+    })
   },
 
   async getOrdersStats(userId: number, dateFrom?: string, dateTo?: string): Promise<{
