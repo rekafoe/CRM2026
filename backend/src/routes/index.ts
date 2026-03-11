@@ -26,6 +26,7 @@ import orderManagementRoutes from './orderManagement'
 import documentTemplatesRoutes from './documentTemplates'
 import departmentsRoutes from './departments'
 import organizationsRoutes from './organizations'
+import designTemplatesRoutes from './designTemplates'
 
 const router = Router()
 
@@ -55,6 +56,7 @@ router.use('/order-management', orderManagementRoutes)
 router.use('/document-templates', documentTemplatesRoutes)
 router.use('/departments', departmentsRoutes)
 router.use('/organizations', organizationsRoutes)
+router.use('/design-templates', designTemplatesRoutes)
 
 console.log('Routes setup complete')
 

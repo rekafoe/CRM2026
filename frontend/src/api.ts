@@ -530,6 +530,16 @@ export const uploadOrderFile = async (orderId: number, file: File, orderItemId?:
 export const deleteOrderFile = (orderId: number, fileId: number) => api.delete(`/orders/${orderId}/files/${fileId}`);
 export const approveOrderFile = (orderId: number, fileId: number) => api.post<OrderFile>(`/orders/${orderId}/files/${fileId}/approve`, {});
 
+/** Префлайт: проверка макета (PDF, JPG, PNG, TIFF) */
+export interface PreflightReport {
+  type: 'pdf' | 'jpeg' | 'png' | 'tiff';
+  valid: boolean;
+  issues: Array<{ severity: 'error' | 'warning' | 'info'; code: string; message: string }>;
+  info: Record<string, unknown>;
+}
+export const getPreflightReport = (orderId: number, fileId: number) =>
+  api.get<PreflightReport>(`/orders/${orderId}/files/${fileId}/preflight`);
+
 /** Скачивание файла по ID через fetch. Имя — из Content-Disposition. */
 export const downloadOrderFile = async (orderId: number, fileId: number, suggestedFileName: string) => {
   const base = api.defaults.baseURL || API_BASE_URL || '/api';
@@ -550,6 +560,23 @@ export const downloadOrderFile = async (orderId: number, fileId: number, suggest
   a.download = suggestedFileName || 'download';
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+/** Загрузка файла для превью (без скачивания). Возвращает Blob. */
+export const fetchOrderFileForPreview = async (orderId: number, fileId: number): Promise<Blob> => {
+  const base = api.defaults.baseURL || API_BASE_URL || '/api';
+  const fullUrl = (base.startsWith('http') ? base : `${typeof window !== 'undefined' ? window.location.origin : ''}${base}`).replace(/\/$/, '') + `/orders/${orderId}/files/${fileId}/download`;
+  const token = typeof localStorage !== 'undefined' ? (localStorage.getItem(APP_CONFIG?.storage?.token || '') || localStorage.getItem('crmToken')) : '';
+  const res = await fetch(fullUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(res.status === 404 ? 'Файл не найден' : `${res.status}: ${text || res.statusText}`);
+  }
+  const blob = await res.blob();
+  if (blob.size === 0) {
+    throw new Error('Сервер вернул пустой файл (0 байт).');
+  }
+  return blob;
 };
 
 // Payments / Prepayment
@@ -883,3 +910,48 @@ export const getOrderBlankTemplate = (organizationId: number) =>
   api.get<{ organization_id: number; html_content: string }>(`/organizations/${organizationId}/order-blank-template`);
 export const saveOrderBlankTemplate = (organizationId: number, html_content: string) =>
   api.put<{ organization_id: number; html_content: string }>(`/organizations/${organizationId}/order-blank-template`, { html_content });
+
+// Design Templates API (каталог шаблонов для редактора макетов)
+export interface DesignTemplate {
+  id: number;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  preview_url?: string | null;
+  spec?: string | null;
+  is_active: number;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DesignTemplateSpec {
+  width_mm?: number;
+  height_mm?: number;
+  page_count?: number;
+  [key: string]: unknown;
+}
+
+/** Полезная нагрузка для create/update — spec как объект, is_active как boolean */
+export type DesignTemplateInput = Omit<Partial<DesignTemplate>, 'spec' | 'is_active'> & {
+  name?: string;
+  spec?: object | string | null;
+  is_active?: boolean | number;
+};
+
+export const getDesignTemplates = () => api.get<DesignTemplate[]>('/design-templates');
+export const getDesignTemplatesByCategory = (category: string) =>
+  api.get<DesignTemplate[]>(`/design-templates/category/${encodeURIComponent(category)}`);
+export const getDesignTemplate = (id: number) => api.get<DesignTemplate>(`/design-templates/${id}`);
+export const createDesignTemplate = (data: DesignTemplateInput & { name: string }) =>
+  api.post<DesignTemplate>('/design-templates', data);
+export const updateDesignTemplate = (id: number, data: DesignTemplateInput) =>
+  api.put<DesignTemplate>(`/design-templates/${id}`, data);
+export const deleteDesignTemplate = (id: number) => api.delete(`/design-templates/${id}`);
+export const uploadDesignTemplatePreview = (file: File) => {
+  const formData = new FormData();
+  formData.append('preview', file);
+  return api.post<{ filename: string; url: string }>('/design-templates/upload-preview', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};

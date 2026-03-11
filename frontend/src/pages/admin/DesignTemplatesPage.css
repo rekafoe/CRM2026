@@ -1,0 +1,251 @@
+.design-templates-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.design-templates-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.design-templates-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.design-templates-filter label {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.design-templates-filter select {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #111827);
+}
+
+.design-templates-loading,
+.design-templates-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted, #6b7280);
+}
+
+.design-templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.design-template-card {
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s;
+}
+
+.design-template-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.design-template-preview {
+  aspect-ratio: 4/3;
+  background: var(--bg-secondary, #f8f9fa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.design-template-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.design-template-placeholder {
+  color: var(--text-muted, #9ca3af);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.design-template-info {
+  padding: 12px;
+  flex: 1;
+}
+
+.design-template-info h4 {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.design-template-category,
+.design-template-size {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.design-template-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.design-template-actions .btn-open {
+  flex: 1;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #dbeafe;
+  color: #2563eb;
+  font-size: 12px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.design-template-actions .btn-open:hover {
+  background: #bfdbfe;
+}
+
+.design-template-actions .btn-edit,
+.design-template-actions .btn-delete {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
+  transition: background 0.2s, color 0.2s;
+}
+
+.design-template-actions .btn-edit:hover {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.design-template-actions .btn-delete:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Форма в модалке */
+.design-template-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.design-template-form .form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.design-template-form .form-row label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+}
+
+.design-template-form .form-row input[type="text"],
+.design-template-form .form-row input[type="number"],
+.design-template-form .form-row select,
+.design-template-form .form-row textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #111827);
+}
+
+.design-template-form .form-row-inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.design-template-form .form-row-inline label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.design-template-form .form-row-inline label span {
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+}
+
+.design-template-form .checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  cursor: pointer;
+}
+
+.preview-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preview-preview {
+  position: relative;
+  display: inline-block;
+  max-width: 200px;
+}
+
+.preview-preview img {
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.preview-preview button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.preview-preview button:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.design-template-form .form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .design-templates-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+}

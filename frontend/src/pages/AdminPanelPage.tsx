@@ -52,6 +52,15 @@ const UserManagement = lazy(() =>
   import('../features/userManagement').then((m) => ({ default: m.UserManagement }))
 );
 const MultiPageProductEditor = lazy(() => import('./admin/MultiPageProductEditor'));
+const PreflightPage = lazy(() =>
+  import('./admin/PreflightPage').then((m) => ({ default: m.PreflightPage }))
+);
+const DesignTemplatesPage = lazy(() =>
+  import('./admin/DesignTemplatesPage').then((m) => ({ default: m.DesignTemplatesPage }))
+);
+const DesignEditorPage = lazy(() =>
+  import('./admin/DesignEditorPage').then((m) => ({ default: m.DesignEditorPage }))
+);
 
 // Компонент страницы уведомлений (исправлен - убраны инлайн стили)
 const NotificationsPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
@@ -164,6 +173,12 @@ const AdminPanelHome: React.FC = () => {
           <button onClick={() => navigate('/adminpanel/notifications')} className="nav-btn">
             <AppIcon name="bell" size="xs" /> Уведомления
           </button>
+          <button onClick={() => navigate('/adminpanel/preflight')} className="nav-btn">
+            <AppIcon name="layers" size="xs" /> Префлайт
+          </button>
+          <button onClick={() => navigate('/adminpanel/design-templates')} className="nav-btn">
+            <AppIcon name="image" size="xs" /> Шаблоны дизайна
+          </button>
         </div>
       </div>
       
@@ -247,6 +262,22 @@ const AdminPanelHome: React.FC = () => {
               <span className="link-title">Клиенты</span>
               <span className="link-desc">База клиентов и история заказов</span>
             </button>
+            <button 
+              className="admin-link-card"
+              onClick={() => navigate('/adminpanel/preflight')}
+            >
+              <span className="link-icon"><AppIcon name="layers" size="md" circle /></span>
+              <span className="link-title">Префлайт</span>
+              <span className="link-desc">Проверка макетов: вылеты, цвет, шрифты, разрешение</span>
+            </button>
+            <button 
+              className="admin-link-card"
+              onClick={() => navigate('/adminpanel/design-templates')}
+            >
+              <span className="link-icon"><AppIcon name="image" size="md" circle /></span>
+              <span className="link-title">Шаблоны дизайна</span>
+              <span className="link-desc">Каталог шаблонов для редактора макетов</span>
+            </button>
           </div>
         </div>
 
@@ -297,6 +328,9 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/print-prices/new" element={<PrintPriceEditPage />} />
           <Route path="/print-prices/:id" element={<PrintPriceEditPage />} />
           <Route path="/counters" element={<CountersServicePage />} />
+          <Route path="/preflight" element={<PreflightPage />} />
+          <Route path="/design-templates" element={<DesignTemplatesPage />} />
+          <Route path="/design-editor/:templateId" element={<DesignEditorPage />} />
           <Route path="/clients" element={<CustomersAdminPage />} />
           <Route path="/document-templates" element={<DocumentTemplatesPage />} />
           <Route path="/organizations" element={<OrganizationsPage />} />

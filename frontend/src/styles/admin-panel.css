@@ -534,3 +534,114 @@
   margin-bottom: 20px;
   color: #333;
 }
+
+/* Префлайт — страница сервиса */
+.preflight-page .admin-page-content {
+  padding: 20px 24px;
+}
+
+.preflight-card {
+  background: #fff;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 640px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.preflight-card h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 20px 0 8px;
+}
+
+.preflight-card h2:first-of-type {
+  margin-top: 0;
+}
+
+.preflight-card p {
+  margin: 0 0 12px;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.preflight-status {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.preflight-status--planned {
+  background: rgba(107, 114, 128, 0.15);
+  color: #4b5563;
+}
+
+.preflight-category {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 16px !important;
+}
+
+.preflight-plan {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(209, 213, 219, 0.6);
+}
+
+.preflight-plan h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 16px 0 8px;
+}
+
+.preflight-plan h3:first-child {
+  margin-top: 0;
+}
+
+.preflight-plan ol {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.preflight-plan ol li {
+  margin-bottom: 6px;
+}
+
+.preflight-plan ul {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.preflight-plan ul li {
+  margin-bottom: 4px;
+}
+
+.preflight-plan-table {
+  width: 100%;
+  max-width: 400px;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 8px 0 16px;
+}
+
+.preflight-plan-table th,
+.preflight-plan-table td {
+  padding: 6px 10px;
+  text-align: left;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+}
+
+.preflight-plan-table th {
+  background: rgba(249, 250, 251, 0.8);
+  font-weight: 600;
+  color: #374151;
+}

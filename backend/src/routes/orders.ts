@@ -11,6 +11,7 @@ import { PDFReportService } from '../services/pdfReportService'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { getLastWebsiteOrderAt } from '../utils/poolSync'
 import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
+import { runPreflight, parseTargetFormatFromParams } from '../services/preflightService'
 
 const router = Router()
 
@@ -528,6 +529,37 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
   res.setHeader('Content-Length', String(buffer.length))
   if (row.mime) res.setHeader('Content-Type', row.mime)
   res.send(buffer)
+}))
+
+// Префлайт: проверка макета (PDF, JPG, PNG, TIFF)
+router.get('/:id/files/:fileId/preflight', asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  const fileId = Number(req.params.fileId)
+  const db = await getDb()
+  const row = await db.get<any>(
+    'SELECT filename, mime, orderItemId FROM order_files WHERE id = ? AND orderId = ?',
+    fileId,
+    orderId
+  )
+  if (!row || !row.filename) {
+    res.status(404).json({ message: 'Файл не найден' })
+    return
+  }
+  let targetFormat: { width_mm: number; height_mm: number } | null = null
+  if (row.orderItemId != null) {
+    const item = await db.get<{ params: string }>('SELECT params FROM items WHERE id = ? AND orderId = ?', row.orderItemId, orderId)
+    if (item?.params) {
+      let params: unknown
+      try {
+        params = typeof item.params === 'string' ? JSON.parse(item.params) : item.params
+      } catch {
+        params = null
+      }
+      targetFormat = parseTargetFormatFromParams(params)
+    }
+  }
+  const report = await runPreflight(String(row.filename), row.mime || null, targetFormat)
+  res.json(report)
 }))
 
 router.delete('/:orderId/files/:fileId', asyncHandler(async (req, res) => {

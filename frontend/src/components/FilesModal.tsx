@@ -1,8 +1,12 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { OrderFile, Item } from '../types';
-import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, downloadOrderFile } from '../api';
+import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, downloadOrderFile, getPreflightReport, type PreflightReport } from '../api';
 import { AppIcon } from './ui/AppIcon';
+import { PreflightReportModal } from './PreflightReportModal';
 import './FilesModal.css';
+
+const PREFLIGHT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/tiff'];
 
 interface FilesModalProps {
   isOpen: boolean;
@@ -25,11 +29,17 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   orderNumber,
   items = []
 }) => {
+  const navigate = useNavigate();
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   /** К какой позиции привязать следующий загружаемый файл (null = общие) */
   const [selectedOrderItemId, setSelectedOrderItemId] = useState<number | null>(null);
+  /** Префлайт */
+  const [preflightFile, setPreflightFile] = useState<{ id: number; name: string } | null>(null);
+  const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null);
+  const [preflightLoading, setPreflightLoading] = useState(false);
+  const [preflightError, setPreflightError] = useState<string | null>(null);
 
   // Загружаем файлы при открытии модального окна
   React.useEffect(() => {
@@ -98,6 +108,32 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     }
   };
 
+  const handlePreflight = async (file: OrderFile) => {
+    setPreflightFile({ id: file.id, name: file.originalName || file.filename });
+    setPreflightReport(null);
+    setPreflightError(null);
+    setPreflightLoading(true);
+    try {
+      const res = await getPreflightReport(orderId, file.id);
+      setPreflightReport(res.data);
+    } catch (err) {
+      setPreflightError(err instanceof Error ? err.message : 'Ошибка проверки');
+    } finally {
+      setPreflightLoading(false);
+    }
+  };
+
+  const closePreflight = () => {
+    setPreflightFile(null);
+    setPreflightReport(null);
+    setPreflightError(null);
+  };
+
+  const canPreflight = (file: OrderFile) => {
+    const m = (file.mime || '').toLowerCase();
+    return PREFLIGHT_MIME_TYPES.includes(m);
+  };
+
   const approvedCount = files.filter(f => f.approved).length;
   const totalCount = files.length;
 
@@ -127,6 +163,11 @@ export const FilesModal: React.FC<FilesModalProps> = ({
           </div>
         </div>
         <div className="file-actions">
+          {canPreflight(file) && (
+            <button className="btn-preflight" onClick={() => handlePreflight(file)} title="Проверить макет (префлайт)">
+              <AppIcon name="shield" size="xs" />
+            </button>
+          )}
           <button className="btn-download" onClick={() => handleDownloadFile(file)} title="Скачать файл">
             <AppIcon name="download" size="xs" />
           </button>
@@ -210,6 +251,19 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               <>Загрузить файл</>
             )}
           </label>
+          <button
+            type="button"
+            className="btn-create-design"
+            onClick={() => {
+              onClose();
+              const q = new URLSearchParams({ orderId: String(orderId) });
+              if (selectedOrderItemId != null) q.set('orderItemId', String(selectedOrderItemId));
+              navigate(`/adminpanel/design-templates?${q.toString()}`);
+            }}
+            title="Создать макет в редакторе"
+          >
+            <AppIcon name="image" size="xs" /> Создать макет
+          </button>
         </div>
 
         {/* Список файлов */}
@@ -248,6 +302,17 @@ export const FilesModal: React.FC<FilesModalProps> = ({
           )}
         </div>
       </div>
+
+      <PreflightReportModal
+        isOpen={preflightFile !== null}
+        onClose={closePreflight}
+        fileName={preflightFile?.name ?? ''}
+        report={preflightReport}
+        isLoading={preflightLoading}
+        error={preflightError}
+        orderId={orderId}
+        fileId={preflightFile?.id ?? 0}
+      />
     </div>
   );
 };

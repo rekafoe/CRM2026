@@ -521,6 +521,7 @@ export class OrderItemController {
         sheets: number
         waste: number
         executor_user_id: number | null
+        params: Record<string, unknown>
       }>
       const db = await getDb()
 
@@ -645,6 +646,18 @@ export class OrderItemController {
         const executorVal = hasExecutorUserId && body.executor_user_id !== undefined
           ? [body.executor_user_id ?? null] : []
 
+        let paramsJson: string | undefined
+        if (body.params != null && typeof body.params === 'object') {
+          const existingParams = (() => {
+            try {
+              return JSON.parse(existing.params || '{}') as Record<string, unknown>
+            } catch {
+              return {}
+            }
+          })()
+          paramsJson = JSON.stringify({ ...existingParams, ...body.params })
+        }
+
         await db.run(
           `UPDATE items SET 
               ${body.price != null ? 'price = ?,' : ''}
@@ -654,6 +667,7 @@ export class OrderItemController {
               ${body.sheets != null ? 'sheets = ?,' : ''}
               ${body.waste != null ? 'waste = ?,' : ''}
               ${executorClause}
+              ${paramsJson != null ? 'params = ?,' : ''}
               clicks = ?
            WHERE id = ? AND orderId = ?`,
           ...([body.price != null ? Number(body.price) : []] as any),
@@ -663,6 +677,7 @@ export class OrderItemController {
           ...([body.sheets != null ? nextSheets : []] as any),
           ...([body.waste != null ? Math.max(0, Number(body.waste) || 0) : []] as any),
           ...executorVal,
+          ...(paramsJson != null ? [paramsJson] : []),
           clicks,
           itemId,
           orderId
