@@ -109,8 +109,10 @@ export function buildOrderPayload({
       }))
     : [];
 
-  // Бэкенд уже применяет множитель priceType при расчёте
-  const effectivePricePerItem = Math.round(result.pricePerItem * 100) / 100;
+  // Округляем итог, затем делим на кол-во — чтобы сумма в заказе совпадала с калькулятором
+  const qty = Math.max(1, result.specifications.quantity || 1);
+  const effectiveTotal = Math.round(result.pricePerItem * qty * 100) / 100;
+  const effectivePricePerItem = effectiveTotal / qty;
 
   const paramsPayload = {
     description,
