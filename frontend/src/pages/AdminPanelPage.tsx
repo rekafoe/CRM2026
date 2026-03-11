@@ -97,7 +97,7 @@ const AdminPanelHome: React.FC = () => {
     return (
       <div className="admin-panel-home">
         <div className="admin-panel-header">
-          <h1><AppIcon name="shield" size="sm" /> Админ панель</h1>
+          <h1><AppIcon name="settings" size="xl" /> Админ панель</h1>
           <p>Загрузка...</p>
         </div>
       </div>
@@ -116,7 +116,7 @@ const AdminPanelHome: React.FC = () => {
             ← Назад
           </button>
           <div className="header-text">
-            <h1><AppIcon name="shield" size="sm" /> Админ панель</h1>
+            <h1><AppIcon name="settings" size="xl" /> Админ панель</h1>
             <p>Добро пожаловать в систему управления CRM</p>
           </div>
         </div>

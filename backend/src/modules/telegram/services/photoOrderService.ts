@@ -1,5 +1,6 @@
 import { getDb } from '../../../db';
 import { ImageProcessingService, PhotoSize, ProcessingOptions, ProcessedPhoto } from './imageProcessingService';
+import { setLastWebsiteOrderAt } from '../../../utils/poolSync';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../../../utils/logger';
@@ -142,6 +143,7 @@ export class PhotoOrderService {
       };
 
       logger.info(`Photo order created: ${orderId}`);
+      setLastWebsiteOrderAt(Date.now());
       return order;
     } catch (error) {
       logger.error('Error creating photo order', error);

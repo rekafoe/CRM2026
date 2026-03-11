@@ -14,6 +14,8 @@ interface TopBarProps {
   onShowOrderPool: () => void;
   onShowCountersPage: () => void;
   onLogout: () => void;
+  /** Новый заказ с сайта/TG в пуле — показываем зелёный бейдж "new" */
+  hasNewPoolOrder?: boolean;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -25,6 +27,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onShowOrderPool,
   onShowCountersPage,
   onLogout,
+  hasNewPoolOrder = false,
 }) => {
   const navigate = useNavigate();
   const rawLogoUrl = organization?.logo_url;
@@ -68,13 +71,14 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
       <div className="topbar-actions">
         <button 
-          onClick={() => navigate('/order-pool')}
+          onClick={onShowOrderPool}
           title="Пул заказов" 
           aria-label="Пул заказов" 
-          className="app-icon-btn app-icon-btn--with-label"
+          className="app-icon-btn app-icon-btn--with-label app-icon-btn--pool"
         >
           <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="clipboard" size="sm" /></span>
           <span className="app-icon-btn__label">Пул заказов</span>
+          {hasNewPoolOrder && <span className="pool-badge pool-badge--new">new</span>}
         </button>
         <button 
           onClick={onShowCountersPage}

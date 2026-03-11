@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo, useReducer, useRef } 
 import { useNavigate } from 'react-router-dom';
 import { Order } from '../types';
 import { getOrders, getOrderPoolSync, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder, getOrderStatuses, getOperatorsToday, updateOrderItem } from '../api';
+
+const ORDER_POOL_LAST_SEEN_KEY = 'orderPoolLastSeenAt';
 import { parseNumberFlexible } from '../utils/numberInput';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { OrderHeader } from '../components/optimized/OrderHeader';
@@ -338,6 +340,18 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     [loadOrders, toast]
   );
 
+
+  /** При открытии страницы пула — помечаем как просмотренное (убираем бейдж "new" на главной) */
+  useEffect(() => {
+    getOrderPoolSync()
+      .then(({ data }) => {
+        const at = data?.lastWebsiteOrderAt ?? Date.now();
+        try {
+          localStorage.setItem(ORDER_POOL_LAST_SEEN_KEY, String(at));
+        } catch {}
+      })
+      .catch(() => {});
+  }, []);
 
   /** Опрос маркера «заказ с сайта»: при обращении к orderpool API с printcore.by бэкенд обновляет lastWebsiteOrderAt — принудительно обновляем список */
   const poolSyncRef = useRef<number>(0);

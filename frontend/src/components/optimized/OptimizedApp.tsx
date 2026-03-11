@@ -38,6 +38,7 @@ import { MemoizedOrderItem } from './MemoizedOrderItem';
 import { OrderList } from './OrderList';
 import { useOptimizedAppData, type OrdersListTab } from './hooks/useOptimizedAppData';
 import { useModalState } from './hooks/useModalState';
+import { usePoolNewBadge } from './hooks/usePoolNewBadge';
 import { useOrderHandlers } from './hooks/useOrderHandlers';
 import { OrderDetailSection } from './components/OrderDetailSection';
 import { useReasonPrompt } from '../common/useReasonPrompt';
@@ -93,6 +94,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   // Хук для состояния модальных окон
   const modalState = useModalState();
   const { requestReason, ReasonPromptModalElement } = useReasonPrompt();
+  const { hasNew: hasNewPoolOrder, markAsSeen: markPoolAsSeen } = usePoolNewBadge();
 
   // Хук для обработчиков заказов
   const orderHandlers = useOrderHandlers({
@@ -295,9 +297,13 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
             currentUserName={currentUser?.name || ''}
             isAdmin={currentUser?.role === 'admin'}
             onShowPageSwitcher={useCallback(() => setShowPageSwitcher(true), [setShowPageSwitcher])}
-            onShowOrderPool={useCallback(() => navigate('/order-pool'), [navigate])}
+            onShowOrderPool={useCallback(() => {
+              markPoolAsSeen();
+              navigate('/order-pool');
+            }, [markPoolAsSeen, navigate])}
             onShowCountersPage={useCallback(() => setShowCountersPage(true), [setShowCountersPage])}
             onLogout={handleLogout}
+            hasNewPoolOrder={hasNewPoolOrder}
           />
 
           {showTopPicker && (
