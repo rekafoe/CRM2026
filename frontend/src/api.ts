@@ -29,7 +29,7 @@ api.interceptors.response.use(
     // Ошибки логируются через систему логирования, не через console
     if (error.response) {
       // Server responded with error status
-      const message = error.response.data?.message || error.response.statusText || 'Ошибка сервера';
+      const message = error.response.data?.message || error.response.data?.error || error.response.statusText || 'Ошибка сервера';
       throw new Error(`${error.response.status}: ${message}`);
     } else if (error.request) {
       // Request was made but no response received
