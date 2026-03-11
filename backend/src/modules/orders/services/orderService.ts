@@ -667,26 +667,8 @@ export class OrderService {
       const orderInOrders = await db.get('SELECT id FROM orders WHERE id = ?', [id])
       
       if (orderInOrders) {
-        if (Number(status) === 5) {
-          const reasonText = String(cancelReason || '').trim();
-          if (!reasonText) {
-            throw new Error('Для отмены заказа необходимо указать причину')
-          }
-          const ord = await db.get<{ number?: string | null; source?: string | null; status?: number | null }>(
-            'SELECT number, source, status FROM orders WHERE id = ?',
-            [id]
-          );
-          await this.recordCancellationEvent(db, {
-            orderId: id,
-            orderNumber: ord?.number ?? null,
-            orderSource: ord?.source ?? null,
-            statusBefore: Number(ord?.status ?? 0),
-            eventType: 'status_cancel',
-            reason: reasonText,
-            userId
-          });
-        }
-
+        // Статус 5 в order_statuses = «Передан в ПВЗ», не отмена. Запись в order_cancellation_events
+        // только при deleteOrder (handleDeleteOrder). Отмена через статус не используется.
         // Обновляем обычный заказ
         try {
           await db.run('UPDATE orders SET status = ?, updatedAt = datetime(\"now\") WHERE id = ?', [status, id])

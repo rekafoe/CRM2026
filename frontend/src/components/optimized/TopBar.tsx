@@ -2,9 +2,11 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logo } from '../Logo.tsx';
 import { AppIcon } from '../ui/AppIcon';
+import type { Organization } from '../../api';
 import './TopBar.css';
 
 interface TopBarProps {
+  organization?: Organization | null;
   contextDate: string;
   currentUserName: string;
   isAdmin: boolean;
@@ -15,6 +17,7 @@ interface TopBarProps {
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
+  organization,
   contextDate,
   currentUserName,
   isAdmin,
@@ -24,10 +27,21 @@ export const TopBar: React.FC<TopBarProps> = ({
   onLogout,
 }) => {
   const navigate = useNavigate();
+  const hasLogo = organization?.logo_url && (organization.logo_url.startsWith('data:') || organization.logo_url.startsWith('http'));
   return (
     <div className="app-topbar">
       <div className="topbar-logo">
-        <Logo size="small" showText={false} />
+        {hasLogo ? (
+          <div className="topbar-org">
+            <img src={organization!.logo_url} alt={organization!.name || 'Лого'} className="topbar-org-logo" />
+            {organization?.name && <span className="topbar-org-name">{organization.name}</span>}
+          </div>
+        ) : (
+          <div className="topbar-org topbar-org--fallback">
+            <Logo size="small" showText={false} />
+            {organization?.name && <span className="topbar-org-name">{organization.name}</span>}
+          </div>
+        )}
       </div>
       <div className="topbar-info">
         <button 

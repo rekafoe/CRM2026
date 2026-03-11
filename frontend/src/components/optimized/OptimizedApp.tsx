@@ -28,7 +28,8 @@ import { OrderPool } from "../orders/OrderPool";
 import { UserOrderPage } from "../orders/UserOrderPage";
 import { TopBar } from "./TopBar";
 import { DateSwitchContainer } from "../orders/DateSwitchContainer";
-import { setAuthToken, getOrderStatuses, listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, createPrepaymentLink, issueOrder, getLowStock, getCurrentUser, getUsers, getDailyReportByDate, createDailyReport } from '../../api';
+import { setAuthToken, getOrderStatuses, listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, createPrepaymentLink, issueOrder, getLowStock, getCurrentUser, getUsers, getDailyReportByDate, createDailyReport, getOrganizations } from '../../api';
+import type { Organization } from '../../api';
 import { APP_CONFIG } from '../../types';
 import type { OrderFile } from '../../types';
 
@@ -76,9 +77,20 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   } = useOptimizedAppData(contextDate, contextUserId, selectedId, ordersListTab);
 
   const [operatorsToday, setOperatorsToday] = useState<Array<{ id: number; name: string }>>([]);
+  const [organization, setOrganization] = useState<Organization | null>(null);
+
   useEffect(() => {
     getOperatorsToday(contextDate).then(res => setOperatorsToday(res.data ?? [])).catch(() => setOperatorsToday([]));
   }, [contextDate]);
+
+  useEffect(() => {
+    getOrganizations()
+      .then((res) => {
+        const list = Array.isArray(res.data) ? res.data : [];
+        setOrganization(list.find((o) => o.is_default) ?? list[0] ?? null);
+      })
+      .catch(() => setOrganization(null));
+  }, []);
 
   // Хук для состояния модальных окон
   const modalState = useModalState();
@@ -257,11 +269,29 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
     if (currentUser && !contextUserId) setContextUserId(currentUser.id);
   }, [currentUser, contextUserId]);
 
+  useEffect(() => {
+    document.title = organization?.name ? `${organization.name} — CRM` : 'PRINT CORE';
+  }, [organization?.name]);
+
+  useEffect(() => {
+    const logoUrl = organization?.logo_url;
+    const hasLogo = logoUrl && (logoUrl.startsWith('data:') || logoUrl.startsWith('http'));
+    let link = document.querySelector<HTMLLinkElement>('link[rel*="icon"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/x-icon';
+      document.head.appendChild(link);
+    }
+    link.href = hasLogo ? logoUrl : '/favicon.ico';
+  }, [organization?.logo_url]);
+
   return (
     <div className="app">
       {currentPage === 'orders' && (
         <>
           <TopBar
+            organization={organization}
             contextDate={contextDate}
             currentUserName={currentUser?.name || ''}
             isAdmin={currentUser?.role === 'admin'}

@@ -135,9 +135,15 @@ export const useOptimizedAppData = (
           prevOrders.every((o, i) => {
             const next = uniqueOrders[i];
             if (!next) return false;
+            const itemsMatch =
+              (o.items?.length || 0) === (next.items?.length || 0) &&
+              (o.items || []).every((it, j) => {
+                const nj = (next.items || [])[j];
+                return it && nj && it.id === nj.id && (it.printerId ?? null) === (nj.printerId ?? null);
+              });
             return (
               o.id === next.id &&
-              (o.items?.length || 0) === (next.items?.length || 0) &&
+              itemsMatch &&
               Number(o.prepaymentAmount || 0) === Number(next.prepaymentAmount || 0) &&
               (o.prepaymentStatus || '') === (next.prepaymentStatus || '') &&
               (o.paymentMethod || '') === (next.paymentMethod || '')
@@ -219,9 +225,15 @@ export const useOptimizedAppData = (
               prevOrders.every((o, i) => {
                 const newOrder = uniqueOrders[i];
                 if (!newOrder) return false;
+                const itemsMatch =
+                  (o.items?.length || 0) === (newOrder.items?.length || 0) &&
+                  (o.items || []).every((it, j) => {
+                    const nj = (newOrder.items || [])[j];
+                    return it && nj && it.id === nj.id && (it.printerId ?? null) === (nj.printerId ?? null);
+                  });
                 return (
                   o.id === newOrder.id && 
-                  (o.items?.length || 0) === (newOrder.items?.length || 0) &&
+                  itemsMatch &&
                   Number(o.prepaymentAmount || 0) === Number(newOrder.prepaymentAmount || 0) &&
                   (o.prepaymentStatus || '') === (newOrder.prepaymentStatus || '') &&
                   (o.paymentMethod || '') === (newOrder.paymentMethod || '')

@@ -167,17 +167,7 @@ export const useOrderHandlers = ({
 
   const handleStatusChange = useCallback(async (orderId: number, newStatus: number) => {
     try {
-      let cancelReason: string | undefined;
-      if (Number(newStatus) === 5) {
-        cancelReason = (await requestReason({
-          title: 'Причина отмены заказа',
-          placeholder: 'Укажите причину отмены заказа',
-          presets: getPresets('status_cancel'),
-          confirmText: 'Отменить заказ',
-          rememberKey: 'order_status_cancel_reason',
-        })) || undefined;
-        if (!cancelReason) return;
-      }
+      // Статус 5 в order_statuses = «Передан в ПВЗ», не отмена. Модалка причины — только при удалении (handleDeleteOrder).
       // Сначала оптимистично обновляем локальное состояние
       setOrders((prev: Order[]) =>
         prev.map((order: Order) =>
@@ -186,7 +176,7 @@ export const useOrderHandlers = ({
       );
 
       // Затем отправляем запрос на бэкенд
-      await updateOrderStatus(orderId, newStatus, cancelReason);
+      await updateOrderStatus(orderId, newStatus);
     } catch (err: any) {
       const msg = err?.response?.data?.error ?? err?.message ?? 'Не удалось обновить статус';
       const is401 = err?.response?.status === 401 || (typeof msg === 'string' && msg.startsWith('401'));

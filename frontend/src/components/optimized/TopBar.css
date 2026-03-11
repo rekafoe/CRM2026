@@ -12,6 +12,28 @@
   margin-right: 16px;
 }
 
+.topbar-org {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-org-logo {
+  max-width: 120px;
+  max-height: 40px;
+  object-fit: contain;
+}
+
+.topbar-org-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #374151;
+}
+
+.topbar-org--fallback .topbar-org-name {
+  margin-left: 4px;
+}
+
 .topbar-info {
   flex: 1;
 }

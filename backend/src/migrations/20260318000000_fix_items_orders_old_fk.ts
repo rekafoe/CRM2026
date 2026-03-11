@@ -28,11 +28,16 @@ export async function up(db: Database): Promise<void> {
     pk?: number;
   }>;
   const cols = itemsInfo
-    .map(
-      (c) =>
-        `"${c.name}" ${c.type} ${c.notnull ? 'NOT NULL' : ''} ${c.dflt_value != null ? `DEFAULT ${c.dflt_value}` : ''} ${c.pk ? 'PRIMARY KEY' : ''}`
-    )
-    .filter(Boolean)
+    .map((c) => {
+      let def = `"${c.name}" ${c.type}`;
+      if (c.notnull) def += ' NOT NULL';
+      if (c.dflt_value != null) {
+        const d = String(c.dflt_value);
+        def += /^\(.+\)$|^-?\d|^'/.test(d) ? ` DEFAULT ${d}` : ` DEFAULT (${d})`;
+      }
+      if (c.pk) def += ' PRIMARY KEY';
+      return def;
+    })
     .join(', ');
   await db.exec(
     `CREATE TABLE items_new (${cols}, FOREIGN KEY(orderId) REFERENCES orders(id) ON DELETE CASCADE)`
