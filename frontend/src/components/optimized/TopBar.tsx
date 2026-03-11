@@ -27,13 +27,26 @@ export const TopBar: React.FC<TopBarProps> = ({
   onLogout,
 }) => {
   const navigate = useNavigate();
-  const hasLogo = organization?.logo_url && (organization.logo_url.startsWith('data:') || organization.logo_url.startsWith('http'));
+  const rawLogoUrl = organization?.logo_url;
+  const logoUrl = rawLogoUrl && typeof rawLogoUrl === 'string' && rawLogoUrl.length > 10
+    ? (rawLogoUrl.startsWith('/') ? `${window.location.origin}${rawLogoUrl}` : rawLogoUrl)
+    : null;
+  const isDataOrHttp = logoUrl &&
+    (logoUrl.startsWith('data:') || logoUrl.startsWith('http') || logoUrl.startsWith('blob:'));
+  const [logoError, setLogoError] = React.useState(false);
+  React.useEffect(() => setLogoError(false), [rawLogoUrl]);
+  const hasLogo = isDataOrHttp && !logoError;
   return (
     <div className="app-topbar">
       <div className="topbar-logo">
         {hasLogo ? (
           <div className="topbar-org">
-            <img src={organization!.logo_url} alt={organization!.name || 'Лого'} className="topbar-org-logo" />
+            <img
+              src={logoUrl!}
+              alt={organization!.name || 'Лого'}
+              className="topbar-org-logo"
+              onError={() => setLogoError(true)}
+            />
             {organization?.name && <span className="topbar-org-name">{organization.name}</span>}
           </div>
         ) : (

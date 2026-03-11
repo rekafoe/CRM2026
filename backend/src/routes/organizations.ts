@@ -29,6 +29,18 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
   res.json(rows);
 }));
 
+/** GET /api/organizations/default — организация по умолчанию (для топбара, favicon) */
+router.get('/default', authenticate, asyncHandler(async (req, res) => {
+  const db = await getDb();
+  const row = await db.get<any>(
+    `SELECT id, name, unp, legal_address, phone, email, bank_details, logo_url, is_default, sort_order
+     FROM organizations
+     ORDER BY is_default DESC, sort_order ASC, id ASC
+     LIMIT 1`
+  );
+  res.json(row || null);
+}));
+
 /** GET /api/organizations/:id — одна организация */
 router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   const id = Number(req.params.id);

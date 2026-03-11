@@ -1,11 +1,8 @@
 import { Database } from 'sqlite';
 
 /**
- * Исправление битых FK: таблица items может ссылаться на несуществующую orders_old
- * (после прерванной миграции с RENAME orders TO orders_old).
- * При INSERT в items SQLite проверяет FK и падает с "no such table: main.orders_old".
- *
- * Миграция идемпотентна: использует исходный SQL схемы, заменяет orders_old на orders.
+ * Повторная попытка исправления битых FK items -> orders_old.
+ * Если 20260318 уже была применена до исправления — эта миграция выполнит фикс.
  */
 export async function up(db: Database): Promise<void> {
   const ordersExists = await db.get(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='orders'`);
@@ -28,6 +25,4 @@ export async function up(db: Database): Promise<void> {
   await db.exec('PRAGMA foreign_keys = ON');
 }
 
-export async function down(db: Database): Promise<void> {
-  // Forward-only fix, no rollback
-}
+export async function down(db: Database): Promise<void> {}

@@ -28,7 +28,7 @@ import { OrderPool } from "../orders/OrderPool";
 import { UserOrderPage } from "../orders/UserOrderPage";
 import { TopBar } from "./TopBar";
 import { DateSwitchContainer } from "../orders/DateSwitchContainer";
-import { setAuthToken, getOrderStatuses, listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, createPrepaymentLink, issueOrder, getLowStock, getCurrentUser, getUsers, getDailyReportByDate, createDailyReport, getOrganizations } from '../../api';
+import { setAuthToken, getOrderStatuses, listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, createPrepaymentLink, issueOrder, getLowStock, getCurrentUser, getUsers, getDailyReportByDate, createDailyReport, getDefaultOrganization } from '../../api';
 import type { Organization } from '../../api';
 import { APP_CONFIG } from '../../types';
 import type { OrderFile } from '../../types';
@@ -84,11 +84,8 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
   }, [contextDate]);
 
   useEffect(() => {
-    getOrganizations()
-      .then((res) => {
-        const list = Array.isArray(res.data) ? res.data : [];
-        setOrganization(list.find((o) => o.is_default) ?? list[0] ?? null);
-      })
+    getDefaultOrganization()
+      .then((res) => setOrganization(res.data ?? null))
       .catch(() => setOrganization(null));
   }, []);
 
@@ -275,7 +272,8 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
 
   useEffect(() => {
     const logoUrl = organization?.logo_url;
-    const hasLogo = logoUrl && (logoUrl.startsWith('data:') || logoUrl.startsWith('http'));
+    const hasLogo = logoUrl && typeof logoUrl === 'string' && logoUrl.length > 10 &&
+      (logoUrl.startsWith('data:') || logoUrl.startsWith('http://') || logoUrl.startsWith('https://') || logoUrl.startsWith('blob:'));
     let link = document.querySelector<HTMLLinkElement>('link[rel*="icon"]');
     if (!link) {
       link = document.createElement('link');
