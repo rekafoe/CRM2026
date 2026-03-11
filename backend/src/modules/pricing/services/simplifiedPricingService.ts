@@ -791,7 +791,8 @@ export class SimplifiedPricingService {
             totalUnits = quantity * unitsPerItem;
             servicePrice = priceForTier * totalUnits;
           } else {
-            totalUnits = unitsPerItem;
+            // per_item: цена за единицу × тираж × units_per_item
+            totalUnits = quantity * (unitsPerItem ?? 1);
             servicePrice = priceForTier * totalUnits;
           }
           
@@ -1215,7 +1216,8 @@ export class SimplifiedPricingService {
         } else if (priceUnit === 'per_cut' || isPerProductOp) {
           finishingPrice += priceForTier * (q * unitsPerItem);
         } else {
-          finishingPrice += priceForTier * unitsPerItem;
+          // per_item: цена за единицу × тираж × units_per_item
+          finishingPrice += priceForTier * (q * (unitsPerItem ?? 1));
         }
       }
 

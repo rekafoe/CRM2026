@@ -102,19 +102,21 @@ const TypeInitialDefaults: React.FC<{
     }))
   }
 
+  // Материалы для «Материал по умолчанию»: только разрешённые для выбранного размера (или первого при «Авто»)
   const availableMaterials = useMemo(() => {
-    const idSet = new Set<number>()
-    for (const s of sizes) {
-      for (const mid of s.allowed_material_ids || []) idSet.add(mid)
-      for (const mp of s.material_prices || []) idSet.add(mp.material_id)
-    }
+    const defaultSizeId = initial.size_id
+    const targetSize = defaultSizeId
+      ? sizes.find((x: any) => String(x.id) === String(defaultSizeId))
+      : sizes[0]
+    const ids = targetSize?.allowed_material_ids || []
+    const idSet = new Set(ids)
     return Array.from(idSet)
       .map(id => {
         const mat = allMaterials.find(m => m.id === id)
         return { id, name: mat ? `${mat.name}` : `Материал #${id}` }
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [sizes, allMaterials])
+  }, [sizes, allMaterials, initial.size_id])
 
   const availableBaseMaterials = useMemo(() => {
     const idSet = new Set<number>()
@@ -179,7 +181,14 @@ const TypeInitialDefaults: React.FC<{
           value={String(initial.size_id ?? '')}
           onChange={(e) => {
             const v = e.target.value;
-            updateInitial({ size_id: v ? (Number(v) || v) : undefined });
+            const newSizeId = v ? (Number(v) || v) : undefined;
+            const newSize = newSizeId ? sizes.find((s: any) => String(s.id) === String(newSizeId)) : sizes[0];
+            const allowedIds = new Set(newSize?.allowed_material_ids || []);
+            const keepMaterial = initial.material_id != null && allowedIds.has(initial.material_id);
+            updateInitial({
+              size_id: newSizeId,
+              ...(keepMaterial ? {} : { material_id: undefined }),
+            });
           }}
         >
           <option value="">Авто (первый размер)</option>
