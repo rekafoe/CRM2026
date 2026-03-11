@@ -694,12 +694,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             value={String(selectedOrder.status)}
             onChange={async (e) => {
               const newStatus = Number(e.target.value);
-              try {
-                await onStatusChange(selectedOrder.id, newStatus);
-                // Не вызываем onLoadOrders - handleStatusChange уже вызывает loadOrders
-              } catch (err) {
-                alert('Не удалось обновить статус. Возможно нужна авторизация.');
-              }
+              await onStatusChange(selectedOrder.id, newStatus);
             }}
             style={{ marginRight: 8 }}
           >

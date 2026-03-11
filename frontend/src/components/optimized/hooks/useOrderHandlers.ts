@@ -54,9 +54,11 @@ export const useOrderHandlers = ({
       setSelectedId(null);
       loadOrders();
     } catch (e: any) {
-      alert('Не удалось удалить заказ. Возможно нужна авторизация.');
+      const msg = e?.response?.data?.error ?? e?.message ?? 'Не удалось удалить заказ';
+      const is401 = e?.response?.status === 401 || (typeof msg === 'string' && msg.startsWith('401'));
+      toast.error(is401 ? 'Сессия истекла' : 'Ошибка удаления', is401 ? 'Войдите в систему снова' : msg);
     }
-  }, [setSelectedId, loadOrders, requestReason, getPresets]);
+  }, [setSelectedId, loadOrders, requestReason, getPresets, toast]);
 
   const handleAddToOrder = useCallback(
     async (item: any) => {
@@ -185,12 +187,13 @@ export const useOrderHandlers = ({
 
       // Затем отправляем запрос на бэкенд
       await updateOrderStatus(orderId, newStatus, cancelReason);
-    } catch (err) {
-      alert('Не удалось обновить статус. Возможно нужна авторизация.');
-      // В случае ошибки можно перезагрузить заказы, чтобы вернуть корректное состояние
+    } catch (err: any) {
+      const msg = err?.response?.data?.error ?? err?.message ?? 'Не удалось обновить статус';
+      const is401 = err?.response?.status === 401 || (typeof msg === 'string' && msg.startsWith('401'));
+      toast.error(is401 ? 'Сессия истекла' : 'Ошибка обновления статуса', is401 ? 'Войдите в систему снова' : msg);
       loadOrders();
     }
-  }, [setOrders, loadOrders, requestReason, getPresets]);
+  }, [setOrders, loadOrders, requestReason, getPresets, toast]);
 
   return {
     handleCreateOrder,

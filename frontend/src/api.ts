@@ -103,7 +103,10 @@ export const addOrderItem = (id: number, item: Omit<Item, 'id'>) =>
   api.post<Item>(`/orders/${id}/items`, item);
 
 export const deleteOrder = (id: number, deleteReason: string) =>
-  api.delete(`/orders/${id}`, { data: { delete_reason: deleteReason } });
+  api.delete(`/orders/${id}`, {
+    data: { delete_reason: deleteReason },
+    params: { delete_reason: deleteReason }, // fallback: некоторые прокси обрезают body у DELETE
+  });
 export const deleteOrderItem = (orderId: number, itemId: number) =>
   api.delete(`/orders/${orderId}/items/${itemId}`);
 export const updateOrderItem = (orderId: number, itemId: number, data: Partial<Item>) =>

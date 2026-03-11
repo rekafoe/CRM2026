@@ -320,11 +320,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 disabled={!selectedOrder}
                 onClick={async () => {
                   if (!selectedOrder) return;
-                  try {
-                    await orderHandlers.handleDeleteOrder(selectedOrder.id);
-                  } catch (e: any) {
-                    alert('Не удалось удалить заказ. Возможно нужна авторизация.');
-                  }
+                  await orderHandlers.handleDeleteOrder(selectedOrder.id);
                 }}
               >🗑️</button>
             </div>
