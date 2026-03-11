@@ -886,10 +886,10 @@ export class SimplifiedPricingService {
       }
     }
     
-    // 7. Рассчитываем итоги
+    // 7. Рассчитываем итоги (округление до 2 знаков — как в buildTierPricesForConfig, чтобы финальная цена совпадала с «Цена» в диапазонах)
     let subtotal = printPrice + materialPrice + finishingPrice;
-    let finalPrice = subtotal; // В упрощённом калькуляторе не применяем наценки (они уже учтены в ценах)
-    let pricePerUnit = quantity > 0 ? finalPrice / quantity : 0;
+    let finalPrice = Math.round(subtotal * 100) / 100;
+    let pricePerUnit = quantity > 0 ? Math.round((finalPrice / quantity) * 100) / 100 : 0;
     
     logger.info('Итоговый расчет упрощенного калькулятора', {
       productId,
@@ -1042,8 +1042,15 @@ export class SimplifiedPricingService {
         t.unit_price *= priceTypeMult;
         if (t.total_price != null) t.total_price *= priceTypeMult;
       });
+      // Округляем после множителя, чтобы избежать 24.497 вместо 24.50
+      finalPrice = Math.round(finalPrice * 100) / 100;
+      pricePerUnit = quantity > 0 ? Math.round((finalPrice / quantity) * 100) / 100 : 0;
+      tierPricesResult.forEach((t) => {
+        t.unit_price = Math.round(t.unit_price * 100) / 100;
+        if (t.total_price != null) t.total_price = Math.round(t.total_price * 100) / 100;
+      });
     }
-    
+
     return {
       productId,
       productName: product.name,
