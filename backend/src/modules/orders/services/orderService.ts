@@ -777,6 +777,10 @@ export class OrderService {
         'SELECT source, status, number, COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
         [id]
       )
+      if (!ord) {
+        await db.run('ROLLBACK')
+        throw new Error('Заказ не найден')
+      }
 
       // Если онлайн/телеграм — не удаляем, а переводим в пул: статус 0, снимаем привязку и ставим is_cancelled=1
       if (ord && (ord.source === 'website' || ord.source === 'telegram')) {
@@ -803,7 +807,7 @@ export class OrderService {
         const materialId = Number(mid)
         const addQty = Math.ceil(returns[materialId])
         if (addQty > 0) {
-          await MaterialTransactionService.return({
+          await MaterialTransactionService.addInTransaction(db, {
             materialId,
             quantity: addQty,
             reason: 'order delete',
@@ -814,6 +818,34 @@ export class OrderService {
       }
 
       await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
+
+      // material_moves ссылается на orders без ON DELETE — обнуляем перед удалением
+      await db.run('UPDATE material_moves SET order_id = NULL WHERE order_id = ?', [id])
+
+      // debt_closed_events ссылается на orders без ON DELETE — удаляем перед удалением заказа
+      try {
+        await db.run('DELETE FROM debt_closed_events WHERE order_id = ?', [id])
+      } catch {
+        // таблица может отсутствовать
+      }
+
+      // user_order_page_orders — привязки заказа к страницам операторов
+      try {
+        await db.run('DELETE FROM user_order_page_orders WHERE order_id = ?', [id])
+      } catch {
+        // таблица может отсутствовать
+      }
+
+      // order_item_earnings — явно удаляем (на случай если CASCADE не сработает)
+      try {
+        await db.run('DELETE FROM order_item_earnings WHERE order_id = ?', [id])
+      } catch {
+        // таблица может отсутствовать
+      }
+
+      // items и order_files — удаляем до orders (CASCADE может не сработать в некоторых конфигурациях)
+      await db.run('DELETE FROM items WHERE orderId = ?', [id])
+      await db.run('DELETE FROM order_files WHERE orderId = ?', [id])
 
       await this.recordCancellationEvent(db, {
         orderId: id,

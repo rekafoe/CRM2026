@@ -472,8 +472,8 @@ export class OrderController {
   }
 
   static async deleteOrder(req: Request, res: Response) {
+    const id = Number(req.params.id)
     try {
-      const id = Number(req.params.id)
       const authUser = (req as any).user as { id: number } | undefined
       const deleteReason = String((req.body as any)?.delete_reason || (req.query as any)?.delete_reason || '').trim()
       if (!deleteReason) {
@@ -484,7 +484,9 @@ export class OrderController {
       await OrderService.deleteOrder(id, authUser?.id, deleteReason)
       res.status(204).end()
     } catch (error: any) {
-      res.status(500).json({ error: error.message })
+      logger.error('deleteOrder failed', { orderId: id, error: error?.message, stack: error?.stack })
+      const status = error.message === 'Заказ не найден' ? 404 : 500
+      res.status(status).json({ error: error.message })
     }
   }
 
