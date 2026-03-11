@@ -164,20 +164,20 @@ async function fixItemsOrdersOldFk(db: Database): Promise<void> {
     const itemsExists = await db.get(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='items'`)
     if (!ordersExists || !itemsExists) return
 
-    let fkList: Array<{ table?: string }> = []
-    try {
-      fkList = (await db.all(`PRAGMA foreign_key_list(items)`)) as Array<{ table?: string }>
-    } catch {
-      return
+    const schemaRow = await db.get<{ sql?: string }>(`SELECT sql FROM sqlite_master WHERE type='table' AND name='items'`)
+    const sql = schemaRow?.sql || ''
+
+    let refsOrdersOld = sql.includes('orders_old')
+    if (!refsOrdersOld) {
+      try {
+        const fkList = (await db.all(`PRAGMA foreign_key_list(items)`)) as Array<{ table?: string }>
+        refsOrdersOld = (fkList || []).some((fk) => String(fk.table || '').toLowerCase() === 'orders_old')
+      } catch {}
     }
-    const refsOrdersOld = (fkList || []).some((fk) => fk.table === 'orders_old')
     if (!refsOrdersOld) return
 
     console.log('🔧 Fixing items FK: orders_old -> orders')
     await db.exec('PRAGMA foreign_keys = OFF')
-
-    const schemaRow = await db.get<{ sql?: string }>(`SELECT sql FROM sqlite_master WHERE type='table' AND name='items'`)
-    const sql = schemaRow?.sql || ''
 
     if (sql && sql.includes('orders_old')) {
       const fixedSql = sql
