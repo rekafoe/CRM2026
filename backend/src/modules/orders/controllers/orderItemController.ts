@@ -71,6 +71,7 @@ export class OrderItemController {
 
       // Транзакция: резервирование материалов и вставка позиции
       await db.run('BEGIN')
+      await db.exec('PRAGMA foreign_keys = OFF') // workaround: items может ссылаться на несуществующую orders_old
       try {
         const reservationsPayload = needed.map(n => ({
           material_id: n.materialId,
@@ -307,6 +308,7 @@ export class OrderItemController {
         )
 
         await db.run('COMMIT')
+        await db.exec('PRAGMA foreign_keys = ON')
         
         logger.info('✅ [addItem] Транзакция завершена успешно', { itemId, orderId })
 
@@ -330,6 +332,7 @@ export class OrderItemController {
         return
       } catch (e) {
         await db.run('ROLLBACK')
+        await db.exec('PRAGMA foreign_keys = ON')
         throw e
       }
     } catch (error: any) {
@@ -383,8 +386,13 @@ export class OrderItemController {
       )
 
       if (!it) {
-        // Нечего возвращать, просто 204
-        await db.run('DELETE FROM items WHERE orderId = ? AND id = ?', orderId, itemId)
+        // Нечего возвращать, просто 204 (workaround: PRAGMA foreign_keys OFF для битого FK items->orders_old)
+        await db.exec('PRAGMA foreign_keys = OFF')
+        try {
+          await db.run('DELETE FROM items WHERE orderId = ? AND id = ?', orderId, itemId)
+        } finally {
+          await db.exec('PRAGMA foreign_keys = ON')
+        }
         const orderRow = await db.get<{ created_date?: string }>(
           'SELECT COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
           [orderId]
@@ -417,6 +425,7 @@ export class OrderItemController {
       const components = Array.isArray(paramsObj.components) ? paramsObj.components : []
 
       await db.run('BEGIN')
+      await db.exec('PRAGMA foreign_keys = OFF') // workaround: items может ссылаться на orders_old
       try {
         // Если у компонентов есть reservationId — отменяем резервы
         const reservationIds = components
@@ -486,6 +495,7 @@ export class OrderItemController {
         }
         
         await db.run('COMMIT')
+        await db.exec('PRAGMA foreign_keys = ON')
         const orderRow = await db.get<{ created_date?: string }>(
           'SELECT COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
           [orderId]
@@ -503,6 +513,7 @@ export class OrderItemController {
         res.status(204).end()
       } catch (e) {
         await db.run('ROLLBACK')
+        await db.exec('PRAGMA foreign_keys = ON')
         throw e
       }
     } catch (error: any) {
