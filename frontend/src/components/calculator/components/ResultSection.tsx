@@ -145,7 +145,7 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
                 return (
                   <tr key={i} className={isCurrent ? 'tier-prices-row--current' : ''}>
                     <td>{t.max_qty != null ? `${t.min_qty}–${t.max_qty}` : t.min_qty}</td>
-                    <td>{typeof t.unit_price === 'number' ? t.unit_price.toFixed(2) : '—'} BYN</td>
+                    <td>{typeof t.unit_price === 'number' ? t.unit_price.toFixed(4).replace(/0+$/, '').replace(/\.$/, '') : '—'} BYN</td>
                     <td>{t.total_price != null ? `${Number(t.total_price).toFixed(2)} BYN` : '—'}</td>
                   </tr>
                 );

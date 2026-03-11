@@ -1046,7 +1046,7 @@ export class SimplifiedPricingService {
       finalPrice = Math.round(finalPrice * 100) / 100;
       pricePerUnit = quantity > 0 ? Math.round((finalPrice / quantity) * 100) / 100 : 0;
       tierPricesResult.forEach((t) => {
-        t.unit_price = Math.round(t.unit_price * 100) / 100;
+        t.unit_price = Math.round(t.unit_price * 10000) / 10000;
         if (t.total_price != null) t.total_price = Math.round(t.total_price * 100) / 100;
       });
     }
@@ -1130,42 +1130,43 @@ export class SimplifiedPricingService {
     isRollPrint?: boolean;
     metersPerItem?: number;
   }): Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price: number }> {
+    // Диапазоны ТОЛЬКО по раскладке листа: 1 лист, 2 листа, 3 листа... (itemsPerSheet, 2*itemsPerSheet, ...)
+    const ips = Math.max(1, ctx.itemsPerSheet || 1);
     const boundaries = new Set<number>();
 
-    // 1. Текущее количество — в границах, строка в своей позиции между диапазонами
-    if (ctx.currentQuantity != null && Number.isFinite(ctx.currentQuantity) && ctx.currentQuantity > 0) {
-      boundaries.add(ctx.currentQuantity);
-    }
-
-    // 2. Диапазоны из схемы: print_prices для выбранного размера (наследуют от принтера при «Запросить цены»)
-    if (ctx.printPriceConfig?.tiers?.length) {
-      ctx.printPriceConfig.tiers.forEach((t: SimplifiedQtyTier) => {
-        if (t.min_qty != null && Number.isFinite(t.min_qty)) boundaries.add(t.min_qty);
-      });
-    }
-
-    // 3. Диапазоны из material_prices для выбранного размера
-    if (ctx.selectedSize?.material_prices?.length) {
-      ctx.selectedSize.material_prices.forEach((mp: { material_id: number; tiers?: SimplifiedQtyTier[] }) => {
-        mp.tiers?.forEach((t: SimplifiedQtyTier) => {
+    if (ctx.isRollPrint) {
+      // Рулонная печать: используем текущее кол-во + разумный шаг
+      if (ctx.currentQuantity != null && ctx.currentQuantity > 0) {
+        boundaries.add(ctx.currentQuantity);
+      }
+      boundaries.add(1);
+    } else if (ctx.usePagesMultiplier) {
+      // Многостраничные: границы по количеству изделий 1, 2, 3, ..., 10, 20, ...
+      [1, 2, 3, 4, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000].forEach((b) => boundaries.add(b));
+      if (ctx.currentQuantity != null && ctx.currentQuantity > 0) {
+        boundaries.add(ctx.currentQuantity);
+      }
+    } else {
+      // Листовая печать: фиксированные границы по sheetsNeeded
+      // print_prices.tiers — из центральных цен (min_sheets × itemsPerSheet), уже sheet-based
+      if (ctx.printPriceConfig?.tiers?.length) {
+        ctx.printPriceConfig.tiers.forEach((t: SimplifiedQtyTier) => {
           if (t.min_qty != null && Number.isFinite(t.min_qty)) boundaries.add(t.min_qty);
         });
-      });
-    }
-
-    // 4. Диапазоны из finishing
-    ctx.finishingConfig.forEach((f) => {
-      const mapKey = f.variant_id ? `${f.service_id}:${f.variant_id}` : String(f.service_id);
-      const tiers = ctx.serviceTiersMap.get(mapKey);
-      tiers?.forEach((t) => {
-        if (t.min_qty != null && Number.isFinite(t.min_qty)) boundaries.add(t.min_qty);
-      });
-    });
-
-    // Fallback: если в схеме нет диапазонов — минимум itemsPerSheet (рекомендуемое кол-во)
-    if (boundaries.size === 0) {
-      const ips = Math.max(1, ctx.itemsPerSheet || 1);
-      boundaries.add(ips);
+      }
+      boundaries.add(1); // от 1 шт
+      // Fallback: генерируем по раскладке (1л, 2л, 3л...) до 150 листов
+      if (boundaries.size <= 1) {
+        const maxSheets = 150;
+        for (let s = 1; s <= maxSheets; s++) {
+          boundaries.add(s * ips);
+        }
+      }
+      // Текущее количество — чтобы строка отображалась, если выходит за последнюю границу
+      if (ctx.currentQuantity != null && ctx.currentQuantity > 0) {
+        const maxBound = Math.max(...Array.from(boundaries));
+        if (ctx.currentQuantity > maxBound) boundaries.add(ctx.currentQuantity);
+      }
     }
 
     const sorted = Array.from(boundaries).sort((a, b) => a - b);
@@ -1237,11 +1238,11 @@ export class SimplifiedPricingService {
       const total = printPrice + materialPrice + finishingPrice + cuttingPrice;
       const totalRounded = Math.round(total * 100) / 100;
       const unitPrice = q > 0 ? totalRounded / q : 0;
-      // total_price — фактическая сумма (как в main calculation), чтобы «Цена» в таблице совпадала с основной суммой
+      // unit_price с 4 знаками: 646.47/1000=0.64647→0.6465, чтобы 1000×0.6465≈646.47 (не 0.65×1000=650)
       result.push({
         min_qty: q,
         max_qty: maxQty,
-        unit_price: Math.round(unitPrice * 100) / 100,
+        unit_price: Math.round(unitPrice * 10000) / 10000,
         total_price: totalRounded,
       });
     }
