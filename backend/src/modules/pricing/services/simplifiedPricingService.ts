@@ -872,6 +872,7 @@ export class SimplifiedPricingService {
             units_needed: totalCuts,
             priceForQuantity: cuttingPrice,
           });
+          serviceTypesMap.set(cuttingService.id, 'cut');
           logger.info('✂️ [SimplifiedPricingService] Резка стопой (по раскладке)', {
             productId,
             cutsPerSheet: layoutCheck.cutsPerSheet,
