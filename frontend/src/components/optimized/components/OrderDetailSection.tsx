@@ -723,7 +723,10 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
             key={it.id} 
             item={it} 
             orderId={selectedOrder.id}
-            order={selectedOrder}
+            order={{
+              ...selectedOrder,
+              priceType: (selectedOrder as any).priceType ?? items[0]?.params?.priceType ?? (items[0]?.params as any)?.price_type,
+            }}
             onUpdate={onLoadOrders}
             onEditParameters={onEditOrderItem}
             operatorsToday={operatorsToday}

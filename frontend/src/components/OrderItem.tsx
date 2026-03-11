@@ -55,6 +55,8 @@ interface OrderItemProps {
     created_at?: string;
     totalAmount?: number;
     items?: Item[];
+    /** Тип цены заказа (для отображения, если у позиции нет своего) */
+    priceType?: string;
   } | null;
   onUpdate: () => void;
   onEditParameters?: (orderId: number, item: Item) => void;
@@ -285,6 +287,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
           <>
             <OrderItemSummary
               item={item}
+              orderPriceType={order?.priceType}
               qty={Number(numberInputToNumber(qty, 0))}
               price={Number(numberInputToNumber(price, 0))}
               total={total}

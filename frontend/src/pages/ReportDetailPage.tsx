@@ -373,7 +373,10 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
                         key={item.id}
                         item={item}
                         orderId={order.id}
-                        order={order}
+                        order={{
+                          ...order,
+                          priceType: (order as any).priceType ?? order.items?.[0]?.params?.priceType ?? (order.items?.[0]?.params as any)?.price_type,
+                        }}
                         onUpdate={loadReportData}
                       />
                     ))}

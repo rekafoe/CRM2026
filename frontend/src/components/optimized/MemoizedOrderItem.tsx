@@ -12,6 +12,7 @@ interface MemoizedOrderItemProps {
     created_at?: string;
     totalAmount?: number;
     items?: any[];
+    priceType?: string;
   } | null;
   onUpdate: () => void;
   onEditParameters?: (orderId: number, item: any) => void;

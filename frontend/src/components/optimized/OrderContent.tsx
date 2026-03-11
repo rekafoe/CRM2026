@@ -34,7 +34,10 @@ export const OrderContent: React.FC<OrderContentProps> = ({
           key={item.id}
           item={item}
           orderId={order.id}
-          order={order}
+          order={{
+            ...order,
+            priceType: (order as any).priceType ?? items[0]?.params?.priceType ?? (items[0]?.params as any)?.price_type,
+          }}
           onUpdate={onLoadOrders}
           onEditParameters={onEditOrderItem}
           readOnly={readOnly}

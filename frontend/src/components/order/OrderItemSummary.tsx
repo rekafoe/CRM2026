@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Item } from '../../types';
+import { usePriceTypeLabels } from '../../hooks/pricing/usePriceTypeLabels';
 
 interface ParameterSummaryItem {
   label: string;
@@ -8,6 +9,8 @@ interface ParameterSummaryItem {
 
 interface OrderItemSummaryProps {
   item: Item;
+  /** Тип цены заказа (если у позиции нет своего — используем этот) */
+  orderPriceType?: string;
   qty: number;
   price: number;
   total: number;
@@ -25,6 +28,7 @@ interface OrderItemSummaryProps {
 
 export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
   item,
+  orderPriceType,
   qty,
   price,
   total,
@@ -39,6 +43,10 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
   materialDensity,
   parameterSummary,
 }) => {
+  const priceTypeLabels = usePriceTypeLabels();
+  const priceTypeKey = item.params?.priceType ?? (item.params as any)?.price_type ?? item.params?.urgency ?? orderPriceType;
+  const priceTypeLabel = priceTypeKey ? priceTypeLabels[String(priceTypeKey).toLowerCase()] : undefined;
+
   return (
     <div className="order-item-horizontal">
       {/* Название товара */}
@@ -78,37 +86,12 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
         </>
       )}
 
-      {/* Срочность */}
-      {item.params.urgency && item.params.urgency !== 'standard' && (
+      {/* Тип цены / срочность — метка из API getPriceTypes() */}
+      {priceTypeKey && String(priceTypeKey).toLowerCase() !== 'standard' && (
         <>
           <span className="separator">|</span>
-          <span className="detail-item urgency">
-            ⚡{' '}
-            {item.params.urgency === 'urgent'
-              ? 'СРОЧНО'
-              : item.params.urgency === 'online'
-              ? 'ОНЛАЙН'
-              : item.params.urgency === 'promo'
-              ? 'ПРОМО'
-              : item.params.urgency}
-          </span>
-        </>
-      )}
-
-      {/* Тип цены (заказы с сайта: срочно / онлайн / промо / спец.предложение) */}
-      {item.params.priceType && (
-        <>
-          <span className="separator">|</span>
-          <span className="detail-item price-type">
-            {item.params.priceType === 'urgent'
-              ? 'Срочно (+50%)'
-              : item.params.priceType === 'online'
-              ? 'Онлайн (−15%)'
-              : item.params.priceType === 'promo'
-              ? 'Промо (−30%)'
-              : item.params.priceType === 'special'
-              ? 'Спец.предложение (−45%)'
-              : `Тип цены: ${item.params.priceType}`}
+          <span className="detail-item price-type urgency">
+            {priceTypeLabel ? `⚡ ${priceTypeLabel.displayLabel}` : `⚡ ${priceTypeKey}`}
           </span>
         </>
       )}
