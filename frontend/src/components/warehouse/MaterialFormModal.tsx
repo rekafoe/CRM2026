@@ -315,10 +315,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 <label>Плотность (г/м²)</label>
                 <input
                   type="number"
-                  value={(formData as any).density || ''}
+                  value={(formData as any).density ?? ''}
                   onChange={(e) => {
                     const value = e.target.value;
-                    handleChange('density' as any, value ? parseInt(value) : undefined);
+                    handleChange('density' as any, value === '' ? undefined : parseInt(value, 10));
                   }}
                   placeholder="120, 150, 200..."
                   min="50"
@@ -353,10 +353,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 <label>Толщина пленки (мк)</label>
                 <input
                   type="number"
-                  value={(formData as any).density || ''}
+                  value={(formData as any).density ?? ''}
                   onChange={(e) => {
                     const value = e.target.value;
-                    handleChange('density' as any, value ? parseInt(value) : undefined);
+                    handleChange('density' as any, value === '' ? undefined : parseInt(value, 10));
                   }}
                   placeholder="25, 32, 42..."
                   min="10"
@@ -376,7 +376,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <input
                 type="number"
                 value={formData.sheet_width ?? ''}
-                onChange={(e) => handleChange('sheet_width' as any, e.target.value === '' ? '' : parseFloat(e.target.value) || undefined)}
+                onChange={(e) => handleChange('sheet_width' as any, e.target.value === '' ? '' : (parseFloat(e.target.value) ?? undefined))}
                 placeholder="210 (A4), 320 (SRA3)"
                 min="1"
                 max="2000"
@@ -391,7 +391,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <input
                 type="number"
                 value={formData.sheet_height ?? ''}
-                onChange={(e) => handleChange('sheet_height' as any, e.target.value === '' ? '' : parseFloat(e.target.value) || undefined)}
+                onChange={(e) => handleChange('sheet_height' as any, e.target.value === '' ? '' : (parseFloat(e.target.value) ?? undefined))}
                 placeholder="297 (A4), 450 (SRA3)"
                 min="1"
                 max="2000"
@@ -405,10 +405,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <label>Количество *</label>
               <input
                 type="number"
-                value={formData.quantity === 0 ? '' : (formData.quantity ?? '')}
+                value={formData.quantity ?? ''}
                 onChange={(e) => {
                   const v = e.target.value;
-                  const num = v === '' ? 0 : (parseInt(v, 10) || 0);
+                  const num = v === '' ? 0 : (parseInt(v, 10) ?? 0);
                   handleChange('quantity', num);
                 }}
                 required
@@ -420,10 +420,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <label>Цена за единицу (BYN) *</label>
               <input
                 type="number"
-                value={formData.price === 0 ? '' : (formData.price ?? '')}
+                value={formData.price ?? ''}
                 onChange={(e) => {
                   const v = e.target.value;
-                  const price = v === '' ? 0 : (parseFloat(v) || 0);
+                  const price = v === '' ? 0 : (parseFloat(v) ?? 0);
                   handleChange('price', price);
                   handleChange('sheet_price_single', price); // Синхронизируем с backend полем
                 }}
@@ -439,10 +439,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <label>Минимальный запас</label>
               <input
                 type="number"
-                value={formData.min_stock_level === 0 ? '' : (formData.min_stock_level ?? '')}
+                value={formData.min_stock_level ?? ''}
                 onChange={(e) => {
                   const v = e.target.value;
-                  handleChange('min_stock_level', v === '' ? 0 : (parseInt(v, 10) || 0));
+                  handleChange('min_stock_level', v === '' ? 0 : (parseInt(v, 10) ?? 0));
                 }}
                 min="0"
                 step="1"
@@ -452,10 +452,10 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               <label>Максимальный запас</label>
               <input
                 type="number"
-                value={formData.max_stock_level === 0 ? '' : (formData.max_stock_level ?? '')}
+                value={formData.max_stock_level ?? ''}
                 onChange={(e) => {
                   const v = e.target.value;
-                  handleChange('max_stock_level', v === '' ? 0 : (parseInt(v, 10) || 100));
+                  handleChange('max_stock_level', v === '' ? 0 : (parseInt(v, 10) ?? 100));
                 }}
                 min="0"
                 step="1"
