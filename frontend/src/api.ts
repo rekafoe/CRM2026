@@ -109,8 +109,12 @@ export const deleteOrder = (id: number, deleteReason: string) =>
   });
 export const deleteOrderItem = (orderId: number, itemId: number) =>
   api.delete(`/orders/${orderId}/items/${itemId}`);
-export const updateOrderItem = (orderId: number, itemId: number, data: Partial<Item>) =>
-  api.patch(`/orders/${orderId}/items/${itemId}`, data);
+/** При обновлении params передаётся частично (слияние на бэкенде) */
+export const updateOrderItem = (
+  orderId: number,
+  itemId: number,
+  data: Partial<Omit<Item, 'params'>> & { params?: Partial<Item['params']> }
+) => api.patch(`/orders/${orderId}/items/${itemId}`, data);
 
 export const getMaterials = () => api.get<Material[]>('/materials');
 export const saveMaterial = (mat: Partial<Material>) =>
@@ -951,7 +955,5 @@ export const deleteDesignTemplate = (id: number) => api.delete(`/design-template
 export const uploadDesignTemplatePreview = (file: File) => {
   const formData = new FormData();
   formData.append('preview', file);
-  return api.post<{ filename: string; url: string }>('/design-templates/upload-preview', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  return api.post<{ filename: string; url: string }>('/design-templates/upload-preview', formData);
 };

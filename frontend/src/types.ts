@@ -45,6 +45,10 @@ export interface ItemParams {
     sheetSize?: string;
     wastePercentage?: number;
   };
+  /** Состояние редактора макетов (позиции фото и т.д.) */
+  designState?: Record<string, unknown>;
+  /** ID шаблона дизайна из design_templates */
+  designTemplateId?: number;
 }
 
 export interface Item {

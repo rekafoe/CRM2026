@@ -70,7 +70,8 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       await loadFiles();
       e.currentTarget.value = '';
     } catch (error) {
-      alert('Не удалось загрузить файл');
+      const msg = error instanceof Error ? error.message : 'Не удалось загрузить файл';
+      alert(msg);
     } finally {
       setIsUploading(false);
     }
