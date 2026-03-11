@@ -1162,10 +1162,9 @@ export class SimplifiedPricingService {
           boundaries.add(s * ips);
         }
       }
-      // Текущее количество — чтобы строка отображалась, если выходит за последнюю границу
+      // Текущее количество — всегда добавляем, чтобы в таблице была строка с ценой для выбранного тиража
       if (ctx.currentQuantity != null && ctx.currentQuantity > 0) {
-        const maxBound = Math.max(...Array.from(boundaries));
-        if (ctx.currentQuantity > maxBound) boundaries.add(ctx.currentQuantity);
+        boundaries.add(ctx.currentQuantity);
       }
     }
 
