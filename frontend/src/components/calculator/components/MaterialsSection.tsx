@@ -57,6 +57,8 @@ interface MaterialsSectionProps {
         }> 
       } | null;
     } | null;
+    /** Материалы из схемы (с density, paper_type_name) — для simplified с подтипами */
+    materials?: Array<{ id: number; name: string; density?: number; paper_type_name?: string; paper_type_id?: number; price?: number; unit?: string }>;
   } | null;
   // Результат расчета
   result?: CalculationResult | null;
@@ -103,24 +105,29 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   /** Флаг: пользователь вручную выбрал тип — не перезаписывать из specs (избегаем рекурсии) */
   const userChoseTypeRef = useRef(false);
 
-  // Загружаем список всех материалов для упрощённых продуктов
+  // Загружаем материалы для упрощённых продуктов: приоритет — schema.materials (с density из бэкенда),
+  // иначе GET /materials. Для подтипов (Дизайнерские открытки и т.д.) schema.materials содержит density.
   useEffect(() => {
-    if (simplifiedSizesSource && simplifiedSizesSource.length > 0 && allMaterials.length === 0 && !loadingMaterials) {
-      setLoadingMaterials(true);
-      getMaterials()
-        .then(response => {
-          const materials = Array.isArray(response.data) ? response.data : [];
-          // 🆕 Материалы из API содержат paper_type_id и paper_type_name
-          setAllMaterials(materials);
-        })
-        .catch(error => {
-          console.error('Ошибка загрузки материалов:', error);
-        })
-        .finally(() => {
-          setLoadingMaterials(false);
-        });
+    if (!simplifiedSizesSource || simplifiedSizesSource.length === 0) return;
+    const fromSchema = schema?.materials;
+    if (Array.isArray(fromSchema) && fromSchema.length > 0 && fromSchema.some((m: any) => m.density != null)) {
+      setAllMaterials(fromSchema);
+      return;
     }
-  }, [simplifiedSizesSource, allMaterials.length, loadingMaterials]);
+    if (allMaterials.length > 0 || loadingMaterials) return;
+    setLoadingMaterials(true);
+    getMaterials()
+      .then(response => {
+        const materials = Array.isArray(response.data) ? response.data : [];
+        setAllMaterials(materials);
+      })
+      .catch(error => {
+        console.error('Ошибка загрузки материалов:', error);
+      })
+      .finally(() => {
+        setLoadingMaterials(false);
+      });
+  }, [simplifiedSizesSource, schema?.materials, allMaterials.length, loadingMaterials]);
 
   const hasField = (name: string) => !!schema?.fields?.some(f => f.name === name);
   const getLabel = (name: string, fallback: string) => (schema?.fields as any)?.find((f: any) => f.name === name)?.label || fallback;
