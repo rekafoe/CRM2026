@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ['react', 'react-dom'],
+  },
   server: {
     host: 'localhost',
     port: 5173,
@@ -24,11 +27,10 @@ export default defineConfig({
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
 
-          // базовые vendor chunks для стабильного кеширования на Vercel
+          // React и все зависимые от него библиотеки — в один chunk (избегаем useLayoutEffect of undefined)
+          if (id.includes('react') || id.includes('react-konva') || id.includes('use-image') || id.includes('@tanstack')) return 'react';
           if (id.includes('react-router')) return 'router';
-          if (id.includes('@tanstack')) return 'tanstack';
           if (id.includes('axios')) return 'axios';
-          if (id.includes('react')) return 'react';
 
           return 'vendor';
         }
