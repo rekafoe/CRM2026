@@ -6,6 +6,14 @@ import { Database } from 'sqlite';
  * - Не учитывается в ЗП оператора
  */
 export async function up(db: Database): Promise<void> {
+  // Восстановление после частично проваленной миграции: orders_old есть, orders нет
+  const ordersExists = await db.get(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='orders'`);
+  const ordersOldExists = await db.get(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='orders_old'`);
+  if (!ordersExists && ordersOldExists) {
+    await db.exec('ALTER TABLE orders_old RENAME TO orders');
+    // Продолжаем миграцию — ниже добавим internal в CHECK
+  }
+
   const row = await db.get<{ sql?: string | null }>(
     `SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'`
   );
