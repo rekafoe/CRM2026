@@ -56,7 +56,11 @@ export class EarningsService {
 
     const today = new Date().toISOString().slice(0, 10);
     this.recalculateForDate(today).catch((error) => {
-      logger.error('EarningsService initial recalculation failed', { error });
+      logger.error('EarningsService initial recalculation failed', {
+        error,
+        message: (error as Error)?.message,
+        code: (error as { code?: string })?.code,
+      });
     });
   }
 
@@ -71,6 +75,33 @@ export class EarningsService {
   static async recalculateForDate(date: string) {
     const db = await getDb();
 
+    const [earningsExists, itemsExists, ordersExists] = await Promise.all([
+      db.get(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='order_item_earnings'`),
+      db.get(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='items'`),
+      db.get(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='orders'`),
+    ]);
+    if (!earningsExists || !itemsExists || !ordersExists) {
+      logger.warn('EarningsService: required tables missing, skipping recalculation', {
+        order_item_earnings: !!earningsExists,
+        items: !!itemsExists,
+        orders: !!ordersExists,
+      });
+      return;
+    }
+
+    try {
+      await this.doRecalculateForDate(db, date);
+    } catch (error) {
+      logger.error('EarningsService recalculateForDate failed', {
+        date,
+        message: (error as Error)?.message,
+        code: (error as { code?: string })?.code,
+      });
+      throw error;
+    }
+  }
+
+  private static async doRecalculateForDate(db: Awaited<ReturnType<typeof getDb>>, date: string) {
     let hasExecutorUserId = false;
     let hasResponsibleUserId = false;
     let hasIsInternal = false;
