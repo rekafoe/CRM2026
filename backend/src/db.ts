@@ -38,6 +38,7 @@ function resolveDatabasePath(): string {
 const DB_FILE = resolveDatabasePath()
 
 let dbInstance: Database | null = null
+let initPromise: Promise<Database> | null = null
 
 // Отключаем опасные миграции, которые удаляют данные
 const DISABLED_MIGRATIONS = new Set<string>([
@@ -46,22 +47,26 @@ const DISABLED_MIGRATIONS = new Set<string>([
 
 export async function initDB(): Promise<Database> {
   if (dbInstance) return dbInstance
+  if (initPromise) return initPromise
 
-  console.log('📂 Opening database at', DB_FILE)
-  const db = await open({
-    filename: DB_FILE,
-    driver: sqlite3.Database
-  })
+  initPromise = (async () => {
+    console.log('📂 Opening database at', DB_FILE)
+    const db = await open({
+      filename: DB_FILE,
+      driver: sqlite3.Database
+    })
 
+    await db.exec('PRAGMA foreign_keys = ON;')
 
-  await db.exec('PRAGMA foreign_keys = ON;')
+    await runMigrations(db)
+    await migrateLegacyMaterialMoves(db)
+    await fixItemsOrdersOldFk(db)
 
-  await runMigrations(db)
-  await migrateLegacyMaterialMoves(db)
-  await fixItemsOrdersOldFk(db)
+    dbInstance = db
+    return db
+  })()
 
-  dbInstance = db
-  return db
+  return initPromise
 }
 
 export async function getDb(): Promise<Database> {
@@ -142,12 +147,18 @@ async function runMigrations(db: Database): Promise<void> {
         const runner = migration.up ?? migration.default?.up
         if (typeof runner === 'function') {
           await runner(db)
-          // Отмечаем миграцию как применённую
           await db.run('INSERT OR IGNORE INTO migrations (name) VALUES (?)', [migrationName]);
           console.log(`✅ Migration applied: ${migrationFile}`)
         }
-      } catch (error) {
-        console.log(`⚠️ Migration failed: ${migrationFile}`, error)
+      } catch (error: any) {
+        const msg = String(error?.message || error || '')
+        const isDuplicateColumn = msg.includes('duplicate column')
+        if (isDuplicateColumn) {
+          await db.run('INSERT OR IGNORE INTO migrations (name) VALUES (?)', [migrationName]);
+          console.log(`✅ Migration applied (column exists): ${migrationFile}`)
+        } else {
+          console.log(`⚠️ Migration failed: ${migrationFile}`, error)
+        }
       }
     }
     invalidateTableSchemaCache()
