@@ -71,7 +71,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={() => navigate('/order-pool')}
           title="Пул заказов" 
           aria-label="Пул заказов" 
-          className="app-icon-btn app-icon-btn--blue app-icon-btn--with-label"
+          className="app-icon-btn app-icon-btn--with-label"
         >
           <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="clipboard" size="sm" /></span>
           <span className="app-icon-btn__label">Пул заказов</span>
@@ -80,16 +80,16 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={onShowCountersPage}
           title="Счётчики принтеров и кассы" 
           aria-label="Счётчики принтеров и кассы" 
-          className="app-icon-btn app-icon-btn--purple app-icon-btn--with-label"
+          className="app-icon-btn app-icon-btn--with-label"
         >
-          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="chart" size="sm" /></span>
+          <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="chart-bar" size="sm" /></span>
           <span className="app-icon-btn__label">Счётчики</span>
         </button>
         <button
           onClick={() => navigate('/earnings')}
           title="Мои проценты"
           aria-label="Мои проценты"
-          className="app-icon-btn app-icon-btn--green app-icon-btn--with-label"
+          className="app-icon-btn app-icon-btn--with-label"
         >
           <span className="app-icon-btn__icon" aria-hidden="true"><AppIcon name="money" size="sm" /></span>
           <span className="app-icon-btn__label">Мои проценты</span>

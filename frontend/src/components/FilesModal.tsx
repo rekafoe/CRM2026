@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { OrderFile, Item } from '../types';
 import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, downloadOrderFile } from '../api';
+import { AppIcon } from './ui/AppIcon';
+import './FilesModal.css';
 
 interface FilesModalProps {
   isOpen: boolean;
@@ -115,7 +117,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       <div key={file.id} className={`file-item ${file.approved ? 'approved' : 'pending'}`}>
         <div className="file-info">
           <div className="file-name">
-            <button type="button" className="file-name-link" onClick={() => handleDownloadFile(file)}>
+            <button type="button" className="file-name-link" onClick={() => handleDownloadFile(file)} title="Скачать">
               {file.originalName || file.filename}
             </button>
           </div>
@@ -125,13 +127,19 @@ export const FilesModal: React.FC<FilesModalProps> = ({
           </div>
         </div>
         <div className="file-actions">
-          <button className="btn-download" onClick={() => handleDownloadFile(file)} title="Скачать файл">📥</button>
+          <button className="btn-download" onClick={() => handleDownloadFile(file)} title="Скачать файл">
+            <AppIcon name="download" size="xs" />
+          </button>
           {file.approved ? (
-            <span className="status-approved" title="Файл утвержден">✓</span>
+            <span className="status-approved" title="Файл утвержден"><AppIcon name="check" size="sm" /></span>
           ) : (
-            <button className="btn-approve" onClick={() => handleApproveFile(file.id)} title="Утвердить файл">✓</button>
+            <button className="btn-approve" onClick={() => handleApproveFile(file.id)} title="Утвердить файл">
+              <AppIcon name="check" size="xs" />
+            </button>
           )}
-          <button className="btn-delete" onClick={() => handleDeleteFile(file.id)} title="Удалить файл">✕</button>
+          <button className="btn-delete" onClick={() => handleDeleteFile(file.id)} title="Удалить файл">
+            <AppIcon name="x" size="xs" />
+          </button>
         </div>
       </div>
     ))
@@ -144,8 +152,13 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       <div className="files-modal" onClick={(e) => e.stopPropagation()}>
         {/* Заголовок */}
         <div className="files-modal-header">
-          <h3>📁 Файлы макетов - Заказ #{orderNumber}</h3>
-          <button className="btn-close" onClick={onClose}>✕</button>
+          <h3>
+            <AppIcon name="folder" size="sm" className="fm-title-icon" />
+            Файлы макетов — Заказ #{orderNumber}
+          </h3>
+          <button type="button" className="fm-btn-close" onClick={onClose} aria-label="Закрыть">
+            <AppIcon name="x" size="sm" />
+          </button>
         </div>
 
         {/* Статистика */}
@@ -180,18 +193,22 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             </select>
           )}
           {files.length > 0 && (
-            <button className="btn-download-all" onClick={handleDownloadAll}>
-              📥 Скачать все файлы
-            </button>
+          <button className="btn-download-all" onClick={handleDownloadAll}>
+            <AppIcon name="download" size="xs" /> Скачать все файлы
+          </button>
           )}
-          <label className="btn-upload">
+          <label className={`btn-upload ${isUploading ? 'is-uploading' : ''}`}>
             <input 
               type="file" 
               onChange={handleFileUpload}
               disabled={isUploading}
               style={{ display: 'none' }}
             />
-            {isUploading ? '⏳ Загрузка...' : '📤 Загрузить файл'}
+            {isUploading ? (
+              <><AppIcon name="refresh" size="xs" /> Загрузка...</>
+            ) : (
+              <>Загрузить файл</>
+            )}
           </label>
         </div>
 
@@ -201,7 +218,9 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             <div className="loading">Загрузка файлов...</div>
           ) : files.length === 0 ? (
             <div className="no-files">
-              <div className="no-files-icon">📄</div>
+              <div className="no-files-icon">
+                <AppIcon name="document" size="xl" />
+              </div>
               <div className="no-files-text">Файлы не загружены</div>
               <div className="no-files-hint">Загрузите макеты для этого заказа</div>
             </div>
@@ -232,343 +251,3 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     </div>
   );
 };
-
-// CSS стили
-const styles = `
-  .files-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 20px;
-  }
-
-  .files-modal {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    width: 100%;
-    max-width: 800px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .files-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 24px;
-    background: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
-  }
-
-  .files-modal-header h3 {
-    margin: 0;
-    color: #2c3e50;
-    font-size: 18px;
-  }
-
-  .btn-close {
-    background: none;
-    border: none;
-    font-size: 20px;
-    cursor: pointer;
-    color: #6c757d;
-    padding: 4px;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-  }
-
-  .btn-close:hover {
-    background: #e9ecef;
-    color: #495057;
-  }
-
-  .files-stats {
-    display: flex;
-    gap: 24px;
-    padding: 16px 24px;
-    background: #ffffff;
-    border-bottom: 1px solid #e9ecef;
-  }
-
-  .stat-item {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .stat-label {
-    font-size: 12px;
-    color: #6c757d;
-    font-weight: 500;
-  }
-
-  .stat-value {
-    font-size: 16px;
-    font-weight: 700;
-    color: #2c3e50;
-  }
-
-  .stat-value.approved {
-    color: #28a745;
-  }
-
-  .stat-value.pending {
-    color: #ffc107;
-  }
-
-  .files-actions {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-    padding: 16px 24px;
-    background: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
-  }
-
-  .files-position-select {
-    padding: 8px 12px;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    font-size: 13px;
-    background: #fff;
-    min-width: 200px;
-  }
-
-  .files-group {
-    margin-bottom: 20px;
-  }
-
-  .files-group-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #495057;
-    margin-bottom: 8px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid #dee2e6;
-  }
-
-  .btn-download-all,
-  .btn-upload {
-    padding: 10px 16px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .btn-download-all {
-    background: #1976d2;
-    color: white;
-  }
-
-  .btn-download-all:hover {
-    background: #1565c0;
-  }
-
-  .btn-upload {
-    background: #28a745;
-    color: white;
-  }
-
-  .btn-upload:hover {
-    background: #218838;
-  }
-
-  .files-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0;
-  }
-
-  .loading {
-    text-align: center;
-    padding: 40px;
-    color: #6c757d;
-  }
-
-  .no-files {
-    text-align: center;
-    padding: 40px;
-    color: #6c757d;
-  }
-
-  .no-files-icon {
-    font-size: 48px;
-    margin-bottom: 16px;
-  }
-
-  .no-files-text {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 8px;
-  }
-
-  .no-files-hint {
-    font-size: 14px;
-    color: #adb5bd;
-  }
-
-  .files-list {
-    padding: 16px 24px;
-  }
-
-  .file-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px;
-    margin-bottom: 8px;
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-  }
-
-  .file-item:hover {
-    background: #e9ecef;
-    border-color: #dee2e6;
-  }
-
-  .file-item.approved {
-    border-left: 4px solid #28a745;
-    background: #f8fff9;
-  }
-
-  .file-item.pending {
-    border-left: 4px solid #ffc107;
-    background: #fffdf5;
-  }
-
-  .file-info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .file-name {
-    margin-bottom: 4px;
-  }
-
-  .file-name .file-name-link {
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    color: #1976d2;
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 14px;
-    font-family: inherit;
-  }
-
-  .file-name .file-name-link:hover {
-    text-decoration: underline;
-  }
-
-  .file-details {
-    display: flex;
-    gap: 16px;
-    font-size: 12px;
-    color: #6c757d;
-  }
-
-  .file-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .btn-download,
-  .btn-approve,
-  .btn-delete {
-    padding: 8px 12px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-  }
-
-  .btn-download {
-    background: #28a745;
-    color: white;
-  }
-
-  .btn-download:hover {
-    background: #218838;
-  }
-
-  .btn-approve {
-    background: #ffc107;
-    color: #212529;
-  }
-
-  .btn-approve:hover {
-    background: #e0a800;
-  }
-
-  .btn-delete {
-    background: #dc3545;
-    color: white;
-  }
-
-  .btn-delete:hover {
-    background: #c82333;
-  }
-
-  .status-approved {
-    color: #28a745;
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  /* Адаптивность */
-  @media (max-width: 768px) {
-    .files-modal {
-      margin: 10px;
-      max-height: 90vh;
-    }
-
-    .files-stats {
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .files-actions {
-      flex-direction: column;
-    }
-
-    .file-item {
-      flex-direction: column;
-      gap: 12px;
-      align-items: stretch;
-    }
-
-    .file-actions {
-      justify-content: center;
-    }
-  }
-`;
-
-// Добавляем стили в head
-if (typeof document !== 'undefined') {
-  const styleElement = document.createElement('style');
-  styleElement.textContent = styles;
-  document.head.appendChild(styleElement);
-}

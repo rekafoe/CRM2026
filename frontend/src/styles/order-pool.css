@@ -89,9 +89,9 @@
 }
 
 .filters-quick .quick-btn.active {
-  background: var(--accent-primary, #667eea);
-  border-color: var(--accent-primary, #667eea);
-  color: white;
+  background: var(--btn-tab-bg-active, #d4c8e8);
+  border-color: var(--accent-primary, #9b87c4);
+  color: var(--btn-tab-text-active, #4a3d62);
 }
 
 .filters-row {

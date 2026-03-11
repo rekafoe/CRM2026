@@ -22,7 +22,7 @@ export const SelectedProductCard: React.FC<Props> = ({ productType, displayName,
         >
           <div className="product-icon"><AppIcon name={getProductIconName(productType)} size="lg" /></div>
           <div className="product-details">
-            <div className="product-type">{productType}</div>
+            <div className="product-type">{displayName}</div>
           </div>
           <span className="selected-product-change" aria-hidden="true">
             <AppIcon name="refresh" size="sm" />

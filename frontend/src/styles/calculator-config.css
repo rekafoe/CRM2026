@@ -68,20 +68,20 @@
   cursor: pointer;
   font-size: 16px;
   font-weight: 500;
-  color: #666;
+  color: var(--btn-tab-text, #5a4d72);
   transition: all 0.2s ease;
   border-bottom: 3px solid transparent;
 }
 
 .tab-btn:hover {
-  background: #e9ecef;
-  color: #333;
+  background: var(--btn-tab-bg-hover, #e8e4f0);
+  color: var(--btn-tab-text-active, #4a3d62);
 }
 
 .tab-btn.active {
-  color: #667eea;
-  border-bottom-color: #667eea;
-  background: white;
+  color: var(--accent-primary, #9b87c4);
+  border-bottom-color: var(--accent-primary, #9b87c4);
+  background: var(--btn-tab-bg-active, #d4c8e8);
 }
 
 .config-content {

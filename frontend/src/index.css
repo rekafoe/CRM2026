@@ -1,17 +1,17 @@
-:root { --c:#0f172a; --b:#f6f7f8; --br:#e5e7eb; --p:#1976d2; --d:#c00; }
+:root { --c:#212529; --b:#f8f9fa; --br:#dee2e6; --p:#6c8eb8; --d:#b88a8a; }
 *{ box-sizing:border-box; }
-html,body,#root{ height:100%; margin:0; font-family: system-ui, -apple-system, Arial, sans-serif; color:var(--c); background:var(--b); }
+html,body,#root{ height:100%; margin:0; font-family: 'Manrope', system-ui, -apple-system, sans-serif; color:var(--c); background:var(--b); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 .app{ display:flex; height:100%; }
 .sidebar{ width:280px; background:#fff; border-right:1px solid var(--br); display:flex; flex-direction:column; padding:16px; gap:8px }
 .sidebar h2{ font-size:1.1rem; margin:6px 0 }
-.add-order-btn{ padding:10px; border:1px solid var(--p); background:var(--p); color:#fff; border-radius:6px; cursor:pointer }
-.btn-danger{ padding:10px; border:1px solid var(--d); background:#fff; color:var(--d); border-radius:6px; cursor:pointer }
+.add-order-btn{ padding:10px; border:1px solid rgba(255,255,255,0.4); background:rgba(108,142,184,0.75); color:#fff; border-radius:999px; cursor:pointer; font-weight:500; box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.1); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px) }
+.btn-danger{ padding:10px; border:1px solid rgba(184,138,138,0.6); background:rgba(255,255,255,0.82); color:var(--d); border-radius:999px; cursor:pointer; box-shadow:inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 8px rgba(0,0,0,0.08); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px) }
 .order-list{ list-style:none; padding:0; margin:0; overflow:auto }
 .order-item{ padding:8px 10px; margin-bottom:8px; border:1px solid var(--br); border-radius:6px; background:#fff; cursor:pointer }
-.order-item.active{ border-color:var(--p); outline:2px solid rgba(25,118,210,.15) }
+.order-item.active{ border-color:var(--p); outline:2px solid rgba(108,142,184,.2) }
 .detail{ flex:1; padding:20px; display:flex; flex-direction:column; gap:16px }
 .detail-header{ display:flex; align-items:center; justify-content:space-between }
-.detail-actions button{ padding:8px 10px; border:1px solid var(--p); background:var(--p); color:#fff; border-radius:6px; cursor:pointer }
+.detail-actions button{ padding:8px 16px; border:1px solid rgba(255,255,255,0.4); background:rgba(108,142,184,0.75); color:#fff; border-radius:999px; cursor:pointer; font-weight:500; box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.1); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px) }
 .detail-body{ flex:1; overflow:auto }
 .detail-body .item{ padding:10px 0; border-bottom:1px solid var(--br) }
 .progress-bar{ width:100%; margin:10px 0 }
@@ -56,7 +56,51 @@ html,body,#root{ height:100%; margin:0; font-family: system-ui, -apple-system, A
   color: #28a745;
   font-weight: 700;
 }
-input,select,button{ border:1px solid var(--br); padding:8px 10px; border-radius:6px }
+/* Поля ввода и селекторы — в стиле кнопок (консистентный дизайн, без увеличения) */
+input:not([type="checkbox"]):not([type="radio"]), select {
+  border: 1px solid #d1d5db;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+input:not([type="checkbox"]):not([type="radio"]):hover,
+select:hover {
+  border-color: #9ca3af;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus {
+  outline: none;
+  border-color: #6c8eb8;
+  box-shadow: 0 0 0 3px rgba(108, 142, 184, 0.2);
+}
+input::placeholder {
+  color: #9ca3af;
+}
+textarea {
+  border: 1px solid #d1d5db;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+textarea:hover { border-color: #9ca3af; }
+textarea:focus {
+  outline: none;
+  border-color: #6c8eb8;
+  box-shadow: 0 0 0 3px rgba(108, 142, 184, 0.2);
+}
+button { border: 1px solid var(--br); padding: 8px 10px; border-radius: 6px }
 button{ cursor:pointer }
 
 /* Убираем spin buttons (треугольнички) у input[type="number"] */

@@ -373,7 +373,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                 </label>
                 {limits && (
                   <span className="operation-limits">
-                    от {limits.min}{limits.max !== undefined ? ` до ${limits.max}` : ''}
+                    {'\u00A0'}от {limits.min}{limits.max !== undefined ? ` до ${limits.max}` : ''}
                   </span>
                 )}
               </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { AdminPageLayout } from '../components/admin/AdminPageLayout';
 import { Alert, Button, FormField } from '../components/common';
+import { AppIcon } from '../components/ui/AppIcon';
 import { getMyEarnings } from '../api';
 import './EarningsPage.css';
 
@@ -132,7 +133,7 @@ export const EarningsPage: React.FC = () => {
   return (
     <AdminPageLayout
       title="Мои проценты"
-      icon="💸"
+      icon={<AppIcon name="briefcase" size="sm" />}
       onBack={() => navigate('/')}
       className="earnings-page"
       headerExtra={
@@ -158,7 +159,7 @@ export const EarningsPage: React.FC = () => {
       <div className="earnings-summary earnings-summary--row">
         <div className="earnings-summary-group">
           <div className="earnings-summary-card earnings-summary-card--today">
-            <div className="earnings-summary-title">💰 Сегодня</div>
+            <div className="earnings-summary-title"><AppIcon name="wallet" size="xs" /> Сегодня</div>
             <div className="earnings-summary-value">{todayTotal.toFixed(2)} BYN</div>
           </div>
           <div className="earnings-summary-card">

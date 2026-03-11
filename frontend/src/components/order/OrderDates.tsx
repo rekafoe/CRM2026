@@ -8,6 +8,8 @@ interface OrderDatesProps {
   onUpdate: () => void;
   onSuccess: (message: string) => void;
   onError: (message: string) => void;
+  /** В одну строку с другими полями (без отступа сверху) */
+  inline?: boolean;
 }
 
 export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
@@ -15,6 +17,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
   onUpdate,
   onSuccess,
   onError,
+  inline = false,
 }) => {
   const [editingCreatedDate, setEditingCreatedDate] = useState(false);
   const [editingReadyDate, setEditingReadyDate] = useState(false);
@@ -115,10 +118,14 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
     }
   }, [items, onUpdate, onSuccess, onError]);
 
+  const divider = (
+    <span style={{ width: 1, minHeight: 18, margin: '0 8px', background: '#d1d5db', flexShrink: 0 }} aria-hidden />
+  );
+
   return (
-    <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 8 }}>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: inline ? 0 : 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <label style={{ fontSize: 12, color: '#666', marginRight: 4 }}>Создан:</label>
+        <label style={{ fontSize: 11, color: '#666', marginRight: 4 }}>Создан:</label>
         {editingCreatedDate ? (
           <input
             type="date"
@@ -136,7 +143,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
           />
         ) : (
           <span 
-            style={{ fontSize: 12, color: '#333', cursor: 'pointer', textDecoration: 'underline' }}
+            style={{ fontSize: 11, color: '#333', cursor: 'pointer', textDecoration: 'underline' }}
             onClick={() => setEditingCreatedDate(true)}
             title="Кликните для редактирования"
           >
@@ -144,9 +151,9 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
           </span>
         )}
       </div>
-      
+      {divider}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <label style={{ fontSize: 12, color: '#666', marginRight: 4 }}>Готов:</label>
+        <label style={{ fontSize: 11, color: '#666', marginRight: 4 }}>Готов:</label>
         {editingReadyDate ? (
           <input
             type="datetime-local"
@@ -164,7 +171,7 @@ export const OrderDates: React.FC<OrderDatesProps> = React.memo(({
           />
         ) : (
           <span 
-            style={{ fontSize: 12, color: '#333', cursor: 'pointer', textDecoration: 'underline' }}
+            style={{ fontSize: 11, color: '#333', cursor: 'pointer', textDecoration: 'underline' }}
             onClick={() => setEditingReadyDate(true)}
             title="Кликните для редактирования"
           >

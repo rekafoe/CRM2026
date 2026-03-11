@@ -124,7 +124,6 @@ const AdminPanelHome: React.FC = () => {
       
       {/* Простая навигация */}
       <div className="admin-navigation">
-        <h3>Быстрая навигация:</h3>
         <div className="nav-buttons">
           <button onClick={() => navigate('/adminpanel/materials')} className="nav-btn">
             <AppIcon name="package" size="xs" /> Материалы

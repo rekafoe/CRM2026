@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { DateSwitcher } from './DateSwitcher';
+import { AppIcon } from '../ui/AppIcon';
 import { useToastNotifications } from '../Toast';
 import { useLogger } from '../../utils/logger';
 import { getOrders } from '../../api';
@@ -233,7 +234,7 @@ export const DateSwitchContainer: React.FC<DateSwitchContainerProps> = ({
     <div className="modal-overlay date-switcher-overlay">
       <div className="modal modal-lg date-switcher-modal">
         <div className="modal-header date-switcher-header">
-          <h2>📅 Выбор даты</h2>
+          <h2><AppIcon name="calendar" size="sm" /> Выбор даты</h2>
           <button
             className="btn-close"
             onClick={onClose}

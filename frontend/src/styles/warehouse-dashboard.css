@@ -477,21 +477,21 @@
   padding: 16px 20px;
   border: none;
   background: transparent;
-  color: #6c757d;
+  color: var(--btn-tab-text, #5a4d72);
   cursor: pointer;
   transition: all 0.3s ease;
   border-bottom: 3px solid transparent;
 }
 
 .tab-btn:hover {
-  background: #e9ecef;
-  color: #495057;
+  background: var(--btn-tab-bg-hover, #e8e4f0);
+  color: var(--btn-tab-text-active, #4a3d62);
 }
 
 .tab-btn.active {
-  background: white;
-  color: var(--tab-color, #667eea);
-  border-bottom-color: var(--tab-color, #667eea);
+  background: var(--btn-tab-bg-active, #d4c8e8);
+  color: var(--btn-tab-text-active, #4a3d62);
+  border-bottom-color: var(--accent-primary, #9b87c4);
 }
 
 .tab-icon {
@@ -504,8 +504,8 @@
 }
 
 .tab-count {
-  background: var(--tab-color, #667eea);
-  color: white;
+  background: var(--accent-primary, #9b87c4);
+  color: var(--btn-primary-text, #3d3551);
   border-radius: 12px;
   padding: 2px 8px;
   font-size: 12px;

@@ -2,7 +2,35 @@ import { MaterialService } from './materialService';
 import { getDb } from '../config/database';
 import * as fs from 'fs';
 import * as path from 'path';
-import puppeteer from 'puppeteer';
+import puppeteer, { Browser } from 'puppeteer';
+
+/** Переиспользуемый экземпляр браузера — избегаем ~800ms на каждый запрос */
+let _browser: Browser | null = null;
+let _browserPromise: Promise<Browser> | null = null;
+
+async function getBrowser(): Promise<Browser> {
+  if (_browser?.connected) return _browser;
+  if (_browserPromise) return _browserPromise;
+  _browserPromise = puppeteer.launch({
+    headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_BIN,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu'
+    ]
+  });
+  _browser = await _browserPromise;
+  _browser.on('disconnected', () => {
+    _browser = null;
+    _browserPromise = null;
+  });
+  return _browser;
+}
 
 export interface StockReportData {
   materials: Array<{
@@ -273,31 +301,12 @@ export class PDFReportService {
     html: string,
     options?: { headerTemplate?: string; footerTemplate?: string }
   ): Promise<Buffer> {
-    let browser;
-    
+    const browser = await getBrowser();
+    const page = await browser.newPage();
     try {
-      console.log('🔄 Starting PDF generation...');
-      
-      // Запускаем браузер
-      browser = await puppeteer.launch({
-        headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_BIN,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ]
-      });
-
-      const page = await browser.newPage();
-      
-      // Устанавливаем содержимое страницы
+      // load — ждём DOM + ресурсы; networkidle0 добавляет лишние ~500ms
       await page.setContent(html, {
-        waitUntil: 'networkidle0'
+        waitUntil: 'load'
       });
 
       // Определяем header и footer
@@ -330,14 +339,11 @@ export class PDFReportService {
 
       console.log('✅ PDF generated successfully');
       return Buffer.from(pdfBuffer);
-      
     } catch (error) {
       console.error('❌ Error converting HTML to PDF:', error);
       throw error;
     } finally {
-      if (browser) {
-        await browser.close();
-      }
+      await page.close();
     }
   }
 

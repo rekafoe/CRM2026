@@ -71,34 +71,56 @@
   line-height: 1.6;
 }
 
-/* Кнопки */
+/* Кнопки — liquid glass */
 .btn {
   padding: 10px 20px;
-  border: none;
-  border-radius: 4px;
+  border-radius: 999px;
   font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   cursor: pointer;
   text-decoration: none;
-  display: inline-block;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  background: rgba(229, 231, 235, 0.88);
+  color: var(--btn-tab-text, #1f2937);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.btn:hover {
+  background: rgba(229, 231, 235, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary {
-  background: #007bff;
-  color: white;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  background: rgba(229, 231, 235, 0.88);
+  color: #1f2937;
 }
 
 .btn-primary:hover {
-  background: #0056b3;
+  background: rgba(229, 231, 235, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .btn-warning {
-  background: #ffc107;
-  color: #212529;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  background: rgba(229, 231, 235, 0.88);
+  color: #1f2937;
 }
 
 .btn-warning:hover {
-  background: #e0a800;
+  background: rgba(229, 231, 235, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Адаптивность */

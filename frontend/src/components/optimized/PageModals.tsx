@@ -3,6 +3,7 @@ import { OrderPool } from '../orders/OrderPool';
 import { UserOrderPage } from '../orders/UserOrderPage';
 import { CountersPage } from '../../pages/CountersPage';
 import { DateSwitchContainer } from '../orders/DateSwitchContainer';
+import { AppIcon } from '../ui/AppIcon';
 import type { Order } from '../../types';
 
 interface PageModalsProps {
@@ -113,7 +114,7 @@ export const PageModals: React.FC<PageModalsProps> = ({
         <div className="new-order-management-overlay">
           <div className="new-order-management-container">
             <div className="new-order-management-header">
-              <h2>📊 Счётчики принтеров и кассы</h2>
+              <h2><AppIcon name="chart-bar" size="sm" /> Счётчики принтеров и кассы</h2>
               <button
                 className="close-btn"
                 onClick={onCloseCountersPage}

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { AppIcon } from '../ui/AppIcon';
 
 const DAYS_PER_PAGE = 14;
 
@@ -55,7 +56,7 @@ export const DateSwitcher: React.FC<DateSwitcherProps> = ({
 
   return (
     <div className="date-switcher">
-      <h3 className="date-switcher-title">📅 Выберите дату</h3>
+      <h3 className="date-switcher-title"><AppIcon name="calendar" size="sm" /> Выберите дату</h3>
 
       <div className="date-switcher-grid">
         {sortedUserDates.length > 0 ? (
@@ -77,7 +78,7 @@ export const DateSwitcher: React.FC<DateSwitcherProps> = ({
           ))
         ) : (
           <div className="date-switcher-empty">
-            <div className="date-switcher-empty__title">📅 Нет данных о работе</div>
+            <div className="date-switcher-empty__title"><AppIcon name="calendar" size="sm" /> Нет данных о работе</div>
             <div className="date-switcher-empty__subtitle">Вы еще не создавали заказы</div>
           </div>
         )}

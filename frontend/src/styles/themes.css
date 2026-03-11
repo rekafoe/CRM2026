@@ -1,32 +1,32 @@
-/* CSS переменные для темной и светлой темы - MONOCHROME DESIGN */
+/* CSS переменные для темной и светлой темы - СЕРО-СИНИЕ ПАСТЕЛЬ */
 :root {
-  /* Светлая тема (по умолчанию) - монохромная палитра */
+  /* Светлая тема (по умолчанию) - серый фон */
   --bg-primary: #ffffff;
   --bg-secondary: #f8f9fa;
   --bg-tertiary: #e9ecef;
   --bg-hover: #f1f3f4;
   --text-primary: #212529;
-  --text-secondary: #6c757d;
+  --text-secondary: #495057;
   --text-disabled: #adb5bd;
-  --text-muted: #868e96;
+  --text-muted: #6c757d;
   --border-color: #dee2e6;
-  --border-light: #f8f9fa;
-  --shadow: rgba(0, 0, 0, 0.1);
-  --shadow-light: rgba(0, 0, 0, 0.05);
+  --border-light: #f1f3f4;
+  --shadow: rgba(0, 0, 0, 0.08);
+  --shadow-light: rgba(0, 0, 0, 0.04);
 
-  /* Монохромные акценты */
-  --accent-primary: #495057;
-  --accent-secondary: #6c757d;
-  --accent-light: #adb5bd;
-  --accent-dark: #343a40;
+  /* Серо-синие пастельные акценты */
+  --accent-primary: #6c8eb8;
+  --accent-secondary: #8fa3c4;
+  --accent-light: #b8c9e0;
+  --accent-dark: #4a6a94;
 
-  /* Монохромные состояния */
-  --success: #6c757d;
-  --warning: #868e96;
-  --error: #495057;
-  --info: #6c757d;
+  /* Пастельные состояния */
+  --success: #7a9a8a;
+  --warning: #a89b7a;
+  --error: #b88a8a;
+  --info: #7a9ab8;
 
-  /* Расширенные цвета для состояний - монохромные */
+  /* Расширенные цвета для состояний */
   --success-light: #f8f9fa;
   --success-border: #dee2e6;
   --warning-light: #f8f9fa;
@@ -52,32 +52,54 @@
   --border-error: #dee2e6;
   --border-info: #dee2e6;
 
-  /* Цвета для изменений цен - монохромные */
-  --price-increase: #495057;
+  /* Цвета для изменений цен */
+  --price-increase: #4a6a94;
   --price-decrease: #6c757d;
   --price-neutral: #adb5bd;
+
+  /* Серо-синие пастельные кнопки и табы */
+  --btn-tab-bg: #e9ecef;
+  --btn-tab-bg-hover: #dee2e6;
+  --btn-tab-bg-active: #b8c9e0;
+  --btn-tab-text: #1f2937;
+  --btn-tab-text-active: #111827;
+  --btn-tab-border: #dee2e6;
+  --btn-primary-bg: #8fa3c4;
+  --btn-primary-bg-hover: #6c8eb8;
+  --btn-primary-text: #ffffff;
 }
 
 [data-theme="dark"] {
-  /* Темная тема - монохромная палитра */
-  --bg-primary: #121212;
-  --bg-secondary: #1e1e1e;
-  --bg-tertiary: #2a2a2a;
-  --bg-hover: #1a1a1a;
-  --text-primary: #ffffff;
-  --text-secondary: #b0b0b0;
-  --text-disabled: #666666;
-  --text-muted: #888888;
-  --border-color: #333333;
-  --border-light: #1e1e1e;
+  /* Темная тема - пастельная монохромная палитра */
+  --bg-primary: #1a1820;
+  --bg-secondary: #25222d;
+  --bg-tertiary: #302c3a;
+  --bg-hover: #2a2635;
+  --text-primary: #e8e4f0;
+  --text-secondary: #c4b8d8;
+  --text-disabled: #7a6b94;
+  --text-muted: #9b8ab8;
+  --border-color: #3d3551;
+  --border-light: #25222d;
   --shadow: rgba(0, 0, 0, 0.3);
   --shadow-light: rgba(0, 0, 0, 0.2);
 
-  /* Монохромные акценты (темная тема) */
-  --accent-primary: #b0b0b0;
-  --accent-secondary: #888888;
-  --accent-light: #666666;
-  --accent-dark: #cccccc;
+  /* Пастельные акценты (темная тема) */
+  --accent-primary: #b8a9d4;
+  --accent-secondary: #9b87c4;
+  --accent-light: #6b5b8a;
+  --accent-dark: #d4c8e8;
+
+  /* Пастельные кнопки и табы (темная тема) */
+  --btn-tab-bg: #302c3a;
+  --btn-tab-bg-hover: #3d3551;
+  --btn-tab-bg-active: #4a3d62;
+  --btn-tab-text: #c4b8d8;
+  --btn-tab-text-active: #e8e4f0;
+  --btn-tab-border: #3d3551;
+  --btn-primary-bg: #6b5b8a;
+  --btn-primary-bg-hover: #7a6b94;
+  --btn-primary-text: #e8e4f0;
 
   /* Монохромные состояния (темная тема) */
   --success: #b0b0b0;

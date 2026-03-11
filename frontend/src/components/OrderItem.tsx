@@ -10,6 +10,7 @@ import {
   isAutoDescription,
   sanitizeOrderItemDescription,
 } from './order/orderItemUtils';
+import './OrderItem.css';
 import { OrderItemSummary } from './order/OrderItemSummary';
 import { OrderItemEditForm } from './order/OrderItemEditForm';
 import { OrderItemActions } from './order/OrderItemActions';

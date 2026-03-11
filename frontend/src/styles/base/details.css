@@ -97,19 +97,19 @@
 }
 
 .detail-actions button {
-  padding: 8px 10px;
-  border: 1px solid #1976d2;
-  background: #1976d2;
-  color: #fff;
-  border-radius: 6px;
+  padding: 8px 16px;
+  border: none;
+  background: var(--btn-primary-bg, #b8a9d4);
+  color: var(--btn-primary-text, #3d3551);
+  border-radius: 999px;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 500;
   transition: all 0.2s ease;
 }
 
 .detail-actions button:hover {
-  background: #1565c0;
-  border-color: #1565c0;
+  background: var(--btn-primary-bg-hover, #9b87c4);
 }
 
 /* Детали заказа */

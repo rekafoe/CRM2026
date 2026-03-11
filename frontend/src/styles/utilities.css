@@ -507,10 +507,10 @@
 }
 
 .wizard-steps .step.active {
-  background: #667eea;
-  color: white;
-  border-color: #667eea;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  background: var(--btn-tab-bg-active, #d4c8e8);
+  color: var(--btn-tab-text-active, #4a3d62);
+  border-color: var(--accent-primary, #9b87c4);
+  box-shadow: 0 4px 12px rgba(155, 135, 196, 0.25);
   transform: translateY(-2px);
 }
 

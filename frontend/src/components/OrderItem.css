@@ -11,9 +11,44 @@
 .oi-btn { padding: 6px 12px; border-radius: 4px; cursor: pointer; border: none; color: #fff; }
 .oi-btn-xs { padding: 2px 6px; font-size: 11px; }
 .oi-btn-secondary { background-color: #f0f0f0; color: #333; border: 1px solid #ccc; }
-.oi-btn-primary { background-color: #2196f3; }
-.oi-btn-success { background-color: #4caf50; }
-.oi-btn-danger { background-color: #f44336; }
+.oi-btn-primary { background: var(--btn-primary-bg, #8fa3c4); color: var(--btn-primary-text, #fff); }
+.oi-btn-success { background: var(--success, #7a9a8a); color: #fff; }
+.oi-btn-danger { background: var(--error, #b88a8a); color: #fff; }
+
+/* Кнопки Редактировать / Удалить — контрастные */
+.order-item-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.order-item-btn--primary {
+  background: #4a6a94;
+  color: #fff;
+}
+.order-item-btn--primary:hover {
+  background: #3d5a7c;
+  filter: brightness(1.08);
+}
+.order-item-btn--neutral {
+  background: #4b5563;
+  color: #fff;
+}
+.order-item-btn--neutral:hover {
+  background: #374151;
+  filter: brightness(1.08);
+}
+.order-item-btn--danger {
+  background: #b91c1c;
+  color: #fff;
+}
+.order-item-btn--danger:hover {
+  background: #991b1b;
+  filter: brightness(1.08);
+}
 .oi-input { padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; }
 .full { width: 100%; }
 .w-100 { width: 100px; }
@@ -21,13 +56,13 @@
 .w-60 { width: 60px; }
 
 /* From injected styles */
-.order-item-horizontal { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; padding: 8px 12px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px; margin: 2px 0; font-size: 13px; line-height: 1.4; }
+.order-item-horizontal { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; padding: 8px 12px; background: var(--bg-secondary, #f8f9fa); border: 1px solid var(--border-color, #dee2e6); border-radius: 4px; margin: 2px 0; font-size: 13px; line-height: 1.4; }
 .item-name { font-weight: 600; color: #2c3e50; flex-shrink: 0; }
 .separator { color: #adb5bd; margin: 0 4px; font-weight: 300; flex-shrink: 0; }
 .item-quantity { color: #495057; font-weight: 500; flex-shrink: 0; }
 .item-price { color: #6c757d; font-size: 12px; flex-shrink: 0; }
 .item-total { color: #28a745; font-weight: 600; flex-shrink: 0; }
-.detail-item { color: #6c757d; background: #e9ecef; padding: 1px 4px; border-radius: 2px; font-weight: 500; font-size: 11px; flex-shrink: 0; white-space: nowrap; }
+.detail-item { color: #fff; background: #4b5563; padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px; flex-shrink: 0; white-space: nowrap; }
 .detail-item.urgency { background: #fff3cd; color: #856404; font-weight: 600; }
 .detail-item.customer { background: #d1ecf1; color: #0c5460; font-weight: 600; }
 .order-parameter-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }

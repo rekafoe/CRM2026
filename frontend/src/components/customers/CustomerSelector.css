@@ -1,40 +1,41 @@
  .customer-selector {
    margin-bottom: 16px;
  }
- 
+
  .customer-selector__label {
-   font-size: 12px;
-   color: #666;
+   font-size: 13px;
+   color: #1f2937;
    display: block;
-   margin-bottom: 4px;
+   margin-bottom: 6px;
+   font-weight: 500;
  }
  
  .customer-selector__row {
    display: flex;
-   gap: 8px;
+   gap: 10px;
    align-items: center;
  }
  
+ /* Селект и поиск — как кнопки: 10px радиус, тень, без увеличения */
  .customer-selector__select {
-   flex: 1;
-   padding: 6px 12px;
-   border: 1px solid #ddd;
-   border-radius: 4px;
-   font-size: 14px;
-   background: #fff;
+   width: 300px;
+   flex: 0 0 300px;
+   padding: 8px 36px 8px 12px;
+   appearance: none;
+   background-color: #fff;
+   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+   background-repeat: no-repeat;
+   background-position: right 12px center;
  }
  
  .customer-selector__search {
    position: relative;
    width: 220px;
+   flex-shrink: 0;
  }
  
  .customer-selector__search-input {
    width: 100%;
-   padding: 6px 12px;
-   border: 1px solid #ddd;
-   border-radius: 4px;
-   font-size: 14px;
  }
  
  .customer-selector__suggestions {
@@ -45,7 +46,7 @@
    background: #fff;
    border: 1px solid #e5e7eb;
    border-radius: 8px;
-   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
    max-height: 260px;
    overflow: auto;
    z-index: 20;
@@ -83,21 +84,34 @@
    color: #6b7280;
  }
  
- .customer-selector__create {
-   padding: 6px 12px;
-   background-color: #007bff;
-   color: white;
-   border: none;
-   border-radius: 4px;
-   cursor: pointer;
-   font-size: 14px;
-   white-space: nowrap;
- }
+.customer-selector__create {
+  padding: 8px 16px;
+  background: #4a6a94;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.customer-selector__create:hover {
+  background: #3d5a7c;
+  filter: brightness(1.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 12px rgba(0, 0, 0, 0.12);
+}
  
  .customer-selector__details {
    margin-top: 8px;
    font-size: 12px;
-   color: #666;
+   color: #6b7280;
+   line-height: 1.5;
  }
  
  .customer-modal-overlay {
@@ -125,66 +139,100 @@
  
  .customer-modal__title {
    margin-top: 0;
+   margin-bottom: 20px;
+   font-size: 18px;
+   font-weight: 600;
+   color: #111827;
  }
  
  .customer-modal__field {
-   margin-bottom: 16px;
+   margin-bottom: 18px;
  }
  
  .customer-modal__label {
    display: block;
-   margin-bottom: 4px;
+   margin-bottom: 6px;
    font-size: 14px;
    font-weight: 600;
+   color: #1f2937;
  }
  
  .customer-modal__label-sm {
    display: block;
-   margin-bottom: 4px;
-   font-size: 12px;
+   margin-bottom: 6px;
+   font-size: 13px;
+   font-weight: 500;
+   color: #374151;
  }
  
- .customer-modal__input {
+ /* Модальные поля — как кнопки (консистентно, без увеличения) */
+ .customer-modal input.customer-modal__input,
+ .customer-modal select.customer-modal__input {
    width: 100%;
-   padding: 8px;
-   border: 1px solid #ddd;
-   border-radius: 4px;
-   font-size: 14px;
  }
- 
- .customer-modal__textarea {
+
+ .customer-modal select.customer-modal__input {
+   appearance: none;
+   background-color: #fff;
+   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+   background-repeat: no-repeat;
+   background-position: right 12px center;
+   padding-right: 36px;
+ }
+
+ .customer-modal textarea.customer-modal__textarea {
    width: 100%;
-   padding: 8px;
-   border: 1px solid #ddd;
-   border-radius: 4px;
-   font-size: 14px;
+   min-height: 72px;
    resize: vertical;
  }
  
  .customer-modal__actions {
    display: flex;
-   gap: 8px;
+   gap: 12px;
    justify-content: flex-end;
+   margin-top: 24px;
+   padding-top: 20px;
+   border-top: 1px solid #e5e7eb;
  }
  
- .customer-modal__button {
-   padding: 8px 16px;
-   border-radius: 4px;
-   cursor: pointer;
-   border: none;
+/* Кнопки модалки — liquid glass */
+.customer-modal__button {
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+ 
+.customer-modal__button--secondary {
+  background-color: rgba(229, 231, 235, 0.88);
+  color: #1f2937;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+}
+ 
+ .customer-modal__button--secondary:hover {
+   background-color: rgba(229, 231, 235, 0.8);
+   border-color: rgba(255, 255, 255, 0.5);
+   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4px 12px rgba(0, 0, 0, 0.08);
  }
  
- .customer-modal__button--secondary {
-   background-color: #f5f5f5;
-   border: 1px solid #ddd;
- }
+.customer-modal__button--primary {
+  background: rgba(108, 142, 184, 0.75);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
  
- .customer-modal__button--primary {
-   background-color: #007bff;
-   color: white;
+ .customer-modal__button--primary:hover:not(:disabled) {
+   background: rgba(108, 142, 184, 0.88);
+   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.12);
  }
  
  .customer-modal__button--primary:disabled {
-   background-color: #ccc;
+   background-color: #9ca3af;
    cursor: not-allowed;
+   box-shadow: none;
  }

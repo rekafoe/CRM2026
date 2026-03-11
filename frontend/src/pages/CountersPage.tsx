@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { getCurrentUser, getUsers } from '../api';
 import { parseNumberFlexible } from '../utils/numberInput';
+import { AppIcon } from '../components/ui/AppIcon';
 import './CountersPage.css';
 
 interface Printer {
@@ -69,6 +70,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
   const [cashContributions, setCashContributions] = useState<CashContribution[]>([]);
   const [cashContributionsTotal, setCashContributionsTotal] = useState<number>(0);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
+  const [activeTab, setActiveTab] = useState<'cash' | 'printers'>('cash');
   const previousDateLabel = React.useMemo(() => {
     const base = new Date(selectedDate);
     if (Number.isNaN(base.getTime())) return 'вчера';
@@ -461,14 +463,14 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
           )}
           {!isModal && (
             <div className="header-text">
-              <h1>📊 Счётчики принтеров и кассы</h1>
+              <h1><AppIcon name="chart-bar" size="sm" /> Счётчики принтеров и кассы</h1>
               <p>Контроль счетчиков принтеров и сверка кассы</p>
             </div>
           )}
         </div>
         
         <div className="date-selector">
-          <label htmlFor="date-input">📅 Дата:</label>
+          <label htmlFor="date-input"><AppIcon name="calendar" size="xs" /> Дата:</label>
           <input
             id="date-input"
             type="date"
@@ -481,16 +483,33 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
 
       {error && (
         <div className="counters-error-banner">
-          ⚠️ {error}
-          <button onClick={() => setError(null)}>✕</button>
+          <AppIcon name="warning" size="xs" /> {error}
+          <button onClick={() => setError(null)} aria-label="Закрыть"><AppIcon name="x" size="xs" /></button>
         </div>
       )}
 
+      <div className="counters-tabs">
+        <button
+          type="button"
+          className={`counters-tab ${activeTab === 'cash' ? 'active' : ''}`}
+          onClick={() => setActiveTab('cash')}
+        >
+          <AppIcon name="wallet" size="xs" /> Касса
+        </button>
+        <button
+          type="button"
+          className={`counters-tab ${activeTab === 'printers' ? 'active' : ''}`}
+          onClick={() => setActiveTab('printers')}
+        >
+          <AppIcon name="printer" size="xs" /> Принтеры
+        </button>
+      </div>
+
       <div className="counters-content">
-        {/* Касса - перемещена вверх */}
+        {activeTab === 'cash' && (
         <div className="counters-section">
           <div className="section-header">
-            <h2>💰 Касса</h2>
+            <h2><AppIcon name="wallet" size="sm" /> Касса</h2>
             <p>Сверка фактической и расчетной суммы</p>
           </div>
           
@@ -512,7 +531,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
                   onClick={handleCashSave}
                   disabled={saving || !cashActualValue.trim()}
                 >
-                  {saving ? '⏳' : '💾'} Сохранить
+                  {saving ? <><AppIcon name="refresh" size="xs" /> Сохранение...</> : <><AppIcon name="save" size="xs" /> Сохранить</>}
                 </button>
               </div>
             </div>
@@ -587,11 +606,12 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
             </div>
           </div>
         </div>
+        )}
 
-        {/* Счетчики принтеров */}
+        {activeTab === 'printers' && (
         <div className="counters-section">
           <div className="section-header">
-            <h2>🖨️ Счётчики принтеров</h2>
+            <h2><AppIcon name="printer" size="sm" /> Счётчики принтеров</h2>
             <p>Сверка кликов SRA3: расчетные vs фактические</p>
           </div>
           
@@ -607,8 +627,9 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
                     className="edit-btn"
                     onClick={() => handlePrinterEdit(printer.id)}
                     disabled={saving}
+                    title="Редактировать"
                   >
-                    ✏️
+                    <AppIcon name="pencil" size="xs" />
                   </button>
                 </div>
                 
@@ -673,22 +694,22 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
                       }}
                     />
                     <div className="edit-actions">
-                      <button
-                        className="save-btn"
-                        onClick={handlePrinterSave}
-                        disabled={saving || !newCounterValue}
-                      >
-                        {saving ? '⏳' : '💾'} Сохранить
-                      </button>
-                      <button
-                        className="cancel-btn"
-                        onClick={() => {
-                          setEditingPrinter(null);
-                          setNewCounterValue('');
-                        }}
-                      >
-                        ✕ Отмена
-                      </button>
+                    <button
+                      className="save-btn"
+                      onClick={handlePrinterSave}
+                      disabled={saving || !newCounterValue}
+                    >
+                      {saving ? <><AppIcon name="refresh" size="xs" /> Сохранение...</> : <><AppIcon name="save" size="xs" /> Сохранить</>}
+                    </button>
+                    <button
+                      className="cancel-btn"
+                      onClick={() => {
+                        setEditingPrinter(null);
+                        setNewCounterValue('');
+                      }}
+                    >
+                      <AppIcon name="x" size="xs" /> Отмена
+                    </button>
                     </div>
                   </div>
                 )}
@@ -696,7 +717,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
             ))}
           </div>
         </div>
-
+        )}
       </div>
     </div>
   );

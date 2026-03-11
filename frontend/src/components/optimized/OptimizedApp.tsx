@@ -27,6 +27,7 @@ import { FilesModal } from "../FilesModal";
 import { OrderPool } from "../orders/OrderPool";
 import { UserOrderPage } from "../orders/UserOrderPage";
 import { TopBar } from "./TopBar";
+import { AppIcon } from "../ui/AppIcon";
 import { DateSwitchContainer } from "../orders/DateSwitchContainer";
 import { setAuthToken, getOrderStatuses, listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, createPrepaymentLink, issueOrder, getLowStock, getCurrentUser, getUsers, getDailyReportByDate, createDailyReport, getDefaultOrganization } from '../../api';
 import type { Organization } from '../../api';
@@ -309,7 +310,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                   onChange={handleDateChangeInPicker}
                 />
               </div>
-              <div className="row">
+              <div className="row" style={{ display: 'none' }}>
                 <span style={{ width: 90 }}>Пользователь:</span>
                 <select 
                   value={String(contextUserId ?? currentUser?.id ?? '')} 
@@ -327,7 +328,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
           )}
 
           <aside className="sidebar">
-            <div className="sidebar-toolbar">
+            <div className="sidebar-actions-row">
               <button
                 className="icon-btn"
                 title="Добавить заказ"
@@ -339,7 +340,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                   }
                 }}
               >
-                ＋
+                <AppIcon name="plus" size="sm" />
               </button>
               <button
                 className="icon-btn"
@@ -350,23 +351,22 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                   if (!selectedOrder) return;
                   await orderHandlers.handleDeleteOrder(selectedOrder.id);
                 }}
-              >🗑️</button>
-            </div>
-            
-        <div className="orders-list-tabs">
+              >
+                <AppIcon name="trash" size="sm" />
+              </button>
               <button
                 type="button"
-                className={ordersListTab === 'orders' ? 'active' : ''}
+                className={`orders-list-tab ${ordersListTab === 'orders' ? 'active' : ''}`}
                 onClick={() => setOrdersListTab('orders')}
               >
                 Заказы
               </button>
               <button
                 type="button"
-                className={ordersListTab === 'issued' ? 'active' : ''}
+                className={`orders-list-tab ${ordersListTab === 'issued' ? 'active' : ''}`}
                 onClick={() => setOrdersListTab('issued')}
               >
-                Выданные заказы
+                Выданные
               </button>
             </div>
             <OrderList
@@ -406,25 +406,48 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
               />
             ) : (
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <p>Выберите заказ слева</p>
-                {selectedId && (
-                  <div style={{ marginTop: '10px', color: '#666', fontSize: '14px' }}>
-                    <p>Заказ с ID {selectedId} не найден в списке</p>
-                    <p>Всего заказов: {orders.length}</p>
-                    <button 
-                      onClick={() => setSelectedId(null)}
-                      style={{ 
-                        marginTop: '10px', 
-                        padding: '8px 16px', 
-                        backgroundColor: '#f5f5f5', 
-                        border: '1px solid #ddd', 
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Сбросить выбор
-                    </button>
-                  </div>
+                {ordersListTab === 'issued' && orders.length === 0 ? (
+                  <>
+                    <p>За выбранную дату выданных заказов нет</p>
+                    {selectedId && (
+                      <button 
+                        onClick={() => setSelectedId(null)}
+                        style={{ 
+                          marginTop: '10px', 
+                          padding: '8px 16px', 
+                          backgroundColor: '#f5f5f5', 
+                          border: '1px solid #ddd', 
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Сбросить выбор
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p>Выберите заказ слева</p>
+                    {selectedId && (
+                      <div style={{ marginTop: '10px', color: '#666', fontSize: '14px' }}>
+                        <p>Заказ с ID {selectedId} не найден в списке</p>
+                        <p>Всего заказов: {orders.length}</p>
+                        <button 
+                          onClick={() => setSelectedId(null)}
+                          style={{ 
+                            marginTop: '10px', 
+                            padding: '8px 16px', 
+                            backgroundColor: '#f5f5f5', 
+                            border: '1px solid #ddd', 
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Сбросить выбор
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -607,6 +630,9 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
           font-size: 20px;
           font-weight: 600;
           color: #333;
+          display: flex;
+          align-items: center;
+          gap: 10px;
         }
         
         .new-order-management-content {
@@ -648,9 +674,10 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
         .counters-modal-overlay .new-order-management-container {
           border-radius: 16px;
           box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04);
-          max-width: 900px;
+          max-width: 1080px;
+          width: min(1080px, 96vw);
           height: auto;
-          max-height: 90vh;
+          max-height: 92vh;
         }
         
         .counters-modal-overlay .new-order-management-header {
@@ -664,6 +691,9 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
           font-weight: 600;
           color: #1e293b;
           letter-spacing: -0.01em;
+          display: flex;
+          align-items: center;
+          gap: 10px;
         }
         
         .counters-modal-overlay .close-btn {
@@ -683,13 +713,14 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
           background: #fafbfc;
         }
         
-        /* Компактное модальное окно для выбора даты */
+        /* Модальное окно для выбора даты — увеличенное, без скролла */
         .date-switcher-modal {
           background: white;
           border-radius: 12px;
           box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-          max-width: 500px;
-          width: 90vw;
+          max-width: 720px;
+          width: 92vw;
+          max-height: 90vh;
           display: flex;
           flex-direction: column;
           overflow: hidden;
@@ -766,7 +797,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
         <div className="new-order-management-overlay counters-modal-overlay">
           <div className="new-order-management-container">
             <div className="new-order-management-header">
-              <h2>📊 Счётчики принтеров и кассы</h2>
+              <h2><AppIcon name="chart-bar" size="sm" /> Счётчики принтеров и кассы</h2>
               <button 
                 className="close-btn"
                 onClick={() => setShowCountersPage(false)}

@@ -19,10 +19,24 @@
   --status-bg-cancelled: #ffebee;
 }
 
-/* Компактная карточка заказа */
+/* Компактная карточка заказа (переопределяем OrderItem.css) */
 .order-list .order-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
   padding: 6px 10px;
   margin-bottom: 4px;
+  border: 1px solid #AAD8E6;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.order-list .order-item.active {
+  border-color: #1976d2;
+  outline: 2px solid rgba(25, 118, 210, 0.15);
+  background: #f0f7ff;
 }
 
 /* Заголовок элемента заказа */
@@ -66,44 +80,45 @@
   margin-top: 4px;
 }
 
-/* Статус-пилл (badge-стиль как в order-lists.css) */
-.status-pill {
+/* Статус-пилл (скрин 2: светлая рамка, белый фон) */
+.order-list .status-pill {
   display: inline-block;
   padding: 3px 6px;
-  border-radius: 10px;
+  border-radius: 999px;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   text-align: center;
   min-width: 70px;
-  background-color: var(--status-bg-new);
+  background: #fff;
+  border: 1px solid #AAD8E6;
   color: var(--status-color-default);
 }
 
-/* Модификаторы статусов */
-.status-pill--new {
-  background-color: var(--status-bg-new);
+/* Модификаторы статусов — цвет рамки и текста */
+.order-list .status-pill--new {
+  border-color: var(--status-color-new);
   color: var(--status-color-new);
 }
 
-.status-pill--pending {
-  background-color: var(--status-bg-pending);
+.order-list .status-pill--pending {
+  border-color: var(--status-color-pending);
   color: var(--status-color-pending);
 }
 
-.status-pill--in-progress {
-  background-color: var(--status-bg-in-progress);
+.order-list .status-pill--in-progress {
+  border-color: var(--status-color-in-progress);
   color: var(--status-color-in-progress);
 }
 
-.status-pill--completed {
-  background-color: var(--status-bg-completed);
+.order-list .status-pill--completed {
+  border-color: var(--status-color-completed);
   color: var(--status-color-completed);
 }
 
-.status-pill--cancelled {
-  background-color: var(--status-bg-cancelled);
+.order-list .status-pill--cancelled {
+  border-color: var(--status-color-cancelled);
   color: var(--status-color-cancelled);
 }
 
@@ -162,7 +177,7 @@
     font-size: 11px;
   }
 
-  .status-pill {
+  .order-list .status-pill {
     font-size: 9px;
     padding: 2px 5px;
     min-width: 55px;

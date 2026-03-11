@@ -37,31 +37,10 @@ export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(({
   if (editing) {
     return (
       <>
-        <button
-          onClick={onSave}
-          style={{ 
-            padding: '6px 12px', 
-            backgroundColor: '#4caf50', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
+        <button className="order-item-btn order-item-btn--primary" onClick={onSave}>
           Сохранить
         </button>
-        <button 
-          className="btn-danger" 
-          onClick={onCancel}
-          style={{ 
-            padding: '6px 12px', 
-            backgroundColor: '#f44336', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
+        <button className="order-item-btn order-item-btn--neutral" onClick={onCancel}>
           Отмена
         </button>
       </>
@@ -93,32 +72,11 @@ export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(({
       </span>
 
       {onEditParameters && (
-        <button 
-          onClick={() => onEditParameters(orderId, item)}
-          style={{ 
-            padding: '6px 12px', 
-            backgroundColor: '#2196f3', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
+        <button className="order-item-btn order-item-btn--primary" onClick={() => onEditParameters(orderId, item)}>
           Редактировать
         </button>
       )}
-      <button
-        className="btn-danger"
-        onClick={onDelete}
-        style={{ 
-          padding: '6px 12px', 
-          backgroundColor: '#f44336', 
-          color: 'white', 
-          border: 'none', 
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }}
-      >
+      <button className="order-item-btn order-item-btn--danger" onClick={onDelete}>
         Удалить
       </button>
     </div>

@@ -327,28 +327,58 @@
   background: transparent !important;
 }
 .calculator-subtotal-bar .form-section.result-section.compact {
-  padding: 14px 20px 18px !important;
+  padding: 10px 16px 14px !important;
 }
 .calculator-subtotal-bar .result-section.compact h3 {
-  color: #0f172a;
-  font-size: 16px;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e2e8f0;
+  color: var(--text-primary, #3d3551);
+  font-size: 14px;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color, #e2dcec);
+}
+.calculator-subtotal-bar .result-details {
+  gap: 4px;
+  margin-bottom: 4px;
 }
 .calculator-subtotal-bar .result-item {
   background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #e2e8f0;
-  color: #334155;
+  border: 1px solid var(--border-color, #e2dcec);
+  color: var(--text-secondary, #5a4d72);
+  padding: 2px 6px;
+  min-width: 72px;
+}
+.calculator-subtotal-bar .result-item span:first-child {
+  font-size: 11px;
+}
+.calculator-subtotal-bar .result-item span:last-child {
+  font-size: 12px;
+}
+.calculator-subtotal-bar .result-parameter-summary {
+  gap: 3px;
+  margin-bottom: 4px;
 }
 .calculator-subtotal-bar .parameter-chip {
   background: white;
-  border-color: #cbd5e0;
+  border-color: var(--border-color, #e2dcec);
+  padding: 2px 5px;
+  font-size: 10px;
+}
+.calculator-subtotal-bar .result-sheet-info {
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+.calculator-subtotal-bar .result-tier-prices {
+  margin: 4px 0;
+  font-size: 11px;
+}
+.calculator-subtotal-bar .result-tier-prices summary {
+  padding: 2px 0;
 }
 .calculator-subtotal-bar .result-actions .btn-primary {
-  padding: 12px 24px;
+  padding: 10px 20px;
   font-weight: 600;
-  border-radius: 12px;
+  font-size: 14px;
+  border-radius: 10px;
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.35);
 }
 
@@ -578,9 +608,9 @@
 }
 
 .product-type-btn.active {
-  border-color: #667eea;
-  background: var(--bg-hover);
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
+  border-color: var(--accent-primary, #9b87c4);
+  background: var(--btn-tab-bg-active, #d4c8e8);
+  box-shadow: 0 8px 25px rgba(155, 135, 196, 0.2);
 }
 
 .product-type-btn.active::before {
@@ -702,9 +732,13 @@
   background: #667eea;
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 50%;
   width: 40px;
   height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  flex-shrink: 0;
+  aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -929,6 +963,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
 }
 
 .checkbox-group label {
@@ -943,6 +978,10 @@
   transition: all 0.3s ease;
   font-size: 14px;
   font-weight: 500;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  box-sizing: border-box;
 }
 
 .checkbox-group label:hover {
@@ -1736,8 +1775,10 @@
   border-radius: 20px;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
   width: 100%;
-  max-width: 1000px;
-  max-height: 80vh;
+  max-width: 1500px;
+  min-height: 900px;
+  height: 900px;
+  max-height: min(900px, 95vh);
   overflow: hidden;
   animation: modalSlideIn 0.3s ease-out;
   margin: 20px;
@@ -1746,9 +1787,9 @@
 }
 
 .selector-header {
-  background: var(--bg-secondary);
-  border: 1px solid var(--accent-primary);
-  color: white;
+  background: #e5e7eb;
+  border: 1px solid #d1d5db;
+  color: #1f2937;
   padding: 24px 32px;
   text-align: center;
   border-radius: 20px 20px 0 0;
@@ -1758,37 +1799,40 @@
 .selector-header h2 {
   margin: 0 0 8px 0;
   font-size: 28px;
-  font-weight: 800;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1f2937;
 }
 
 .selector-header p {
   margin: 0;
   font-size: 16px;
-  opacity: 0.9;
+  color: #374151;
 }
 
-.close-button {
+.selector-header .close-button {
   position: absolute;
   top: 20px;
   right: 20px;
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #d1d5db;
+  color: #374151;
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: 999px;
   font-size: 18px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
-.close-button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
+.selector-header .close-button:hover {
+  background: #d1d5db;
+  color: #1f2937;
+  transform: scale(1.05);
 }
 
 .selector-search {
@@ -1848,27 +1892,35 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  border: 2px solid #e9ecef;
-  border-radius: 12px;
-  background: white;
-  color: #495057;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(229, 231, 235, 0.88);
+  color: #1f2937;
   font-size: 14px;
   font-weight: 500;
+  letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .category-button:hover {
-  border-color: #667eea;
-  color: #667eea;
-  transform: translateY(-1px);
+  background: rgba(229, 231, 235, 0.95);
+  border-color: rgba(156, 163, 175, 0.85);
 }
 
 .category-button.active {
-  background: #667eea;
-  border-color: #667eea;
-  color: white;
+  background: rgba(108, 142, 184, 0.75);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.category-button.active:hover {
+  background: rgba(108, 142, 184, 0.88);
 }
 
 .category-button:disabled {
@@ -2078,15 +2130,21 @@
   gap: 10px;
   font-size: 14px;
   color: #1f2937;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .postprint-service-checkbox input {
   width: 18px;
   height: 18px;
+  min-width: 18px;
+  flex-shrink: 0;
 }
 
 .postprint-service-name {
   font-weight: 600;
+  min-width: 0;
 }
 
 .postprint-service-meta {
@@ -2162,7 +2220,11 @@
 .postprint-quantity-row .quantity-btn {
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  min-width: 34px;
+  min-height: 34px;
+  flex-shrink: 0;
+  aspect-ratio: 1;
+  border-radius: 50%;
   background: #e5e7eb;
   color: #374151;
 }
@@ -2297,31 +2359,38 @@
 }
 
 .action-button {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
+  padding: 10px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .action-button.secondary {
-  background: #e9ecef;
-  color: #495057;
+  background: rgba(229, 231, 235, 0.88);
+  color: #1f2937;
+  border-color: rgba(209, 213, 219, 0.9);
 }
 
 .action-button.secondary:hover {
-  background: #dee2e6;
+  background: rgba(229, 231, 235, 0.95);
+  border-color: rgba(156, 163, 175, 0.85);
 }
 
 .action-button.primary {
-  background: #667eea;
-  color: white;
+  background: rgba(108, 142, 184, 0.75);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .action-button.primary:hover {
-  background: #5a6fd8;
+  background: rgba(108, 142, 184, 0.88);
 }
 
 .action-button:disabled {
@@ -2596,6 +2665,14 @@
   flex-wrap: wrap;
   gap: 8px;
   flex-direction: row;
+  min-width: 0;
+}
+
+.calculator-section-unified .section-group-content .advanced-grid .param-group.checkbox-group label {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Операции (резка, ламинация, упаковка): вертикальная раскладка — контент не накладывается */

@@ -9,6 +9,8 @@ interface CustomerSelectorProps {
   currentCustomerId?: number | null;
   onCustomerChange?: () => void;
   onOrderPatch?: (orderId: number, patch: { payment_channel?: 'cash' | 'invoice' | 'not_cashed' | 'internal' }) => void;
+  /** Inline: без лейбла, в одну строку с кнопками (Создать | Селект 160px | Поиск) */
+  inline?: boolean;
 }
 
 export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
@@ -16,6 +18,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   currentCustomerId,
   onCustomerChange,
   onOrderPatch,
+  inline = false,
 }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -106,8 +109,8 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
   return (
-    <div className="customer-selector">
-      <label className="customer-selector__label">Клиент</label>
+      <div className={`customer-selector ${inline ? 'customer-selector--inline' : ''}`}>
+      {!inline && <label className="customer-selector__label">Клиент</label>}
       <div className="customer-selector__row">
         <select
           value={selectedCustomerId || ''}
@@ -168,7 +171,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
           onClick={() => setShowCreateModal(true)}
           className="customer-selector__create"
         >
-          + Создать
+          Создать
         </button>
       </div>
       {selectedCustomer && (

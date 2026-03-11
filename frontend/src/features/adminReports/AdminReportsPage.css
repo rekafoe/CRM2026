@@ -375,32 +375,30 @@
 
 .reports-tab-btn {
   padding: 10px 16px;
-  background: white;
-  color: #1a202c;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
+  background: var(--btn-tab-bg, #f0ecf5);
+  color: var(--btn-tab-text, #5a4d72);
+  border: none;
+  border-radius: 999px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .reports-tab-btn:hover {
-  border-color: #cbd5e0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  background: var(--btn-tab-bg-hover, #e8e4f0);
 }
 
 .reports-tab-btn--active {
-  background: var(--accent-primary, #667eea);
-  color: white;
-  border-color: var(--accent-primary, #667eea);
+  background: var(--btn-tab-bg-active, #d4c8e8);
+  color: var(--btn-tab-text-active, #4a3d62);
 }
 
 .reports-tab-btn--active:hover {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
+  box-shadow: 0 2px 8px rgba(155, 135, 196, 0.2);
 }
 
 .reports-filters {

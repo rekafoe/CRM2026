@@ -27,7 +27,7 @@ export const OrderActions: React.FC<OrderActionsProps> = ({
           <option key={s.id} value={s.sort_order}>{s.name}</option>
         ))}
       </select>
-      <button onClick={onShowProductSelector}>+ Калькулятор</button>
+      <button onClick={onShowProductSelector}>Калькулятор</button>
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { parseNumberFlexible } from '../../utils/numberInput';
+import { AppIcon } from '../ui/AppIcon';
 
 export interface OrderItem {
   id: number;
@@ -92,17 +93,25 @@ export const OrderTotal: React.FC<OrderTotalProps> = ({
         <>
           <hr />
           <div className="order-total__line prepayment">
-            <span>
-              💳 Предоплата ({paymentMethod === 'online' ? '🌐 Онлайн' : '🏪 Оффлайн'}):
+            <span className="order-total__prepayment-label">
+              <AppIcon name="card" size="xs" />
+              Предоплата (
+              {paymentMethod === 'online' ? (
+                <><AppIcon name="wallet" size="xs" /> Онлайн</>
+              ) : (
+                <><AppIcon name="building" size="xs" /> Оффлайн</>
+              )}
+              ):
             </span>
-            <span className={isPaid ? 'paid' : 'pending'}>
-              {isPaid ? '✅ ' : '⏳ '}{bynFormatter.format(prepayment)}
+            <span className={`order-total__prepayment-value ${isPaid ? 'paid' : 'pending'}`}>
+              {isPaid ? <AppIcon name="check" size="xs" /> : <AppIcon name="clock" size="xs" />}
+              {bynFormatter.format(prepayment)}
             </span>
           </div>
           <div className="order-total__line debt">
             <span>Долг клиента:</span>
             <span className={debt > 0 ? 'debt-amount' : 'paid-amount'}>
-              {debt > 0 ? `${bynFormatter.format(debt)}` : 'Оплачено полностью ✅'}
+              {debt > 0 ? bynFormatter.format(debt) : <><AppIcon name="check" size="xs" /> Оплачено полностью</>}
             </span>
           </div>
         </>

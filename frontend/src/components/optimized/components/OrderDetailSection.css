@@ -1,0 +1,329 @@
+/* Кнопки действий заказа — компактные, liquid glass */
+.order-detail-action-btn {
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.order-detail-action-btn--primary {
+  background: #4a6a94;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.order-detail-action-btn--success {
+  background: #15803d;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.order-detail-action-btn--danger {
+  background: #b91c1c;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.order-detail-action-btn--info {
+  background: #2563eb;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.order-detail-action-btn--neutral {
+  background: #4b5563;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.order-detail-action-btn--discount {
+  background: #4a6a94;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.order-detail-action-btn:disabled,
+.order-detail-action-btn--disabled {
+  background: rgba(229, 231, 235, 0.7) !important;
+  color: #9ca3af;
+  border-color: rgba(209, 213, 219, 0.6);
+  cursor: not-allowed;
+  opacity: 0.7;
+  box-shadow: none;
+}
+
+.order-detail-action-btn:not(:disabled):hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.order-detail-action-btn--primary:not(:disabled):hover {
+  background: #3d5a7c;
+  filter: brightness(1.08);
+}
+
+.order-detail-action-btn--success:not(:disabled):hover {
+  background: #166534;
+  filter: brightness(1.08);
+}
+
+.order-detail-action-btn--danger:not(:disabled):hover {
+  background: #991b1b;
+  filter: brightness(1.08);
+}
+
+.order-detail-action-btn--info:not(:disabled):hover {
+  background: #1d4ed8;
+  filter: brightness(1.08);
+}
+
+.order-detail-action-btn--neutral:not(:disabled):hover {
+  background: #374151;
+  filter: brightness(1.08);
+}
+
+.order-detail-action-btn--discount:not(:disabled):hover {
+  background: #3d5a7c;
+  filter: brightness(1.08);
+}
+
+/* Кнопка «Добавить продукт» — в том же стиле */
+.detail-actions--align-right {
+  margin-left: auto;
+}
+
+.detail-actions--align-right button {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: #4a6a94;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.detail-actions--align-right button:hover {
+  background: #3d5a7c;
+  filter: brightness(1.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+
+/* Ряд мета-полей (Контактёр, Ответственный, Дата) — компактный, контент помещается */
+.detail-meta-row {
+  flex-shrink: 0;
+  overflow: visible;
+}
+.detail-meta-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+  min-width: 72px;
+}
+.detail-meta-field label {
+  font-size: 11px;
+  color: #374151;
+  white-space: nowrap;
+  overflow: visible;
+}
+.detail-meta-field select,
+.detail-meta-field input[type="date"] {
+  min-width: 108px;
+  width: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+  padding-right: 32px;
+}
+
+/* Селекты и инпуты в мета-блоке — компактные */
+.detail-header select,
+.detail-header input[type="date"] {
+  margin-left: 0;
+}
+
+.detail-header .detail-meta-field select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+.detail-header .detail-meta-field input[type="date"] {
+  padding-right: 10px;
+}
+
+/* Шапка с выравниванием: Примечания на одной линии с кнопками, поле опущено */
+.detail-header--notes-aligned {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  grid-template-rows: auto auto;
+  gap: 0 20px;
+  align-items: start;
+}
+.detail-header__col-left {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  min-width: 200px;
+}
+.detail-header__col-notes {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 300px;
+  padding-top: 10px;
+}
+.detail-notes-label {
+  font-size: 12px;
+  color: #374151;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+.detail-header__col-notes .detail-notes-input {
+  margin-top: 32px;
+}
+.detail-header--notes-aligned .detail-actions--align-right {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+/* Поле примечаний — как кнопки */
+.detail-notes-input {
+  width: 300px;
+  height: 150px;
+  min-height: 150px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+/* Разделитель между полями метаданных — тонкий, светлый, на всю высоту контента */
+.detail-meta-divider {
+  width: 1px;
+  min-height: 36px;
+  align-self: stretch;
+  margin: 0 8px;
+  background: #d1d5db;
+  flex-shrink: 0;
+}
+
+/* Нижний блок OrderTotal — liquid glass, новый дизайн */
+.detail .order-total {
+  margin: 12px 0;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 12px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.detail .order-total hr {
+  border: none;
+  height: 1px;
+  background: #e5e7eb;
+  margin: 10px 0;
+}
+
+.detail .order-total__line,
+.detail .order-total__sum {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.detail .order-total__sum {
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+/* Блок предоплаты — синяя полоска слева, иконки */
+.detail .order-total__line.prepayment {
+  background: rgba(108, 142, 184, 0.12);
+  padding: 10px 14px;
+  border-radius: 12px;
+  margin: 10px 0 6px;
+  border-left: 4px solid #6c8eb8;
+}
+
+.detail .order-total__line.debt {
+  background: rgba(108, 142, 184, 0.08);
+  padding: 10px 14px;
+  border-radius: 12px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.detail .order-total__prepayment-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.detail .order-total__prepayment-label .app-icon {
+  color: #6c8eb8;
+}
+
+.detail .order-total__prepayment-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail .order-total__prepayment-value.paid {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.detail .order-total__prepayment-value.paid .app-icon {
+  color: #16a34a;
+}
+
+.detail .order-total__prepayment-value.pending {
+  color: #ca8a04;
+  font-weight: 600;
+}
+
+.detail .order-total__prepayment-value.pending .app-icon {
+  color: #ca8a04;
+}
+
+.detail .order-total__line .debt-amount {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.detail .order-total__line .paid-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.detail .order-total__line .paid-amount .app-icon {
+  color: #16a34a;
+}

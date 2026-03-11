@@ -47,7 +47,7 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
             onClick={onAddToOrder}
             disabled={true}
           >
-            {mode === 'edit' ? <><AppIcon name="save" size="xs" /> Обновить позицию</> : <><AppIcon name="plus" size="xs" /> Добавить в заказ</>}
+            {mode === 'edit' ? <><AppIcon name="save" size="xs" /> Обновить позицию</> : <>Добавить в заказ</>}
           </button>
         </div>
       </div>
@@ -60,7 +60,7 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   const fitsOnSheet = result.layout?.fitsOnSheet;
   const warnings = result.warnings || [];
   const parameterSummary = result.parameterSummary || [];
-  const addButtonLabel = mode === 'edit' ? <><AppIcon name="save" size="xs" /> Обновить позицию</> : <><AppIcon name="plus" size="xs" /> Добавить в заказ</>;
+  const addButtonLabel = mode === 'edit' ? <><AppIcon name="save" size="xs" /> Обновить позицию</> : <>Добавить в заказ</>;
   const showFormatWarning = fitsOnSheet === false || warnings.length > 0;
 
   return (

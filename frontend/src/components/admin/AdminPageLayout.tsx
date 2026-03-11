@@ -3,7 +3,7 @@ import '../../styles/admin-page-layout.css';
 
 interface AdminPageLayoutProps {
   title: string;
-  icon: string;
+  icon: string | React.ReactNode;
   onBack: () => void;
   children: React.ReactNode;
   className?: string;
