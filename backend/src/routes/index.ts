@@ -27,6 +27,7 @@ import documentTemplatesRoutes from './documentTemplates'
 import departmentsRoutes from './departments'
 import organizationsRoutes from './organizations'
 import designTemplatesRoutes from './designTemplates'
+import collageTemplatesRoutes from './collageTemplates'
 
 const router = Router()
 
@@ -57,6 +58,7 @@ router.use('/document-templates', documentTemplatesRoutes)
 router.use('/departments', departmentsRoutes)
 router.use('/organizations', organizationsRoutes)
 router.use('/design-templates', designTemplatesRoutes)
+router.use('/collage-templates', collageTemplatesRoutes)
 
 console.log('Routes setup complete')
 

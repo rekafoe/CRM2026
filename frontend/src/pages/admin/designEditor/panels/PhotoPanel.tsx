@@ -4,6 +4,7 @@ import { Button } from '../../../../components/common';
 
 interface PhotoPanelProps {
   onAddImage: () => void;
+  onAddPhotoField?: () => void;
   onDrop: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   sortBy: 'name' | 'date';
@@ -17,6 +18,7 @@ interface PhotoPanelProps {
 
 export const PhotoPanel: React.FC<PhotoPanelProps> = ({
   onAddImage,
+  onAddPhotoField,
   onDrop,
   onDragOver,
   sortBy,
@@ -38,6 +40,11 @@ export const PhotoPanel: React.FC<PhotoPanelProps> = ({
       <Button variant="primary" onClick={onAddImage} className="design-editor-btn-add-image">
         <AppIcon name="plus" size="xs" /> Добавить изображение
       </Button>
+      {onAddPhotoField && (
+        <Button variant="secondary" onClick={onAddPhotoField} className="design-editor-btn-add-field">
+          <AppIcon name="image" size="xs" /> Поле для фото
+        </Button>
+      )}
       <button type="button" className="design-editor-btn-icon" title="Сетка/галерея" aria-label="Сетка">
         <AppIcon name="image" size="xs" />
       </button>

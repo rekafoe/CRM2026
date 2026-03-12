@@ -13,12 +13,14 @@ import {
   SAFE_ZONE_MM,
   getExportPixelRatio,
   SIDEBAR_ITEMS,
+  EMPTY_PAGE,
 } from './designEditor/constants';
-import type { DesignPage, SidebarSection, CanvasImage, CanvasText } from './designEditor/types';
+import type { DesignPage, SidebarSection, CanvasImage, CanvasText, CanvasPhotoField } from './designEditor/types';
 import { DesignEditorSidebar } from './designEditor/DesignEditorSidebar';
 import { DesignEditorPanel } from './designEditor/DesignEditorPanel';
 import { DesignEditorToolbar } from './designEditor/DesignEditorToolbar';
 import { DesignEditorCanvas } from './designEditor/DesignEditorCanvas';
+import { ImagePickerModal } from '../../components/ImagePickerModal';
 import '../../styles/admin-page-layout.css';
 import './DesignEditorPage.css';
 
@@ -41,9 +43,11 @@ export const DesignEditorPage: React.FC = () => {
   }>({ template: null, loading: true, error: null });
 
   const [saving, setSaving] = useState(false);
-  const [pages, setPages] = useState<DesignPage[]>([{ images: [], texts: [] }]);
+  const [pages, setPages] = useState<DesignPage[]>([{ ...EMPTY_PAGE }]);
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+  const [selectedPhotoFieldId, setSelectedPhotoFieldId] = useState<string | null>(null);
 
   /** Размеры и масштаб страницы (из spec шаблона) */
   const [pageSpec, setPageSpec] = useState({
@@ -77,6 +81,17 @@ export const DesignEditorPage: React.FC = () => {
   const { showGuides, sidebarSection } = ui;
   const { sort: photoSort, autofill: photoAutofill, hideUsed: photoHideUsed } = photoPanel;
   const { active: exportingPdf, progress: pdfExportProgress } = pdfExport;
+
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [imagePickerInitialFiles, setImagePickerInitialFiles] = useState<File[]>([]);
+
+  /** Коллажи: количество фото, фильтр, отступ, выбранный шаблон */
+  const [collageState, setCollageState] = useState({
+    photoCount: 3,
+    filterSuitable: false,
+    padding: 20,
+    selectedTemplateId: null as number | null,
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -112,7 +127,7 @@ export const DesignEditorPage: React.FC = () => {
         if (prev.length > count) return prev.slice(0, count);
         return [
           ...prev,
-          ...Array.from({ length: count - prev.length }, () => ({ images: [] as CanvasImage[], texts: [] as CanvasText[] })),
+          ...Array.from({ length: count - prev.length }, () => ({ ...EMPTY_PAGE })),
         ];
       });
       setCurrentPage((p) => (p >= count ? Math.max(0, count - 1) : p));
@@ -136,7 +151,7 @@ export const DesignEditorPage: React.FC = () => {
   const pageW = pageWidth * MM_TO_PX * scale;
   const pageH = pageHeight * MM_TO_PX * scale;
   const safeZonePx = SAFE_ZONE_MM * MM_TO_PX * scale;
-  const currentPageData = pages[currentPage] ?? { images: [], texts: [] };
+  const currentPageData = pages[currentPage] ?? EMPTY_PAGE;
   const selectedText = selectedTextId ? currentPageData.texts.find((t) => t.id === selectedTextId) : null;
 
   const addImageFromFile = useCallback((file: File) => {
@@ -163,7 +178,7 @@ export const DesignEditorPage: React.FC = () => {
       };
       setPages((prev) => {
         const next = [...prev];
-        const page = next[currentPage] ?? { images: [], texts: [] };
+        const page = next[currentPage] ?? EMPTY_PAGE;
         next[currentPage] = { ...page, images: [...page.images, newImage] };
         return next;
       });
@@ -177,11 +192,25 @@ export const DesignEditorPage: React.FC = () => {
     e.target.value = '';
   }, [addImageFromFile]);
 
+  const openImagePicker = useCallback((initialFiles?: File[]) => {
+    setImagePickerInitialFiles(initialFiles ?? []);
+    setImagePickerOpen(true);
+  }, []);
+
+  const handleImagePickerSelect = useCallback(
+    (files: File[]) => {
+      files.filter((f) => f.type.startsWith('image/')).forEach((file) => addImageFromFile(file));
+      setImagePickerOpen(false);
+      setImagePickerInitialFiles([]);
+    },
+    [addImageFromFile],
+  );
+
   const handlePhotoDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file) addImageFromFile(file);
-  }, [addImageFromFile]);
+    const files = Array.from(e.dataTransfer.files ?? []).filter((f) => f.type.startsWith('image/'));
+    if (files.length > 0) openImagePicker(files);
+  }, [openImagePicker]);
 
   const handlePhotoDropOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -199,17 +228,62 @@ export const DesignEditorPage: React.FC = () => {
     };
     setPages((prev) => {
       const next = [...prev];
-      const page = next[currentPage] ?? { images: [], texts: [] };
+      const page = next[currentPage] ?? EMPTY_PAGE;
       next[currentPage] = { ...page, texts: [...page.texts, newText] };
       return next;
     });
   }, [scale, currentPage]);
 
+  const handleAddPhotoField = useCallback(() => {
+    const w = 100;
+    const h = 100;
+    const newField: CanvasPhotoField = {
+      id: `field-${Date.now()}`,
+      x: PAGE_OFFSET + 20,
+      y: PAGE_OFFSET + 20,
+      width: w,
+      height: h,
+    };
+    setPages((prev) => {
+      const next = [...prev];
+      const page = next[currentPage] ?? EMPTY_PAGE;
+      next[currentPage] = { ...page, photoFields: [...page.photoFields, newField] };
+      return next;
+    });
+    setSelectedPhotoFieldId(newField.id);
+    setSelectedTextId(null);
+    setSelectedImageId(null);
+  }, [currentPage]);
+
+  const handlePhotoFieldDrop = useCallback((fieldId: string, file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    const src = URL.createObjectURL(file);
+    setPages((prev) => {
+      const next = [...prev];
+      const page = next[currentPage] ?? EMPTY_PAGE;
+      next[currentPage] = {
+        ...page,
+        photoFields: page.photoFields.map((f) => (f.id === fieldId ? { ...f, src } : f)),
+      };
+      return next;
+    });
+  }, [currentPage]);
+
+  const getPhotoFieldIdAt = useCallback((stageX: number, stageY: number) => {
+    const page = pages[currentPage] ?? EMPTY_PAGE;
+    const f = page.photoFields.find(
+      (field) =>
+        stageX >= field.x && stageX <= field.x + field.width &&
+        stageY >= field.y && stageY <= field.y + field.height
+    );
+    return f?.id ?? null;
+  }, [currentPage, pages]);
+
   const handleTextChange = useCallback((text: string) => {
     if (!selectedTextId) return;
     setPages((prev) => {
       const next = [...prev];
-      const page = next[currentPage] ?? { images: [], texts: [] };
+      const page = next[currentPage] ?? EMPTY_PAGE;
       next[currentPage] = { ...page, texts: page.texts.map((t) => (t.id === selectedTextId ? { ...t, text } : t)) };
       return next;
     });
@@ -219,7 +293,7 @@ export const DesignEditorPage: React.FC = () => {
     if (!selectedTextId) return;
     setPages((prev) => {
       const next = [...prev];
-      const page = next[currentPage] ?? { images: [], texts: [] };
+      const page = next[currentPage] ?? EMPTY_PAGE;
       next[currentPage] = { ...page, texts: page.texts.map((t) => (t.id === selectedTextId ? { ...t, fontFamily } : t)) };
       return next;
     });
@@ -229,7 +303,7 @@ export const DesignEditorPage: React.FC = () => {
     if (!selectedTextId) return;
     setPages((prev) => {
       const next = [...prev];
-      const page = next[currentPage] ?? { images: [], texts: [] };
+      const page = next[currentPage] ?? EMPTY_PAGE;
       next[currentPage] = { ...page, texts: page.texts.map((t) => (t.id === selectedTextId ? { ...t, fontSize } : t)) };
       return next;
     });
@@ -243,7 +317,8 @@ export const DesignEditorPage: React.FC = () => {
       pageCount,
       pages: pages.map((p) => ({
         images: p.images.map((i) => ({ id: i.id, x: i.x, y: i.y, width: i.width, height: i.height })),
-        texts: p.texts.map((t) => ({ id: t.id, x: t.x, y: t.y, text: t.text, fontSize: t.fontSize, fontFamily: t.fontFamily })),
+        texts: p.texts.map((t) => ({ id: t.id, x: t.x, y: t.y, text: t.text, fontSize: t.fontSize, fontFamily: t.fontFamily, scaleX: t.scaleX, scaleY: t.scaleY })),
+        photoFields: p.photoFields.map((f) => ({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height, src: f.src })),
       })),
     };
 
@@ -395,8 +470,8 @@ export const DesignEditorPage: React.FC = () => {
             pages={pages}
             setPages={setPages}
             pageCount={pageCount}
-            onPagePrev={() => { setCurrentPage((p) => Math.max(0, p - 1)); setSelectedTextId(null); }}
-            onPageNext={() => { setCurrentPage((p) => Math.min(pageCount - 1, p + 1)); setSelectedTextId(null); }}
+            onPagePrev={() => { setCurrentPage((p) => Math.max(0, p - 1)); setSelectedTextId(null); setSelectedImageId(null); setSelectedPhotoFieldId(null); }}
+            onPageNext={() => { setCurrentPage((p) => Math.min(pageCount - 1, p + 1)); setSelectedTextId(null); setSelectedImageId(null); setSelectedPhotoFieldId(null); }}
             setSelectedTextId={setSelectedTextId}
             showGuides={showGuides}
             onGuidesToggle={() => setUi((u) => ({ ...u, showGuides: !u.showGuides }))}
@@ -423,6 +498,12 @@ export const DesignEditorPage: React.FC = () => {
               setPages={setPages}
               selectedTextId={selectedTextId}
               setSelectedTextId={setSelectedTextId}
+              selectedImageId={selectedImageId}
+              setSelectedImageId={setSelectedImageId}
+              selectedPhotoFieldId={selectedPhotoFieldId}
+              setSelectedPhotoFieldId={setSelectedPhotoFieldId}
+              onPhotoFieldDrop={handlePhotoFieldDrop}
+              getPhotoFieldIdAt={getPhotoFieldIdAt}
               showGuides={showGuides}
               stageRef={stageRef}
               guidesLayerRef={guidesLayerRef}
@@ -446,12 +527,20 @@ export const DesignEditorPage: React.FC = () => {
           </div>
         </div>
 
+        <ImagePickerModal
+          isOpen={imagePickerOpen}
+          onClose={() => { setImagePickerOpen(false); setImagePickerInitialFiles([]); }}
+          onSelect={handleImagePickerSelect}
+          initialFiles={imagePickerInitialFiles}
+        />
+
         {sidebarSection && (
           <aside className="design-editor-panel" aria-label={`Панель: ${SIDEBAR_ITEMS.find((i) => i.id === sidebarSection)?.label}`}>
             <DesignEditorPanel
               section={sidebarSection}
               onClose={() => setUi((u) => ({ ...u, sidebarSection: null }))}
-              onAddImage={() => fileInputRef.current?.click()}
+              onAddImage={() => openImagePicker()}
+              onAddPhotoField={handleAddPhotoField}
               onPhotoDrop={handlePhotoDrop}
               onPhotoDragOver={handlePhotoDropOver}
               photoSort={photoSort}
@@ -465,6 +554,14 @@ export const DesignEditorPage: React.FC = () => {
               onTextChange={handleTextChange}
               onFontChange={handleFontChange}
               onFontSizeChange={handleFontSizeChange}
+              collagePhotoCount={collageState.photoCount}
+              onCollagePhotoCountChange={(v) => setCollageState((c) => ({ ...c, photoCount: v }))}
+              collageFilterSuitable={collageState.filterSuitable}
+              onCollageFilterSuitableChange={(v) => setCollageState((c) => ({ ...c, filterSuitable: v }))}
+              collagePadding={collageState.padding}
+              onCollagePaddingChange={(v) => setCollageState((c) => ({ ...c, padding: v }))}
+              collageSelectedTemplateId={collageState.selectedTemplateId}
+              onCollageSelectTemplate={(id) => setCollageState((c) => ({ ...c, selectedTemplateId: id }))}
             />
           </aside>
         )}

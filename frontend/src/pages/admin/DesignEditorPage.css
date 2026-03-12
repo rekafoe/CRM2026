@@ -271,6 +271,89 @@
   color: var(--text-muted, #9ca3af);
 }
 
+.design-editor-panel-field {
+  margin-bottom: 12px;
+}
+
+.design-editor-panel-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 4px;
+}
+
+.design-editor-panel-error {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+/* Коллажи: сетка шаблонов, слайдер отступа */
+.design-editor-panel-collages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.design-editor-collage-padding-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.design-editor-collage-slider {
+  flex: 1;
+  min-width: 80px;
+  height: 8px;
+  accent-color: #2563eb;
+}
+
+.design-editor-collage-padding-input {
+  width: 52px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.design-editor-collage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.design-editor-collage-thumb {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.design-editor-collage-thumb:hover {
+  border-color: #93c5fd;
+}
+
+.design-editor-collage-thumb--selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
+}
+
+.design-editor-collage-thumb-inner {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .design-editor-panel-add-text {
   width: 100%;
 }

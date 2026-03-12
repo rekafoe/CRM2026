@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppIcon } from '../../../components/ui/AppIcon';
 import { Button } from '../../../components/common';
-import { TEXT_FONTS } from './constants';
+import { TEXT_FONTS, EMPTY_PAGE } from './constants';
 import type { CanvasText, DesignPage } from './types';
 
 interface DesignEditorToolbarProps {
@@ -59,7 +59,7 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
           onChange={(e) =>
             setPages((prev) => {
               const next = [...prev];
-              const page = next[currentPage] ?? { images: [], texts: [] };
+              const page = next[currentPage] ?? EMPTY_PAGE;
               next[currentPage] = {
                 ...page,
                 texts: page.texts.map((t) => (t.id === selectedTextId ? { ...t, text: e.target.value } : t)),
@@ -76,7 +76,7 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
           onChange={(e) =>
             setPages((prev) => {
               const next = [...prev];
-              const page = next[currentPage] ?? { images: [], texts: [] };
+              const page = next[currentPage] ?? EMPTY_PAGE;
               next[currentPage] = {
                 ...page,
                 texts: page.texts.map((t) => (t.id === selectedTextId ? { ...t, fontFamily: e.target.value } : t)),
@@ -100,7 +100,7 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
             onChange={(e) =>
               setPages((prev) => {
                 const next = [...prev];
-                const page = next[currentPage] ?? { images: [], texts: [] };
+                const page = next[currentPage] ?? EMPTY_PAGE;
                 next[currentPage] = {
                   ...page,
                   texts: page.texts.map((t) =>

@@ -1,5 +1,9 @@
 import type { SidebarSection } from './types';
 import type { IconName } from '../../../components/ui/AppIcon';
+import type { DesignPage } from './types';
+
+/** Пустая страница по умолчанию */
+export const EMPTY_PAGE: DesignPage = { images: [], texts: [], photoFields: [] };
 
 /** Масштаб: 1 мм = N пикселей на экране (для превью) */
 export const MM_TO_PX = 96 / 25.4;

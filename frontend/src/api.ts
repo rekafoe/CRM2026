@@ -957,3 +957,38 @@ export const uploadDesignTemplatePreview = (file: File) => {
   formData.append('preview', file);
   return api.post<{ filename: string; url: string }>('/design-templates/upload-preview', formData);
 };
+
+// Collage Templates API (шаблоны раскладки для коллажей в редакторе макетов)
+export interface CollageLayoutCell {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface CollageLayout {
+  cells: CollageLayoutCell[];
+}
+
+export interface CollageTemplate {
+  id: number;
+  name: string | null;
+  photo_count: number;
+  layout: string;
+  layoutParsed?: CollageLayout;
+  padding_default: number;
+  sort_order: number;
+  is_active: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const getCollageTemplates = (params?: { photo_count?: number; only_suitable?: boolean }) => {
+  const search = new URLSearchParams();
+  if (params?.photo_count != null) search.set('photo_count', String(params.photo_count));
+  if (params?.only_suitable) search.set('only_suitable', 'true');
+  const q = search.toString();
+  return api.get<CollageTemplate[]>(`/collage-templates${q ? `?${q}` : ''}`);
+};
+
+export const getCollageTemplate = (id: number) => api.get<CollageTemplate>(`/collage-templates/${id}`);
