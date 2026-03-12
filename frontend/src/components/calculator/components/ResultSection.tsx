@@ -23,11 +23,12 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   onAddToOrder,
   mode = 'create',
 }) => {
-  const formatNumber = (value?: number, suffix?: string) => {
+  const formatNumber = (value?: number, suffix?: string, roundTo2 = false) => {
     if (typeof value !== 'number' || Number.isNaN(value)) {
       return '—';
     }
-    const formatted = value.toLocaleString();
+    const v = roundTo2 ? Math.round(value * 100) / 100 : value;
+    const formatted = v.toLocaleString('ru-RU', roundTo2 ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : undefined);
     return suffix ? `${formatted} ${suffix}` : formatted;
   };
 
@@ -75,11 +76,12 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
           ))}
         </div>
       )}
-      <h3><AppIcon name="money" size="xs" /> Стоимость: {formatNumber(result.totalCost, 'BYN')}</h3>
+      {/* Округляем до 2 знаков — так же, как при добавлении в заказ (storedTotalCost), чтобы сумма в заказе совпадала с калькулятором */}
+      <h3><AppIcon name="money" size="xs" /> Стоимость: {formatNumber(result.totalCost, 'BYN', true)}</h3>
       <div className="result-details">
         <div className="result-item">
           <span>За штуку:</span>
-          <span>{formatNumber(result.pricePerItem, 'BYN')}</span>
+          <span>{formatNumber(Math.round(result.totalCost * 100) / 100 / Math.max(1, result.specifications?.quantity ?? 1), 'BYN', true)}</span>
         </div>
         <div className="result-item">
           <span>Количество:</span>

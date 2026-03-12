@@ -11,6 +11,8 @@ export interface ItemParams {
   description: string;
   /** Итог от калькулятора — источник истины для отображения суммы */
   storedTotalCost?: number;
+  /** ID принтера (дублируется в колонку, fallback при загрузке) */
+  printerId?: number;
   paperDensity?: number;
   paperName?: string;
   lamination?: LaminationType;
@@ -59,6 +61,8 @@ export interface Item {
   params: ItemParams;
   price: number;
   quantity: number; // Убираем optional для лучшей типизации
+  /** При добавлении в заказ: итог от калькулятора; бэкенд по нему округляет и сохраняет price и storedTotalCost */
+  totalCost?: number;
   printerId?: number;
   sides: number; // Убираем optional
   sheets: number; // Убираем optional

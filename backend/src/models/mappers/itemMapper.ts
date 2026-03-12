@@ -7,7 +7,8 @@ export type ItemRow = {
   params: string | Record<string, unknown>
   price: number
   quantity: number
-  printerId: number | null
+  printerId?: number | null
+  printer_id?: number | null
   sides: number
   sheets: number
   waste: number
@@ -29,6 +30,10 @@ export function mapItemRowToItem(row: ItemRow): Item {
   } catch {
     parsedParams = { description: 'Ошибка данных' }
   }
+  // Источник истины — колонка БД; драйвер может вернуть printerId или printer_id
+  const rowPrinterId = row.printerId ?? (row as { printer_id?: number | null }).printer_id
+  const printerId =
+    rowPrinterId != null && Number.isFinite(Number(rowPrinterId)) ? Number(rowPrinterId) : undefined
   return {
     id: row.id,
     orderId: row.orderId,
@@ -36,7 +41,7 @@ export function mapItemRowToItem(row: ItemRow): Item {
     params: parsedParams,
     price: row.price,
     quantity: row.quantity ?? 1,
-    printerId: row.printerId ?? undefined,
+    printerId,
     sides: row.sides,
     sheets: row.sheets,
     waste: row.waste,

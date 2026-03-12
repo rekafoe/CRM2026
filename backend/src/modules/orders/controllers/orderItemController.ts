@@ -16,6 +16,7 @@ export class OrderItemController {
       const orderId = Number(req.params.id)
       const rawAddBody = req.body as Record<string, unknown>
       const printerIdAdd = rawAddBody?.printerId ?? rawAddBody?.printer_id
+      const totalCostFromClient = typeof rawAddBody?.totalCost === 'number' ? rawAddBody.totalCost : undefined
       const { type, params, price, quantity = 1, sides = 1, sheets = 0, waste = 0, components } = rawAddBody as {
         type: string
         params: { description: string }
@@ -28,6 +29,12 @@ export class OrderItemController {
         waste?: number
         components?: Array<{ materialId: number; qtyPerItem: number }>
       }
+      // Итог и цена считаются на бэкенде: при переданном totalCost округляем и выводим price и storedTotalCost
+      const qtyForPrice = Math.max(1, Number(quantity) || 1)
+      const effectiveTotal = totalCostFromClient != null && Number.isFinite(totalCostFromClient)
+        ? Math.round(Number(totalCostFromClient) * 100) / 100
+        : null
+      const priceToStore = effectiveTotal != null ? effectiveTotal / qtyForPrice : Number(price)
       const printerId = printerIdAdd !== undefined && printerIdAdd !== null && printerIdAdd !== ''
         ? Number(printerIdAdd)
         : undefined
@@ -178,6 +185,7 @@ export class OrderItemController {
           
           const paramsToSave = {
             ...cleanParams,
+            ...(effectiveTotal != null ? { storedTotalCost: effectiveTotal } : {}),
             components: Array.isArray(components)
               ? components.map((c) => {
                   const r = reservations.find((rr) => rr.material_id === Number(c.materialId))
@@ -219,6 +227,7 @@ export class OrderItemController {
           // Fallback: сохраняем только базовые поля
           paramsJson = JSON.stringify({
             description: params?.description || type,
+            ...(effectiveTotal != null ? { storedTotalCost: effectiveTotal } : {}),
             components: Array.isArray(components)
               ? components.map((c) => {
                   const r = reservations.find((rr) => rr.material_id === Number(c.materialId))
@@ -231,7 +240,7 @@ export class OrderItemController {
         logger.info('💾 [addItem] Вставляем позицию в БД', {
           orderId,
           type,
-          price,
+          price: priceToStore,
           quantity: Math.max(1, Number(quantity) || 1),
           paramsJsonLength: paramsJson.length
         })
@@ -254,14 +263,14 @@ export class OrderItemController {
             ? 'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, executor_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             : 'INSERT INTO items (orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           hasExecutorUserId
-            ? [orderId, type, paramsJson, price, Math.max(1, Number(quantity) || 1), printerId || null, Math.max(1, Number(sides) || 1), Math.max(0, Number(sheets) || 0), Math.max(0, Number(waste) || 0), clicks, defaultExecutor]
-            : [orderId, type, paramsJson, price, Math.max(1, Number(quantity) || 1), printerId || null, Math.max(1, Number(sides) || 1), Math.max(0, Number(sheets) || 0), Math.max(0, Number(waste) || 0), clicks]
+            ? [orderId, type, paramsJson, priceToStore, Math.max(1, Number(quantity) || 1), printerId || null, Math.max(1, Number(sides) || 1), Math.max(0, Number(sheets) || 0), Math.max(0, Number(waste) || 0), clicks, defaultExecutor]
+            : [orderId, type, paramsJson, priceToStore, Math.max(1, Number(quantity) || 1), printerId || null, Math.max(1, Number(sides) || 1), Math.max(0, Number(sheets) || 0), Math.max(0, Number(waste) || 0), clicks]
         )
         const itemId = insertItem.lastID!
 
         // 🆕 Пересчёт предоплаты при изменении итога: первая позиция или синк при offline
         const qty = Math.max(1, Number(quantity) || 1)
-        const itemSum = (Number(price) || 0) * qty
+        const itemSum = (Number(priceToStore) || 0) * qty
         const paymentRow = await db.get<{
           prepaymentAmount?: number | null
           prepaymentStatus?: string | null
@@ -740,7 +749,7 @@ export class OrderItemController {
       }
 
       const updated = await db.get<any>('SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, executor_user_id FROM items WHERE id = ? AND orderId = ?', itemId, orderId)
-      const printerIdVal = updated?.printerId ?? undefined
+      const printerIdVal = updated?.printerId ?? updated?.printer_id ?? undefined
       res.json({
         id: updated.id,
         orderId: updated.orderId,

@@ -139,25 +139,31 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     specsAny?.printColorMode ||
     null;
 
-  // Загружаем принтеры при монтировании — всегда все принтеры, чтобы dropdown имел опции (фильтр по технологии часто даёт пустой список)
+  // Загружаем принтеры: фильтр по технологии продукта; если технологии нет — все принтеры
   useEffect(() => {
     (async () => {
       try {
-        const resp = await getPrinters();
+        const resp = await getPrinters(printTech ? { technology_code: printTech } : undefined);
         const list = Array.isArray(resp.data) ? resp.data : [];
-        setPrinters(list);
+        const filtered = printColorMode
+          ? list.filter((p: any) => (p.color_mode || 'both') === 'both' || p.color_mode === printColorMode)
+          : list;
+        setPrinters(filtered);
       } catch (e) {
         setPrinters([]);
       }
     })();
-  }, []);
+  }, [printTech, printColorMode]);
 
   const loadPrintersIfNeeded = async () => {
     if (printers.length > 0) return;
     try {
-      const resp = await getPrinters();
+      const resp = await getPrinters(printTech ? { technology_code: printTech } : undefined);
       const list = Array.isArray(resp.data) ? resp.data : [];
-      setPrinters(list);
+      const filtered = printColorMode
+        ? list.filter((p: any) => (p.color_mode || 'both') === 'both' || p.color_mode === printColorMode)
+        : list;
+      setPrinters(filtered);
     } catch {
       setPrinters([]);
     }
@@ -165,13 +171,15 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
 
   const handleQuickPrinterChange = async (next: number | '') => {
     setPrinterId(next);
-    // Сохраняем только при выборе конкретного принтера (не даём "снять" через пустое значение)
     if (next === '') return;
     const printerIdVal = Number(next);
     if (!Number.isFinite(printerIdVal)) return;
     try {
       setSavingPrinter(true);
-      const payload = { printerId: printerIdVal, printer_id: printerIdVal };
+      const payload = {
+        printerId: printerIdVal,
+        printer_id: printerIdVal,
+      };
       const res = await updateOrderItem(orderId, item.id, payload as any);
       const updated = res?.data;
       if (updated && typeof updated.printerId === 'number') {
@@ -219,19 +227,21 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
       }
       const newPrice = numberInputToNumber(price, 0);
       const newQty = Math.max(1, numberInputToNumber(qty, 1));
+      const newPrinterId = printerId === '' ? undefined : Number(printerId);
       await updateOrderItem(orderId, item.id, {
         quantity: newQty,
         price: newPrice,
         sides: Math.max(1, numberInputToNumber(sides, 1)),
         sheets: Math.max(0, numberInputToNumber(sheets, 0)),
         waste: Math.max(0, numberInputToNumber(waste, 0)),
-        printerId: printerId === '' ? undefined : Number(printerId),
+        printerId: newPrinterId,
+        printer_id: newPrinterId,
         params: {
           ...item.params,
           description: customDescription,
           storedTotalCost: Math.round(newPrice * newQty * 100) / 100,
         } as Item['params']
-      });
+      } as any);
       setEditing(false);
       onUpdate();
       addToast({ type: 'success', title: 'Успешно', message: 'Позиция обновлена' });

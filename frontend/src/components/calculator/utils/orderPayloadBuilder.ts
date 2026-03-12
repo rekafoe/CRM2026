@@ -109,12 +109,8 @@ export function buildOrderPayload({
       }))
     : [];
 
-  // Используем totalCost (итог от бэкенда) как источник истины — чтобы сумма в заказе точно совпадала с калькулятором.
-  // pricePerItem округляется на бэкенде, поэтому pricePerItem * qty может отличаться от totalCost.
+  // Итог и округление считает бэкенд при добавлении позиции (по полю totalCost). Фронт только передаёт данные.
   const qty = Math.max(1, result.specifications.quantity || 1);
-  const effectiveTotal = typeof result.totalCost === 'number' ? Math.round(result.totalCost * 100) / 100 : Math.round(result.pricePerItem * qty * 100) / 100;
-  const effectivePricePerItem = qty > 0 ? effectiveTotal / qty : 0;
-
   const paramsPayload = {
     description,
     specifications: specificationsPayload,
@@ -143,8 +139,6 @@ export function buildOrderPayload({
       : {}),
     layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined,
     customFormat: isCustomFormat ? customFormat : undefined,
-    /** Итог от калькулятора — источник истины для отображения суммы (избегает расхождений из‑за округления price) */
-    storedTotalCost: effectiveTotal,
   };
 
   const components =
@@ -163,15 +157,20 @@ export function buildOrderPayload({
   const apiItem = {
     type: fallbackName,
     params: paramsPayload,
-    price: effectivePricePerItem,
+    price: result.pricePerItem,
     quantity: result.specifications.quantity,
     sides: result.specifications.sides ?? 1,
     sheets: computedSheets ?? 0,
     waste: result.specifications.waste ?? 0,
     clicks,
     components,
+    /** Итог от калькулятора — бэкенд по нему округлит и сохранит price и storedTotalCost */
+    totalCost: typeof result.totalCost === 'number' ? result.totalCost : undefined,
   };
 
+  const effectivePricePerItem = qty > 0 && typeof result.totalCost === 'number'
+    ? Math.round(result.totalCost * 100) / 100 / qty
+    : result.pricePerItem;
   return { apiItem, effectivePricePerItem, description };
 }
 
