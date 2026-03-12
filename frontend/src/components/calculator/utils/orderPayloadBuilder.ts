@@ -109,10 +109,11 @@ export function buildOrderPayload({
       }))
     : [];
 
-  // Округляем итог, затем делим на кол-во — чтобы сумма в заказе совпадала с калькулятором
+  // Используем totalCost (итог от бэкенда) как источник истины — чтобы сумма в заказе точно совпадала с калькулятором.
+  // pricePerItem округляется на бэкенде, поэтому pricePerItem * qty может отличаться от totalCost.
   const qty = Math.max(1, result.specifications.quantity || 1);
-  const effectiveTotal = Math.round(result.pricePerItem * qty * 100) / 100;
-  const effectivePricePerItem = effectiveTotal / qty;
+  const effectiveTotal = typeof result.totalCost === 'number' ? Math.round(result.totalCost * 100) / 100 : Math.round(result.pricePerItem * qty * 100) / 100;
+  const effectivePricePerItem = qty > 0 ? effectiveTotal / qty : 0;
 
   const paramsPayload = {
     description,

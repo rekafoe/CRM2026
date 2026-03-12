@@ -51,7 +51,7 @@ interface UseCalculatorPricingActionsReturn {
 }
 
 /** Продукт «требует печать», только если в схеме явно заданы технологии/цены печати (иначе — продукт без печати: секция «Печать» не показывается, расчёт идёт без выбора типа/режима). */
-function productRequiresPrint(schema: any, effectiveSizes?: any[]): boolean {
+export function productRequiresPrint(schema: any, effectiveSizes?: any[]): boolean {
   if (!schema) return false;
   const constraints = schema.constraints;
   if (constraints?.allowed_print_technologies && Array.isArray(constraints.allowed_print_technologies) && constraints.allowed_print_technologies.length > 0) {
@@ -171,7 +171,6 @@ export function useCalculatorPricingActions({
               : parseFormatToTrimSize(specs.format);
           if (parsed) {
             trimSize = parsed;
-            logger.info('📐 Парсим format в trim_size', { format: specs.format, trimSize: parsed });
           } else {
             logger.info('⚠️ Не удалось распарсить format', { format: specs.format });
           }
@@ -187,11 +186,6 @@ export function useCalculatorPricingActions({
           if (!printColorMode) missingParams.push('режим цвета (чб/цвет)');
           
           if (!showToast) {
-            logger.info('⏭️ Пропускаем автопересчет: параметры печати не выбраны', {
-              missingParams,
-              printTechnology,
-              printColorMode
-            });
             return;
           }
           

@@ -174,14 +174,21 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     setPrinterId(next);
     // Сохраняем только при выборе конкретного принтера (не даём "снять" через пустое значение)
     if (next === '') return;
+    const printerIdVal = Number(next);
+    if (!Number.isFinite(printerIdVal)) return;
     try {
       setSavingPrinter(true);
-      await updateOrderItem(orderId, item.id, {
-        printerId: Number(next),
-      } as any);
+      // Отправляем оба варианта ключа (camelCase и snake_case) для совместимости с разными прокси/бэкендами
+      const payload = { printerId: printerIdVal, printer_id: printerIdVal };
+      const res = await updateOrderItem(orderId, item.id, payload as any);
+      // Обновляем локальное состояние из ответа, если бэкенд вернул обновлённую позицию
+      const updated = res?.data;
+      if (updated && typeof updated.printerId === 'number') {
+        setPrinterId(updated.printerId);
+      }
       onUpdate();
-    } catch {
-      addToast({ type: 'error', title: 'Ошибка', message: 'Ошибка при сохранении принтера' });
+    } catch (err: any) {
+      addToast({ type: 'error', title: 'Ошибка', message: err?.message || 'Ошибка при сохранении принтера' });
     } finally {
       setSavingPrinter(false);
     }

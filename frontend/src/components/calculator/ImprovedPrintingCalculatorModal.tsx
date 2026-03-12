@@ -21,7 +21,7 @@ import { getProductionTimeLabel, getProductionDaysByPriceType, getProductionTime
 import { getEffectiveSimplifiedConfig } from './utils/simplifiedConfig';
 import { ProductSpecs, CalculationResult, EditContextPayload } from './types/calculator.types';
 import { useCalculatorEditContext } from './hooks/useCalculatorEditContext';
-import { useCalculatorPricingActions } from './hooks/useCalculatorPricingActions';
+import { useCalculatorPricingActions, productRequiresPrint } from './hooks/useCalculatorPricingActions';
 import { useAutoCalculate } from './hooks/useAutoCalculate'; // 🆕 Автопересчет
 import { getEnhancedProductTypes } from '../../api';
 import { buildParameterSummary, type BuildSummaryOptions } from './utils/summaryBuilder';
@@ -352,11 +352,15 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   });
 
   // 🆕 Автоматический пересчет при изменении параметров
+  // Не запускаем, если продукт требует печать, но параметры печати ещё не выбраны (избегаем лишних вызовов и логов)
+  const requiresPrint = productRequiresPrint(backendProductSchema, effectiveSizes?.length ? effectiveSizes : undefined);
+  const hasPrintParams = Boolean(printTechnology && printColorMode);
   const { instantCalculate } = useAutoCalculate({
     specs,
     selectedProduct,
     isValid,
-    enabled: (userInteracted || !!editContext?.item) && selectedProduct?.id != null && !isCustomProduct && !isPostprintProduct, // В режиме редактирования включаем автопересчёт сразу
+    enabled: (userInteracted || !!editContext?.item) && selectedProduct?.id != null && !isCustomProduct && !isPostprintProduct
+      && (!requiresPrint || hasPrintParams),
     onCalculate: calculateCost,
     debounceMs: 500,
     customFormat, // ✅ Передаем кастомный формат для отслеживания изменений
