@@ -30,12 +30,15 @@ export function mapItemRowToItem(row: ItemRow): Item {
   } catch {
     parsedParams = { description: 'Ошибка данных' }
   }
-  // Источник истины — колонка БД; драйвер/SQLite могут вернуть имя в разном регистре
+  // Сначала из колонки (с учётом разного регистра), затем из params — на проде колонка может не возвращаться
   const rawRow = row as Record<string, unknown>
   let rowPrinterId: unknown = rawRow.printerId ?? rawRow.printer_id ?? rawRow.PRINTERID
   if (rowPrinterId == null) {
     const key = Object.keys(rawRow).find((k) => k.toLowerCase() === 'printerid')
     if (key) rowPrinterId = rawRow[key]
+  }
+  if (rowPrinterId == null && parsedParams && typeof (parsedParams as any).printerId === 'number') {
+    rowPrinterId = (parsedParams as any).printerId
   }
   const printerId =
     rowPrinterId != null && Number.isFinite(Number(rowPrinterId)) ? Number(rowPrinterId) : undefined

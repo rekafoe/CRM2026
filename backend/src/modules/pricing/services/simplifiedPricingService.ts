@@ -764,8 +764,8 @@ export class SimplifiedPricingService {
 
           const priceUnit = priceUnitFromDb;
           const unitsPerItem = finConfig.units_per_item ?? 1;
-          // per_cut: кол-во резов на всю позицию (как per_order). 5 резов = 5 проходов на стопу, стоимость = 5 × цена_за_рез.
-          const totalCutsForOrder = (layoutCheck?.cutsPerSheet ?? 0) > 0 ? (layoutCheck!.cutsPerSheet ?? 0) : Math.max(unitsPerItem, 1);
+          // per_cut (обычная резка): тупо сколько внёс резов — столько и считаем. Цена × кол-во внесённых. Раскладку не подставляем.
+          const totalCutsForOrder = Math.max(unitsPerItem, 1);
           const tierQty = isPerSheetOp ? perSheetUnits : (priceUnit === 'per_cut' ? totalCutsForOrder : quantity);
           const tier = this.findTierForQuantity(tiers, tierQty);
           if (!tier) {
@@ -1219,7 +1219,8 @@ export class SimplifiedPricingService {
         const isPerSheetOp = priceUnitFromDb === 'per_sheet';
         const perSheetUnits = isPerSheetOp ? (ctx.isRollPrint ? metersForQ : sheetsForQ) : 0;
         const unitsPerItem = finConfig.units_per_item ?? 1;
-        const totalCutsForOrder = (ctx.cutsPerSheet ?? 0) > 0 ? ctx.cutsPerSheet! : Math.max(unitsPerItem, 1);
+        // per_cut: только внесённое пользователем кол-во резов, без раскладки
+        const totalCutsForOrder = Math.max(unitsPerItem, 1);
         const tierQty = isPerSheetOp ? perSheetUnits : (priceUnitFromDb === 'per_cut' ? totalCutsForOrder : q);
         const tier = this.findTierForQuantity(tiers, tierQty);
         if (!tier) continue;

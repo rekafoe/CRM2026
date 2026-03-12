@@ -5,6 +5,20 @@ import { Item } from '../models/Item'
 import { Order } from '../models/Order'
 import { PhotoOrderRow } from '../models/mappers/telegramPhotoOrderMapper'
 
+/** Имя колонки принтера в items (на проде может быть printer_id). Кэш на время жизни процесса. */
+let itemPrinterColCache: string | null = null
+async function getItemSelectWithPrinterCol(db: Awaited<ReturnType<typeof getDb>>): Promise<string> {
+  if (itemPrinterColCache) return itemPrinterColCache
+  try {
+    const cols = (await db.all<{ name: string }>('PRAGMA table_info(items)')) || []
+    const printerCol = cols.find((c) => c.name.toLowerCase().includes('printer'))
+    itemPrinterColCache = printerCol?.name || 'printerId'
+  } catch {
+    itemPrinterColCache = 'printerId'
+  }
+  return `id, orderId, type, params, price, quantity, ${itemPrinterColCache}, sides, sheets, waste, clicks, executor_user_id`
+}
+
 /** Если type — числовая строка (ID продукта с сайта), подставляем имя из products. */
 async function enrichItemsWithProductNames(items: Item[]): Promise<Item[]> {
   const numericTypes = [...new Set(
@@ -41,8 +55,9 @@ export const OrderRepository = {
   async getItemsByOrderId(orderId: number): Promise<Item[]> {
     const db = await getDb()
     try {
+      const selectList = await getItemSelectWithPrinterCol(db)
       const rows = await db.all<ItemRow>(
-        `SELECT ${itemRowSelect} FROM items WHERE orderId = ?`,
+        `SELECT ${selectList} FROM items WHERE orderId = ?`,
         orderId
       )
       const items = Array.isArray(rows) ? rows.map(mapItemRowToItem) : []
@@ -64,9 +79,10 @@ export const OrderRepository = {
 
     const db = await getDb()
     try {
+      const selectList = await getItemSelectWithPrinterCol(db)
       const placeholders = orderIds.map(() => '?').join(',')
       const rows = await db.all<ItemRow>(
-        `SELECT ${itemRowSelect} FROM items WHERE orderId IN (${placeholders})`,
+        `SELECT ${selectList} FROM items WHERE orderId IN (${placeholders})`,
         ...orderIds
       )
       for (const row of Array.isArray(rows) ? rows : []) {

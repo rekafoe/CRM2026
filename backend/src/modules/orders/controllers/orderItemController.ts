@@ -566,6 +566,14 @@ export class OrderItemController {
       const newQuantity = body.quantity != null ? Math.max(1, Number(body.quantity) || 1) : existing.quantity
       const deltaQty = newQuantity - (existing.quantity ?? 1)
 
+      let printerIdCol = 'printerId'
+      try {
+        const rawCols = await db.all<{ name: string }>('PRAGMA table_info(items)')
+        const cols = Array.isArray(rawCols) ? rawCols : []
+        const printerCol = cols.find((c) => c.name.toLowerCase().includes('printer'))
+        if (printerCol?.name) printerIdCol = printerCol.name
+      } catch (_) {}
+
       await db.run('BEGIN')
       try {
         if (deltaQty !== 0) {
@@ -669,19 +677,22 @@ export class OrderItemController {
           ? 'executor_user_id = ?,' : ''
         const executorVal = hasExecutorUserId && body.executor_user_id !== undefined
           ? [body.executor_user_id ?? null] : []
-        const printerIdClause = body.printerId !== undefined ? 'printerId = ?,' : ''
+        const printerIdClause = body.printerId !== undefined ? `${printerIdCol} = ?,` : ''
         const printerIdVal = body.printerId !== undefined ? [body.printerId ?? null] : []
 
+        const existingParams = (() => {
+          try {
+            return JSON.parse(existing.params || '{}') as Record<string, unknown>
+          } catch {
+            return {}
+          }
+        })()
         let paramsJson: string | undefined
         if (body.params != null && typeof body.params === 'object') {
-          const existingParams = (() => {
-            try {
-              return JSON.parse(existing.params || '{}') as Record<string, unknown>
-            } catch {
-              return {}
-            }
-          })()
           paramsJson = JSON.stringify({ ...existingParams, ...body.params })
+        } else if (body.printerId !== undefined) {
+          // Всегда дублируем printerId в params — на проде колонка может не сохраняться (SQLite/драйвер)
+          paramsJson = JSON.stringify({ ...existingParams, printerId: body.printerId ?? null })
         }
 
         await db.run(
@@ -748,15 +759,19 @@ export class OrderItemController {
         throw e
       }
 
-      const updated = await db.get<any>('SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, executor_user_id FROM items WHERE id = ? AND orderId = ?', itemId, orderId)
+      const updated = await db.get<any>(`SELECT id, orderId, type, params, price, quantity, ${printerIdCol} AS printerId, sides, sheets, waste, clicks, executor_user_id FROM items WHERE id = ? AND orderId = ?`, itemId, orderId)
       const printerIdKey = updated && Object.keys(updated).find((k) => k.toLowerCase() === 'printerid')
-      const printerIdVal = printerIdKey != null ? updated[printerIdKey] : (updated?.printerId ?? updated?.printer_id ?? undefined)
-      logger.info('🖨️ [updateItem] После UPDATE прочитано из БД', { itemId, orderId, printerIdVal, printerIdKey: printerIdKey ?? 'none' })
+      let printerIdVal = printerIdKey != null ? updated[printerIdKey] : (updated?.printerId ?? updated?.printer_id ?? undefined)
+      const parsedParams = (() => { try { return JSON.parse(updated?.params || '{}') } catch { return {} } })()
+      if ((printerIdVal == null || printerIdVal === '') && typeof (parsedParams as any).printerId === 'number') {
+        printerIdVal = (parsedParams as any).printerId
+      }
+      logger.info('🖨️ [updateItem] После UPDATE', { itemId, orderId, printerIdVal, printerIdKey: printerIdKey ?? 'none', fromParams: (parsedParams as any).printerId })
       res.json({
         id: updated.id,
         orderId: updated.orderId,
         type: updated.type,
-        params: JSON.parse(updated.params || '{}'),
+        params: typeof parsedParams === 'object' ? parsedParams : JSON.parse(updated.params || '{}'),
         price: updated.price,
         quantity: updated.quantity,
         printerId: printerIdVal,
