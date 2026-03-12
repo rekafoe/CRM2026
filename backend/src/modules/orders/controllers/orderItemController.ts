@@ -749,7 +749,9 @@ export class OrderItemController {
       }
 
       const updated = await db.get<any>('SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, executor_user_id FROM items WHERE id = ? AND orderId = ?', itemId, orderId)
-      const printerIdVal = updated?.printerId ?? updated?.printer_id ?? undefined
+      const printerIdKey = updated && Object.keys(updated).find((k) => k.toLowerCase() === 'printerid')
+      const printerIdVal = printerIdKey != null ? updated[printerIdKey] : (updated?.printerId ?? updated?.printer_id ?? undefined)
+      logger.info('🖨️ [updateItem] После UPDATE прочитано из БД', { itemId, orderId, printerIdVal, printerIdKey: printerIdKey ?? 'none' })
       res.json({
         id: updated.id,
         orderId: updated.orderId,

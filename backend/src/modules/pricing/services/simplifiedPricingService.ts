@@ -764,9 +764,9 @@ export class SimplifiedPricingService {
 
           const priceUnit = priceUnitFromDb;
           const unitsPerItem = finConfig.units_per_item ?? 1;
-          // ✂️ Резка стопой: для operation_type=cut + per_cut используем cutsPerSheet (раскладка), а не quantity×units
-          const isCuttingOp = operationType === 'cut' && priceUnit === 'per_cut';
-          const tierQty = isPerSheetOp ? perSheetUnits : (isCuttingOp ? (layoutCheck.cutsPerSheet ?? 0) : quantity);
+          // per_cut: кол-во резов на всю позицию (как per_order). 5 резов = 5 проходов на стопу, стоимость = 5 × цена_за_рез.
+          const totalCutsForOrder = (layoutCheck?.cutsPerSheet ?? 0) > 0 ? (layoutCheck!.cutsPerSheet ?? 0) : Math.max(unitsPerItem, 1);
+          const tierQty = isPerSheetOp ? perSheetUnits : (priceUnit === 'per_cut' ? totalCutsForOrder : quantity);
           const tier = this.findTierForQuantity(tiers, tierQty);
           if (!tier) {
             logger.warn('Не найден диапазон для услуги отделки', {
@@ -781,8 +781,8 @@ export class SimplifiedPricingService {
           const priceForTier = this.getPriceForQuantityTier(tier);
           const serviceMinQty = limits?.min ?? 0;
           // Операции «на изделие»: fold/score — кол-во = тираж × units_per_item
-          // per_sheet: кол-во = листов печати (или пог. м), с учётом минимального тиража
-          // ✂️ Резка: per_cut = cutsPerSheet (резка стопой — один проход на раскладку), не quantity×units
+          // per_sheet: кол-во = листов печати (или пог. м)
+          // per_cut: кол-во резов на всю позицию (из раскладки или units_per_item), не quantity × units
           const isPerProductOp = ['fold', 'score'].includes(operationType);
 
           let servicePrice = 0;
@@ -790,10 +790,10 @@ export class SimplifiedPricingService {
           if (isPerSheetOp) {
             totalUnits = Math.max(perSheetUnits, serviceMinQty);
             servicePrice = priceForTier * totalUnits;
-          } else if (isCuttingOp) {
-            totalUnits = Math.max(layoutCheck.cutsPerSheet ?? 0, serviceMinQty);
+          } else if (priceUnit === 'per_cut') {
+            totalUnits = Math.max(totalCutsForOrder, serviceMinQty);
             servicePrice = priceForTier * totalUnits;
-          } else if (priceUnit === 'per_cut' || isPerProductOp) {
+          } else if (isPerProductOp) {
             totalUnits = quantity * unitsPerItem;
             servicePrice = priceForTier * totalUnits;
           } else {
@@ -1218,18 +1218,21 @@ export class SimplifiedPricingService {
         const priceUnitFromDb = (ctx.servicePriceUnitMap?.get(finConfig.service_id) ?? finConfig.price_unit ?? 'per_item').toLowerCase();
         const isPerSheetOp = priceUnitFromDb === 'per_sheet';
         const perSheetUnits = isPerSheetOp ? (ctx.isRollPrint ? metersForQ : sheetsForQ) : 0;
-        const tierQty = isPerSheetOp ? perSheetUnits : q;
+        const unitsPerItem = finConfig.units_per_item ?? 1;
+        const totalCutsForOrder = (ctx.cutsPerSheet ?? 0) > 0 ? ctx.cutsPerSheet! : Math.max(unitsPerItem, 1);
+        const tierQty = isPerSheetOp ? perSheetUnits : (priceUnitFromDb === 'per_cut' ? totalCutsForOrder : q);
         const tier = this.findTierForQuantity(tiers, tierQty);
         if (!tier) continue;
         const priceForTier = this.getPriceForQuantityTier(tier);
         const priceUnit = priceUnitFromDb;
-        const unitsPerItem = finConfig.units_per_item ?? 1;
         const serviceMinQty = ctx.serviceLimitsMap?.get(finConfig.service_id)?.min ?? 0;
         const isPerProductOp = ['fold', 'score'].includes(operationType);
         if (isPerSheetOp) {
           const totalUnits = Math.max(perSheetUnits, serviceMinQty);
           finishingPrice += priceForTier * totalUnits;
-        } else if (priceUnit === 'per_cut' || isPerProductOp) {
+        } else if (priceUnit === 'per_cut') {
+          finishingPrice += priceForTier * Math.max(totalCutsForOrder, serviceMinQty);
+        } else if (isPerProductOp) {
           finishingPrice += priceForTier * (q * unitsPerItem);
         } else {
           // per_item: цена за единицу × тираж × units_per_item

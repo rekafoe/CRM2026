@@ -30,8 +30,13 @@ export function mapItemRowToItem(row: ItemRow): Item {
   } catch {
     parsedParams = { description: 'Ошибка данных' }
   }
-  // Источник истины — колонка БД; драйвер может вернуть printerId или printer_id
-  const rowPrinterId = row.printerId ?? (row as { printer_id?: number | null }).printer_id
+  // Источник истины — колонка БД; драйвер/SQLite могут вернуть имя в разном регистре
+  const rawRow = row as Record<string, unknown>
+  let rowPrinterId: unknown = rawRow.printerId ?? rawRow.printer_id ?? rawRow.PRINTERID
+  if (rowPrinterId == null) {
+    const key = Object.keys(rawRow).find((k) => k.toLowerCase() === 'printerid')
+    if (key) rowPrinterId = rawRow[key]
+  }
   const printerId =
     rowPrinterId != null && Number.isFinite(Number(rowPrinterId)) ? Number(rowPrinterId) : undefined
   return {
