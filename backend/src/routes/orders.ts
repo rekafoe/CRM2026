@@ -599,7 +599,8 @@ router.post('/:orderId/files/:fileId/approve', asyncHandler(async (req, res) => 
   res.json(row)
 }))
 
-// Выдать заказ: 100% остатка → предоплата, debt_closed_events, статус 4. Учёт в отчёте и счётчиках принтеров по дате выдачи.
+// Выдать заказ: 100% остатка → предоплата, debt_closed_events, статус 7. Учёт в отчёте по дате выдачи.
+// Счётчики принтеров при выдаче не меняем: клики считаются только в день добавления позиции (addItem, заказ не в первом статусе).
 // Заказ не переносится выдавшему: сдельная остаётся у создателя; «долги закрыты» учитываются у выдавшего.
 router.post('/:id/issue', asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
@@ -630,7 +631,7 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
   let hasPrepaymentUpdatedAt = false
   try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt') } catch { /* ignore */ }
   const paymentId = `ISSUE-${Date.now()}-${id}`
-  // prepaymentUpdatedAt = дата выдачи (today), чтобы заказ попадал в отчёты и счётчики принтеров по этой дате
+  // prepaymentUpdatedAt = дата выдачи (today), чтобы заказ попадал в отчёты по этой дате
   const issueDateTime = `${today} 12:00:00`
   if (hasPrepaymentUpdatedAt) {
     await db.run(

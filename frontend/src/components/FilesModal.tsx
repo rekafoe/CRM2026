@@ -61,14 +61,15 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const file = e.target?.files?.[0];
+    const input = e.currentTarget;
     if (!file) return;
 
     setIsUploading(true);
     try {
       await uploadOrderFile(orderId, file, selectedOrderItemId ?? undefined);
       await loadFiles();
-      e.currentTarget.value = '';
+      if (input) input.value = '';
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Не удалось загрузить файл';
       alert(msg);

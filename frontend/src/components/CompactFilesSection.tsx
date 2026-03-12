@@ -17,7 +17,8 @@ export const CompactFilesSection: React.FC<CompactFilesSectionProps> = ({
   const [isUploading, setIsUploading] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const file = e.target?.files?.[0];
+    const input = e.currentTarget;
     if (!file) return;
 
     setIsUploading(true);
@@ -25,7 +26,7 @@ export const CompactFilesSection: React.FC<CompactFilesSectionProps> = ({
       await uploadOrderFile(orderId, file);
       const response = await listOrderFiles(orderId);
       onFilesUpdate(response.data);
-      e.currentTarget.value = '';
+      if (input) input.value = '';
     } catch (error) {
       alert('Не удалось загрузить файл');
     } finally {

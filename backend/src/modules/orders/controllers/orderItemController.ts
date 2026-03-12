@@ -55,6 +55,12 @@ export class OrderItemController {
       })
 
       const db = await getDb()
+      const orderRow = await db.get<{ status: number }>('SELECT status FROM orders WHERE id = ?', orderId)
+      if (!orderRow) {
+        res.status(404).json({ message: 'Заказ не найден' })
+        return
+      }
+      const orderStatus = Number(orderRow.status)
       // Узнаём материалы и остатки (либо из переданных components, либо по пресету)
       let needed = [] as Array<{ materialId: number; qtyPerItem: number; quantity: number; min_quantity: number | null }>
       if (Array.isArray(components) && components.length > 0) {
@@ -315,6 +321,26 @@ export class OrderItemController {
         }
         
         logger.info('✅ [addItem] Позиция вставлена', { itemId })
+
+        // Если заказ не в первом статусе (0 или 1) — прибавляем клики позиции в счётчик принтера на дату добавления
+        const notFirstStatus = orderStatus !== 0 && orderStatus !== 1
+        if (notFirstStatus && printerId != null && Number.isFinite(printerId) && clicks > 0) {
+          const todayRow = await db.get<{ d: string }>("SELECT date('now','localtime') as d")
+          const today = todayRow?.d?.slice(0, 10) ?? new Date().toISOString().slice(0, 10)
+          const current = await db.get<{ value: number }>(
+            'SELECT value FROM printer_counters WHERE printer_id = ? AND counter_date = ?',
+            printerId,
+            today
+          )
+          const newValue = (current?.value ?? 0) + clicks
+          await db.run(
+            'INSERT OR REPLACE INTO printer_counters (printer_id, counter_date, value) VALUES (?, ?, ?)',
+            printerId,
+            today,
+            newValue
+          )
+          logger.info('🖨️ [addItem] Счётчик принтера обновлён', { printerId, counter_date: today, addedClicks: clicks, newValue })
+        }
         
         const rawItem = await db.get(
           `SELECT ${itemRowSelect} FROM items WHERE id = ?`,

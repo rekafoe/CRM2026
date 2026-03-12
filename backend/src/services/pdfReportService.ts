@@ -567,11 +567,14 @@ export class PDFReportService {
           }
           
           const rawPrice = Number(item.price) || 0;
-          const discountedPrice = Math.round(rawPrice * (1 - discountPercent / 100) * 100) / 100;
+          const qty = Number(item.quantity) || 1;
+          const rowTotal = Math.round(rawPrice * qty * (1 - discountPercent / 100) * 100) / 100;
+          const discountedPrice = qty > 0 ? Math.round((rowTotal / qty) * 100) / 100 : 0;
           return {
             type: item.type || 'Товар',
-            quantity: Number(item.quantity) || 1,
+            quantity: qty,
             price: discountedPrice,
+            rowTotal,
             parameters: paramParts.join(' | ') || ''
           };
         });
@@ -593,7 +596,7 @@ export class PDFReportService {
               <td><strong>${this.escapeHtml(item.type)}</strong></td>
               <td style="font-size: 7px; color: #555;">${this.escapeHtml(item.parameters || '')}</td>
               <td style="text-align: center;">${item.quantity}</td>
-              <td style="text-align: right;"><strong>${(item.price * item.quantity).toFixed(2)}</strong></td>
+              <td style="text-align: right;"><strong>${(item.rowTotal != null ? item.rowTotal : item.price * item.quantity).toFixed(2)}</strong></td>
             </tr>
           `).join('');
           const logoImgOrder = org.logo_url && (org.logo_url.startsWith('data:') || org.logo_url.startsWith('http'))
@@ -691,6 +694,7 @@ export class PDFReportService {
       type: string;
       quantity: number;
       price: number;
+      rowTotal?: number;
       parameters: string;
     }>;
     totalAmount: number;
@@ -1102,7 +1106,7 @@ export class PDFReportService {
                             <td><strong>${this.escapeHtml(item.type)}</strong></td>
                             <td style="font-size: 7px; color: #555;">${this.escapeHtml(item.parameters || '')}</td>
                             <td style="text-align: center;">${item.quantity}</td>
-                            <td style="text-align: right;"><strong>${(item.price * item.quantity).toFixed(2)}</strong></td>
+                            <td style="text-align: right;"><strong>${(item.rowTotal != null ? item.rowTotal : item.price * item.quantity).toFixed(2)}</strong></td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -1193,7 +1197,7 @@ export class PDFReportService {
                             <td class="item-params">${this.escapeHtml(item.parameters || '')}</td>
                             <td style="text-align: center;">${item.quantity}</td>
                             <td style="text-align: right;">${item.price.toFixed(2)}</td>
-                            <td style="text-align: right;"><strong>${(item.price * item.quantity).toFixed(2)}</strong></td>
+                            <td style="text-align: right;"><strong>${(item.rowTotal != null ? item.rowTotal : item.price * item.quantity).toFixed(2)}</strong></td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -1258,7 +1262,7 @@ export class PDFReportService {
     };
   }
 
-  /** Сумма прописью для товарного чека: "(X) белорусских рублей Y копеек" */
+  /** Сумма прописью для товарного чека: "(X) белорусских рублей Y копеек". Сначала округляем до 2 знаков, чтобы не было "100 копеек". */
   private static amountInWordsBel(num: number): string {
     const ones = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
     const onesF = ['', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
@@ -1266,8 +1270,13 @@ export class PDFReportService {
     const teens = ['десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
     const hundreds = ['', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'];
 
-    const rub = Math.floor(num);
-    const kop = Math.round((num - rub) * 100);
+    const rounded = Math.round(num * 100) / 100;
+    let rub = Math.floor(rounded);
+    let kop = Math.round((rounded - rub) * 100);
+    if (kop >= 100) {
+      kop = 0;
+      rub += 1;
+    }
 
     const three = (n: number, fem: boolean) => {
       if (n === 0) return '';
@@ -1406,12 +1415,12 @@ export class PDFReportService {
       const rows = (items || []).map((it: any, idx: number) => {
         const q = Number(it.quantity) || 1;
         const rawP = Number(it.price) || 0;
-        const p = Math.round(rawP * (1 - discountPercent / 100) * 100) / 100;
-        const sum = Math.round(q * p * 100) / 100;
+        const sum = Math.round(rawP * q * (1 - discountPercent / 100) * 100) / 100;
+        const p = q > 0 ? Math.round((sum / q) * 100) / 100 : 0;
         const name = this.getCommodityReceiptItemName(it);
         return { num: idx + 1, name, quantity: q, price: p, sum };
       });
-      const totalAmount = rows.reduce((s: number, r: any) => s + r.sum, 0);
+      const totalAmount = Math.round(rows.reduce((s: number, r: any) => s + r.sum, 0) * 100) / 100;
       const amountInWords = this.amountInWordsBel(totalAmount);
       const manager = order.executedByName || executedBy || '';
 
@@ -1700,8 +1709,8 @@ export class PDFReportService {
         
         const qty = Number(item.quantity) || 1;
         const rawPrice = Number(item.price) || 0;
-        const price = Math.round(rawPrice * (1 - discountPercent / 100) * 100) / 100;
-        const amount = Math.round(qty * price * 100) / 100;
+        const amount = Math.round(rawPrice * qty * (1 - discountPercent / 100) * 100) / 100;
+        const price = qty > 0 ? Math.round((amount / qty) * 100) / 100 : 0;
         return {
           number: index + 1,
           name: itemName,
@@ -1711,7 +1720,7 @@ export class PDFReportService {
         };
       });
 
-      const totalAmount = receiptItems.reduce((sum, it) => sum + it.amount, 0);
+      const totalAmount = Math.round(receiptItems.reduce((sum, it) => sum + it.amount, 0) * 100) / 100;
 
       // Форматируем дату
       let createdDate = '';
@@ -1797,10 +1806,13 @@ export class PDFReportService {
       const hundreds = ['', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'];
       
       if (num === 0) return 'ноль';
-      
-      const rubles = Math.floor(num);
-      const kopecks = Math.round((num - rubles) * 100);
-      
+      const rounded = Math.round(num * 100) / 100;
+      let rubles = Math.floor(rounded);
+      let kopecks = Math.round((rounded - rubles) * 100);
+      if (kopecks >= 100) {
+        kopecks = 0;
+        rubles += 1;
+      }
       const convertThreeDigits = (n: number, feminine: boolean = false): string => {
         if (n === 0) return '';
         
