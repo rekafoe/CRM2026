@@ -230,7 +230,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
           ...item.params,
           description: customDescription,
           storedTotalCost: Math.round(newPrice * newQty * 100) / 100,
-        }
+        } as Item['params']
       });
       setEditing(false);
       onUpdate();

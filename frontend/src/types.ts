@@ -9,6 +9,8 @@ export type { Customer, ProductSpecs, CalculationResult } from '../../shared/typ
 
 export interface ItemParams {
   description: string;
+  /** Итог от калькулятора — источник истины для отображения суммы */
+  storedTotalCost?: number;
   paperDensity?: number;
   paperName?: string;
   lamination?: LaminationType;
