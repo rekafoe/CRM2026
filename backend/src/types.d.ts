@@ -1,5 +1,21 @@
 declare module 'multer';
 
+declare module 'pdf-lib' {
+  export interface PDFDocumentLoadOptions {
+    ignoreEncryption?: boolean;
+  }
+  export interface PDFPage {
+    getSize(): { width: number; height: number };
+    getBleedBox?(): { x: number; y: number; width: number; height: number };
+  }
+  export class PDFDocument {
+    static load(data: ArrayBuffer | Uint8Array, options?: PDFDocumentLoadOptions): Promise<PDFDocument>;
+    getPageCount(): number;
+    getPages(): PDFPage[];
+    getPage(index: number): PDFPage;
+  }
+}
+
 // Декларации типов для библиотек без официальных типов
 declare module 'docxtemplater' {
   interface DocxtemplaterOptions {
