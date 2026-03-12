@@ -14,17 +14,23 @@ export class OrderItemController {
   static async addItem(req: Request, res: Response) {
     try {
       const orderId = Number(req.params.id)
-      const { type, params, price, quantity = 1, printerId, sides = 1, sheets = 0, waste = 0, components } = req.body as {
+      const rawAddBody = req.body as Record<string, unknown>
+      const printerIdAdd = rawAddBody?.printerId ?? rawAddBody?.printer_id
+      const { type, params, price, quantity = 1, sides = 1, sheets = 0, waste = 0, components } = rawAddBody as {
         type: string
         params: { description: string }
         price: number
         quantity?: number
         printerId?: number
+        printer_id?: number
         sides?: number
         sheets?: number
         waste?: number
         components?: Array<{ materialId: number; qtyPerItem: number }>
       }
+      const printerId = printerIdAdd !== undefined && printerIdAdd !== null && printerIdAdd !== ''
+        ? Number(printerIdAdd)
+        : undefined
       const authUser = (req as AuthenticatedRequest).user as { id: number } | undefined
       
       // 🆕 Детальное логирование входящих данных для отладки
@@ -513,7 +519,13 @@ export class OrderItemController {
     try {
       const orderId = Number(req.params.orderId)
       const itemId = Number(req.params.itemId)
-      const body = req.body as Partial<{
+      const rawBody = req.body as Record<string, unknown>
+      // Нормализуем printerId: поддерживаем и camelCase, и snake_case (printer_id)
+      const printerIdRaw = rawBody?.printerId ?? rawBody?.printer_id
+      const body = {
+        ...rawBody,
+        printerId: printerIdRaw !== undefined ? (printerIdRaw === null || printerIdRaw === '' ? null : Number(printerIdRaw)) : undefined,
+      } as Partial<{
         price: number
         quantity: number
         printerId: number | null
@@ -523,6 +535,9 @@ export class OrderItemController {
         executor_user_id: number | null
         params: Record<string, unknown>
       }>
+      if (body.printerId !== undefined) {
+        logger.info('🖨️ [updateItem] Обновление принтера позиции', { orderId, itemId, printerId: body.printerId })
+      }
       const db = await getDb()
 
       const existing = await db.get<{

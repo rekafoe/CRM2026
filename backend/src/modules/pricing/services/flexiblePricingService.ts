@@ -702,14 +702,16 @@ export class FlexiblePricingService {
         break;
       case 'per_cut':
       case 'за рез':
-        // 🔪 Исправлено: резка рассчитывается за количество листов, а не за каждый рез
-        // Логично: чем больше листов, тем больше работы по резке
-        effectiveQuantity = sheetsNeeded;
+        // 🔪 Резка стопой: один рез проходит через всю стопу листов, поэтому считаем cutsPerSheet, а не cutsPerSheet × sheetsNeeded
+        // 5 резов на лист × 10 листов = 5 резов всего (стопой), не 50
+        effectiveQuantity = layout?.cutsPerSheet ?? 0;
+        if (effectiveQuantity <= 0) effectiveQuantity = 1;
 
-        logger.info('🔪 Расчет резки (по листам)', {
+        logger.info('🔪 Расчет резки (стопой)', {
+          cutsPerSheet: layout?.cutsPerSheet,
           sheetsNeeded,
           effectiveQuantity,
-          layout: `${layout.layout.cols}×${layout.layout.rows}`
+          layout: `${layout?.layout?.cols ?? 0}×${layout?.layout?.rows ?? 0}`
         });
         break;
       case 'fixed':

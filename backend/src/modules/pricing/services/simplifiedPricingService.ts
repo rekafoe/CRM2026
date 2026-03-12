@@ -764,7 +764,9 @@ export class SimplifiedPricingService {
 
           const priceUnit = priceUnitFromDb;
           const unitsPerItem = finConfig.units_per_item ?? 1;
-          const tierQty = isPerSheetOp ? perSheetUnits : quantity;
+          // ✂️ Резка стопой: для operation_type=cut + per_cut используем cutsPerSheet (раскладка), а не quantity×units
+          const isCuttingOp = operationType === 'cut' && priceUnit === 'per_cut';
+          const tierQty = isPerSheetOp ? perSheetUnits : (isCuttingOp ? (layoutCheck.cutsPerSheet ?? 0) : quantity);
           const tier = this.findTierForQuantity(tiers, tierQty);
           if (!tier) {
             logger.warn('Не найден диапазон для услуги отделки', {
@@ -780,12 +782,16 @@ export class SimplifiedPricingService {
           const serviceMinQty = limits?.min ?? 0;
           // Операции «на изделие»: fold/score — кол-во = тираж × units_per_item
           // per_sheet: кол-во = листов печати (или пог. м), с учётом минимального тиража
+          // ✂️ Резка: per_cut = cutsPerSheet (резка стопой — один проход на раскладку), не quantity×units
           const isPerProductOp = ['fold', 'score'].includes(operationType);
 
           let servicePrice = 0;
           let totalUnits: number;
           if (isPerSheetOp) {
             totalUnits = Math.max(perSheetUnits, serviceMinQty);
+            servicePrice = priceForTier * totalUnits;
+          } else if (isCuttingOp) {
+            totalUnits = Math.max(layoutCheck.cutsPerSheet ?? 0, serviceMinQty);
             servicePrice = priceForTier * totalUnits;
           } else if (priceUnit === 'per_cut' || isPerProductOp) {
             totalUnits = quantity * unitsPerItem;
@@ -829,7 +835,9 @@ export class SimplifiedPricingService {
     // ✂️ Резка по раскладке (стопой): если configuration.cutting === true, считаем резы как cutsPerSheet
     // (режем стопу листов одним проходом — количество резов = число линий раскладки на лист, не × на кол-во листов)
     // Цена: сначала из markup_settings.auto_cutting_price (если > 0), иначе из услуги резки
-    const configCutting = (configuration as any).cutting === true;
+    // Пропускаем, если резка уже учтена в finishing (selectedOperations)
+    const cuttingAlreadyInFinishing = finishingDetails.some(d => serviceTypesMap.get(d.service_id) === 'cut');
+    const configCutting = (configuration as any).cutting === true && !cuttingAlreadyInFinishing;
     if (configCutting) {
       const cuttingService = await db.get<{ id: number; name: string }>(
         `SELECT id, name FROM post_processing_services WHERE operation_type = 'cut' AND price_unit = 'per_cut' AND is_active = 1 LIMIT 1`

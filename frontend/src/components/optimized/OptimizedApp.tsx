@@ -399,7 +399,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 onDateChange={handleDateChange}
                 onUserIdChange={setContextUserId}
                 onStatusChange={orderHandlers.handleStatusChange}
-                onLoadOrders={loadOrders}
+                onLoadOrders={() => loadOrders(undefined, true)}
                 onShowFilesModal={handleShowFilesModal}
                 onShowPrepaymentModal={handleShowPrepaymentModal}
                 onRemovePrepayment={handleRemovePrepayment}
