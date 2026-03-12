@@ -549,23 +549,7 @@ export class OrderItemController {
       }
       const db = await getDb()
 
-      const existing = await db.get<{
-        id: number
-        orderId: number
-        type: string
-        params: string
-        price: number
-        quantity: number
-        printerId: number | null
-        sides: number
-        sheets: number
-        waste: number
-      }>('SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste FROM items WHERE id = ? AND orderId = ?', itemId, orderId)
-      if (!existing) { res.status(404).json({ message: 'Позиция не найдена' }); return }
-
-      const newQuantity = body.quantity != null ? Math.max(1, Number(body.quantity) || 1) : existing.quantity
-      const deltaQty = newQuantity - (existing.quantity ?? 1)
-
+      // Имя колонки принтера может быть printerId или printer_id — запрос existing должен использовать его
       let printerIdCol = 'printerId'
       try {
         const rawCols = await db.all<{ name: string }>('PRAGMA table_info(items)')
@@ -573,6 +557,28 @@ export class OrderItemController {
         const printerCol = cols.find((c) => c.name.toLowerCase().includes('printer'))
         if (printerCol?.name) printerIdCol = printerCol.name
       } catch (_) {}
+      logger.info('🖨️ [updateItem] Колонка принтера в items', { printerIdCol })
+
+      type ExistingRow = {
+        id: number
+        orderId: number
+        type: string
+        params: string
+        price: number
+        quantity: number
+        sides: number
+        sheets: number
+        waste: number
+      }
+      const existing = await db.get<ExistingRow & Record<string, unknown>>(
+        `SELECT id, orderId, type, params, price, quantity, ${printerIdCol}, sides, sheets, waste FROM items WHERE id = ? AND orderId = ?`,
+        itemId,
+        orderId
+      )
+      if (!existing) { res.status(404).json({ message: 'Позиция не найдена' }); return }
+
+      const newQuantity = body.quantity != null ? Math.max(1, Number(body.quantity) || 1) : existing.quantity
+      const deltaQty = newQuantity - (existing.quantity ?? 1)
 
       await db.run('BEGIN')
       try {
@@ -695,8 +701,7 @@ export class OrderItemController {
           paramsJson = JSON.stringify({ ...existingParams, printerId: body.printerId ?? null })
         }
 
-        await db.run(
-          `UPDATE items SET 
+        const updateSql = `UPDATE items SET 
               ${body.price != null ? 'price = ?,' : ''}
               ${body.quantity != null ? 'quantity = ?,' : ''}
               ${printerIdClause}
@@ -706,19 +711,31 @@ export class OrderItemController {
               ${executorClause}
               ${paramsJson != null ? 'params = ?,' : ''}
               clicks = ?
-           WHERE id = ? AND orderId = ?`,
-          ...([body.price != null ? Number(body.price) : []] as any),
-          ...([body.quantity != null ? newQuantity : []] as any),
+           WHERE id = ? AND orderId = ?`
+        if (body.printerId !== undefined) {
+          logger.info('🖨️ [updateItem] UPDATE SQL', { printerIdCol, printerIdClause: printerIdClause || '(none)', printerIdVal })
+        }
+        const bindings = [
+          ...(body.price != null ? [Number(body.price)] : []),
+          ...(body.quantity != null ? [newQuantity] : []),
           ...printerIdVal,
-          ...([body.sides != null ? nextSides : []] as any),
-          ...([body.sheets != null ? nextSheets : []] as any),
-          ...([body.waste != null ? Math.max(0, Number(body.waste) || 0) : []] as any),
+          ...(body.sides != null ? [nextSides] : []),
+          ...(body.sheets != null ? [nextSheets] : []),
+          ...(body.waste != null ? [Math.max(0, Number(body.waste) || 0)] : []),
           ...executorVal,
           ...(paramsJson != null ? [paramsJson] : []),
           clicks,
           itemId,
-          orderId
-        )
+          orderId,
+        ]
+        if (body.printerId !== undefined) {
+          logger.info('🖨️ [updateItem] Bindings (printerId index)', {
+            printerIdCol,
+            bindingsLength: bindings.length,
+            printerIdBinding: printerIdVal[0],
+          })
+        }
+        await db.run(updateSql, ...bindings)
 
         if (priceOrQtyChanged && paymentRow && paymentRow.paymentMethod === 'offline') {
           const pct = Number(paymentRow?.discount_percent || 0) / 100
@@ -759,7 +776,12 @@ export class OrderItemController {
         throw e
       }
 
+      // Читаем обратно строку (с реальным именем колонки) для ответа и диагностики
       const updated = await db.get<any>(`SELECT id, orderId, type, params, price, quantity, ${printerIdCol} AS printerId, sides, sheets, waste, clicks, executor_user_id FROM items WHERE id = ? AND orderId = ?`, itemId, orderId)
+      const rawRow = await db.get<any>(`SELECT id, ${printerIdCol} FROM items WHERE id = ? AND orderId = ?`, itemId, orderId)
+      if (body.printerId !== undefined) {
+        logger.info('🖨️ [updateItem] Прочитано из БД после COMMIT', { itemId, printerIdCol, rawPrinterValue: rawRow?.[printerIdCol], rawRowKeys: rawRow ? Object.keys(rawRow) : [] })
+      }
       const printerIdKey = updated && Object.keys(updated).find((k) => k.toLowerCase() === 'printerid')
       let printerIdVal = printerIdKey != null ? updated[printerIdKey] : (updated?.printerId ?? updated?.printer_id ?? undefined)
       const parsedParams = (() => { try { return JSON.parse(updated?.params || '{}') } catch { return {} } })()

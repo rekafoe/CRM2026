@@ -61,10 +61,10 @@ export async function initDB(): Promise<Database> {
     await runMigrations(db)
     await migrateLegacyMaterialMoves(db)
 
-    // Гарантируем наличие колонки printerId в items (на случай пересоздания таблицы без неё)
+    // Гарантируем наличие колонки принтера в items (printerId или printer_id — не создаём вторую)
     const itemsCols = (await db.all('PRAGMA table_info(items)')) as Array<{ name: string }>
-    const hasPrinterId = itemsCols.some((c) => c.name.toLowerCase() === 'printerid')
-    if (!hasPrinterId) {
+    const hasPrinterCol = itemsCols.some((c) => c.name.toLowerCase().includes('printer'))
+    if (!hasPrinterCol) {
       await db.exec('ALTER TABLE items ADD COLUMN printerId INTEGER')
       console.log('✅ Added missing column items.printerId')
     }
