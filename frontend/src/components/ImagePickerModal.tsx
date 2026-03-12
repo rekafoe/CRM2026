@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { AppIcon } from './ui/AppIcon';
-import '../../styles/utilities.css';
+import '../styles/utilities.css';
 import './ImagePickerModal.css';
 
 const IMAGE_PICKER_MAX_SELECT = 500;
