@@ -8,6 +8,7 @@ export interface OrderItem {
   price: number | string;
   quantity?: number | string;
   serviceCost?: number | string;
+  params?: { storedTotalCost?: number };
 }
 
 interface OrderTotalProps {
@@ -35,15 +36,15 @@ export const OrderTotal: React.FC<OrderTotalProps> = ({
   prepaymentStatus,
   paymentMethod,
 }) => {
-  // ✅ ПРАВИЛЬНО: Суммируем УЖЕ рассчитанные цены из БД
-  // item.price рассчитан бэкендом и сохранен при создании позиции
-  // Здесь мы просто СУММИРУЕМ (аналог SQL SUM(price * quantity))
+  // Приоритет storedTotalCost (итог от калькулятора) — источник истины; иначе price × qty
   const subtotal = React.useMemo(() => {
     return items.reduce((sum, item) => {
-      const price = parseNumberFlexible(item.price);
-      const qty = parseNumberFlexible(item.quantity ?? 1);
+      const stored = item.params?.storedTotalCost;
+      const itemTotal = typeof stored === 'number' && Number.isFinite(stored)
+        ? stored
+        : parseNumberFlexible(item.price) * parseNumberFlexible(item.quantity ?? 1);
       const service = parseNumberFlexible(item.serviceCost);
-      return sum + price * qty + service;
+      return sum + itemTotal + service;
     }, 0);
   }, [items]);
 

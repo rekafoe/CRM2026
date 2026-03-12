@@ -653,13 +653,17 @@ export class OrderItemController {
         }
 
         let hasExecutorUserId = false
+        let hasPrinterId = false
         try {
           hasExecutorUserId = await hasColumn('items', 'executor_user_id')
+          hasPrinterId = await hasColumn('items', 'printerId')
         } catch { /* ignore */ }
         const executorClause = hasExecutorUserId && body.executor_user_id !== undefined
           ? 'executor_user_id = ?,' : ''
         const executorVal = hasExecutorUserId && body.executor_user_id !== undefined
           ? [body.executor_user_id ?? null] : []
+        const printerIdClause = hasPrinterId && body.printerId !== undefined ? 'printerId = ?,' : ''
+        const printerIdVal = hasPrinterId && body.printerId !== undefined ? [body.printerId ?? null] : []
 
         let paramsJson: string | undefined
         if (body.params != null && typeof body.params === 'object') {
@@ -677,7 +681,7 @@ export class OrderItemController {
           `UPDATE items SET 
               ${body.price != null ? 'price = ?,' : ''}
               ${body.quantity != null ? 'quantity = ?,' : ''}
-              ${body.printerId !== undefined ? 'printerId = ?,' : ''}
+              ${printerIdClause}
               ${body.sides != null ? 'sides = ?,' : ''}
               ${body.sheets != null ? 'sheets = ?,' : ''}
               ${body.waste != null ? 'waste = ?,' : ''}
@@ -687,7 +691,7 @@ export class OrderItemController {
            WHERE id = ? AND orderId = ?`,
           ...([body.price != null ? Number(body.price) : []] as any),
           ...([body.quantity != null ? newQuantity : []] as any),
-          ...([body.printerId !== undefined ? (body.printerId as any) : []] as any),
+          ...printerIdVal,
           ...([body.sides != null ? nextSides : []] as any),
           ...([body.sheets != null ? nextSheets : []] as any),
           ...([body.waste != null ? Math.max(0, Number(body.waste) || 0) : []] as any),

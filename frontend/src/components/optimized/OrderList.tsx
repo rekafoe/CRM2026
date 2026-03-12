@@ -173,10 +173,12 @@ export const OrderList = memo<OrderListProps>(({
         Math.min(100, Math.round(((statusValue - 1) / Math.max(1, maxSort - 1)) * 100))
       );
       const items = Array.isArray(order.items) ? order.items : [];
-      const subtotal = items.reduce(
-        (s, i) => s + parseNumberFlexible(i.price ?? 0) * parseNumberFlexible(i.quantity ?? 1),
-        0
-      );
+      const subtotal = items.reduce((s, i) => {
+        const stored = (i.params as { storedTotalCost?: number })?.storedTotalCost;
+        return s + (typeof stored === 'number' && Number.isFinite(stored)
+          ? stored
+          : parseNumberFlexible(i.price ?? 0) * parseNumberFlexible(i.quantity ?? 1));
+      }, 0);
       const discount = parseNumberFlexible((order as any).discount_percent ?? 0);
       const total = Math.round((1 - discount / 100) * subtotal * 100) / 100;
       const prepay = parseNumberFlexible((order as any).prepaymentAmount ?? 0);

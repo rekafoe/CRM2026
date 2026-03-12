@@ -143,6 +143,8 @@ export function buildOrderPayload({
       : {}),
     layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined,
     customFormat: isCustomFormat ? customFormat : undefined,
+    /** Итог от калькулятора — источник истины для отображения суммы (избегает расхождений из‑за округления price) */
+    storedTotalCost: effectiveTotal,
   };
 
   const components =

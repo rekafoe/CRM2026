@@ -139,13 +139,12 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     specsAny?.printColorMode ||
     null;
 
+  // Загружаем принтеры при монтировании и при смене редактирования — чтобы dropdown был доступен и в режиме просмотра
   useEffect(() => {
-    if (!editing) return;
     (async () => {
       try {
         const resp = await getPrinters(printTech ? { technology_code: printTech } : undefined);
         const list = Array.isArray(resp.data) ? resp.data : [];
-        // Фильтр по режиму печати (если указан в продукте)
         const filtered = printColorMode
           ? list.filter((p: any) => (p.color_mode || 'both') === 'both' || p.color_mode === printColorMode)
           : list;
@@ -154,7 +153,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
         setPrinters([]);
       }
     })();
-  }, [editing, printTech, printColorMode]);
+  }, [printTech, printColorMode]);
 
   const loadPrintersIfNeeded = async () => {
     if (printers.length > 0) return;
@@ -194,8 +193,12 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     }
   };
   
-  // Вычисляем общую стоимость
-  const total = numberInputToNumber(qty, 0) * numberInputToNumber(price, 0);
+  // Вычисляем общую стоимость: приоритет — storedTotalCost из калькулятора (источник истины), иначе price × qty
+  const computedTotal = numberInputToNumber(qty, 0) * numberInputToNumber(price, 0);
+  const storedTotal = (item.params as { storedTotalCost?: number })?.storedTotalCost;
+  const total = typeof storedTotal === 'number' && Number.isFinite(storedTotal)
+    ? Math.round(storedTotal * 100) / 100
+    : Math.round(computedTotal * 100) / 100;
   
   // Получаем название товара
   const name = (item as any).name || 'Товар без названия';
@@ -221,16 +224,19 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
         addToast({ type: 'warning', title: 'Внимание', message: 'Заполните цену, количество и стороны печати' });
         return;
       }
+      const newPrice = numberInputToNumber(price, 0);
+      const newQty = Math.max(1, numberInputToNumber(qty, 1));
       await updateOrderItem(orderId, item.id, {
-        quantity: Math.max(1, numberInputToNumber(qty, 1)),
-        price: numberInputToNumber(price, 0),
+        quantity: newQty,
+        price: newPrice,
         sides: Math.max(1, numberInputToNumber(sides, 1)),
         sheets: Math.max(0, numberInputToNumber(sheets, 0)),
         waste: Math.max(0, numberInputToNumber(waste, 0)),
         printerId: printerId === '' ? undefined : Number(printerId),
         params: {
           ...item.params,
-          description: customDescription
+          description: customDescription,
+          storedTotalCost: Math.round(newPrice * newQty * 100) / 100,
         }
       });
       setEditing(false);

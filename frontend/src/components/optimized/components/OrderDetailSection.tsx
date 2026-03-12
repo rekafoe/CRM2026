@@ -74,10 +74,12 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   const items = selectedOrder.items ?? [];
   const subtotal = React.useMemo(() => {
     return items.reduce((sum, it) => {
-      const p = parseNumberFlexible(it.price);
-      const q = parseNumberFlexible(it.quantity ?? 1);
+      const stored = (it.params as { storedTotalCost?: number })?.storedTotalCost;
+      const itemTotal = typeof stored === 'number' && Number.isFinite(stored)
+        ? stored
+        : parseNumberFlexible(it.price) * parseNumberFlexible(it.quantity ?? 1);
       const s = parseNumberFlexible((it as any).serviceCost);
-      return sum + p * q + s;
+      return sum + itemTotal + s;
     }, 0);
   }, [items]);
   const discountPercent = selectedOrder.discount_percent ?? 0;
@@ -632,6 +634,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
           type: it.type,
           price: it.price,
           quantity: it.quantity ?? 1,
+          params: it.params,
         }))}
         discount={discountAmount}
         taxRate={0}

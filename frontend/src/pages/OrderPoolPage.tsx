@@ -229,9 +229,10 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     orders.forEach((order) => {
       const items = Array.isArray(order.items) ? order.items : [];
       const subtotal = items.reduce((sum, item) => {
-        const price = parseNumberFlexible(item.price ?? 0);
-        const qty = parseNumberFlexible(item.quantity ?? 1);
-        return sum + price * qty;
+        const stored = (item.params as { storedTotalCost?: number })?.storedTotalCost;
+        return sum + (typeof stored === 'number' && Number.isFinite(stored)
+          ? stored
+          : parseNumberFlexible(item.price ?? 0) * parseNumberFlexible(item.quantity ?? 1));
       }, 0);
       const pct = (order as any).discount_percent ?? 0;
       const total = Math.round(subtotal * (1 - pct / 100) * 100) / 100;
