@@ -139,31 +139,25 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     specsAny?.printColorMode ||
     null;
 
-  // Загружаем принтеры при монтировании и при смене редактирования — чтобы dropdown был доступен и в режиме просмотра
+  // Загружаем принтеры при монтировании — всегда все принтеры, чтобы dropdown имел опции (фильтр по технологии часто даёт пустой список)
   useEffect(() => {
     (async () => {
       try {
-        const resp = await getPrinters(printTech ? { technology_code: printTech } : undefined);
+        const resp = await getPrinters();
         const list = Array.isArray(resp.data) ? resp.data : [];
-        const filtered = printColorMode
-          ? list.filter((p: any) => (p.color_mode || 'both') === 'both' || p.color_mode === printColorMode)
-          : list;
-        setPrinters(filtered);
+        setPrinters(list);
       } catch (e) {
         setPrinters([]);
       }
     })();
-  }, [printTech, printColorMode]);
+  }, []);
 
   const loadPrintersIfNeeded = async () => {
     if (printers.length > 0) return;
     try {
-      const resp = await getPrinters(printTech ? { technology_code: printTech } : undefined);
+      const resp = await getPrinters();
       const list = Array.isArray(resp.data) ? resp.data : [];
-      const filtered = printColorMode
-        ? list.filter((p: any) => (p.color_mode || 'both') === 'both' || p.color_mode === printColorMode)
-        : list;
-      setPrinters(filtered);
+      setPrinters(list);
     } catch {
       setPrinters([]);
     }
@@ -177,15 +171,14 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     if (!Number.isFinite(printerIdVal)) return;
     try {
       setSavingPrinter(true);
-      // Отправляем оба варианта ключа (camelCase и snake_case) для совместимости с разными прокси/бэкендами
       const payload = { printerId: printerIdVal, printer_id: printerIdVal };
       const res = await updateOrderItem(orderId, item.id, payload as any);
-      // Обновляем локальное состояние из ответа, если бэкенд вернул обновлённую позицию
       const updated = res?.data;
       if (updated && typeof updated.printerId === 'number') {
         setPrinterId(updated.printerId);
       }
       onUpdate();
+      addToast({ type: 'success', title: 'Принтер привязан', message: 'Принтер успешно привязан к позиции' });
     } catch (err: any) {
       addToast({ type: 'error', title: 'Ошибка', message: err?.message || 'Ошибка при сохранении принтера' });
     } finally {

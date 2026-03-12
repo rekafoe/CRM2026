@@ -653,17 +653,15 @@ export class OrderItemController {
         }
 
         let hasExecutorUserId = false
-        let hasPrinterId = false
         try {
           hasExecutorUserId = await hasColumn('items', 'executor_user_id')
-          hasPrinterId = await hasColumn('items', 'printerId')
         } catch { /* ignore */ }
         const executorClause = hasExecutorUserId && body.executor_user_id !== undefined
           ? 'executor_user_id = ?,' : ''
         const executorVal = hasExecutorUserId && body.executor_user_id !== undefined
           ? [body.executor_user_id ?? null] : []
-        const printerIdClause = hasPrinterId && body.printerId !== undefined ? 'printerId = ?,' : ''
-        const printerIdVal = hasPrinterId && body.printerId !== undefined ? [body.printerId ?? null] : []
+        const printerIdClause = body.printerId !== undefined ? 'printerId = ?,' : ''
+        const printerIdVal = body.printerId !== undefined ? [body.printerId ?? null] : []
 
         let paramsJson: string | undefined
         if (body.params != null && typeof body.params === 'object') {
@@ -742,6 +740,7 @@ export class OrderItemController {
       }
 
       const updated = await db.get<any>('SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, executor_user_id FROM items WHERE id = ? AND orderId = ?', itemId, orderId)
+      const printerIdVal = updated?.printerId ?? undefined
       res.json({
         id: updated.id,
         orderId: updated.orderId,
@@ -749,7 +748,8 @@ export class OrderItemController {
         params: JSON.parse(updated.params || '{}'),
         price: updated.price,
         quantity: updated.quantity,
-        printerId: updated.printerId ?? undefined,
+        printerId: printerIdVal,
+        printer_id: printerIdVal,
         sides: updated.sides,
         sheets: updated.sheets,
         waste: updated.waste,

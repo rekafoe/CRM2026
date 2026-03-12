@@ -48,28 +48,28 @@ export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(({
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      {/* Фиксированный выбор принтера рядом с кнопками */}
-      <span className="detail-item">
-        <span style={{ fontSize: 12, color: '#666', marginRight: 6 }}>Принтер:</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      {/* Выбор принтера — отдельный блок для надёжного клика */}
+      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>Принтер:</span>
         <select
-          value={printerId}
+          value={printerId === '' ? '' : String(printerId)}
           onFocus={onPrinterFocus}
           onMouseDown={onPrinterFocus}
           onChange={handlePrinterChange}
           disabled={savingPrinter}
-          style={{ maxWidth: 220 }}
+          style={{ minWidth: 140, maxWidth: 220, padding: '4px 8px' }}
         >
-          {printerId === '' && <option value="">Не выбран</option>}
+          <option value="">Не выбран</option>
           {printerId !== '' && !printers.some((p) => p.id === printerId) && (
-            <option value={printerId}>{`Принтер #${printerId}`}</option>
+            <option value={String(printerId)}>{`Принтер #${printerId}`}</option>
           )}
           {printers.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
+            <option key={p.id} value={String(p.id)}>{p.name}</option>
           ))}
         </select>
-        {savingPrinter && <span style={{ fontSize: 11, color: '#888', marginLeft: 6 }}>Сохраняем…</span>}
-      </span>
+        {savingPrinter && <span style={{ fontSize: 11, color: '#888' }}>Сохраняем…</span>}
+      </label>
 
       {onEditParameters && (
         <button className="order-item-btn order-item-btn--primary" onClick={() => onEditParameters(orderId, item)}>
