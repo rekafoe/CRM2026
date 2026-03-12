@@ -33,6 +33,12 @@ const LazyEarningsPage = React.lazy(() =>
 const LazyCustomersPage = React.lazy(() =>
   import('./pages/admin/CustomersAdminPage').then((m) => ({ default: m.default }))
 );
+const LazyDesignTemplatesPage = React.lazy(() =>
+  import('./pages/admin/DesignTemplatesPage').then((m) => ({ default: m.DesignTemplatesPage }))
+);
+const LazyDesignEditorPage = React.lazy(() =>
+  import('./pages/admin/DesignEditorPage').then((m) => ({ default: m.DesignEditorPage }))
+);
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem(APP_CONFIG.storage.token) : null;
@@ -140,6 +146,26 @@ root.render(
               <RequireAuth>
                 <React.Suspense fallback={<LoadingFallback />}>
                   <LazyCustomersPage backTo="/" />
+                </React.Suspense>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/design-templates"
+            element={
+              <RequireAuth>
+                <React.Suspense fallback={<LoadingFallback />}>
+                  <LazyDesignTemplatesPage />
+                </React.Suspense>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/design-editor/:templateId"
+            element={
+              <RequireAuth>
+                <React.Suspense fallback={<LoadingFallback />}>
+                  <LazyDesignEditorPage />
                 </React.Suspense>
               </RequireAuth>
             }

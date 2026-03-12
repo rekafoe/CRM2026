@@ -40,6 +40,8 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null);
   const [preflightLoading, setPreflightLoading] = useState(false);
   const [preflightError, setPreflightError] = useState<string | null>(null);
+  /** Кэш результатов префлайта по fileId — для отображения статуса в списке */
+  const [preflightCache, setPreflightCache] = useState<Record<number, PreflightReport>>({});
 
   // Загружаем файлы при открытии модального окна
   React.useEffect(() => {
@@ -67,9 +69,19 @@ export const FilesModal: React.FC<FilesModalProps> = ({
 
     setIsUploading(true);
     try {
-      await uploadOrderFile(orderId, file, selectedOrderItemId ?? undefined);
+      const { data: newFile } = await uploadOrderFile(orderId, file, selectedOrderItemId ?? undefined);
       await loadFiles();
       if (input) input.value = '';
+      // Авто-префлайт для поддерживаемых типов (PDF, JPG, PNG, TIFF)
+      const mime = (newFile?.mime ?? file.type ?? '').toLowerCase();
+      if (newFile?.id && PREFLIGHT_MIME_TYPES.includes(mime)) {
+        try {
+          const res = await getPreflightReport(orderId, newFile.id);
+          setPreflightCache((prev) => ({ ...prev, [newFile.id]: res.data }));
+        } catch {
+          // Результат не кэшируем при ошибке — пользователь может запустить проверку вручную
+        }
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Не удалось загрузить файл';
       alert(msg);
@@ -118,11 +130,21 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     try {
       const res = await getPreflightReport(orderId, file.id);
       setPreflightReport(res.data);
+      setPreflightCache((prev) => ({ ...prev, [file.id]: res.data }));
     } catch (err) {
       setPreflightError(err instanceof Error ? err.message : 'Ошибка проверки');
     } finally {
       setPreflightLoading(false);
     }
+  };
+
+  /** Статус префлайта для отображения в списке */
+  const getPreflightStatus = (report: PreflightReport): 'ok' | 'warning' | 'error' => {
+    const hasError = report.issues?.some((i) => i.severity === 'error') ?? false;
+    const hasWarning = report.issues?.some((i) => i.severity === 'warning') ?? false;
+    if (hasError || !report.valid) return 'error';
+    if (hasWarning) return 'warning';
+    return 'ok';
   };
 
   const closePreflight = () => {
@@ -151,13 +173,35 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   }, [files]);
 
   const renderFileList = (list: OrderFile[]) => (
-    list.map(file => (
+    list.map(file => {
+      const cached = canPreflight(file) ? preflightCache[file.id] : null;
+      const status = cached ? getPreflightStatus(cached) : null;
+      return (
       <div key={file.id} className={`file-item ${file.approved ? 'approved' : 'pending'}`}>
         <div className="file-info">
           <div className="file-name">
             <button type="button" className="file-name-link" onClick={() => handleDownloadFile(file)} title="Скачать">
               {file.originalName || file.filename}
             </button>
+            {canPreflight(file) && (
+              <span
+                className={`file-preflight-status file-preflight-status--${status ?? 'none'}`}
+                title={
+                  status === 'ok'
+                    ? 'Префлайт: ок'
+                    : status === 'warning'
+                      ? 'Префлайт: есть предупреждения'
+                      : status === 'error'
+                        ? 'Префлайт: есть ошибки'
+                        : 'Нажмите щит для проверки'
+                }
+              >
+                {status === 'ok' && <AppIcon name="check" size="xs" />}
+                {status === 'warning' && <span className="preflight-warning-icon" aria-label="предупреждение">!</span>}
+                {status === 'error' && <AppIcon name="ban" size="xs" />}
+                {status === null && <AppIcon name="shield" size="xs" />}
+              </span>
+            )}
           </div>
           <div className="file-details">
             <span className="file-size">{file.size ? Math.round(file.size / 1024) : 0} KB</span>
@@ -166,7 +210,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
         </div>
         <div className="file-actions">
           {canPreflight(file) && (
-            <button className="btn-preflight" onClick={() => handlePreflight(file)} title="Проверить макет (префлайт)">
+            <button className="btn-preflight" onClick={() => handlePreflight(file)} title={cached ? 'Открыть отчёт префлайта' : 'Проверить макет (префлайт)'}>
               <AppIcon name="shield" size="xs" />
             </button>
           )}
@@ -185,7 +229,8 @@ export const FilesModal: React.FC<FilesModalProps> = ({
           </button>
         </div>
       </div>
-    ))
+      );
+    })
   );
 
   if (!isOpen) return null;
@@ -260,7 +305,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               onClose();
               const q = new URLSearchParams({ orderId: String(orderId) });
               if (selectedOrderItemId != null) q.set('orderItemId', String(selectedOrderItemId));
-              navigate(`/adminpanel/design-templates?${q.toString()}`);
+              navigate(`/design-templates?${q.toString()}`);
             }}
             title="Создать макет в редакторе"
           >

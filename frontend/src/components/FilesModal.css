@@ -304,6 +304,42 @@
 
 .file-name {
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.file-preflight-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.file-preflight-status--ok {
+  color: #15803d;
+}
+
+.file-preflight-status--warning {
+  color: #d97706;
+}
+
+.file-preflight-status--error {
+  color: #b91c1c;
+}
+
+.file-preflight-status--none {
+  color: #9ca3af;
+  opacity: 0.8;
+}
+
+.preflight-warning-icon {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 14px;
+  text-align: center;
 }
 
 .file-name-link {

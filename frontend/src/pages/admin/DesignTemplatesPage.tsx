@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { AppIcon } from '../../components/ui/AppIcon';
 import { Alert, Button, Modal } from '../../components/common';
@@ -20,7 +20,12 @@ const DEFAULT_CATEGORIES = ['Свадьба', 'Дети', 'Love story', 'Вып�
 
 export const DesignTemplatesPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
+  /** Маршрут в основном приложении (/design-templates), а не в админке */
+  const isMainAppRoute = location.pathname === '/design-templates';
+  const catalogPath = isMainAppRoute ? '/design-templates' : '/adminpanel/design-templates';
+  const editorPathPrefix = isMainAppRoute ? '/design-editor' : '/adminpanel/design-editor';
   const orderId = searchParams.get('orderId') ?? '';
   const orderItemId = searchParams.get('orderItemId') ?? '';
   const orderQuery = [orderId, orderItemId].filter(Boolean).length
@@ -165,7 +170,7 @@ export const DesignTemplatesPage: React.FC = () => {
     <AdminPageLayout
       title="Каталог шаблонов дизайна"
       icon={<AppIcon name="layers" size="sm" />}
-      onBack={() => navigate('/adminpanel')}
+      onBack={isMainAppRoute ? () => navigate(-1) : () => navigate('/adminpanel')}
     >
       {error && <Alert type="error">{error}</Alert>}
 
@@ -209,7 +214,7 @@ export const DesignTemplatesPage: React.FC = () => {
                     {sizeStr && <span className="design-template-size">{sizeStr}</span>}
                   </div>
                   <div className="design-template-actions">
-                    <button type="button" onClick={() => navigate(`/adminpanel/design-editor/${t.id}${orderQuery}`)} className="btn-open" title="Открыть в редакторе">
+                    <button type="button" onClick={() => navigate(`${editorPathPrefix}/${t.id}${orderQuery}`)} className="btn-open" title="Открыть в редакторе">
                       <AppIcon name="edit" size="xs" /> Редактор
                     </button>
                     <button type="button" onClick={() => openEdit(t)} className="btn-edit" title="Редактировать">
@@ -262,7 +267,7 @@ export const DesignTemplatesPage: React.FC = () => {
             </select>
           </div>
           <div className="form-row">
-            <label>Превью</label>
+            <label>Превью (фон в редакторе)</label>
             <div className="preview-upload">
               {form.preview_url ? (
                 <div className="preview-preview">
@@ -280,6 +285,7 @@ export const DesignTemplatesPage: React.FC = () => {
               <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
                 Загрузить изображение
               </Button>
+              <p className="form-hint">Для фона в редакторе макетов нужен файл-картинка (PNG, JPG). Файлы InDesign (.indd, .indt) загружать сюда нельзя — экспортируйте из InDesign в PNG/JPG.</p>
             </div>
           </div>
           <div className="form-row form-row-inline">
