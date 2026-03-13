@@ -190,12 +190,14 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     const operationsFromInitial: Array<{ operationId: number; variantId?: number; subtype?: string }> = [];
     if (initial?.operations?.length) {
       for (const op of initial.operations) {
-        const opId = op.operation_id;
-        if (opId && !opsSet.has(opId)) {
-          opsSet.add(opId);
+        // Поддержка и operation_id (схема), и service_id (typeConfig/size.finishing)
+        const opId = op.operation_id ?? op.service_id ?? op.id;
+        if (opId != null && !opsSet.has(Number(opId))) {
+          const numId = Number(opId);
+          opsSet.add(numId);
           operationsFromInitial.push({
-            operationId: opId,
-            ...(op.variant_id != null ? { variantId: op.variant_id } : {}),
+            operationId: numId,
+            ...(op.variant_id != null ? { variantId: Number(op.variant_id) } : {}),
             ...(op.subtype ? { subtype: op.subtype } : {}),
           });
         }
@@ -490,7 +492,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     }
 
     const materialChanged = current.materialId !== prev.materialId;
-    const typeChanged = current.typeId != null && current.typeId !== prev.typeId && prev.typeId != null;
+    // Смена типа: либо явно другой typeId, либо первая установка типа (prev.typeId пустой)
+    const typeChanged = current.typeId !== prev.typeId;
 
     prevCalcTriggerRef.current = current;
 

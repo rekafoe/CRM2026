@@ -21,8 +21,11 @@ function getSpecsKey(specs: any, customFormat?: { width: string; height: string 
     priceType: specs.priceType,
     pages: specs.pages, // ✅ Страницы тоже важны
     material_id: specs.material_id, // ✅ ID материала тоже важен
+    materialType: specs.materialType, // ✅ Тип материала (при смене типа пересчитываем)
     // 🆕 Для упрощённых продуктов размер влияет на расчет
     size_id: specs.size_id,
+    // 🆕 Подтип продукта (typeId) влияет на цену (другой typeConfig → другие размеры/операции)
+    typeId: specs.typeId,
     // 🆕 Выбранные операции влияют на расчет (finishing)
     // Нормализуем массив для стабильного сравнения (сортируем по operationId)
     selectedOperations: specs.selectedOperations && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0

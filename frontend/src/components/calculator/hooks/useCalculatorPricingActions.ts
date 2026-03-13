@@ -211,44 +211,41 @@ export function useCalculatorPricingActions({
           finishingConfig = specs.selectedOperations
             .map((sel: any) => {
               const op = backendOps.find((o) => {
-                const opId = Number(o.operation_id ?? o.id);
+                const opId = Number(o.operation_id ?? o.id ?? (o as any).service_id);
                 const selId = Number(sel.operationId);
                 return Number.isFinite(opId) && Number.isFinite(selId) && opId === selId;
               });
 
-              if (!op) {
-                logger.info('⚠️ Не найдена операция в schema для selectedOperation', { selectedOperation: sel });
-                return null;
-              }
-
-              const serviceId: number | undefined = op.operation_id ?? op.id;
+              const serviceId: number | undefined = op
+                ? (op.operation_id ?? op.id ?? (op as any).service_id)
+                : Number(sel.operationId);
               if (!serviceId || !Number.isFinite(serviceId)) {
-                logger.info('⚠️ Невалидный service_id для операции', { op });
+                logger.info('⚠️ Невалидный service_id для selectedOperation', { sel });
                 return null;
               }
 
-              const opType: string | undefined =
-                op.operation_type ??
-                op.type ??
-                op.service_type ??
-                (op.parameters && typeof op.parameters === 'object' ? op.parameters.operation_type : undefined);
+              let priceUnit: 'per_cut' | 'per_item' = 'per_item';
+              if (op) {
+                const opType: string | undefined =
+                  op.operation_type ??
+                  op.type ??
+                  op.service_type ??
+                  (op.parameters && typeof op.parameters === 'object' ? op.parameters.operation_type : undefined);
+                priceUnit = opType === 'cut' || opType === 'score' || opType === 'fold' ? 'per_cut' : 'per_item';
+              }
 
-              // Для операций типа рез/биг/фальц считаем цену за "рез" (per_cut), иначе за изделие (per_item)
-              const priceUnit: 'per_cut' | 'per_item' =
-                opType === 'cut' || opType === 'score' || opType === 'fold' ? 'per_cut' : 'per_item';
-
-              // ✅ Количество из UI:
-              // - Для per_cut: количество резов/бигов/фальцев на одно изделие (умножается на тираж на бэкенде)
-              // - Для per_item: общее количество единиц услуги на весь заказ (НЕ умножается на тираж)
               const unitsPerItem = Number(sel.quantity) > 0 ? Number(sel.quantity) : 1;
 
-              return {
+              const entry = {
                 service_id: Number(serviceId),
                 price_unit: priceUnit,
                 units_per_item: unitsPerItem,
-                // 🆕 Передаём variantId для услуг с вариантами (например, ламинация)
-                ...(sel.variantId ? { variant_id: Number(sel.variantId) } : {}),
+                ...(sel.variantId != null ? { variant_id: Number(sel.variantId) } : {}),
               };
+              if (!op) {
+                logger.info('🧩 finishing из selectedOperation без совпадения в schema (simplified)', { selectedOperation: sel, entry });
+              }
+              return entry;
             })
             .filter((f): f is { service_id: number; price_unit: 'per_cut' | 'per_item'; units_per_item: number } => !!f);
 

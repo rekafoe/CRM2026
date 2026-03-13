@@ -343,8 +343,9 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     }
   }, [isSimplifiedProduct, specs.size_id, materialTypesFromMaterials, specs.material_id, allowedMaterialsForSize, selectedMaterialType, densitiesForSelectedType]);
 
-  // При смене типа — ставим первую плотность этого типа (или сбрасываем, если у типа нет плотностей)
-  // Не сбрасываем material_id, если allowedMaterialsForSize ещё пуст (загрузка) — иначе затираем initial из подтипа
+  // При смене типа — ставим первую плотность этого типа (или сбрасываем, если у типа нет плотностей).
+  // Если плотность сбрасывается на первую — сразу обновляем material_id, иначе стоимость не пересчитается
+  // до смены плотности (materialByTypeAndDensity в другом эффекте ещё со старой плотностью).
   useEffect(() => {
     if (!isSimplifiedProduct || !specs.size_id) return;
     if (densitiesForSelectedType.length === 0) {
@@ -354,12 +355,23 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       }
       return;
     }
-    if (!selectedDensity) {
-      setSelectedDensity(densitiesForSelectedType[0]);
-    } else if (!densitiesForSelectedType.includes(selectedDensity as number)) {
-      setSelectedDensity(densitiesForSelectedType[0]);
+    const firstDensity = densitiesForSelectedType[0];
+    const needResetDensity = !selectedDensity || !densitiesForSelectedType.includes(selectedDensity as number);
+    if (needResetDensity) {
+      setSelectedDensity(firstDensity);
+      const materialForFirstDensity = allowedMaterialsByType.find(m => getMaterialDensity(m) === firstDensity);
+      if (materialForFirstDensity && Number(specs.material_id) !== Number(materialForFirstDensity.id)) {
+        const paperType = warehousePaperTypes.length > 0 && (materialForFirstDensity as any).paper_type_name
+          ? warehousePaperTypes.find(pt => pt.display_name === (materialForFirstDensity as any).paper_type_name)
+          : null;
+        const nextMaterialType = paperType ? paperType.name : undefined;
+        updateSpecs({
+          material_id: materialForFirstDensity.id,
+          ...(nextMaterialType ? { materialType: nextMaterialType as any } : {}),
+        }, true);
+      }
     }
-  }, [selectedMaterialType, densitiesForSelectedType, selectedDensity, isSimplifiedProduct, specs.size_id, specs.material_id, allowedMaterialsForSize.length, updateSpecs]);
+  }, [selectedMaterialType, densitiesForSelectedType, selectedDensity, isSimplifiedProduct, specs.size_id, specs.material_id, allowedMaterialsForSize.length, allowedMaterialsByType, warehousePaperTypes, updateSpecs]);
 
   // По выбранным типу и плотности выставляем material_id и materialType (только при изменении — иначе рекурсия)
   // Не перезаписываем material_id, если он задан из initial и материал в разрешённых — ждём синхронизацию selectedMaterialType/selectedDensity из effect выше
