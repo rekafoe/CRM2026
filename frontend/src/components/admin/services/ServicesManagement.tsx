@@ -11,6 +11,7 @@ import { ServiceFormState } from './components/ServiceForm';
 import usePricingServices from '../../../hooks/pricing/usePricingServices';
 import { getServiceCategories } from '../../../services/pricing';
 import { ServiceCategory } from '../../../types/pricing';
+import { getMaterials } from '../../../api';
 import { ServiceCategoriesBlock } from './components/ServiceCategoriesBlock';
 import { useServicesManagementState } from '../hooks/useServicesManagementState';
 import { useServiceOperations } from './hooks/useServiceOperations';
@@ -39,6 +40,8 @@ const emptyServiceForm: ServiceFormState = {
   maxQuantity: '',
   operatorPercent: '',
   categoryId: '',
+  materialId: '',
+  qtyPerItem: '1',
 };
 
 const serviceToFormState = (service: PricingService): ServiceFormState => ({
@@ -53,6 +56,8 @@ const serviceToFormState = (service: PricingService): ServiceFormState => ({
   maxQuantity: service.maxQuantity !== undefined ? String(service.maxQuantity) : '',
   operatorPercent: (service as any).operator_percent !== undefined ? String((service as any).operator_percent) : '',
   categoryId: service.categoryId != null ? service.categoryId : '',
+  materialId: service.material_id != null ? service.material_id : '',
+  qtyPerItem: service.qty_per_item != null ? String(service.qty_per_item) : '1',
 });
 
 interface ServicesManagementProps {
@@ -90,6 +95,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
 
   const [servicesWithVariants, setServicesWithVariants] = useState<Set<number>>(new Set());
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [materials, setMaterials] = useState<Array<{ id: number; name: string }>>([]);
 
   const loadCategories = useCallback(() => {
     getServiceCategories().then(setCategories).catch(() => setCategories([]));
@@ -98,6 +104,15 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
+
+  useEffect(() => {
+    getMaterials()
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setMaterials(list.map((m: any) => ({ id: m.id, name: m.name || `#${m.id}` })));
+      })
+      .catch(() => setMaterials([]));
+  }, []);
 
   const combinedError = state.actionError || servicesError;
 
@@ -186,6 +201,8 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         ? Number(state.editingServiceForm.operatorPercent) || 0
         : undefined,
       categoryId: state.editingServiceForm.categoryId !== '' ? state.editingServiceForm.categoryId : null,
+      material_id: state.editingServiceForm.materialId !== '' ? state.editingServiceForm.materialId : null,
+      qty_per_item: state.editingServiceForm.qtyPerItem !== '' && Number(state.editingServiceForm.qtyPerItem) > 0 ? Number(state.editingServiceForm.qtyPerItem) : undefined,
     };
     await serviceOperationsRef.current.updateService(state.editingService.id, payload);
     resetEditingService();
@@ -210,6 +227,8 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         ? Number(state.newServiceForm.operatorPercent) || 0
         : undefined,
       categoryId: state.newServiceForm.categoryId !== '' ? state.newServiceForm.categoryId : undefined,
+      material_id: state.newServiceForm.materialId !== '' ? state.newServiceForm.materialId : undefined,
+      qty_per_item: state.newServiceForm.qtyPerItem !== '' && Number(state.newServiceForm.qtyPerItem) > 0 ? Number(state.newServiceForm.qtyPerItem) : undefined,
     });
     
     if (created) {
@@ -300,6 +319,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
           serviceName={service.name}
           serviceMinQuantity={service.minQuantity}
           serviceMaxQuantity={service.maxQuantity}
+          materials={materials}
         />
       );
     }
@@ -428,7 +448,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       {/* Модальное окно создания услуги */}
       {state.showCreateService && (
         <Modal isOpen={true} title="Новая услуга" onClose={() => setShowCreateService(false)}>
-          <ServiceForm value={state.newServiceForm} onChange={setNewServiceForm} categories={categories} />
+          <ServiceForm value={state.newServiceForm} onChange={setNewServiceForm} categories={categories} materials={materials} />
           <Alert type="info" className="mt-4">
             После создания услугу можно привязать к продукту в разделе управления продуктами.
           </Alert>
@@ -446,7 +466,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
           title="Редактирование услуги"
           onClose={resetEditingService}
         >
-          <ServiceForm value={state.editingServiceForm} onChange={setEditingServiceForm} categories={categories} />
+          <ServiceForm value={state.editingServiceForm} onChange={setEditingServiceForm} categories={categories} materials={materials} />
           <div className="flex justify-end gap-2 w-full mt-4 pt-4 border-t">
             <Button variant="secondary" onClick={resetEditingService}>
               Отмена

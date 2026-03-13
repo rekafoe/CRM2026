@@ -376,6 +376,13 @@ export class UnifiedPricingService {
           unitPrice: result.baseMaterialDetails?.tier.price || 0,
           totalCost: result.baseMaterialDetails?.priceForQuantity ?? 0,
         }] : []),
+        ...(result.operationMaterials?.map((om) => ({
+          materialId: om.material_id,
+          materialName: om.material_name,
+          quantity: om.quantity,
+          unitPrice: 0,
+          totalCost: 0,
+        })) ?? []),
       ],
       operations: [
         ...(result.printDetails ? [{

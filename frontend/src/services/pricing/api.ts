@@ -46,6 +46,8 @@ const mapService = (svc: any): PricingService => ({
   operator_percent: svc.operator_percent ?? svc.operatorPercent ?? undefined,
   categoryId: svc.categoryId ?? svc.category_id ?? undefined,
   categoryName: svc.categoryName ?? svc.category_name ?? undefined,
+  material_id: svc.material_id != null ? Number(svc.material_id) : undefined,
+  qty_per_item: svc.qty_per_item != null ? Number(svc.qty_per_item) : undefined,
 });
 
 const mapTier = (tier: any): ServiceVolumeTier => ({
@@ -81,6 +83,8 @@ export async function createPricingService(payload: CreatePricingServicePayload)
     ...(payload.maxQuantity !== undefined ? { max_quantity: payload.maxQuantity } : {}),
     ...(payload.operator_percent !== undefined && Number.isFinite(Number(payload.operator_percent)) ? { operator_percent: Number(payload.operator_percent) } : {}),
     ...(payload.categoryId !== undefined && payload.categoryId !== null ? { category_id: payload.categoryId } : {}),
+    ...(payload.material_id !== undefined && payload.material_id !== null ? { material_id: payload.material_id } : {}),
+    ...(payload.qty_per_item !== undefined && payload.qty_per_item !== null ? { qty_per_item: payload.qty_per_item } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);
@@ -103,6 +107,8 @@ export async function updatePricingService(id: number, payload: UpdatePricingSer
     ...(payload.maxQuantity !== undefined ? { max_quantity: payload.maxQuantity } : {}),
     ...(payload.operator_percent !== undefined ? { operator_percent: Number(payload.operator_percent) } : {}),
     ...(payload.categoryId !== undefined ? { category_id: payload.categoryId } : {}),
+    ...(payload.material_id !== undefined ? { material_id: payload.material_id } : {}),
+    ...(payload.qty_per_item !== undefined ? { qty_per_item: payload.qty_per_item } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);
@@ -255,6 +261,8 @@ const mapVariant = (data: any): ServiceVariant => {
     isActive: data.isActive ?? data.is_active ?? true,
     createdAt: data.createdAt ?? data.created_at,
     updatedAt: data.updatedAt ?? data.updated_at,
+    material_id: data.material_id != null ? Number(data.material_id) : undefined,
+    qty_per_item: data.qty_per_item != null ? Number(data.qty_per_item) : undefined,
   };
 };
 
@@ -271,6 +279,8 @@ export async function createServiceVariant(serviceId: number, payload: ServiceVa
     parameters: payload.parameters ?? {},
     sort_order: payload.sortOrder ?? 0,
     is_active: payload.isActive ?? true,
+    ...(payload.material_id !== undefined && payload.material_id !== null ? { material_id: payload.material_id } : {}),
+    ...(payload.qty_per_item !== undefined && payload.qty_per_item !== null ? { qty_per_item: payload.qty_per_item } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapVariant(data);
@@ -291,6 +301,8 @@ export async function updateServiceVariant(serviceId: number, variantId: number 
     parameters: payload.parameters,
     sort_order: payload.sortOrder,
     is_active: payload.isActive,
+    ...(payload.material_id !== undefined ? { material_id: payload.material_id } : {}),
+    ...(payload.qty_per_item !== undefined ? { qty_per_item: payload.qty_per_item } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapVariant(data);

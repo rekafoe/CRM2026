@@ -63,6 +63,8 @@ type RawServiceRow = {
   operator_percent?: number | null;
   category_id?: number | null;
   category_name?: string | null;
+  material_id?: number | null;
+  qty_per_item?: number | null;
 };
 
 type RawTierRow = {
@@ -225,6 +227,8 @@ export class PricingServiceRepository {
       operator_percent: row.operator_percent !== undefined && row.operator_percent !== null ? Number(row.operator_percent) : undefined,
       categoryId: row.category_id != null ? row.category_id : undefined,
       categoryName: row.category_name != null && row.category_name !== '' ? row.category_name : undefined,
+      material_id: row.material_id != null ? row.material_id : undefined,
+      qty_per_item: row.qty_per_item != null ? Number(row.qty_per_item) : undefined,
     };
   }
 
@@ -243,10 +247,15 @@ export class PricingServiceRepository {
     const db = await this.getConnection();
     let hasOpPercent = false;
     let hasCategoryId = false;
+    let hasMaterialId = false;
+    let hasQtyPerItem = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
     try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
+    try { hasMaterialId = await hasColumn('post_processing_services', 'material_id'); } catch { /* ignore */ }
+    try { hasQtyPerItem = await hasColumn('post_processing_services', 'qty_per_item'); } catch { /* ignore */ }
     const opPercentSel = hasOpPercent ? ', pps.operator_percent' : '';
     const categorySel = hasCategoryId ? ', pps.category_id, sc.name as category_name' : '';
+    const materialSel = (hasMaterialId && hasQtyPerItem) ? `, ${hasCategoryId ? 'pps.' : ''}material_id, ${hasCategoryId ? 'pps.' : ''}qty_per_item` : '';
     const joinCategory = hasCategoryId ? 'LEFT JOIN service_categories sc ON sc.id = pps.category_id' : '';
     const fromTable = hasCategoryId ? 'post_processing_services pps' : 'post_processing_services';
     const prefix = hasCategoryId ? 'pps.' : '';
@@ -261,7 +270,7 @@ export class PricingServiceRepository {
         ${prefix}price as price_per_unit, 
         ${prefix}is_active,
         ${prefix}min_quantity,
-        ${prefix}max_quantity${opPercentSel}${categorySel}
+        ${prefix}max_quantity${opPercentSel}${categorySel}${materialSel}
       FROM ${fromTable} ${joinCategory}
       ORDER BY ${hasCategoryId ? 'sc.sort_order, sc.name, pps.name' : 'name'}
     `);
@@ -272,10 +281,15 @@ export class PricingServiceRepository {
     const db = await this.getConnection();
     let hasOpPercent = false;
     let hasCategoryId = false;
+    let hasMaterialId = false;
+    let hasQtyPerItem = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
     try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
+    try { hasMaterialId = await hasColumn('post_processing_services', 'material_id'); } catch { /* ignore */ }
+    try { hasQtyPerItem = await hasColumn('post_processing_services', 'qty_per_item'); } catch { /* ignore */ }
     const opPercentSel = hasOpPercent ? ', pps.operator_percent' : '';
     const categorySel = hasCategoryId ? ', pps.category_id, sc.name as category_name' : '';
+    const materialSel = (hasMaterialId && hasQtyPerItem) ? `, ${hasCategoryId ? 'pps.' : ''}material_id, ${hasCategoryId ? 'pps.' : ''}qty_per_item` : '';
     const joinCategory = hasCategoryId ? 'LEFT JOIN service_categories sc ON sc.id = pps.category_id' : '';
     const prefix = hasCategoryId ? 'pps.' : '';
     const fromTable = hasCategoryId ? 'post_processing_services pps' : 'post_processing_services';
@@ -289,7 +303,7 @@ export class PricingServiceRepository {
         ${prefix}price as price_per_unit, 
         ${prefix}is_active,
         ${prefix}min_quantity,
-        ${prefix}max_quantity${opPercentSel}${categorySel}
+        ${prefix}max_quantity${opPercentSel}${categorySel}${materialSel}
       FROM ${fromTable} ${joinCategory}
       WHERE ${prefix}id = ?
     `, id);
@@ -324,16 +338,24 @@ export class PricingServiceRepository {
 
     let hasOpPercent = false;
     let hasCategoryId = false;
+    let hasMaterialId = false;
+    let hasQtyPerItem = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
     try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
+    try { hasMaterialId = await hasColumn('post_processing_services', 'material_id'); } catch { /* ignore */ }
+    try { hasQtyPerItem = await hasColumn('post_processing_services', 'qty_per_item'); } catch { /* ignore */ }
     const opPercentVal = (payload as any).operator_percent;
     const includeOpPercent = hasOpPercent && opPercentVal !== undefined && opPercentVal !== null && Number.isFinite(Number(opPercentVal));
     const categoryIdVal = payload.categoryId != null && Number.isFinite(Number(payload.categoryId)) ? Number(payload.categoryId) : null;
     const includeCategoryId = hasCategoryId;
+    const includeMaterial = hasMaterialId && hasQtyPerItem;
+    const materialIdVal = (payload as any).material_id != null && Number.isFinite(Number((payload as any).material_id)) ? Number((payload as any).material_id) : null;
+    const qtyPerItemVal = (payload as any).qty_per_item != null && Number.isFinite(Number((payload as any).qty_per_item)) ? Number((payload as any).qty_per_item) : 1;
     const insertCols = [
       'name', 'operation_type', 'unit', 'price_unit', 'price', 'is_active', 'min_quantity', 'max_quantity',
       ...(includeOpPercent ? ['operator_percent'] : []),
       ...(includeCategoryId ? ['category_id'] : []),
+      ...(includeMaterial ? ['material_id', 'qty_per_item'] : []),
     ];
     const insertVals = insertCols.map(() => '?').join(', ');
     const insertParams: any[] = [
@@ -348,12 +370,14 @@ export class PricingServiceRepository {
     ];
     if (includeOpPercent) insertParams.push(Number(opPercentVal));
     if (includeCategoryId) insertParams.push(categoryIdVal);
+    if (includeMaterial) { insertParams.push(materialIdVal); insertParams.push(qtyPerItemVal); }
     const result = await db.run(
       `INSERT INTO post_processing_services (${insertCols.join(', ')}) VALUES (${insertVals})`,
       ...insertParams
     );
     const opPercentSel = hasOpPercent ? ', operator_percent' : '';
     const categorySel = hasCategoryId ? ', category_id, (SELECT name FROM service_categories WHERE id = post_processing_services.category_id) as category_name' : '';
+    const materialSel = includeMaterial ? ', material_id, qty_per_item' : '';
     const created = await db.get<any>(`
       SELECT 
         id, 
@@ -365,7 +389,7 @@ export class PricingServiceRepository {
         price as price_per_unit, 
         is_active,
         min_quantity,
-        max_quantity${opPercentSel}${categorySel}
+        max_quantity${opPercentSel}${categorySel}${materialSel}
       FROM post_processing_services 
       WHERE id = ?
     `, result.lastID);
@@ -415,12 +439,18 @@ export class PricingServiceRepository {
 
     let hasOpPercent = false;
     let hasCategoryId = false;
+    let hasMaterialId = false;
+    let hasQtyPerItem = false;
     try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
     try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
+    try { hasMaterialId = await hasColumn('post_processing_services', 'material_id'); } catch { /* ignore */ }
+    try { hasQtyPerItem = await hasColumn('post_processing_services', 'qty_per_item'); } catch { /* ignore */ }
     const opPercentUpdate = hasOpPercent && (payload as any).operator_percent !== undefined ? ', operator_percent = ?' : '';
     const categoryIdUpdate = hasCategoryId && payload.categoryId !== undefined
       ? ', category_id = ?'
       : '';
+    const materialIdUpdate = hasMaterialId && (payload as any).material_id !== undefined ? ', material_id = ?' : '';
+    const qtyPerItemUpdate = hasQtyPerItem && (payload as any).qty_per_item !== undefined ? ', qty_per_item = ?' : '';
     const updateParams: any[] = [
       payload.name ?? current.name,
       operationType,
@@ -433,16 +463,19 @@ export class PricingServiceRepository {
     ];
     if (opPercentUpdate) updateParams.push(Number((payload as any).operator_percent));
     if (categoryIdUpdate) updateParams.push(payload.categoryId != null && Number.isFinite(Number(payload.categoryId)) ? payload.categoryId : null);
+    if (materialIdUpdate) updateParams.push((payload as any).material_id != null && Number.isFinite(Number((payload as any).material_id)) ? Number((payload as any).material_id) : null);
+    if (qtyPerItemUpdate) updateParams.push((payload as any).qty_per_item != null && Number.isFinite(Number((payload as any).qty_per_item)) ? Number((payload as any).qty_per_item) : (current.qty_per_item ?? 1));
     updateParams.push(id);
     await db.run(
       `UPDATE post_processing_services 
-       SET name = ?, operation_type = ?, unit = ?, price_unit = ?, price = ?, is_active = ?, min_quantity = ?, max_quantity = ?${opPercentUpdate}${categoryIdUpdate}
+       SET name = ?, operation_type = ?, unit = ?, price_unit = ?, price = ?, is_active = ?, min_quantity = ?, max_quantity = ?${opPercentUpdate}${categoryIdUpdate}${materialIdUpdate}${qtyPerItemUpdate}
        WHERE id = ?`,
       ...updateParams
     );
 
     const opPercentSel = hasOpPercent ? ', operator_percent' : '';
     const categorySel = hasCategoryId ? ', category_id, (SELECT name FROM service_categories WHERE id = post_processing_services.category_id) as category_name' : '';
+    const materialSel = (hasMaterialId && hasQtyPerItem) ? ', material_id, qty_per_item' : '';
     const updated = await db.get<any>(`
       SELECT 
         id, 
@@ -454,7 +487,7 @@ export class PricingServiceRepository {
         price as price_per_unit, 
         is_active,
         min_quantity,
-        max_quantity${opPercentSel}${categorySel}
+        max_quantity${opPercentSel}${categorySel}${materialSel}
       FROM post_processing_services 
       WHERE id = ?
     `, id);
@@ -710,8 +743,13 @@ export class PricingServiceRepository {
   static async listServiceVariants(serviceId: number): Promise<ServiceVariantDTO[]> {
     const db = await this.getConnection();
     await this.ensureSchema(db);
+    let hasMaterialId = false;
+    let hasQtyPerItem = false;
+    try { hasMaterialId = await hasColumn('service_variants', 'material_id'); } catch { /* ignore */ }
+    try { hasQtyPerItem = await hasColumn('service_variants', 'qty_per_item'); } catch { /* ignore */ }
+    const materialCols = hasMaterialId && hasQtyPerItem ? ', material_id, qty_per_item' : '';
     const rows = await db.all<any[]>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at 
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${materialCols}
        FROM service_variants 
        WHERE service_id = ? 
        ORDER BY sort_order, id`,
@@ -726,23 +764,39 @@ export class PricingServiceRepository {
       isActive: row.is_active !== undefined ? !!row.is_active : true,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      ...(hasMaterialId && row.material_id != null ? { material_id: row.material_id } : {}),
+      ...(hasQtyPerItem && row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
     }));
   }
 
   static async createServiceVariant(serviceId: number, payload: CreateServiceVariantDTO): Promise<ServiceVariantDTO> {
     const db = await this.getConnection();
-    // Убираем ensureSchema отсюда - схема проверяется при getConnection()
-    const result = await db.run(
-      `INSERT INTO service_variants (service_id, variant_name, parameters, sort_order, is_active)
-       VALUES (?, ?, ?, ?, ?)`,
+    let hasMaterialId = false;
+    let hasQtyPerItem = false;
+    try { hasMaterialId = await hasColumn('service_variants', 'material_id'); } catch { /* ignore */ }
+    try { hasQtyPerItem = await hasColumn('service_variants', 'qty_per_item'); } catch { /* ignore */ }
+    const includeMaterial = hasMaterialId && hasQtyPerItem;
+    const materialIdVal = payload.material_id != null && Number.isFinite(Number(payload.material_id)) ? Number(payload.material_id) : null;
+    const qtyPerItemVal = payload.qty_per_item != null && Number.isFinite(Number(payload.qty_per_item)) ? Number(payload.qty_per_item) : 1;
+    const insertCols = includeMaterial
+      ? 'service_id, variant_name, parameters, sort_order, is_active, material_id, qty_per_item'
+      : 'service_id, variant_name, parameters, sort_order, is_active';
+    const insertPlaces = includeMaterial ? '?, ?, ?, ?, ?, ?, ?' : '?, ?, ?, ?, ?';
+    const insertParams: any[] = [
       serviceId,
       payload.variantName,
       JSON.stringify(payload.parameters || {}),
       payload.sortOrder ?? 0,
       payload.isActive === undefined || payload.isActive ? 1 : 0,
+    ];
+    if (includeMaterial) { insertParams.push(materialIdVal); insertParams.push(qtyPerItemVal); }
+    const result = await db.run(
+      `INSERT INTO service_variants (${insertCols}) VALUES (${insertPlaces})`,
+      ...insertParams
     );
+    const materialSel = includeMaterial ? ', material_id, qty_per_item' : '';
     const row = await db.get<any>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at 
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${materialSel}
        FROM service_variants 
        WHERE id = ?`,
       result.lastID,
@@ -759,6 +813,8 @@ export class PricingServiceRepository {
       isActive: row.is_active !== undefined ? !!row.is_active : true,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      ...(row.material_id != null ? { material_id: row.material_id } : {}),
+      ...(row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
     };
   }
 
@@ -769,20 +825,31 @@ export class PricingServiceRepository {
     if (!current) {
       return null;
     }
-
-    await db.run(
-      `UPDATE service_variants 
-       SET variant_name = ?, parameters = ?, sort_order = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP 
-       WHERE id = ?`,
+    let hasMaterialId = false;
+    let hasQtyPerItem = false;
+    try { hasMaterialId = await hasColumn('service_variants', 'material_id'); } catch { /* ignore */ }
+    try { hasQtyPerItem = await hasColumn('service_variants', 'qty_per_item'); } catch { /* ignore */ }
+    const materialIdUpdate = hasMaterialId && payload.material_id !== undefined ? ', material_id = ?' : '';
+    const qtyPerItemUpdate = hasQtyPerItem && payload.qty_per_item !== undefined ? ', qty_per_item = ?' : '';
+    const updateParams: any[] = [
       payload.variantName ?? current.variant_name,
       payload.parameters !== undefined ? JSON.stringify(payload.parameters) : current.parameters,
       payload.sortOrder !== undefined ? payload.sortOrder : current.sort_order,
       payload.isActive !== undefined ? (payload.isActive ? 1 : 0) : current.is_active,
-      variantId,
+    ];
+    if (materialIdUpdate) updateParams.push(payload.material_id != null && Number.isFinite(Number(payload.material_id)) ? Number(payload.material_id) : null);
+    if (qtyPerItemUpdate) updateParams.push(payload.qty_per_item != null && Number.isFinite(Number(payload.qty_per_item)) ? Number(payload.qty_per_item) : (current.qty_per_item ?? 1));
+    updateParams.push(variantId);
+    await db.run(
+      `UPDATE service_variants 
+       SET variant_name = ?, parameters = ?, sort_order = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP${materialIdUpdate}${qtyPerItemUpdate}
+       WHERE id = ?`,
+      ...updateParams
     );
 
+    const materialSel = (hasMaterialId && hasQtyPerItem) ? ', material_id, qty_per_item' : '';
     const updated = await db.get<any>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at 
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${materialSel}
        FROM service_variants 
        WHERE id = ?`,
       variantId,
@@ -799,6 +866,8 @@ export class PricingServiceRepository {
       isActive: updated.is_active !== undefined ? !!updated.is_active : true,
       createdAt: updated.created_at,
       updatedAt: updated.updated_at,
+      ...(updated.material_id != null ? { material_id: updated.material_id } : {}),
+      ...(updated.qty_per_item != null ? { qty_per_item: Number(updated.qty_per_item) } : {}),
     };
   }
 

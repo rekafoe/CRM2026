@@ -44,6 +44,8 @@ export interface ServiceVariantsTableProps {
   serviceName: string;
   serviceMinQuantity?: number;
   serviceMaxQuantity?: number;
+  /** Список материалов для выбора списания по варианту */
+  materials?: Array<{ id: number; name: string }>;
 }
 
 /**
@@ -52,8 +54,8 @@ export interface ServiceVariantsTableProps {
 export interface VariantRowLevel0Props {
   variant: VariantWithTiers;
   typeName: string;
-  allTypeVariants: VariantWithTiers[];
-  commonRanges: Array<{ min_qty: number; max_qty?: number; unit_price: number }>;
+  allTypeVariants?: VariantWithTiers[];
+  commonRanges?: Array<{ min_qty: number; max_qty?: number; unit_price: number }>;
   commonRangesAsPriceRanges: Array<{ minQty: number; maxQty?: number; price: number }>;
   isEditingName: boolean;
   editingNameValue: string;
@@ -64,7 +66,7 @@ export interface VariantRowLevel0Props {
   onDelete: () => void;
   onCreateChild: () => void;
   onCreateSibling: () => void;
-  serviceId: number;
+  serviceId?: number;
 }
 
 /**
@@ -93,7 +95,7 @@ export interface VariantRowLevel1Props {
  */
 export interface VariantRowLevel2Props {
   variant: VariantWithTiers;
-  typeName: string;
+  typeName?: string;
   commonRangesAsPriceRanges: Array<{ minQty: number; maxQty?: number; price: number }>;
   isEditingParams: boolean;
   editingParamsValue: Record<string, any>;
@@ -104,5 +106,7 @@ export interface VariantRowLevel2Props {
   onPriceChange: (minQty: number, newPrice: number) => void;
   onDelete: () => void;
   onCreateSibling: () => void;
-  serviceId: number;
+  serviceId?: number;
+  hoveredRangeIndex?: number | null;
+  onRangeHover?: (index: number | null) => void;
 }

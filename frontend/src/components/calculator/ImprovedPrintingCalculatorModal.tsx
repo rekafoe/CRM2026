@@ -489,7 +489,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       return;
     }
 
-    const materialChanged = current.materialId != null && current.materialId !== prev.materialId;
+    const materialChanged = current.materialId !== prev.materialId;
     const typeChanged = current.typeId != null && current.typeId !== prev.typeId && prev.typeId != null;
 
     prevCalcTriggerRef.current = current;
@@ -747,9 +747,10 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     setSpecs(prev => ({ ...prev, ...normalizedUpdates }));
     setUserInteracted(true); // Отмечаем, что пользователь взаимодействовал с калькулятором
 
-    // Для select (материал, формат и т.д.) — мгновенный пересчёт без debounce
+    // Для select (материал, формат и т.д.) — пересчёт после того как React применит setState,
+    // иначе calculateCost видит старые specs (замыкание). Небольшая задержка даёт время на коммит и ре-рендер.
     if (instant) {
-      setTimeout(() => instantCalculate(), 0);
+      setTimeout(() => instantCalculate(), 50);
     }
   }, [setSpecs, setUserInteracted, instantCalculate]);
 

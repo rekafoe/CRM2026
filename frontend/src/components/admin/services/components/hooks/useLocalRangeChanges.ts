@@ -35,15 +35,25 @@ export interface VariantChange {
   variantId?: number;
   variantName?: string;
   parameters?: Record<string, any>;
-  oldVariantName?: string; // Для обновления имени (если меняется имя, нужно обновить все варианты с таким именем)
+  oldVariantName?: string;
 }
 
 /**
- * Хук для управления локальными изменениями диапазонов и цен
+ * Единый объект несохранённых изменений — одна модель для кнопки «Сохранить».
+ */
+export interface PendingChanges {
+  rangeChanges: RangeChange[];
+  priceChanges: PriceChange[];
+  variantChanges: VariantChange[];
+}
+
+/**
+ * Хук для управления локальными изменениями диапазонов и цен.
+ * Сохранение: один вызов onSaveChanges(pending) применяет все изменения.
  */
 export function useLocalRangeChanges(
   initialVariants: VariantWithTiers[],
-  onSaveChanges: (rangeChanges: RangeChange[], priceChanges: PriceChange[], variantChanges: VariantChange[]) => Promise<void>
+  onSaveChanges: (pending: PendingChanges) => Promise<void>
 ) {
   const [localVariants, setLocalVariants] = useState<VariantWithTiers[]>(initialVariants);
   const [rangeChanges, setRangeChanges] = useState<RangeChange[]>([]);
@@ -122,7 +132,6 @@ export function useLocalRangeChanges(
     setLocalVariants(updatedVariants);
     setRangeChanges(prev => [...prev, { type: 'add', boundary }]);
     setHasUnsavedChanges(true);
-    console.log('=== ADD RANGE BOUNDARY === hasUnsavedChanges set to true');
   }, [localVariants]);
 
   // Локальное редактирование диапазона
@@ -178,7 +187,6 @@ export function useLocalRangeChanges(
     setLocalVariants(updatedVariants);
     setRangeChanges(prev => [...prev, { type: 'edit', rangeIndex, newBoundary }]);
     setHasUnsavedChanges(true);
-    console.log('=== EDIT RANGE BOUNDARY === hasUnsavedChanges set to true');
   }, [localVariants]);
 
   // Локальное удаление диапазона
@@ -234,24 +242,18 @@ export function useLocalRangeChanges(
     setLocalVariants(updatedVariants);
     setRangeChanges(prev => [...prev, { type: 'remove', rangeIndex }]);
     setHasUnsavedChanges(true);
-    console.log('=== REMOVE RANGE === hasUnsavedChanges set to true');
   }, [localVariants]);
 
   // Локальное изменение цены (для конкретного варианта)
   const changePrice = useCallback((variantId: number, minQty: number, newPrice: number) => {
-    console.log('=== CHANGE PRICE ===', { variantId, minQty, newPrice });
     setLocalVariants(prev => {
       const updated = prev.map(variant => {
         if (variant.id !== variantId) return variant;
 
         const hasTier = variant.tiers.some(tier => tier.minQuantity === minQty);
-        let updatedTiers = variant.tiers.map(tier => {
-          if (tier.minQuantity === minQty) {
-            console.log('=== CHANGE PRICE === Found tier to update:', { tier, newPrice });
-            return { ...tier, rate: newPrice };
-          }
-          return tier;
-        });
+        let updatedTiers = variant.tiers.map(tier =>
+          tier.minQuantity === minQty ? { ...tier, rate: newPrice } : tier
+        );
 
         if (!hasTier) {
           const newTier = {
@@ -265,11 +267,6 @@ export function useLocalRangeChanges(
           updatedTiers = [...updatedTiers, newTier].sort((a, b) => a.minQuantity - b.minQuantity);
         }
 
-        console.log('=== CHANGE PRICE === Updated variant:', { 
-          variantId, 
-          oldTiers: variant.tiers, 
-          newTiers: updatedTiers 
-        });
         return { ...variant, tiers: updatedTiers };
       });
       return updated;
@@ -291,7 +288,6 @@ export function useLocalRangeChanges(
     });
 
     setHasUnsavedChanges(true);
-    console.log('=== CHANGE PRICE === hasUnsavedChanges set to true');
   }, []);
 
   // Локальное создание варианта
@@ -324,7 +320,6 @@ export function useLocalRangeChanges(
       parameters,
     }]);
     setHasUnsavedChanges(true);
-    console.log('=== CREATE VARIANT LOCALLY === hasUnsavedChanges set to true, variant:', newVariant);
 
     return newVariant;
   }, [localVariants, nextVariantId]);
@@ -332,12 +327,8 @@ export function useLocalRangeChanges(
   // Локальное удаление варианта
   const deleteVariant = useCallback((variantId: number) => {
     setLocalVariants(prev => prev.filter(v => v.id !== variantId));
-    setVariantChanges(prev => [...prev, {
-      type: 'delete',
-      variantId,
-    }]);
+    setVariantChanges(prev => [...prev, { type: 'delete', variantId }]);
     setHasUnsavedChanges(true);
-    console.log('=== DELETE VARIANT LOCALLY === hasUnsavedChanges set to true, variantId:', variantId);
   }, []);
 
   // 🆕 Локальное обновление имени варианта (для новых и существующих вариантов)
@@ -390,8 +381,6 @@ export function useLocalRangeChanges(
         }
       }
     });
-    
-    console.log('=== UPDATE VARIANT NAME LOCALLY ===', { variantId, newName });
   }, [localVariants]);
 
   // 🆕 Локальное обновление параметров варианта (для новых и существующих вариантов)
@@ -435,35 +424,23 @@ export function useLocalRangeChanges(
         }
       }
     });
-    
-    console.log('=== UPDATE VARIANT PARAMS LOCALLY ===', { variantId, params });
   }, [localVariants]);
 
-  // Сохранение всех изменений на сервер
+  // Сохранение: один вызов onSaveChanges(pending) применяет все изменения
   const saveChanges = useCallback(async () => {
-    if (rangeChanges.length === 0 && priceChanges.length === 0 && variantChanges.length === 0) {
-      console.log('=== SAVE CHANGES === No changes to save');
+    const pending: PendingChanges = { rangeChanges, priceChanges, variantChanges };
+    if (pending.rangeChanges.length === 0 && pending.priceChanges.length === 0 && pending.variantChanges.length === 0) {
       return;
     }
 
-    console.log('=== SAVE CHANGES ===', {
-      rangeChanges: rangeChanges.length,
-      priceChanges: priceChanges.length,
-      variantChanges: variantChanges.length,
-    });
-
     try {
-      await onSaveChanges(rangeChanges, priceChanges, variantChanges);
-
-      // Очищаем локальные изменения после успешного сохранения
+      await onSaveChanges(pending);
       setRangeChanges([]);
       setPriceChanges([]);
       setVariantChanges([]);
       setHasUnsavedChanges(false);
-      console.log('=== SAVE CHANGES === Successfully saved');
     } catch (error) {
-      console.error('=== SAVE CHANGES === Error:', error);
-      throw error; // Пробрасываем ошибку выше
+      throw error;
     }
   }, [rangeChanges, priceChanges, variantChanges, onSaveChanges]);
 
@@ -476,12 +453,15 @@ export function useLocalRangeChanges(
     setHasUnsavedChanges(false);
   }, [initialVariants]);
 
+  const pendingChanges: PendingChanges = useMemo(
+    () => ({ rangeChanges, priceChanges, variantChanges }),
+    [rangeChanges, priceChanges, variantChanges]
+  );
+
   return {
     localVariants,
     hasUnsavedChanges,
-    rangeChanges,
-    priceChanges,
-    variantChanges,
+    pendingChanges,
 
     // Функции для локальных изменений
     addRangeBoundary,

@@ -44,6 +44,8 @@ export function useServiceOperations({
       maxQuantity?: number;
       operator_percent?: number;
       categoryId?: number | null;
+      material_id?: number | null;
+      qty_per_item?: number | null;
     }) => {
       try {
         if (!payload.name.trim() || !payload.unit.trim()) {
@@ -62,6 +64,8 @@ export function useServiceOperations({
           maxQuantity: payload.maxQuantity,
           operator_percent: payload.operator_percent,
           categoryId: payload.categoryId,
+          material_id: payload.material_id,
+          qty_per_item: payload.qty_per_item,
         });
 
         // Если услуга сложная (hasVariants = true), создаем первый вариант-тип

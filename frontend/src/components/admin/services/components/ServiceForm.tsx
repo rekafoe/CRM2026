@@ -14,6 +14,10 @@ export interface ServiceFormState {
   maxQuantity: string;
   operatorPercent: string;
   categoryId: number | ''; // id категории послепечатной услуги (для группировки в выборе продукта)
+  /** ID материала для списания при выполнении операции */
+  materialId: number | '';
+  /** Расход материала на единицу операции */
+  qtyPerItem: string;
 }
 
 interface ServiceFormProps {
@@ -23,6 +27,8 @@ interface ServiceFormProps {
   typeOptions?: Array<{ value: PricingServiceType; label: string }>;
   unitOptions?: Array<{ value: string; label: string }>;
   categories?: Array<{ id: number; name: string }>;
+  /** Список материалов для выбора списания по операции */
+  materials?: Array<{ id: number; name: string }>;
 }
 
 const defaultTypeOptions: Array<{ value: PricingServiceType; label: string }> = [
@@ -70,6 +76,7 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
   typeOptions = defaultTypeOptions,
   unitOptions = defaultUnitOptions,
   categories = [],
+  materials = [],
 }) => {
   const updateField = <K extends keyof ServiceFormState>(field: K, fieldValue: ServiceFormState[K]) => {
     onChange({ ...value, [field]: fieldValue });
@@ -200,6 +207,37 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
           placeholder="0"
         />
       </FormField>
+      {materials.length > 0 && (
+        <>
+          <FormField label="Материал для списания" help="При выполнении операции этот материал будет списываться со склада">
+            <select
+              className="px-2 py-1 border rounded w-full"
+              value={value.materialId === '' ? '' : value.materialId}
+              disabled={disabled}
+              onChange={(e) => updateField('materialId', e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              <option value="">— Без списания</option>
+              {materials.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Норма расхода на ед. операции" help="Сколько единиц материала списывать на одну единицу операции (по умолчанию 1)">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              className="px-2 py-1 border rounded w-full"
+              value={value.qtyPerItem}
+              disabled={disabled}
+              onChange={(e) => updateField('qtyPerItem', e.target.value)}
+              placeholder="1"
+            />
+          </FormField>
+        </>
+      )}
       <label className="inline-flex items-center gap-2 text-sm text-gray-600">
         <input
           type="checkbox"

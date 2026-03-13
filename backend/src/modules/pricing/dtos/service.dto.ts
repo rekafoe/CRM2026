@@ -13,6 +13,10 @@ export interface PricingServiceDTO {
   operator_percent?: number;
   categoryId?: number | null;
   categoryName?: string | null;
+  /** ID материала для списания при выполнении операции (ламинирование, крепление и т.д.) */
+  material_id?: number | null;
+  /** Расход материала на единицу операции (по умолчанию 1) */
+  qty_per_item?: number | null;
 }
 
 export interface ServiceCategoryDTO {
@@ -35,6 +39,8 @@ export interface CreatePricingServiceDTO {
   maxQuantity?: number;
   operator_percent?: number;
   categoryId?: number | null;
+  material_id?: number | null;
+  qty_per_item?: number | null;
 }
 
 export interface UpdatePricingServiceDTO {
@@ -50,6 +56,8 @@ export interface UpdatePricingServiceDTO {
   maxQuantity?: number;
   operator_percent?: number;
   categoryId?: number | null;
+  material_id?: number | null;
+  qty_per_item?: number | null;
 }
 
 export interface ServiceVolumeTierDTO {
@@ -84,6 +92,8 @@ export interface ServiceVariantDTO {
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
+  material_id?: number | null;
+  qty_per_item?: number | null;
 }
 
 export interface CreateServiceVariantDTO {
@@ -91,6 +101,8 @@ export interface CreateServiceVariantDTO {
   parameters: Record<string, any>;
   sortOrder?: number;
   isActive?: boolean;
+  material_id?: number | null;
+  qty_per_item?: number | null;
 }
 
 export interface UpdateServiceVariantDTO {
@@ -98,5 +110,7 @@ export interface UpdateServiceVariantDTO {
   parameters?: Record<string, any>;
   sortOrder?: number;
   isActive?: boolean;
+  material_id?: number | null;
+  qty_per_item?: number | null;
 }
 

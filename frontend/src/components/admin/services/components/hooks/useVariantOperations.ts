@@ -142,6 +142,8 @@ export function useVariantOperations(
           updateServiceVariant(serviceId, v.id, {
             variantName: newName,
             parameters: v.parameters,
+            material_id: v.material_id ?? undefined,
+            qty_per_item: v.qty_per_item ?? undefined,
           })
         )
       );
@@ -159,9 +161,12 @@ export function useVariantOperations(
         prev.map((v) => (v.id === variantId ? { ...v, parameters: params } : v))
       );
 
+      const v = variants.find((x) => x.id === variantId);
       await updateServiceVariant(serviceId, variantId, {
-        variantName: variants.find((v) => v.id === variantId)?.variantName || '',
+        variantName: v?.variantName || '',
         parameters: params,
+        material_id: v?.material_id ?? undefined,
+        qty_per_item: v?.qty_per_item ?? undefined,
       });
     } catch (err) {
       console.error('Ошибка обновления параметров варианта:', err);
@@ -170,6 +175,26 @@ export function useVariantOperations(
       await reloadVariantsRef.current();
     }
   }, [serviceId, variants, setVariants, setError]); // reloadVariants через ref
+
+  const updateVariantMaterial = useCallback(async (variantId: number, material_id: number | null, qty_per_item: number) => {
+    try {
+      setVariants((prev) =>
+        prev.map((v) => (v.id === variantId ? { ...v, material_id: material_id ?? undefined, qty_per_item } : v))
+      );
+      const v = variants.find((x) => x.id === variantId);
+      await updateServiceVariant(serviceId, variantId, {
+        variantName: v?.variantName ?? '',
+        parameters: v?.parameters ?? {},
+        material_id: material_id ?? undefined,
+        qty_per_item,
+      });
+    } catch (err) {
+      console.error('Ошибка обновления материала варианта:', err);
+      setError('Не удалось обновить материал варианта');
+      invalidateCacheRef.current?.();
+      await reloadVariantsRef.current();
+    }
+  }, [serviceId, variants, setVariants, setError]);
 
   const deleteVariant = useCallback(async (variantId: number, skipConfirm: boolean = false) => {
     if (!skipConfirm && !confirm('Удалить этот вариант? Все связанные диапазоны цен будут удалены.')) {
@@ -640,6 +665,7 @@ export function useVariantOperations(
     createVariant,
     updateVariantName,
     updateVariantParams,
+    updateVariantMaterial,
     deleteVariant,
     changePrice,
     savePriceImmediate,

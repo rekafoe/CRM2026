@@ -78,6 +78,8 @@ const initialState: ServicesManagementState = {
     maxQuantity: '',
     operatorPercent: '',
     categoryId: '',
+    materialId: '',
+    qtyPerItem: '1',
   },
   editingService: null,
   editingServiceForm: null,

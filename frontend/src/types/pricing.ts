@@ -35,6 +35,10 @@ export interface PricingService {
   operator_percent?: number;
   categoryId?: number | null;
   categoryName?: string | null;
+  /** ID материала для списания при выполнении операции */
+  material_id?: number | null;
+  /** Расход материала на единицу операции */
+  qty_per_item?: number | null;
 }
 
 export interface ServiceVolumeTier {
@@ -62,6 +66,8 @@ export interface ServiceVariant {
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
+  material_id?: number | null;
+  qty_per_item?: number | null;
 }
 
 export interface ServiceVariantPayload {
@@ -69,6 +75,8 @@ export interface ServiceVariantPayload {
   parameters: Record<string, any>;
   sortOrder?: number;
   isActive?: boolean;
+  material_id?: number | null;
+  qty_per_item?: number | null;
 }
 
 export interface CreatePricingServicePayload {
@@ -83,6 +91,8 @@ export interface CreatePricingServicePayload {
   maxQuantity?: number;
   operator_percent?: number;
   categoryId?: number | null;
+  material_id?: number | null;
+  qty_per_item?: number | null;
 }
 
 export interface UpdatePricingServicePayload extends Partial<CreatePricingServicePayload> {}

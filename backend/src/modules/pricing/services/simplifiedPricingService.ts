@@ -72,6 +72,7 @@ export interface SimplifiedPricingResult {
   };
   finishingDetails?: Array<{
     service_id: number;
+    variant_id?: number;
     service_name: string;
     tier: { min_qty: number; max_qty?: number; price: number };
     units_needed: number;
@@ -79,7 +80,9 @@ export interface SimplifiedPricingResult {
     price_unit?: string;
     operation_type?: string;
   }>;
-  
+  /** Материалы по операциям отделки (ламинирование, крепление и т.д.) — для списания со склада */
+  operationMaterials?: Array<{ material_id: number; material_name: string; quantity: number }>;
+
   calculatedAt: string;
   calculationMethod: 'simplified';
   /** Цены за единицу по диапазонам тиража для выбранной конфигурации (от min_qty шт) */
@@ -821,6 +824,7 @@ export class SimplifiedPricingService {
           
           finishingDetails.push({
             service_id: finConfig.service_id,
+            variant_id: variantId,
             service_name: serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`,
             tier: { ...tier, price: priceForTier },
             units_needed: totalUnits,
@@ -891,6 +895,60 @@ export class SimplifiedPricingService {
         }
       } else {
         logger.warn('✂️ [SimplifiedPricingService] Резка включена, но не найдена услуга operation_type=cut, price_unit=per_cut');
+      }
+    }
+
+    // Сбор материалов по операциям отделки (для списания со склада)
+    const operationMaterials: Array<{ material_id: number; material_name: string; quantity: number }> = [];
+    if (finishingDetails.length > 0) {
+      const svCols = await getTableColumns('service_variants');
+      const ppsCols = await getTableColumns('post_processing_services');
+      const hasVariantMaterial = svCols.has('material_id') && svCols.has('qty_per_item');
+      const hasServiceMaterial = ppsCols.has('material_id') && ppsCols.has('qty_per_item');
+      const variantIds = [...new Set(finishingDetails.map((d) => d.variant_id).filter((id): id is number => typeof id === 'number' && Number.isFinite(id)))];
+      const serviceIds = [...new Set(finishingDetails.map((d) => d.service_id))];
+      let variantMaterialMap: Map<number, { material_id: number; qty_per_item: number }> = new Map();
+      let serviceMaterialMap: Map<number, { material_id: number; qty_per_item: number }> = new Map();
+      if (hasVariantMaterial && variantIds.length > 0) {
+        const rows = await db.all<Array<{ id: number; material_id: number | null; qty_per_item: number }>>(
+          `SELECT id, material_id, qty_per_item FROM service_variants WHERE id IN (${variantIds.map(() => '?').join(',')})`,
+          variantIds
+        );
+        rows.forEach((r) => {
+          if (r.material_id != null) variantMaterialMap.set(r.id, { material_id: r.material_id, qty_per_item: Number(r.qty_per_item ?? 1) });
+        });
+      }
+      if (hasServiceMaterial && serviceIds.length > 0) {
+        const rows = await db.all<Array<{ id: number; material_id: number | null; qty_per_item: number }>>(
+          `SELECT id, material_id, qty_per_item FROM post_processing_services WHERE id IN (${serviceIds.map(() => '?').join(',')})`,
+          serviceIds
+        );
+        rows.forEach((r) => {
+          if (r.material_id != null) serviceMaterialMap.set(r.id, { material_id: r.material_id, qty_per_item: Number(r.qty_per_item ?? 1) });
+        });
+      }
+      const materialIdsToFetch = new Set<number>();
+      for (const d of finishingDetails) {
+        const src = d.variant_id != null ? variantMaterialMap.get(d.variant_id) : serviceMaterialMap.get(d.service_id);
+        if (src) materialIdsToFetch.add(src.material_id);
+      }
+      let materialNamesMap: Map<number, string> = new Map();
+      if (materialIdsToFetch.size > 0) {
+        const names = await db.all<Array<{ id: number; name: string }>>(
+          `SELECT id, name FROM materials WHERE id IN (${[...materialIdsToFetch].map(() => '?').join(',')})`,
+          [...materialIdsToFetch]
+        );
+        names.forEach((r) => materialNamesMap.set(r.id, r.name));
+      }
+      for (const d of finishingDetails) {
+        const src = d.variant_id != null ? variantMaterialMap.get(d.variant_id) : serviceMaterialMap.get(d.service_id);
+        if (!src) continue;
+        const qtyPerItem = src.qty_per_item;
+        const totalQty = qtyPerItem * d.units_needed;
+        const name = materialNamesMap.get(src.material_id) ?? `Material #${src.material_id}`;
+        const existing = operationMaterials.find((m) => m.material_id === src.material_id);
+        if (existing) existing.quantity += totalQty;
+        else operationMaterials.push({ material_id: src.material_id, material_name: name, quantity: totalQty });
       }
     }
     
@@ -1108,6 +1166,7 @@ export class SimplifiedPricingService {
       calculationMethod: 'simplified',
       layout: layoutResult,
       warnings: warnings.length > 0 ? warnings : undefined,
+      ...(operationMaterials.length > 0 ? { operationMaterials } : {}),
     };
   }
   
