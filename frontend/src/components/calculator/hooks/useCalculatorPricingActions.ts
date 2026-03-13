@@ -268,6 +268,30 @@ export function useCalculatorPricingActions({
           });
         }
 
+        // Если есть выбранные операции (например ламинация), но finishingConfig пуст — собираем минимальный finishing,
+        // чтобы бэкенд всегда учитывал стоимость операций
+        if (
+          (!finishingConfig || finishingConfig.length === 0) &&
+          Array.isArray(specs.selectedOperations) &&
+          specs.selectedOperations.length > 0
+        ) {
+          finishingConfig = specs.selectedOperations
+            .map((sel: any) => {
+              const sid = Number(sel.operationId);
+              if (!Number.isFinite(sid)) return null;
+              return {
+                service_id: sid,
+                price_unit: 'per_item' as const,
+                units_per_item: Number(sel.quantity) > 0 ? Number(sel.quantity) : 1,
+                ...(sel.variantId != null ? { variant_id: Number(sel.variantId) } : {}),
+              };
+            })
+            .filter((f): f is { service_id: number; price_unit: 'per_item'; units_per_item: number } => !!f);
+          if (finishingConfig.length > 0) {
+            logger.info('🧩 finishing собран из selectedOperations (fallback)', { count: finishingConfig.length });
+          }
+        }
+
         const configuration = {
           ...specs,
           productType: resolvedType,

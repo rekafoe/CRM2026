@@ -344,8 +344,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   }, [isSimplifiedProduct, specs.size_id, materialTypesFromMaterials, specs.material_id, allowedMaterialsForSize, selectedMaterialType, densitiesForSelectedType]);
 
   // При смене типа — ставим первую плотность этого типа (или сбрасываем, если у типа нет плотностей).
-  // Если плотность сбрасывается на первую — сразу обновляем material_id, иначе стоимость не пересчитается
-  // до смены плотности (materialByTypeAndDensity в другом эффекте ещё со старой плотностью).
+  // Если плотность та же и подходит для нового типа — сразу синхронизируем material_id (пересчёт при смене типа при той же плотности).
   useEffect(() => {
     if (!isSimplifiedProduct || !specs.size_id) return;
     if (densitiesForSelectedType.length === 0) {
@@ -367,6 +366,20 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         const nextMaterialType = paperType ? paperType.name : undefined;
         updateSpecs({
           material_id: materialForFirstDensity.id,
+          ...(nextMaterialType ? { materialType: nextMaterialType as any } : {}),
+        }, true);
+      }
+    } else {
+      // Плотность не менялась (та же для нового типа) — всё равно синхронизируем material_id по (тип + плотность)
+      const densityNum = Number(selectedDensity);
+      const materialForCurrentDensity = allowedMaterialsByType.find(m => getMaterialDensity(m) === densityNum);
+      if (materialForCurrentDensity && Number(specs.material_id) !== Number(materialForCurrentDensity.id)) {
+        const paperType = warehousePaperTypes.length > 0 && (materialForCurrentDensity as any).paper_type_name
+          ? warehousePaperTypes.find(pt => pt.display_name === (materialForCurrentDensity as any).paper_type_name)
+          : null;
+        const nextMaterialType = paperType ? paperType.name : undefined;
+        updateSpecs({
+          material_id: materialForCurrentDensity.id,
           ...(nextMaterialType ? { materialType: nextMaterialType as any } : {}),
         }, true);
       }
