@@ -332,12 +332,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     if (typeFromCurrent && typeMatches) {
       if (!userChoseTypeRef.current) {
         setSelectedMaterialType(prev => (prev !== typeFromCurrent ? typeFromCurrent : prev));
-      } else {
-        userChoseTypeRef.current = false;
+        if (densityFromCurrent != null) {
+          setSelectedDensity(prev => (prev !== densityFromCurrent ? densityFromCurrent : prev));
+        }
       }
-      if (densityFromCurrent != null) {
-        setSelectedDensity(prev => (prev !== densityFromCurrent ? densityFromCurrent : prev));
-      }
+      // Не сбрасываем userChoseTypeRef здесь — иначе следующий эффект (376–396) решит, что пользователь не выбирал тип,
+      // и выйдет по guard, не вызвав updateSpecs. Сброс делается в эффекте 376–396 после успешного updateSpecs.
     } else if (materialTypesFromMaterials.length > 0 && !selectedMaterialType) {
       setSelectedMaterialType(materialTypesFromMaterials[0]);
     }

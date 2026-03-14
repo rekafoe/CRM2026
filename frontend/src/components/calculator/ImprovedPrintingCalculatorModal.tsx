@@ -220,20 +220,24 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       setPrintColorMode(initial.color_mode);
     }
 
-    setSpecs((prev) => ({
-      ...prev,
-      typeId: typeId ?? undefined,
-      typeName: typeVariant?.name ?? undefined,
-      ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}` } : {}),
-      quantity: initial?.quantity ?? autoQty,
-      ...(initial?.material_id != null ? { material_id: initial.material_id } : {}),
-      ...(initial?.base_material_id != null ? { base_material_id: initial.base_material_id } : {}),
-      ...(initial?.sides_mode ? { sides: initial.sides_mode === 'single' ? 1 : 2 } : {}),
-      selectedOperations: operationsFromInitial,
-      ...(initial?.cutting_required ? { cutting: true, cutting_required: true } : initial?.cutting !== undefined ? { cutting: initial.cutting } : {}),
-      ...(initial?.folding !== undefined ? { folding: initial.folding } : {}),
-      ...(initial?.roundCorners !== undefined ? { roundCorners: initial.roundCorners } : {}),
-    }));
+    setSpecs((prev) => {
+      const isNewType = prev.typeId !== typeId;
+      return {
+        ...prev,
+        typeId: typeId ?? undefined,
+        typeName: typeVariant?.name ?? undefined,
+        ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}` } : {}),
+        quantity: initial?.quantity ?? autoQty,
+        // material_id из initial только при смене подтипа; иначе не перезаписываем — пользователь мог уже выбрать материал
+        ...(initial?.material_id != null && isNewType ? { material_id: initial.material_id } : {}),
+        ...(initial?.base_material_id != null && isNewType ? { base_material_id: initial.base_material_id } : {}),
+        ...(initial?.sides_mode ? { sides: initial.sides_mode === 'single' ? 1 : 2 } : {}),
+        selectedOperations: operationsFromInitial,
+        ...(initial?.cutting_required ? { cutting: true, cutting_required: true } : initial?.cutting !== undefined ? { cutting: initial.cutting } : {}),
+        ...(initial?.folding !== undefined ? { folding: initial.folding } : {}),
+        ...(initial?.roundCorners !== undefined ? { roundCorners: initial.roundCorners } : {}),
+      };
+    });
   }, [simplified?.types, simplified?.typeConfigs, backendProductSchema?.operations, setSpecs]);
 
   useEffect(() => {
