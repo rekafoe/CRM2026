@@ -150,6 +150,55 @@ const getOrderItemProductionName = (item: any): string => {
   return main;
 };
 
+/**
+ * Разворачивает позицию заказа в отдельные строки для акта/счёта:
+ * 1) Печать на X бумаге Y г/м² — кол-во листов (шт.)
+ * 2) Каждая операция (скругление, ламинация и т.д.) — отдельная строка, кол-во в шт.
+ * 3) Резка — отдельная строка, кол-во резок в шт.
+ * Для позиций без раскладки/операций — одна строка с названием и quantity позиции.
+ */
+const getOrderItemProductionRows = (item: any): Array<{ name: string; quantity: number; unit: string }> => {
+  const productName =
+    item.name ||
+    item.params?.productName ||
+    item.params?.name ||
+    item.params?.description ||
+    item.type ||
+    'Услуга';
+  const params = item.params || {};
+  const specs = params.specifications || {};
+  const layout = params.layout || specs.layout || {};
+  const sheetsNeeded = Number(params.sheetsNeeded ?? specs.sheetsNeeded ?? layout.sheetsNeeded) || 0;
+  const cutsPerSheet = Number(layout.cutsPerSheet) || 0;
+  const paperPhrase = getOrderItemPaperPhrase(item);
+
+  const rows: Array<{ name: string; quantity: number; unit: string }> = [];
+
+  if (sheetsNeeded > 0) {
+    rows.push({ name: paperPhrase || 'Печать (листы)', quantity: sheetsNeeded, unit: 'шт.' });
+  }
+  const rawServices = params.services;
+  if (Array.isArray(rawServices) && rawServices.length > 0) {
+    for (const s of rawServices) {
+      const name = String(s.operationName || s.service || s.name || '').trim();
+      if (!name || name.toLowerCase() === 'операция') continue;
+      const q = Number(s.quantity);
+      if (!Number.isFinite(q) || q <= 0) continue;
+      const pu = String(s.priceUnit || s.unit || '').toLowerCase();
+      const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
+      rows.push({ name, quantity: q, unit });
+    }
+  }
+  if (cutsPerSheet > 0) {
+    const cutWord = cutsPerSheet === 1 ? 'резка' : cutsPerSheet < 5 ? 'резки' : 'резок';
+    rows.push({ name: cutWord.charAt(0).toUpperCase() + cutWord.slice(1), quantity: cutsPerSheet, unit: 'шт.' });
+  }
+
+  if (rows.length > 0) return rows;
+  const qty = Number(item.quantity) || 1;
+  return [{ name: productName, quantity: qty, unit: 'шт.' }];
+};
+
 interface CustomersAdminPageProps {
   /** Куда вести кнопка «Назад»: по умолчанию /adminpanel, на странице /clients — / */
   backTo?: string;
@@ -455,38 +504,26 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
         const orderItems = (order as any).items || [];
         const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
-          // Подробное наименование для акта: тираж, листы печати, резки
-          const itemName = getOrderItemProductionName(item);
-          
-          // Определяем единицу измерения
-          let unit = 'шт';
-          if (item.params?.unit) {
-            unit = item.params.unit;
-          } else if (item.type === 'print' || item.type === 'postprint') {
-            unit = 'шт';
-          }
-          
-          const quantity = Number(item.quantity) || 1;
           const rawPrice = Number(item.price) || 0;
-          // Применяем скидку заказа к цене позиции (для актов/счетов — цены со скидкой)
           const price = Math.round(rawPrice * (1 - discountPct / 100) * 100) / 100;
-          const amount = Math.round(price * quantity * 100) / 100; // Округляем до копеек
-          
-          // Для НДС можно добавить логику позже
+          const itemAmount = Math.round(price * (Number(item.quantity) || 1) * 100) / 100;
           const vatRate = 'Без НДС';
           const vatAmount = 0;
-          const totalWithVat = amount;
-          
-          allOrderItems.push({
-            number: itemNumber++,
-            name: itemName,
-            unit: unit,
-            quantity: quantity,
-            price: price,
-            amount: amount,
-            vatRate: vatRate,
-            vatAmount: vatAmount,
-            totalWithVat: totalWithVat,
+
+          const lines = getOrderItemProductionRows(item);
+          lines.forEach((line, idx) => {
+            const isFirst = idx === 0;
+            allOrderItems.push({
+              number: itemNumber++,
+              name: line.name,
+              unit: line.unit,
+              quantity: line.quantity,
+              price: isFirst ? price : 0,
+              amount: isFirst ? itemAmount : 0,
+              vatRate,
+              vatAmount,
+              totalWithVat: isFirst ? itemAmount : 0,
+            });
           });
         }
       }
@@ -628,30 +665,24 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
         const orderItems = (order as any).items || [];
         const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
-          // Подробное наименование для счёта: тираж, листы печати, резки
-          const itemName = getOrderItemProductionName(item);
-          
-          let unit = 'шт';
-          if (item.params?.unit) {
-            unit = item.params.unit;
-          }
-          
-          const quantity = Number(item.quantity) || 1;
           const rawPrice = Number(item.price) || 0;
-          // Применяем скидку заказа к цене позиции (для счетов — цены со скидкой)
           const price = Math.round(rawPrice * (1 - discountPct / 100) * 100) / 100;
-          const amount = Math.round(price * quantity * 100) / 100;
-          
-          allOrderItems.push({
-            number: itemNumber++,
-            name: itemName,
-            unit: unit,
-            quantity: quantity,
-            price: price,
-            amount: amount,
-            vatRate: 'Без НДС',
-            vatAmount: 0,
-            totalWithVat: amount,
+          const itemAmount = Math.round(price * (Number(item.quantity) || 1) * 100) / 100;
+
+          const lines = getOrderItemProductionRows(item);
+          lines.forEach((line, idx) => {
+            const isFirst = idx === 0;
+            allOrderItems.push({
+              number: itemNumber++,
+              name: line.name,
+              unit: line.unit,
+              quantity: line.quantity,
+              price: isFirst ? price : 0,
+              amount: isFirst ? itemAmount : 0,
+              vatRate: 'Без НДС',
+              vatAmount: 0,
+              totalWithVat: isFirst ? itemAmount : 0,
+            });
           });
         }
       }

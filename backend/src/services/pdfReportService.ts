@@ -1362,6 +1362,49 @@ export class PDFReportService {
   }
 
   /**
+   * Разворачивает позицию в отдельные строки для чека: 1) Печать на X бумаге — кол-во листов (шт.), 2) операции по строкам, 3) резка.
+   */
+  private static getOrderItemProductionRows(it: any): Array<{ name: string; quantity: number; unit: string }> {
+    const rows: Array<{ name: string; quantity: number; unit: string }> = [];
+    try {
+      const params = typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
+      const specs = params.specifications || {};
+      const layout = params.layout || specs.layout || {};
+      const sheetsNeeded = Number(params.sheetsNeeded ?? specs.sheetsNeeded ?? layout.sheetsNeeded) || 0;
+      const cutsPerSheet = Number(layout.cutsPerSheet) || 0;
+      const paperPhrase = this.getOrderItemPaperPhrase(it);
+      const productName = (it.name || params.productName || params.name || it.type || 'Услуга').toString().trim();
+
+      if (sheetsNeeded > 0) {
+        rows.push({ name: paperPhrase || 'Печать (листы)', quantity: sheetsNeeded, unit: 'шт.' });
+      }
+      const rawServices = params.services;
+      if (Array.isArray(rawServices) && rawServices.length > 0) {
+        for (const s of rawServices) {
+          const name = String(s.operationName || s.service || s.name || '').trim();
+          if (!name || name.toLowerCase() === 'операция') continue;
+          const q = Number(s.quantity);
+          if (!Number.isFinite(q) || q <= 0) continue;
+          const pu = String(s.priceUnit || s.unit || '').toLowerCase();
+          const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
+          rows.push({ name, quantity: q, unit });
+        }
+      }
+      if (cutsPerSheet > 0) {
+        const cutWord = cutsPerSheet === 1 ? 'Резка' : cutsPerSheet < 5 ? 'Резки' : 'Резок';
+        rows.push({ name: cutWord, quantity: cutsPerSheet, unit: 'шт.' });
+      }
+      if (rows.length > 0) return rows;
+      const qty = Number(it.quantity) || 1;
+      rows.push({ name: productName, quantity: qty, unit: 'шт.' });
+    } catch (_) {
+      const qty = Number(it.quantity) || 1;
+      rows.push({ name: (it.name || it.type || 'Позиция').toString(), quantity: qty, unit: 'шт.' });
+    }
+    return rows;
+  }
+
+  /**
    * Подробное наименование позиции: тираж, листы печати, резки, операции (ламинация, скругление и т.д.) + при наличии — фраза о бумаге.
    * Пример: "96 Визитки: 4 листа печати, 13 резок, Ламинация: 96 шт., Скругление углов: 96 шт. Печать на мелованной бумаге 300 г/м² двухсторонняя."
    */
@@ -1510,14 +1553,27 @@ export class PDFReportService {
       const receiptNumber = String(order.number || orderId);
       const orderNumber = String(order.number || orderId);
       const discountPercent = Number(order.discount_percent) || 0;
-      const rows = (items || []).map((it: any, idx: number) => {
+      const rows: Array<{ num: number; name: string; quantity: number; unit: string; price: number; sum: number }> = [];
+      let rowNum = 0;
+      for (const it of items || []) {
         const q = Number(it.quantity) || 1;
         const rawP = Number(it.price) || 0;
-        const sum = Math.round(rawP * q * (1 - discountPercent / 100) * 100) / 100;
-        const p = q > 0 ? Math.round((sum / q) * 100) / 100 : 0;
-        const name = this.getCommodityReceiptItemName(it);
-        return { num: idx + 1, name, quantity: q, price: p, sum };
-      });
+        const itemSum = Math.round(rawP * q * (1 - discountPercent / 100) * 100) / 100;
+        const itemPrice = q > 0 ? Math.round((itemSum / q) * 100) / 100 : 0;
+        const lines = this.getOrderItemProductionRows(it);
+        lines.forEach((line, idx) => {
+          rowNum++;
+          const isFirst = idx === 0;
+          rows.push({
+            num: rowNum,
+            name: line.name,
+            quantity: line.quantity,
+            unit: line.unit,
+            price: isFirst ? itemPrice : 0,
+            sum: isFirst ? itemSum : 0,
+          });
+        });
+      }
       const totalAmount = Math.round(rows.reduce((s: number, r: any) => s + r.sum, 0) * 100) / 100;
       const amountInWords = this.amountInWordsBel(totalAmount);
       const manager = order.executedByName || executedBy || '';
@@ -1528,7 +1584,7 @@ export class PDFReportService {
         <tr>
           <td>${r.num}</td>
           <td>${this.escapeHtml(r.name)}</td>
-          <td>${r.quantity} шт.</td>
+          <td>${r.quantity} ${r.unit || 'шт.'}</td>
           <td>${fmt(r.price)}</td>
           <td>${fmt(r.sum)}</td>
         </tr>
@@ -1783,21 +1839,28 @@ export class PDFReportService {
 
       const discountPercent = Number(order.discount_percent) || 0;
 
-      // Формируем список товаров: при наличии раскладки — подробно (тираж, листы, резки), иначе краткое название
-      const receiptItems = (Array.isArray(items) ? items : []).map((item, index) => {
-        const itemName = this.getCommodityReceiptItemName(item);
+      // Разворачиваем каждую позицию в отдельные строки: печать (по листам), операции, резка
+      const receiptItems: Array<{ number: number; name: string; quantity: number; unit?: string; price: number; amount: number }> = [];
+      let itemNumber = 0;
+      for (const item of Array.isArray(items) ? items : []) {
         const qty = Number(item.quantity) || 1;
         const rawPrice = Number(item.price) || 0;
-        const amount = Math.round(rawPrice * qty * (1 - discountPercent / 100) * 100) / 100;
-        const price = qty > 0 ? Math.round((amount / qty) * 100) / 100 : 0;
-        return {
-          number: index + 1,
-          name: itemName,
-          quantity: qty,
-          price,
-          amount
-        };
-      });
+        const itemAmount = Math.round(rawPrice * qty * (1 - discountPercent / 100) * 100) / 100;
+        const itemPrice = qty > 0 ? Math.round((itemAmount / qty) * 100) / 100 : 0;
+        const lines = this.getOrderItemProductionRows(item);
+        lines.forEach((line, idx) => {
+          itemNumber++;
+          const isFirst = idx === 0;
+          receiptItems.push({
+            number: itemNumber,
+            name: line.name,
+            quantity: line.quantity,
+            unit: line.unit,
+            price: isFirst ? itemPrice : 0,
+            amount: isFirst ? itemAmount : 0,
+          });
+        });
+      }
 
       const totalAmount = Math.round(receiptItems.reduce((sum, it) => sum + it.amount, 0) * 100) / 100;
 
@@ -1868,6 +1931,7 @@ export class PDFReportService {
       number: number;
       name: string;
       quantity: number;
+      unit?: string;
       price: number;
       amount: number;
     }>;
@@ -2079,7 +2143,7 @@ export class PDFReportService {
                     <tr>
                         <td class="number-col">${item.number}</td>
                         <td class="name-col">${this.escapeHtml(item.name)}</td>
-                        <td class="quantity-col">${item.quantity} шт.</td>
+                        <td class="quantity-col">${item.quantity} ${item.unit || 'шт.'}</td>
                         <td class="price-col">${item.price.toFixed(2)}</td>
                         <td class="amount-col">${item.amount.toFixed(2)}</td>
                     </tr>
