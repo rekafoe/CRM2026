@@ -105,12 +105,25 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
         )
       : null;
 
-    // 1) Для упрощённых продуктов: технологии из print_prices конкретно выбранного размера
+    // Порядок из настроек продукта: по умолчанию подставляем первую технологию продукта, а не первую из глобального списка (например dtf).
+    const techListFromOrder = (order: string[]) => {
+      const seen = new Set<string>();
+      return order
+        .filter((code) => {
+          if (!code || seen.has(code)) return false;
+          seen.add(code);
+          return !constrainedCodes || constrainedCodes.has(code);
+        })
+        .map((code) => printTechnologies.find((t) => t.code === code))
+        .filter((t): t is NonNullable<typeof t> => Boolean(t));
+    };
+
+    // 1) Для упрощённых продуктов: технологии из print_prices в порядке появления в продукте
     const sizesToCheck = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
       ? effectiveSizesProp
       : backendProductSchema?.template?.simplified?.sizes;
     if (sizesToCheck && Array.isArray(sizesToCheck)) {
-      const techCodesFromPrintPrices = new Set<string>();
+      const orderFromSize: string[] = [];
       const targetSizes = selectedSizeId 
         ? sizesToCheck.filter((s: any) => String(s.id) === String(selectedSizeId))
         : sizesToCheck;
@@ -118,40 +131,28 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
         if (Array.isArray(size.print_prices)) {
           size.print_prices.forEach((priceConfig: any) => {
             const techCode = priceConfig.technology_code || priceConfig.technologyCode;
-            if (techCode && typeof techCode === 'string') {
-              techCodesFromPrintPrices.add(techCode);
-            }
+            if (techCode && typeof techCode === 'string') orderFromSize.push(techCode);
           });
         }
       });
-      if (techCodesFromPrintPrices.size > 0) {
-        return printTechnologies.filter((tech) => {
-          const inSize = techCodesFromPrintPrices.has(tech.code);
-          if (!inSize) return false;
-          return constrainedCodes ? constrainedCodes.has(tech.code) : true;
-        });
+      if (orderFromSize.length > 0) {
+        const ordered = techListFromOrder(orderFromSize);
+        if (ordered.length > 0) return ordered;
       }
     }
     const template = backendProductSchema?.template;
 
-    // 2) Для обычных продуктов: проверяем config_data.print_prices (если есть)
-    // На странице шаблона продукта могут быть сохранены цены печати по технологиям
+    // 2) Для обычных продуктов: порядок из config_data.print_prices (как в шаблоне продукта)
     const configData = template?.config_data || template;
     if (configData?.print_prices && Array.isArray(configData.print_prices)) {
-      const techCodesFromConfig = new Set<string>();
+      const orderFromConfig: string[] = [];
       configData.print_prices.forEach((priceConfig: any) => {
         const techCode = priceConfig.technology_code || priceConfig.technologyCode || priceConfig.technology;
-        if (techCode && typeof techCode === 'string') {
-          techCodesFromConfig.add(techCode);
-        }
+        if (techCode && typeof techCode === 'string') orderFromConfig.push(techCode);
       });
-      
-      if (techCodesFromConfig.size > 0) {
-        return printTechnologies.filter((tech) => {
-          const inConfig = techCodesFromConfig.has(tech.code);
-          if (!inConfig) return false;
-          return constrainedCodes ? constrainedCodes.has(tech.code) : true;
-        });
+      if (orderFromConfig.length > 0) {
+        const ordered = techListFromOrder(orderFromConfig);
+        if (ordered.length > 0) return ordered;
       }
     }
 

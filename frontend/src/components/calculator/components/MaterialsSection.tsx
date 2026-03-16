@@ -205,16 +205,13 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     if (!allowedPaperTypes || !Array.isArray(allowedPaperTypes) || allowedPaperTypes.length === 0) {
       return warehousePaperTypes;
     }
-    
     // Фильтруем только разрешенные типы
     const filtered = warehousePaperTypes.filter(pt => {
       return allowedPaperTypes.includes(pt.name);
     });
-    
     if (filtered.length === 0) {
       console.warn('⚠️ [MaterialsSection] После фильтрации не осталось типов бумаги!');
     }
-    
     return filtered;
   }, [warehousePaperTypes, allowedPaperTypes]);
 

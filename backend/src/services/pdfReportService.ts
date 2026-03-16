@@ -1328,9 +1328,14 @@ export class PDFReportService {
       const specs = params.specifications || {};
       const ps: Array<{ label?: string; key?: string; value?: string }> = Array.isArray(params.parameterSummary) ? params.parameterSummary : [];
       let paperType = specs.paperType ? String(specs.paperType).trim() : '';
+      if (!paperType && specs.materialType) paperType = String(specs.materialType).trim();
       let density = specs.paperDensity != null ? String(specs.paperDensity).replace(/\s*г\/м².*/i, '').trim() : '';
       if (!paperType && ps.length) {
-        const ptEntry = ps.find((x: any) => /тип\s*бумаги|paperType|бумага|материал/i.test(String(x.label || x.key || '')));
+        const ptEntry = ps.find((x: any) => {
+          const label = String(x.label || x.key || '').toLowerCase();
+          if (/тип\s*печати|print_technology|printtechnology/.test(label)) return false;
+          return /тип\s*бумаги|papertype|бумага|тип\s*материала|^материал$/i.test(label);
+        });
         if (ptEntry?.value) paperType = String(ptEntry.value).trim();
       }
       if (!density && ps.length) {
@@ -1431,7 +1436,11 @@ export class PDFReportService {
         if (sidesEntry?.value) sidesStr = String(sidesEntry.value).toLowerCase().includes('двух') || String(sidesEntry.value).includes('2') ? '2-стор.' : '1-стор.';
       }
 
-      const paperTypeEntry = ps.find((x: any) => /тип\s*бумаги|paperType|бумага/i.test(String(x.label || x.key || '')));
+      const paperTypeEntry = ps.find((x: any) => {
+        const label = String(x.label || x.key || '').toLowerCase();
+        if (/тип\s*печати|print_technology|printtechnology/.test(label)) return false;
+        return /тип\s*бумаги|papertype|бумага|тип\s*материала|^материал$/i.test(label);
+      });
       const densityEntry = ps.find((x: any) => /плотность|density|г\/м/i.test(String(x.label || x.key || '')));
       const paperTypeVal = paperTypeEntry?.value ? String(paperTypeEntry.value).trim() : '';
       let densityVal = densityEntry?.value ? String(densityEntry.value).trim() : '';
