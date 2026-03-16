@@ -96,6 +96,8 @@ export interface SimplifiedPricingResult {
     metersNeeded?: number;
     wastePercentage?: number;
     recommendedSheetSize?: { width: number; height: number };
+    /** Количество резов на лист (для резки стопой) */
+    cutsPerSheet?: number;
   };
   warnings?: string[];
 }
