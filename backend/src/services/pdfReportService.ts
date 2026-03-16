@@ -1321,14 +1321,15 @@ export class PDFReportService {
 
   /**
    * Фраза о расходуемой бумаге: "Печать на (тип) бумаге (плотность) (односторонняя/двухсторонняя)".
+   * Тип берём из выбранного материала (materialType/paperType из specs), не первый попавшийся из summary.
    */
   private static getOrderItemPaperPhrase(it: any): string {
     try {
       const params = typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
       const specs = params.specifications || {};
       const ps: Array<{ label?: string; key?: string; value?: string }> = Array.isArray(params.parameterSummary) ? params.parameterSummary : [];
-      let paperType = specs.paperType ? String(specs.paperType).trim() : '';
-      if (!paperType && specs.materialType) paperType = String(specs.materialType).trim();
+      // Приоритет: тип из спецификации (привязан к выбранному материалу), потом из summary по метке «Материал»/«Тип материала»
+      let paperType = (specs.materialType ? String(specs.materialType).trim() : '') || (specs.paperType ? String(specs.paperType).trim() : '');
       let density = specs.paperDensity != null ? String(specs.paperDensity).replace(/\s*г\/м².*/i, '').trim() : '';
       if (!paperType && ps.length) {
         const ptEntry = ps.find((x: any) => {
@@ -1442,22 +1443,20 @@ export class PDFReportService {
         return /тип\s*бумаги|papertype|бумага|тип\s*материала|^материал$/i.test(label);
       });
       const densityEntry = ps.find((x: any) => /плотность|density|г\/м/i.test(String(x.label || x.key || '')));
-      const paperTypeVal = paperTypeEntry?.value ? String(paperTypeEntry.value).trim() : '';
+      let paperTypeVal = paperTypeEntry?.value ? String(paperTypeEntry.value).trim() : '';
       let densityVal = densityEntry?.value ? String(densityEntry.value).trim() : '';
       if (!paperTypeVal && !densityVal) {
-        if (specs.paperType || specs.paperDensity) {
-          const pt = specs.paperType ? String(specs.paperType) : '';
-          const den = specs.paperDensity ? String(specs.paperDensity) : '';
-          if (pt) materialDensityStr = pt.toLowerCase();
-          if (den) materialDensityStr += (materialDensityStr ? ' ' : '') + den.replace(/\s*г\/м².*/i, '').trim() + ' г';
-        }
+        const pt = (specs.materialType ? String(specs.materialType) : '') || (specs.paperType ? String(specs.paperType) : '');
+        const den = specs.paperDensity ? String(specs.paperDensity) : '';
+        if (pt) materialDensityStr = pt.toLowerCase();
+        if (den) materialDensityStr += (materialDensityStr ? ' ' : '') + den.replace(/\s*г\/м².*/i, '').trim() + ' г';
       } else {
         if (densityVal) {
           densityVal = densityVal.replace(/\s*г\/м².*/i, '').trim();
           if (densityVal && !/\d/.test(densityVal)) densityVal = '';
           else if (densityVal && !/г\s*$/i.test(densityVal)) densityVal = densityVal + ' г';
         }
-        materialDensityStr = [paperTypeVal.toLowerCase(), densityVal].filter(Boolean).join(' ');
+        materialDensityStr = [paperTypeVal ? paperTypeVal.toLowerCase() : '', densityVal].filter(Boolean).join(' ');
       }
     } catch (_) { /* ignore */ }
 

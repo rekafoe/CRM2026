@@ -68,6 +68,12 @@ export function buildOrderPayload({
         : JSON.parse(JSON.stringify(result.formatInfo)))
     : undefined;
 
+  // Тип бумаги — из выбранного материала (material_id), чтобы в PDF не попадал первый попавшийся
+  const selectedMaterial = result.specifications.material_id && result.materials?.length
+    ? result.materials.find((m: any) => Number(m.materialId ?? m.material_id) === Number(result.specifications.material_id))
+    : null;
+  const materialTypeFromSelected = selectedMaterial?.paper_type_name ? String(selectedMaterial.paper_type_name).trim() : null;
+
   const specificationsPayload = {
     ...cleanSpecifications,
     formatInfo: cleanFormatInfo,
@@ -83,6 +89,7 @@ export function buildOrderPayload({
     ...(result.specifications.material_id ? { material_id: result.specifications.material_id } : {}),
     ...(result.specifications.base_material_id ? { base_material_id: result.specifications.base_material_id } : {}),
     ...(result.specifications.size_id ? { size_id: result.specifications.size_id } : {}),
+    ...(materialTypeFromSelected ? { materialType: materialTypeFromSelected, paperType: materialTypeFromSelected } : {}),
   };
 
   const cleanMaterials = result.materials

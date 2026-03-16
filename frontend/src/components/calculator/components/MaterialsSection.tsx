@@ -259,11 +259,20 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     (s ?? '').toString().trim().toLowerCase();
 
   // Уникальные типы материала (paper_type_name) из разрешённых материалов — для фильтра
+  // Порядок типов — по появлению в списке материалов размера (allowed_material_ids), не по алфавиту,
+  // чтобы «первый по умолчанию» был из продукта, а не «Dtf» из-за localeCompare.
   const materialTypesFromMaterials = useMemo(() => {
-    const names = allowedMaterialsForSize
-      .map(m => (m as any).paper_type_name)
-      .filter((name): name is string => !!name);
-    return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+    const seen = new Set<string>();
+    const order: string[] = [];
+    const norm = (s: string) => (s ?? '').toString().trim().toLowerCase();
+    allowedMaterialsForSize.forEach(m => {
+      const name = (m as any).paper_type_name;
+      if (name && !seen.has(norm(name))) {
+        seen.add(norm(name));
+        order.push(name);
+      }
+    });
+    return order;
   }, [allowedMaterialsForSize]);
 
   // Материалы выбранного типа (из разрешённых для продукта)
