@@ -1370,24 +1370,28 @@ export class PDFReportService {
       const hasCuts = cutsPerSheet > 0;
       const qty = Number(it.quantity) || 1;
       const parts: string[] = [];
+      // 1) Печать — листы
       if (hasSheets) {
         const sheetWord = sheetsNeeded === 1 ? 'лист' : sheetsNeeded < 5 ? 'листа' : 'листов';
         parts.push(`${sheetsNeeded} ${sheetWord} печати`);
       }
-      if (hasCuts) {
-        const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
-        parts.push(`${cutsPerSheet} ${cutWord}`);
-      }
+      // 2) Послепечатные операции (только с осмысленным названием)
       const rawServices = params.services;
       if (Array.isArray(rawServices) && rawServices.length > 0) {
         for (const s of rawServices) {
-          const name = s.operationName || s.service || s.name || 'Операция';
+          const name = String(s.operationName || s.service || s.name || '').trim();
+          if (!name || name.toLowerCase() === 'операция') continue;
           const serviceQty = Number(s.quantity);
           if (!Number.isFinite(serviceQty) || serviceQty <= 0) continue;
           const pu = String(s.priceUnit || s.unit || '').toLowerCase();
           const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
-          parts.push(`${String(name).trim()}: ${serviceQty} ${unit}`);
+          parts.push(`${name} ${serviceQty} ${unit}`);
         }
+      }
+      // 3) Резка
+      if (hasCuts) {
+        const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
+        parts.push(`${cutsPerSheet} ${cutWord}`);
       }
       if (parts.length === 0) return null;
       let main = `${qty} ${productName}: ${parts.join(', ')}`;

@@ -108,32 +108,36 @@ const getOrderItemProductionName = (item: any): string => {
 
   const paperPhrase = getOrderItemPaperPhrase(item);
 
-  // Операции из params.services (ламинация, резка, скругление и т.д.) — отдельными строками в описании
+  // Порядок как инструкция: печать (листы) → послепечатные операции по имени → резка. Без названия — не показываем.
   const servicesList: Array<{ name: string; qty: number; unit: string }> = [];
   const rawServices = params.services;
   if (Array.isArray(rawServices) && rawServices.length > 0) {
     for (const s of rawServices) {
-      const name = s.operationName || s.service || s.name || 'Операция';
+      const name = String(s.operationName || s.service || s.name || '').trim();
+      if (!name || name.toLowerCase() === 'операция') continue;
       const serviceQty = Number(s.quantity);
       if (!Number.isFinite(serviceQty) || serviceQty <= 0) continue;
       const pu = String(s.priceUnit || s.unit || '').toLowerCase();
       const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
-      servicesList.push({ name: String(name).trim(), qty: serviceQty, unit });
+      servicesList.push({ name, qty: serviceQty, unit });
     }
   }
 
   let main = productName;
   const parts: string[] = [];
+  // 1) Печать — листы
   if (hasSheets) {
     const sheetWord = sheetsNeeded === 1 ? 'лист' : sheetsNeeded < 5 ? 'листа' : 'листов';
     parts.push(`${sheetsNeeded} ${sheetWord} печати`);
   }
+  // 2) Послепечатные операции (ламинация, скругление и т.д.)
+  for (const op of servicesList) {
+    parts.push(`${op.name} ${op.qty} ${op.unit}`);
+  }
+  // 3) Резка
   if (hasCuts) {
     const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
     parts.push(`${cutsPerSheet} ${cutWord}`);
-  }
-  for (const op of servicesList) {
-    parts.push(`${op.name}: ${op.qty} ${op.unit}`);
   }
 
   if (parts.length > 0) {
