@@ -1356,8 +1356,8 @@ export class PDFReportService {
   }
 
   /**
-   * Подробное наименование позиции: тираж, листы печати, резки + при наличии — фраза о бумаге.
-   * Пример: "96 Визитки: 4 листа печати, 13 резок. Печать на мелованной бумаге 300 г/м² двухсторонняя."
+   * Подробное наименование позиции: тираж, листы печати, резки, операции (ламинация, скругление и т.д.) + при наличии — фраза о бумаге.
+   * Пример: "96 Визитки: 4 листа печати, 13 резок, Ламинация: 96 шт., Скругление углов: 96 шт. Печать на мелованной бумаге 300 г/м² двухсторонняя."
    */
   private static getOrderItemProductionDescription(it: any, productName: string): string | null {
     try {
@@ -1368,7 +1368,6 @@ export class PDFReportService {
       const cutsPerSheet = Number(layout.cutsPerSheet) || 0;
       const hasSheets = sheetsNeeded > 0;
       const hasCuts = cutsPerSheet > 0;
-      if (!hasSheets && !hasCuts) return null;
       const qty = Number(it.quantity) || 1;
       const parts: string[] = [];
       if (hasSheets) {
@@ -1379,6 +1378,18 @@ export class PDFReportService {
         const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
         parts.push(`${cutsPerSheet} ${cutWord}`);
       }
+      const rawServices = params.services;
+      if (Array.isArray(rawServices) && rawServices.length > 0) {
+        for (const s of rawServices) {
+          const name = s.operationName || s.service || s.name || 'Операция';
+          const serviceQty = Number(s.quantity);
+          if (!Number.isFinite(serviceQty) || serviceQty <= 0) continue;
+          const pu = String(s.priceUnit || s.unit || '').toLowerCase();
+          const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
+          parts.push(`${String(name).trim()}: ${serviceQty} ${unit}`);
+        }
+      }
+      if (parts.length === 0) return null;
       let main = `${qty} ${productName}: ${parts.join(', ')}`;
       const paperPhrase = this.getOrderItemPaperPhrase(it);
       if (paperPhrase) main += `. ${paperPhrase}`;

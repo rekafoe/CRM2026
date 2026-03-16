@@ -268,10 +268,39 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
           const itemName = (item as any).name || (item as any).params?.productName || (item as any).params?.name || (item as any).type || 'Позиция';
           const display = sanitizeOrderItemDescription(String(customDescription || ''), (item as any).type);
           const showDesc = Boolean(display) && display !== 'Без описания';
+          // Расшифровка: листы печати, резки, операции (ламинация, скругление и т.д.)
+          const params = item.params || {};
+          const layout = params.layout || params.specifications?.layout || {};
+          const sheetsNeeded = Number(params.sheetsNeeded ?? params.specifications?.sheetsNeeded ?? layout.sheetsNeeded) || 0;
+          const cutsPerSheet = Number(layout.cutsPerSheet) || 0;
+          const parts: string[] = [];
+          if (sheetsNeeded > 0) {
+            const sheetWord = sheetsNeeded === 1 ? 'лист' : sheetsNeeded < 5 ? 'листа' : 'листов';
+            parts.push(`${sheetsNeeded} ${sheetWord} печати`);
+          }
+          if (cutsPerSheet > 0) {
+            const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
+            parts.push(`${cutsPerSheet} ${cutWord}`);
+          }
+          const rawServices = params.services;
+          if (Array.isArray(rawServices)) {
+            for (const s of rawServices) {
+              const name = s.operationName || s.service || s.name || 'Операция';
+              const q = Number(s.quantity);
+              if (Number.isFinite(q) && q > 0) {
+                const unit = String(s.priceUnit || s.unit || '').toLowerCase().includes('sheet') || String(s.priceUnit || '').toLowerCase().includes('лист') ? 'лист.' : 'шт.';
+                parts.push(`${String(name).trim()}: ${q} ${unit}`);
+              }
+            }
+          }
+          const productionBreakdown = parts.length > 0 ? parts.join(', ') : null;
           return (
             <>
               <strong>{itemName}</strong>
               {showDesc ? <> — {display}</> : null}
+              {productionBreakdown && (
+                <span style={{ display: 'block', fontSize: 12, color: '#555', marginTop: 2 }}>{productionBreakdown}</span>
+              )}
             </>
           );
         })()}

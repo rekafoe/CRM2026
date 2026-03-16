@@ -108,17 +108,35 @@ const getOrderItemProductionName = (item: any): string => {
 
   const paperPhrase = getOrderItemPaperPhrase(item);
 
+  // Операции из params.services (ламинация, резка, скругление и т.д.) — отдельными строками в описании
+  const servicesList: Array<{ name: string; qty: number; unit: string }> = [];
+  const rawServices = params.services;
+  if (Array.isArray(rawServices) && rawServices.length > 0) {
+    for (const s of rawServices) {
+      const name = s.operationName || s.service || s.name || 'Операция';
+      const serviceQty = Number(s.quantity);
+      if (!Number.isFinite(serviceQty) || serviceQty <= 0) continue;
+      const pu = String(s.priceUnit || s.unit || '').toLowerCase();
+      const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
+      servicesList.push({ name: String(name).trim(), qty: serviceQty, unit });
+    }
+  }
+
   let main = productName;
-  if (hasSheets || hasCuts) {
-    const parts: string[] = [];
-    if (hasSheets) {
-      const sheetWord = sheetsNeeded === 1 ? 'лист' : sheetsNeeded < 5 ? 'листа' : 'листов';
-      parts.push(`${sheetsNeeded} ${sheetWord} печати`);
-    }
-    if (hasCuts) {
-      const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
-      parts.push(`${cutsPerSheet} ${cutWord}`);
-    }
+  const parts: string[] = [];
+  if (hasSheets) {
+    const sheetWord = sheetsNeeded === 1 ? 'лист' : sheetsNeeded < 5 ? 'листа' : 'листов';
+    parts.push(`${sheetsNeeded} ${sheetWord} печати`);
+  }
+  if (hasCuts) {
+    const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
+    parts.push(`${cutsPerSheet} ${cutWord}`);
+  }
+  for (const op of servicesList) {
+    parts.push(`${op.name}: ${op.qty} ${op.unit}`);
+  }
+
+  if (parts.length > 0) {
     main = `${qty} ${productName}: ${parts.join(', ')}`;
   } else if (qty > 1) {
     main = `${qty} ${productName}`;
