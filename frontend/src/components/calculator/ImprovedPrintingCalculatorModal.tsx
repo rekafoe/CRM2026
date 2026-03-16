@@ -240,18 +240,30 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     });
   }, [simplified?.types, simplified?.typeConfigs, backendProductSchema?.operations, setSpecs]);
 
+  // Выбор начального подтипа (тип материала): только при невалидном selectedTypeId, и не применяем один и тот же nextId повторно — иначе цикл смены типа.
+  const lastAppliedTypeIdRef = useRef<number | null>(null);
+  const lastProductIdRef = useRef<number | null>(null);
   useEffect(() => {
     if (!hasProductTypes) {
       if (selectedTypeId !== null) setSelectedTypeId(null);
+      lastAppliedTypeIdRef.current = null;
       return;
+    }
+    const productId = selectedProduct?.id ?? null;
+    if (lastProductIdRef.current !== productId) {
+      lastProductIdRef.current = productId;
+      lastAppliedTypeIdRef.current = null;
     }
     const valid = simplified?.types?.some((t: any) => t.id === selectedTypeId);
     if (!valid) {
       const nextId = defaultTypeId ?? simplified?.types?.[0]?.id ?? null;
+      if (nextId == null) return;
+      if (lastAppliedTypeIdRef.current === nextId) return;
+      lastAppliedTypeIdRef.current = nextId;
       setSelectedTypeId(nextId);
       applyProductTypeConfig(nextId);
     }
-  }, [hasProductTypes, simplified?.types, simplified?.typeConfigs, defaultTypeId, selectedTypeId, applyProductTypeConfig]);
+  }, [hasProductTypes, selectedProduct?.id, simplified?.types, simplified?.typeConfigs, defaultTypeId, selectedTypeId, applyProductTypeConfig]);
 
   // Для продуктов без типов: начальные операции из schema.operations (is_required или is_default)
   useEffect(() => {
@@ -562,37 +574,43 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     }
   }, [isOpen]);
 
-  // 🆕 Устанавливаем дефолтные значения для всех селекторов (первый элемент)
+  // 🆕 Устанавливаем дефолтные значения для всех селекторов (первый элемент). Один вызов setSpecs и только при необходимости — иначе цикл перерисовок и смена типа материала.
   useEffect(() => {
-    if (!isOpen || editContext?.item) return; // Пропускаем при редактировании
-    
-    // Устанавливаем первый тип бумаги только если продукт использует материалы (есть поле paperType в схеме)
-    const productUsesPaper = backendProductSchema?.fields?.some((f: any) => f.name === 'paperType');
-    if (productUsesPaper && safeWarehousePaperTypes.length > 0 && !specs.paperType) {
-      const firstPaperType = safeWarehousePaperTypes[0];
-      setSpecs(prev => ({
-        ...prev,
-        paperType: firstPaperType.name as any,
-        paperDensity: getDefaultPaperDensity(firstPaperType.name)
-      }));
-    }
-    
-    // Устанавливаем первый формат, если не выбран
-    if (availableFormats.length > 0 && !specs.format) {
-      setSpecs(prev => ({
-        ...prev,
-        format: availableFormats[0]
-      }));
-    }
-    
-    // Устанавливаем дефолтные значения для других полей
-    setSpecs(prev => ({
-      ...prev,
-      sides: prev.sides || 1,
-      lamination: prev.lamination || 'none',
-      priceType: 'standard', // По умолчанию стандарт (×1)
-      customerType: 'regular', // Всегда используем обычный тип клиента по умолчанию
-    }));
+    if (!isOpen || editContext?.item) return;
+    setSpecs(prev => {
+      let changed = false;
+      let next = { ...prev };
+      const productUsesPaper = backendProductSchema?.fields?.some((f: any) => f.name === 'paperType');
+      if (productUsesPaper && safeWarehousePaperTypes.length > 0 && !prev.paperType) {
+        const firstPaperType = safeWarehousePaperTypes[0];
+        next = {
+          ...next,
+          paperType: firstPaperType.name as any,
+          paperDensity: getDefaultPaperDensity(firstPaperType.name),
+        };
+        changed = true;
+      }
+      if (availableFormats.length > 0 && !prev.format) {
+        next = { ...next, format: availableFormats[0] };
+        changed = true;
+      }
+      const needDefaults =
+        !next.sides || next.sides !== 1 ||
+        next.lamination !== 'none' ||
+        next.priceType !== 'standard' ||
+        next.customerType !== 'regular';
+      if (needDefaults) {
+        next = {
+          ...next,
+          sides: next.sides || 1,
+          lamination: next.lamination || 'none',
+          priceType: 'standard',
+          customerType: 'regular',
+        };
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
   }, [isOpen, safeWarehousePaperTypes, specs.paperType, specs.format, availableFormats, getDefaultPaperDensity, editContext, backendProductSchema]);
 
   // Устанавливаем materialType только для обычных продуктов (из paperType).
