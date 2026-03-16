@@ -1362,8 +1362,9 @@ export class PDFReportService {
   }
 
   /**
-   * Разворачивает позицию в отдельные строки для чека: 1) Печать на X бумаге — кол-во листов (шт.), 2) операции по строкам (с учётом стоимости), 3) резка — только если ещё не в services.
-   * totalCost в строке — доля стоимости позиции (из params.services), чтобы в чеке отразить всё, что влияет на цену.
+   * Разворачивает позицию в отдельные строки для чека только из данных заказа:
+   * 1) Печать (листы) из params.sheetsNeeded / layout; 2) операции из params.services (печать, резка, ламинация и т.д.).
+   * Строки и суммы берутся только из item.params — без подстановок из раскладки.
    */
   private static getOrderItemProductionRows(it: any): Array<{ name: string; quantity: number; unit: string; totalCost?: number }> {
     const rows: Array<{ name: string; quantity: number; unit: string; totalCost?: number }> = [];
@@ -1372,16 +1373,10 @@ export class PDFReportService {
       const specs = params.specifications || {};
       const layout = params.layout || specs.layout || {};
       const sheetsNeeded = Number(params.sheetsNeeded ?? specs.sheetsNeeded ?? layout.sheetsNeeded) || 0;
-      const cutsPerSheet = Number(layout.cutsPerSheet) || 0;
       const paperPhrase = this.getOrderItemPaperPhrase(it);
       const productName = (it.name || params.productName || params.name || it.type || 'Услуга').toString().trim();
 
       const rawServices = params.services || [];
-      const hasCuttingInServices = Array.isArray(rawServices) && rawServices.some((s: any) => {
-        const type = String(s.operationType || s.operation_type || '').toLowerCase();
-        const name = String(s.operationName || s.service || s.name || '').toLowerCase();
-        return type === 'cut' || /резк/.test(name);
-      });
 
       if (sheetsNeeded > 0) {
         rows.push({ name: paperPhrase || 'Печать (листы)', quantity: sheetsNeeded, unit: 'шт.' });
@@ -1397,10 +1392,6 @@ export class PDFReportService {
           const totalCost = typeof s.totalCost === 'number' ? s.totalCost : (typeof s.total === 'number' ? s.total : undefined);
           rows.push({ name, quantity: q, unit, ...(typeof totalCost === 'number' && totalCost >= 0 ? { totalCost } : {}) });
         }
-      }
-      if (cutsPerSheet > 0 && !hasCuttingInServices) {
-        const cutWord = cutsPerSheet === 1 ? 'Резка' : cutsPerSheet < 5 ? 'Резки' : 'Резок';
-        rows.push({ name: cutWord, quantity: cutsPerSheet, unit: 'шт.' });
       }
       if (rows.length > 0) return rows;
       const qty = Number(it.quantity) || 1;

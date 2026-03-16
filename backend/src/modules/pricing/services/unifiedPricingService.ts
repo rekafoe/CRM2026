@@ -355,6 +355,7 @@ export class UnifiedPricingService {
         metersNeeded: result.layout.metersNeeded,
         wastePercentage: result.layout.wastePercentage,
         recommendedSheetSize: result.layout.recommendedSheetSize,
+        cutsPerSheet: (result.layout as any).cutsPerSheet,
       } : {},
       sheetsNeeded: result.layout?.sheetsNeeded,
       metersNeeded: result.layout?.metersNeeded,

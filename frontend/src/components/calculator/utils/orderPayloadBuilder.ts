@@ -104,15 +104,16 @@ export function buildOrderPayload({
       }))
     : [];
 
+  // Операции (печать, резка, ламинация и т.д.) — только из ответа расчёта. В заказ сохраняем как есть; чек и отчёты читают из item.params.services.
   const cleanServices = result.services
     ? result.services.map((s: any) => ({
         operationId: s.operationId,
-        operationName: s.operationName,
+        operationName: s.operationName ?? s.service,
         operationType: s.operationType,
-        priceUnit: s.priceUnit,
-        unitPrice: s.unitPrice,
+        priceUnit: s.priceUnit ?? s.unit,
+        unitPrice: s.unitPrice ?? s.price,
         quantity: s.quantity,
-        totalCost: s.totalCost,
+        totalCost: s.totalCost ?? s.total,
       }))
     : [];
 

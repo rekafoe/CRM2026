@@ -1064,6 +1064,7 @@ export class SimplifiedPricingService {
       ...(isRollPrint && { metersNeeded }),
       wastePercentage: layoutCheck.wastePercentage,
       recommendedSheetSize: layoutCheck.recommendedSheetSize,
+      cutsPerSheet: layoutCheck.cutsPerSheet ?? 0,
     };
     const warnings: string[] = [];
     if (!isRollPrint && !layoutCheck.fitsOnSheet) {

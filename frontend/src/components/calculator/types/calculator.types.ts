@@ -76,8 +76,13 @@ export interface CalculationResult {
     price: number;
     total: number;
     operationId?: number;
+    operationName?: string;
+    operationType?: string;
+    priceUnit?: string;
     quantity?: number;
     unit?: string;
+    unitPrice?: number;
+    totalCost?: number;
   }>;
   totalCost: number;
   pricePerItem: number;
@@ -91,6 +96,7 @@ export interface CalculationResult {
     sheetSize?: string;
     wastePercentage?: number;
     fitsOnSheet?: boolean;
+    cutsPerSheet?: number;
   };
   /** Предупреждения от бэкенда (например: формат не помещается на печатный лист) */
   warnings?: string[];

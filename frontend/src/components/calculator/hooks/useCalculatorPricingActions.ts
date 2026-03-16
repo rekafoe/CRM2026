@@ -312,6 +312,10 @@ export function useCalculatorPricingActions({
           ...(specs.size_id ? { size_id: specs.size_id } : {}),
           ...(specs.material_id ? { material_id: specs.material_id } : {}),
           ...(specs.base_material_id ? { base_material_id: specs.base_material_id } : {}),
+          // 🆕 Резка: явно передаём в заказ для simplified (бэкенд учтёт в цене и вернёт в operations)
+          ...(specs.cutting === true || (backendProductSchema?.template?.simplified as any)?.cutting === true
+            ? { cutting: true }
+            : {}),
           // 🆕 Передаем выбранные операции (для обратной совместимости и отладки)
           ...(specs.selectedOperations && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0
             ? { selectedOperations: specs.selectedOperations }
@@ -603,8 +607,9 @@ export function useCalculatorPricingActions({
 
         const wastePercentage = layoutData.wastePercentage ?? layoutData.waste_percentage;
         const fitsOnSheet = layoutData.fitsOnSheet;
+        const cutsPerSheet = layoutData.cutsPerSheet ?? layoutData.cuts_per_sheet;
         const layoutSummary =
-          itemsPerSheet || sheetsNeeded || sheetSizeLabel || wastePercentage || fitsOnSheet === false
+          itemsPerSheet || sheetsNeeded || sheetSizeLabel || wastePercentage || fitsOnSheet === false || (Number(cutsPerSheet) > 0)
             ? {
                 itemsPerSheet,
                 sheetsNeeded,
@@ -612,6 +617,7 @@ export function useCalculatorPricingActions({
                 wastePercentage:
                   wastePercentage != null ? Math.round(Number(wastePercentage) * 100) / 100 : undefined,
                 fitsOnSheet: fitsOnSheet === undefined ? undefined : !!fitsOnSheet,
+                ...(Number(cutsPerSheet) > 0 ? { cutsPerSheet: Number(cutsPerSheet) } : {}),
               }
             : undefined;
 
@@ -818,13 +824,19 @@ export function useCalculatorPricingActions({
           }))
         });
 
+        // Все операции из ответа расчёта — с полными полями для сохранения в заказ (params.services)
         const normalizedServices = services.map((s: any) => ({
           operationId: s.operationId ?? s.operation_id ?? s.id,
-          service: s.operationName || s.name,
+          operationName: s.operationName ?? s.operation_name ?? s.name,
+          operationType: s.operationType ?? s.operation_type,
+          priceUnit: s.priceUnit ?? s.price_unit ?? s.unit,
+          service: s.operationName ?? s.operation_name ?? s.name,
           quantity: s.quantity,
-          unit: s.priceUnit || s.unit,
-          price: s.unitPrice || s.price,
-          total: s.totalCost || s.total,
+          unit: s.priceUnit ?? s.price_unit ?? s.unit,
+          price: s.unitPrice ?? s.unit_price ?? s.price,
+          unitPrice: s.unitPrice ?? s.unit_price ?? s.price,
+          total: s.totalCost ?? s.total,
+          totalCost: s.totalCost ?? s.total,
         }));
 
         // 🆕 Синхронизируем quantity операций per_sheet (ламинация и т.д.) с бэкендом
