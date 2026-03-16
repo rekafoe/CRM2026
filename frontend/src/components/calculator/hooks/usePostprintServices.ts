@@ -316,8 +316,13 @@ export function usePostprintServices({
 
   const handleAddPostprintProduct = useCallback(async () => {
     if (!isPostprintValid) return;
+    const serviceNames = selectedPostprintOperations.map((op) => op.name).filter(Boolean);
+    const concreteName = serviceNames.length > 0 ? serviceNames.join(', ') : 'Послепечатные услуги';
+
     const paramsPayload = {
       postprintProduct: true,
+      productName: concreteName,
+      name: concreteName,
       postprintOperations: selectedPostprintOperations.map((operation) => ({
         key: operation.key,
         serviceId: operation.serviceId,
@@ -332,7 +337,8 @@ export function usePostprintServices({
     };
 
     const apiItem = {
-      type: 'Послепечатные услуги',
+      type: 'postprint',
+      name: concreteName,
       params: paramsPayload,
       price: postprintTotal,
       quantity: 1,

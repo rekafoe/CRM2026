@@ -1320,7 +1320,76 @@ export class PDFReportService {
   }
 
   /**
-   * Краткое название позиции для товарного чека: название продукта, стороны печати, материал и плотность в одном блоке (напр. "Визитки. 2-стор., офисная 80 г").
+   * Фраза о расходуемой бумаге: "Печать на (тип) бумаге (плотность) (односторонняя/двухсторонняя)".
+   */
+  private static getOrderItemPaperPhrase(it: any): string {
+    try {
+      const params = typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
+      const specs = params.specifications || {};
+      const ps: Array<{ label?: string; key?: string; value?: string }> = Array.isArray(params.parameterSummary) ? params.parameterSummary : [];
+      let paperType = specs.paperType ? String(specs.paperType).trim() : '';
+      let density = specs.paperDensity != null ? String(specs.paperDensity).replace(/\s*г\/м².*/i, '').trim() : '';
+      if (!paperType && ps.length) {
+        const ptEntry = ps.find((x: any) => /тип\s*бумаги|paperType|бумага|материал/i.test(String(x.label || x.key || '')));
+        if (ptEntry?.value) paperType = String(ptEntry.value).trim();
+      }
+      if (!density && ps.length) {
+        const denEntry = ps.find((x: any) => /плотность|density|г\/м/i.test(String(x.label || x.key || '')));
+        if (denEntry?.value) density = String(denEntry.value).replace(/\s*г\/м².*/i, '').trim();
+      }
+      const sides = specs.sides ?? (typeof specs.sides === 'number' ? specs.sides : undefined);
+      let sidesStr = '';
+      if (sides === 1) sidesStr = 'односторонняя';
+      else if (sides === 2) sidesStr = 'двухсторонняя';
+      if (!sidesStr && ps.length) {
+        const sidesEntry = ps.find((x: any) => /сторон|печать|sides/i.test(String(x.label || x.key || '')));
+        if (sidesEntry?.value) sidesStr = /двух|2/i.test(String(sidesEntry.value)) ? 'двухсторонняя' : 'односторонняя';
+      }
+      if (!paperType && !density && !sidesStr) return '';
+      const typePart = paperType ? ` на ${paperType.toLowerCase()} бумаге` : (density && /\d/.test(density) ? ' на бумаге' : '');
+      const densityPart = density && /\d/.test(density) ? ` ${density}${/г\s*$/i.test(density) ? '' : ' г'}/м²` : '';
+      const sidesPart = sidesStr ? ` ${sidesStr}` : '';
+      return `Печать${typePart}${densityPart}${sidesPart}`.trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /**
+   * Подробное наименование позиции: тираж, листы печати, резки + при наличии — фраза о бумаге.
+   * Пример: "96 Визитки: 4 листа печати, 13 резок. Печать на мелованной бумаге 300 г/м² двухсторонняя."
+   */
+  private static getOrderItemProductionDescription(it: any, productName: string): string | null {
+    try {
+      const params = typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
+      const specs = params.specifications || {};
+      const layout = params.layout || specs.layout || {};
+      const sheetsNeeded = Number(params.sheetsNeeded ?? specs.sheetsNeeded ?? layout.sheetsNeeded) || 0;
+      const cutsPerSheet = Number(layout.cutsPerSheet) || 0;
+      const hasSheets = sheetsNeeded > 0;
+      const hasCuts = cutsPerSheet > 0;
+      if (!hasSheets && !hasCuts) return null;
+      const qty = Number(it.quantity) || 1;
+      const parts: string[] = [];
+      if (hasSheets) {
+        const sheetWord = sheetsNeeded === 1 ? 'лист' : sheetsNeeded < 5 ? 'листа' : 'листов';
+        parts.push(`${sheetsNeeded} ${sheetWord} печати`);
+      }
+      if (hasCuts) {
+        const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
+        parts.push(`${cutsPerSheet} ${cutWord}`);
+      }
+      let main = `${qty} ${productName}: ${parts.join(', ')}`;
+      const paperPhrase = this.getOrderItemPaperPhrase(it);
+      if (paperPhrase) main += `. ${paperPhrase}`;
+      return main;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /**
+   * Краткое название позиции для товарного чека: при наличии раскладки — подробно (тираж, листы, резки), иначе название продукта + стороны + материал.
    */
   private static getCommodityReceiptItemName(it: any): string {
     let productName = (it.type || 'Товар').trim();
@@ -1330,8 +1399,14 @@ export class PDFReportService {
       const params = typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
       if (params.productName) productName = String(params.productName).trim();
 
+      const productionDesc = this.getOrderItemProductionDescription(it, productName);
+      if (productionDesc) return productionDesc;
+
       const specs = params.specifications || {};
       const ps: Array<{ label?: string; key?: string; value?: string }> = Array.isArray(params.parameterSummary) ? params.parameterSummary : [];
+
+      const paperPhrase = this.getOrderItemPaperPhrase(it);
+      if (paperPhrase) return `${productName}. ${paperPhrase}`;
 
       const sides = specs.sides ?? (typeof specs.sides === 'number' ? specs.sides : undefined);
       if (sides === 1) sidesStr = '1-стор.';
@@ -1685,28 +1760,9 @@ export class PDFReportService {
 
       const discountPercent = Number(order.discount_percent) || 0;
 
-      // Формируем список товаров с упрощенными названиями и ценами со скидкой
+      // Формируем список товаров: при наличии раскладки — подробно (тираж, листы, резки), иначе краткое название
       const receiptItems = (Array.isArray(items) ? items : []).map((item, index) => {
-        let params: any = {};
-        try {
-          if (item.params) {
-            params = typeof item.params === 'string' ? JSON.parse(item.params) : (item.params || {});
-          }
-        } catch (e) {
-          params = {};
-        }
-        
-        // Упрощенное название товара (как в примере)
-        let itemName = item.type || 'Товар';
-        
-        // Если есть productName в params, используем его
-        if (params.productName) {
-          itemName = params.productName;
-        } else if (params.description) {
-          // Берем только основную часть описания
-          itemName = params.description.split('.')[0] || itemName;
-        }
-        
+        const itemName = this.getCommodityReceiptItemName(item);
         const qty = Number(item.quantity) || 1;
         const rawPrice = Number(item.price) || 0;
         const amount = Math.round(rawPrice * qty * (1 - discountPercent / 100) * 100) / 100;

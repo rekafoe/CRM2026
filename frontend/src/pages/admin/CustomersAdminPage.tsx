@@ -47,6 +47,85 @@ const formatDateValue = (value?: string) => {
 
 const formatDateForFile = (date: Date) => date.toISOString().slice(0, 10).replace(/-/g, '');
 
+/**
+ * Фраза о расходуемой бумаге для документов: "Печать на (тип) бумаге (плотность) (односторонняя/двухсторонняя)".
+ * Возвращает пустую строку, если данных нет.
+ */
+const getOrderItemPaperPhrase = (item: any): string => {
+  const params = item.params || {};
+  const specs = params.specifications || {};
+  const ps: Array<{ label?: string; key?: string; value?: string }> = Array.isArray(params.parameterSummary) ? params.parameterSummary : [];
+  let paperType = specs.paperType ? String(specs.paperType).trim() : '';
+  let density = specs.paperDensity != null ? String(specs.paperDensity).replace(/\s*г\/м².*/i, '').trim() : '';
+  if (!paperType && ps.length) {
+    const ptEntry = ps.find((x: any) => /тип\s*бумаги|paperType|бумага|материал/i.test(String(x.label || x.key || '')));
+    if (ptEntry?.value) paperType = String(ptEntry.value).trim();
+  }
+  if (!density && ps.length) {
+    const denEntry = ps.find((x: any) => /плотность|density|г\/м/i.test(String(x.label || x.key || '')));
+    if (denEntry?.value) density = String(denEntry.value).replace(/\s*г\/м².*/i, '').trim();
+  }
+  const sides = specs.sides ?? (typeof specs.sides === 'number' ? specs.sides : undefined);
+  let sidesStr = '';
+  if (sides === 1) sidesStr = 'односторонняя';
+  else if (sides === 2) sidesStr = 'двухсторонняя';
+  if (!sidesStr && ps.length) {
+    const sidesEntry = ps.find((x: any) => /сторон|печать|sides/i.test(String(x.label || x.key || '')));
+    if (sidesEntry?.value) {
+      const v = String(sidesEntry.value);
+      sidesStr = /двух|2/i.test(v) ? 'двухсторонняя' : 'односторонняя';
+    }
+  }
+  if (!paperType && !density && !sidesStr) return '';
+  const typePart = paperType ? ` на ${paperType.toLowerCase()} бумаге` : (density && /\d/.test(density) ? ' на бумаге' : '');
+  const densityPart = density && /\d/.test(density) ? ` ${density}${/г\s*$/i.test(density) ? '' : ' г'}/м²` : '';
+  const sidesPart = sidesStr ? ` ${sidesStr}` : '';
+  return `Печать${typePart}${densityPart}${sidesPart}`.trim();
+};
+
+/**
+ * Подробное наименование позиции для акта/счёта: тираж, листы печати, резки + расходуемая бумага.
+ * Пример: "96 Визитки: 4 листа печати, 13 резок. Печать на мелованной бумаге 300 г/м² двухсторонняя."
+ * Работает для любого продукта: при отсутствии раскладки — только название и при наличии — бумага.
+ */
+const getOrderItemProductionName = (item: any): string => {
+  const productName =
+    item.params?.productName ||
+    item.params?.name ||
+    item.type ||
+    item.params?.description ||
+    'Услуга';
+  const qty = Number(item.quantity) || 1;
+  const params = item.params || {};
+  const specs = params.specifications || {};
+  const layout = params.layout || specs.layout || {};
+  const sheetsNeeded = Number(params.sheetsNeeded ?? specs.sheetsNeeded ?? layout.sheetsNeeded) || 0;
+  const cutsPerSheet = Number(layout.cutsPerSheet) || 0;
+  const hasSheets = sheetsNeeded > 0;
+  const hasCuts = cutsPerSheet > 0;
+
+  const paperPhrase = getOrderItemPaperPhrase(item);
+
+  let main = productName;
+  if (hasSheets || hasCuts) {
+    const parts: string[] = [];
+    if (hasSheets) {
+      const sheetWord = sheetsNeeded === 1 ? 'лист' : sheetsNeeded < 5 ? 'листа' : 'листов';
+      parts.push(`${sheetsNeeded} ${sheetWord} печати`);
+    }
+    if (hasCuts) {
+      const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
+      parts.push(`${cutsPerSheet} ${cutWord}`);
+    }
+    main = `${qty} ${productName}: ${parts.join(', ')}`;
+  } else if (qty > 1) {
+    main = `${qty} ${productName}`;
+  }
+
+  if (paperPhrase) return `${main}. ${paperPhrase}`;
+  return main;
+};
+
 interface CustomersAdminPageProps {
   /** Куда вести кнопка «Назад»: по умолчанию /adminpanel, на странице /clients — / */
   backTo?: string;
@@ -339,35 +418,21 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
       
       console.log(`[Frontend] Всего найдено позиций: ${totalItemsFound} из ${filteredOrders.length} заказов`);
       
-      // Функция для формирования краткого названия товара для акта
+      // Функция для формирования краткого названия (если нет листов/резок)
       const buildSimplifiedItemName = (item: any): string => {
-        // Проверяем, является ли это произвольным продуктом
         const isCustomProduct = item.params?.customProduct === true;
-        
         if (isCustomProduct) {
-          // Для произвольных продуктов просто возвращаем название
-          return item.type || 
-                 item.params?.customName || 
-                 item.params?.productName || 
-                 item.params?.description || 
-                 'Произвольный продукт';
+          return item.type || item.params?.customName || item.params?.productName || item.params?.description || 'Произвольный продукт';
         }
-        
-        // Для готовых продуктов возвращаем только название услуги/продукта
-        // Без всех характеристик (материал, формат печати и т.д.)
-        return item.type || 
-               item.params?.productName || 
-               item.params?.name ||
-               item.params?.description ||
-               'Услуга';
+        return item.type || item.params?.productName || item.params?.name || item.params?.description || 'Услуга';
       };
       
       for (const order of filteredOrders) {
         const orderItems = (order as any).items || [];
         const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
-          // Формируем упрощенное наименование
-          const itemName = buildSimplifiedItemName(item);
+          // Подробное наименование для акта: тираж, листы печати, резки
+          const itemName = getOrderItemProductionName(item);
           
           // Определяем единицу измерения
           let unit = 'шт';
@@ -539,13 +604,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
                  'Произвольный продукт';
         }
         
-        // Для готовых продуктов возвращаем только название услуги/продукта
-        // Без всех характеристик (материал, формат печати и т.д.)
-        return item.type || 
-               item.params?.productName || 
-               item.params?.name ||
-               item.params?.description ||
-               'Услуга';
+        return item.type || item.params?.productName || item.params?.name || item.params?.description || 'Услуга';
       };
       
       let itemNumber = 1;
@@ -553,8 +612,8 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
         const orderItems = (order as any).items || [];
         const discountPct = Number((order as any).discount_percent) || 0;
         for (const item of orderItems) {
-          // Используем упрощенное название
-          const itemName = buildSimplifiedItemName(item);
+          // Подробное наименование для счёта: тираж, листы печати, резки
+          const itemName = getOrderItemProductionName(item);
           
           let unit = 'шт';
           if (item.params?.unit) {
