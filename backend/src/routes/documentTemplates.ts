@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { DocumentTemplateService, TemplateData } from '../services/documentTemplateService';
-import { PdfReportService } from '../services/pdfReportService';
+import { PDFReportService } from '../services/pdfReportService';
 import { OrderRepository } from '../repositories/orderRepository';
 import { CustomerService } from '../modules/customers/services/customerService';
 import { getDb } from '../config/database';
@@ -318,14 +318,16 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
       return;
     }
 
+    type OrderRow = { id: number; number: string; created_at: string; status: number; customer_id: number; discount_percent: number };
     const db = await getDb();
     const placeholders = orderIds.map(() => '?').join(',');
-    const orderRows = await db.all<{ id: number; number: string; created_at: string; status: number; customer_id: number; discount_percent: number }>(
+    const rawOrderRows = await db.all<OrderRow>(
       `SELECT id, number, created_at, status, customer_id, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id IN (${placeholders})`,
       ...orderIds
     );
-    const orderMap = new Map(orderRows.map((r) => [r.id, r]));
-    const orders = orderIds.map((id) => orderMap.get(id)).filter(Boolean) as typeof orderRows;
+    const orderRows: OrderRow[] = Array.isArray(rawOrderRows) ? rawOrderRows : [];
+    const orderMap = new Map<number, OrderRow>(orderRows.map((r) => [r.id, r]));
+    const orders: OrderRow[] = orderIds.map((id) => orderMap.get(id)).filter((o): o is OrderRow => Boolean(o));
     if (orders.length === 0) {
       res.status(404).json({ message: 'Заказы не найдены' });
       return;
@@ -348,7 +350,7 @@ router.post('/generate/:type/from-orders', asyncHandler(async (req: Request, res
     }
 
     const getDiscountPercent = (orderId: number) => orderMap.get(orderId)?.discount_percent ?? 0;
-    const { orderItems, totalAmount, totalQuantity } = PdfReportService.buildDocumentRowsFromItems(flatItems, getDiscountPercent);
+    const { orderItems, totalAmount, totalQuantity } = PDFReportService.buildDocumentRowsFromItems(flatItems, getDiscountPercent);
 
     const orderAmounts = new Map<number, number>();
     for (const o of orders) {
