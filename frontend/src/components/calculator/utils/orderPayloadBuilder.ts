@@ -155,7 +155,8 @@ export function buildOrderPayload({
   const clicks = (computedSheets ?? 0) * ((result.specifications.sides ?? 1) * 2);
 
   const apiItem = {
-    type: fallbackName,
+    type: 'print',
+    name: fallbackName,
     params: paramsPayload,
     price: result.pricePerItem,
     quantity: result.specifications.quantity,

@@ -202,7 +202,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     : Math.round(computedTotal * 100) / 100;
   
   // Получаем название товара
-  const name = (item as any).name || 'Товар без названия';
+  const name = (item as any).name || (item as any).params?.productName || (item as any).params?.name || (item as any).type || 'Товар без названия';
   const parameterSummary = Array.isArray(item.params.parameterSummary) ? item.params.parameterSummary : [];
   const sheetCountRaw = item.sheets ?? item.params.sheetsNeeded ?? item.params.layout?.sheetsNeeded ?? null;
   const sheetCount = sheetCountRaw != null && sheetCountRaw > 0 ? sheetCountRaw : null;
@@ -264,13 +264,13 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     <div className="item" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <div style={{ flex: 1 }}>
         {(() => {
-          // В заголовке показываем только кастомное / сохранённое описание,
-          // без автогенерации из parameterSummary (иначе дублируется с чипами ниже).
-          const display = sanitizeOrderItemDescription(String(customDescription || ''), item.type);
-          const showDesc = Boolean(display);
+          // Заголовок — по имени (дизайн, ламинация, визитки и т.д.), не по типу
+          const itemName = (item as any).name || (item as any).params?.productName || (item as any).params?.name || (item as any).type || 'Позиция';
+          const display = sanitizeOrderItemDescription(String(customDescription || ''), (item as any).type);
+          const showDesc = Boolean(display) && display !== 'Без описания';
           return (
             <>
-              <strong>{item.type}</strong>
+              <strong>{itemName}</strong>
               {showDesc ? <> — {display}</> : null}
             </>
           );

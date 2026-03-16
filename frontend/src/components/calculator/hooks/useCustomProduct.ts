@@ -112,7 +112,8 @@ export function useCustomProduct({
     };
 
     const apiItem = {
-      type: name || 'Произвольный продукт',
+      type: 'custom',
+      name: name || 'Произвольный продукт',
       params: paramsPayload,
       price: customPrice,
       quantity: customQuantity,

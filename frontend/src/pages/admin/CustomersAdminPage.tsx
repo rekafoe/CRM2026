@@ -89,11 +89,13 @@ const getOrderItemPaperPhrase = (item: any): string => {
  * Работает для любого продукта: при отсутствии раскладки — только название и при наличии — бумага.
  */
 const getOrderItemProductionName = (item: any): string => {
+  // Всегда по имени (дизайн, ламинация, визитки и т.д.), тип — только запасной вариант
   const productName =
+    item.name ||
     item.params?.productName ||
     item.params?.name ||
-    item.type ||
     item.params?.description ||
+    item.type ||
     'Услуга';
   const qty = Number(item.quantity) || 1;
   const params = item.params || {};
@@ -422,9 +424,9 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
       const buildSimplifiedItemName = (item: any): string => {
         const isCustomProduct = item.params?.customProduct === true;
         if (isCustomProduct) {
-          return item.type || item.params?.customName || item.params?.productName || item.params?.description || 'Произвольный продукт';
+          return item.name || item.params?.customName || item.params?.productName || item.params?.description || item.type || 'Произвольный продукт';
         }
-        return item.type || item.params?.productName || item.params?.name || item.params?.description || 'Услуга';
+        return item.name || item.params?.productName || item.params?.name || item.params?.description || item.type || 'Услуга';
       };
       
       for (const order of filteredOrders) {
@@ -592,19 +594,11 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
       
       // Функция для формирования краткого названия товара для счёта
       const buildSimplifiedItemName = (item: any): string => {
-        // Проверяем, является ли это произвольным продуктом
         const isCustomProduct = item.params?.customProduct === true;
-        
         if (isCustomProduct) {
-          // Для произвольных продуктов просто возвращаем название
-          return item.type || 
-                 item.params?.customName || 
-                 item.params?.productName || 
-                 item.params?.description || 
-                 'Произвольный продукт';
+          return item.name || item.params?.customName || item.params?.productName || item.params?.description || item.type || 'Произвольный продукт';
         }
-        
-        return item.type || item.params?.productName || item.params?.name || item.params?.description || 'Услуга';
+        return item.name || item.params?.productName || item.params?.name || item.params?.description || item.type || 'Услуга';
       };
       
       let itemNumber = 1;

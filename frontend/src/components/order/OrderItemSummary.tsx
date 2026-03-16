@@ -50,7 +50,7 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
   return (
     <div className="order-item-horizontal">
       {/* Название товара */}
-      <span className="item-name">{item.type}</span>
+      <span className="item-name">{item.name || item.params?.productName || item.params?.name || item.type || 'Позиция'}</span>
 
       {/* Разделитель */}
       <span className="separator">|</span>
