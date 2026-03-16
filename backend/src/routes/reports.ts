@@ -59,6 +59,8 @@ function getAnalyticsDateRange(query: Record<string, unknown>): {
 } {
   const dateFrom = query.date_from ? String(query.date_from).trim().slice(0, 10) : null
   const dateTo = query.date_to ? String(query.date_to).trim().slice(0, 10) : null
+  const createdExpr = (alias: string) =>
+    alias ? `COALESCE(${alias}.createdAt, ${alias}.created_at)` : 'COALESCE(createdAt, created_at)'
   if (dateFrom && dateTo) {
     const startDate = new Date(dateFrom + 'T00:00:00.000Z')
     const endDate = new Date(dateTo + 'T23:59:59.999Z')
@@ -67,7 +69,7 @@ function getAnalyticsDateRange(query: Record<string, unknown>): {
       endDate,
       dateParams: [startDate.toISOString(), endDate.toISOString()],
       dateFilter: (alias: string) => {
-        const p = alias ? `${alias}.createdAt` : 'createdAt'
+        const p = createdExpr(alias)
         return `${p} >= ? AND ${p} <= ?`
       }
     }
@@ -80,7 +82,7 @@ function getAnalyticsDateRange(query: Record<string, unknown>): {
     endDate: null,
     dateParams: [startDate.toISOString()],
     dateFilter: (alias: string) => {
-      const p = alias ? `${alias}.createdAt` : 'createdAt'
+      const p = createdExpr(alias)
       return `${p} >= ?`
     }
   }
@@ -92,7 +94,7 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
   if (!d) { res.status(400).json({ message: 'date required' }); return }
   const db = await getDb()
   const ordersCount = await db.get<any>(
-    `SELECT COUNT(1) as c FROM orders WHERE substr(createdAt,1,10) = ?`, d
+    `SELECT COUNT(1) as c FROM orders WHERE substr(COALESCE(createdAt, created_at),1,10) = ?`, d
   )
   const sums = await db.get<any>(
     `SELECT 
@@ -103,7 +105,7 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
         COALESCE(SUM(i.waste), 0) as total_waste
      FROM items i
      JOIN orders o ON o.id = i.orderId
-    WHERE substr(o.createdAt,1,10) = ?`, d
+    WHERE substr(COALESCE(o.createdAt, o.created_at),1,10) = ?`, d
   )
   const prepay = await db.get<any>(
     `SELECT 
@@ -115,7 +117,7 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
         COALESCE(SUM(CASE WHEN paymentMethod = 'offline' AND prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END),0) as offline_paid_amount,
         COALESCE(SUM(CASE WHEN paymentMethod = 'online' THEN 1 ELSE 0 END),0) as online_count,
         COALESCE(SUM(CASE WHEN paymentMethod = 'offline' THEN 1 ELSE 0 END),0) as offline_count
-       FROM orders WHERE substr(createdAt,1,10) = ?`, d
+       FROM orders WHERE substr(COALESCE(createdAt, created_at),1,10) = ?`, d
   )
   const materials = await db.all<any>(
     `SELECT m.id as materialId, m.name as material_name,
@@ -335,7 +337,7 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
 
   const productPopularity = await db.all<any>(
     `SELECT i.type as product_type, COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity,
-      SUM(i.price * i.quantity) as total_revenue, AVG(i.price) as avg_price, MAX(o.createdAt) as last_order_date
+      SUM(i.price * i.quantity) as total_revenue, AVG(i.price) as avg_price, MAX(COALESCE(o.createdAt, o.created_at)) as last_order_date
      FROM items i JOIN orders o ON o.id = i.orderId
      WHERE ${dateFilter('o')}
      GROUP BY i.type ORDER BY total_revenue DESC LIMIT ?`,
@@ -355,10 +357,10 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
   )
 
   const productTrends = await db.all<any>(
-    `SELECT DATE(o.createdAt) as date, i.type as product_type, COUNT(DISTINCT o.id) as daily_orders,
+    `SELECT DATE(COALESCE(o.createdAt, o.created_at)) as date, i.type as product_type, COUNT(DISTINCT o.id) as daily_orders,
       SUM(i.price * i.quantity) as daily_revenue
      FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')}
-     GROUP BY DATE(o.createdAt), i.type ORDER BY date DESC, daily_revenue DESC`,
+     GROUP BY DATE(COALESCE(o.createdAt, o.created_at)), i.type ORDER BY date DESC, daily_revenue DESC`,
     dateParams
   )
 
@@ -506,16 +508,16 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
   `, dateParams)
 
   const statusConversion = await db.all<any>(`
-    SELECT DATE(createdAt) as date, COUNT(CASE WHEN status >= 1 THEN 1 END) as confirmed_orders,
+    SELECT DATE(COALESCE(createdAt, created_at)) as date, COUNT(CASE WHEN status >= 1 THEN 1 END) as confirmed_orders,
       COUNT(CASE WHEN status >= 2 THEN 1 END) as in_progress_orders, COUNT(CASE WHEN status >= 3 THEN 1 END) as ready_orders,
       COUNT(CASE WHEN status >= 7 THEN 1 END) as completed_orders, COUNT(*) as total_created
     FROM orders WHERE ${dateFilter('')}
-    GROUP BY DATE(createdAt) ORDER BY date DESC
+    GROUP BY DATE(COALESCE(createdAt, created_at)) ORDER BY date DESC
   `, dateParams)
 
   const avgProcessingTime = await db.all<any>(`
-    SELECT AVG(JULIANDAY(updatedAt) - JULIANDAY(createdAt)) * 24 as avg_hours_to_complete, COUNT(*) as completed_orders
-    FROM orders WHERE status = 7 AND ${dateFilter('')} AND updatedAt > createdAt
+    SELECT AVG(JULIANDAY(COALESCE(updatedAt, updated_at)) - JULIANDAY(COALESCE(createdAt, created_at))) * 24 as avg_hours_to_complete, COUNT(*) as completed_orders
+    FROM orders WHERE status = 7 AND ${dateFilter('')} AND COALESCE(updatedAt, updated_at) > COALESCE(createdAt, created_at)
   `, dateParams)
 
   const cancellationReasons = await db.all<any>(`
