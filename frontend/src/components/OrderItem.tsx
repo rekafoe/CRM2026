@@ -282,7 +282,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
             const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
             parts.push(`${cutsPerSheet} ${cutWord}`);
           }
-          const rawServices = params.services;
+          const rawServices = params.services as Array<{ operationName?: string; service?: string; name?: string; quantity?: number; priceUnit?: string; unit?: string }> | undefined;
           if (Array.isArray(rawServices)) {
             for (const s of rawServices) {
               const name = s.operationName || s.service || s.name || 'Операция';
