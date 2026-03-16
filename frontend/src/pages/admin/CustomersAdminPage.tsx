@@ -8,6 +8,7 @@ import {
   getOrders, 
   updateCustomer,
   generateDocumentByType,
+  generateDocumentByTypeFromOrders,
   getDocumentTemplatesByType
 } from '../../api';
 import { Customer, Order, TemplateData } from '../../types';
@@ -157,7 +158,9 @@ const getOrderItemProductionName = (item: any): string => {
  * 3) Резка — отдельная строка, кол-во резок в шт.
  * Для позиций без раскладки/операций — одна строка с названием и quantity позиции.
  */
-const getOrderItemProductionRows = (item: any): Array<{ name: string; quantity: number; unit: string }> => {
+const getOrderItemProductionRows = (
+  item: any
+): Array<{ name: string; quantity: number; unit: string; totalCost?: number }> => {
   const productName =
     item.name ||
     item.params?.productName ||
@@ -172,12 +175,18 @@ const getOrderItemProductionRows = (item: any): Array<{ name: string; quantity: 
   const cutsPerSheet = Number(layout.cutsPerSheet) || 0;
   const paperPhrase = getOrderItemPaperPhrase(item);
 
-  const rows: Array<{ name: string; quantity: number; unit: string }> = [];
+  const rawServices = params.services || [];
+  const hasCuttingInServices = Array.isArray(rawServices) && rawServices.some((s: any) => {
+    const type = String(s.operationType || s.operation_type || '').toLowerCase();
+    const name = String(s.operationName || s.service || s.name || '').toLowerCase();
+    return type === 'cut' || /резк/.test(name);
+  });
+
+  const rows: Array<{ name: string; quantity: number; unit: string; totalCost?: number }> = [];
 
   if (sheetsNeeded > 0) {
     rows.push({ name: paperPhrase || 'Печать (листы)', quantity: sheetsNeeded, unit: 'шт.' });
   }
-  const rawServices = params.services;
   if (Array.isArray(rawServices) && rawServices.length > 0) {
     for (const s of rawServices) {
       const name = String(s.operationName || s.service || s.name || '').trim();
@@ -191,10 +200,11 @@ const getOrderItemProductionRows = (item: any): Array<{ name: string; quantity: 
       }
       const pu = String(s.priceUnit || s.unit || '').toLowerCase();
       const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
-      rows.push({ name, quantity: q, unit });
+      const totalCost = typeof s.totalCost === 'number' ? s.totalCost : (typeof s.total === 'number' ? s.total : undefined);
+      rows.push({ name, quantity: q, unit, ...(typeof totalCost === 'number' && totalCost >= 0 ? { totalCost } : {}) });
     }
   }
-  if (cutsPerSheet > 0) {
+  if (cutsPerSheet > 0 && !hasCuttingInServices) {
     const cutWord = cutsPerSheet === 1 ? 'резка' : cutsPerSheet < 5 ? 'резки' : 'резок';
     rows.push({ name: cutWord.charAt(0).toUpperCase() + cutWord.slice(1), quantity: cutsPerSheet, unit: 'шт.' });
   }
@@ -203,6 +213,38 @@ const getOrderItemProductionRows = (item: any): Array<{ name: string; quantity: 
   const qty = Number(item.quantity) || 1;
   return [{ name: productName, quantity: qty, unit: 'шт.' }];
 };
+
+/** Распределяет сумму позиции по строкам как в товарном чеке: по totalCost из services, остаток — первой строке. */
+function distributeItemSumToRows(
+  itemSum: number,
+  lines: Array<{ name: string; quantity: number; unit: string; totalCost?: number }>
+): number[] {
+  const withCost = lines.map((l) => (typeof l.totalCost === 'number' && l.totalCost >= 0 ? l.totalCost : 0));
+  const totalCostSum = withCost.reduce((a, b) => a + b, 0);
+  if (totalCostSum <= 0) {
+    const out: number[] = [itemSum];
+    for (let i = 1; i < lines.length; i++) out.push(0);
+    return out;
+  }
+  const scale = Math.min(1, itemSum / totalCostSum);
+  const out: number[] = [];
+  let remainder = itemSum;
+  for (let i = 0; i < lines.length; i++) {
+    const cost = withCost[i];
+    const rowSum = cost > 0 ? Math.round(cost * scale * 100) / 100 : 0;
+    remainder -= rowSum;
+    out.push(rowSum);
+  }
+  const firstNoCostIdx = lines.findIndex((l) => typeof l.totalCost !== 'number' || l.totalCost < 0);
+  if (firstNoCostIdx >= 0 && Math.abs(remainder) > 0.001) {
+    out[firstNoCostIdx] = Math.round((out[firstNoCostIdx] + remainder) * 100) / 100;
+  }
+  const diff = itemSum - out.reduce((a, b) => a + b, 0);
+  if (Math.abs(diff) > 0.001 && out.length > 0) {
+    out[0] = Math.round((out[0] + diff) * 100) / 100;
+  }
+  return out;
+}
 
 interface CustomersAdminPageProps {
   /** Куда вести кнопка «Назад»: по умолчанию /adminpanel, на странице /clients — / */
@@ -463,8 +505,42 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
     
     try {
       setGeneratingDocument('act');
-      
-      // Собираем все позиции из всех заказов
+      const orderIds = filteredOrders.map((o) => o.id);
+      if (orderIds.length > 0) {
+        try {
+          const response = await generateDocumentByTypeFromOrders('act', orderIds);
+          const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          let filename = `ACT-${formatDateForFile(new Date())}-${selectedCustomer.id}.xlsx`;
+          const contentDisposition = response.headers['content-disposition'];
+          if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (filenameMatch?.[1]) {
+              try {
+                filename = decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''));
+              } catch {
+                filename = filenameMatch[1].replace(/['"]/g, '');
+              }
+            }
+          }
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          return;
+        } catch (fromOrdersErr: any) {
+          const msg = fromOrdersErr?.message || '';
+          if (!msg.includes('404') && !msg.includes('не найден') && !msg.includes('Шаблон')) {
+            setError(`Ошибка генерации акта: ${msg || 'Неизвестная ошибка'}`);
+            return;
+          }
+        }
+      }
+
+      // Запасной вариант: сбор строк на фронте (если бэкенд не вернул документ)
       const allOrderItems: Array<{
         number: number;
         name: string;
@@ -516,18 +592,22 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
           const vatAmount = 0;
 
           const lines = getOrderItemProductionRows(item);
+          const rowAmounts = distributeItemSumToRows(itemAmount, lines);
           lines.forEach((line, idx) => {
-            const isFirst = idx === 0;
+            const rowAmount = rowAmounts[idx] ?? 0;
+            const rowPrice = line.quantity > 0 && rowAmount > 0
+              ? Math.round((rowAmount / line.quantity) * 100) / 100
+              : 0;
             allOrderItems.push({
               number: itemNumber++,
               name: line.name,
               unit: line.unit,
               quantity: line.quantity,
-              price: isFirst ? price : 0,
-              amount: isFirst ? itemAmount : 0,
+              price: rowPrice,
+              amount: rowAmount,
               vatRate,
               vatAmount,
-              totalWithVat: isFirst ? itemAmount : 0,
+              totalWithVat: rowAmount,
             });
           });
         }
@@ -642,8 +722,42 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
     
     try {
       setGeneratingDocument('invoice');
-      
-      // Собираем все позиции из всех заказов (аналогично акту)
+      const orderIds = filteredOrders.map((o) => o.id);
+      if (orderIds.length > 0) {
+        try {
+          const response = await generateDocumentByTypeFromOrders('invoice', orderIds);
+          const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          let filename = `INVOICE-${formatDateForFile(new Date())}-${selectedCustomer.id}.xlsx`;
+          const contentDisposition = response.headers['content-disposition'];
+          if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (filenameMatch?.[1]) {
+              try {
+                filename = decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''));
+              } catch {
+                filename = filenameMatch[1].replace(/['"]/g, '');
+              }
+            }
+          }
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          return;
+        } catch (fromOrdersErr: any) {
+          const msg = fromOrdersErr?.message || '';
+          if (!msg.includes('404') && !msg.includes('не найден') && !msg.includes('Шаблон')) {
+            setError(`Ошибка генерации счёта: ${msg || 'Неизвестная ошибка'}`);
+            return;
+          }
+        }
+      }
+
+      // Запасной вариант: сбор строк на фронте
       const allOrderItems: Array<{
         number: number;
         name: string;
@@ -675,18 +789,22 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
           const itemAmount = Math.round(price * (Number(item.quantity) || 1) * 100) / 100;
 
           const lines = getOrderItemProductionRows(item);
+          const rowAmounts = distributeItemSumToRows(itemAmount, lines);
           lines.forEach((line, idx) => {
-            const isFirst = idx === 0;
+            const rowAmount = rowAmounts[idx] ?? 0;
+            const rowPrice = line.quantity > 0 && rowAmount > 0
+              ? Math.round((rowAmount / line.quantity) * 100) / 100
+              : 0;
             allOrderItems.push({
               number: itemNumber++,
               name: line.name,
               unit: line.unit,
               quantity: line.quantity,
-              price: isFirst ? price : 0,
-              amount: isFirst ? itemAmount : 0,
+              price: rowPrice,
+              amount: rowAmount,
               vatRate: 'Без НДС',
               vatAmount: 0,
-              totalWithVat: isFirst ? itemAmount : 0,
+              totalWithVat: rowAmount,
             });
           });
         }

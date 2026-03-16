@@ -863,6 +863,10 @@ export const generateDocumentFromTemplate = (id: number, data: TemplateData) =>
 export const generateDocumentByType = (type: 'contract' | 'act' | 'invoice', data: TemplateData) => 
   api.post(`/document-templates/generate/${type}`, data, { responseType: 'blob' });
 
+/** Генерация акта/счёта по списку заказов: расчёт строк и сумм на бэкенде. */
+export const generateDocumentByTypeFromOrders = (type: 'act' | 'invoice', orderIds: number[]) =>
+  api.post(`/document-templates/generate/${type}/from-orders`, { orderIds }, { responseType: 'blob' });
+
 // Анализ шаблона и маппинг полей
 export interface TemplateAnalysis {
   placeholders: string[];

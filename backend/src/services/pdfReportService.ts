@@ -1448,6 +1448,72 @@ export class PDFReportService {
   }
 
   /**
+   * Строит строки для акта/счёта из позиций заказов (та же логика, что в товарном чеке).
+   * Используется бэкендом при генерации акта/счёта по orderIds — фронт ничего не считает.
+   */
+  static buildDocumentRowsFromItems(
+    items: Array<{ orderId: number; price: number; quantity: number; params: any; name?: string; type?: string }>,
+    getDiscountPercent: (orderId: number) => number
+  ): {
+    orderItems: Array<{
+      number: number;
+      name: string;
+      unit: string;
+      quantity: number;
+      price: number;
+      amount: number;
+      vatRate: string;
+      vatAmount: number;
+      totalWithVat: number;
+    }>;
+    totalAmount: number;
+    totalQuantity: number;
+  } {
+    const orderItems: Array<{
+      number: number;
+      name: string;
+      unit: string;
+      quantity: number;
+      price: number;
+      amount: number;
+      vatRate: string;
+      vatAmount: number;
+      totalWithVat: number;
+    }> = [];
+    let rowNum = 0;
+    let totalAmount = 0;
+    let totalQuantity = 0;
+    for (const it of items) {
+      const discountPct = getDiscountPercent(it.orderId);
+      const qty = Math.max(1, Number(it.quantity) || 1);
+      const rawPrice = Number(it.price) || 0;
+      const itemAmount = Math.round(rawPrice * qty * (1 - discountPct / 100) * 100) / 100;
+      const lines = this.getOrderItemProductionRows(it);
+      const rowAmounts = this.distributeItemSumToRows(itemAmount, lines);
+      lines.forEach((line, idx) => {
+        rowNum++;
+        const amount = rowAmounts[idx] ?? 0;
+        const price = line.quantity > 0 && amount > 0 ? Math.round((amount / line.quantity) * 100) / 100 : 0;
+        orderItems.push({
+          number: rowNum,
+          name: line.name,
+          unit: line.unit,
+          quantity: line.quantity,
+          price,
+          amount,
+          vatRate: 'Без НДС',
+          vatAmount: 0,
+          totalWithVat: amount,
+        });
+        totalAmount += amount;
+        totalQuantity += line.quantity;
+      });
+    }
+    totalAmount = Math.round(totalAmount * 100) / 100;
+    return { orderItems, totalAmount, totalQuantity };
+  }
+
+  /**
    * Подробное наименование позиции: тираж, листы печати, резки, операции (ламинация, скругление и т.д.) + при наличии — фраза о бумаге.
    * Пример: "96 Визитки: 4 листа печати, 13 резок, Ламинация: 96 шт., Скругление углов: 96 шт. Печать на мелованной бумаге 300 г/м² двухсторонняя."
    */
