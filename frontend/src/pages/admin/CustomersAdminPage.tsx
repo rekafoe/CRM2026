@@ -184,6 +184,11 @@ const getOrderItemProductionRows = (item: any): Array<{ name: string; quantity: 
       if (!name || name.toLowerCase() === 'операция') continue;
       const q = Number(s.quantity);
       if (!Number.isFinite(q) || q <= 0) continue;
+      const isPrintOp =
+        String(s.operationType || s.operation_type || '').toLowerCase() === 'print' || /^печать$/i.test(name);
+      if (isPrintOp && rows.length > 0 && /печать|листы/i.test(rows[0].name)) {
+        continue;
+      }
       const pu = String(s.priceUnit || s.unit || '').toLowerCase();
       const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
       rows.push({ name, quantity: q, unit });

@@ -570,8 +570,9 @@ export class PDFReportService {
           const qty = Number(item.quantity) || 1;
           const rowTotal = Math.round(rawPrice * qty * (1 - discountPercent / 100) * 100) / 100;
           const discountedPrice = qty > 0 ? Math.round((rowTotal / qty) * 100) / 100 : 0;
+          const displayName = (item.name || params.productName || params.name || item.type || 'Товар').toString().trim();
           return {
-            type: item.type || 'Товар',
+            type: displayName || item.type || 'Товар',
             quantity: qty,
             price: discountedPrice,
             rowTotal,
@@ -1387,9 +1388,17 @@ export class PDFReportService {
           if (!name || name.toLowerCase() === 'операция') continue;
           const q = Number(s.quantity);
           if (!Number.isFinite(q) || q <= 0) continue;
+          const totalCost = typeof s.totalCost === 'number' ? s.totalCost : (typeof s.total === 'number' ? s.total : undefined);
+          const isPrintOp = String(s.operationType || s.operation_type || '').toLowerCase() === 'print' || /^печать$/i.test(name);
+          // Печать из operations объединяем с первой строкой «Печать на … бумаге» (не дублируем строку)
+          if (isPrintOp && rows.length > 0 && typeof totalCost === 'number' && totalCost >= 0) {
+            if (/печать|листы/i.test(rows[0].name)) {
+              rows[0].totalCost = totalCost;
+              continue;
+            }
+          }
           const pu = String(s.priceUnit || s.unit || '').toLowerCase();
           const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
-          const totalCost = typeof s.totalCost === 'number' ? s.totalCost : (typeof s.total === 'number' ? s.total : undefined);
           rows.push({ name, quantity: q, unit, ...(typeof totalCost === 'number' && totalCost >= 0 ? { totalCost } : {}) });
         }
       }
