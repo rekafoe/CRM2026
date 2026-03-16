@@ -1362,10 +1362,11 @@ export class PDFReportService {
   }
 
   /**
-   * Разворачивает позицию в отдельные строки для чека: 1) Печать на X бумаге — кол-во листов (шт.), 2) операции по строкам, 3) резка.
+   * Разворачивает позицию в отдельные строки для чека: 1) Печать на X бумаге — кол-во листов (шт.), 2) операции по строкам (с учётом стоимости), 3) резка — только если ещё не в services.
+   * totalCost в строке — доля стоимости позиции (из params.services), чтобы в чеке отразить всё, что влияет на цену.
    */
-  private static getOrderItemProductionRows(it: any): Array<{ name: string; quantity: number; unit: string }> {
-    const rows: Array<{ name: string; quantity: number; unit: string }> = [];
+  private static getOrderItemProductionRows(it: any): Array<{ name: string; quantity: number; unit: string; totalCost?: number }> {
+    const rows: Array<{ name: string; quantity: number; unit: string; totalCost?: number }> = [];
     try {
       const params = typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
       const specs = params.specifications || {};
@@ -1375,10 +1376,16 @@ export class PDFReportService {
       const paperPhrase = this.getOrderItemPaperPhrase(it);
       const productName = (it.name || params.productName || params.name || it.type || 'Услуга').toString().trim();
 
+      const rawServices = params.services || [];
+      const hasCuttingInServices = Array.isArray(rawServices) && rawServices.some((s: any) => {
+        const type = String(s.operationType || s.operation_type || '').toLowerCase();
+        const name = String(s.operationName || s.service || s.name || '').toLowerCase();
+        return type === 'cut' || /резк/.test(name);
+      });
+
       if (sheetsNeeded > 0) {
         rows.push({ name: paperPhrase || 'Печать (листы)', quantity: sheetsNeeded, unit: 'шт.' });
       }
-      const rawServices = params.services;
       if (Array.isArray(rawServices) && rawServices.length > 0) {
         for (const s of rawServices) {
           const name = String(s.operationName || s.service || s.name || '').trim();
@@ -1387,10 +1394,11 @@ export class PDFReportService {
           if (!Number.isFinite(q) || q <= 0) continue;
           const pu = String(s.priceUnit || s.unit || '').toLowerCase();
           const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
-          rows.push({ name, quantity: q, unit });
+          const totalCost = typeof s.totalCost === 'number' ? s.totalCost : (typeof s.total === 'number' ? s.total : undefined);
+          rows.push({ name, quantity: q, unit, ...(typeof totalCost === 'number' && totalCost >= 0 ? { totalCost } : {}) });
         }
       }
-      if (cutsPerSheet > 0) {
+      if (cutsPerSheet > 0 && !hasCuttingInServices) {
         const cutWord = cutsPerSheet === 1 ? 'Резка' : cutsPerSheet < 5 ? 'Резки' : 'Резок';
         rows.push({ name: cutWord, quantity: cutsPerSheet, unit: 'шт.' });
       }
@@ -1402,6 +1410,41 @@ export class PDFReportService {
       rows.push({ name: (it.name || it.type || 'Позиция').toString(), quantity: qty, unit: 'шт.' });
     }
     return rows;
+  }
+
+  /**
+   * Распределяет сумму позиции (itemSum) по строкам: у строк с totalCost — доля по пропорции, остаток — первой строке без totalCost (печать).
+   */
+  private static distributeItemSumToRows(
+    itemSum: number,
+    lines: Array<{ name: string; quantity: number; unit: string; totalCost?: number }>
+  ): number[] {
+    const out: number[] = [];
+    const withCost = lines.map((l) => (typeof l.totalCost === 'number' && l.totalCost >= 0 ? l.totalCost : 0));
+    const totalCostSum = withCost.reduce((a, b) => a + b, 0);
+    if (totalCostSum <= 0) {
+      out.push(itemSum);
+      for (let i = 1; i < lines.length; i++) out.push(0);
+      return out;
+    }
+    const scale = Math.min(1, itemSum / totalCostSum);
+    let remainder = itemSum;
+    for (let i = 0; i < lines.length; i++) {
+      const cost = withCost[i];
+      let rowSum = 0;
+      if (cost > 0) {
+        rowSum = Math.round(cost * scale * 100) / 100;
+        remainder -= rowSum;
+      }
+      out.push(rowSum);
+    }
+    const firstNoCostIdx = lines.findIndex((l) => typeof l.totalCost !== 'number' || l.totalCost < 0);
+    if (firstNoCostIdx >= 0 && Math.abs(remainder) > 0.001) {
+      out[firstNoCostIdx] = Math.round((out[firstNoCostIdx] + remainder) * 100) / 100;
+    }
+    const diff = itemSum - out.reduce((a, b) => a + b, 0);
+    if (Math.abs(diff) > 0.001 && out.length > 0) out[0] = Math.round((out[0] + diff) * 100) / 100;
+    return out;
   }
 
   /**
@@ -1559,18 +1602,19 @@ export class PDFReportService {
         const q = Number(it.quantity) || 1;
         const rawP = Number(it.price) || 0;
         const itemSum = Math.round(rawP * q * (1 - discountPercent / 100) * 100) / 100;
-        const itemPrice = q > 0 ? Math.round((itemSum / q) * 100) / 100 : 0;
         const lines = this.getOrderItemProductionRows(it);
+        const rowSums = this.distributeItemSumToRows(itemSum, lines);
         lines.forEach((line, idx) => {
           rowNum++;
-          const isFirst = idx === 0;
+          const sum = rowSums[idx] ?? 0;
+          const price = line.quantity > 0 ? Math.round((sum / line.quantity) * 100) / 100 : 0;
           rows.push({
             num: rowNum,
             name: line.name,
             quantity: line.quantity,
             unit: line.unit,
-            price: isFirst ? itemPrice : 0,
-            sum: isFirst ? itemSum : 0,
+            price,
+            sum,
           });
         });
       }
@@ -1839,25 +1883,26 @@ export class PDFReportService {
 
       const discountPercent = Number(order.discount_percent) || 0;
 
-      // Разворачиваем каждую позицию в отдельные строки: печать (по листам), операции, резка
+      // Разворачиваем каждую позицию в отдельные строки; сумма позиции распределяется по строкам (печать, операции с totalCost, резка)
       const receiptItems: Array<{ number: number; name: string; quantity: number; unit?: string; price: number; amount: number }> = [];
       let itemNumber = 0;
       for (const item of Array.isArray(items) ? items : []) {
         const qty = Number(item.quantity) || 1;
         const rawPrice = Number(item.price) || 0;
         const itemAmount = Math.round(rawPrice * qty * (1 - discountPercent / 100) * 100) / 100;
-        const itemPrice = qty > 0 ? Math.round((itemAmount / qty) * 100) / 100 : 0;
         const lines = this.getOrderItemProductionRows(item);
+        const rowSums = this.distributeItemSumToRows(itemAmount, lines);
         lines.forEach((line, idx) => {
           itemNumber++;
-          const isFirst = idx === 0;
+          const amount = rowSums[idx] ?? 0;
+          const price = line.quantity > 0 ? Math.round((amount / line.quantity) * 100) / 100 : 0;
           receiptItems.push({
             number: itemNumber,
             name: line.name,
             quantity: line.quantity,
             unit: line.unit,
-            price: isFirst ? itemPrice : 0,
-            amount: isFirst ? itemAmount : 0,
+            price,
+            amount,
           });
         });
       }
