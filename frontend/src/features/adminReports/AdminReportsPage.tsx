@@ -441,6 +441,8 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
   const totalCreated = orderStatusData?.statusConversion?.reduce((sum, row) => sum + Number(row.total_created || 0), 0) || 0;
   const totalPaid = Number(financialData?.prepaymentAnalysis?.paid_prepayments || 0);
   const totalCompleted = orderStatusData?.statusConversion?.reduce((sum, row) => sum + Number(row.completed_orders || 0), 0) || 0;
+  const pendingOrdersCount = Number(financialData?.prepaymentAnalysis?.pending_prepayments || 0);
+  const pendingOrdersAmount = Number(financialData?.prepaymentAnalysis?.total_pending_prepayment || 0);
   const avgCheckCurrent = Number(
     financialData?.avgCheckSummary?.current_avg_check ??
     (totalStats.totalOrders > 0 ? totalStats.totalRevenue / totalStats.totalOrders : 0)
@@ -667,6 +669,20 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               {totalStats.totalRevenue.toLocaleString('ru-RU')} BYN
             </div>
             <div className="reports-stat-label">Общая выручка</div>
+          </div>
+          <div
+            className="reports-stat-card reports-stat-card--clickable"
+            onClick={() => void loadDrilldownOrders('pending_payment', 'Неоплаченные заказы')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void loadDrilldownOrders('pending_payment', 'Неоплаченные заказы'); }}
+          >
+            <div className="reports-stat-value">
+              {pendingOrdersCount}
+            </div>
+            <div className="reports-stat-label">
+              Неоплаченные заказы {pendingOrdersAmount > 0 ? `(${pendingOrdersAmount.toLocaleString('ru-RU')} BYN)` : ''}
+            </div>
           </div>
           <div className="reports-stat-card">
             <div className="reports-stat-value">

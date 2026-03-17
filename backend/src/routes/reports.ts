@@ -581,6 +581,7 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
     } else if (statusFilter === 'paid') {
       where.push(`o.prepaymentStatus IN ('paid','successful')`)
     } else if (statusFilter === 'pending_payment') {
+      where.push('(o.status IS NULL OR o.status != 5)')
       where.push(`COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
     } else if (statusFilter === 'completed') {
       where.push('o.status = 7')
