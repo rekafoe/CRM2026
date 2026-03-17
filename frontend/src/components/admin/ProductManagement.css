@@ -535,6 +535,7 @@
 
 .products-table thead th:last-child {
   border-right: none;
+  min-width: 340px;
 }
 
 .sortable-header {
@@ -606,10 +607,16 @@
 
 .products-table .row-actions {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: nowrap;
   justify-content: flex-end;
   align-items: center;
+  min-width: 0;
+}
+
+.products-table tbody td:last-child {
+  min-width: 340px;
+  padding-right: 16px;
 }
 
 .products-table .row-actions .lg-btn {
