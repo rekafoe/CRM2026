@@ -371,8 +371,22 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
     dateParams
   )
 
+  // Общая выручка за период = сумма по заказам с учётом скидки (как в кассе)
+  const periodRevenueRow = await db.get<{ total_revenue: number }>(`
+    SELECT COALESCE(SUM(
+      (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(i_totals.raw_total, 0)
+    ), 0) as total_revenue
+    FROM orders o
+    LEFT JOIN (
+      SELECT orderId, SUM(price * quantity) as raw_total FROM items GROUP BY orderId
+    ) i_totals ON i_totals.orderId = o.id
+    WHERE ${dateFilter('o')}
+  `, dateParams)
+  const total_revenue = Number(periodRevenueRow?.total_revenue ?? 0)
+
   res.json({
     period: { days, startDate: startDate.toISOString(), endDate: endDate?.toISOString() ?? undefined },
+    total_revenue,
     productPopularity,
     categoryStats,
     productTrends,

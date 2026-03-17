@@ -130,7 +130,7 @@ export const useAnalytics = () => {
     // Вычисляемые свойства
     totalStats: {
       totalOrders: state.productData?.productPopularity.reduce((sum, p) => sum + p.order_count, 0) || 0,
-      totalRevenue: state.productData?.productPopularity.reduce((sum, p) => sum + p.total_revenue, 0) || 0,
+      totalRevenue: state.productData?.total_revenue ?? state.productData?.productPopularity.reduce((sum, p) => sum + p.total_revenue, 0) ?? 0,
       uniqueUsers: state.managerData?.managerEfficiency.length || 0,
       reportsCount: state.productData?.productPopularity.length || 0
     }

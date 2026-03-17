@@ -37,6 +37,8 @@ export interface ProductAverageOrderValue {
 
 export interface ProductAnalyticsData {
   period: AnalyticsPeriod;
+  /** Общая выручка за период с учётом скидок по заказам (как в кассе) */
+  total_revenue?: number;
   productPopularity: ProductPopularityItem[];
   categoryStats: ProductCategoryStats[];
   productTrends: ProductTrend[];
