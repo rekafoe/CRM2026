@@ -334,12 +334,14 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
     : parseInt(String(req.query.period || '30'), 10) || 30
 
   const db = await getDb()
+  // Не учитываем отменённые заказы (status = 5) в счётчиках и в общей выручке
+  const notCancelledCond = '(o.status IS NULL OR o.status != 5)'
 
   const productPopularity = await db.all<any>(
     `SELECT i.type as product_type, COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity,
       SUM(i.price * i.quantity) as total_revenue, AVG(i.price) as avg_price, MAX(COALESCE(o.createdAt, o.created_at)) as last_order_date
      FROM items i JOIN orders o ON o.id = i.orderId
-     WHERE ${dateFilter('o')}
+     WHERE ${dateFilter('o')} AND ${notCancelledCond}
      GROUP BY i.type ORDER BY total_revenue DESC LIMIT ?`,
     [...dateParams, limitNum]
   )
@@ -351,7 +353,7 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
         WHEN LOWER(i.type) LIKE '%плакат%' OR LOWER(i.type) LIKE '%poster%' THEN 'Плакаты'
         WHEN LOWER(i.type) LIKE '%календар%' THEN 'Календари' ELSE 'Другое' END as category,
       COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity, SUM(i.price * i.quantity) as total_revenue
-     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')}
+     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')} AND ${notCancelledCond}
      GROUP BY category ORDER BY total_revenue DESC`,
     dateParams
   )
@@ -359,19 +361,19 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
   const productTrends = await db.all<any>(
     `SELECT DATE(COALESCE(o.createdAt, o.created_at)) as date, i.type as product_type, COUNT(DISTINCT o.id) as daily_orders,
       SUM(i.price * i.quantity) as daily_revenue
-     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')}
+     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')} AND ${notCancelledCond}
      GROUP BY DATE(COALESCE(o.createdAt, o.created_at)), i.type ORDER BY date DESC, daily_revenue DESC`,
     dateParams
   )
 
   const averageOrderValue = await db.all<any>(
     `SELECT i.type as product_type, AVG(i.price * i.quantity) as avg_order_value, COUNT(DISTINCT o.id) as orders_with_product
-     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')}
+     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')} AND ${notCancelledCond}
      GROUP BY i.type HAVING orders_with_product >= 3 ORDER BY avg_order_value DESC`,
     dateParams
   )
 
-  // Общая выручка за период = сумма по заказам с учётом скидки (как в кассе)
+  // Общая выручка = заказы оплаченные или завершённые (деньги в кассе); без статуса 0 (ожидает) и без отменённых
   const periodRevenueRow = await db.get<{ total_revenue: number }>(`
     SELECT COALESCE(SUM(
       (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(i_totals.raw_total, 0)
@@ -380,7 +382,8 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
     LEFT JOIN (
       SELECT orderId, SUM(price * quantity) as raw_total FROM items GROUP BY orderId
     ) i_totals ON i_totals.orderId = o.id
-    WHERE ${dateFilter('o')}
+    WHERE ${dateFilter('o')} AND (o.status IS NULL OR o.status != 0) AND (o.status IS NULL OR o.status != 5)
+      AND (o.status = 7 OR o.prepaymentStatus IN ('paid', 'successful'))
   `, dateParams)
   const total_revenue = Number(periodRevenueRow?.total_revenue ?? 0)
 
@@ -399,11 +402,13 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
   const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
   const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
   const db = await getDb()
+  const notCancelled = '(o.status IS NULL OR o.status != 5)'
+  const notCancelledNoAlias = '(status IS NULL OR status != 5)'
 
   const productProfitability = await db.all<any>(`
     SELECT i.type as product_type, SUM(i.price * i.quantity) as total_revenue, COUNT(DISTINCT o.id) as order_count,
       AVG(i.price * i.quantity) as avg_order_value, SUM(i.quantity) as total_items
-    FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')}
+    FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')} AND ${notCancelled}
     GROUP BY i.type ORDER BY total_revenue DESC
   `, dateParams)
 
@@ -415,7 +420,7 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
       SUM(CASE WHEN paymentMethod = 'offline' AND prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as offline_revenue,
       SUM(CASE WHEN paymentMethod = 'telegram' AND prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as telegram_revenue,
       AVG(CASE WHEN prepaymentStatus IN ('paid','successful') THEN prepaymentAmount END) as avg_payment_amount
-    FROM orders WHERE ${dateFilter('')}
+    FROM orders WHERE ${dateFilter('')} AND ${notCancelledNoAlias}
   `, dateParams)
 
   const prepaymentAnalysis = await db.get<any>(`
@@ -423,14 +428,14 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
       COUNT(CASE WHEN prepaymentStatus NOT IN ('paid','successful') THEN 1 END) as pending_prepayments,
       SUM(CASE WHEN prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as total_paid_prepayment,
       SUM(CASE WHEN prepaymentStatus NOT IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as total_pending_prepayment,
-      AVG(CASE WHEN prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END) as avg_paid_prepayment
-    FROM orders WHERE ${dateFilter('')} AND prepaymentAmount > 0
+      AVG(CASE WHEN prepaymentStatus IN ('paid','successful') THEN prepaymentAmount END) as avg_paid_prepayment
+    FROM orders WHERE ${dateFilter('')} AND prepaymentAmount > 0 AND ${notCancelledNoAlias}
   `, dateParams)
 
   const createdExpr = 'COALESCE(o.createdAt, o.created_at)'
   const currentRangeCondition = endDate
-    ? `${createdExpr} >= ? AND ${createdExpr} <= ?`
-    : `${createdExpr} >= ?`
+    ? `${createdExpr} >= ? AND ${createdExpr} <= ? AND (o.status IS NULL OR o.status != 5)`
+    : `${createdExpr} >= ? AND (o.status IS NULL OR o.status != 5)`
   const currentRangeParams = endDate ? [startDate.toISOString(), endDate.toISOString()] : [startDate.toISOString()]
 
   const avgCheckTrend = await db.all<any>(`
@@ -480,7 +485,7 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
         (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(i.price * i.quantity), 0) as order_total
       FROM orders o
       LEFT JOIN items i ON i.orderId = o.id
-      WHERE ${createdExpr} >= ? AND ${createdExpr} <= ?
+      WHERE ${createdExpr} >= ? AND ${createdExpr} <= ? AND (o.status IS NULL OR o.status != 5)
       GROUP BY o.id
     )
     SELECT COALESCE(AVG(order_total), 0) as avg_check, COUNT(order_id) as orders_count
