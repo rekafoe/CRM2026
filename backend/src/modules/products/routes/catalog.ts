@@ -82,6 +82,10 @@ router.get('/parameter-presets', asyncHandler(async (req, res) => {
  *         name: withMinPrice
  *         schema: { type: string, enum: ['1'] }
  *         description: Добавить min_price для каждого продукта
+ *       - in: query
+ *         name: forSite
+ *         schema: { type: string, enum: ['1', 'true'] }
+ *         description: Только продукты, активные для сайта (is_active=1 и active_for_site=1)
  *     responses:
  *       200:
  *         description: Массив продуктов
@@ -94,8 +98,9 @@ router.get('/parameter-presets', asyncHandler(async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const db = await getDb();
-    const { activeOnly, search, withMinPrice } = req.query;
+    const { activeOnly, search, withMinPrice, forSite } = req.query;
     const wantMinPrice = withMinPrice === '1';
+    const forSiteCatalog = forSite === '1' || forSite === 'true';
     const searchValue = typeof search === 'string' ? search.trim() : '';
 
     const conditions: string[] = [];
@@ -103,6 +108,10 @@ router.get('/', async (req, res) => {
     if (activeOnly === 'true') {
       conditions.push('p.is_active = 1');
       if (!searchValue) conditions.push('pc.is_active = 1');
+    }
+    if (forSiteCatalog) {
+      conditions.push('p.is_active = 1');
+      conditions.push('COALESCE(p.active_for_site, 0) = 1');
     }
     if (searchValue) {
       const lowerSearch = searchValue.toLowerCase();
@@ -179,17 +188,25 @@ router.get('/', async (req, res) => {
 router.get('/category/:categoryId', async (req, res) => {
   try {
     const { categoryId } = req.params;
-    const { activeOnly } = req.query;
+    const { activeOnly, forSite } = req.query;
     const db = await getDb();
-    const whereClause = activeOnly === 'true' ? 'AND p.is_active = 1 AND pc.is_active = 1' : '';
+    const parts: string[] = ['p.category_id = ?'];
+    const queryParams: any[] = [categoryId];
+    if (activeOnly === 'true') {
+      parts.push('p.is_active = 1', 'pc.is_active = 1');
+    }
+    if (forSite === '1' || forSite === 'true') {
+      parts.push('p.is_active = 1', 'COALESCE(p.active_for_site, 0) = 1');
+    }
+    const whereClause = parts.length > 0 ? `WHERE ${parts.join(' AND ')}` : '';
 
     const products = await db.all(`
       SELECT p.*, pc.name as category_name, pc.icon as category_icon
       FROM products p
       LEFT JOIN product_categories pc ON p.category_id = pc.id
-      WHERE p.category_id = ? ${whereClause}
+      ${whereClause}
       ORDER BY p.name
-    `, [categoryId]);
+    `, queryParams);
     res.json(products);
   } catch (error) {
     logger.error('Error fetching products by category', error);

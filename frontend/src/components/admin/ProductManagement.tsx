@@ -4,10 +4,11 @@ import {
   Product,
   deleteProduct,
   clearProductCache,
+  updateProduct,
 } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import { useUIStore } from '../../stores/uiStore';
-import { Button, StatusBadge, LoadingState } from '../common';
+import { StatusBadge, LoadingState } from '../common';
 import { AppIcon } from '../ui/AppIcon';
 import { ProductCreateModal } from './ProductCreateModal';
 import { ProductSetupStatus } from './ProductSetupStatus';
@@ -20,6 +21,7 @@ import './ProductManagement.css';
 const ProductManagement: React.FC = () => {
   const navigate = useNavigate();
   const [showCategoryModal, setShowCategoryModal] = React.useState(false);
+  const [togglingSiteProductId, setTogglingSiteProductId] = React.useState<number | null>(null);
   const categories = useProductDirectoryStore((state) => state.categories);
   const products = useProductDirectoryStore((state) => state.products);
   const directoryLoading = useProductDirectoryStore((state) => state.loading);
@@ -57,6 +59,23 @@ const ProductManagement: React.FC = () => {
 
   const handleWizardClose = () => {
     closeWizard();
+  };
+
+  const toggleProductSite = async (product: Product) => {
+    const next = !(product.active_for_site === true || product.active_for_site === 1);
+    try {
+      setTogglingSiteProductId(product.id);
+      await updateProduct(product.id, { active_for_site: next ? 1 : 0 } as Partial<Product>);
+      await fetchProducts(true);
+      showToast(
+        `Продукт «${product.name}» ${next ? 'показывается на сайте' : 'скрыт с сайта'}`,
+        'success'
+      );
+    } catch (e) {
+      showToast(getAxiosErrorMessage(e, 'Не удалось изменить видимость на сайте'), 'error');
+    } finally {
+      setTogglingSiteProductId(null);
+    }
   };
 
   const toggleProductActive = async (product: Product) => {
@@ -216,9 +235,9 @@ const ProductManagement: React.FC = () => {
       {/* Заголовок */}
       <div className="product-management__header">
         <div className="product-management__header-left">
-          <Button variant="secondary" size="sm" onClick={() => navigate('/adminpanel')}>
+          <button type="button" className="lg-btn" onClick={() => navigate('/adminpanel')}>
             ← Назад
-          </Button>
+          </button>
           <div className="product-management__title-row">
             <AppIcon name="puzzle" size="lg" circle />
             <div>
@@ -228,12 +247,12 @@ const ProductManagement: React.FC = () => {
           </div>
         </div>
         <div className="product-management__header-actions">
-          <Button variant="secondary" size="sm" onClick={() => setShowCategoryModal(true)}>
+          <button type="button" className="lg-btn" onClick={() => setShowCategoryModal(true)}>
             <AppIcon name="folder" size="xs" /> Категории
-          </Button>
-          <Button variant="primary" size="sm" onClick={() => openCreateWizard(false)}>
+          </button>
+          <button type="button" className="lg-btn lg-btn--primary" onClick={() => openCreateWizard(false)}>
             <AppIcon name="plus" size="xs" /> Создать продукт
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -353,15 +372,15 @@ const ProductManagement: React.FC = () => {
           <div className="bulk-actions-bar">
             <span className="bulk-count">Выбрано: {state.selectedProducts.size}</span>
             <div className="flex gap-2">
-              <Button size="sm" variant="success" onClick={handleBulkActivate}>
+              <button type="button" className="lg-btn lg-btn--success" onClick={handleBulkActivate}>
                 <AppIcon name="check" size="xs" /> Активировать
-              </Button>
-              <Button size="sm" variant="warning" onClick={handleBulkDeactivate}>
+              </button>
+              <button type="button" className="lg-btn lg-btn--warning" onClick={handleBulkDeactivate}>
                 <AppIcon name="ban" size="xs" /> Деактивировать
-              </Button>
-              <Button size="sm" variant="secondary" onClick={clearSelectedProducts}>
+              </button>
+              <button type="button" className="lg-btn" onClick={clearSelectedProducts}>
                 Отменить выбор
-              </Button>
+              </button>
             </div>
           </div>
         )}
@@ -390,6 +409,7 @@ const ProductManagement: React.FC = () => {
                     Категория {state.sortField === 'category' && (state.sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th>Статус</th>
+                  <th style={{ width: '90px' }} title="Показывать в каталоге на сайте">На сайте</th>
                   <th style={{ width: '50px' }}></th>
                   <th>Описание</th>
                   <th>Действия</th>
@@ -423,6 +443,20 @@ const ProductManagement: React.FC = () => {
                     </td>
                     <td>
                       <button
+                        type="button"
+                        className={`lg-btn ${product.active_for_site === true || product.active_for_site === 1 ? 'lg-btn--success' : ''}`}
+                        onClick={() => toggleProductSite(product)}
+                        disabled={!product.is_active || togglingSiteProductId === product.id}
+                        title={product.is_active
+                          ? (product.active_for_site ? 'Скрыть с сайта' : 'Показать на сайте')
+                          : 'Сначала включите продукт'}
+                      >
+                        {togglingSiteProductId === product.id ? '…' : (product.active_for_site === true || product.active_for_site === 1 ? 'Да' : 'Нет')}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
                         className="btn-setup-status"
                         onClick={() => setSetupStatusModal(product.id)}
                         title="Проверить статус настройки"
@@ -433,40 +467,38 @@ const ProductManagement: React.FC = () => {
                     <td className="cell-description">{product.description}</td>
                     <td>
                       <div className="row-actions">
-                        <Button size="sm" variant="secondary" onClick={() => navigate(`/adminpanel/products/${product.id}/edit`)}>
+                        <button type="button" className="lg-btn" onClick={() => navigate(`/adminpanel/products/${product.id}/edit`)}>
                           <AppIcon name="clipboard" size="xs" /> Инфо
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => navigate(`/adminpanel/products/${product.id}/template`)}>
+                        </button>
+                        <button type="button" className="lg-btn" onClick={() => navigate(`/adminpanel/products/${product.id}/template`)}>
                           <AppIcon name="edit" size="xs" /> Шаблон
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => navigate(`/adminpanel/products/${product.id}/tech-process`)}>
+                        </button>
+                        <button type="button" className="lg-btn" onClick={() => navigate(`/adminpanel/products/${product.id}/tech-process`)}>
                           <AppIcon name="cog" size="xs" /> Процесс
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={product.is_active ? 'warning' : 'success'}
+                        </button>
+                        <button
+                          type="button"
+                          className={`lg-btn row-actions__toggle-btn ${product.is_active ? 'lg-btn--warning' : 'lg-btn--success'}`}
                           onClick={() => toggleProductActive(product)}
-                          loading={directoryLoading.toggleProduct}
-                          className="row-actions__toggle-btn"
+                          disabled={directoryLoading.toggleProduct}
                         >
                           {product.is_active ? <><AppIcon name="ban" size="xs" /> Выкл</> : <><AppIcon name="check" size="xs" /> Вкл</>}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="error"
+                        </button>
+                        <button
+                          type="button"
+                          className="lg-btn lg-btn--danger"
                           onClick={() => handleDeleteProduct(product)}
-                          loading={state.deletingProductId === product.id}
                           disabled={state.deletingProductId === product.id}
                         >
                           <AppIcon name="trash" size="xs" />
-                        </Button>
+                        </button>
                       </div>
                     </td>
                   </tr>
                 ))}
                 {!filteredProducts.length && (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
                       Нет продуктов, удовлетворяющих условиям поиска.
                     </td>
                   </tr>

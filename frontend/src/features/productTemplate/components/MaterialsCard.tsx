@@ -16,6 +16,12 @@ interface MaterialsCardProps {
   allMaterials?: CalculatorMaterial[]
   hasUserInteractedWithMaterialsRef: React.MutableRefObject<boolean>
   updateSize: (sizeId: number | string, patch: Partial<SimplifiedSizeConfig>) => void
+  /** Есть типы продуктов: показываем общие материалы типа и флаг «свои материалы» у размера */
+  hasCommonMaterialsFeature?: boolean
+  useOwnMaterials?: boolean
+  effectiveAllowedMaterialIds?: number[]
+  updateEffectiveMaterials?: (ids: number[]) => void
+  setUseOwnMaterials?: (v: boolean) => void
 }
 
 export const MaterialsCard: React.FC<MaterialsCardProps> = ({
@@ -29,9 +35,17 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
   allMaterials = [],
   hasUserInteractedWithMaterialsRef,
   updateSize,
+  hasCommonMaterialsFeature = false,
+  useOwnMaterials = true,
+  effectiveAllowedMaterialIds,
+  updateEffectiveMaterials,
+  setUseOwnMaterials,
 }) => {
   const allowedBaseIds = selected.allowed_base_material_ids ?? []
   const baseMaterialsList = allMaterials.length > 0 ? allMaterials : allMaterialsFromAllPaperTypes
+  const effectiveIds = effectiveAllowedMaterialIds ?? selected.allowed_material_ids ?? []
+  const setEffectiveIds = updateEffectiveMaterials ?? ((ids: number[]) => updateSize(selected.id, { allowed_material_ids: ids }))
+
   return (
   <div className="simplified-card">
     <div className="simplified-card__header">
@@ -41,6 +55,23 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
       </div>
     </div>
     <div className="simplified-card__content">
+      {hasCommonMaterialsFeature && setUseOwnMaterials && (
+        <div className="mb-3" style={{ border: '1px solid #e5e7eb', borderRadius: '4px', padding: '10px 12px', backgroundColor: '#fafafa' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={useOwnMaterials}
+              onChange={(e) => {
+                hasUserInteractedWithMaterialsRef.current = true
+                setUseOwnMaterials(e.target.checked)
+              }}
+              style={{ cursor: 'pointer' }}
+            />
+            <span className="text-sm">У этого размера свои материалы (иначе — общие для типа)</span>
+          </label>
+        </div>
+      )}
+
       <div style={{ maxWidth: '200px', width: 'fit-content', alignSelf: 'flex-start', flexShrink: 0 }}>
         <FormField label="Тип бумаги">
           <select
@@ -67,12 +98,15 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
       {selectedPaperTypeId && materialsForSelectedPaperType.length > 0 && (
         <>
           <div className="mt-3 mb-3" style={{ border: '1px solid #e5e7eb', borderRadius: '4px', padding: '12px' }}>
+            {hasCommonMaterialsFeature && !useOwnMaterials && (
+              <div className="text-muted text-sm mb-2">Используются общие материалы типа для всех размеров.</div>
+            )}
             <div className="text-sm font-medium mb-2">Выберите разрешенные материалы:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
               {materialsForSelectedPaperType.map(m => {
                 const densityInfo = paperTypes.find(pt => pt.id === selectedPaperTypeId)
                   ?.densities?.find(d => d.material_id === Number(m.id))
-                const isAllowed = selected.allowed_material_ids.includes(Number(m.id))
+                const isAllowed = effectiveIds.includes(Number(m.id))
 
                 return (
                   <label
@@ -95,13 +129,9 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
                         hasUserInteractedWithMaterialsRef.current = true
                         const checked = e.target.checked
                         if (checked) {
-                          updateSize(selected.id, {
-                            allowed_material_ids: [...selected.allowed_material_ids, Number(m.id)]
-                          })
+                          setEffectiveIds([...effectiveIds, Number(m.id)])
                         } else {
-                          updateSize(selected.id, {
-                            allowed_material_ids: selected.allowed_material_ids.filter(id => id !== Number(m.id))
-                          })
+                          setEffectiveIds(effectiveIds.filter(id => id !== Number(m.id)))
                         }
                       }}
                       style={{ cursor: 'pointer' }}
@@ -120,12 +150,12 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
             </div>
           </div>
 
-          {selected.allowed_material_ids.length > 0 && (
+          {effectiveIds.length > 0 && (
             <div className="mt-3" style={{ fontSize: 13 }}>
               <div className="text-muted text-sm mb-2">Цены подтягиваются со склада при расчёте заказа</div>
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 {allMaterialsFromAllPaperTypes
-                  .filter(m => selected.allowed_material_ids.includes(Number(m.id)))
+                  .filter(m => effectiveIds.includes(Number(m.id)))
                   .map(m => {
                     const pt = paperTypes.find(p => p.densities?.some(d => d.material_id === Number(m.id)))
                     const density = pt?.densities?.find(d => d.material_id === Number(m.id))

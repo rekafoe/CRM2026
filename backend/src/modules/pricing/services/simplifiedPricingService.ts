@@ -119,6 +119,8 @@ interface SimplifiedSizeConfig {
   min_qty?: number;
   max_qty?: number;
   allowed_material_ids?: number[];
+  /** Если true — размер использует свой список материалов; иначе — общие типа (common_allowed_material_ids) */
+  use_own_materials?: boolean;
   /** Материалы-основы (заготовки): футболки, кружки — расход 1 шт на изделие */
   allowed_base_material_ids?: number[];
   print_prices: Array<{
@@ -140,6 +142,19 @@ interface SimplifiedSizeConfig {
     // tiers оставлен только для обратной совместимости со старыми данными
     tiers?: SimplifiedQtyTier[]; // Опционально, только для чтения старых данных
   }>;
+}
+
+interface SimplifiedTypeConfig {
+  sizes: SimplifiedSizeConfig[];
+  /** Общие материалы типа: используются размерами с use_own_materials !== true */
+  common_allowed_material_ids?: number[];
+}
+
+function getEffectiveAllowedMaterialIds(typeConfig: SimplifiedTypeConfig, size: SimplifiedSizeConfig): number[] {
+  const common = typeConfig.common_allowed_material_ids;
+  if ((size as any).use_own_materials === true) return size.allowed_material_ids ?? [];
+  if ((size as any).use_own_materials === false) return common ?? [];
+  return (common != null && common.length > 0) ? common : (size.allowed_material_ids ?? []);
 }
 
 interface SimplifiedConfig {
@@ -214,6 +229,7 @@ export class SimplifiedPricingService {
     const typeConfigs = (configData.simplified as any)?.typeConfigs;
     let sizesToUse: SimplifiedSizeConfig[] = simplifiedConfig.sizes ?? [];
     
+    const typeConfig: SimplifiedTypeConfig | null = typeId && typeConfigs?.[typeId] ? typeConfigs[typeId] : null;
     if (typeId && typeConfigs?.[typeId]?.sizes?.length) {
       sizesToUse = typeConfigs[typeId].sizes;
       logger.info('Используем размеры из typeConfigs', { typeId, sizesCount: sizesToUse.length });
@@ -507,7 +523,10 @@ export class SimplifiedPricingService {
     }
 
     if (includeMaterialCost && normalizedConfig.material_id) {
-      const isAllowed = selectedSize.allowed_material_ids?.includes(normalizedConfig.material_id) ?? true;
+      const effectiveAllowed = typeConfig
+        ? getEffectiveAllowedMaterialIds(typeConfig, selectedSize)
+        : (selectedSize.allowed_material_ids ?? []);
+      const isAllowed = effectiveAllowed.length === 0 ? true : effectiveAllowed.includes(normalizedConfig.material_id);
       if (!isAllowed) {
         logger.warn('Материал не в списке разрешённых для размера', { material_id: normalizedConfig.material_id });
       } else {

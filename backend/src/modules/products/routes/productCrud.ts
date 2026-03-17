@@ -314,7 +314,7 @@ router.post('/setup', asyncHandler(async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { category_id, name, description, icon, calculator_type, product_type, operator_percent, image_url } = req.body;
+    const { category_id, name, description, icon, calculator_type, product_type, operator_percent, image_url, active_for_site } = req.body;
     const resolvedCalculatorType = product_type === 'multi_page' ? 'simplified' : calculator_type;
     const db = await getDb();
 
@@ -351,6 +351,7 @@ router.post('/', async (req, res) => {
     const normalizedOperatorPercent = Number.isFinite(Number(operator_percent)) ? Number(operator_percent) : 0;
     const hasOperatorPercentCol = await hasColumn('products', 'operator_percent');
     const hasImageUrlCol = await hasColumn('products', 'image_url');
+    const hasActiveForSiteCol = await hasColumn('products', 'active_for_site');
     const insertColumns = ['category_id', 'name', 'description', 'icon', 'calculator_type', 'product_type'];
     const insertValues: any[] = [resolvedCategoryId, name.trim(), description ?? null, icon ?? null, resolvedCalculatorType || 'product', product_type || 'sheet_single'];
 
@@ -361,6 +362,10 @@ router.post('/', async (req, res) => {
     if (hasOperatorPercentCol) {
       insertColumns.push('operator_percent');
       insertValues.push(normalizedOperatorPercent);
+    }
+    if (hasActiveForSiteCol) {
+      insertColumns.push('active_for_site');
+      insertValues.push(active_for_site === true || active_for_site === 1 ? 1 : 0);
     }
 
     const placeholders = insertColumns.map(() => '?').join(', ');
@@ -427,11 +432,13 @@ router.put('/:id', async (req, res) => {
 
     const hasOperatorPercentCol = await hasColumn('products', 'operator_percent');
     const hasImageUrlCol = await hasColumn('products', 'image_url');
+    const hasActiveForSiteCol = await hasColumn('products', 'active_for_site');
     const allowedFields = [
       'category_id', 'name', 'description', 'icon', 'is_active',
       'product_type', 'calculator_type', 'setup_status', 'print_settings',
       ...(hasImageUrlCol ? ['image_url'] : []),
       ...(hasOperatorPercentCol ? ['operator_percent'] : []),
+      ...(hasActiveForSiteCol ? ['active_for_site'] : []),
     ];
     const setFields: string[] = [];
     const values: any[] = [];
@@ -439,7 +446,9 @@ router.put('/:id', async (req, res) => {
     for (const field of allowedFields) {
       if (updates[field] !== undefined) {
         setFields.push(`${field} = ?`);
-        values.push(field === 'print_settings' && typeof updates[field] === 'object' ? JSON.stringify(updates[field]) : updates[field]);
+        let val = field === 'print_settings' && typeof updates[field] === 'object' ? JSON.stringify(updates[field]) : updates[field];
+        if (field === 'active_for_site') val = val === true || val === 1 ? 1 : 0;
+        values.push(val);
       }
     }
 

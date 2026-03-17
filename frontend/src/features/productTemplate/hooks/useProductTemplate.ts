@@ -38,6 +38,8 @@ export type SimplifiedSizeConfig = {
   default_print?: Partial<SimplifiedPrintKey>;
   print_prices: SimplifiedPrintPrice[];
   allowed_material_ids: number[];
+  /** Если true — размер использует свой список материалов; иначе — общие материалы типа (common_allowed_material_ids) */
+  use_own_materials?: boolean;
   /** Материалы-основы (заготовки): футболки, кружки и т.п. — расход 1 шт на изделие */
   allowed_base_material_ids?: number[];
   material_prices: SimplifiedMaterialPrice[];
@@ -99,6 +101,8 @@ export type SubtypeInitialDefaults = {
 /** Конфиг одного типа: размеры и цены (печать, материалы, отделка) */
 export type SimplifiedTypeConfig = {
   sizes: SimplifiedSizeConfig[];
+  /** Общие материалы типа: используются всеми размерами, у которых use_own_materials !== true */
+  common_allowed_material_ids?: number[];
   pages?: SimplifiedPagesConfig;
   initial?: SubtypeInitialDefaults;
 }
@@ -267,12 +271,31 @@ export function useProductTemplateInitial(): TemplateState {
   }
 }
 
+/** Сортировка размеров от меньшего к большему по площади (ширина×высота), затем по ширине, затем по высоте */
+export function sortSizesByArea(sizes: SimplifiedSizeConfig[]): SimplifiedSizeConfig[] {
+  return [...sizes].sort((a, b) => {
+    const areaA = (a.width_mm ?? 0) * (a.height_mm ?? 0)
+    const areaB = (b.width_mm ?? 0) * (b.height_mm ?? 0)
+    if (areaA !== areaB) return areaA - areaB
+    if ((a.width_mm ?? 0) !== (b.width_mm ?? 0)) return (a.width_mm ?? 0) - (b.width_mm ?? 0)
+    return (a.height_mm ?? 0) - (b.height_mm ?? 0)
+  })
+}
+
 /** Конфиг текущего типа или legacy (sizes/pages из корня) */
 export function getEffectiveConfig(value: SimplifiedConfig, selectedTypeId: ProductTypeId | null): SimplifiedTypeConfig {
   if (value.types?.length && value.typeConfigs && selectedTypeId) {
     return value.typeConfigs[toTypeConfigKey(selectedTypeId)] ?? { sizes: [], pages: value.pages }
   }
   return { sizes: value.sizes, pages: value.pages }
+}
+
+/** Эффективный список разрешённых материалов для размера: свои или общие типа (по флагу use_own_materials) */
+export function getEffectiveAllowedMaterialIds(typeConfig: SimplifiedTypeConfig, size: SimplifiedSizeConfig): number[] {
+  const common = typeConfig.common_allowed_material_ids
+  if (size.use_own_materials === true) return size.allowed_material_ids ?? []
+  if (size.use_own_materials === false) return common ?? []
+  return (common != null && common.length > 0) ? common : (size.allowed_material_ids ?? [])
 }
 
 export function generateTypeId(): ProductTypeId {

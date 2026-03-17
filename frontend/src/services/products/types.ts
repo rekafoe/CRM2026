@@ -25,6 +25,8 @@ export interface Product {
   product_type?: 'sheet_single' | 'multi_page' | 'universal' | 'sheet_item' | 'multi_page_item';
   operator_percent?: number;
   is_active: boolean;
+  /** Показывать в каталоге на сайте (при запросе с forSite=1) */
+  active_for_site?: boolean | number;
   created_at: string;
   updated_at: string;
   category_name?: string;

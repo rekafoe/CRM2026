@@ -13,20 +13,22 @@ const productDetailsCache = new KeyedCache<ProductWithDetails>(5 * 60 * 1000);
 
 /**
  * Получить продукты по категории
+ * @param forSite - только продукты, активные для сайта (для каталога на сайте)
  */
 export async function getProductsByCategory(
   categoryId: number,
-  force: boolean = false
+  force: boolean = false,
+  forSite: boolean = false
 ): Promise<Product[]> {
-  const cacheKey = `category_${categoryId}`;
-
+  const cacheKey = forSite ? `category_${categoryId}_site` : `category_${categoryId}`;
   if (!force) {
     const cached = productsByCategoryCache.get(cacheKey);
     if (cached) return cached;
   }
 
+  const params = forSite ? { forSite: '1' } : {};
   const products = await apiRequestSafe<Product[]>(
-    () => api.get(`/products/category/${categoryId}`),
+    () => api.get(`/products/category/${categoryId}`, { params }),
     `загрузки продуктов категории ${categoryId}`,
     []
   );
@@ -39,17 +41,25 @@ export async function getProductsByCategory(
  * Получить все продукты
  * @param force - принудительно обновить кэш
  * @param activeOnly - показывать только активные продукты (для калькулятора/заказов)
+ * @param forSite - только продукты, активные для сайта (is_active=1 и active_for_site=1), для каталога на сайте
  */
-export async function getAllProducts(force: boolean = false, activeOnly: boolean = false): Promise<Product[]> {
-  const cacheKey = activeOnly ? 'active' : 'all';
-  
+export async function getAllProducts(
+  force: boolean = false,
+  activeOnly: boolean = false,
+  forSite: boolean = false
+): Promise<Product[]> {
+  const cacheKey = forSite ? 'site' : activeOnly ? 'active' : 'all';
   if (!force) {
     const cached = allProductsCache.get(cacheKey);
     if (cached) return cached;
   }
 
+  const params: Record<string, string> = {};
+  if (activeOnly) params.activeOnly = 'true';
+  if (forSite) params.forSite = '1';
+
   const products = await apiRequestSafe<Product[]>(
-    () => api.get('/products', { params: activeOnly ? { activeOnly: 'true' } : {} }),
+    () => api.get('/products', { params }),
     'загрузки всех продуктов',
     []
   );
@@ -111,6 +121,7 @@ export async function createProduct(productData: {
   calculator_type?: 'product' | 'operation' | 'simplified';
   product_type?: 'sheet_single' | 'multi_page' | 'universal' | 'sheet_item' | 'multi_page_item';
   operator_percent?: number;
+  active_for_site?: boolean | number;
 }): Promise<{ id: number; name: string }> {
   const response = await api.post('/products', productData);
   

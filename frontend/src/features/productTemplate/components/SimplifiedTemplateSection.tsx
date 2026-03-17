@@ -4,6 +4,7 @@ import type { CalculatorMaterial } from '../../../services/calculatorMaterialSer
 import { getPaperTypesFromWarehouse, type PaperTypeForCalculator } from '../../../services/calculatorMaterialService'
 import { getPrintTechnologies } from '../../../api'
 import type { SimplifiedConfig, SimplifiedSizeConfig, ProductTypeId } from '../hooks/useProductTemplate'
+import { sortSizesByArea, getEffectiveAllowedMaterialIds } from '../hooks/useProductTemplate'
 import type { UseSimplifiedTypesResult } from '../hooks/useSimplifiedTypes'
 import { PrintPricesCard } from './PrintPricesCard'
 import { MaterialsCard } from './MaterialsCard'
@@ -49,6 +50,7 @@ const cloneSizeWithNewId = (size: SimplifiedSizeConfig): SimplifiedSizeConfig =>
     tiers: (pp.tiers || []).map((t) => ({ ...t })),
   })),
   allowed_material_ids: [...(size.allowed_material_ids || [])],
+  use_own_materials: size.use_own_materials,
   allowed_base_material_ids: [...(size.allowed_base_material_ids || [])],
   material_prices: (size.material_prices || []).map((mp) => ({
     ...mp,
@@ -76,6 +78,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     selectedSizeId,
     setSelectedSizeId,
     selected,
+    effectiveConfig,
     pagesConfig,
     applyToCurrentConfig,
     updatePagesConfig,
@@ -85,6 +88,46 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     setDefaultType,
     removeType,
   } = types
+
+  // Эффективные материалы: общие типа или свои размера (флаг use_own_materials)
+  const useOwnMaterials = useMemo(() => {
+    if (!hasTypes || !selected) return true
+    if (selected.use_own_materials === true) return true
+    if (selected.use_own_materials === false) return false
+    const common = effectiveConfig.common_allowed_material_ids
+    return !common || common.length === 0
+  }, [hasTypes, selected, selected?.use_own_materials, effectiveConfig.common_allowed_material_ids])
+
+  const effectiveAllowedMaterialIds = useMemo(() => {
+    if (!selected) return []
+    if (useOwnMaterials) return selected.allowed_material_ids ?? []
+    return effectiveConfig.common_allowed_material_ids ?? []
+  }, [selected, useOwnMaterials, effectiveConfig.common_allowed_material_ids])
+
+  const updateEffectiveMaterials = useCallback(
+    (ids: number[]) => {
+      if (!selected) return
+      if (useOwnMaterials) {
+        updateSize(selected.id, { allowed_material_ids: ids })
+      } else {
+        applyToCurrentConfig((prev) => ({ ...prev, common_allowed_material_ids: ids }))
+      }
+    },
+    [selected, useOwnMaterials, updateSize, applyToCurrentConfig],
+  )
+
+  const setUseOwnMaterials = useCallback(
+    (v: boolean) => {
+      if (!selected) return
+      if (v) {
+        const common = effectiveConfig.common_allowed_material_ids ?? []
+        updateSize(selected.id, { use_own_materials: true, allowed_material_ids: [...common] })
+      } else {
+        updateSize(selected.id, { use_own_materials: false })
+      }
+    },
+    [selected, effectiveConfig.common_allowed_material_ids, updateSize],
+  )
 
   const [paperTypes, setPaperTypes] = useState<PaperTypeRow[]>([])
   const [printTechs, setPrintTechs] = useState<PrintTechRow[]>([])
@@ -110,10 +153,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   // Восстанавливаем флаг взаимодействия с материалами при смене размера
   useEffect(() => {
     if (!selected) return
-    if (selected.allowed_material_ids && selected.allowed_material_ids.length > 0) {
+    if (effectiveAllowedMaterialIds.length > 0) {
       hasUserInteractedWithMaterialsRef.current = true
     }
-  }, [selected])
+  }, [selected, effectiveAllowedMaterialIds])
 
   const loadLists = useCallback(async () => {
     setLoadingLists(true)
@@ -125,12 +168,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       setPaperTypes(pt || [])
       setPrintTechs((techResp || []).filter((t: any) => t && t.code))
 
-      if (selected && selected.allowed_material_ids && selected.allowed_material_ids.length > 0 && pt && pt.length > 0 && !selectedPaperTypeId) {
+      const typeConfig = hasTypes && selectedTypeId ? value.typeConfigs?.[String(selectedTypeId)] : undefined
+      const effectiveIds = typeConfig && selected ? getEffectiveAllowedMaterialIds(typeConfig, selected) : (selected?.allowed_material_ids ?? [])
+      if (selected && effectiveIds.length > 0 && pt && pt.length > 0 && !selectedPaperTypeId) {
         for (const paperType of pt) {
           const materialIds = new Set(
             paperType.densities?.map(d => d.material_id).filter(id => id && id > 0) || []
           )
-          const hasMatchingMaterial = selected.allowed_material_ids.some(id => materialIds.has(id))
+          const hasMatchingMaterial = effectiveIds.some(id => materialIds.has(id))
           if (hasMatchingMaterial && materialIds.size > 0) {
             setSelectedPaperTypeId(paperType.id)
             hasUserInteractedWithMaterialsRef.current = true
@@ -147,7 +192,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     } finally {
       setLoadingLists(false)
     }
-  }, [selectedPaperTypeId, selected])
+  }, [selectedPaperTypeId, selected, hasTypes, selectedTypeId, value.typeConfigs])
 
   useEffect(() => {
     if (!loadingLists && (paperTypes.length === 0 || printTechs.length === 0)) {
@@ -193,7 +238,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       material_prices: [],
       finishing: [],
     }
-    applyToCurrentConfig(prev => ({ ...prev, sizes: [...(prev.sizes || []), size] }))
+    applyToCurrentConfig(prev => ({ ...prev, sizes: sortSizesByArea([...(prev.sizes || []), size]) }))
     setSelectedSizeId(size.id)
     setShowAddSize(false)
     setNewSize({ label: '', width_mm: '', height_mm: '' })
@@ -233,7 +278,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     const cloned = selectedSourceSizes.map(cloneSizeWithNewId)
     applyToCurrentConfig((prev) => ({
       ...prev,
-      sizes: [...(prev.sizes || []), ...cloned],
+      sizes: sortSizesByArea([...(prev.sizes || []), ...cloned]),
     }))
     setSelectedSizeId(cloned[0]?.id ?? null)
     closeCopySizesModal()
@@ -358,28 +403,21 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const hasUserInteractedWithMaterialsRef = useRef(false)
   
   // Автоматическое добавление материалов при выборе типа бумаги только при первой загрузке
-  // НЕ добавляем автоматически, если уже есть сохраненные allowed_material_ids (пользователь уже выбирал)
   useEffect(() => {
     if (!selected || !selectedPaperTypeId || materialsForSelectedPaperType.length === 0) return
-    // Если пользователь уже взаимодействовал с материалами, не добавляем автоматически
     if (hasUserInteractedWithMaterialsRef.current) return
-    
-    // Если уже есть сохраненные allowed_material_ids, значит пользователь уже выбирал материалы
-    // Не добавляем автоматически, чтобы не перезаписать выбор пользователя
-    if (selected.allowed_material_ids && selected.allowed_material_ids.length > 0) {
+    if (effectiveAllowedMaterialIds.length > 0) {
       hasUserInteractedWithMaterialsRef.current = true
       return
     }
 
-    const materialsToAdd = materialsForSelectedPaperType.filter(m => 
-      !selected.allowed_material_ids.includes(Number(m.id))
+    const materialsToAdd = materialsForSelectedPaperType.filter(m =>
+      !effectiveAllowedMaterialIds.includes(Number(m.id))
     )
-    
     if (materialsToAdd.length > 0) {
-      const nextAllowed = [...selected.allowed_material_ids, ...materialsToAdd.map(m => Number(m.id))]
-      updateSize(selected.id, { allowed_material_ids: nextAllowed })
+      updateEffectiveMaterials([...effectiveAllowedMaterialIds, ...materialsToAdd.map(m => Number(m.id))])
     }
-  }, [selectedPaperTypeId, materialsForSelectedPaperType, selected, updateSize])
+  }, [selectedPaperTypeId, materialsForSelectedPaperType, selected, effectiveAllowedMaterialIds, updateEffectiveMaterials])
 
   // Отслеживание взаимодействия пользователя с услугами для каждого размера отдельно
   // Ключ - ID размера, значение - был ли пользователь взаимодействовал с услугами
@@ -388,12 +426,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   // Восстанавливаем флаг взаимодействия при смене размера
   useEffect(() => {
     if (!selected) return
-    
+    const hasMaterials = effectiveAllowedMaterialIds.length > 0
     // Если размер уже был настроен (есть print_prices или material_prices), 
     // и finishing пустой - значит пользователь явно удалил все услуги
     const hasOtherData = (selected.print_prices && selected.print_prices.length > 0) || 
-                        (selected.material_prices && selected.material_prices.length > 0) ||
-                        (selected.allowed_material_ids && selected.allowed_material_ids.length > 0)
+                        (selected.material_prices && selected.material_prices.length > 0) || hasMaterials
     
     if (hasOtherData && selected.finishing && selected.finishing.length === 0) {
       // Размер был настроен, но услуг нет - пользователь явно удалил их
@@ -403,7 +440,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       hasUserInteractedWithServicesRef.current.set(selected.id, true)
     }
     // Если размер новый (нет других данных) и finishing пустой - не помечаем как взаимодействие
-  }, [selected])
+  }, [selected, effectiveAllowedMaterialIds])
   
   useEffect(() => {
     if (!selected || services.length === 0) return
@@ -419,9 +456,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     }
 
     // Проверяем, был ли размер настроен ранее (есть другие данные)
+    const hasMaterials = effectiveAllowedMaterialIds.length > 0
     const hasOtherData = (selected.print_prices && selected.print_prices.length > 0) || 
-                        (selected.material_prices && selected.material_prices.length > 0) ||
-                        (selected.allowed_material_ids && selected.allowed_material_ids.length > 0)
+                        (selected.material_prices && selected.material_prices.length > 0) || hasMaterials
     
     // Если размер был настроен, но услуг нет - не добавляем автоматически
     // (пользователь мог явно удалить их)
@@ -431,7 +468,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     }
 
     // По умолчанию услуги не добавляем — послепечатные включаются вручную
-  }, [services, selected, getSizeRanges, updateSize])
+  }, [services, selected, effectiveAllowedMaterialIds, getSizeRanges, updateSize])
 
   return (
     <div className="simplified-template simplified-template--pricing">
@@ -555,35 +592,37 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         </div>
       )}
 
-      {sizes.length === 0 ? (
-        <Alert type="info">Добавьте хотя бы один размер (обрезной формат), чтобы начать настройку.</Alert>
-      ) : (
-        <div className="simplified-template__grid">
-          <div className="simplified-template__sizes">
-            <div className="simplified-template__sizes-header">
-              <div className="simplified-template__sizes-title">Обрезные форматы</div>
-              <div className="simplified-template__sizes-actions">
+      <div className="simplified-template__grid">
+        <div className="simplified-template__sizes">
+          <div className="simplified-template__sizes-header">
+            <div className="simplified-template__sizes-title">Обрезные форматы</div>
+            <div className="simplified-template__sizes-actions">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={openAddSize}
+                className="simplified-template__action-btn"
+              >
+                Добавить размер
+              </Button>
+              {hasTypes && availableSourceTypes.length > 0 && (
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={openAddSize}
+                  onClick={openCopySizesModal}
                   className="simplified-template__action-btn"
                 >
-                  Добавить размер
+                  Скопировать из типа
                 </Button>
-                {hasTypes && availableSourceTypes.length > 0 && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={openCopySizesModal}
-                    className="simplified-template__action-btn"
-                  >
-                    Скопировать из типа
-                  </Button>
-                )}
-              </div>
+              )}
             </div>
-            {sizes.map(s => (
+          </div>
+          {sizes.length === 0 ? (
+            <div className="simplified-template__sizes-empty text-muted text-sm" style={{ padding: 12 }}>
+              Нет размеров. Добавьте размер кнопкой выше или скопируйте из другого типа.
+            </div>
+          ) : (
+            sizes.map(s => (
               <button
                 key={s.id}
                 type="button"
@@ -593,13 +632,16 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                 <div className="simplified-size__label">{s.label}</div>
                 <div className="simplified-size__meta">{s.width_mm}×{s.height_mm}</div>
               </button>
-            ))}
-          </div>
+            ))
+          )}
+        </div>
 
-          <div className="simplified-template__editor">
-            {!selected ? (
-              <Alert type="warning">Выберите размер слева.</Alert>
-            ) : (
+        <div className="simplified-template__editor">
+          {!selected ? (
+            <Alert type="info">
+              {sizes.length === 0 ? 'Добавьте размер в блоке слева.' : 'Выберите размер слева.'}
+            </Alert>
+          ) : (
               <>
                 <div className="simplified-card">
                   <div className="simplified-card__header">
@@ -684,6 +726,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   allMaterials={allMaterials}
                   hasUserInteractedWithMaterialsRef={hasUserInteractedWithMaterialsRef}
                   updateSize={updateSize}
+                  hasCommonMaterialsFeature={hasTypes}
+                  useOwnMaterials={useOwnMaterials}
+                  effectiveAllowedMaterialIds={effectiveAllowedMaterialIds}
+                  updateEffectiveMaterials={updateEffectiveMaterials}
+                  setUseOwnMaterials={setUseOwnMaterials}
                 />
 
                 <FinishingCard
@@ -701,7 +748,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
             )}
           </div>
         </div>
-      )}
 
       <AddSizeModal
         isOpen={showAddSize}

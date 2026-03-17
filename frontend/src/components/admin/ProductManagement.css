@@ -81,6 +81,81 @@
   flex-shrink: 0;
 }
 
+/* Кнопки в стиле liquidglass (как на основной странице админки) */
+.product-management .lg-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  background: rgba(229, 231, 235, 0.88);
+  color: #1f2937;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.product-management .lg-btn:hover:not(:disabled) {
+  background: rgba(229, 231, 235, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.product-management .lg-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.product-management .lg-btn--primary {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #1d4ed8;
+}
+
+.product-management .lg-btn--primary:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.product-management .lg-btn--success {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #15803d;
+}
+
+.product-management .lg-btn--success:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.3);
+  border-color: rgba(34, 197, 94, 0.5);
+}
+
+.product-management .lg-btn--warning {
+  background: rgba(234, 179, 8, 0.2);
+  border-color: rgba(234, 179, 8, 0.4);
+  color: #a16207;
+}
+
+.product-management .lg-btn--warning:hover:not(:disabled) {
+  background: rgba(234, 179, 8, 0.3);
+  border-color: rgba(234, 179, 8, 0.5);
+}
+
+.product-management .lg-btn--danger {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #b91c1c;
+}
+
+.product-management .lg-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
 /* =================================
    Статистические карточки
    ================================= */
@@ -231,21 +306,38 @@
   background: #fff;
 }
 
+/* Селект категорий в стиле liquidglass */
 .product-controls__select {
-  padding: 10px 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  padding: 10px 36px 10px 16px;
+  border-radius: 999px;
   font-size: 13px;
-  background: #f8fafc;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s;
   min-width: 170px;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  background: rgba(229, 231, 235, 0.88);
+  color: #1f2937;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23475569' stroke-width='2'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+
+.product-controls__select:hover {
+  background-color: rgba(229, 231, 235, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .product-controls__select:focus {
   outline: none;
-  border-color: #64748b;
-  box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 0 3px rgba(71, 85, 105, 0.15);
 }
 
 .product-controls__actions {
@@ -254,35 +346,43 @@
   flex-wrap: wrap;
 }
 
+/* Переключатель «Только активные» в стиле liquidglass */
 .product-controls__toggle {
   padding: 10px 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #f8fafc;
+  border-radius: 999px;
   font-size: 13px;
   font-weight: 500;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  transition: all 0.2s;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: #334155;
+  gap: 8px;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  background: rgba(229, 231, 235, 0.88);
+  color: #1f2937;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
 }
 
 .product-controls__toggle:hover {
-  background: #f8fafc;
-  border-color: #cbd5e0;
+  background: rgba(229, 231, 235, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .product-controls__toggle--active {
-  background: #475569;
-  color: white;
-  border-color: #475569;
+  background: rgba(71, 85, 105, 0.35);
+  border-color: rgba(71, 85, 105, 0.5);
+  color: #1e293b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .product-controls__toggle--active:hover {
-  background: #334155;
-  border-color: #334155;
+  background: rgba(71, 85, 105, 0.45);
+  border-color: rgba(71, 85, 105, 0.6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Быстрые фильтры (чипы) */
@@ -355,10 +455,39 @@
   align-items: center;
   gap: 16px;
   padding: 12px 24px;
-  background: #475569;
+  background: rgba(71, 85, 105, 0.92);
   color: white;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   animation: pmSlideDown 0.25s ease-out;
+}
+
+.bulk-actions-bar .flex {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bulk-actions-bar .lg-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+.bulk-actions-bar .lg-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.bulk-actions-bar .lg-btn--success {
+  background: rgba(34, 197, 94, 0.4);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.bulk-actions-bar .lg-btn--warning {
+  background: rgba(234, 179, 8, 0.4);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 @keyframes pmSlideDown {
@@ -483,19 +612,17 @@
   align-items: center;
 }
 
-.products-table .row-actions .btn {
+.products-table .row-actions .lg-btn {
   white-space: nowrap;
   padding: 6px 10px;
   font-size: 12px;
   min-width: 0;
-  display: inline-flex;
 }
 
-.products-table .row-actions .row-actions__toggle-btn {
+.products-table .row-actions .lg-btn.row-actions__toggle-btn {
   min-width: 72px;
   width: 72px;
   justify-content: center;
-  align-items: center;
   gap: 4px;
 }
 
@@ -503,20 +630,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  background: rgba(229, 231, 235, 0.88);
   cursor: pointer;
   color: #475569;
-  transition: all 0.15s;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
 }
 
 .btn-setup-status:hover {
-  background: #334155;
-  color: white;
-  border-color: #334155;
+  background: rgba(229, 231, 235, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Пустая таблица */

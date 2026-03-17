@@ -270,6 +270,9 @@ export function compactSimplifiedForSite(simplified: any) {
     if (Array.isArray(size?.allowed_material_ids) && size.allowed_material_ids.length > 0) {
       base.allowed_material_ids = size.allowed_material_ids;
     }
+    if (size?.use_own_materials !== undefined) {
+      base.use_own_materials = size.use_own_materials;
+    }
     if (Array.isArray(size?.allowed_base_material_ids) && size.allowed_base_material_ids.length > 0) {
       base.allowed_base_material_ids = size.allowed_base_material_ids;
     }
@@ -310,6 +313,7 @@ export function compactSimplifiedForSite(simplified: any) {
             key,
             {
               sizes: Array.isArray(cfg?.sizes) ? cfg.sizes.map(compactSize) : [],
+              ...(Array.isArray(cfg?.common_allowed_material_ids) ? { common_allowed_material_ids: cfg.common_allowed_material_ids } : {}),
               pages: cfg?.pages || simplified.pages || null,
               initial: cfg?.initial || undefined,
             },
@@ -327,14 +331,22 @@ export function compactSimplifiedForSite(simplified: any) {
   };
 }
 
-/** Собирает уникальные ID материалов из simplified (allowed_material_ids, allowed_base_material_ids). */
+function getEffectiveAllowedMaterialIdsForSize(typeConfig: any, size: any): number[] {
+  const common = typeConfig?.common_allowed_material_ids;
+  if (size?.use_own_materials === true) return size?.allowed_material_ids ?? [];
+  if (size?.use_own_materials === false) return common ?? [];
+  return (common != null && common.length > 0) ? common : (size?.allowed_material_ids ?? []);
+}
+
+/** Собирает уникальные ID материалов из simplified (allowed_material_ids, common_allowed_material_ids, allowed_base_material_ids). */
 export function collectMaterialIdsFromSimplified(simplified: any): number[] {
   if (!simplified || typeof simplified !== 'object') return [];
   const ids = new Set<number>();
 
-  const addFromSize = (size: any) => {
-    if (Array.isArray(size?.allowed_material_ids)) {
-      size.allowed_material_ids.forEach((id: number) => {
+  const addFromSize = (size: any, typeConfig?: any) => {
+    const materialIds = typeConfig ? getEffectiveAllowedMaterialIdsForSize(typeConfig, size) : (size?.allowed_material_ids ?? []);
+    if (Array.isArray(materialIds)) {
+      materialIds.forEach((id: number) => {
         if (Number.isFinite(Number(id))) ids.add(Number(id));
       });
     }
@@ -346,11 +358,16 @@ export function collectMaterialIdsFromSimplified(simplified: any): number[] {
   };
 
   if (Array.isArray(simplified.sizes)) {
-    simplified.sizes.forEach(addFromSize);
+    simplified.sizes.forEach((s: any) => addFromSize(s));
   }
   if (simplified.typeConfigs && typeof simplified.typeConfigs === 'object') {
     for (const cfg of Object.values(simplified.typeConfigs) as any[]) {
-      if (Array.isArray(cfg?.sizes)) cfg.sizes.forEach(addFromSize);
+      if (Array.isArray(cfg?.common_allowed_material_ids)) {
+        cfg.common_allowed_material_ids.forEach((id: number) => {
+          if (Number.isFinite(Number(id))) ids.add(Number(id));
+        });
+      }
+      if (Array.isArray(cfg?.sizes)) cfg.sizes.forEach((s: any) => addFromSize(s, cfg));
     }
   }
 

@@ -193,27 +193,35 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
           const commonRanges = getSizeRanges(selected)
           const colorRows = selected.print_prices.filter(p => p.color_mode === 'color')
           const bwRows = selected.print_prices.filter(p => p.color_mode === 'bw')
-          const removeSidesMode = (sidesMode: 'single' | 'duplex') => {
-            const remaining = selected.print_prices.filter(p => p.sides_mode !== sidesMode)
+          const techCode = selected.print_prices[0]?.technology_code ?? selected.default_print?.technology_code ?? ''
+          const selectedTech = techCode ? printTechs.find(t => t.code === techCode) : null
+          const supportsDuplex = selectedTech?.supports_duplex === 1 || selectedTech?.supports_duplex === true
+          const isColorOnly = techCode.toLowerCase().includes('inkjet_pigment') ||
+            (techCode.toLowerCase().includes('inkjet') && selectedTech?.name?.toLowerCase().includes('пигмент'))
+
+          const removeVariant = (color_mode: 'color' | 'bw', sides_mode: 'single' | 'duplex') => {
+            const remaining = selected.print_prices.filter(
+              p => !(p.color_mode === color_mode && p.sides_mode === sides_mode)
+            )
             if (remaining.length === 0) return
             updateSize(selected.id, { print_prices: remaining })
           }
-          const hasSingle = selected.print_prices.some(p => p.sides_mode === 'single')
-          const hasDuplex = selected.print_prices.some(p => p.sides_mode === 'duplex')
-          const selectedTech = selected.default_print?.technology_code
-            ? printTechs.find(t => t.code === selected.default_print?.technology_code)
-            : null
-          const supportsDuplex = selectedTech?.supports_duplex === 1 || selectedTech?.supports_duplex === true
-          const addSidesMode = (sidesMode: 'single' | 'duplex') => {
+          const addVariant = (color_mode: 'color' | 'bw', sides_mode: 'single' | 'duplex') => {
             const existing = selected.print_prices
-            const newEntries = existing.map(p => ({
-              technology_code: p.technology_code,
-              color_mode: p.color_mode,
-              sides_mode: sidesMode as 'single' | 'duplex',
-              tiers: (p.tiers || defaultTiers()).map(t => ({ ...t, unit_price: 0 }))
-            }))
-            updateSize(selected.id, { print_prices: [...existing, ...newEntries] })
+            const ref = existing[0]
+            if (!ref) return
+            const tiers = (ref.tiers || defaultTiers()).map(t => ({ ...t, unit_price: 0 }))
+            const newEntry = {
+              technology_code: ref.technology_code,
+              color_mode,
+              sides_mode,
+              tiers,
+            }
+            if (existing.some(p => p.color_mode === color_mode && p.sides_mode === sides_mode)) return
+            updateSize(selected.id, { print_prices: [...existing, newEntry] })
           }
+          const hasVariant = (color_mode: 'color' | 'bw', sides_mode: 'single' | 'duplex') =>
+            selected.print_prices.some(p => p.color_mode === color_mode && p.sides_mode === sides_mode)
 
           const renderPriceRow = (row: typeof selected.print_prices[0], label: string, canRemove: boolean, removeFn: () => void) => {
             const actualIdx = selected.print_prices.findIndex(p =>
@@ -372,15 +380,15 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                         renderPriceRow(
                           colorRows.find(r => r.sides_mode === 'single')!,
                           'односторонняя',
-                          selected.print_prices.some(p => p.sides_mode === 'duplex'),
-                          () => removeSidesMode('single')
+                          selected.print_prices.length > 1,
+                          () => removeVariant('color', 'single')
                         )}
                       {colorRows.find(r => r.sides_mode === 'duplex') &&
                         renderPriceRow(
                           colorRows.find(r => r.sides_mode === 'duplex')!,
                           'двухсторонняя',
-                          selected.print_prices.some(p => p.sides_mode === 'single'),
-                          () => removeSidesMode('duplex')
+                          selected.print_prices.length > 1,
+                          () => removeVariant('color', 'duplex')
                         )}
                     </>
                   )}
@@ -391,50 +399,48 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                         renderPriceRow(
                           bwRows.find(r => r.sides_mode === 'single')!,
                           'односторонняя',
-                          selected.print_prices.some(p => p.sides_mode === 'duplex'),
-                          () => removeSidesMode('single')
+                          selected.print_prices.length > 1,
+                          () => removeVariant('bw', 'single')
                         )}
                       {bwRows.find(r => r.sides_mode === 'duplex') &&
                         renderPriceRow(
                           bwRows.find(r => r.sides_mode === 'duplex')!,
                           'двухсторонняя',
-                          selected.print_prices.some(p => p.sides_mode === 'single'),
-                          () => removeSidesMode('duplex')
+                          selected.print_prices.length > 1,
+                          () => removeVariant('bw', 'duplex')
                         )}
                     </>
                   )}
                 </tbody>
               </table>
-              {(hasSingle && !hasDuplex && supportsDuplex) || (!hasSingle && hasDuplex) ? (
-                <div className="simplified-tiers-table__add-sides" style={{ marginTop: 10, fontSize: 13, color: '#606266' }}>
-                  {hasSingle && !hasDuplex && supportsDuplex && (
-                    <>
-                      Сейчас только односторонняя печать.{' '}
-                      <button
-                        type="button"
-                        className="el-button el-button--text el-button--mini"
-                        style={{ color: 'var(--primary, #409eff)' }}
-                        onClick={() => addSidesMode('duplex')}
-                      >
-                        Добавить двухстороннюю
-                      </button>
-                    </>
-                  )}
-                  {!hasSingle && hasDuplex && (
-                    <>
-                      Сейчас только двухсторонняя печать.{' '}
-                      <button
-                        type="button"
-                        className="el-button el-button--text el-button--mini"
-                        style={{ color: 'var(--primary, #409eff)' }}
-                        onClick={() => addSidesMode('single')}
-                      >
-                        Добавить одностороннюю
-                      </button>
-                    </>
-                  )}
-                </div>
-              ) : null}
+              {(() => {
+                const missing: Array<{ color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex'; label: string }> = []
+                if (!hasVariant('color', 'single')) missing.push({ color_mode: 'color', sides_mode: 'single', label: 'полноцвет односторонняя' })
+                if (supportsDuplex && !hasVariant('color', 'duplex')) missing.push({ color_mode: 'color', sides_mode: 'duplex', label: 'полноцвет двухсторонняя' })
+                if (!isColorOnly) {
+                  if (!hasVariant('bw', 'single')) missing.push({ color_mode: 'bw', sides_mode: 'single', label: 'ч/б односторонняя' })
+                  if (supportsDuplex && !hasVariant('bw', 'duplex')) missing.push({ color_mode: 'bw', sides_mode: 'duplex', label: 'ч/б двухсторонняя' })
+                }
+                if (missing.length === 0) return null
+                return (
+                  <div className="simplified-tiers-table__add-sides" style={{ marginTop: 10, fontSize: 13, color: '#606266' }}>
+                    Добавить вариацию:{' '}
+                    {missing.map((m, i) => (
+                      <span key={`${m.color_mode}-${m.sides_mode}`}>
+                        {i > 0 && ' · '}
+                        <button
+                          type="button"
+                          className="el-button el-button--text el-button--mini"
+                          style={{ color: 'var(--primary, #409eff)' }}
+                          onClick={() => addVariant(m.color_mode, m.sides_mode)}
+                        >
+                          {m.label}
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
           )
         })()}

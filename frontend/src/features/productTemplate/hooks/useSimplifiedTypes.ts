@@ -8,6 +8,7 @@ import {
   getEffectiveConfig,
   generateTypeId,
   buildDefaultSizes,
+  sortSizesByArea,
 } from './useProductTemplate'
 
 export interface UseSimplifiedTypesResult {
@@ -44,7 +45,10 @@ export function useSimplifiedTypes(
     () => getEffectiveConfig(value, hasTypes ? selectedTypeId : null),
     [value, hasTypes, selectedTypeId],
   )
-  const sizes = effectiveConfig.sizes
+  const sizes = useMemo(
+    () => sortSizesByArea(effectiveConfig.sizes ?? []),
+    [effectiveConfig.sizes],
+  )
 
   const selected = useMemo(
     () => sizes.find(s => String(s.id) === String(selectedSizeId)) || null,

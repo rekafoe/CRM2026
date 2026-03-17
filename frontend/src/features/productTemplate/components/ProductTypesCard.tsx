@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../../../components/common'
 import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
 import type { SimplifiedConfig, SimplifiedTypeConfig, ProductTypeVariant, ProductTypeId, SubtypeInitialDefaults, InitialOperation } from '../hooks/useProductTemplate'
+import { sortSizesByArea, getEffectiveAllowedMaterialIds } from '../hooks/useProductTemplate'
 import { uploadProductImage } from '../../../services/products'
 import './SimplifiedTemplateSection.css'
 
@@ -87,6 +88,7 @@ const TypeInitialDefaults: React.FC<{
   const cfg = value.typeConfigs?.[String(typeId)]
   const initial = cfg?.initial ?? {} as Partial<SubtypeInitialDefaults>
   const sizes = cfg?.sizes ?? []
+  const sortedSizes = useMemo(() => sortSizesByArea(sizes), [sizes])
   const finishingServices = useTypeFinishingServices(cfg, services)
 
   const updateInitial = (patch: Partial<SubtypeInitialDefaults>) => {
@@ -107,8 +109,8 @@ const TypeInitialDefaults: React.FC<{
     const defaultSizeId = initial.size_id
     const targetSize = defaultSizeId
       ? sizes.find((x: any) => String(x.id) === String(defaultSizeId))
-      : sizes[0]
-    const ids = targetSize?.allowed_material_ids || []
+      : sortedSizes[0]
+    const ids = targetSize && cfg ? getEffectiveAllowedMaterialIds(cfg, targetSize) : (targetSize?.allowed_material_ids || [])
     const idSet = new Set(ids)
     return Array.from(idSet)
       .map(id => {
@@ -116,7 +118,7 @@ const TypeInitialDefaults: React.FC<{
         return { id, name: mat ? `${mat.name}` : `Материал #${id}` }
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [sizes, allMaterials, initial.size_id])
+  }, [cfg, sizes, sortedSizes, allMaterials, initial.size_id])
 
   const availableBaseMaterials = useMemo(() => {
     const idSet = new Set<number>()
@@ -182,8 +184,8 @@ const TypeInitialDefaults: React.FC<{
           onChange={(e) => {
             const v = e.target.value;
             const newSizeId = v ? (Number(v) || v) : undefined;
-            const newSize = newSizeId ? sizes.find((s: any) => String(s.id) === String(newSizeId)) : sizes[0];
-            const allowedIds = new Set(newSize?.allowed_material_ids || []);
+            const newSize = newSizeId ? sizes.find((s: any) => String(s.id) === String(newSizeId)) : sortedSizes[0];
+            const allowedIds = new Set(newSize && cfg ? getEffectiveAllowedMaterialIds(cfg, newSize) : (newSize?.allowed_material_ids || []));
             const keepMaterial = initial.material_id != null && allowedIds.has(initial.material_id);
             updateInitial({
               size_id: newSizeId,
@@ -192,7 +194,7 @@ const TypeInitialDefaults: React.FC<{
           }}
         >
           <option value="">Авто (первый размер)</option>
-          {sizes.map((s: any) => (
+          {sortedSizes.map((s: any) => (
             <option key={s.id} value={s.id}>
               {s.label || `${s.width_mm}×${s.height_mm}`}
             </option>
