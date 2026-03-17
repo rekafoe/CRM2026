@@ -94,8 +94,10 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
     id: number;
     number: string;
     status: number;
+    status_name?: string;
     created_at: string;
     prepayment_status?: string | null;
+    prepayment_status_label?: string;
     payment_method?: string | null;
     prepayment_amount: number;
     discount_percent: number;
@@ -654,7 +656,13 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
             </div>
             <div className="reports-stat-label">Всего заказов</div>
           </div>
-          <div className="reports-stat-card">
+          <div
+            className="reports-stat-card reports-stat-card--clickable"
+            onClick={() => void loadDrilldownOrders('revenue', 'Заказы в выручке')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void loadDrilldownOrders('revenue', 'Заказы в выручке'); }}
+          >
             <div className="reports-stat-value">
               {totalStats.totalRevenue.toLocaleString('ru-RU')} BYN
             </div>
@@ -1118,6 +1126,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
                   onChange={(e) => void loadDrilldownOrders(e.target.value, undefined, drilldownReasonFilter || undefined)}
                 >
                   <option value="all">Все</option>
+                  <option value="revenue">В выручке</option>
                   <option value="created">Создан</option>
                   <option value="completed">Выдан</option>
                   <option value="cancelled">Отменён</option>
@@ -1139,6 +1148,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
                       <th>№</th>
                       <th>Дата</th>
                       <th>Статус</th>
+                      <th>Статус оплаты</th>
                       <th>Оператор</th>
                       <th>Предоплата</th>
                       <th>Сумма заказа</th>
@@ -1149,7 +1159,8 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
                       <tr key={order.id}>
                         <td>{order.number || `#${order.id}`}</td>
                         <td>{String(order.created_at || '').slice(0, 16).replace('T', ' ')}</td>
-                        <td>{order.status}</td>
+                        <td>{order.status_name ?? order.status}</td>
+                        <td>{order.prepayment_status_label ?? order.prepayment_status ?? '—'}</td>
                         <td>{order.user_name || '—'}</td>
                         <td>{Number(order.prepayment_amount || 0).toLocaleString('ru-RU')} BYN</td>
                         <td>{Number(order.order_total || 0).toLocaleString('ru-RU')} BYN</td>
@@ -1157,7 +1168,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
                     ))}
                     {drilldownOrders.length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ textAlign: 'center', padding: 16 }}>Нет заказов по текущему фильтру</td>
+                        <td colSpan={7} style={{ textAlign: 'center', padding: 16 }}>Нет заказов по текущему фильтру</td>
                       </tr>
                     )}
                   </tbody>

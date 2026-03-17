@@ -574,7 +574,11 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
   }
 
   if (statusFilter && statusFilter !== 'all') {
-    if (statusFilter === 'paid') {
+    if (statusFilter === 'revenue') {
+      where.push('(o.status IS NULL OR o.status != 0)')
+      where.push('(o.status IS NULL OR o.status != 5)')
+      where.push("(o.status = 7 OR o.prepaymentStatus IN ('paid', 'successful'))")
+    } else if (statusFilter === 'paid') {
       where.push(`o.prepaymentStatus IN ('paid','successful')`)
     } else if (statusFilter === 'pending_payment') {
       where.push(`COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
@@ -626,8 +630,10 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
       o.id,
       o.number,
       o.status,
-      COALESCE(o.createdAt, o.created_at) as created_at,
+      CASE WHEN o.status = 0 THEN 'Создан' WHEN o.status = 1 THEN 'Подтверждён' WHEN o.status = 2 THEN 'В работе'
+        WHEN o.status = 3 THEN 'Выполнен' WHEN o.status = 4 THEN 'Передан в ПВЗ' WHEN o.status = 5 THEN 'Отменён' WHEN o.status = 7 THEN 'Завершён' ELSE '—' END as status_name,
       o.prepaymentStatus as prepayment_status,
+      CASE WHEN o.prepaymentStatus IN ('paid','successful') THEN 'Оплачен' WHEN o.prepaymentStatus IS NULL OR o.prepaymentStatus = '' THEN '—' ELSE o.prepaymentStatus END as prepayment_status_label,
       o.paymentMethod as payment_method,
       COALESCE(o.prepaymentAmount, 0) as prepayment_amount,
       COALESCE(o.discount_percent, 0) as discount_percent,
