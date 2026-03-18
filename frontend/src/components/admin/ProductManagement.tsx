@@ -394,14 +394,14 @@ const ProductManagement: React.FC = () => {
             <table className="products-table">
               <thead>
                 <tr>
-                  <th style={{ width: '40px' }}>
+                  <th>
                     <input
                       type="checkbox"
                       checked={state.selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
                       onChange={toggleSelectAll}
                     />
                   </th>
-                  <th style={{ width: '50px' }}></th>
+                  <th></th>
                   <th className="sortable-header" onClick={() => toggleSort('name')}>
                     Название {state.sortField === 'name' && (state.sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
@@ -409,8 +409,8 @@ const ProductManagement: React.FC = () => {
                     Категория {state.sortField === 'category' && (state.sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th>Статус</th>
-                  <th style={{ width: '90px' }} title="Показывать в каталоге на сайте">На сайте</th>
-                  <th style={{ width: '50px' }}></th>
+                  <th title="Показывать в каталоге на сайте">На сайте</th>
+                  <th></th>
                   <th>Описание</th>
                   <th>Действия</th>
                 </tr>

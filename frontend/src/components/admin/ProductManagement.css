@@ -7,9 +7,9 @@
    Основной контейнер
    ================================= */
 .product-management {
-  max-width: 1440px;
+  max-width: 1680px;
   margin: 0 auto;
-  padding: 24px 24px 48px;
+  padding: 24px 20px 48px;
   animation: pmFadeIn 0.3s ease-out;
 }
 
@@ -509,6 +509,7 @@
 
 .products-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -518,7 +519,7 @@
 }
 
 .products-table thead th {
-  padding: 14px 18px;
+  padding: 10px 12px;
   text-align: left;
   font-size: 11px;
   font-weight: 600;
@@ -529,13 +530,22 @@
   white-space: nowrap;
 }
 
+.products-table thead th:nth-child(1) { width: 3%; }
+.products-table thead th:nth-child(2) { width: 4%; }
+.products-table thead th:nth-child(3) { width: 24%; }
+.products-table thead th:nth-child(4) { width: 12%; }
+.products-table thead th:nth-child(5) { width: 8%; }
+.products-table thead th:nth-child(6) { width: 8%; }
+.products-table thead th:nth-child(7) { width: 4%; }
+.products-table thead th:nth-child(8) { width: 15%; }
+.products-table thead th:nth-child(9) { width: 22%; }
+
 .products-table thead th {
   border-right: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .products-table thead th:last-child {
   border-right: none;
-  min-width: 340px;
 }
 
 .sortable-header {
@@ -565,16 +575,19 @@
 }
 
 .products-table tbody td {
-  padding: 12px 18px;
+  padding: 10px 12px;
   font-size: 13px;
   color: #334155;
   vertical-align: middle;
   border-bottom: 1px solid #e2e8f0;
   border-right: 1px solid #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .products-table tbody td:last-child {
   border-right: none;
+  overflow: visible;
 }
 
 .products-table .cell-icon {
@@ -599,7 +612,7 @@
 
 .products-table .cell-description {
   color: #64748b;
-  max-width: 200px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -607,7 +620,7 @@
 
 .products-table .row-actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: nowrap;
   justify-content: flex-end;
   align-items: center;
@@ -615,22 +628,25 @@
 }
 
 .products-table tbody td:last-child {
-  min-width: 340px;
-  padding-right: 16px;
+  width: 22%;
+  padding: 8px 10px;
+  min-width: 0;
 }
 
 .products-table .row-actions .lg-btn {
   white-space: nowrap;
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 5px 8px;
+  font-size: 11px;
   min-width: 0;
+  border-radius: 8px;
 }
 
 .products-table .row-actions .lg-btn.row-actions__toggle-btn {
-  min-width: 72px;
-  width: 72px;
+  min-width: 52px;
+  width: 52px;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
+  padding: 5px 6px;
 }
 
 .btn-setup-status {
