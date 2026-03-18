@@ -33,6 +33,7 @@ interface MaterialsSectionProps {
       price?: number;
       available_quantity?: number;
       is_available?: boolean;
+      material_id?: number;
     }> 
   }>;
   availableDensities: Array<{ value: number; label: string }>;
@@ -286,20 +287,35 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     });
   }, [allowedMaterialsForSize, selectedMaterialType]);
 
-  // Плотности для выбранного типа (из разрешённых для продукта материалов этого типа)
+  // Плотности для выбранного типа: из материалов продукта; если пусто — из типа бумаги на складе (по display_name)
   const densitiesForSelectedType = useMemo(() => {
-    const values = allowedMaterialsByType
+    const fromMaterials = allowedMaterialsByType
       .map(m => getMaterialDensity(m))
       .filter((d): d is number => d != null && d > 0);
-    return [...new Set(values)].sort((a, b) => a - b);
-  }, [allowedMaterialsByType]);
+    if (fromMaterials.length > 0) return [...new Set(fromMaterials)].sort((a, b) => a - b);
+    const pt = warehousePaperTypes.find(
+      p => normalizeForCompare(p.display_name) === normalizeForCompare(selectedMaterialType)
+    );
+    if (pt?.densities?.length) return pt.densities.map(d => d.value).sort((a, b) => a - b);
+    return [];
+  }, [allowedMaterialsByType, selectedMaterialType, warehousePaperTypes]);
 
-  // По выбранному типу + плотности находим материал (первый подходящий из разрешённых)
+  // По выбранному типу + плотности находим материал: сначала по полю density в материалах, затем по material_id из типа бумаги (склад)
   const materialByTypeAndDensity = useMemo(() => {
     if (selectedDensity === '') return undefined;
     const targetDensity = Number(selectedDensity);
-    return allowedMaterialsByType.find(m => getMaterialDensity(m) === targetDensity);
-  }, [allowedMaterialsByType, selectedDensity]);
+    let m = allowedMaterialsByType.find(material => getMaterialDensity(material) === targetDensity);
+    if (m) return m;
+    const pt = warehousePaperTypes.find(
+      p => normalizeForCompare(p.display_name) === normalizeForCompare(selectedMaterialType)
+    );
+    const densityEntry = pt?.densities?.find(d => d.value === targetDensity);
+    if (densityEntry && allowedMaterialsForSize.some(material => Number(material.id) === densityEntry.material_id)) {
+      m = allowedMaterialsForSize.find(material => Number(material.id) === densityEntry.material_id);
+      if (m) return m;
+    }
+    return undefined;
+  }, [allowedMaterialsByType, allowedMaterialsForSize, selectedDensity, selectedMaterialType, warehousePaperTypes]);
 
   // Сбрасываем material_id, если он не входит в разрешённые для выбранного размера
   useEffect(() => {

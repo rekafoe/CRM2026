@@ -470,7 +470,11 @@
 .earnings-detail-modal .earnings-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
+.earnings-detail-modal .earnings-table th:nth-child(1) { width: 28%; }
+.earnings-detail-modal .earnings-table th:nth-child(2) { width: 22%; }
+.earnings-detail-modal .earnings-table th:nth-child(3) { width: 50%; }
 .earnings-detail-modal .earnings-table th {
   background: rgba(249, 250, 251, 0.9);
   font-size: 12px;
@@ -485,6 +489,12 @@
   font-size: 13px;
   color: #334155;
   border-bottom: 1px solid rgba(241, 245, 249, 0.9);
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+.earnings-detail-modal .earnings-table td:nth-child(3) {
+  min-width: 0;
 }
 .earnings-detail-modal .earnings-table tbody tr:last-child td {
   border-bottom: none;

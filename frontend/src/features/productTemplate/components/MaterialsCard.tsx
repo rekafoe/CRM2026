@@ -99,9 +99,13 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
         <>
           <div className="mt-3 mb-3" style={{ border: '1px solid #e5e7eb', borderRadius: '4px', padding: '12px' }}>
             {hasCommonMaterialsFeature && !useOwnMaterials && (
-              <div className="text-muted text-sm mb-2">Используются общие материалы типа для всех размеров.</div>
+              <div className="text-muted text-sm mb-2" style={{ backgroundColor: '#f0f9ff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #bae6fd' }}>
+                <strong>Общие материалы типа.</strong> Список ниже — общий для всех размеров этого типа. Добавляйте и снимайте галочки — изменения применятся ко всем размерам, у которых не включены «свои материалы».
+              </div>
             )}
-            <div className="text-sm font-medium mb-2">Выберите разрешенные материалы:</div>
+            <div className="text-sm font-medium mb-2">
+              {hasCommonMaterialsFeature && !useOwnMaterials ? 'Общие материалы типа (отметьте разрешённые):' : 'Выберите разрешенные материалы:'}
+            </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
               {materialsForSelectedPaperType.map(m => {
                 const densityInfo = paperTypes.find(pt => pt.id === selectedPaperTypeId)
