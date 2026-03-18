@@ -287,7 +287,7 @@ router.get('/admin', asyncHandler(async (req, res) => {
     const earnings = totalsCurrentMap.get(u.id) || 0
     const totalPenalties = penaltiesMap.get(u.id) || 0
     const totalBonuses = bonusesMap.get(u.id) || 0
-    const totalNet = Math.max(0, earnings + totalBonuses - totalPenalties)
+    const totalNet = Math.max(0, Number(earnings) + Number(totalBonuses) - Number(totalPenalties))
     const history = historyKeys.map((key) => ({
       month: key,
       total: historyMap.get(`${u.id}_${key}`) || 0,
@@ -429,7 +429,7 @@ router.patch('/penalties/:id', asyncHandler(async (req, res) => {
       `SELECT id, user_id, amount, reason, penalty_date, order_id, created_at, created_by FROM user_penalties WHERE id = ?`,
       [id]
     )
-    return res.json({
+    res.json({
       id: row.id,
       userId: row.user_id,
       amount: Number(row.amount) || 0,
@@ -439,6 +439,7 @@ router.patch('/penalties/:id', asyncHandler(async (req, res) => {
       createdAt: row.created_at,
       createdBy: row.created_by ?? undefined,
     })
+    return
   }
   values.push(id)
   await db.run(`UPDATE user_penalties SET ${updates.join(', ')} WHERE id = ?`, values)
@@ -597,7 +598,7 @@ router.patch('/bonuses/:id', asyncHandler(async (req, res) => {
       `SELECT id, user_id, amount, reason, bonus_date, order_id, created_at, created_by FROM user_bonuses WHERE id = ?`,
       [id]
     )
-    return res.json({
+    res.json({
       id: row.id,
       userId: row.user_id,
       amount: Number(row.amount) || 0,
@@ -607,6 +608,7 @@ router.patch('/bonuses/:id', asyncHandler(async (req, res) => {
       createdAt: row.created_at,
       createdBy: row.created_by ?? undefined,
     })
+    return
   }
   values.push(id)
   await db.run(`UPDATE user_bonuses SET ${updates.join(', ')} WHERE id = ?`, values)
