@@ -9,6 +9,7 @@ interface ModalProps {
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  overlayClassName?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({ 
@@ -17,7 +18,8 @@ export const Modal: React.FC<ModalProps> = ({
   title, 
   children, 
   size = 'md',
-  className = '' 
+  className = '',
+  overlayClassName = '',
 }) => {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -50,25 +52,26 @@ export const Modal: React.FC<ModalProps> = ({
 
   const sizeClasses = getSizeClasses(size);
 
+  const overlayClasses = overlayClassName ? `modal-overlay ${overlayClassName}` : 'modal-overlay';
   const modalContent = (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className={overlayClasses} onClick={onClose}>
       <div 
         className={`modal-content ${sizeClasses} ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {title && (
-          <div className="flex items-center justify-between p-6 border-b border-color">
+          <div className="modal-header flex items-center justify-between p-6 border-b border-color">
             <h2 className="text-xl font-semibold text-primary">{title}</h2>
             <button 
               onClick={onClose}
-              className="btn btn-sm btn-secondary"
+              className="modal-close-btn btn btn-sm btn-secondary"
               aria-label="Закрыть"
             >
               ×
             </button>
           </div>
         )}
-        <div className="p-6">
+        <div className="modal-body p-6">
           {children}
         </div>
       </div>

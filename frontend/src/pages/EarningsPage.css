@@ -203,6 +203,17 @@
    color: #1f2937;
  }
 
+.earnings-summary-card--clickable {
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.earnings-summary-card--clickable:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
 .earnings-table-wrapper {
   border: 1px solid rgba(209, 213, 219, 0.5);
   border-radius: 12px;
@@ -275,6 +286,205 @@
 
 .earnings-summary-card--today .earnings-summary-value {
   color: #166534;
+}
+
+.earnings-summary-card--bonus .earnings-summary-value {
+  color: #15803d;
+}
+
+.earnings-summary-card--penalty .earnings-summary-value {
+  color: #b91c1c;
+}
+
+.earnings-summary-card--net {
+  background: rgba(226, 232, 240, 0.9);
+  border-color: rgba(71, 85, 105, 0.4);
+}
+
+.earnings-summary-card--net .earnings-summary-value {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+/* Блоки премий и штрафов — в одном стиле с группами по дням */
+.earnings-aux-block {
+  margin-left: 60px;
+  margin-right: 60px;
+  margin-bottom: 16px;
+  background: #fff;
+  border: 1px solid rgba(209, 213, 219, 0.5);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.earnings-aux-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  background: rgba(249, 250, 251, 0.9);
+  border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+}
+
+.earnings-aux-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.earnings-aux-total {
+  font-weight: 600;
+  font-size: 14px;
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+
+.earnings-aux-total--bonus {
+  color: #166534;
+  background: rgba(209, 250, 229, 0.8);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.earnings-aux-total--penalty {
+  color: #57534e;
+  background: rgba(241, 245, 249, 0.95);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.earnings-aux-block .earnings-table--aux {
+  margin: 0;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.earnings-aux-block .earnings-table--aux th {
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+  text-align: left;
+}
+
+.earnings-aux-block .earnings-table--aux td {
+  padding: 10px 18px;
+  font-size: 13px;
+  color: #334155;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.9);
+}
+
+.earnings-aux-block .earnings-table--aux tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.earnings-amount--bonus {
+  font-weight: 600;
+  color: #15803d;
+}
+
+.earnings-amount--penalty {
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+/* Модалки премий и штрафов — в стиле страницы (карточка как earnings-day-group) */
+.earnings-modal-overlay {
+  background-color: rgba(15, 23, 42, 0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.earnings-modal {
+  background: #fff;
+  border: 1px solid rgba(209, 213, 219, 0.5);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  max-height: 85vh;
+}
+
+.earnings-modal .modal-header {
+  padding: 12px 18px;
+  background: rgba(249, 250, 251, 0.9);
+  border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+}
+
+.earnings-modal .modal-header h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.earnings-modal .modal-close-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  background: rgba(229, 231, 235, 0.88);
+  color: #475569;
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.earnings-modal .modal-close-btn:hover {
+  background: rgba(241, 245, 249, 0.95);
+  border-color: rgba(203, 213, 225, 0.8);
+  color: #1f2937;
+}
+
+.earnings-modal .modal-body {
+  padding: 18px;
+}
+
+/* Контент внутри модалки */
+.earnings-detail-modal {
+  padding: 0 4px;
+}
+.earnings-detail-modal__summary {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #64748b;
+}
+.earnings-detail-modal__summary strong {
+  color: #1f2937;
+}
+.earnings-detail-modal__empty {
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+}
+.earnings-detail-modal .earnings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.earnings-detail-modal .earnings-table th {
+  background: rgba(249, 250, 251, 0.9);
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+  text-align: left;
+}
+.earnings-detail-modal .earnings-table td {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #334155;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.9);
+}
+.earnings-detail-modal .earnings-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 /* Liquid glass для header extra (месяц, кнопки) */

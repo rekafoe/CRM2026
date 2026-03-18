@@ -499,6 +499,44 @@ export const getAdminEarnings = (params?: { month?: string; history_months?: num
 export const getDailyEarnings = (date: string, userId?: number) =>
   api.get('/earnings/daily', { params: userId ? { date, user_id: userId } : { date } });
 
+// Penalties API (earnings)
+export interface Penalty {
+  id: number;
+  userId: number;
+  amount: number;
+  reason: string;
+  penaltyDate: string;
+  orderId?: number;
+  createdAt?: string;
+  createdBy?: number;
+}
+export const getPenalties = (params: { user_id: number; month?: string }) =>
+  api.get<{ month: string; userId: number; totalPenalties: number; penalties: Penalty[] }>('/earnings/penalties', { params });
+export const createPenalty = (data: { user_id: number; amount: number; reason?: string; penalty_date?: string; order_id?: number }) =>
+  api.post<Penalty>('/earnings/penalties', data);
+export const updatePenalty = (id: number, data: { amount?: number; reason?: string; penalty_date?: string }) =>
+  api.patch<Penalty>(`/earnings/penalties/${id}`, data);
+export const deletePenalty = (id: number) => api.delete(`/earnings/penalties/${id}`);
+
+// Bonuses API (earnings)
+export interface Bonus {
+  id: number;
+  userId: number;
+  amount: number;
+  reason: string;
+  bonusDate: string;
+  orderId?: number;
+  createdAt?: string;
+  createdBy?: number;
+}
+export const getBonuses = (params: { user_id: number; month?: string }) =>
+  api.get<{ month: string; userId: number; totalBonuses: number; bonuses: Bonus[] }>('/earnings/bonuses', { params });
+export const createBonus = (data: { user_id: number; amount: number; reason?: string; bonus_date?: string; order_id?: number }) =>
+  api.post<Bonus>('/earnings/bonuses', data);
+export const updateBonus = (id: number, data: { amount?: number; reason?: string; bonus_date?: string }) =>
+  api.patch<Bonus>(`/earnings/bonuses/${id}`, data);
+export const deleteBonus = (id: number) => api.delete(`/earnings/bonuses/${id}`);
+
 // Shifts API
 export const getShifts = (params?: { user_id?: number; month?: string; date?: string }) =>
   api.get('/shifts', { params });

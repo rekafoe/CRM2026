@@ -369,6 +369,19 @@
   color: #059669;
 }
 
+.earn-cell-money--bonus {
+  color: #059669;
+}
+
+.earn-cell-money--penalty {
+  color: #dc2626;
+}
+
+.earn-cell-money--net {
+  color: #0f172a;
+  font-weight: 700;
+}
+
 .earn-row-actions {
   display: flex;
   gap: 6px;
@@ -487,6 +500,29 @@
   align-items: flex-end;
   flex-wrap: wrap;
   margin-bottom: 20px;
+}
+
+.earn-penalty-form {
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 16px;
+}
+
+.earn-penalty-summary {
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 16px;
+}
+
+.earn-penalty-summary strong,
+.earn-bonus-summary strong {
+  color: #0f172a;
+}
+
+.earn-bonus-summary {
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 16px;
 }
 
 /* =================================

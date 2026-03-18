@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { AdminPageLayout } from '../components/admin/AdminPageLayout';
-import { Alert, Button, FormField } from '../components/common';
+import { Alert, Button, FormField, Modal } from '../components/common';
 import { AppIcon } from '../components/ui/AppIcon';
 import { getMyEarnings } from '../api';
 import './EarningsPage.css';
@@ -26,6 +26,13 @@ export const EarningsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<EarningsItem[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalPenalties, setTotalPenalties] = useState(0);
+  const [totalBonuses, setTotalBonuses] = useState(0);
+  const [totalNet, setTotalNet] = useState(0);
+  const [penalties, setPenalties] = useState<Array<{ id: number; amount: number; reason: string; penaltyDate: string }>>([]);
+  const [bonuses, setBonuses] = useState<Array<{ id: number; amount: number; reason: string; bonusDate: string }>>([]);
+  const [showPenaltiesModal, setShowPenaltiesModal] = useState(false);
+  const [showBonusesModal, setShowBonusesModal] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -35,6 +42,14 @@ export const EarningsPage: React.FC = () => {
       const payload = res.data || {};
       setItems(Array.isArray(payload.items) ? payload.items : []);
       setTotal(Number(payload.total) || 0);
+      setTotalPenalties(Number(payload.totalPenalties) || 0);
+      setTotalBonuses(Number(payload.totalBonuses) || 0);
+      const t = Number(payload.total) || 0;
+      const tp = Number(payload.totalPenalties) || 0;
+      const tb = Number(payload.totalBonuses) || 0;
+      setTotalNet(Number(payload.totalNet) ?? Math.max(0, t + tb - tp));
+      setPenalties(Array.isArray(payload.penalties) ? payload.penalties : []);
+      setBonuses(Array.isArray(payload.bonuses) ? payload.bonuses : []);
     } catch (e: any) {
       setError(e?.response?.data?.message || 'Не удалось загрузить проценты');
     } finally {
@@ -166,6 +181,26 @@ export const EarningsPage: React.FC = () => {
             <div className="earnings-summary-title">Итого за месяц</div>
             <div className="earnings-summary-value">{total.toFixed(2)} BYN</div>
           </div>
+          <button
+            type="button"
+            className="earnings-summary-card earnings-summary-card--bonus earnings-summary-card--clickable"
+            onClick={() => setShowBonusesModal(true)}
+          >
+            <div className="earnings-summary-title">Премии</div>
+            <div className="earnings-summary-value">+{totalBonuses.toFixed(2)} BYN</div>
+          </button>
+          <button
+            type="button"
+            className="earnings-summary-card earnings-summary-card--penalty earnings-summary-card--clickable"
+            onClick={() => setShowPenaltiesModal(true)}
+          >
+            <div className="earnings-summary-title">Штрафы</div>
+            <div className="earnings-summary-value">−{totalPenalties.toFixed(2)} BYN</div>
+          </button>
+          <div className="earnings-summary-card earnings-summary-card--net">
+            <div className="earnings-summary-title">К выплате</div>
+            <div className="earnings-summary-value">{totalNet.toFixed(2)} BYN</div>
+          </div>
           <div className="earnings-summary-card">
             <div className="earnings-summary-title">Количество позиций</div>
             <div className="earnings-summary-value">{items.length}</div>
@@ -232,6 +267,72 @@ export const EarningsPage: React.FC = () => {
           ))}
         </div>
       )}
+
+      <Modal
+        isOpen={showBonusesModal}
+        onClose={() => setShowBonusesModal(false)}
+        title="Мои премии"
+        size="md"
+        className="earnings-modal"
+        overlayClassName="earnings-modal-overlay"
+      >
+        <div className="earnings-detail-modal">
+          <p className="earnings-detail-modal__summary">
+            За {month}: <strong>+{totalBonuses.toFixed(2)} BYN</strong>
+          </p>
+          {bonuses.length === 0 ? (
+            <p className="earnings-detail-modal__empty">Нет премий за выбранный месяц</p>
+          ) : (
+            <table className="earnings-table earnings-table--aux">
+              <thead>
+                <tr><th>Дата</th><th>Сумма</th><th>Причина</th></tr>
+              </thead>
+              <tbody>
+                {bonuses.map((b) => (
+                  <tr key={b.id}>
+                    <td>{b.bonusDate}</td>
+                    <td className="earnings-amount earnings-amount--bonus">+{Number(b.amount).toFixed(2)} BYN</td>
+                    <td>{b.reason || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showPenaltiesModal}
+        onClose={() => setShowPenaltiesModal(false)}
+        title="Мои штрафы"
+        size="md"
+        className="earnings-modal"
+        overlayClassName="earnings-modal-overlay"
+      >
+        <div className="earnings-detail-modal">
+          <p className="earnings-detail-modal__summary">
+            За {month}: <strong>−{totalPenalties.toFixed(2)} BYN</strong>
+          </p>
+          {penalties.length === 0 ? (
+            <p className="earnings-detail-modal__empty">Нет штрафов за выбранный месяц</p>
+          ) : (
+            <table className="earnings-table earnings-table--aux">
+              <thead>
+                <tr><th>Дата</th><th>Сумма</th><th>Причина</th></tr>
+              </thead>
+              <tbody>
+                {penalties.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.penaltyDate}</td>
+                    <td className="earnings-amount earnings-amount--penalty">−{Number(p.amount).toFixed(2)} BYN</td>
+                    <td>{p.reason || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </Modal>
     </AdminPageLayout>
   );
 };

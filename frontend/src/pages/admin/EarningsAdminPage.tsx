@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Button, FormField, Modal } from '../../components/common';
 import { AppIcon } from '../../components/ui/AppIcon';
-import { getAdminEarnings, getShifts, updateShift, createShift, getDepartments, type Department } from '../../api';
+import { getAdminEarnings, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus } from '../../api';
 import './EarningsAdminPage.css';
 
 type AdminUserRow = {
@@ -12,6 +12,9 @@ type AdminUserRow = {
   isActive: boolean;
   totalCurrentMonth: number;
   totalPreviousMonth: number;
+  totalPenalties?: number;
+  totalBonuses?: number;
+  totalNet?: number;
   hours: number;
   shifts: number;
   history: Array<{ month: string; total: number }>;
@@ -42,6 +45,20 @@ export const EarningsAdminPage: React.FC = () => {
   const [shiftLoading, setShiftLoading] = useState(false);
   const [newShiftDate, setNewShiftDate] = useState('');
   const [newShiftHours, setNewShiftHours] = useState('');
+  const [penaltyUser, setPenaltyUser] = useState<AdminUserRow | null>(null);
+  const [penaltyList, setPenaltyList] = useState<Penalty[]>([]);
+  const [penaltyTotal, setPenaltyTotal] = useState(0);
+  const [penaltyLoading, setPenaltyLoading] = useState(false);
+  const [newPenaltyAmount, setNewPenaltyAmount] = useState('');
+  const [newPenaltyReason, setNewPenaltyReason] = useState('');
+  const [newPenaltyDate, setNewPenaltyDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [bonusUser, setBonusUser] = useState<AdminUserRow | null>(null);
+  const [bonusList, setBonusList] = useState<Bonus[]>([]);
+  const [bonusTotal, setBonusTotal] = useState(0);
+  const [bonusLoading, setBonusLoading] = useState(false);
+  const [newBonusAmount, setNewBonusAmount] = useState('');
+  const [newBonusReason, setNewBonusReason] = useState('');
+  const [newBonusDate, setNewBonusDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const loadData = useCallback(async () => {
     try {
@@ -97,6 +114,108 @@ export const EarningsAdminPage: React.FC = () => {
     setNewShiftDate('');
     setNewShiftHours('');
   }, [shiftUser, newShiftDate, newShiftHours]);
+
+  const openPenaltyModal = useCallback(async (user: AdminUserRow) => {
+    setPenaltyUser(user);
+    setPenaltyLoading(true);
+    try {
+      const res = await getPenalties({ user_id: user.userId, month });
+      setPenaltyList(Array.isArray(res.data?.penalties) ? res.data.penalties : []);
+      setPenaltyTotal(Number(res.data?.totalPenalties) || 0);
+    } catch {
+      setPenaltyList([]);
+      setPenaltyTotal(0);
+    } finally {
+      setPenaltyLoading(false);
+    }
+    setNewPenaltyAmount('');
+    setNewPenaltyReason('');
+    setNewPenaltyDate(new Date().toISOString().slice(0, 10));
+  }, [month]);
+
+  const handlePenaltyCreate = useCallback(async () => {
+    if (!penaltyUser) return;
+    const amount = Number(newPenaltyAmount);
+    if (!Number.isFinite(amount) || amount < 0) return;
+    try {
+      const res = await createPenalty({
+        user_id: penaltyUser.userId,
+        amount,
+        reason: newPenaltyReason.trim() || undefined,
+        penalty_date: newPenaltyDate,
+      });
+      setPenaltyList((prev) => [res.data as Penalty, ...prev]);
+      setPenaltyTotal((t) => t + amount);
+      setNewPenaltyAmount('');
+      setNewPenaltyReason('');
+      setNewPenaltyDate(new Date().toISOString().slice(0, 10));
+      loadData();
+    } catch (e: any) {
+      console.error(e);
+    }
+  }, [penaltyUser, newPenaltyAmount, newPenaltyReason, newPenaltyDate, loadData]);
+
+  const handlePenaltyDelete = useCallback(async (id: number, amount: number) => {
+    try {
+      await deletePenalty(id);
+      setPenaltyList((prev) => prev.filter((p) => p.id !== id));
+      setPenaltyTotal((t) => Math.max(0, t - amount));
+      loadData();
+    } catch (e: any) {
+      console.error(e);
+    }
+  }, [loadData]);
+
+  const openBonusModal = useCallback(async (user: AdminUserRow) => {
+    setBonusUser(user);
+    setBonusLoading(true);
+    try {
+      const res = await getBonuses({ user_id: user.userId, month });
+      setBonusList(Array.isArray(res.data?.bonuses) ? res.data.bonuses : []);
+      setBonusTotal(Number(res.data?.totalBonuses) || 0);
+    } catch {
+      setBonusList([]);
+      setBonusTotal(0);
+    } finally {
+      setBonusLoading(false);
+    }
+    setNewBonusAmount('');
+    setNewBonusReason('');
+    setNewBonusDate(new Date().toISOString().slice(0, 10));
+  }, [month]);
+
+  const handleBonusCreate = useCallback(async () => {
+    if (!bonusUser) return;
+    const amount = Number(newBonusAmount);
+    if (!Number.isFinite(amount) || amount < 0) return;
+    try {
+      const res = await createBonus({
+        user_id: bonusUser.userId,
+        amount,
+        reason: newBonusReason.trim() || undefined,
+        bonus_date: newBonusDate,
+      });
+      setBonusList((prev) => [res.data as Bonus, ...prev]);
+      setBonusTotal((t) => t + amount);
+      setNewBonusAmount('');
+      setNewBonusReason('');
+      setNewBonusDate(new Date().toISOString().slice(0, 10));
+      loadData();
+    } catch (e: any) {
+      console.error(e);
+    }
+  }, [bonusUser, newBonusAmount, newBonusReason, newBonusDate, loadData]);
+
+  const handleBonusDelete = useCallback(async (id: number, amount: number) => {
+    try {
+      await deleteBonus(id);
+      setBonusList((prev) => prev.filter((b) => b.id !== id));
+      setBonusTotal((t) => Math.max(0, t - amount));
+      loadData();
+    } catch (e: any) {
+      console.error(e);
+    }
+  }, [loadData]);
 
   const activeRows = useMemo(() => rows.filter((r) => r.isActive), [rows]);
   const totalActive = useMemo(() => activeRows.length, [activeRows]);
@@ -258,7 +377,10 @@ export const EarningsAdminPage: React.FC = () => {
                 <tr>
                   <th>Сотрудник</th>
                   <th>Текущий месяц</th>
-                  <th>Предыдущий месяц</th>
+                  <th>Премии</th>
+                  <th>Штрафы</th>
+                  <th>К выплате</th>
+                  <th>Пред. месяц</th>
                   <th>Часы</th>
                   <th>Смены</th>
                   <th>Действия</th>
@@ -267,7 +389,7 @@ export const EarningsAdminPage: React.FC = () => {
               <tbody>
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
                       Нет данных за выбранный месяц
                     </td>
                   </tr>
@@ -276,6 +398,15 @@ export const EarningsAdminPage: React.FC = () => {
                   <tr key={row.userId}>
                     <td className="earn-cell-name">{row.name}</td>
                     <td className="earn-cell-money">{Number(row.totalCurrentMonth).toFixed(2)} BYN</td>
+                    <td className="earn-cell-money earn-cell-money--bonus">
+                      +{Number(row.totalBonuses ?? 0).toFixed(2)} BYN
+                    </td>
+                    <td className="earn-cell-money earn-cell-money--penalty">
+                      −{Number(row.totalPenalties ?? 0).toFixed(2)} BYN
+                    </td>
+                    <td className="earn-cell-money earn-cell-money--net">
+                      {Number(row.totalNet ?? row.totalCurrentMonth).toFixed(2)} BYN
+                    </td>
                     <td>{Number(row.totalPreviousMonth).toFixed(2)} BYN</td>
                     <td>{Number(row.hours).toFixed(1)}</td>
                     <td>{row.shifts}</td>
@@ -283,6 +414,12 @@ export const EarningsAdminPage: React.FC = () => {
                       <div className="earn-row-actions">
                         <Button variant="secondary" size="sm" onClick={() => setDetailUser(row)}>
                           Детали
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={() => openBonusModal(row)}>
+                          Премии
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={() => openPenaltyModal(row)}>
+                          Штрафы
                         </Button>
                         <Button variant="secondary" size="sm" onClick={() => openShiftModal(row)}>
                           Часы
@@ -454,6 +591,124 @@ export const EarningsAdminPage: React.FC = () => {
                         <td>
                           <Button variant="secondary" size="sm" onClick={() => handleShiftUpdate(row.id, row.hours)}>
                             Сохранить
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </Modal>
+
+      {/* Penalty modal — выписка штрафов */}
+      <Modal isOpen={!!penaltyUser} onClose={() => setPenaltyUser(null)} title={penaltyUser ? `Штрафы: ${penaltyUser.name}` : 'Штрафы'} size="lg">
+        {penaltyUser && (
+          <>
+            <div className="earn-shift-form earn-penalty-form">
+              <FormField label="Сумма (BYN)">
+                <input type="number" className="earn-filter-input" min={0} step={0.01} value={newPenaltyAmount} onChange={(e) => setNewPenaltyAmount(e.target.value)} />
+              </FormField>
+              <FormField label="Причина">
+                <input type="text" className="earn-filter-input" placeholder="Опционально" value={newPenaltyReason} onChange={(e) => setNewPenaltyReason(e.target.value)} />
+              </FormField>
+              <FormField label="Дата">
+                <input type="date" className="earn-filter-input" value={newPenaltyDate} onChange={(e) => setNewPenaltyDate(e.target.value)} />
+              </FormField>
+              <Button variant="primary" onClick={handlePenaltyCreate} disabled={newPenaltyAmount === '' || Number(newPenaltyAmount) < 0}>
+                Выписать штраф
+              </Button>
+            </div>
+            <div className="earn-penalty-summary">
+              Итого штрафов за {month}: <strong>{penaltyTotal.toFixed(2)} BYN</strong>
+              {' · '}
+              К выплате: <strong>{Math.max(0, (penaltyUser.totalCurrentMonth ?? 0) + (penaltyUser.totalBonuses ?? 0) - penaltyTotal).toFixed(2)} BYN</strong>
+            </div>
+            {penaltyLoading ? (
+              <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>Загрузка...</div>
+            ) : (
+              <div className="earn-table-wrapper">
+                <table className="earn-table">
+                  <thead>
+                    <tr><th>Дата</th><th>Сумма</th><th>Причина</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {penaltyList.length === 0 && (
+                      <tr>
+                        <td colSpan={4} style={{ textAlign: 'center', padding: '32px', color: '#94a3b8' }}>
+                          Нет штрафов за выбранный месяц
+                        </td>
+                      </tr>
+                    )}
+                    {penaltyList.map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.penaltyDate}</td>
+                        <td className="earn-cell-money">{Number(p.amount).toFixed(2)} BYN</td>
+                        <td>{p.reason || '—'}</td>
+                        <td>
+                          <Button variant="secondary" size="sm" onClick={() => handlePenaltyDelete(p.id, p.amount)}>
+                            Удалить
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </Modal>
+
+      {/* Bonus modal — начисление премий */}
+      <Modal isOpen={!!bonusUser} onClose={() => setBonusUser(null)} title={bonusUser ? `Премии: ${bonusUser.name}` : 'Премии'} size="lg">
+        {bonusUser && (
+          <>
+            <div className="earn-shift-form earn-penalty-form">
+              <FormField label="Сумма (BYN)">
+                <input type="number" className="earn-filter-input" min={0} step={0.01} value={newBonusAmount} onChange={(e) => setNewBonusAmount(e.target.value)} />
+              </FormField>
+              <FormField label="Причина">
+                <input type="text" className="earn-filter-input" placeholder="Опционально" value={newBonusReason} onChange={(e) => setNewBonusReason(e.target.value)} />
+              </FormField>
+              <FormField label="Дата">
+                <input type="date" className="earn-filter-input" value={newBonusDate} onChange={(e) => setNewBonusDate(e.target.value)} />
+              </FormField>
+              <Button variant="primary" onClick={handleBonusCreate} disabled={newBonusAmount === '' || Number(newBonusAmount) < 0}>
+                Начислить премию
+              </Button>
+            </div>
+            <div className="earn-bonus-summary">
+              Итого премий за {month}: <strong>+{bonusTotal.toFixed(2)} BYN</strong>
+              {' · '}
+              К выплате: <strong>{Math.max(0, (bonusUser.totalCurrentMonth ?? 0) + bonusTotal - (bonusUser.totalPenalties ?? 0)).toFixed(2)} BYN</strong>
+            </div>
+            {bonusLoading ? (
+              <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>Загрузка...</div>
+            ) : (
+              <div className="earn-table-wrapper">
+                <table className="earn-table">
+                  <thead>
+                    <tr><th>Дата</th><th>Сумма</th><th>Причина</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {bonusList.length === 0 && (
+                      <tr>
+                        <td colSpan={4} style={{ textAlign: 'center', padding: '32px', color: '#94a3b8' }}>
+                          Нет премий за выбранный месяц
+                        </td>
+                      </tr>
+                    )}
+                    {bonusList.map((b) => (
+                      <tr key={b.id}>
+                        <td>{b.bonusDate}</td>
+                        <td className="earn-cell-money">+{Number(b.amount).toFixed(2)} BYN</td>
+                        <td>{b.reason || '—'}</td>
+                        <td>
+                          <Button variant="secondary" size="sm" onClick={() => handleBonusDelete(b.id, b.amount)}>
+                            Удалить
                           </Button>
                         </td>
                       </tr>
