@@ -4,13 +4,11 @@ import { checkMaterialAvailability, calculateMaterialCost } from '../../../servi
 import type { CalculationResult } from '../types/calculator.types';
 import { getMaterials } from '../../../api';
 
-/** Плотность материала: из поля density или из названия (например «300 г», «300 г/м²») */
+/** Плотность материала берём строго из поля density (или density_g_sm), без парсинга из названия. */
 function getMaterialDensity(m: any): number | null {
   const d = m?.density ?? m?.density_g_sm;
   if (d != null && Number(d) > 0) return Number(d);
-  const name = (m?.name ?? '').toString();
-  const match = name.match(/(\d{2,4})\s*(?:г\/?м²|г\/м2|г)/i);
-  return match ? Number(match[1]) : null;
+  return null;
 }
 
 interface MaterialsSectionProps {
@@ -287,35 +285,20 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     });
   }, [allowedMaterialsForSize, selectedMaterialType]);
 
-  // Плотности для выбранного типа: из материалов продукта; если пусто — из типа бумаги на складе (по display_name)
+  // Плотности для выбранного типа — только из разрешённых материалов продукта (поле density или из названия, например «300 г/м²»)
   const densitiesForSelectedType = useMemo(() => {
-    const fromMaterials = allowedMaterialsByType
+    const values = allowedMaterialsByType
       .map(m => getMaterialDensity(m))
       .filter((d): d is number => d != null && d > 0);
-    if (fromMaterials.length > 0) return [...new Set(fromMaterials)].sort((a, b) => a - b);
-    const pt = warehousePaperTypes.find(
-      p => normalizeForCompare(p.display_name) === normalizeForCompare(selectedMaterialType)
-    );
-    if (pt?.densities?.length) return pt.densities.map(d => d.value).sort((a, b) => a - b);
-    return [];
-  }, [allowedMaterialsByType, selectedMaterialType, warehousePaperTypes]);
+    return [...new Set(values)].sort((a, b) => a - b);
+  }, [allowedMaterialsByType]);
 
-  // По выбранному типу + плотности находим материал: сначала по полю density в материалах, затем по material_id из типа бумаги (склад)
+  // По выбранному типу + плотности находим материал из разрешённых для продукта
   const materialByTypeAndDensity = useMemo(() => {
     if (selectedDensity === '') return undefined;
     const targetDensity = Number(selectedDensity);
-    let m = allowedMaterialsByType.find(material => getMaterialDensity(material) === targetDensity);
-    if (m) return m;
-    const pt = warehousePaperTypes.find(
-      p => normalizeForCompare(p.display_name) === normalizeForCompare(selectedMaterialType)
-    );
-    const densityEntry = pt?.densities?.find(d => d.value === targetDensity);
-    if (densityEntry && allowedMaterialsForSize.some(material => Number(material.id) === densityEntry.material_id)) {
-      m = allowedMaterialsForSize.find(material => Number(material.id) === densityEntry.material_id);
-      if (m) return m;
-    }
-    return undefined;
-  }, [allowedMaterialsByType, allowedMaterialsForSize, selectedDensity, selectedMaterialType, warehousePaperTypes]);
+    return allowedMaterialsByType.find(m => getMaterialDensity(m) === targetDensity);
+  }, [allowedMaterialsByType, selectedDensity]);
 
   // Сбрасываем material_id, если он не входит в разрешённые для выбранного размера
   useEffect(() => {
@@ -486,9 +469,11 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         {loadingMaterials ? (
           <div className="form-control" style={{ color: '#666' }}>Загрузка...</div>
         ) : allowedMaterialsForSize.length === 0 ? (
-          <div className="alert alert-warning"><small><AppIcon name="warning" size="xs" /> Для размера нет разрешённых материалов</small></div>
+          <div className="alert alert-warning"><small><AppIcon name="warning" size="xs" /> Для размера нет разрешённых материалов. Добавьте материалы в шаблоне продукта (редактор шаблона → Материалы).</small></div>
         ) : densitiesForSelectedType.length === 0 ? (
-          <div className="form-control" style={{ color: '#666' }}>Нет плотностей для этого типа</div>
+          <div className="alert alert-warning" style={{ margin: 0 }}>
+            <small><AppIcon name="warning" size="xs" /> У материалов подтипа не задана плотность. Задайте поле «Плотность» в карточке материала на складе или укажите её в названии (например, «Бумага 300 г/м²»).</small>
+          </div>
         ) : (
           <select
             value={selectedDensity}
@@ -675,9 +660,11 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
             {loadingMaterials ? (
               <div className="form-control" style={{ color: '#666' }}>Загрузка...</div>
             ) : allowedMaterialsForSize.length === 0 ? (
-              <div className="alert alert-warning"><small><AppIcon name="warning" size="xs" /> Для размера нет разрешённых материалов</small></div>
+              <div className="alert alert-warning"><small><AppIcon name="warning" size="xs" /> Для размера нет разрешённых материалов. Добавьте материалы в шаблоне продукта (редактор шаблона → Материалы).</small></div>
             ) : densitiesForSelectedType.length === 0 ? (
-              <div className="form-control" style={{ color: '#666' }}>Нет плотностей для этого типа</div>
+              <div className="alert alert-warning" style={{ margin: 0 }}>
+                <small><AppIcon name="warning" size="xs" /> У материалов подтипа не задана плотность. Задайте поле «Плотность» в карточке материала на складе или укажите её в названии (например, «Бумага 300 г/м²»).</small>
+              </div>
             ) : (
               <select
                 value={selectedDensity}
