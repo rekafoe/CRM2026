@@ -18,7 +18,7 @@ import { AdvancedSettingsSection } from './components/AdvancedSettingsSection';
 import { DynamicProductSelector, CUSTOM_PRODUCT_ID, POSTPRINT_PRODUCT_ID } from './components/DynamicProductSelector';
 import { PrintingSettingsSection } from './components/PrintingSettingsSection';
 import { getProductionTimeLabel, getProductionDaysByPriceType, getProductionTimeLabelFromDays } from './utils/time';
-import { getEffectiveSimplifiedConfig } from './utils/simplifiedConfig';
+import { getEffectiveSimplifiedConfig, getEffectiveAllowedMaterialIds } from './utils/simplifiedConfig';
 import { ProductSpecs, CalculationResult, EditContextPayload } from './types/calculator.types';
 import { useCalculatorEditContext } from './hooks/useCalculatorEditContext';
 import { useCalculatorPricingActions, productRequiresPrint } from './hooks/useCalculatorPricingActions';
@@ -228,17 +228,41 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       setPrintColorMode(initial.color_mode);
     }
 
+    // При смене подтипа: не тащить material_id с прошлого типа и не брать initial.material_id,
+    // если его нет в эффективном allowed для стартового размера (иначе считается «чужой» материал / другая плотность).
+    const allowedForFirstSize =
+      firstSize && cfg ? getEffectiveAllowedMaterialIds(cfg, firstSize as any) : [];
+    const allowedMaterialSet = new Set(allowedForFirstSize.map((id: number) => Number(id)));
+    const baseIdsRaw = (firstSize as { allowed_base_material_ids?: number[] } | undefined)?.allowed_base_material_ids ?? [];
+    const allowedBaseSet = new Set(baseIdsRaw.map((id: number) => Number(id)));
+
     setSpecs((prev) => {
       const isNewType = prev.typeId !== typeId;
+      const nextMaterialId =
+        isNewType &&
+        initial?.material_id != null &&
+        allowedMaterialSet.has(Number(initial.material_id))
+          ? Number(initial.material_id)
+          : undefined;
+      const nextBaseMaterialId =
+        isNewType &&
+        initial?.base_material_id != null &&
+        allowedBaseSet.has(Number(initial.base_material_id))
+          ? Number(initial.base_material_id)
+          : undefined;
+
       return {
         ...prev,
         typeId: typeId ?? undefined,
         typeName: typeVariant?.name ?? undefined,
         ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}` } : {}),
         quantity: initial?.quantity ?? autoQty,
-        // material_id из initial только при смене подтипа; иначе не перезаписываем — пользователь мог уже выбрать материал
-        ...(initial?.material_id != null && isNewType ? { material_id: initial.material_id } : {}),
-        ...(initial?.base_material_id != null && isNewType ? { base_material_id: initial.base_material_id } : {}),
+        ...(isNewType
+          ? {
+              material_id: nextMaterialId,
+              base_material_id: nextBaseMaterialId,
+            }
+          : {}),
         ...(initial?.sides_mode ? { sides: initial.sides_mode === 'single' ? 1 : 2 } : {}),
         selectedOperations: operationsFromInitial,
         ...(initial?.cutting_required ? { cutting: true, cutting_required: true } : initial?.cutting !== undefined ? { cutting: initial.cutting } : {}),

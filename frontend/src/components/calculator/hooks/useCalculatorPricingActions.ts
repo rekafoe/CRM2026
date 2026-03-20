@@ -72,6 +72,19 @@ export function productRequiresPrint(schema: any, effectiveSizes?: any[]): boole
   return false;
 }
 
+/** Сравнение id материала с бэкенда и из specs (число / строка). Иначе find() не находит строку и срабатывает fallback на materials[0] (часто расходник отделки — DTF). */
+function materialRowId(m: any): number | undefined {
+  const v = m?.materialId ?? m?.material_id ?? m?.id;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function sameMaterialId(a: unknown, b: unknown): boolean {
+  const na = Number(a);
+  const nb = Number(b);
+  return Number.isFinite(na) && Number.isFinite(nb) && na === nb;
+}
+
 export function useCalculatorPricingActions({
   specs,
   isValid,
@@ -414,7 +427,17 @@ export function useCalculatorPricingActions({
 
         const materials = (backendResult.materials || []) as any[];
         const services = (backendResult.operations || []) as any[];
-        
+
+        /** Для UI/логов: основной лист/материал заказа первым (не расходник отделки), если известен specs.material_id */
+        const materialsOrderedForUi =
+          specs.material_id != null && materials.length > 1
+            ? [...materials].sort((a: any, b: any) => {
+                const aMain = sameMaterialId(materialRowId(a), specs.material_id) ? 0 : 1;
+                const bMain = sameMaterialId(materialRowId(b), specs.material_id) ? 0 : 1;
+                return aMain - bMain;
+              })
+            : materials;
+
         // 🆕 Логируем операции для отладки finishing
         logger.info('🔧 Операции от бэкенда (включая finishing)', {
           operationsCount: services.length,
@@ -538,9 +561,9 @@ export function useCalculatorPricingActions({
           technologyCode: s.technologyCode
         }));
 
-        // Анализ материалов (?? чтобы 0 не превращался в undefined)
-        const materialsFlat = materials.map((m: any) => ({
-          id: m.materialId || m.id,
+        // Анализ материалов (?? чтобы 0 не превращался в undefined); порядок как в materialsOrderedForUi
+        const materialsFlat = materialsOrderedForUi.map((m: any) => ({
+          id: m.materialId ?? m.material_id ?? m.id,
           name: m.materialName || m.name,
           unitPrice: m.unitPrice ?? m.unit_price ?? m.price ?? 0,
           quantity: m.quantity,
@@ -590,9 +613,13 @@ export function useCalculatorPricingActions({
         // Если формат материала недоступен - не показываем "Формат листа" вообще
         let sheetSizeLabel: string | undefined;
         
-        // Пробуем получить формат материала из первого материала
-        if (materials.length > 0) {
-          const material = materials[0] as any;
+        // Формат листа: берём строку основного материала заказа, не первую в массиве (там мог быть расходник DTF)
+        const materialForSheetFormat =
+          (specs.material_id != null
+            ? materials.find((m: any) => sameMaterialId(materialRowId(m), specs.material_id))
+            : undefined) || (materials[0] as any);
+        if (materials.length > 0 && materialForSheetFormat) {
+          const material = materialForSheetFormat as any;
           if (material.sheet_width && material.sheet_height) {
             sheetSizeLabel = `${material.sheet_width}×${material.sheet_height} мм`;
             logger.info('✅ Используем формат материала со склада', { sheetSizeLabel });
@@ -633,11 +660,19 @@ export function useCalculatorPricingActions({
         if (specs.material_id && specs.size_id) {
           // Для упрощённых продуктов плотность должна быть в материалах из бэкенда
           if (materials.length > 0) {
-            const material = materials.find((m: any) => 
-              (m.materialId ?? m.material_id ?? m.id) === specs.material_id
-            ) || materials[0];
-            const materialDensity = material.density;
-            if (materialDensity) {
+            const material = materials.find((m: any) => sameMaterialId(materialRowId(m), specs.material_id));
+            if (!material) {
+              logger.info(
+                '⚠️ В ответе бэкенда нет строки материала с выбранным material_id (проверьте тип id: число/строка). Не подставляем materials[0] — это часто расходник отделки (DTF).',
+                {
+                  specsMaterialId: specs.material_id,
+                  backendIds: materials.map((m: any) => materialRowId(m)),
+                  firstRowName: materials[0]?.materialName || materials[0]?.name,
+                }
+              );
+            }
+            const materialDensity = material?.density;
+            if (material && materialDensity) {
               // Для упрощённых продуктов ВСЕГДА используем плотность из материала бэкенда
               // (потому что пользователь не может выбрать плотность вручную - поле скрыто)
               actualPaperDensity = materialDensity;
@@ -648,7 +683,7 @@ export function useCalculatorPricingActions({
                 originalSpecsDensity: specSnapshot.paperDensity,
                 note: 'Поле плотности скрыто для упрощённых продуктов, поэтому используем плотность из материала'
               });
-            } else {
+            } else if (material) {
               logger.info('⚠️ Для упрощённого продукта не найдена плотность в материале бэкенда', {
                 material_id: specs.material_id,
                 material: material.materialName || material.material || material.name,
@@ -662,14 +697,16 @@ export function useCalculatorPricingActions({
             });
           }
         } else if (materials.length > 0 && actualPaperDensity) {
-          // Для обычных продуктов проверяем, что плотность из материала бэкенда совпадает с выбранной пользователем
-          const material = materials[0] as any;
-          const backendDensity = material.density;
+          // Для обычных продуктов: строка материала — по выбранному material_id или первая
+          const material = (specs.material_id != null
+            ? materials.find((m: any) => sameMaterialId(materialRowId(m), specs.material_id))
+            : undefined) || materials[0];
+          const backendDensity = material?.density;
           
           if (backendDensity && backendDensity !== actualPaperDensity) {
             // Плотность из бэкенда не совпадает с выбранной - используем выбранную пользователем
             logger.info('⚠️ Плотность из материала бэкенда не совпадает с выбранной пользователем, используем выбранную', { 
-              materialId: material.materialId ?? material.material_id ?? material.id,
+              materialId: materialRowId(material),
               backendDensity,
               userSelectedDensity: actualPaperDensity,
               usingUserSelected: true,
@@ -680,18 +717,20 @@ export function useCalculatorPricingActions({
           } else if (backendDensity && backendDensity === actualPaperDensity) {
             // Плотности совпадают - всё хорошо
             logger.info('✅ Плотность из материала бэкенда совпадает с выбранной', { 
-              materialId: material.materialId ?? material.material_id ?? material.id,
+              materialId: materialRowId(material),
               density: actualPaperDensity
             });
           }
         } else if (!actualPaperDensity && materials.length > 0) {
           // Если пользователь не выбрал плотность, но бэкенд вернул - используем её
-          const material = materials[0] as any;
-          const backendDensity = material.density;
+          const material = (specs.material_id != null
+            ? materials.find((m: any) => sameMaterialId(materialRowId(m), specs.material_id))
+            : undefined) || materials[0];
+          const backendDensity = material?.density;
           if (backendDensity) {
             actualPaperDensity = backendDensity;
             logger.info('ℹ️ Используем плотность из материала бэкенда (пользователь не выбрал)', { 
-              materialId: material.materialId ?? material.material_id ?? material.id,
+              materialId: materialRowId(material),
               density: actualPaperDensity
             });
           }
@@ -784,7 +823,7 @@ export function useCalculatorPricingActions({
           };
           
           // 🆕 Логирование для отладки
-          if (specs.material_id && finalMaterialId === specs.material_id) {
+          if (specs.material_id != null && sameMaterialId(finalMaterialId, specs.material_id)) {
             console.log('🔍 [useCalculatorPricingActions] Нормализация материала для упрощённого продукта', {
               originalMaterial: m,
               normalized,
@@ -795,6 +834,19 @@ export function useCalculatorPricingActions({
           
           return normalized;
         });
+
+        if (specs.material_id != null && specs.size_id && normalizedMaterials.length > 1) {
+          const target = Number(specs.material_id);
+          if (Number.isFinite(target)) {
+            normalizedMaterials.sort((a, b) => {
+              const ma = Number(a.materialId);
+              const mb = Number(b.materialId);
+              const aMain = Number.isFinite(ma) && ma === target ? 0 : 1;
+              const bMain = Number.isFinite(mb) && mb === target ? 0 : 1;
+              return aMain - bMain;
+            });
+          }
+        }
         
         // 🆕 Для упрощённых продуктов, если материалов нет в результате, но material_id есть в specs - добавляем
         if (normalizedMaterials.length === 0 && specs.material_id && specs.size_id) {

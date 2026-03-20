@@ -10,12 +10,20 @@ export interface EffectiveSimplifiedConfig {
   pages?: { options?: number[]; default?: number };
 }
 
-/** Эффективный список материалов размера: свои (use_own_materials) или общие типа (common_allowed_material_ids). */
-function getEffectiveAllowedMaterialIds(typeConfig: { common_allowed_material_ids?: number[] }, size: { use_own_materials?: boolean; allowed_material_ids?: number[] }): number[] {
-  const common = typeConfig.common_allowed_material_ids;
+/**
+ * Эффективный список id материалов для размера подтипа:
+ * свои (use_own_materials) или общие типа (common_allowed_material_ids).
+ * Экспорт для калькулятора: при смене подтипа не подставлять initial.material_id вне этого списка.
+ */
+export function getEffectiveAllowedMaterialIds(
+  typeConfig: { common_allowed_material_ids?: number[] } | null | undefined,
+  size: { use_own_materials?: boolean; allowed_material_ids?: number[] } | null | undefined
+): number[] {
+  if (!size) return [];
+  const common = typeConfig?.common_allowed_material_ids;
   if (size.use_own_materials === true) return size.allowed_material_ids ?? [];
   if (size.use_own_materials === false) return common ?? [];
-  return (common != null && common.length > 0) ? common : (size.allowed_material_ids ?? []);
+  return common != null && common.length > 0 ? common : (size.allowed_material_ids ?? []);
 }
 
 export function getEffectiveSimplifiedConfig(
@@ -35,7 +43,7 @@ export function getEffectiveSimplifiedConfig(
     const rawSizes = typeConfig?.sizes ?? [];
     const sizesWithEffectiveMaterials = rawSizes.map((s: any) => ({
       ...s,
-      allowed_material_ids: getEffectiveAllowedMaterialIds(typeConfig, s),
+      allowed_material_ids: getEffectiveAllowedMaterialIds(typeConfig as any, s),
     }));
     return {
       sizes: sizesWithEffectiveMaterials,
