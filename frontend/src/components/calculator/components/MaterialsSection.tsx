@@ -4,11 +4,22 @@ import { checkMaterialAvailability, calculateMaterialCost } from '../../../servi
 import type { CalculationResult } from '../types/calculator.types';
 import { getMaterials } from '../../../api';
 
-/** Плотность материала берём строго из поля density (или density_g_sm), без парсинга из названия. */
+  /**
+   * Плотность только из явных полей (без парсинга названия).
+   * Поддерживаем варианты имён с бэкенда/форм.
+   */
 function getMaterialDensity(m: any): number | null {
-  const d = m?.density ?? m?.density_g_sm;
-  if (d != null && Number(d) > 0) return Number(d);
-  return null;
+  const raw =
+    m?.density ??
+    m?.density_g_sm ??
+    m?.densityGsm ??
+    m?.grams_per_sqm ??
+    m?.gramsPerSqm ??
+    m?.paper_density ??
+    m?.paperDensity;
+  if (raw == null || raw === '') return null;
+  const d = Number(raw);
+  return Number.isFinite(d) && d > 0 ? d : null;
 }
 
 interface MaterialsSectionProps {
@@ -83,6 +94,25 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     ? effectiveSizesProp
     : schema?.template?.simplified?.sizes;
 
+  /** Стабильный ключ: перезагрузка /materials только при смене подтипа/размеров/списков id, не при каждом рендере schema */
+  const materialsReloadKey = useMemo(() => {
+    if (!Array.isArray(simplifiedSizesSource) || simplifiedSizesSource.length === 0) return '';
+    return simplifiedSizesSource
+      .map((s: any) => {
+        const am = Array.isArray(s.allowed_material_ids)
+          ? [...s.allowed_material_ids].sort((a: number, b: number) => Number(a) - Number(b)).join(',')
+          : '';
+        const ab = Array.isArray(s.allowed_base_material_ids)
+          ? [...s.allowed_base_material_ids].sort((a: number, b: number) => Number(a) - Number(b)).join(',')
+          : '';
+        return `${String(s.id)}:${am}:${ab}`;
+      })
+      .join('|');
+  }, [simplifiedSizesSource]);
+
+  const schemaRef = useRef(schema);
+  schemaRef.current = schema;
+
   const [materialAvailability, setMaterialAvailability] = useState<{
     available: boolean;
     available_quantity: number;
@@ -103,30 +133,69 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   const [selectedDensity, setSelectedDensity] = useState<number | ''>('');
   /** Флаг: пользователь вручную выбрал тип — не перезаписывать из specs (избегаем рекурсии) */
   const userChoseTypeRef = useRef(false);
+  /** Порядковый номер запроса /materials — отбрасываем устаревший ответ при быстрой смене подтипа */
+  const materialsFetchGenerationRef = useRef(0);
 
-  // Загружаем материалы для упрощённых продуктов: приоритет — schema.materials (с density из бэкенда),
-  // иначе GET /materials. Для подтипов (Дизайнерские открытки и т.д.) schema.materials содержит density.
+  // Упрощённые продукты: тянем актуальный список с GET /materials при смене набора размеров/материалов (подтип и т.д.).
+  // schema.materials подмешиваем через ref (без зависимости от ссылки массива), иначе лишние запросы и гонки при смене таба.
   useEffect(() => {
-    if (!simplifiedSizesSource || simplifiedSizesSource.length === 0) return;
-    const fromSchema = schema?.materials;
-    if (Array.isArray(fromSchema) && fromSchema.length > 0 && fromSchema.some((m: any) => m.density != null)) {
-      setAllMaterials(fromSchema);
-      return;
-    }
-    if (allMaterials.length > 0 || loadingMaterials) return;
+    if (!materialsReloadKey) return;
+    let cancelled = false;
+    const requestId = ++materialsFetchGenerationRef.current;
     setLoadingMaterials(true);
     getMaterials()
-      .then(response => {
-        const materials = Array.isArray(response.data) ? response.data : [];
-        setAllMaterials(materials);
+      .then((response) => {
+        if (cancelled || requestId !== materialsFetchGenerationRef.current) return;
+        const fromApi = Array.isArray(response.data)
+          ? response.data.filter((m: any) => m && m.id != null)
+          : [];
+        const fromSchema = Array.isArray(schemaRef.current?.materials) ? schemaRef.current.materials : [];
+        if (fromSchema.length === 0) {
+          setAllMaterials(fromApi);
+          return;
+        }
+        const byIdEntries: Array<[number, any]> = [];
+        for (const m of fromApi) {
+          if (!m || m.id == null) continue;
+          const id = Number(m.id);
+          if (!Number.isFinite(id)) continue;
+          byIdEntries.push([id, { ...m }]);
+        }
+        const byId = new Map<number, any>(byIdEntries);
+        for (const sm of fromSchema) {
+          if (!sm || typeof sm !== 'object') continue;
+          const id = Number((sm as any).id);
+          if (!Number.isFinite(id)) continue;
+          const cur = byId.get(id);
+          if (!cur) {
+            byId.set(id, { ...sm });
+            continue;
+          }
+          const dSchema = getMaterialDensity(sm);
+          const dApi = getMaterialDensity(cur);
+          if (dSchema != null && dApi == null) {
+            byId.set(id, {
+              ...cur,
+              density: (sm as any).density ?? (sm as any).density_g_sm ?? dSchema,
+            });
+          }
+        }
+        setAllMaterials(Array.from(byId.values()));
       })
-      .catch(error => {
-        console.error('Ошибка загрузки материалов:', error);
+      .catch((error) => {
+        if (!cancelled && requestId === materialsFetchGenerationRef.current) {
+          console.error('Ошибка загрузки материалов:', error);
+        }
       })
       .finally(() => {
-        setLoadingMaterials(false);
+        if (!cancelled && requestId === materialsFetchGenerationRef.current) {
+          setLoadingMaterials(false);
+        }
       });
-  }, [simplifiedSizesSource, schema?.materials, allMaterials.length, loadingMaterials]);
+    return () => {
+      cancelled = true;
+    };
+  }, [materialsReloadKey]);
 
   const hasField = (name: string) => !!schema?.fields?.some(f => f.name === name);
   const getLabel = (name: string, fallback: string) => (schema?.fields as any)?.find((f: any) => f.name === name)?.label || fallback;
@@ -232,25 +301,52 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   const isSimplifiedProduct = simplifiedSizesSource && simplifiedSizesSource.length > 0;
   
   // 🆕 Получаем разрешённые материалы для выбранного размера
+  // Важно: порядок как в шаблоне (allowed_material_ids), а не порядок строк в ответе /materials —
+  // иначе дефолт «первый тип / первая плотность» уезжает на чужой тип (например DTF), если он раньше в API.
   const allowedMaterialsForSize = useMemo(() => {
     if (!isSimplifiedProduct || !specs.size_id) return [];
-    
+
     const selectedSize = simplifiedSizesSource?.find((s: any) => String(s.id) === String(specs.size_id));
-    if (!selectedSize || !selectedSize.allowed_material_ids || selectedSize.allowed_material_ids.length === 0) {
-      return [];
+    const ids = selectedSize?.allowed_material_ids;
+    if (!selectedSize || !Array.isArray(ids) || ids.length === 0) return [];
+
+    const byId = new Map<number, (typeof allMaterials)[number]>();
+    for (const m of allMaterials) {
+      if (m?.id == null) continue;
+      const id = Number(m.id);
+      if (Number.isFinite(id)) byId.set(id, m);
     }
-    
-    // Фильтруем материалы по allowed_material_ids
-    return allMaterials.filter(m => selectedSize.allowed_material_ids!.includes(Number(m.id)));
+    const ordered: typeof allMaterials = [];
+    for (const rawId of ids) {
+      const mid = Number(rawId);
+      if (!Number.isFinite(mid)) continue;
+      const row = byId.get(mid);
+      if (row) ordered.push(row);
+    }
+    return ordered;
   }, [isSimplifiedProduct, specs.size_id, simplifiedSizesSource, allMaterials]);
 
-  // 🆕 Разрешённые материалы-основы (заготовки) для выбранного размера
+  // 🆕 Разрешённые материалы-основы (заготовки) для выбранного размера — порядок как в шаблоне
   const allowedBaseMaterialsForSize = useMemo(() => {
     if (!isSimplifiedProduct || !specs.size_id) return [];
     const selectedSize = simplifiedSizesSource?.find((s: any) => String(s.id) === String(specs.size_id)) as { allowed_base_material_ids?: number[] } | undefined;
     const ids = selectedSize?.allowed_base_material_ids;
-    if (!ids || ids.length === 0) return [];
-    return allMaterials.filter(m => ids.includes(Number(m.id)));
+    if (!Array.isArray(ids) || ids.length === 0) return [];
+
+    const byId = new Map<number, (typeof allMaterials)[number]>();
+    for (const m of allMaterials) {
+      if (m?.id == null) continue;
+      const id = Number(m.id);
+      if (Number.isFinite(id)) byId.set(id, m);
+    }
+    const ordered: typeof allMaterials = [];
+    for (const rawId of ids) {
+      const mid = Number(rawId);
+      if (!Number.isFinite(mid)) continue;
+      const row = byId.get(mid);
+      if (row) ordered.push(row);
+    }
+    return ordered;
   }, [isSimplifiedProduct, specs.size_id, simplifiedSizesSource, allMaterials]);
 
   // Нормализация для сравнения (без учёта регистра и пробелов)
@@ -285,7 +381,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     });
   }, [allowedMaterialsForSize, selectedMaterialType]);
 
-  // Плотности для выбранного типа — только из разрешённых материалов продукта (поле density или из названия, например «300 г/м²»)
+  // Плотности для выбранного типа — только из разрешённых материалов продукта (явные поля плотности)
   const densitiesForSelectedType = useMemo(() => {
     const values = allowedMaterialsByType
       .map(m => getMaterialDensity(m))
@@ -472,7 +568,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
           <div className="alert alert-warning"><small><AppIcon name="warning" size="xs" /> Для размера нет разрешённых материалов. Добавьте материалы в шаблоне продукта (редактор шаблона → Материалы).</small></div>
         ) : densitiesForSelectedType.length === 0 ? (
           <div className="alert alert-warning" style={{ margin: 0 }}>
-            <small><AppIcon name="warning" size="xs" /> У материалов подтипа не задана плотность. Задайте поле «Плотность» в карточке материала на складе или укажите её в названии (например, «Бумага 300 г/м²»).</small>
+            <small><AppIcon name="warning" size="xs" /> У разрешённых для этого размера материалов не заполнено числовое поле «Плотность» (г/м²) в карточке материала на складе. Обновите карточку и перезагрузите калькулятор при необходимости.</small>
           </div>
         ) : (
           <select
@@ -663,7 +759,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
               <div className="alert alert-warning"><small><AppIcon name="warning" size="xs" /> Для размера нет разрешённых материалов. Добавьте материалы в шаблоне продукта (редактор шаблона → Материалы).</small></div>
             ) : densitiesForSelectedType.length === 0 ? (
               <div className="alert alert-warning" style={{ margin: 0 }}>
-                <small><AppIcon name="warning" size="xs" /> У материалов подтипа не задана плотность. Задайте поле «Плотность» в карточке материала на складе или укажите её в названии (например, «Бумага 300 г/м²»).</small>
+                <small><AppIcon name="warning" size="xs" /> У разрешённых для этого размера материалов не заполнено числовое поле «Плотность» (г/м²) в карточке материала на складе. Обновите карточку и перезагрузите калькулятор при необходимости.</small>
               </div>
             ) : (
               <select
