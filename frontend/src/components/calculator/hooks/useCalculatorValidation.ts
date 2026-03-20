@@ -29,12 +29,44 @@ function computeErrors(params: {
   customFormat: { width: string; height: string };
   sizeLimits?: { min?: number; max?: number };
   operationLimits?: { min?: number; max?: number };
+  /** Размеры с уже подставленными effective allowed_material_ids (как в MaterialsSection) */
+  effectiveSizes?: Array<{ id: string; allowed_material_ids?: number[]; [key: string]: any }>;
+  backendProductSchema?: any | null;
 }): Record<string, string> {
-  const { specs, schemaPagesEnum, isCustomFormat, customFormat, sizeLimits, operationLimits } = params;
+  const {
+    specs,
+    schemaPagesEnum,
+    isCustomFormat,
+    customFormat,
+    sizeLimits,
+    operationLimits,
+    effectiveSizes,
+    backendProductSchema,
+  } = params;
   const errors: Record<string, string> = {};
 
   if (!specs.quantity || specs.quantity < 1) {
     errors.quantity = 'Количество должно быть больше 0';
+  }
+
+  // Упрощённый калькулятор: не даём дергать бэкенд без material_id, пока для размера заданы материалы
+  // (иначе в ответе только расходники отделки — DTF и т.д., unitPrice 0, «фолбэк» в логах).
+  const simplified = backendProductSchema?.template?.simplified;
+  if (simplified && specs.size_id) {
+    const sizes =
+      Array.isArray(effectiveSizes) && effectiveSizes.length > 0
+        ? effectiveSizes
+        : backendProductSchema?.template?.simplified?.sizes;
+    const selectedSize = Array.isArray(sizes)
+      ? sizes.find((s: any) => s.id === specs.size_id)
+      : undefined;
+    const allowed = selectedSize?.allowed_material_ids;
+    if (Array.isArray(allowed) && allowed.length > 0) {
+      const mid = specs.material_id;
+      if (mid == null || mid === '' || Number.isNaN(Number(mid))) {
+        errors.material_id = 'Выберите тип и плотность материала';
+      }
+    }
   }
 
   const needsPages = Array.isArray(schemaPagesEnum) && schemaPagesEnum.length > 0;
@@ -135,10 +167,12 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
         customFormat,
         sizeLimits: getSizeLimits(nextSpecs.size_id),
         operationLimits: getOperationLimits(nextSpecs.selectedOperations),
+        effectiveSizes,
+        backendProductSchema,
       });
       return { errors, isValid: Object.keys(errors).length === 0 };
     },
-    [schemaPagesEnum, isCustomFormat, customFormat, getSizeLimits, getOperationLimits],
+    [schemaPagesEnum, isCustomFormat, customFormat, getSizeLimits, getOperationLimits, effectiveSizes, backendProductSchema],
   );
 
   const validationErrors = useMemo(() => {

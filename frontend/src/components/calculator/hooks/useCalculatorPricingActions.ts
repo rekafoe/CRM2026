@@ -806,10 +806,18 @@ export function useCalculatorPricingActions({
 
         // 🆕 Нормализуем материалы, добавляя material_id из specs для упрощённых продуктов
         const normalizedMaterials = materials.map((m: any) => {
-          const materialId = m.materialId ?? m.material_id ?? m.id;
-          // Для упрощённых продуктов, если material_id не в результате, используем из specs
-          const finalMaterialId = materialId || (specs.material_id ? specs.material_id : undefined);
-          
+          const rawId = m.materialId ?? m.material_id ?? m.id;
+          const hasOwnId =
+            rawId != null &&
+            rawId !== '' &&
+            Number.isFinite(Number(rawId));
+          // Не подставляем specs.material_id в строку без id — иначе расходник отделки получит id основной бумаги
+          const finalMaterialId = hasOwnId
+            ? Number(rawId)
+            : specs.material_id != null
+              ? specs.material_id
+              : undefined;
+
           const normalized = {
             materialId: finalMaterialId,
             material: m.materialName || m.material || m.name,
@@ -818,8 +826,8 @@ export function useCalculatorPricingActions({
             unitPrice: m.unitPrice ?? m.unit_price ?? m.price ?? 0,
             price: m.unitPrice ?? m.unit_price ?? m.price ?? 0,
             total: m.totalCost ?? m.total ?? 0,
-            // 🆕 Добавляем paper_type_name для установки materialType на фронтенде
             paper_type_name: m.paper_type_name,
+            isConsumableOnly: m.isConsumableOnly === true,
           };
           
           // 🆕 Логирование для отладки
@@ -864,6 +872,7 @@ export function useCalculatorPricingActions({
             price: 0,
             total: 0,
             paper_type_name: undefined, // Будет установлено из результата расчёта или из API
+            isConsumableOnly: false,
           });
         }
         
@@ -889,6 +898,9 @@ export function useCalculatorPricingActions({
           unitPrice: s.unitPrice ?? s.unit_price ?? s.price,
           total: s.totalCost ?? s.total,
           totalCost: s.totalCost ?? s.total,
+          pricingSource: s.pricingSource ?? s.pricing_source,
+          pricingKey: s.pricingKey ?? s.pricing_key,
+          technologyCode: s.technologyCode ?? s.technology_code,
         }));
 
         // 🆕 Синхронизируем quantity операций per_sheet (ламинация и т.д.) с бэкендом

@@ -37,6 +37,8 @@ export interface UnifiedPricingResult {
     totalCost: number;
     density?: number; // 🆕 Плотность материала
     paper_type_name?: string; // 🆕 display_name типа бумаги для установки materialType на фронтенде
+    /** Расходник отделки (DTF и т.д.): деньги в строках операций, не в отдельной позиции материала */
+    isConsumableOnly?: boolean;
   }>;
   operations: Array<{
     operationId: number;
@@ -48,6 +50,9 @@ export interface UnifiedPricingResult {
     setupCost: number;
     totalCost: number;
     appliedRules?: string[];
+    pricingSource?: string;
+    pricingKey?: string;
+    technologyCode?: string;
   }>;
   
   // Итоги
@@ -383,6 +388,7 @@ export class UnifiedPricingService {
           quantity: om.quantity,
           unitPrice: 0,
           totalCost: 0,
+          isConsumableOnly: true,
         })) ?? []),
       ],
       operations: [
@@ -396,6 +402,9 @@ export class UnifiedPricingService {
           setupCost: 0,
           totalCost: result.printPrice,
           appliedRules: undefined,
+          pricingSource: 'simplified',
+          pricingKey: 'print',
+          technologyCode: result.selectedPrint?.technology_code,
         }] : []),
         ...(result.finishingDetails?.map(f => ({
           operationId: f.service_id,
@@ -407,6 +416,9 @@ export class UnifiedPricingService {
           setupCost: 0,
           totalCost: f.priceForQuantity,
           appliedRules: undefined,
+          pricingSource: 'simplified',
+          pricingKey: `service:${f.service_id}`,
+          technologyCode: undefined,
         })) || []),
       ],
       materialCost: result.materialPrice,

@@ -206,19 +206,24 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         }
       }
     }
-    // Добавляем обязательные операции из схемы, если их ещё нет (чтобы галочки отображались)
+    // Операции из схемы: обязательные и по умолчанию (как для продуктов без подтипов в useEffect ниже).
+    // Без is_default при пустом initial.operations у подтипа selectedOperations остаётся [] → фоллбэк в pricing и «пустой» finishing.
     const schemaOps = backendProductSchema?.operations || [];
     for (const op of schemaOps) {
       const opId = op.operation_id ?? op.id;
-      if (opId && (op.is_required === true || op.is_required === 1) && !opsSet.has(opId)) {
-        opsSet.add(opId);
-        operationsFromInitial.push({
-          operationId: opId,
-          ...(Number(op.units_per_item ?? op.quantity) > 0
-            ? { quantity: Number(op.units_per_item ?? op.quantity) }
-            : {}),
-        });
-      }
+      if (!opId || opsSet.has(opId)) continue;
+      const isReq = op.is_required === true || op.is_required === 1;
+      const isDef = op.is_default === true || op.is_default === 1;
+      if (!isReq && !isDef) continue;
+      opsSet.add(opId);
+      operationsFromInitial.push({
+        operationId: opId,
+        ...(op.variant_id != null ? { variantId: op.variant_id } : {}),
+        ...(op.subtype ? { subtype: op.subtype } : {}),
+        ...(Number(op.units_per_item ?? op.quantity) > 0
+          ? { quantity: Number(op.units_per_item ?? op.quantity) }
+          : {}),
+      });
     }
 
     if (initial?.print_technology) {
@@ -352,7 +357,15 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   // Валидация вынесена в хук
   const { validationErrors, isValid } = useCalculatorValidation({
-    specs: { productType: specs.productType, quantity: specs.quantity, pages: specs.pages, size_id: specs.size_id, selectedOperations: specs.selectedOperations },
+    specs: {
+      productType: specs.productType,
+      quantity: specs.quantity,
+      pages: specs.pages,
+      size_id: specs.size_id,
+      material_id: specs.material_id,
+      typeId: specs.typeId,
+      selectedOperations: specs.selectedOperations,
+    },
     backendProductSchema,
     isCustomFormat,
     customFormat,
