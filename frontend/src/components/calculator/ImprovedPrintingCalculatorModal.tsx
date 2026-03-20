@@ -187,7 +187,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     const autoQty = firstSize?.min_qty ?? firstSize?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
 
     const opsSet = new Set<number>();
-    const operationsFromInitial: Array<{ operationId: number; variantId?: number; subtype?: string }> = [];
+    const operationsFromInitial: Array<{ operationId: number; variantId?: number; subtype?: string; quantity?: number }> = [];
     if (initial?.operations?.length) {
       for (const op of initial.operations) {
         // Поддержка и operation_id (схема), и service_id (typeConfig/size.finishing)
@@ -199,6 +199,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
             operationId: numId,
             ...(op.variant_id != null ? { variantId: Number(op.variant_id) } : {}),
             ...(op.subtype ? { subtype: op.subtype } : {}),
+            ...(Number(op.units_per_item ?? op.quantity) > 0
+              ? { quantity: Number(op.units_per_item ?? op.quantity) }
+              : {}),
           });
         }
       }
@@ -209,7 +212,12 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       const opId = op.operation_id ?? op.id;
       if (opId && (op.is_required === true || op.is_required === 1) && !opsSet.has(opId)) {
         opsSet.add(opId);
-        operationsFromInitial.push({ operationId: opId });
+        operationsFromInitial.push({
+          operationId: opId,
+          ...(Number(op.units_per_item ?? op.quantity) > 0
+            ? { quantity: Number(op.units_per_item ?? op.quantity) }
+            : {}),
+        });
       }
     }
 
@@ -279,6 +287,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         operationId: op.operation_id ?? op.id,
         ...(op.variant_id != null ? { variantId: op.variant_id } : {}),
         ...(op.subtype ? { subtype: op.subtype } : {}),
+        ...(Number(op.units_per_item ?? op.quantity) > 0
+          ? { quantity: Number(op.units_per_item ?? op.quantity) }
+          : {}),
       }));
       return { ...prev, selectedOperations: initial };
     });
