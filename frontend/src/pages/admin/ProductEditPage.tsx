@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Alert, StatusBadge } from '../../components/common';
 import './product-edit/ProductEditPage.css';
@@ -39,6 +39,10 @@ const ProductEditPage: React.FC = () => {
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   const [form, setForm] = useState<{ name: string; description?: string; icon?: string; image_url?: string; calculator_type?: string; product_type?: string; category_id?: number; operator_percent?: string }>({ name: '' });
   const [saving, setSaving] = useState(false);
+  const savePriceTypesRef = useRef<(() => Promise<void>) | null>(null);
+  const registerPriceTypesSave = useCallback((fn: (() => Promise<void>) | null) => {
+    savePriceTypesRef.current = fn;
+  }, []);
 
   const {
     loading,
@@ -107,6 +111,9 @@ const ProductEditPage: React.FC = () => {
           ? { operator_percent: operatorPercentValue }
           : {}),
       } as any);
+      if (activeTab === 'priceTypes' && savePriceTypesRef.current) {
+        await savePriceTypesRef.current();
+      }
       await reloadData();
       alert('Сохранено');
     } catch (error) {
@@ -115,7 +122,7 @@ const ProductEditPage: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [productId, form.name, form.description, form.icon, form.image_url, form.calculator_type, form.product_type, form.operator_percent, form.category_id, reloadData]);
+  }, [productId, form.name, form.description, form.icon, form.image_url, form.calculator_type, form.product_type, form.operator_percent, form.category_id, reloadData, activeTab]);
 
   const handleFormChange = useCallback((field: string, value: string) => {
     if (field === 'category_id') {
@@ -268,7 +275,7 @@ const ProductEditPage: React.FC = () => {
               <MaterialsTab materials={materials} />
             )}
             {activeTab === 'priceTypes' && (
-              <PriceTypesTab productId={productId} />
+              <PriceTypesTab productId={productId} onRegisterSave={registerPriceTypesSave} />
             )}
             {activeTab === 'print' && (
               <PrintTab

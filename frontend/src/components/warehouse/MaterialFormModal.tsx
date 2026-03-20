@@ -76,6 +76,9 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     return name.includes('лам') || name.includes('пленк');
   }, [selectedCategory]);
 
+  /** Погонные метры — в основном рулон; поля мм в форме про условный «лист» для раскладки, не длина бобины */
+  const isRollOrLinearUnit = formData.unit === 'м';
+
   // 🆕 Загрузка типов бумаги
   const loadPaperTypes = async () => {
     try {
@@ -372,31 +375,39 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
 
           <div className="form-row">
             <div className="form-group">
-              <label>Ширина листа (мм)</label>
+              <label>{isRollOrLinearUnit ? 'Ширина полотна / рулона (мм)' : 'Ширина листа (мм)'}</label>
               <input
                 type="number"
                 value={formData.sheet_width ?? ''}
                 onChange={(e) => handleChange('sheet_width' as any, e.target.value === '' ? '' : (parseFloat(e.target.value) ?? undefined))}
-                placeholder="210 (A4), 320 (SRA3)"
+                placeholder={isRollOrLinearUnit ? 'Напр. 1060 — ширина рулона' : '210 (A4), 320 (SRA3)'}
                 min="1"
                 max="2000"
                 step="1"
               />
               <small style={{ color: '#666', fontSize: '12px' }}>
-                Размер печатного листа для расчёта вместимости в калькуляторе
+                {isRollOrLinearUnit
+                  ? 'Опционально: для расчёта раскладки «как на листе». Для рулонной печати (пог. м) размер заказа берётся из продукта; остаток на складе — в поле «Количество» в метрах.'
+                  : 'Размер печатного листа для расчёта вместимости в калькуляторе'}
               </small>
             </div>
             <div className="form-group">
-              <label>Высота листа (мм)</label>
+              <label>{isRollOrLinearUnit ? 'Вторая сторона (мм), опционально' : 'Высота листа (мм)'}</label>
               <input
                 type="number"
                 value={formData.sheet_height ?? ''}
                 onChange={(e) => handleChange('sheet_height' as any, e.target.value === '' ? '' : (parseFloat(e.target.value) ?? undefined))}
-                placeholder="297 (A4), 450 (SRA3)"
+                placeholder={isRollOrLinearUnit ? 'Оставьте пустым или 1000' : '297 (A4), 450 (SRA3)'}
                 min="1"
                 max="2000"
                 step="1"
               />
+              {isRollOrLinearUnit && (
+                <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: 4 }}>
+                  Для рулона это не «длина бобины». Если раскладка по листу не нужна — оставьте пустым: калькулятор возьмёт размер изделия.
+                  Если нужен прямоугольник «как лист» (ширина × длина полотна), укажите вторую сторону (например 1000).
+                </small>
+              )}
             </div>
           </div>
 

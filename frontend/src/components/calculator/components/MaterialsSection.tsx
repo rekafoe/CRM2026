@@ -202,13 +202,41 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   const isRequired = (name: string) => !!(schema?.fields as any)?.find((f: any) => f.name === name)?.required;
   const getPlaceholder = (name: string, fb: string) => (schema?.fields as any)?.find((f: any) => f.name === name)?.placeholder || fb;
 
-  // Проверяем доступность материалов при изменении параметров
+  // Стабильный «отпечаток» результата расчёта — НЕ кладём весь result в deps (новый объект каждый рендер → цикл: effect → calculateCost → родитель → result → effect).
+  const resultMaterialFingerprint = useMemo(() => {
+    const m = result?.materials?.[0] as { total?: number; unitPrice?: number; price?: number } | undefined;
+    const layout = result?.layout as { sheetsNeeded?: number; metersNeeded?: number } | undefined;
+    if (!m || layout == null) return '';
+    const sn = layout.sheetsNeeded;
+    const mn = layout.metersNeeded;
+    if (sn == null && mn == null) return '';
+    return [
+      m.total ?? '',
+      m.unitPrice ?? m.price ?? '',
+      sn ?? '',
+      mn ?? '',
+    ].join('|');
+  }, [
+    result?.materials?.[0]?.total,
+    (result?.materials?.[0] as any)?.unitPrice,
+    (result?.materials?.[0] as any)?.price,
+    result?.layout?.sheetsNeeded,
+    (result?.layout as any)?.metersNeeded,
+  ]);
+
+  // Проверяем доступность и fallback-стоимость при смене параметров (без зависимости от result)
   useEffect(() => {
     if (specs.paperType && specs.paperDensity && specs.quantity > 0) {
       checkAvailability();
-      calculateCost();
+      void calculateCost();
     }
-  }, [specs.paperType, specs.paperDensity, specs.quantity, result]); // 🆕 Добавили result в зависимости
+  }, [specs.paperType, specs.paperDensity, specs.quantity, specs.sides]);
+
+  // Когда с бэкенда пришёл новый расчёт — обновляем блок стоимости из result без повторного цикла по ссылке result
+  useEffect(() => {
+    if (!resultMaterialFingerprint || !specs.paperType || !specs.paperDensity || specs.quantity <= 0) return;
+    void calculateCost();
+  }, [resultMaterialFingerprint, specs.paperType, specs.paperDensity, specs.quantity]);
 
   const checkAvailability = async () => {
     setIsCheckingAvailability(true);
@@ -286,16 +314,21 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   // 🆕 Если текущий тип бумаги не входит в разрешенные - сбрасываем на первый разрешенный
   // Также устанавливаем первый тип бумаги, если paperType не установлен, но есть разрешённые типы
   useEffect(() => {
-    if (filteredPaperTypes.length > 0) {
-      // Если paperType не установлен или не входит в разрешённые - устанавливаем первый
-      if (!specs.paperType || !filteredPaperTypes.some(pt => pt.name === specs.paperType)) {
-        updateSpecs({ 
-          paperType: filteredPaperTypes[0].name,
-          paperDensity: getDefaultPaperDensity(filteredPaperTypes[0].name)
-        }, true);
-      }
-    }
-  }, [filteredPaperTypes, specs.paperType, updateSpecs, getDefaultPaperDensity]);
+    if (filteredPaperTypes.length === 0) return;
+    const firstName = filteredPaperTypes[0].name;
+    const inList = specs.paperType && filteredPaperTypes.some((pt) => pt.name === specs.paperType);
+    if (inList) return;
+    const nextDensity = getDefaultPaperDensity(firstName);
+    // Не дёргаем updateSpecs, если уже выставлены те же значения (иначе лишние рендеры и гонки с материалами)
+    if (specs.paperType === firstName && specs.paperDensity === nextDensity) return;
+    updateSpecs(
+      {
+        paperType: firstName,
+        paperDensity: nextDensity,
+      },
+      true,
+    );
+  }, [filteredPaperTypes, specs.paperType, specs.paperDensity, updateSpecs, getDefaultPaperDensity]);
 
   // 🆕 Проверяем, является ли продукт упрощённым
   const isSimplifiedProduct = simplifiedSizesSource && simplifiedSizesSource.length > 0;

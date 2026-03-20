@@ -5,9 +5,11 @@ import { getProductTemplateConfig, updateProductConfig, createProductConfig } fr
 
 interface PriceTypesTabProps {
   productId: number | null;
+  /** Регистрация сохранения для кнопки «Сохранить изменения» в шапке страницы */
+  onRegisterSave?: (save: (() => Promise<void>) | null) => void;
 }
 
-export const PriceTypesTab: React.FC<PriceTypesTabProps> = ({ productId }) => {
+export const PriceTypesTab: React.FC<PriceTypesTabProps> = ({ productId, onRegisterSave }) => {
   const [allowedPriceTypes, setAllowedPriceTypes] = useState<string[]>(['standard', 'online']);
   const [templateConfigId, setTemplateConfigId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,11 +44,12 @@ export const PriceTypesTab: React.FC<PriceTypesTabProps> = ({ productId }) => {
     loadConfig();
   }, [loadConfig]);
 
-  const handleSave = useCallback(async () => {
+  /** Сохранение без alert (для кнопки в шапке); при ошибке — throw */
+  const persistAllowedPriceTypes = useCallback(async () => {
     if (!productId) return;
+    setSaving(true);
+    setError(null);
     try {
-      setSaving(true);
-      setError(null);
       const config = await getProductTemplateConfig(productId);
       const existingConstraints = (config?.constraints as Record<string, any>) || {};
       const overrides = existingConstraints.overrides || {};
@@ -70,13 +73,29 @@ export const PriceTypesTab: React.FC<PriceTypesTabProps> = ({ productId }) => {
         });
         setTemplateConfigId(created.id);
       }
-      alert('Разрешённые типы цен сохранены');
     } catch (e: any) {
-      setError(e?.message || 'Не удалось сохранить');
+      const msg = e?.message || 'Не удалось сохранить';
+      setError(msg);
+      throw e;
     } finally {
       setSaving(false);
     }
   }, [productId, allowedPriceTypes]);
+
+  const handleSave = useCallback(async () => {
+    try {
+      await persistAllowedPriceTypes();
+      alert('Разрешённые типы цен сохранены');
+    } catch {
+      /* сообщение уже в setError */
+    }
+  }, [persistAllowedPriceTypes]);
+
+  useEffect(() => {
+    if (!onRegisterSave || !productId) return;
+    onRegisterSave(() => persistAllowedPriceTypes());
+    return () => onRegisterSave(null);
+  }, [onRegisterSave, productId, persistAllowedPriceTypes]);
 
   if (!productId) return null;
 
