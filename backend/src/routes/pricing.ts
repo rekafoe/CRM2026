@@ -386,7 +386,47 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
       ORDER BY id DESC LIMIT 1
     `, [technology_code])
     if (!pp) {
-      res.status(404).json({ error: `Цены для технологии ${technology_code} не найдены` })
+      // Рулон / пог. м: в центре нет листовых диапазонов — считаем одну «цену за изделие» как в SimplifiedPricingService (roll)
+      const ppMeters = await db.get<{
+        id: number
+        price_bw_per_meter: number | null
+        price_color_per_meter: number | null
+      }>(
+        `
+        SELECT id, price_bw_per_meter, price_color_per_meter FROM print_prices
+        WHERE technology_code = ? AND is_active = 1 AND counter_unit = 'meters'
+        ORDER BY id DESC LIMIT 1
+      `,
+        [technology_code],
+      )
+      if (!ppMeters) {
+        res.status(404).json({ error: `Цены для технологии ${technology_code} не найдены` })
+        return
+      }
+      const isColor = String(color_mode).toLowerCase() !== 'bw'
+      const perMeter = isColor
+        ? ppMeters.price_color_per_meter != null
+          ? Number(ppMeters.price_color_per_meter)
+          : 0
+        : ppMeters.price_bw_per_meter != null
+          ? Number(ppMeters.price_bw_per_meter)
+          : 0
+      if (!Number.isFinite(perMeter) || perMeter <= 0) {
+        res.status(404).json({
+          error: `Для технологии ${technology_code} (пог. м) не задана цена за погонный метр (${isColor ? 'цвет' : 'ч/б'})`,
+        })
+        return
+      }
+      const widthMeters = Math.max(w, h) / 1000
+      const metersPerItem = Math.min(w, h) / 1000
+      const unitPrice = Math.round(perMeter * widthMeters * metersPerItem * 100) / 100
+      res.json({
+        counter_unit: 'meters',
+        items_per_sheet: 1,
+        tiers: [{ min_qty: 1, max_qty: undefined, unit_price: unitPrice }],
+        note:
+          'Рулон: цена за изделие = (цена за пг.м) × ширина по рулону (большая сторона, м) × длина вдоль подачи (меньшая сторона, м). Диапазоны тиража из print_price_tiers для пог. м не используются.',
+      })
       return
     }
     let sheetW = pp.sheet_width_mm ?? 320
