@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Material } from '../../types/shared';
 import { api } from '../../api';
+import { materialPriceFieldLabel } from '../../utils/materialPriceLabels';
 
 interface PaperType {
   id: number;
@@ -428,7 +429,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               />
             </div>
             <div className="form-group">
-              <label>Цена за единицу (BYN) *</label>
+              <label>{materialPriceFieldLabel(formData.unit)}</label>
               <input
                 type="number"
                 value={formData.price ?? ''}
@@ -442,6 +443,11 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                 min="0"
                 step="0.01"
               />
+              {isRollOrLinearUnit && (
+                <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: 4 }}>
+                  В расчёте заказа умножается на списанные погонные метры.
+                </small>
+              )}
             </div>
           </div>
 

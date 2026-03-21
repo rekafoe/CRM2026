@@ -1,5 +1,6 @@
 import React from 'react';
 import { Material } from '../../../types/shared';
+import { materialPriceSecondaryLabel } from '../../../utils/materialPriceLabels';
 import { WarehouseButton } from '../common/WarehouseButton';
 import { StatusBadge } from '../../common/StatusBadge';
 
@@ -78,7 +79,7 @@ export const MaterialRowCard: React.FC<MaterialRowCardProps> = ({
       <div className="row-column price-column">
         <div className="price-info">
           <div className="font-bold">{material.sheet_price_single || material.price || 0} BYN</div>
-          <div className="text-xs text-text-secondary">за единицу</div>
+          <div className="text-xs text-text-secondary">{materialPriceSecondaryLabel(material.unit)}</div>
         </div>
       </div>
 

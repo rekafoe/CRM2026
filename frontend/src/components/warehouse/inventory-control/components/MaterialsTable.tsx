@@ -25,7 +25,7 @@ export const MaterialsTable: React.FC<MaterialsTableProps> = React.memo(({
             <th>Доступно</th>
             <th>Мин. остаток</th>
             <th>Ед.</th>
-            <th>Цена/лист</th>
+            <th title="Для ед. «м» — за погонный метр">Цена за ед.</th>
             <th>Статус</th>
             <th>Действия</th>
           </tr>
