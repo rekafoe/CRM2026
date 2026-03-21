@@ -21,6 +21,8 @@ interface OperationsSectionProps {
   backendProductSchema: any;
   specs: Record<string, any>;
   updateSpecs: (updates: Record<string, any>, instant?: boolean) => void;
+  /** Если задан — показываем только операции с этими operation_id (подтип simplified) */
+  allowedOperationIds?: number[];
 }
 
 interface SelectedOperation {
@@ -47,15 +49,27 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
   backendProductSchema,
   specs,
   updateSpecs,
+  allowedOperationIds,
 }) => {
-  // Получаем операции из схемы — показываем ВСЕ (включая обязательные),
-  // чтобы пользователь видел операции, включённые по умолчанию для подтипа (например, «биговка с фальцовкой»)
+  const allowedSet = useMemo(() => {
+    if (!Array.isArray(allowedOperationIds)) return null;
+    return new Set(allowedOperationIds.map((id) => Number(id)).filter((id) => Number.isFinite(id)));
+  }, [allowedOperationIds]);
+
+  // Получаем операции из схемы. Для продуктов с подтипами схема — объединение услуг всех подтипов;
+  // allowedOperationIds ограничивает список тем, что заданы в finishing / initial этого подтипа.
   const operations = useMemo(() => {
     if (!backendProductSchema?.operations || !Array.isArray(backendProductSchema.operations)) {
       return [];
     }
-    return backendProductSchema.operations;
-  }, [backendProductSchema?.operations]);
+    const raw = backendProductSchema.operations;
+    if (allowedSet === null) return raw;
+    if (allowedSet.size === 0) return [];
+    return raw.filter((op: Operation) => {
+      const oid = op.operation_id ?? op.id;
+      return oid != null && allowedSet.has(Number(oid));
+    });
+  }, [backendProductSchema?.operations, allowedSet]);
 
   // 🆕 Состояние для вариантов услуг (типы и подтипы)
   const [serviceVariants, setServiceVariants] = useState<Map<number, ServiceVariant[]>>(new Map());

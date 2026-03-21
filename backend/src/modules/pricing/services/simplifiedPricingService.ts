@@ -595,6 +595,7 @@ export class SimplifiedPricingService {
     // ⛔ Раньше брали цены из selectedSize.finishing[].tiers (локальные цены в шаблоне продукта)
     // ✅ Теперь всегда берём цены из централизованной системы услуг (service_volume_prices / post_processing_services),
     //    а в simplified-конфиге используем только ссылки на service_id и конфиг units_per_item/price_unit.
+    const pricingWarnings: string[] = [];
     let finishingPrice = 0;
     const finishingDetails: SimplifiedPricingResult['finishingDetails'] = [];
     let serviceTiersMap: Map<string, SimplifiedQtyTier[]> = new Map();
@@ -786,16 +787,38 @@ export class SimplifiedPricingService {
             const minLimit = limits.min ?? 1;
             const maxLimit = limits.max;
             const checkQty = isPerSheetOp ? perSheetUnits : quantity;
-            if (checkQty < minLimit || (maxLimit !== undefined && checkQty > maxLimit)) {
+            if (maxLimit !== undefined && checkQty > maxLimit) {
               const serviceName = serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`;
               const unitLabel = isPerSheetOp ? (isRollPrint ? 'пог. м' : 'листов') : 'шт';
               const err: any = new Error(
-                maxLimit !== undefined
-                  ? `Тираж для операции "${serviceName}" должен быть от ${minLimit} до ${maxLimit} ${unitLabel}`
-                  : `Тираж для операции "${serviceName}" должен быть не меньше ${minLimit} ${unitLabel}`
+                `Тираж для операции "${serviceName}" должен быть от ${minLimit} до ${maxLimit} ${unitLabel}`
               );
               err.status = 400;
               throw err;
+            }
+            // Ниже минимума: per_sheet / per_cut — считаем по минимуму услуги и предупреждаем (ламинатор 3 л мин при 1 л печати).
+            if (checkQty < minLimit) {
+              const canBumpByMin =
+                isPerSheetOp || String(priceUnitFromDb).toLowerCase() === 'per_cut';
+              if (!canBumpByMin) {
+                const serviceName = serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`;
+                const unitLabel = 'шт';
+                const err: any = new Error(
+                  `Тираж для операции "${serviceName}" должен быть не меньше ${minLimit} ${unitLabel}`
+                );
+                err.status = 400;
+                throw err;
+              }
+              const serviceName = serviceNamesMap.get(finConfig.service_id) || `Услуга #${finConfig.service_id}`;
+              const unitLabel = isPerSheetOp
+                ? isRollPrint
+                  ? 'пог. м'
+                  : 'листов печати'
+                : 'единиц';
+              const billed = minLimit;
+              pricingWarnings.push(
+                `${serviceName}: по раскладке и тиражу ${quantity} шт. требуется ${checkQty} ${unitLabel}, минимальный объём услуги ${minLimit} ${unitLabel}. В стоимость заложено ${billed} ${unitLabel}.`
+              );
             }
           }
           const tiers = serviceTiersMap.get(mapKey);
@@ -811,7 +834,15 @@ export class SimplifiedPricingService {
           const unitsPerItem = finConfig.units_per_item ?? 1;
           // per_cut (обычная резка): тупо сколько внёс резов — столько и считаем. Цена × кол-во внесённых. Раскладку не подставляем.
           const totalCutsForOrder = Math.max(unitsPerItem, 1);
-          const tierQty = isPerSheetOp ? perSheetUnits : (priceUnit === 'per_cut' ? totalCutsForOrder : quantity);
+          const billedPerSheetForTier =
+            isPerSheetOp && limits ? Math.max(perSheetUnits, limits.min ?? 1) : perSheetUnits;
+          const billedCutsForTier =
+            priceUnit === 'per_cut' && limits ? Math.max(totalCutsForOrder, limits.min ?? 1) : totalCutsForOrder;
+          const tierQty = isPerSheetOp
+            ? billedPerSheetForTier
+            : priceUnit === 'per_cut'
+              ? billedCutsForTier
+              : quantity;
           const tier = this.findTierForQuantity(tiers, tierQty);
           if (!tier) {
             logger.warn('Не найден диапазон для услуги отделки', {
@@ -1111,7 +1142,7 @@ export class SimplifiedPricingService {
       recommendedSheetSize: layoutCheck.recommendedSheetSize,
       cutsPerSheet: layoutCheck.cutsPerSheet ?? 0,
     };
-    const warnings: string[] = [];
+    const warnings: string[] = [...pricingWarnings];
     if (!isRollPrint && !layoutCheck.fitsOnSheet) {
       warnings.push(
         `Формат ${selectedSize.width_mm}×${selectedSize.height_mm} мм не помещается на стандартные печатные листы (SRA3, A3, A4). Проверьте размер.`
@@ -1326,7 +1357,18 @@ export class SimplifiedPricingService {
         const unitsPerItem = finConfig.units_per_item ?? 1;
         // per_cut: только внесённое пользователем кол-во резов, без раскладки
         const totalCutsForOrder = Math.max(unitsPerItem, 1);
-        const tierQty = isPerSheetOp ? perSheetUnits : (priceUnitFromDb === 'per_cut' ? totalCutsForOrder : q);
+        const limitsFin = ctx.serviceLimitsMap?.get(finConfig.service_id);
+        const billedPerSheetTier =
+          isPerSheetOp && limitsFin ? Math.max(perSheetUnits, limitsFin.min ?? 1) : perSheetUnits;
+        const billedCutsTier =
+          priceUnitFromDb === 'per_cut' && limitsFin
+            ? Math.max(totalCutsForOrder, limitsFin.min ?? 1)
+            : totalCutsForOrder;
+        const tierQty = isPerSheetOp
+          ? billedPerSheetTier
+          : priceUnitFromDb === 'per_cut'
+            ? billedCutsTier
+            : q;
         const tier = this.findTierForQuantity(tiers, tierQty);
         if (!tier) continue;
         const priceForTier = this.getPriceForQuantityTier(tier);

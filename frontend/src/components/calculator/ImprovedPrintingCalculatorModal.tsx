@@ -18,7 +18,11 @@ import { AdvancedSettingsSection } from './components/AdvancedSettingsSection';
 import { DynamicProductSelector, CUSTOM_PRODUCT_ID, POSTPRINT_PRODUCT_ID } from './components/DynamicProductSelector';
 import { PrintingSettingsSection } from './components/PrintingSettingsSection';
 import { getProductionTimeLabel, getProductionDaysByPriceType, getProductionTimeLabelFromDays } from './utils/time';
-import { getEffectiveSimplifiedConfig, getEffectiveAllowedMaterialIds } from './utils/simplifiedConfig';
+import {
+  getEffectiveSimplifiedConfig,
+  getEffectiveAllowedMaterialIds,
+  collectAllowedOperationIdsForTypeConfig,
+} from './utils/simplifiedConfig';
 import { ProductSpecs, CalculationResult, EditContextPayload } from './types/calculator.types';
 import { useCalculatorEditContext } from './hooks/useCalculatorEditContext';
 import { useCalculatorPricingActions, productRequiresPrint } from './hooks/useCalculatorPricingActions';
@@ -169,6 +173,14 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     () => getEffectiveSimplifiedConfig(simplified, hasProductTypes ? selectedTypeId : null),
     [simplified, hasProductTypes, selectedTypeId]
   );
+
+  /** Услуги, разрешённые шаблоном для текущего подтипа — фильтр чекбоксов в OperationsSection */
+  const subtypeAllowedOperationIds = useMemo(() => {
+    if (!hasProductTypes || selectedTypeId == null) return undefined;
+    const cfg = simplified?.typeConfigs?.[String(selectedTypeId)];
+    if (!cfg) return undefined;
+    return Array.from(collectAllowedOperationIdsForTypeConfig(cfg));
+  }, [hasProductTypes, selectedTypeId, simplified?.typeConfigs]);
   const effectiveSizes = effectiveConfig.sizes;
   const effectivePagesOptions = effectiveConfig.pages?.options;
 
@@ -206,24 +218,33 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         }
       }
     }
-    // Операции из схемы: обязательные и по умолчанию (как для продуктов без подтипов в useEffect ниже).
-    // Без is_default при пустом initial.operations у подтипа selectedOperations остаётся [] → фоллбэк в pricing и «пустой» finishing.
+    // Операции из схемы: обязательные и по умолчанию — но для продуктов с подтипами
+    // схема содержит объединение услуг всех подтипов (product_operations_link).
+    // Подмешиваем только те id, что есть в finishing / initial.operations ЭТОГО подтипа.
+    const allowedForSubtype = collectAllowedOperationIdsForTypeConfig(cfg);
+    const hasSubtypeAllowList = allowedForSubtype.size > 0;
+    // Подтип заведён в typeConfigs, но ни один размер не содержит finishing и нет initial.operations —
+    // не тянем чужие is_default из объединённой схемы.
+    const typedSubtypeWithNoTemplateOps = Boolean(simplified?.types?.length && cfg && !hasSubtypeAllowList);
     const schemaOps = backendProductSchema?.operations || [];
-    for (const op of schemaOps) {
-      const opId = op.operation_id ?? op.id;
-      if (!opId || opsSet.has(opId)) continue;
-      const isReq = op.is_required === true || op.is_required === 1;
-      const isDef = op.is_default === true || op.is_default === 1;
-      if (!isReq && !isDef) continue;
-      opsSet.add(opId);
-      operationsFromInitial.push({
-        operationId: opId,
-        ...(op.variant_id != null ? { variantId: op.variant_id } : {}),
-        ...(op.subtype ? { subtype: op.subtype } : {}),
-        ...(Number(op.units_per_item ?? op.quantity) > 0
-          ? { quantity: Number(op.units_per_item ?? op.quantity) }
-          : {}),
-      });
+    if (!typedSubtypeWithNoTemplateOps) {
+      for (const op of schemaOps) {
+        const opId = op.operation_id ?? op.id;
+        if (!opId || opsSet.has(opId)) continue;
+        if (hasSubtypeAllowList && !allowedForSubtype.has(Number(opId))) continue;
+        const isReq = op.is_required === true || op.is_required === 1;
+        const isDef = op.is_default === true || op.is_default === 1;
+        if (!isReq && !isDef) continue;
+        opsSet.add(opId);
+        operationsFromInitial.push({
+          operationId: opId,
+          ...(op.variant_id != null ? { variantId: op.variant_id } : {}),
+          ...(op.subtype ? { subtype: op.subtype } : {}),
+          ...(Number(op.units_per_item ?? op.quantity) > 0
+            ? { quantity: Number(op.units_per_item ?? op.quantity) }
+            : {}),
+        });
+      }
     }
 
     if (initial?.print_technology) {
@@ -1034,6 +1055,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                     ? `${selectedProduct.id}:${hasProductTypes ? (selectedTypeId ?? '') : ''}`
                     : undefined
                 }
+                allowedOperationIds={subtypeAllowedOperationIds}
               />
             )}
 

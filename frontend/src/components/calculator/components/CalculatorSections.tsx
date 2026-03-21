@@ -39,6 +39,8 @@ interface CalculatorSectionsProps {
   onSelectType?: (typeId: number) => void;
   /** Сброс локального выбора материала в MaterialsSection при смене продукта/подтипа */
   materialSelectionResetKey?: string;
+  /** Для simplified + подтипы: только эти operation_id из схемы показывать в «Операции» */
+  allowedOperationIds?: number[];
 }
 
 export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(({
@@ -68,6 +70,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   selectedTypeId,
   onSelectType,
   materialSelectionResetKey,
+  allowedOperationIds,
 }) => {
   const hasEffectiveSizes = Array.isArray(effectiveSizes) && effectiveSizes.length > 0;
   const showTypeSelector = Array.isArray(productTypes) && productTypes.length > 0 && onSelectType != null;
@@ -198,6 +201,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           backendProductSchema={backendProductSchema}
           specs={specs as any}
           updateSpecs={updateSpecs as any}
+          allowedOperationIds={allowedOperationIds}
         />
 
         <AdvancedSettingsSection

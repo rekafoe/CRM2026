@@ -26,6 +26,37 @@ export function getEffectiveAllowedMaterialIds(
   return common != null && common.length > 0 ? common : (size.allowed_material_ids ?? []);
 }
 
+/**
+ * ID услуг (post_processing_services), явно заданные для подтипа:
+ * `sizes[].finishing[].service_id` и `initial.operations`.
+ * В схеме API операции продукта — объединение по всем подтипам; без этой выборки
+ * в калькулятор подмешиваются чужие is_default и остаются лишние чекбоксы.
+ */
+export function collectAllowedOperationIdsForTypeConfig(
+  cfg: { sizes?: any[]; initial?: { operations?: any[] } } | null | undefined
+): Set<number> {
+  const ids = new Set<number>();
+  if (!cfg || typeof cfg !== 'object') return ids;
+  const sizes = Array.isArray(cfg.sizes) ? cfg.sizes : [];
+  for (const size of sizes) {
+    const fin = Array.isArray(size?.finishing) ? size.finishing : [];
+    for (const f of fin) {
+      const sid = f?.service_id ?? f?.operation_id;
+      if (sid != null && sid !== '' && Number.isFinite(Number(sid))) {
+        ids.add(Number(sid));
+      }
+    }
+  }
+  const initialOps = Array.isArray(cfg.initial?.operations) ? cfg.initial.operations : [];
+  for (const op of initialOps) {
+    const oid = op?.operation_id ?? op?.service_id ?? op?.id;
+    if (oid != null && oid !== '' && Number.isFinite(Number(oid))) {
+      ids.add(Number(oid));
+    }
+  }
+  return ids;
+}
+
 export function getEffectiveSimplifiedConfig(
   simplified: {
     sizes?: EffectiveSimplifiedConfig['sizes'];

@@ -424,16 +424,31 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     return order;
   }, [allowedMaterialsForSize]);
 
-  // Материалы выбранного типа (из разрешённых для продукта)
-  // Сравнение без учёта регистра — «Дизайнерская» и «дизайнерская» считаются одним типом
+  // Материалы «текущего» типа для расчётов (плотности, material_id).
+  // Важно: при пустом selectedMaterialType (сброс подтипа / первый кадр) НЕ подмешивать все типы разом —
+  // иначе densitiesForSelectedType = объединение плотностей всех типов, эффект ниже берёт min по всем,
+  // а другой эффект ставит первый тип из списка → разные материалы и бесконечные перезаписи material_id.
   const allowedMaterialsByType = useMemo(() => {
-    if (!selectedMaterialType) return allowedMaterialsForSize;
-    const normSelected = normalizeForCompare(selectedMaterialType);
+    let typeToUse: string | undefined;
+    if (selectedMaterialType && String(selectedMaterialType).trim() !== '') {
+      typeToUse = selectedMaterialType;
+    } else if (specs.material_id != null) {
+      const row = allowedMaterialsForSize.find(m => Number(m.id) === Number(specs.material_id));
+      const raw = row ? String((row as any).paper_type_name ?? '').trim() : '';
+      typeToUse = raw || undefined;
+    }
+    if (!typeToUse) {
+      typeToUse = materialTypesFromMaterials[0];
+    }
+    if (!typeToUse) {
+      return allowedMaterialsForSize;
+    }
+    const normSelected = normalizeForCompare(typeToUse);
     return allowedMaterialsForSize.filter(m => {
       const ptName = (m as any).paper_type_name;
       return normSelected && normalizeForCompare(ptName) === normSelected;
     });
-  }, [allowedMaterialsForSize, selectedMaterialType]);
+  }, [allowedMaterialsForSize, selectedMaterialType, specs.material_id, materialTypesFromMaterials]);
 
   // Плотности для выбранного типа — только из разрешённых материалов продукта (явные поля плотности)
   const densitiesForSelectedType = useMemo(() => {
