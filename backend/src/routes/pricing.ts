@@ -355,8 +355,18 @@ router.get('/print-prices', asyncHandler(async (req, res) => {
 
 // GET /api/pricing/print-prices/derive — должен быть ДО /:id, иначе "derive" матчится как id - рассчитать цены за ед. по размеру продукта из центральных диапазонов
 // ?technology_code=laser_prof&width_mm=105&height_mm=148&color_mode=color&sides_mode=single
+// Опционально: material_id — взять sheet_width/sheet_height со склада; или sheet_width_mm + sheet_height_mm — явный формат раскладки (приоритет выше material_id и выше размеров из print_prices).
 router.get('/print-prices/derive', asyncHandler(async (req, res) => {
-  const { technology_code, width_mm, height_mm, color_mode = 'color', sides_mode = 'single' } = req.query
+  const {
+    technology_code,
+    width_mm,
+    height_mm,
+    color_mode = 'color',
+    sides_mode = 'single',
+    material_id: materialIdQ,
+    sheet_width_mm: layoutWq,
+    sheet_height_mm: layoutHq,
+  } = req.query
   if (!technology_code || !width_mm || !height_mm) {
     res.status(400).json({ error: 'technology_code, width_mm, height_mm обязательны' })
     return
@@ -379,8 +389,30 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
       res.status(404).json({ error: `Цены для технологии ${technology_code} не найдены` })
       return
     }
-    const sheetW = pp.sheet_width_mm ?? 320
-    const sheetH = pp.sheet_height_mm ?? 450
+    let sheetW = pp.sheet_width_mm ?? 320
+    let sheetH = pp.sheet_height_mm ?? 450
+
+    const lw = layoutWq != null && String(layoutWq).trim() !== '' ? Number(layoutWq) : NaN
+    const lh = layoutHq != null && String(layoutHq).trim() !== '' ? Number(layoutHq) : NaN
+    if (Number.isFinite(lw) && Number.isFinite(lh) && lw > 0 && lh > 0) {
+      sheetW = lw
+      sheetH = lh
+    } else if (materialIdQ != null && String(materialIdQ).trim() !== '') {
+      const mid = Number(materialIdQ)
+      if (Number.isFinite(mid) && mid > 0) {
+        const mat = await db.get<{ sheet_width: number | null; sheet_height: number | null }>(
+          `SELECT sheet_width, sheet_height FROM materials WHERE id = ? AND is_active = 1`,
+          [mid]
+        )
+        const mw = mat?.sheet_width != null && Number(mat.sheet_width) > 0 ? Number(mat.sheet_width) : 0
+        const mh = mat?.sheet_height != null && Number(mat.sheet_height) > 0 ? Number(mat.sheet_height) : 0
+        if (mw > 0 && mh > 0) {
+          sheetW = mw
+          sheetH = mh
+        }
+      }
+    }
+
     const itemsPerSheet = calcItemsPerSheet(w, h, sheetW, sheetH)
     const tiers = await db.all<any>(`
       SELECT min_sheets, max_sheets, price_per_sheet FROM print_price_tiers

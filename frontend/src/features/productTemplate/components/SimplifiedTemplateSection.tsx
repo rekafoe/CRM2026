@@ -713,6 +713,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   updateSize={updateSize}
                   getSizeRanges={getSizeRanges}
                   updateSizeRanges={updateSizeRanges}
+                  allMaterials={allMaterials}
+                  allowedMaterialIds={effectiveAllowedMaterialIds}
                 />
 
                 <MaterialsCard

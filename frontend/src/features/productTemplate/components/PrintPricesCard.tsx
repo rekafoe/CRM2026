@@ -15,6 +15,23 @@ type TierRangeModalState = {
   anchorElement?: HTMLElement
 }
 
+/** Первый разрешённый материал с заполненными sheet_width и sheet_height — для раскладки при «Заполнить из центральных цен». */
+function firstMaterialIdWithSheetDims(
+  allMaterials: Array<{ id: number; sheet_width?: number | null; sheet_height?: number | null }> | undefined,
+  allowedIds: number[] | undefined,
+): number | undefined {
+  if (!allMaterials?.length || !allowedIds?.length) return undefined
+  for (const rawId of allowedIds) {
+    const id = Number(rawId)
+    if (!Number.isFinite(id)) continue
+    const m = allMaterials.find((x) => Number(x.id) === id)
+    const sw = m != null ? Number(m.sheet_width) : 0
+    const sh = m != null ? Number(m.sheet_height) : 0
+    if (sw > 0 && sh > 0) return id
+  }
+  return undefined
+}
+
 interface PrintPricesCardProps {
   selected: SimplifiedSizeConfig
   printTechs: PrintTechRow[]
@@ -23,6 +40,10 @@ interface PrintPricesCardProps {
   updateSize: (sizeId: number | string, patch: Partial<SimplifiedSizeConfig>) => void
   getSizeRanges: (size: SimplifiedSizeConfig) => Tier[]
   updateSizeRanges: (sizeId: number | string, newRanges: Tier[]) => void
+  /** Материалы склада (для раскладки по ширине/высоте листа при запросе из центральных цен) */
+  allMaterials?: Array<{ id: number; sheet_width?: number | null; sheet_height?: number | null }>
+  /** Разрешённые id материалов для текущего размера (порядок важен: берётся первый с обоими размерами мм) */
+  allowedMaterialIds?: number[]
 }
 
 export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
@@ -33,6 +54,8 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
   updateSize,
   getSizeRanges,
   updateSizeRanges,
+  allMaterials,
+  allowedMaterialIds,
 }) => {
   const [tierModal, setTierModal] = useState<TierRangeModalState>({
     type: 'add',
@@ -83,6 +106,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
               if (!tech) return
               const w = selected.width_mm
               const h = selected.height_mm
+              const layoutMaterialId = firstMaterialIdWithSheetDims(allMaterials, allowedMaterialIds)
               const modes: Array<{ color_mode: 'color' | 'bw'; sides_mode: 'single' | 'duplex' }> = [
                 { color_mode: 'color', sides_mode: 'single' },
                 { color_mode: 'color', sides_mode: 'duplex' },
@@ -94,7 +118,14 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
               for (const m of modes) {
                 try {
                   const r = await api.get('/pricing/print-prices/derive', {
-                    params: { technology_code: tech, width_mm: w, height_mm: h, color_mode: m.color_mode, sides_mode: m.sides_mode },
+                    params: {
+                      technology_code: tech,
+                      width_mm: w,
+                      height_mm: h,
+                      color_mode: m.color_mode,
+                      sides_mode: m.sides_mode,
+                      ...(layoutMaterialId != null ? { material_id: layoutMaterialId } : {}),
+                    },
                   })
                   const data = r.data as { items_per_sheet?: number; tiers?: Array<{ min_qty: number; max_qty?: number; unit_price: number }> }
                   if (data?.items_per_sheet != null) itemsPerSheet = data.items_per_sheet
@@ -122,6 +153,11 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
           >
             Заполнить из центральных цен
           </Button>
+        )}
+        {selected.default_print?.technology_code && selected.width_mm > 0 && selected.height_mm > 0 && (
+          <p className="text-muted text-xs mt-2 mb-0" style={{ maxWidth: 520 }}>
+            Раскладка при этом запросе: первый разрешённый для размера материал с заполненными «ширина и высота листа (мм)» в карточке склада; если таких нет — размер листа из централизованной цены печати (по умолчанию часто 320×450).
+          </p>
         )}
       </div>
       <div className="simplified-card__content">
