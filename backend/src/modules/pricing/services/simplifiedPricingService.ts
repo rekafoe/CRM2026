@@ -633,6 +633,44 @@ export class SimplifiedPricingService {
       finishingToUse = [];
     }
 
+    // Клиент (CRM/сайт) часто шлёт finishing: [{ service_id, variant_id }] без units_per_item —
+    // тогда берём норму «на изделие» из шаблона размера (как в админке продукта).
+    if (
+      normalizedConfig.finishing &&
+      normalizedConfig.finishing.length > 0 &&
+      finishingToUse.length > 0 &&
+      Array.isArray(selectedSize.finishing) &&
+      selectedSize.finishing.length > 0
+    ) {
+      const tmplByKey = new Map<string, { units_per_item?: number }>();
+      for (const t of selectedSize.finishing) {
+        const sid = Number((t as any).service_id);
+        if (!Number.isFinite(sid)) continue;
+        const rawVid = (t as any).variant_id;
+        const vid =
+          rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
+        const row = t as { units_per_item?: number };
+        if (vid != null) tmplByKey.set(`${sid}:${vid}`, row);
+        if (!tmplByKey.has(String(sid))) tmplByKey.set(String(sid), row);
+      }
+      finishingToUse = finishingToUse.map((f) => {
+        const sid = Number(f.service_id);
+        const rawVid = (f as any).variant_id;
+        const vid =
+          rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
+        const k = vid != null ? `${sid}:${vid}` : String(sid);
+        const tmpl = tmplByKey.get(k) ?? tmplByKey.get(String(sid));
+        const raw = f.units_per_item;
+        const missingUnits =
+          raw === undefined || raw === null || (typeof raw === 'string' && String(raw).trim() === '');
+        if (missingUnits && tmpl?.units_per_item != null) {
+          const u = Number(tmpl.units_per_item);
+          if (Number.isFinite(u) && u > 0) return { ...f, units_per_item: u };
+        }
+        return f;
+      });
+    }
+
     // При fallback: исключаем операции с min_quantity > quantity (пользователь не выбирал их явно)
     const isFallbackFinishing = !(normalizedConfig.finishing && normalizedConfig.finishing.length > 0) && finishingToUse.length > 0;
     if (isFallbackFinishing && finishingToUse.length > 0) {
@@ -856,10 +894,7 @@ export class SimplifiedPricingService {
 
           const priceForTier = this.getPriceForQuantityTier(tier);
           const serviceMinQty = limits?.min ?? 0;
-          // Операции «на изделие»: fold/score — кол-во = тираж × units_per_item
-          // per_sheet: кол-во = листов печати (или пог. м)
-          // per_cut: кол-во резов на всю позицию (из раскладки или units_per_item), не quantity × units
-          const isPerProductOp = ['fold', 'score'].includes(operationType);
+          // per_sheet: листы/пог. м; per_cut: резы на позицию (units_per_item); иначе — тираж × units_per_item (per_item и др.)
 
           let servicePrice = 0;
           let totalUnits: number;
@@ -869,11 +904,7 @@ export class SimplifiedPricingService {
           } else if (priceUnit === 'per_cut') {
             totalUnits = Math.max(totalCutsForOrder, serviceMinQty);
             servicePrice = priceForTier * totalUnits;
-          } else if (isPerProductOp) {
-            totalUnits = quantity * unitsPerItem;
-            servicePrice = priceForTier * totalUnits;
           } else {
-            // per_item: цена за единицу × тираж × units_per_item
             totalUnits = quantity * (unitsPerItem ?? 1);
             servicePrice = priceForTier * totalUnits;
           }
@@ -1350,7 +1381,6 @@ export class SimplifiedPricingService {
         const mapKey = finConfig.variant_id ? `${finConfig.service_id}:${finConfig.variant_id}` : String(finConfig.service_id);
         const tiers = ctx.serviceTiersMap.get(mapKey);
         if (!tiers?.length) continue;
-        const operationType = ctx.serviceTypesMap.get(finConfig.service_id) || '';
         const priceUnitFromDb = (ctx.servicePriceUnitMap?.get(finConfig.service_id) ?? finConfig.price_unit ?? 'per_item').toLowerCase();
         const isPerSheetOp = priceUnitFromDb === 'per_sheet';
         const perSheetUnits = isPerSheetOp ? (ctx.isRollPrint ? metersForQ : sheetsForQ) : 0;
@@ -1374,16 +1404,12 @@ export class SimplifiedPricingService {
         const priceForTier = this.getPriceForQuantityTier(tier);
         const priceUnit = priceUnitFromDb;
         const serviceMinQty = ctx.serviceLimitsMap?.get(finConfig.service_id)?.min ?? 0;
-        const isPerProductOp = ['fold', 'score'].includes(operationType);
         if (isPerSheetOp) {
           const totalUnits = Math.max(perSheetUnits, serviceMinQty);
           finishingPrice += priceForTier * totalUnits;
         } else if (priceUnit === 'per_cut') {
           finishingPrice += priceForTier * Math.max(totalCutsForOrder, serviceMinQty);
-        } else if (isPerProductOp) {
-          finishingPrice += priceForTier * (q * unitsPerItem);
         } else {
-          // per_item: цена за единицу × тираж × units_per_item
           finishingPrice += priceForTier * (q * (unitsPerItem ?? 1));
         }
       }
