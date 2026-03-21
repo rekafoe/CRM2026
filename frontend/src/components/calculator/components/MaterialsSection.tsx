@@ -76,6 +76,11 @@ interface MaterialsSectionProps {
   renderMaterialOnly?: boolean;
   /** Размеры текущего типа продукта (если у продукта есть типы) */
   effectiveSizes?: Array<{ id: string; allowed_material_ids?: number[]; allowed_base_material_ids?: number[]; [key: string]: any }>;
+  /**
+   * Меняется при смене продукта или подтипа (simplified types).
+   * Сбрасывает локальный выбор типа бумаги/плотности — иначе после смены таба остаётся paper_type от прошлого подтипа и список материалов пустой/не тот.
+   */
+  materialSelectionResetKey?: string;
 }
 
 export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
@@ -89,6 +94,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   result,
   renderMaterialOnly = false,
   effectiveSizes: effectiveSizesProp,
+  materialSelectionResetKey,
 }) => {
   const simplifiedSizesSource = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
     ? effectiveSizesProp
@@ -135,6 +141,21 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   const userChoseTypeRef = useRef(false);
   /** Порядковый номер запроса /materials — отбрасываем устаревший ответ при быстрой смене подтипа */
   const materialsFetchGenerationRef = useRef(0);
+  const prevMaterialSelectionKeyRef = useRef<string | null>(null);
+
+  // Смена продукта / подтипа упрощённого продукта: сброс локального UI материала (иначе selectedMaterialType «прилипает» к прошлому табу).
+  useEffect(() => {
+    if (!materialSelectionResetKey) return;
+    if (prevMaterialSelectionKeyRef.current === null) {
+      prevMaterialSelectionKeyRef.current = materialSelectionResetKey;
+      return;
+    }
+    if (prevMaterialSelectionKeyRef.current === materialSelectionResetKey) return;
+    prevMaterialSelectionKeyRef.current = materialSelectionResetKey;
+    setSelectedMaterialType('');
+    setSelectedDensity('');
+    userChoseTypeRef.current = false;
+  }, [materialSelectionResetKey]);
 
   // Упрощённые продукты: тянем актуальный список с GET /materials при смене набора размеров/материалов (подтип и т.д.).
   // schema.materials подмешиваем через ref (без зависимости от ссылки массива), иначе лишние запросы и гонки при смене таба.

@@ -421,9 +421,62 @@ export class SimplifiedPricingService {
     let printDetails: SimplifiedPricingResult['printDetails'] | undefined;
     
     if (normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode) {
-      // Рулонная печать (counter_unit=meters): цена за пог. м × ширина × метры
-      if (isRollPrint && centralPriceForRoll) {
-        // Ширина по рулону (большая сторона) — для расчёта цены за пог. м
+      const techNorm = (s: string) => (s ?? '').trim().toLowerCase();
+      const printPriceConfig = selectedSize.print_prices.find(p =>
+        techNorm(p.technology_code) === techNorm(normalizedConfig.print_technology!) &&
+        (p.color_mode ?? '').toLowerCase() === (normalizedConfig.print_color_mode ?? '').toLowerCase() &&
+        (p.sides_mode ?? '').toLowerCase() === (pricingSidesMode ?? '').toLowerCase()
+      );
+
+      logger.info('Расчет цены печати', {
+        print_technology: normalizedConfig.print_technology,
+        print_color_mode: normalizedConfig.print_color_mode,
+        print_sides_mode: normalizedConfig.print_sides_mode,
+        pricing_sides_mode: pricingSidesMode,
+        duplex_as_single_x2: duplexAsSingleX2,
+        billing_mode_multiplier: billingModeMultiplier,
+        foundConfig: !!printPriceConfig,
+        tiersCount: printPriceConfig?.tiers?.length || 0,
+        isRollPrint,
+      });
+
+      // Сначала — цены из шаблона продукта (simplified.print_prices), в том числе для рулонных технологий.
+      // Раньше при counter_unit=meters ветка рулона шла раньше и полностью игнорировала шаблон.
+      let resolvedFromTemplate = false;
+      if (printPriceConfig?.tiers?.length) {
+        const tier = this.findTierForQuantity(printPriceConfig.tiers, quantity);
+        const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
+        if (priceForTier > 0) {
+          const pricePerSheet = priceForTier * itemsPerSheet;
+          const basePrintPrice = usePagesMultiplier ? priceForTier * quantity : sheetsNeeded * pricePerSheet;
+          printPrice = basePrintPrice * billingModeMultiplier;
+          printDetails = {
+            tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
+            priceForQuantity: printPrice,
+          };
+          resolvedFromTemplate = true;
+          logger.info('Цена печати по шаблону продукта (print_prices)', {
+            priceForTier,
+            quantity,
+            sheetsNeeded,
+            pricePerSheet,
+            pages: effectivePages,
+            sheetsPerItem,
+            effectivePrintQuantity,
+            basePrintPrice,
+            billingModeMultiplier,
+            printPrice,
+            isRollPrint,
+          });
+        } else if (tier) {
+          logger.warn('Цена печати в шаблоне равна 0', { quantity });
+        } else {
+          logger.warn('Не найден диапазон для печати в шаблоне', { quantity, tiers: printPriceConfig.tiers });
+        }
+      }
+
+      // Fallback: рулон — централизованные ставки за пог. м (если в шаблоне нет применимой цены)
+      if (!resolvedFromTemplate && isRollPrint && centralPriceForRoll) {
         const widthMeters = Math.max(productSize.width, productSize.height) / 1000;
         const isColor = normalizedConfig.print_color_mode === 'color';
         const perMeter = isColor ? centralPriceForRoll.price_color_per_meter : centralPriceForRoll.price_bw_per_meter;
@@ -435,7 +488,7 @@ export class SimplifiedPricingService {
             tier: { min_qty: 1, max_qty: undefined, price: pricePerItem },
             priceForQuantity: printPrice,
           };
-          logger.info('Цена печати (рулонная, пог. м)', {
+          logger.info('Цена печати (рулонная, пог. м — из централизованных цен принтера)', {
             technology: normalizedConfig.print_technology,
             widthMeters,
             metersNeeded,
@@ -449,66 +502,16 @@ export class SimplifiedPricingService {
             isColor,
           });
         }
-      } else {
-      const techNorm = (s: string) => (s ?? '').trim().toLowerCase();
-      const printPriceConfig = selectedSize.print_prices.find(p =>
-        techNorm(p.technology_code) === techNorm(normalizedConfig.print_technology!) &&
-        (p.color_mode ?? '').toLowerCase() === (normalizedConfig.print_color_mode ?? '').toLowerCase() &&
-        (p.sides_mode ?? '').toLowerCase() === (pricingSidesMode ?? '').toLowerCase()
-      );
-      
-      logger.info('Расчет цены печати', {
-        print_technology: normalizedConfig.print_technology,
-        print_color_mode: normalizedConfig.print_color_mode,
-        print_sides_mode: normalizedConfig.print_sides_mode,
-        pricing_sides_mode: pricingSidesMode,
-        duplex_as_single_x2: duplexAsSingleX2,
-        billing_mode_multiplier: billingModeMultiplier,
-        foundConfig: !!printPriceConfig,
-        tiersCount: printPriceConfig?.tiers?.length || 0
-      });
-      
-      if (printPriceConfig) {
-        // unit_price в шаблоне — «цена за изделие» (UI), tiers.min_qty — в штуках. Ищем по quantity.
-        const tier = this.findTierForQuantity(printPriceConfig.tiers, quantity);
-        const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
-        if (priceForTier > 0) {
-          // Листовые продукты: считаем по листам (sheetsNeeded), а не по штукам.
-          // При 5 шт/лист и 6 шт — печатаем 2 листа, цена = 2 × price_per_sheet, а не 6 × unit_price.
-          // unit_price = price_per_sheet / itemsPerSheet → price_per_sheet = priceForTier * itemsPerSheet
-          const pricePerSheet = priceForTier * itemsPerSheet;
-          const basePrintPrice = usePagesMultiplier ? priceForTier * quantity : sheetsNeeded * pricePerSheet;
-          printPrice = basePrintPrice * billingModeMultiplier;
-          printDetails = {
-            tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
-            priceForQuantity: printPrice,
-          };
-          logger.info('Цена печати рассчитана', {
-            priceForTier,
-            quantity,
-            sheetsNeeded,
-            pricePerSheet,
-            pages: effectivePages,
-            sheetsPerItem,
-            effectivePrintQuantity,
-            basePrintPrice,
-            billingModeMultiplier,
-            printPrice,
+      } else if (!resolvedFromTemplate && !isRollPrint) {
+        if (!printPriceConfig) {
+          logger.warn('Не найдена конфигурация печати', {
+            available: selectedSize.print_prices.map(p => ({
+              tech: p.technology_code,
+              color: p.color_mode,
+              sides: p.sides_mode
+            }))
           });
-        } else if (tier) {
-          logger.warn('Цена печати в шаблоне равна 0', { quantity });
-        } else {
-          logger.warn('Не найден диапазон для печати', { quantity, tiers: printPriceConfig.tiers });
         }
-      } else {
-        logger.warn('Не найдена конфигурация печати', {
-          available: selectedSize.print_prices.map(p => ({
-            tech: p.technology_code,
-            color: p.color_mode,
-            sides: p.sides_mode
-          }))
-        });
-      }
       }
     }
     
@@ -681,8 +684,10 @@ export class SimplifiedPricingService {
         serviceTiersMap = new Map<string, SimplifiedQtyTier[]>(); // Ключ: "serviceId" или "serviceId:variantId"
         
         for (const finConfig of finishingToUse) {
-          const serviceId = finConfig.service_id;
-          const variantId = (finConfig as any).variant_id as number | undefined;
+          const serviceId = Number(finConfig.service_id);
+          const rawVid = (finConfig as any).variant_id;
+          const variantId =
+            rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
           const mapKey = variantId ? `${serviceId}:${variantId}` : String(serviceId);
           
           // Пропускаем, если уже загрузили для этого ключа
@@ -690,9 +695,23 @@ export class SimplifiedPricingService {
           
           try {
             // 🆕 Если есть variantId, загружаем тарифы варианта, иначе базовые тарифы услуги
-            const tiers = variantId 
-              ? await PricingServiceRepository.listServiceTiers(serviceId, variantId)
-              : await PricingServiceRepository.listServiceTiers(serviceId);
+            let tiers =
+              variantId != null
+                ? await PricingServiceRepository.listServiceTiers(serviceId, variantId)
+                : await PricingServiceRepository.listServiceTiers(serviceId);
+
+            // Частый кейс: цены заведены только на услуге (variant_id IS NULL), а в калькуляторе выбран вариант (мат/глянец).
+            // Иначе карта тарифов пустая → ламинация даёт 0 в итоге.
+            if ((!tiers || tiers.length === 0) && variantId != null) {
+              const serviceOnlyTiers = await PricingServiceRepository.listServiceTiers(serviceId);
+              if (serviceOnlyTiers && serviceOnlyTiers.length > 0) {
+                tiers = serviceOnlyTiers;
+                logger.info(
+                  '🔧 [SimplifiedPricingService] Тарифы для variant_id пусты — используем тарифы услуги без варианта',
+                  { productId, serviceId, variantId }
+                );
+              }
+            }
             
             if (tiers && tiers.length > 0) {
               // Конвертируем ServiceVolumeTierDTO -> SimplifiedQtyTier с расчётом max_qty по следующему minQuantity
@@ -749,7 +768,9 @@ export class SimplifiedPricingService {
         });
 
         for (const finConfig of finishingToUse) {
-          const variantId = (finConfig as any).variant_id as number | undefined;
+          const rawVid = (finConfig as any).variant_id;
+          const variantId =
+            rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
           const mapKey = variantId ? `${finConfig.service_id}:${variantId}` : String(finConfig.service_id);
           const operationType = serviceTypesMap.get(finConfig.service_id) || '';
           const limits = serviceLimitsMap.get(finConfig.service_id);
@@ -1009,13 +1030,16 @@ export class SimplifiedPricingService {
     }
 
     // 7.5. Цены по диапазонам тиража для выбранной конфигурации
-    const printPriceConfigForTiers = !isRollPrint && normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode
-      ? selectedSize.print_prices.find((p: any) =>
-          (p.technology_code ?? '').toLowerCase() === (normalizedConfig.print_technology ?? '').toLowerCase() &&
-          (p.color_mode ?? '').toLowerCase() === (normalizedConfig.print_color_mode ?? '').toLowerCase() &&
-          (p.sides_mode ?? '').toLowerCase() === (pricingSidesMode ?? '').toLowerCase()
-        )
-      : undefined;
+    const tnTier = (s: string) => (s ?? '').trim().toLowerCase();
+    const printPriceConfigForTiers =
+      normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode
+        ? selectedSize.print_prices.find(
+            (p: any) =>
+              tnTier(p.technology_code) === tnTier(normalizedConfig.print_technology!) &&
+              (p.color_mode ?? '').toLowerCase() === (normalizedConfig.print_color_mode ?? '').toLowerCase() &&
+              (p.sides_mode ?? '').toLowerCase() === (pricingSidesMode ?? '').toLowerCase()
+          )
+        : undefined;
     const materialPricePerSheet = includeMaterialCost && normalizedConfig.material_id
       ? ((await db.get<{ sheet_price_single: number }>('SELECT sheet_price_single FROM materials WHERE id = ?', [normalizedConfig.material_id]))?.sheet_price_single ?? 0)
       : 0;

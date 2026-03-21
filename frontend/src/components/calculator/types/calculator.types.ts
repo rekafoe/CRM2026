@@ -53,6 +53,8 @@ export interface ProductSpecs {
   selectedOperations?: Array<{ // 🆕 Выбранные операции с подтипами и количеством
     operationId: number;
     subtype?: string;
+    /** Вариант услуги (ламинация и др.) — уходит в finishing.variant_id на бэкенде */
+    variantId?: number;
     quantity?: number;
   }>;
   [key: string]: any;

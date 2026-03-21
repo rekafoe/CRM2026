@@ -30,6 +30,19 @@ interface SelectedOperation {
   quantity?: number;
 }
 
+/** parentVariantId из БД/JSON иногда строка — строгое === ломало связь «тип → подтип» и оставляло variantId родителя без тарифов */
+function isVariantRootNode(parameters: any): boolean {
+  const p = parameters?.parentVariantId;
+  return p == null || p === '';
+}
+
+function isVariantChildOf(parentId: number | undefined, parameters: any): boolean {
+  if (parentId == null) return false;
+  const p = parameters?.parentVariantId;
+  if (p == null || p === '') return false;
+  return Number(p) === Number(parentId);
+}
+
 export const OperationsSection: React.FC<OperationsSectionProps> = ({
   backendProductSchema,
   specs,
@@ -256,13 +269,11 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
       
       if (hasVariants) {
         const typeVariants = variants.filter(
-          (v) => v.parameters?.type && !v.parameters?.parentVariantId
+          (v) => v.parameters?.type && isVariantRootNode(v.parameters)
         );
         if (typeVariants.length > 0) {
           const firstType = typeVariants[0];
-          const subtypeVariants = variants.filter(
-            (v) => v.parameters?.parentVariantId === firstType.id
-          );
+          const subtypeVariants = variants.filter((v) => isVariantChildOf(firstType.id, v.parameters));
           const firstSubtype = subtypeVariants[0];
           const subtypeLabel =
             firstSubtype?.parameters?.subType ||
@@ -386,7 +397,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                 // Если есть варианты, группируем их по типам/подтипам
                 if (hasVariants) {
                   const typeVariants = allVariants.filter(
-                    (v) => v.parameters?.type && !v.parameters?.parentVariantId
+                    (v) => v.parameters?.type && isVariantRootNode(v.parameters)
                   );
                   const hasTypeHierarchy = typeVariants.length > 0;
                   const uniqueTypes = hasTypeHierarchy
@@ -409,9 +420,13 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   }
                   
                   const selectedTypeVariant = hasTypeHierarchy
-                    ? (selectedVariant?.parameters?.parentVariantId
-                      ? allVariants.find(v => v.id === selectedVariant?.parameters?.parentVariantId)
-                      : typeVariants.find(v => v.id === selectedVariant?.id)) || typeVariants[0]
+                    ? (selectedVariant?.parameters?.parentVariantId != null &&
+                        selectedVariant?.parameters?.parentVariantId !== ''
+                      ? allVariants.find(
+                          (v) =>
+                            Number(v.id) === Number(selectedVariant?.parameters?.parentVariantId)
+                        )
+                      : typeVariants.find((v) => v.id === selectedVariant?.id)) || typeVariants[0]
                     : selectedVariant || uniqueTypes[0];
 
                   // 🆕 Определяем выбранный тип: из выбранного варианта или первый доступный
@@ -421,7 +436,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                   
                   // 🆕 Собираем все подтипы ТОЛЬКО из вариантов выбранного типа
                   const variantsOfSelectedType = hasTypeHierarchy
-                    ? allVariants.filter(v => v.parameters?.parentVariantId === selectedTypeVariant?.id)
+                    ? allVariants.filter((v) => isVariantChildOf(selectedTypeVariant?.id, v.parameters))
                     : allVariants.filter(v => v.variantName === selectedTypeName);
                   
                   // 🆕 Детальное логирование для отладки
@@ -501,7 +516,7 @@ export const OperationsSection: React.FC<OperationsSectionProps> = ({
                               ? typeVariants.find(v => v.parameters?.type === newTypeName) || typeVariants[0]
                               : uniqueTypes.find(v => v.variantName === newTypeName) || uniqueTypes[0];
                             const variantsOfNewType = hasTypeHierarchy
-                              ? allVariants.filter(v => v.parameters?.parentVariantId === nextTypeVariant?.id)
+                              ? allVariants.filter((v) => isVariantChildOf(nextTypeVariant?.id, v.parameters))
                               : allVariants.filter(v => v.variantName === newTypeName);
                             const firstVariantOfType = variantsOfNewType[0];
                             let firstSubtypeValue: string | undefined;

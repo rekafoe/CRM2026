@@ -1029,6 +1029,11 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                 productTypes={hasProductTypes ? simplified?.types : undefined}
                 selectedTypeId={selectedTypeId}
                 onSelectType={handleSelectProductType}
+                materialSelectionResetKey={
+                  selectedProduct?.id != null
+                    ? `${selectedProduct.id}:${hasProductTypes ? (selectedTypeId ?? '') : ''}`
+                    : undefined
+                }
               />
             )}
 

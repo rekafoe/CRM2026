@@ -37,6 +37,8 @@ interface CalculatorSectionsProps {
   productTypes?: Array<{ id: number; name: string; default?: boolean }>;
   selectedTypeId?: number | null;
   onSelectType?: (typeId: number) => void;
+  /** Сброс локального выбора материала в MaterialsSection при смене продукта/подтипа */
+  materialSelectionResetKey?: string;
 }
 
 export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(({
@@ -65,6 +67,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   productTypes,
   selectedTypeId,
   onSelectType,
+  materialSelectionResetKey,
 }) => {
   const hasEffectiveSizes = Array.isArray(effectiveSizes) && effectiveSizes.length > 0;
   const showTypeSelector = Array.isArray(productTypes) && productTypes.length > 0 && onSelectType != null;
@@ -156,6 +159,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
                       result={result}
                       renderMaterialOnly
                       effectiveSizes={effectiveSizes}
+                      materialSelectionResetKey={materialSelectionResetKey}
                     />
                   )
                 : undefined
@@ -179,6 +183,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           schema={backendProductSchema}
           result={result}
           effectiveSizes={effectiveSizes}
+          materialSelectionResetKey={materialSelectionResetKey}
         />
           ) : null}
         </div>
