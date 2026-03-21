@@ -46,11 +46,17 @@ export const useOptimizedAppData = (
 
   // Загрузка начальных данных
   useEffect(() => {
-    getOrderStatuses().then(r => setStatuses(r.data));
+    getOrderStatuses()
+      .then((r) => setStatuses(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setStatuses([]));
     getCurrentUser().then(r => setCurrentUser(r.data)).catch(() => setCurrentUser(null));
-    getUsers().then(r => setAllUsers(r.data)).catch(() => setAllUsers([]));
+    getUsers()
+      .then((r) => setAllUsers(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setAllUsers([]));
     if (typeof window !== 'undefined' && localStorage.getItem(APP_CONFIG.storage.role) === 'admin') {
-      getLowStock().then(r => setLowStock(r.data as any[]));
+      getLowStock()
+        .then((r) => setLowStock(Array.isArray(r.data) ? (r.data as any[]) : []))
+        .catch(() => setLowStock([]));
     }
   }, []);
 

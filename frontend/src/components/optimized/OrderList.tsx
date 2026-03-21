@@ -157,7 +157,8 @@ export const OrderList = memo<OrderListProps>(({
   const { statusById, maxSort } = useMemo(() => {
     const statusMap = new Map<number, StatusInfo>();
     let highest = 1;
-    for (const status of statuses) {
+    const list = Array.isArray(statuses) ? statuses : [];
+    for (const status of list) {
       statusMap.set(status.id, status);
       if (status.sort_order > highest) highest = status.sort_order;
     }

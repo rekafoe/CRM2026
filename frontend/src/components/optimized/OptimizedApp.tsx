@@ -251,6 +251,14 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
     }
   }, [contextDate, setShowTopPicker]);
 
+  /** Нельзя вызывать useCallback внутри JSX — нарушение Rules of Hooks и падение в ErrorBoundary после входа */
+  const topBarShowPageSwitcher = useCallback(() => setShowPageSwitcher(true), [setShowPageSwitcher]);
+  const topBarShowOrderPool = useCallback(() => {
+    markPoolAsSeen();
+    navigate('/order-pool');
+  }, [markPoolAsSeen, navigate]);
+  const topBarShowCountersPage = useCallback(() => setShowCountersPage(true), [setShowCountersPage]);
+
   // Мемоизированные вычисления
   const selectedOrder = useMemo(() => {
     return orders.find((o) => o.id === selectedId) || null;
@@ -296,12 +304,9 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
             contextDate={contextDate}
             currentUserName={currentUser?.name || ''}
             isAdmin={currentUser?.role === 'admin'}
-            onShowPageSwitcher={useCallback(() => setShowPageSwitcher(true), [setShowPageSwitcher])}
-            onShowOrderPool={useCallback(() => {
-              markPoolAsSeen();
-              navigate('/order-pool');
-            }, [markPoolAsSeen, navigate])}
-            onShowCountersPage={useCallback(() => setShowCountersPage(true), [setShowCountersPage])}
+            onShowPageSwitcher={topBarShowPageSwitcher}
+            onShowOrderPool={topBarShowOrderPool}
+            onShowCountersPage={topBarShowCountersPage}
             onLogout={handleLogout}
             hasNewPoolOrder={hasNewPoolOrder}
           />
