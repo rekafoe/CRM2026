@@ -423,9 +423,9 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
       res.json({
         counter_unit: 'meters',
         items_per_sheet: 1,
-        tiers: [{ min_qty: 1, max_qty: undefined, unit_price: unitPrice }],
+        tiers: buildRollDerivePlaceholderTiers(unitPrice),
         note:
-          'Рулон: цена за изделие = (цена за пг.м) × ширина по рулону (большая сторона, м) × длина вдоль подачи (меньшая сторона, м). Диапазоны тиража из print_price_tiers для пог. м не используются.',
+          'Рулон: цена за изделие из пг.м и размера (как в калькуляторе). Диапазоны 1/5/10/50/100/500/1000 шт — временно с одной ценой на все ступени; расчёт и списание в заказе идут по пг.м (центр), не по этим tier-ам.',
       })
       return
     }
@@ -488,6 +488,20 @@ function calcItemsPerSheet(itemW: number, itemH: number, sheetW: number, sheetH:
   const rows2 = Math.floor(ah / (itemW + GAP))
   const n2 = cols2 * rows2
   return Math.max(1, n1, n2)
+}
+
+/** Временные границы тиража (шт) при «Заполнить из центра» для рулона — одна и та же unit_price, пока нет настоящих ступеней по метрам. */
+const ROLL_DERIVE_TIER_MINS = [1, 5, 10, 50, 100, 500, 1000] as const
+
+function buildRollDerivePlaceholderTiers(unitPrice: number): Array<{ min_qty: number; max_qty?: number; unit_price: number }> {
+  const tiers: Array<{ min_qty: number; max_qty?: number; unit_price: number }> = []
+  for (let i = 0; i < ROLL_DERIVE_TIER_MINS.length; i++) {
+    const minQty = ROLL_DERIVE_TIER_MINS[i]
+    const nextMin = ROLL_DERIVE_TIER_MINS[i + 1]
+    const maxQty = nextMin != null ? nextMin - 1 : undefined
+    tiers.push({ min_qty: minQty, max_qty: maxQty, unit_price: unitPrice })
+  }
+  return tiers
 }
 
 // GET /api/pricing/print-prices/:id - одна запись по id (после /derive!)
