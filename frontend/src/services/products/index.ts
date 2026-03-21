@@ -27,6 +27,7 @@ export {
   updateProduct,
   createProduct,
   createProductWithSetup,
+  duplicateProduct,
   deleteProduct,
   searchProducts,
   getProductsForCalculator,
@@ -59,6 +60,7 @@ export {
 export {
   getProductConfigs,
   getProductTemplateConfig,
+  clearProductConfigsCache,
   createProductConfig,
   updateProductConfig,
   getProductParameterPresets,

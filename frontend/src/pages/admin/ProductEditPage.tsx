@@ -13,6 +13,8 @@ import { MaterialsTab } from './product-edit/MaterialsTab';
 import { PrintTab, ProductPrintSettings } from './product-edit/PrintTab';
 import { PriceTypesTab } from './product-edit/PriceTypesTab';
 import { AddServiceModal } from './product-edit/AddServiceModal';
+import { ProductDuplicateModal, productCanBeDuplicated } from '../../components/admin/ProductDuplicateModal';
+import { useUIStore } from '../../stores/uiStore';
 
 interface ProductDto {
   id: number;
@@ -33,10 +35,13 @@ const ProductEditPage: React.FC = () => {
 
   const categories = useProductDirectoryStore((s) => s.categories);
   const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
+  const fetchProducts = useProductDirectoryStore((s) => s.fetchProducts);
+  const showToast = useUIStore((s) => s.showToast);
 
   const [activeTab, setActiveTab] = useState<'info' | 'services' | 'materials' | 'print' | 'priceTypes'>('info');
   const [savingPrintSettings, setSavingPrintSettings] = useState(false);
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [form, setForm] = useState<{ name: string; description?: string; icon?: string; image_url?: string; calculator_type?: string; product_type?: string; category_id?: number; operator_percent?: string }>({ name: '' });
   const [saving, setSaving] = useState(false);
   const savePriceTypesRef = useRef<(() => Promise<void>) | null>(null);
@@ -208,6 +213,11 @@ const ProductEditPage: React.FC = () => {
               size="sm"
             />
           )}
+          {product && productCanBeDuplicated(product) && (
+            <Button variant="secondary" size="sm" onClick={() => setDuplicateModalOpen(true)}>
+              Копировать продукт…
+            </Button>
+          )}
           <Button variant="primary" onClick={handleSaveProduct} disabled={saving || !form.name}>
             {saving ? 'Сохранение…' : 'Сохранить изменения'}
           </Button>
@@ -296,6 +306,18 @@ const ProductEditPage: React.FC = () => {
         assignedServiceIds={assignedServiceIds}
         serviceAction={serviceAction}
         onAddService={handleAddService}
+      />
+
+      <ProductDuplicateModal
+        visible={duplicateModalOpen && !!product}
+        source={product && duplicateModalOpen ? { id: product.id, name: product.name } : null}
+        onClose={() => setDuplicateModalOpen(false)}
+        extraHint="Копируется сохранённый в базе шаблон и настройки. Откроется страница шаблона новой копии."
+        onDuplicated={async (newId) => {
+          await fetchProducts(true);
+          showToast('Копия продукта создана', 'success');
+          navigate(`/adminpanel/products/${newId}/template`);
+        }}
       />
     </div>
   );

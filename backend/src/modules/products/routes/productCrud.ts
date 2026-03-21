@@ -12,9 +12,125 @@ import {
   parseParameterOptions,
   loadPrintTechnologies,
   DEFAULT_COLOR_MODE_OPTIONS,
+  normalizeConfigDataForPersistence,
 } from './helpers';
 
 const router = Router();
+
+/**
+ * Таблицы с колонкой product_id → products(id).
+ * При дублировании копируем все; при удалении — чистим все (в т.ч. product_service_links, чеклист, legacy product_configs).
+ */
+const PRODUCT_RELATED_TABLES = [
+  'product_template_configs',
+  'product_parameters',
+  'product_operations_link',
+  'product_materials',
+  'product_service_links',
+  'product_post_processing',
+  'product_setup_checklist',
+  'product_configs',
+] as const;
+
+function isSimplifiedProductRow(row: { calculator_type?: string; product_type?: string } | null): boolean {
+  if (!row) return false;
+  return row.calculator_type === 'simplified' || row.product_type === 'multi_page';
+}
+
+type SqliteDb = {
+  get: (sql: string, params?: unknown[]) => Promise<unknown>;
+  all: (sql: string, params?: unknown[]) => Promise<any[]>;
+  run: (sql: string, params?: unknown[]) => Promise<{ lastID?: number }>;
+};
+
+async function tableExists(db: SqliteDb, name: string): Promise<boolean> {
+  const r = await db.get(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`, [name]);
+  return !!r;
+}
+
+/** Копирует строки с product_id = source на newProductId (без PK id). Имена таблиц — только из whitelist. */
+async function copyChildRowsByProductId(
+  db: SqliteDb,
+  table: (typeof PRODUCT_RELATED_TABLES)[number],
+  sourceProductId: number,
+  newProductId: number,
+): Promise<void> {
+  if (!(await tableExists(db, table))) return;
+
+  const info = await db.all(`PRAGMA table_info(${table})`);
+  const allCols = (info as Array<{ name: string }>).map((r) => r.name);
+  if (!allCols.includes('product_id')) return;
+
+  const insertCols = allCols.filter((c) => c !== 'id');
+  const rows = await db.all(`SELECT * FROM ${table} WHERE product_id = ?`, [sourceProductId]);
+  if (!rows.length) return;
+
+  const placeholders = insertCols.map(() => '?').join(', ');
+  for (const row of rows) {
+    const vals = insertCols.map((col) => (col === 'product_id' ? newProductId : row[col]));
+    await db.run(`INSERT INTO ${table} (${insertCols.join(', ')}) VALUES (${placeholders})`, vals);
+  }
+}
+
+async function insertDuplicateProductRow(
+  db: SqliteDb,
+  source: Record<string, unknown>,
+  newName: string,
+): Promise<number> {
+  const info = await db.all(`PRAGMA table_info(products)`);
+  const allCols = (info as Array<{ name: string }>).map((r) => r.name).filter((c) => c !== 'id');
+  const omitDefaults = new Set(['created_at', 'updated_at']);
+
+  const cols: string[] = [];
+  const vals: unknown[] = [];
+
+  for (const col of allCols) {
+    if (omitDefaults.has(col)) continue;
+    cols.push(col);
+    if (col === 'name') vals.push(newName.trim());
+    else if (col === 'is_active') vals.push(0);
+    else if (col === 'active_for_site') vals.push(0);
+    else vals.push(source[col] ?? null);
+  }
+
+  const ph = cols.map(() => '?').join(', ');
+  const result = await db.run(`INSERT INTO products (${cols.join(', ')}) VALUES (${ph})`, vals);
+  return result.lastID as number;
+}
+
+async function deleteAllProductRelatedRows(db: SqliteDb, productId: number | string): Promise<void> {
+  for (const table of PRODUCT_RELATED_TABLES) {
+    if (!(await tableExists(db, table))) continue;
+    const info = await db.all(`PRAGMA table_info(${table})`);
+    const cols = (info as Array<{ name: string }>).map((r) => r.name);
+    if (!cols.includes('product_id')) continue;
+    await db.run(`DELETE FROM ${table} WHERE product_id = ?`, [productId]);
+  }
+}
+
+/** После копирования строк: выровнять types[].id и ключи typeConfigs (как при сохранении через API). */
+async function normalizeDuplicatedTemplateConfigs(db: SqliteDb, newProductId: number): Promise<void> {
+  if (!(await tableExists(db, 'product_template_configs'))) return;
+  const rows = await db.all(
+    `SELECT id, config_data FROM product_template_configs WHERE product_id = ?`,
+    [newProductId],
+  );
+  for (const row of rows) {
+    const raw = row?.config_data;
+    if (raw == null || raw === '') continue;
+    let parsed: unknown;
+    try {
+      parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch {
+      continue;
+    }
+    const normalized = normalizeConfigDataForPersistence(parsed);
+    await db.run(`UPDATE product_template_configs SET config_data = ? WHERE id = ?`, [
+      JSON.stringify(normalized),
+      row.id,
+    ]);
+  }
+}
 
 /**
  * @swagger
@@ -284,6 +400,59 @@ router.post('/setup', asyncHandler(async (req, res) => {
   }
 }));
 
+router.post('/:productId/duplicate', asyncHandler(async (req, res) => {
+  const sourceId = Number(req.params.productId);
+  if (!Number.isFinite(sourceId) || sourceId <= 0) {
+    res.status(400).json({ error: 'Некорректный ID продукта' });
+    return;
+  }
+
+  const rawName = req.body?.name;
+  if (typeof rawName !== 'string' || !rawName.trim()) {
+    res.status(400).json({ error: 'Укажите непустое имя нового продукта' });
+    return;
+  }
+  const newName = rawName.trim();
+
+  const db = await getDb();
+
+  const nameTaken = await db.get(`SELECT id FROM products WHERE name = ? LIMIT 1`, [newName]);
+  if (nameTaken) {
+    res.status(409).json({ error: 'Продукт с таким названием уже существует' });
+    return;
+  }
+
+  const source = await db.get(`SELECT * FROM products WHERE id = ?`, [sourceId]);
+  if (!source) {
+    res.status(404).json({ error: 'Product not found' });
+    return;
+  }
+
+  if (!isSimplifiedProductRow(source as { calculator_type?: string; product_type?: string })) {
+    res.status(400).json({ error: 'Копирование доступно только для упрощённых продуктов (multi_page / simplified)' });
+    return;
+  }
+
+  await db.exec('BEGIN TRANSACTION');
+  try {
+    const newProductId = await insertDuplicateProductRow(db, source as Record<string, unknown>, newName);
+
+    for (const table of PRODUCT_RELATED_TABLES) {
+      await copyChildRowsByProductId(db, table, sourceId, newProductId);
+    }
+
+    await normalizeDuplicatedTemplateConfigs(db, newProductId);
+
+    await db.exec('COMMIT');
+    logger.info('Product duplicated', { sourceId, newProductId, name: newName });
+    res.status(201).json({ success: true, data: { id: newProductId, name: newName } });
+  } catch (error: any) {
+    await db.exec('ROLLBACK');
+    logger.error('Error duplicating product', { sourceId, error: error?.message, stack: error?.stack });
+    res.status(500).json({ error: error?.message || 'Не удалось скопировать продукт' });
+  }
+}));
+
 /**
  * @swagger
  * /api/products:
@@ -491,11 +660,17 @@ router.delete('/:id', asyncHandler(async (req, res) => {
   const product = await db.get('SELECT id, name FROM products WHERE id = ?', [id]);
   if (!product) { res.status(404).json({ error: 'Product not found' }); return; }
 
-  await db.run('DELETE FROM product_materials WHERE product_id = ?', [id]);
-  await db.run('DELETE FROM product_parameters WHERE product_id = ?', [id]);
-  await db.run('DELETE FROM product_operations_link WHERE product_id = ?', [id]);
-  await db.run('DELETE FROM product_template_configs WHERE product_id = ?', [id]);
-  await db.run('DELETE FROM products WHERE id = ?', [id]);
+  await db.exec('BEGIN TRANSACTION');
+  try {
+    await deleteAllProductRelatedRows(db, id);
+    await db.run('DELETE FROM products WHERE id = ?', [id]);
+    await db.exec('COMMIT');
+  } catch (e: any) {
+    await db.exec('ROLLBACK');
+    logger.error('Error deleting product', { productId: id, error: e?.message });
+    res.status(500).json({ error: e?.message || 'Failed to delete product' });
+    return;
+  }
 
   logger.info('Product deleted', { productId: id, productName: product.name });
   res.json({ success: true });

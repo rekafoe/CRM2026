@@ -6,6 +6,7 @@ import { api, apiClient } from '../../api/client';
 import { Product, ProductWithDetails } from './types';
 import { KeyedCache, SimpleCache } from './utils/cache';
 import { apiRequest, apiRequestSafe, extractData } from './utils/apiHelpers';
+import { clearProductConfigsCache } from './configs';
 
 const productsByCategoryCache = new KeyedCache<Product[]>(5 * 60 * 1000);
 const allProductsCache = new KeyedCache<Product[]>(5 * 60 * 1000); // ✅ Используем KeyedCache для поддержки activeOnly
@@ -207,6 +208,22 @@ export async function createProductWithSetup(payload: {
   productsByCategoryCache.clear();
   allProductsCache.clear(); // Очищаем все ключи (all и active)
   
+  return extractData(response, { id: 0, name: '' });
+}
+
+/**
+ * Полная копия упрощённого продукта (шаблон, параметры, операции, материалы и т.д.), новое имя — с сервера.
+ */
+export async function duplicateProduct(
+  sourceProductId: number,
+  payload: { name: string }
+): Promise<{ id: number; name: string }> {
+  const response = await api.post(`/products/${sourceProductId}/duplicate`, payload);
+
+  productsByCategoryCache.clear();
+  allProductsCache.clear();
+  clearProductConfigsCache();
+
   return extractData(response, { id: 0, name: '' });
 }
 

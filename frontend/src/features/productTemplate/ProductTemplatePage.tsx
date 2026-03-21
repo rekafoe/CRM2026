@@ -27,6 +27,8 @@ import { useSimplifiedTypes } from './hooks/useSimplifiedTypes';
 import { ProductTypesCard } from './components/ProductTypesCard';
 import { api } from '../../api';
 import { AppIcon } from '../../components/ui/AppIcon';
+import { ProductDuplicateModal, productCanBeDuplicated } from '../../components/admin/ProductDuplicateModal';
+import { useUIStore } from '../../stores/uiStore';
 
 
 const ProductTemplatePage: React.FC = () => {
@@ -36,6 +38,8 @@ const ProductTemplatePage: React.FC = () => {
   const navigate = useNavigate();
   const categories = useProductDirectoryStore((s) => s.categories);
   const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
+  const fetchProducts = useProductDirectoryStore((s) => s.fetchProducts);
+  const showToast = useUIStore((s) => s.showToast);
 
   useEffect(() => { initializeDirectory() }, [initializeDirectory]);
 
@@ -46,6 +50,7 @@ const ProductTemplatePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'main' | 'materials' | 'run' | 'operations' | 'print'>('main');
   const [savingPrintSettings, setSavingPrintSettings] = useState(false);
   const [calcOptionsExpanded, setCalcOptionsExpanded] = useState(false);
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const isInitialLoadRef = useRef(true);
   const lastSavedStateRef = useRef<string>('');
   const autoSaveInProgressRef = useRef(false);
@@ -238,6 +243,16 @@ const ProductTemplatePage: React.FC = () => {
           >
             Основные поля
           </Button>
+          {product && productCanBeDuplicated(product) && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setDuplicateModalOpen(true)}
+              icon={<span style={{ marginRight: '4px' }}><AppIcon name="copy" size="xs" /></span>}
+            >
+              Копировать продукт
+            </Button>
+          )}
         </>
       )}
     >
@@ -668,6 +683,18 @@ const ProductTemplatePage: React.FC = () => {
           }}
         />
       </Modal>
+
+      <ProductDuplicateModal
+        visible={duplicateModalOpen && !!product}
+        source={product && duplicateModalOpen ? { id: product.id, name: product.name } : null}
+        onClose={() => setDuplicateModalOpen(false)}
+        extraHint="В копию попадает версия шаблона из базы (последнее сохранение). Несохранённые на этой странице правки в копию не попадут."
+        onDuplicated={async (newId) => {
+          await fetchProducts(true);
+          showToast('Копия продукта создана', 'success');
+          navigate(`/adminpanel/products/${newId}/template`);
+        }}
+      />
     </div>
     </AdminPageLayout>
   );

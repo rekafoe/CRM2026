@@ -19,12 +19,9 @@ interface ProductManagementState {
   // Выбор продуктов
   selectedProducts: Set<number>;
   
-  // Мастер создания продукта
+  // Модалка создания продукта
   wizard: {
-    mode: 'create' | 'duplicate';
-    initialProductId: number | null;
     show: boolean;
-    useSimplifiedCreator: boolean;
   };
   
   // Модальные окна
@@ -59,8 +56,7 @@ type ProductManagementAction =
   | { type: 'TOGGLE_PRODUCT_SELECTION'; payload: number }
   | { type: 'SET_SELECTED_PRODUCTS'; payload: Set<number> }
   | { type: 'CLEAR_SELECTED_PRODUCTS' }
-  | { type: 'OPEN_CREATE_WIZARD'; payload: { simplified: boolean } }
-  | { type: 'OPEN_DUPLICATE_WIZARD'; payload: { productId: number } }
+  | { type: 'OPEN_CREATE_WIZARD' }
   | { type: 'CLOSE_WIZARD' }
   | { type: 'SET_SETUP_STATUS_MODAL'; payload: number | null }
   | { type: 'SET_DELETING_PRODUCT_ID'; payload: number | null }
@@ -78,10 +74,7 @@ const initialState: ProductManagementState = {
   sortDirection: 'asc',
   selectedProducts: new Set(),
   wizard: {
-    mode: 'create',
-    initialProductId: null,
     show: false,
-    useSimplifiedCreator: true,
   },
   setupStatusModal: null,
   deletingProductId: null,
@@ -153,31 +146,13 @@ function productManagementReducer(
     case 'OPEN_CREATE_WIZARD':
       return {
         ...state,
-        wizard: {
-          mode: 'create',
-          initialProductId: null,
-          show: true,
-          useSimplifiedCreator: action.payload.simplified,
-        },
+        wizard: { show: true },
       };
-    
-    case 'OPEN_DUPLICATE_WIZARD':
-      return {
-        ...state,
-        wizard: {
-          mode: 'duplicate',
-          initialProductId: action.payload.productId,
-          show: true,
-          useSimplifiedCreator: false,
-        },
-      };
-    
+
     case 'CLOSE_WIZARD':
       return {
         ...state,
-        wizard: {
-          ...initialState.wizard,
-        },
+        wizard: { ...initialState.wizard },
       };
     
     case 'SET_SETUP_STATUS_MODAL':
@@ -242,12 +217,8 @@ export function useProductManagementState() {
     dispatch({ type: 'CLEAR_SELECTED_PRODUCTS' });
   }, []);
 
-  const openCreateWizard = useCallback((simplified: boolean = true) => {
-    dispatch({ type: 'OPEN_CREATE_WIZARD', payload: { simplified } });
-  }, []);
-
-  const openDuplicateWizard = useCallback((productId: number) => {
-    dispatch({ type: 'OPEN_DUPLICATE_WIZARD', payload: { productId } });
+  const openCreateWizard = useCallback(() => {
+    dispatch({ type: 'OPEN_CREATE_WIZARD' });
   }, []);
 
   const closeWizard = useCallback(() => {
@@ -291,7 +262,6 @@ export function useProductManagementState() {
     setSelectedProducts,
     clearSelectedProducts,
     openCreateWizard,
-    openDuplicateWizard,
     closeWizard,
     setSetupStatusModal,
     setDeletingProductId,

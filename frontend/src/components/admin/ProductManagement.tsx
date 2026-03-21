@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Product,
@@ -11,6 +11,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { StatusBadge, LoadingState } from '../common';
 import { AppIcon } from '../ui/AppIcon';
 import { ProductCreateModal } from './ProductCreateModal';
+import { ProductDuplicateModal, productCanBeDuplicated } from './ProductDuplicateModal';
 import { ProductSetupStatus } from './ProductSetupStatus';
 import { Modal } from '../common/Modal';
 import { useProductManagementState } from './hooks/useProductManagementState';
@@ -21,6 +22,7 @@ import './ProductManagement.css';
 const ProductManagement: React.FC = () => {
   const navigate = useNavigate();
   const [showCategoryModal, setShowCategoryModal] = React.useState(false);
+  const [duplicateSource, setDuplicateSource] = useState<Product | null>(null);
   const [togglingSiteProductId, setTogglingSiteProductId] = React.useState<number | null>(null);
   const categories = useProductDirectoryStore((state) => state.categories);
   const products = useProductDirectoryStore((state) => state.products);
@@ -45,7 +47,6 @@ const ProductManagement: React.FC = () => {
     setSelectedProducts,
     clearSelectedProducts,
     openCreateWizard,
-    openDuplicateWizard,
     closeWizard,
     setSetupStatusModal,
     setDeletingProductId,
@@ -94,7 +95,7 @@ const ProductManagement: React.FC = () => {
   };
 
   const handleDeleteProduct = async (product: Product) => {
-    const confirmMessage = `Вы уверены, что хотите удалить продукт "${product.name}"?\n\nБудут удалены:\n- Все материалы продукта\n- Все операции\n- Все параметры\n- Конфигурация\n\nЭто действие необратимо!`;
+    const confirmMessage = `Вы уверены, что хотите удалить продукт "${product.name}"?\n\nБудут удалены:\n- Материалы и привязки к складу\n- Операции (услуги печати по продукту)\n- Параметры калькулятора\n- Все шаблоны и конфигурации (в т.ч. упрощённый калькулятор)\n- Доп. услуги из каталога, привязанные к продукту\n- Чеклист настройки и связанные служебные записи\n\nЭто действие необратимо!`;
     
     if (!confirm(confirmMessage)) return;
     
@@ -167,6 +168,13 @@ const ProductManagement: React.FC = () => {
     await fetchProducts(true);
     handleWizardClose();
     showToast('Продукт создан', 'success');
+    navigate(`/adminpanel/products/${productId}/template`);
+  };
+
+  const handleDuplicateCreated = async (productId: number) => {
+    await fetchProducts(true);
+    setDuplicateSource(null);
+    showToast('Копия продукта создана', 'success');
     navigate(`/adminpanel/products/${productId}/template`);
   };
 
@@ -250,7 +258,7 @@ const ProductManagement: React.FC = () => {
           <button type="button" className="lg-btn" onClick={() => setShowCategoryModal(true)}>
             <AppIcon name="folder" size="xs" /> Категории
           </button>
-          <button type="button" className="lg-btn lg-btn--primary" onClick={() => openCreateWizard(false)}>
+          <button type="button" className="lg-btn lg-btn--primary" onClick={() => openCreateWizard()}>
             <AppIcon name="plus" size="xs" /> Создать продукт
           </button>
         </div>
@@ -467,6 +475,16 @@ const ProductManagement: React.FC = () => {
                     <td className="cell-description">{product.description}</td>
                     <td>
                       <div className="row-actions">
+                        {productCanBeDuplicated(product) && (
+                          <button
+                            type="button"
+                            className="lg-btn"
+                            onClick={() => setDuplicateSource(product)}
+                            title="Полная копия шаблона и настроек"
+                          >
+                            <AppIcon name="copy" size="xs" /> Копировать
+                          </button>
+                        )}
                         <button type="button" className="lg-btn" onClick={() => navigate(`/adminpanel/products/${product.id}/edit`)}>
                           <AppIcon name="clipboard" size="xs" /> Инфо
                         </button>
@@ -510,7 +528,7 @@ const ProductManagement: React.FC = () => {
       </div>
 
       {/* Мастер создания продукта */}
-      {state.wizard.show && state.wizard.mode === 'create' && (
+      {state.wizard.show && (
         <ProductCreateModal
           visible={state.wizard.show}
           onClose={handleWizardClose}
@@ -518,6 +536,13 @@ const ProductManagement: React.FC = () => {
           onCreated={handleWizardCreated}
         />
       )}
+
+      <ProductDuplicateModal
+        visible={!!duplicateSource}
+        source={duplicateSource ? { id: duplicateSource.id, name: duplicateSource.name } : null}
+        onClose={() => setDuplicateSource(null)}
+        onDuplicated={handleDuplicateCreated}
+      />
 
       {/* Модальное окно статуса настройки */}
       {state.setupStatusModal && (

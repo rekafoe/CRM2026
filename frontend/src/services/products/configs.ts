@@ -9,6 +9,10 @@ import { apiRequestSafe, extractData } from './utils/apiHelpers';
 
 const configsCache = new KeyedCache<ProductConfig[]>(5 * 60 * 1000);
 
+export function clearProductConfigsCache(): void {
+  configsCache.clear();
+}
+
 /**
  * Получить конфигурации продукта
  * @param productId - ID продукта
