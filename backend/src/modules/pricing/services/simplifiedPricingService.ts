@@ -642,14 +642,14 @@ export class SimplifiedPricingService {
       Array.isArray(selectedSize.finishing) &&
       selectedSize.finishing.length > 0
     ) {
-      const tmplByKey = new Map<string, { units_per_item?: number }>();
+      const tmplByKey = new Map<string, { units_per_item?: number; price_unit?: string }>();
       for (const t of selectedSize.finishing) {
         const sid = Number((t as any).service_id);
         if (!Number.isFinite(sid)) continue;
         const rawVid = (t as any).variant_id;
         const vid =
           rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
-        const row = t as { units_per_item?: number };
+        const row = t as { units_per_item?: number; price_unit?: string };
         if (vid != null) tmplByKey.set(`${sid}:${vid}`, row);
         if (!tmplByKey.has(String(sid))) tmplByKey.set(String(sid), row);
       }
@@ -660,14 +660,22 @@ export class SimplifiedPricingService {
           rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
         const k = vid != null ? `${sid}:${vid}` : String(sid);
         const tmpl = tmplByKey.get(k) ?? tmplByKey.get(String(sid));
+        let next: { service_id: number; variant_id?: number; price_unit?: string; units_per_item?: number } = {
+          ...f,
+        };
         const raw = f.units_per_item;
         const missingUnits =
           raw === undefined || raw === null || (typeof raw === 'string' && String(raw).trim() === '');
         if (missingUnits && tmpl?.units_per_item != null) {
           const u = Number(tmpl.units_per_item);
-          if (Number.isFinite(u) && u > 0) return { ...f, units_per_item: u };
+          if (Number.isFinite(u) && u > 0) next.units_per_item = u;
         }
-        return f;
+        // Единица учёта из шаблона размера (например per_sheet для скругления по листам печати)
+        const tmplPu = (tmpl as { price_unit?: string } | undefined)?.price_unit;
+        if (tmplPu != null && String(tmplPu).trim() !== '') {
+          next.price_unit = String(tmplPu).trim().toLowerCase();
+        }
+        return next;
       });
     }
 
@@ -813,7 +821,11 @@ export class SimplifiedPricingService {
           const mapKey = variantId ? `${finConfig.service_id}:${variantId}` : String(finConfig.service_id);
           const operationType = serviceTypesMap.get(finConfig.service_id) || '';
           const limits = serviceLimitsMap.get(finConfig.service_id);
-          const priceUnitFromDb = servicePriceUnitMap.get(finConfig.service_id) ?? (finConfig.price_unit ?? 'per_item').toLowerCase();
+          const cfgPu = (finConfig as { price_unit?: string }).price_unit;
+          const priceUnitFromDb =
+            cfgPu != null && String(cfgPu).trim() !== ''
+              ? String(cfgPu).trim().toLowerCase()
+              : (servicePriceUnitMap.get(finConfig.service_id) ?? 'per_item').toLowerCase();
 
           // Операции с price_unit=per_sheet: считаем по листам печати (или пог. м для рулонной). До резки обрабатываем целые листы.
           const isPerSheetOp = priceUnitFromDb === 'per_sheet';
@@ -1381,7 +1393,11 @@ export class SimplifiedPricingService {
         const mapKey = finConfig.variant_id ? `${finConfig.service_id}:${finConfig.variant_id}` : String(finConfig.service_id);
         const tiers = ctx.serviceTiersMap.get(mapKey);
         if (!tiers?.length) continue;
-        const priceUnitFromDb = (ctx.servicePriceUnitMap?.get(finConfig.service_id) ?? finConfig.price_unit ?? 'per_item').toLowerCase();
+        const cfgPu = finConfig.price_unit;
+        const priceUnitFromDb =
+          cfgPu != null && String(cfgPu).trim() !== ''
+            ? String(cfgPu).trim().toLowerCase()
+            : (ctx.servicePriceUnitMap?.get(finConfig.service_id) ?? 'per_item').toLowerCase();
         const isPerSheetOp = priceUnitFromDb === 'per_sheet';
         const perSheetUnits = isPerSheetOp ? (ctx.isRollPrint ? metersForQ : sheetsForQ) : 0;
         const unitsPerItem = finConfig.units_per_item ?? 1;

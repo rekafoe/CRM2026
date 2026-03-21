@@ -210,19 +210,21 @@ export function useCalculatorPricingActions({
 
         // 🆕 Нормализуем выбранные операции в формат finishing для SimplifiedPricingService
         // selectedOperations (фронтенд) -> finishing (бэкенд, simplified-конфиг)
-        let finishingConfig: Array<{
+        type FinishingCalcEntry = {
           service_id: number;
-          price_unit: 'per_cut' | 'per_item';
+          price_unit: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order';
           units_per_item: number;
-        }> | undefined;
+          variant_id?: number;
+        };
+        let finishingConfig: FinishingCalcEntry[] | undefined;
 
         if (Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0) {
           const backendOps: any[] = Array.isArray(backendProductSchema?.operations)
             ? backendProductSchema.operations
             : [];
 
-          finishingConfig = specs.selectedOperations
-            .map((sel: any) => {
+          const mappedFinishing = specs.selectedOperations
+            .map((sel: any): FinishingCalcEntry | null => {
               const op = backendOps.find((o) => {
                 const opId = Number(o.operation_id ?? o.id ?? (o as any).service_id);
                 const selId = Number(sel.operationId);
@@ -237,14 +239,24 @@ export function useCalculatorPricingActions({
                 return null;
               }
 
-              let priceUnit: 'per_cut' | 'per_item' = 'per_item';
+              const KNOWN_UNITS = ['per_sheet', 'per_cut', 'per_item', 'fixed', 'per_order'] as const;
+              type KnownPu = (typeof KNOWN_UNITS)[number];
+              let priceUnit: KnownPu = 'per_item';
               if (op) {
-                const opType: string | undefined =
-                  op.operation_type ??
-                  op.type ??
-                  op.service_type ??
-                  (op.parameters && typeof op.parameters === 'object' ? op.parameters.operation_type : undefined);
-                priceUnit = opType === 'cut' || opType === 'score' || opType === 'fold' ? 'per_cut' : 'per_item';
+                const fromApi = String(op.price_unit ?? op.priceUnit ?? '')
+                  .trim()
+                  .toLowerCase();
+                if ((KNOWN_UNITS as readonly string[]).includes(fromApi)) {
+                  priceUnit = fromApi as KnownPu;
+                } else {
+                  const opType: string | undefined =
+                    op.operation_type ??
+                    op.type ??
+                    op.service_type ??
+                    (op.parameters && typeof op.parameters === 'object' ? op.parameters.operation_type : undefined);
+                  priceUnit =
+                    opType === 'cut' || opType === 'score' || opType === 'fold' ? 'per_cut' : 'per_item';
+                }
               }
 
               const unitsPerItem = Number(sel.quantity) > 0 ? Number(sel.quantity) : 1;
@@ -259,8 +271,8 @@ export function useCalculatorPricingActions({
                 logger.info('🧩 finishing из selectedOperation без совпадения в schema (simplified)', { selectedOperation: sel, entry });
               }
               return entry;
-            })
-            .filter((f): f is { service_id: number; price_unit: 'per_cut' | 'per_item'; units_per_item: number } => !!f);
+            });
+          finishingConfig = mappedFinishing.filter((f): f is FinishingCalcEntry => f != null);
 
           logger.info('🧮 Нормализованные finishing из selectedOperations', {
             selectedOperationsCount: specs.selectedOperations.length,
@@ -288,19 +300,19 @@ export function useCalculatorPricingActions({
           Array.isArray(specs.selectedOperations) &&
           specs.selectedOperations.length > 0
         ) {
-          finishingConfig = specs.selectedOperations
-            .map((sel: any) => {
+          const fallbackMapped = specs.selectedOperations
+            .map((sel: any): FinishingCalcEntry | null => {
               const sid = Number(sel.operationId);
               if (!Number.isFinite(sid)) return null;
               return {
                 service_id: sid,
-                price_unit: 'per_item' as const,
+                price_unit: 'per_item',
                 units_per_item: Number(sel.quantity) > 0 ? Number(sel.quantity) : 1,
                 ...(sel.variantId != null ? { variant_id: Number(sel.variantId) } : {}),
               };
-            })
-            .filter((f): f is { service_id: number; price_unit: 'per_item'; units_per_item: number } => !!f);
-          if (finishingConfig.length > 0) {
+            });
+          finishingConfig = fallbackMapped.filter((f): f is FinishingCalcEntry => f != null);
+          if (finishingConfig && finishingConfig.length > 0) {
             logger.info('🧩 finishing собран из selectedOperations (fallback)', { count: finishingConfig.length });
           }
         }

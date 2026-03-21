@@ -9,13 +9,13 @@ export type Tier = { min_qty: number; max_qty?: number; unit_price: number }
 export interface ServiceItem {
   id: number
   name: string
-  price_unit?: 'per_cut' | 'per_item'
+  price_unit?: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order'
   operation_type?: string
 }
 
 export interface ServicePricing {
   service_id: number
-  price_unit: 'per_cut' | 'per_item'
+  price_unit: 'per_sheet' | 'per_cut' | 'per_item' | 'fixed' | 'per_order'
   units_per_item: number
   // 🆕 tiers больше не храним в шаблоне продукта - цены берутся из централизованной системы услуг
   // tiers оставлен только для обратной совместимости со старыми данными, но не используется при сохранении
@@ -520,7 +520,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                   const firstLeaf = flatVariantOptions[0]
                   const newPricing: ServicePricing = {
                     service_id: Number(service.id),
-                    price_unit: service.price_unit || 'per_cut',
+                    price_unit: service.price_unit || 'per_item',
                     units_per_item: 1,
                     ...(needsVariants && firstLeaf ? {
                       variant_id: firstLeaf.id,

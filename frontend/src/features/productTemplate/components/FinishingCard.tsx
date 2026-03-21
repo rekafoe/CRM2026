@@ -68,12 +68,19 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
 
         const serviceItems: ServiceItem[] = services.map(s => {
           const opType = s.operation_type ?? s.operationType ?? s.type ?? s.service_type ?? ''
+          const apiPu = String(s.price_unit ?? s.priceUnit ?? '')
+            .trim()
+            .toLowerCase()
+          const allowed = ['per_sheet', 'per_cut', 'per_item', 'fixed', 'per_order'] as const
+          const price_unit = (allowed as readonly string[]).includes(apiPu)
+            ? (apiPu as (typeof allowed)[number])
+            : (opType === 'cut' || opType === 'score' || opType === 'fold')
+              ? ('per_cut' as const)
+              : ('per_item' as const)
           return {
             id: Number(s.id),
             name: s.name || s.service_name || `Услуга #${s.id}`,
-            price_unit: (opType === 'cut' || opType === 'score' || opType === 'fold')
-              ? 'per_cut' as const
-              : 'per_item' as const,
+            price_unit,
             operation_type: opType
           }
         })
