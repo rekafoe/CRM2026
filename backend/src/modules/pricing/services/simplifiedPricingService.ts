@@ -44,7 +44,7 @@ export interface SimplifiedPricingResult {
   selectedFinishing?: Array<{
     service_id: number;
     service_name: string;
-    price_unit: 'per_cut' | 'per_item';
+    price_unit: string;
     units_per_item: number;
   }>;
   
@@ -642,14 +642,14 @@ export class SimplifiedPricingService {
       Array.isArray(selectedSize.finishing) &&
       selectedSize.finishing.length > 0
     ) {
-      const tmplByKey = new Map<string, { units_per_item?: number; price_unit?: string }>();
+      const tmplByKey = new Map<string, { units_per_item?: number }>();
       for (const t of selectedSize.finishing) {
         const sid = Number((t as any).service_id);
         if (!Number.isFinite(sid)) continue;
         const rawVid = (t as any).variant_id;
         const vid =
           rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
-        const row = t as { units_per_item?: number; price_unit?: string };
+        const row = t as { units_per_item?: number };
         if (vid != null) tmplByKey.set(`${sid}:${vid}`, row);
         if (!tmplByKey.has(String(sid))) tmplByKey.set(String(sid), row);
       }
@@ -670,11 +670,7 @@ export class SimplifiedPricingService {
           const u = Number(tmpl.units_per_item);
           if (Number.isFinite(u) && u > 0) next.units_per_item = u;
         }
-        // Единица учёта из шаблона размера (например per_sheet для скругления по листам печати)
-        const tmplPu = (tmpl as { price_unit?: string } | undefined)?.price_unit;
-        if (tmplPu != null && String(tmplPu).trim() !== '') {
-          next.price_unit = String(tmplPu).trim().toLowerCase();
-        }
+        // price_unit не подмешиваем из шаблона: источник истины — карточка услуги (БД), иначе старый per_item в шаблоне ломает per_sheet.
         return next;
       });
     }
@@ -821,11 +817,11 @@ export class SimplifiedPricingService {
           const mapKey = variantId ? `${finConfig.service_id}:${variantId}` : String(finConfig.service_id);
           const operationType = serviceTypesMap.get(finConfig.service_id) || '';
           const limits = serviceLimitsMap.get(finConfig.service_id);
-          const cfgPu = (finConfig as { price_unit?: string }).price_unit;
-          const priceUnitFromDb =
-            cfgPu != null && String(cfgPu).trim() !== ''
-              ? String(cfgPu).trim().toLowerCase()
-              : (servicePriceUnitMap.get(finConfig.service_id) ?? 'per_item').toLowerCase();
+          const priceUnitFromDb = this.resolveFinishingPriceUnit(
+            finConfig.service_id,
+            finConfig as { price_unit?: string },
+            servicePriceUnitMap
+          );
 
           // Операции с price_unit=per_sheet: считаем по листам печати (или пог. м для рулонной). До резки обрабатываем целые листы.
           const isPerSheetOp = priceUnitFromDb === 'per_sheet';
@@ -1262,15 +1258,12 @@ export class SimplifiedPricingService {
         material_id: normalizedConfig.base_material_id,
         material_name: selectedBaseMaterialName,
       } : undefined,
-      selectedFinishing: finishingDetails.map(d => {
-        const finConfig = selectedSize.finishing.find(f => f.service_id === d.service_id);
-        return {
-          service_id: d.service_id,
-          service_name: d.service_name,
-          price_unit: finConfig?.price_unit || 'per_item',
-          units_per_item: d.units_needed / quantity,
-        };
-      }),
+      selectedFinishing: finishingDetails.map(d => ({
+        service_id: d.service_id,
+        service_name: d.service_name,
+        price_unit: d.price_unit || 'per_item',
+        units_per_item: quantity > 0 ? d.units_needed / quantity : 0,
+      })),
       printPrice,
       materialPrice,
       finishingPrice,
@@ -1393,11 +1386,11 @@ export class SimplifiedPricingService {
         const mapKey = finConfig.variant_id ? `${finConfig.service_id}:${finConfig.variant_id}` : String(finConfig.service_id);
         const tiers = ctx.serviceTiersMap.get(mapKey);
         if (!tiers?.length) continue;
-        const cfgPu = finConfig.price_unit;
-        const priceUnitFromDb =
-          cfgPu != null && String(cfgPu).trim() !== ''
-            ? String(cfgPu).trim().toLowerCase()
-            : (ctx.servicePriceUnitMap?.get(finConfig.service_id) ?? 'per_item').toLowerCase();
+        const priceUnitFromDb = this.resolveFinishingPriceUnit(
+          finConfig.service_id,
+          finConfig,
+          ctx.servicePriceUnitMap ?? new Map()
+        );
         const isPerSheetOp = priceUnitFromDb === 'per_sheet';
         const perSheetUnits = isPerSheetOp ? (ctx.isRollPrint ? metersForQ : sheetsForQ) : 0;
         const unitsPerItem = finConfig.units_per_item ?? 1;
@@ -1447,6 +1440,27 @@ export class SimplifiedPricingService {
       });
     }
     return result;
+  }
+
+  /**
+   * Единица учёта отделки: приоритет у справочника услуг (post_processing_services),
+   * иначе из finishing в запросе (редкий fallback, если услуга не попала в выборку).
+   * Шаблон продукта не должен переопределять БД — иначе устаревший per_item ломает per_sheet.
+   */
+  private static resolveFinishingPriceUnit(
+    serviceId: number,
+    finConfig: { price_unit?: string | null },
+    servicePriceUnitMap: Map<number, string>
+  ): string {
+    const fromDb = servicePriceUnitMap.get(serviceId);
+    if (fromDb != null && String(fromDb).trim() !== '') {
+      return String(fromDb).trim().toLowerCase();
+    }
+    const cfg = finConfig?.price_unit;
+    if (cfg != null && String(cfg).trim() !== '') {
+      return String(cfg).trim().toLowerCase();
+    }
+    return 'per_item';
   }
 
   /**
