@@ -323,8 +323,35 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
   const loadYearlyRevenue = async (deptId?: number) => {
     setYearlyRevenueLoading(true);
     try {
-      const res = await getYearlyRevenue({ department_id: deptId });
-      setYearlyRevenue(res.data ?? null);
+      const now = new Date();
+      const yearDateTo = now.toISOString().slice(0, 10);
+      const yearDateFrom = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate() + 1)
+        .toISOString().slice(0, 10);
+
+      // Пробуем новый endpoint с разбивкой по месяцам
+      let byMonth: Array<{ month: string; orders: number; revenue: number }> = [];
+      try {
+        const yearlyRes = await getYearlyRevenue({ department_id: deptId });
+        byMonth = yearlyRes.data?.by_month ?? [];
+      } catch {
+        // Новый endpoint ещё не задеплоен — by_month останется пустым
+      }
+
+      // Итоговую сумму берём из существующего endpoint (всегда работает)
+      const listRes = await getAnalyticsOrdersList({
+        date_from: yearDateFrom,
+        date_to: yearDateTo,
+        status: 'revenue',
+        department_id: deptId,
+        limit: 1,
+        offset: 0,
+      });
+      const summary = listRes.data?.summary ?? { total_orders: 0, total_revenue: 0 };
+      setYearlyRevenue({
+        total_revenue: summary.total_revenue,
+        total_orders: summary.total_orders,
+        by_month: byMonth,
+      });
     } catch {
       // не блокируем страницу при ошибке
     } finally {
