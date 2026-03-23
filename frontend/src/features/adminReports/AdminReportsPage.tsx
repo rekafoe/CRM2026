@@ -274,15 +274,26 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
     URL.revokeObjectURL(url);
   };
 
-  const loadDrilldownOrders = async (status: string, title?: string, reasonFilter?: string, offset = 0) => {
+  const loadDrilldownOrders = async (
+    status: string,
+    title?: string,
+    reasonFilter?: string,
+    offset = 0,
+    overrideDateFrom?: string,
+    overrideDateTo?: string,
+  ) => {
     setDrilldownLoading(true);
     if (title) setDrilldownTitle(title);
     setDrilldownStatus(status);
     setDrilldownReasonFilter(reasonFilter || '');
     setDrilldownOffset(offset);
     try {
+      const effectiveDateFrom = overrideDateFrom ?? dateFrom;
+      const effectiveDateTo = overrideDateTo ?? dateTo;
       const res = await getAnalyticsOrdersList({
-        ...(dateFrom && dateTo ? { date_from: dateFrom, date_to: dateTo } : { period: String(period) }),
+        ...(effectiveDateFrom && effectiveDateTo
+          ? { date_from: effectiveDateFrom, date_to: effectiveDateTo }
+          : { period: String(period) }),
         status,
         reason_filter: reasonFilter || undefined,
         department_id: departmentId,
@@ -727,30 +738,20 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
             className="reports-stat-card reports-stat-card--clickable reports-stat-card--yearly"
             onClick={() => {
               const now = new Date();
-              const dateTo = now.toISOString().slice(0, 10);
-              const dateFrom = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate() + 1).toISOString().slice(0, 10);
-              void loadDrilldownOrders('revenue', 'Выручка за последние 12 месяцев', undefined, 0);
-              // Показываем данные по годовому диапазону
-              void (async () => {
-                const res = await getAnalyticsOrdersList({
-                  date_from: dateFrom,
-                  date_to: dateTo,
-                  status: 'revenue',
-                  department_id: departmentId,
-                  limit: 100,
-                  offset: 0,
-                });
-                setDrilldownOrders(res.data?.orders ?? []);
-                setDrilldownSummary(res.data?.summary ?? { total_orders: 0, total_revenue: 0 });
-                setDrilldownStatus('revenue');
-                setDrilldownOffset(0);
-                setDrilldownTitle('Выручка за последние 12 месяцев');
-                setDrilldownOpen(true);
-              })();
+              const yearTo = now.toISOString().slice(0, 10);
+              const yearFrom = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate() + 1).toISOString().slice(0, 10);
+              void loadDrilldownOrders('revenue', 'Выручка за последние 12 месяцев', undefined, 0, yearFrom, yearTo);
             }}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void loadDrilldownOrders('revenue', 'Выручка за последние 12 месяцев'); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                const now = new Date();
+                const yearTo = now.toISOString().slice(0, 10);
+                const yearFrom = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate() + 1).toISOString().slice(0, 10);
+                void loadDrilldownOrders('revenue', 'Выручка за последние 12 месяцев', undefined, 0, yearFrom, yearTo);
+              }
+            }}
           >
             <div className="reports-stat-value">
               {yearlyRevenueLoading
