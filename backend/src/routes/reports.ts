@@ -580,7 +580,7 @@ router.get('/analytics/revenue/yearly', asyncHandler(async (req, res) => {
   const deptJoin = departmentId !== undefined ? 'LEFT JOIN users u ON u.id = o.userId' : ''
   const deptWhere = departmentId !== undefined ? `AND u.department_id = ${departmentId}` : ''
 
-  const rows = await db.all<{ month: string; orders: number; revenue: number }>(`
+  const rows = await db.all<Array<{ month: string; orders: number; revenue: number }>>(`
     SELECT
       strftime('%Y-%m', COALESCE(o.createdAt, o.created_at)) AS month,
       COUNT(*) AS orders,
