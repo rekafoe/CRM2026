@@ -334,8 +334,12 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
     : parseInt(String(req.query.period || '30'), 10) || 30
 
   const db = await getDb()
-  // Не учитываем отменённые заказы (status = 5) в счётчиках и в общей выручке
-  const notCancelledCond = '(o.status IS NULL OR o.status != 5)'
+  // Отменённые = мягко удалённые онлайн-заказы (status=0 + is_cancelled=1).
+  // Status 5 = «Передан в ПВЗ» — это активный статус, не отмена.
+  const hasIsCancelledPop = await hasColumn('orders', 'is_cancelled')
+  const notCancelledCond = hasIsCancelledPop
+    ? '(o.status != 0 AND COALESCE(o.is_cancelled, 0) = 0)'
+    : 'o.status != 0'
 
   const productPopularity = await db.all<any>(
     `SELECT i.type as product_type, COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity,
@@ -373,7 +377,8 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
     dateParams
   )
 
-  // Общая выручка = заказы оплаченные или завершённые (деньги в кассе); без статуса 0 (ожидает) и без отменённых
+  // Общая выручка = заказы оплаченные или завершённые (деньги в кассе).
+  // Исключаем: «Ожидает» (status=1), мягко-отменённые (status=0 / is_cancelled=1).
   const periodRevenueRow = await db.get<{ total_revenue: number }>(`
     SELECT COALESCE(SUM(
       (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(i_totals.raw_total, 0)
@@ -382,7 +387,9 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
     LEFT JOIN (
       SELECT orderId, SUM(price * quantity) as raw_total FROM items GROUP BY orderId
     ) i_totals ON i_totals.orderId = o.id
-    WHERE ${dateFilter('o')} AND (o.status IS NULL OR o.status != 0) AND (o.status IS NULL OR o.status != 5)
+    WHERE ${dateFilter('o')}
+      AND o.status != 1
+      AND ${notCancelledCond}
       AND (o.status = 7 OR o.prepaymentStatus IN ('paid', 'successful'))
   `, dateParams)
   const total_revenue = Number(periodRevenueRow?.total_revenue ?? 0)
@@ -402,8 +409,13 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
   const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
   const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
   const db = await getDb()
-  const notCancelled = '(o.status IS NULL OR o.status != 5)'
-  const notCancelledNoAlias = '(status IS NULL OR status != 5)'
+  const hasIsCancelledFin = await hasColumn('orders', 'is_cancelled')
+  const notCancelled = hasIsCancelledFin
+    ? '(o.status != 0 AND COALESCE(o.is_cancelled, 0) = 0)'
+    : 'o.status != 0'
+  const notCancelledNoAlias = hasIsCancelledFin
+    ? '(status != 0 AND COALESCE(is_cancelled, 0) = 0)'
+    : 'status != 0'
 
   const productProfitability = await db.all<any>(`
     SELECT i.type as product_type, SUM(i.price * i.quantity) as total_revenue, COUNT(DISTINCT o.id) as order_count,
@@ -434,8 +446,8 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
 
   const createdExpr = 'COALESCE(o.createdAt, o.created_at)'
   const currentRangeCondition = endDate
-    ? `${createdExpr} >= ? AND ${createdExpr} <= ? AND (o.status IS NULL OR o.status != 5)`
-    : `${createdExpr} >= ? AND (o.status IS NULL OR o.status != 5)`
+    ? `${createdExpr} >= ? AND ${createdExpr} <= ? AND ${notCancelled}`
+    : `${createdExpr} >= ? AND ${notCancelled}`
   const currentRangeParams = endDate ? [startDate.toISOString(), endDate.toISOString()] : [startDate.toISOString()]
 
   const avgCheckTrend = await db.all<any>(`
@@ -485,7 +497,7 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
         (1 - COALESCE(o.discount_percent, 0) / 100.0) * COALESCE(SUM(i.price * i.quantity), 0) as order_total
       FROM orders o
       LEFT JOIN items i ON i.orderId = o.id
-      WHERE ${createdExpr} >= ? AND ${createdExpr} <= ? AND (o.status IS NULL OR o.status != 5)
+      WHERE ${createdExpr} >= ? AND ${createdExpr} <= ? AND o.status != 0
       GROUP BY o.id
     )
     SELECT COALESCE(AVG(order_total), 0) as avg_check, COUNT(order_id) as orders_count
@@ -519,17 +531,23 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
   const db = await getDb()
 
   const statusFunnel = await db.all<any>(`
-    SELECT CASE WHEN status = 0 THEN 'Создан' WHEN status = 1 THEN 'Подтвержден' WHEN status = 2 THEN 'В работе'
-      WHEN status = 3 THEN 'Выполнен' WHEN status = 4 THEN 'Передан в ПВЗ' WHEN status = 5 THEN 'Отменен' WHEN status = 7 THEN 'Завершён' ELSE 'Неизвестный' END as status_name,
-      status, COUNT(*) as count, SUM(COALESCE(prepaymentAmount, 0)) as total_amount, AVG(COALESCE(prepaymentAmount, 0)) as avg_amount
-    FROM orders WHERE ${dateFilter('')}
-    GROUP BY status, status_name ORDER BY status
+    SELECT COALESCE(os.name, CASE WHEN o.status = 0 THEN 'Отменён (пул)' ELSE CAST(o.status AS TEXT) END) as status_name,
+      o.status, COUNT(*) as count,
+      SUM(COALESCE(o.prepaymentAmount, 0)) as total_amount,
+      AVG(COALESCE(o.prepaymentAmount, 0)) as avg_amount
+    FROM orders o
+    LEFT JOIN order_statuses os ON os.id = o.status
+    WHERE ${dateFilter('o')}
+    GROUP BY o.status, status_name ORDER BY o.status
   `, dateParams)
 
   const statusConversion = await db.all<any>(`
-    SELECT DATE(COALESCE(createdAt, created_at)) as date, COUNT(CASE WHEN status >= 1 THEN 1 END) as confirmed_orders,
-      COUNT(CASE WHEN status >= 2 THEN 1 END) as in_progress_orders, COUNT(CASE WHEN status >= 3 THEN 1 END) as ready_orders,
-      COUNT(CASE WHEN status >= 7 THEN 1 END) as completed_orders, COUNT(*) as total_created
+    SELECT DATE(COALESCE(createdAt, created_at)) as date,
+      COUNT(CASE WHEN status >= 2 THEN 1 END) as confirmed_orders,
+      COUNT(CASE WHEN status >= 3 THEN 1 END) as in_progress_orders,
+      COUNT(CASE WHEN status >= 4 THEN 1 END) as ready_orders,
+      COUNT(CASE WHEN status = 7 THEN 1 END) as completed_orders,
+      COUNT(CASE WHEN status != 0 AND COALESCE(is_cancelled, 0) = 0 THEN 1 END) as total_active
     FROM orders WHERE ${dateFilter('')}
     GROUP BY DATE(COALESCE(createdAt, created_at)) ORDER BY date DESC
   `, dateParams)
@@ -541,7 +559,7 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
 
   const cancellationReasons = await db.all<any>(`
     SELECT COUNT(*) as cancelled_count, SUM(COALESCE(prepaymentAmount, 0)) as cancelled_amount
-    FROM orders WHERE status = 5 AND ${dateFilter('')}
+    FROM orders WHERE (status = 0 OR COALESCE(is_cancelled, 0) = 1) AND ${dateFilter('')}
   `, dateParams)
 
   res.json({
@@ -576,7 +594,8 @@ router.get('/analytics/revenue/yearly', asyncHandler(async (req, res) => {
     ) i_totals ON i_totals.order_id = o.id
     WHERE
       COALESCE(o.createdAt, o.created_at) >= date('now', '-12 months')
-      AND (o.status IS NULL OR o.status != 5)
+      AND o.status != 1
+      AND o.status != 0
       AND (o.status = 7 OR o.prepaymentStatus IN ('paid', 'successful'))
       ${deptWhere}
     GROUP BY month
@@ -622,18 +641,18 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
 
   if (statusFilter && statusFilter !== 'all') {
     if (statusFilter === 'revenue') {
-      where.push('(o.status IS NULL OR o.status != 0)')
-      where.push('(o.status IS NULL OR o.status != 5)')
+      where.push('o.status != 1')  // исключаем «Ожидает»
+      where.push('o.status != 0')  // исключаем мягко-отменённые
       where.push("(o.status = 7 OR o.prepaymentStatus IN ('paid', 'successful'))")
     } else if (statusFilter === 'paid') {
       where.push(`o.prepaymentStatus IN ('paid','successful')`)
     } else if (statusFilter === 'pending_payment') {
-      where.push('(o.status IS NULL OR o.status != 5)')
+      where.push('o.status != 0')  // не мягко-отменённые
       where.push(`COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
     } else if (statusFilter === 'completed') {
       where.push('o.status = 7')
     } else if (statusFilter === 'cancelled') {
-      where.push('o.status = 5')
+      where.push('o.status = 0')  // мягко-отменённые (status=0 + is_cancelled=1)
     } else if (statusFilter === 'created') {
       where.push('o.status = 0')
     } else {
@@ -647,18 +666,20 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
 
   const ageHoursExpr = `(JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24`
   if (reasonFilter) {
+    // Отменённые = мягко удалённые (status=0, is_cancelled=1) или жёстко удалённые (нет в БД).
+    // Status 5 = «Передан в ПВЗ» — активный статус, не отмена.
     if (reasonFilter === 'cancellation_no_prepayment') {
-      where.push('o.status = 5 AND COALESCE(o.prepaymentAmount, 0) = 0')
+      where.push('o.status = 0 AND COALESCE(o.prepaymentAmount, 0) = 0')
     } else if (reasonFilter === 'cancellation_unpaid_prepayment') {
-      where.push(`o.status = 5 AND COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
+      where.push(`o.status = 0 AND COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
     } else if (reasonFilter === 'cancellation_after_paid') {
-      where.push(`o.status = 5 AND o.prepaymentStatus IN ('paid','successful')`)
+      where.push(`o.status = 0 AND o.prepaymentStatus IN ('paid','successful')`)
     } else if (reasonFilter === 'delay_waiting_payment') {
-      where.push(`o.status IN (0,1,2,3) AND COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') AND ${ageHoursExpr} > 24`)
+      where.push(`o.status IN (1,2,3,4,5,6) AND COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') AND ${ageHoursExpr} > 24`)
     } else if (reasonFilter === 'delay_long_production') {
-      where.push(`o.status IN (2,3) AND ${ageHoursExpr} > 48`)
+      where.push(`o.status IN (3,4) AND ${ageHoursExpr} > 48`)
     } else if (reasonFilter === 'delay_initial_stuck') {
-      where.push(`o.status IN (0,1) AND ${ageHoursExpr} > 24`)
+      where.push(`o.status IN (1,2) AND ${ageHoursExpr} > 24`)
     } else {
       const hasCancellationEvents = !!(await db.get(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='order_cancellation_events'"
@@ -676,6 +697,7 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
   const orderBaseQuery = `
     FROM orders o
     LEFT JOIN users u ON u.id = o.userId
+    LEFT JOIN order_statuses os ON os.id = o.status
     LEFT JOIN (
       SELECT i.orderId as order_id, SUM(i.price * i.quantity) as raw_total
       FROM items i
@@ -697,8 +719,7 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
       o.id,
       o.number,
       o.status,
-      CASE WHEN o.status = 0 THEN 'Создан' WHEN o.status = 1 THEN 'Подтверждён' WHEN o.status = 2 THEN 'В работе'
-        WHEN o.status = 3 THEN 'Выполнен' WHEN o.status = 4 THEN 'Передан в ПВЗ' WHEN o.status = 5 THEN 'Отменён' WHEN o.status = 7 THEN 'Завершён' ELSE '—' END as status_name,
+      COALESCE(os.name, CASE WHEN o.status = 0 THEN 'Отменён (пул)' ELSE CAST(o.status AS TEXT) END) as status_name,
       o.prepaymentStatus as prepayment_status,
       CASE WHEN o.prepaymentStatus IN ('paid','successful') THEN 'Оплачен' WHEN o.prepaymentStatus IS NULL OR o.prepaymentStatus = '' THEN '—' ELSE o.prepaymentStatus END as prepayment_status_label,
       o.paymentMethod as payment_method,
@@ -797,7 +818,7 @@ router.get('/analytics/orders/reasons', asyncHandler(async (req, res) => {
         COUNT(*) as count
       FROM orders o
       LEFT JOIN users u ON u.id = o.userId
-      WHERE ${baseWhere.join(' AND ')} AND o.status = 5
+      WHERE ${baseWhere.join(' AND ')} AND o.status = 0
       GROUP BY reason, reason_code
       ORDER BY count DESC
       LIMIT 10
@@ -808,21 +829,21 @@ router.get('/analytics/orders/reasons', asyncHandler(async (req, res) => {
     SELECT
       CASE
         WHEN COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24 THEN 'Ожидание предоплаты >24ч'
-        WHEN o.status IN (2,3) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 48 THEN 'Длительное производство >48ч'
-        WHEN o.status IN (0,1) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24 THEN 'Долго в начальных статусах >24ч'
+        WHEN o.status IN (3,4) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 48 THEN 'Длительное производство >48ч'
+        WHEN o.status IN (1,2) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24 THEN 'Долго в начальных статусах >24ч'
         ELSE 'Прочие задержки'
       END as reason,
       CASE
         WHEN COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24 THEN 'delay_waiting_payment'
-        WHEN o.status IN (2,3) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 48 THEN 'delay_long_production'
-        WHEN o.status IN (0,1) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24 THEN 'delay_initial_stuck'
+        WHEN o.status IN (3,4) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 48 THEN 'delay_long_production'
+        WHEN o.status IN (1,2) AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24 THEN 'delay_initial_stuck'
         ELSE 'delay_other'
       END as reason_code,
       COUNT(*) as count
     FROM orders o
     LEFT JOIN users u ON u.id = o.userId
     WHERE ${baseWhere.join(' AND ')}
-      AND o.status IN (0,1,2,3)
+      AND o.status IN (1,2,3,4)
       AND (JULIANDAY('now') - JULIANDAY(COALESCE(o.createdAt, o.created_at))) * 24 > 24
     GROUP BY reason, reason_code
     ORDER BY count DESC
@@ -915,7 +936,7 @@ router.put('/analytics/reason-presets', asyncHandler(async (req, res) => {
 }))
 
 // GET /api/reports/analytics/managers/efficiency — эффективность менеджеров
-// Без ограничений по статусам: выручка, средний чек, «Выполнено» и время — по всем заказам. Отмена = статус 5 или is_cancelled=1
+// Отмена = status=0 (мягко удалённые) или is_cancelled=1. Status 5 = «Передан в ПВЗ», не отмена.
 router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
   const { department_id: deptIdParam } = req.query
   const departmentId = deptIdParam != null ? parseInt(String(deptIdParam), 10) : undefined
@@ -933,7 +954,9 @@ router.get('/analytics/managers/efficiency', asyncHandler(async (req, res) => {
   const deptCondition = Number.isFinite(departmentId) ? ' AND u.department_id = ? ' : ''
   const deptParam = Number.isFinite(departmentId) ? [departmentId] : []
   const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
-  const cancelledCondition = hasIsCancelled ? '(o.status = 5 OR COALESCE(o.is_cancelled, 0) = 1)' : 'o.status = 5'
+  const cancelledCondition = hasIsCancelled
+    ? '(o.status = 0 OR COALESCE(o.is_cancelled, 0) = 1)'
+    : 'o.status = 0'
   const oUpdated = 'COALESCE(o.updatedAt, o.updated_at)'
 
   const managerEfficiency = await db.all<any>(
@@ -1002,7 +1025,7 @@ router.get('/analytics/daily-activity', asyncHandler(async (req, res) => {
        COALESCE(SUM(o.prepaymentAmount), 0) as total_amount
      FROM orders o
      LEFT JOIN users u ON o.userId = u.id
-     WHERE ${oCreatedRange} AND (o.status IS NULL OR o.status != 5)
+     WHERE ${oCreatedRange} AND o.status != 0
      GROUP BY ${oDate}, u.id, u.name, u.email
      ORDER BY date DESC, total_amount DESC`,
     dateParams
@@ -1015,7 +1038,7 @@ router.get('/analytics/daily-activity', asyncHandler(async (req, res) => {
        COALESCE(SUM(o.prepaymentAmount), 0) as total_amount,
        COUNT(DISTINCT o.userId) as operators_count
      FROM orders o
-     WHERE ${oCreatedRange} AND (o.status IS NULL OR o.status != 5)
+     WHERE ${oCreatedRange} AND o.status != 0
      GROUP BY ${oDate}
      ORDER BY date DESC`,
     dateParams
@@ -1025,7 +1048,7 @@ router.get('/analytics/daily-activity', asyncHandler(async (req, res) => {
   const overall = await db.get<any>(
     `SELECT COUNT(o.id) as orders_count, COALESCE(SUM(o.prepaymentAmount), 0) as total_amount
      FROM orders o
-     WHERE ${oCreatedRange} AND (o.status IS NULL OR o.status != 5)`,
+     WHERE ${oCreatedRange} AND o.status != 0`,
     dateParams
   )
 
