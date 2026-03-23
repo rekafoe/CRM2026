@@ -529,6 +529,7 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
   const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)
   const days = endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) : parseInt(String(req.query.period || '30'), 10) || 30
   const db = await getDb()
+  const hasFunnelIsCancelled = await hasColumn('orders', 'is_cancelled')
 
   const statusFunnel = await db.all<any>(`
     SELECT COALESCE(os.name, CASE WHEN o.status = 0 THEN 'Отменён (пул)' ELSE CAST(o.status AS TEXT) END) as status_name,
@@ -541,13 +542,17 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
     GROUP BY o.status, status_name ORDER BY o.status
   `, dateParams)
 
+  const totalActiveCond = hasFunnelIsCancelled
+    ? 'status != 0 AND COALESCE(is_cancelled, 0) = 0'
+    : 'status != 0'
+
   const statusConversion = await db.all<any>(`
     SELECT DATE(COALESCE(createdAt, created_at)) as date,
       COUNT(CASE WHEN status >= 2 THEN 1 END) as confirmed_orders,
       COUNT(CASE WHEN status >= 3 THEN 1 END) as in_progress_orders,
       COUNT(CASE WHEN status >= 4 THEN 1 END) as ready_orders,
       COUNT(CASE WHEN status = 7 THEN 1 END) as completed_orders,
-      COUNT(CASE WHEN status != 0 AND COALESCE(is_cancelled, 0) = 0 THEN 1 END) as total_active
+      COUNT(CASE WHEN ${totalActiveCond} THEN 1 END) as total_active
     FROM orders WHERE ${dateFilter('')}
     GROUP BY DATE(COALESCE(createdAt, created_at)) ORDER BY date DESC
   `, dateParams)
@@ -557,9 +562,13 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
     FROM orders WHERE status = 7 AND ${dateFilter('')} AND COALESCE(updatedAt, updated_at) > COALESCE(createdAt, created_at)
   `, dateParams)
 
+  const cancelledCond = hasFunnelIsCancelled
+    ? `(status = 0 OR COALESCE(is_cancelled, 0) = 1)`
+    : 'status = 0'
+
   const cancellationReasons = await db.all<any>(`
     SELECT COUNT(*) as cancelled_count, SUM(COALESCE(prepaymentAmount, 0)) as cancelled_amount
-    FROM orders WHERE (status = 0 OR COALESCE(is_cancelled, 0) = 1) AND ${dateFilter('')}
+    FROM orders WHERE ${cancelledCond} AND ${dateFilter('')}
   `, dateParams)
 
   res.json({

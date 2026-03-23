@@ -74,14 +74,17 @@ export class AnalyticsService {
     timeData?: TimeAnalyticsData;
   }> {
     const results: any = {};
-    const [productData, financialData, orderStatusData] = await Promise.all([
+    const [productResult, financialResult, orderStatusResult] = await Promise.allSettled([
       this.getProductAnalytics(params),
       this.getFinancialAnalytics(params),
       this.getOrderStatusAnalytics(params)
     ]);
-    results.productData = productData;
-    results.financialData = financialData;
-    results.orderStatusData = orderStatusData;
+    if (productResult.status === 'fulfilled') results.productData = productResult.value;
+    else console.error('Product analytics failed:', productResult.reason);
+    if (financialResult.status === 'fulfilled') results.financialData = financialResult.value;
+    else console.error('Financial analytics failed:', financialResult.reason);
+    if (orderStatusResult.status === 'fulfilled') results.orderStatusData = orderStatusResult.value;
+    else console.error('Order status analytics failed:', orderStatusResult.reason);
 
     if (tab === 'managers' || tab === 'overview') {
       try {
