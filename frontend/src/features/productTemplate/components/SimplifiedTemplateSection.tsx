@@ -11,6 +11,7 @@ import { MaterialsCard } from './MaterialsCard'
 import { FinishingCard } from './FinishingCard'
 import { AddSizeModal, CopySizesModal } from './SizeModals'
 import { type Tier, defaultTiers, normalizeTiers } from '../utils/tierManagement'
+import { clonePrintBlockFromSize } from '../utils/clonePrintConfig'
 import './SimplifiedTemplateSection.css'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
@@ -103,6 +104,37 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     if (useOwnMaterials) return selected.allowed_material_ids ?? []
     return effectiveConfig.common_allowed_material_ids ?? []
   }, [selected, useOwnMaterials, effectiveConfig.common_allowed_material_ids])
+
+  const otherSizesForPrintCopy = useMemo(
+    () =>
+      sizes
+        .filter((s) => selected && String(s.id) !== String(selected.id))
+        .map((s) => ({
+          id: s.id,
+          label: s.label && String(s.label).trim() ? String(s.label) : `${s.width_mm}×${s.height_mm} мм`,
+        })),
+    [sizes, selected],
+  )
+
+  const handleCopyPrintFromSize = useCallback(
+    (sourceSizeId: string | number) => {
+      const source = sizes.find((s) => String(s.id) === String(sourceSizeId))
+      if (!source || !selected) return
+      const label =
+        source.label && String(source.label).trim()
+          ? String(source.label)
+          : `${source.width_mm}×${source.height_mm} мм`
+      if (
+        !window.confirm(
+          `Заменить настройки печати текущего размера копией из «${label}»? Материалы и отделка не изменятся.`,
+        )
+      ) {
+        return
+      }
+      updateSize(selected.id, clonePrintBlockFromSize(source))
+    },
+    [sizes, selected, updateSize],
+  )
 
   const updateEffectiveMaterials = useCallback(
     (ids: number[]) => {
@@ -715,6 +747,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   updateSizeRanges={updateSizeRanges}
                   allMaterials={allMaterials}
                   allowedMaterialIds={effectiveAllowedMaterialIds}
+                  otherSizesForPrintCopy={otherSizesForPrintCopy}
+                  onCopyPrintFromSize={handleCopyPrintFromSize}
                 />
 
                 <MaterialsCard

@@ -44,6 +44,10 @@ interface PrintPricesCardProps {
   allMaterials?: Array<{ id: number; sheet_width?: number | null; sheet_height?: number | null }>
   /** Разрешённые id материалов для текущего размера (порядок важен: берётся первый с обоими размерами мм) */
   allowedMaterialIds?: number[]
+  /** Другие размеры того же типа — для «Скопировать печать из размера» */
+  otherSizesForPrintCopy?: Array<{ id: string | number; label: string }>
+  /** Подставить в текущий размер копию default_print + print_prices с выбранного размера */
+  onCopyPrintFromSize?: (sourceSizeId: string | number) => void
 }
 
 export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
@@ -56,7 +60,10 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
   updateSizeRanges,
   allMaterials,
   allowedMaterialIds,
+  otherSizesForPrintCopy = [],
+  onCopyPrintFromSize,
 }) => {
+  const [copyPrintSourceId, setCopyPrintSourceId] = useState<string>('')
   const [tierModal, setTierModal] = useState<TierRangeModalState>({
     type: 'add',
     isOpen: false,
@@ -64,6 +71,10 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
   })
   const tierModalRef = useRef<HTMLDivElement>(null)
   const addRangeButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    setCopyPrintSourceId('')
+  }, [selected.id])
 
   useEffect(() => {
     if (!tierModal.isOpen) return
@@ -96,6 +107,43 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
         <div>
           <strong>Печать (цена за изделие)</strong>
           <div className="text-muted text-sm">Выберите технологию печати, и система автоматически покажет все доступные вариации с диапазонами цен.</div>
+          {otherSizesForPrintCopy.length > 0 && typeof onCopyPrintFromSize === 'function' && (
+            <div
+              className="simplified-print-copy-row"
+              style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 10 }}
+            >
+              <label className="text-sm text-muted" style={{ margin: 0 }}>
+                Скопировать настройки печати из размера:
+              </label>
+              <select
+                className="form-select form-select--compact"
+                style={{ minWidth: 180, maxWidth: '100%' }}
+                value={copyPrintSourceId}
+                onChange={(e) => setCopyPrintSourceId(e.target.value)}
+                aria-label="Размер-источник для копирования печати"
+              >
+                <option value="">— выберите размер —</option>
+                {otherSizesForPrintCopy.map((s) => (
+                  <option key={String(s.id)} value={String(s.id)}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={!copyPrintSourceId}
+                onClick={() => {
+                  if (!copyPrintSourceId || !onCopyPrintFromSize) return
+                  const src = otherSizesForPrintCopy.find((s) => String(s.id) === copyPrintSourceId)
+                  if (src) onCopyPrintFromSize(src.id)
+                }}
+              >
+                Скопировать
+              </Button>
+            </div>
+          )}
         </div>
         {selected.default_print?.technology_code && selected.width_mm > 0 && selected.height_mm > 0 && (
           <Button
