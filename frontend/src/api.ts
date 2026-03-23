@@ -322,6 +322,14 @@ export const getOrderStatusFunnelAnalytics = (params?: AnalyticsPeriodParams) =>
     };
   }>('/reports/analytics/orders/status-funnel', { params });
 
+export const getYearlyRevenue = (params?: { department_id?: number }) =>
+  api.get<{
+    department_id: number | null;
+    total_revenue: number;
+    total_orders: number;
+    by_month: Array<{ month: string; orders: number; revenue: number }>;
+  }>('/reports/analytics/revenue/yearly', { params })
+
 export const getAnalyticsOrdersList = (params?: AnalyticsPeriodParams & { status?: string; reason_filter?: string; department_id?: number; limit?: number; offset?: number }) =>
   api.get<{
     period: { startDate: string; endDate?: string };

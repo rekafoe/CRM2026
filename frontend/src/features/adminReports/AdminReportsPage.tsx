@@ -8,7 +8,7 @@ import { ManagerAnalytics } from './components/ManagerAnalytics';
 import { MaterialsAnalytics } from './components/MaterialsAnalytics';
 import { TimeAnalytics } from './components/TimeAnalytics';
 import { AnalyticsTab } from './types';
-import { api, getAnalyticsOrderReasons, getAnalyticsOrdersList, getDepartments, updateReasonPresetsSettings, type Department } from '../../api';
+import { api, getAnalyticsOrderReasons, getAnalyticsOrdersList, getYearlyRevenue, getDepartments, updateReasonPresetsSettings, type Department } from '../../api';
 import { Button } from '../../components/common';
 import { AppIcon } from '../../components/ui/AppIcon';
 import { useReasonPresets } from '../../components/common/useReasonPresets';
@@ -112,6 +112,12 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
   const [drilldownReasonFilter, setDrilldownReasonFilter] = useState<string>('');
   const [drilldownOffset, setDrilldownOffset] = useState(0);
   const drilldownPageSize = 100;
+  const [yearlyRevenue, setYearlyRevenue] = useState<{
+    total_revenue: number;
+    total_orders: number;
+    by_month: Array<{ month: string; orders: number; revenue: number }>;
+  } | null>(null);
+  const [yearlyRevenueLoading, setYearlyRevenueLoading] = useState(false);
   const [reasonStatsLoading, setReasonStatsLoading] = useState(false);
   const [orderReasonStats, setOrderReasonStats] = useState<{
     cancellation_total: number;
@@ -313,6 +319,22 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
   useEffect(() => {
     void loadOrderReasonStats();
   }, [period, dateFrom, dateTo, departmentId]);
+
+  const loadYearlyRevenue = async (deptId?: number) => {
+    setYearlyRevenueLoading(true);
+    try {
+      const res = await getYearlyRevenue({ department_id: deptId });
+      setYearlyRevenue(res.data ?? null);
+    } catch {
+      // не блокируем страницу при ошибке
+    } finally {
+      setYearlyRevenueLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadYearlyRevenue(departmentId);
+  }, [departmentId]);
 
   useEffect(() => {
     setReasonPresetsDraft({
@@ -642,7 +664,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
           >
             {isExportingXlsx ? '⏳ Экспорт...' : <><AppIcon name="chart-bar" size="xs" /> Экспорт XLSX</>}
           </Button>
-          <Button variant="primary" size="sm" onClick={refreshAnalytics} disabled={isLoading}>
+          <Button variant="primary" size="sm" onClick={() => { void refreshAnalytics(); void loadYearlyRevenue(departmentId); }} disabled={isLoading}>
             {isLoading ? 'Загрузка…' : <><AppIcon name="refresh" size="xs" /> Обновить</>}
           </Button>
         </div>
@@ -673,6 +695,54 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               {totalStats.totalRevenue.toLocaleString('ru-RU')} BYN
             </div>
             <div className="reports-stat-label">Общая выручка</div>
+          </div>
+          <div
+            className="reports-stat-card reports-stat-card--clickable reports-stat-card--yearly"
+            onClick={() => {
+              const now = new Date();
+              const dateTo = now.toISOString().slice(0, 10);
+              const dateFrom = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate() + 1).toISOString().slice(0, 10);
+              void loadDrilldownOrders('revenue', 'Выручка за последние 12 месяцев', undefined, 0);
+              // Показываем данные по годовому диапазону
+              void (async () => {
+                const res = await getAnalyticsOrdersList({
+                  date_from: dateFrom,
+                  date_to: dateTo,
+                  status: 'revenue',
+                  department_id: departmentId,
+                  limit: 100,
+                  offset: 0,
+                });
+                setDrilldownOrders(res.data?.orders ?? []);
+                setDrilldownSummary(res.data?.summary ?? { total_orders: 0, total_revenue: 0 });
+                setDrilldownStatus('revenue');
+                setDrilldownOffset(0);
+                setDrilldownTitle('Выручка за последние 12 месяцев');
+                setDrilldownOpen(true);
+              })();
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void loadDrilldownOrders('revenue', 'Выручка за последние 12 месяцев'); }}
+          >
+            <div className="reports-stat-value">
+              {yearlyRevenueLoading
+                ? '…'
+                : yearlyRevenue
+                  ? `${yearlyRevenue.total_revenue.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BYN`
+                  : '—'}
+            </div>
+            <div className="reports-stat-label">Выручка за 12 мес.</div>
+            {yearlyRevenue && yearlyRevenue.by_month.length > 0 && (
+              <div className="reports-stat-yearly-months">
+                {yearlyRevenue.by_month.slice(-6).map((m) => (
+                  <span key={m.month} className="reports-stat-yearly-month">
+                    <span className="reports-stat-yearly-month__label">{m.month.slice(5)}</span>
+                    <span className="reports-stat-yearly-month__val">{Number(m.revenue || 0).toLocaleString('ru-RU', { maximumFractionDigits: 0 })}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div
             className="reports-stat-card reports-stat-card--clickable"

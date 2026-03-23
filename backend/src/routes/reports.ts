@@ -553,6 +553,51 @@ router.get('/analytics/orders/status-funnel', asyncHandler(async (req, res) => {
   })
 }))
 
+// GET /api/reports/analytics/revenue/yearly — выручка за последние 12 месяцев, по месяцам
+router.get('/analytics/revenue/yearly', asyncHandler(async (req, res) => {
+  const db = await getDb()
+  const departmentIdParam = req.query.department_id ? Number(req.query.department_id) : undefined
+  const departmentId = Number.isFinite(departmentIdParam) ? Number(departmentIdParam) : undefined
+
+  const deptJoin = departmentId !== undefined ? 'LEFT JOIN users u ON u.id = o.userId' : ''
+  const deptWhere = departmentId !== undefined ? `AND u.department_id = ${departmentId}` : ''
+
+  const rows = await db.all<{ month: string; orders: number; revenue: number }>(`
+    SELECT
+      strftime('%Y-%m', COALESCE(o.createdAt, o.created_at)) AS month,
+      COUNT(*) AS orders,
+      SUM(COALESCE(i_totals.raw_total, 0) * (1 - COALESCE(o.discount_percent, 0) / 100.0)) AS revenue
+    FROM orders o
+    ${deptJoin}
+    LEFT JOIN (
+      SELECT i.orderId AS order_id, SUM(i.price * i.quantity) AS raw_total
+      FROM items i
+      GROUP BY i.orderId
+    ) i_totals ON i_totals.order_id = o.id
+    WHERE
+      COALESCE(o.createdAt, o.created_at) >= date('now', '-12 months')
+      AND (o.status IS NULL OR o.status != 5)
+      AND (o.status = 7 OR o.prepaymentStatus IN ('paid', 'successful'))
+      ${deptWhere}
+    GROUP BY month
+    ORDER BY month
+  `)
+
+  const total_revenue = rows.reduce((s, r) => s + Number(r.revenue || 0), 0)
+  const total_orders = rows.reduce((s, r) => s + Number(r.orders || 0), 0)
+
+  res.json({
+    department_id: departmentId ?? null,
+    total_revenue,
+    total_orders,
+    by_month: rows.map(r => ({
+      month: r.month,
+      orders: Number(r.orders || 0),
+      revenue: Number(r.revenue || 0),
+    })),
+  })
+}))
+
 // GET /api/reports/analytics/orders/list — первичка заказов для drill-down из KPI
 router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
   const { startDate, endDate, dateParams, dateFilter } = getAnalyticsDateRange(req.query)

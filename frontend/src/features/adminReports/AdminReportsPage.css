@@ -178,6 +178,41 @@
   cursor: pointer;
 }
 
+.reports-stat-card--yearly {
+  grid-column: span 2;
+}
+
+.reports-stat-yearly-months {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.reports-stat-yearly-month {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 4px 8px;
+  min-width: 52px;
+}
+
+.reports-stat-yearly-month__label {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.reports-stat-yearly-month__val {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a202c;
+  white-space: nowrap;
+}
+
 .reports-stat-value {
   font-size: 24px;
   font-weight: 700;
@@ -789,6 +824,21 @@
   gap: 12px;
   margin-bottom: 12px;
   flex-wrap: wrap;
+}
+
+.reports-drilldown-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.reports-drilldown-pagination__info {
+  font-size: 13px;
+  color: #64748b;
+  min-width: 120px;
+  text-align: center;
 }
 
 .reports-drilldown-table-wrap {
