@@ -562,8 +562,10 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
   const reasonFilter = req.query.reason_filter ? String(req.query.reason_filter) : ''
   const departmentIdParam = req.query.department_id ? Number(req.query.department_id) : undefined
   const departmentId = Number.isFinite(departmentIdParam) ? Number(departmentIdParam) : undefined
-  const limitRaw = Number(req.query.limit ?? 200)
-  const limit = Math.min(1000, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 200))
+  const limitRaw = Number(req.query.limit ?? 100)
+  const limit = Math.min(500, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 100))
+  const offsetRaw = Number(req.query.offset ?? 0)
+  const offset = Math.max(0, Number.isFinite(offsetRaw) ? offsetRaw : 0)
 
   const where: string[] = [dateFilter('o')]
   const params: any[] = [...dateParams]
@@ -626,6 +628,25 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
     }
   }
 
+  const orderBaseQuery = `
+    FROM orders o
+    LEFT JOIN users u ON u.id = o.userId
+    LEFT JOIN (
+      SELECT i.orderId as order_id, SUM(i.price * i.quantity) as raw_total
+      FROM items i
+      GROUP BY i.orderId
+    ) i_totals ON i_totals.order_id = o.id
+    WHERE ${where.join(' AND ')}
+  `
+
+  // Суммы по всей выборке без LIMIT — истинные итоги для шапки модалки
+  const summaryRow = await db.get<{ total_orders: number; total_revenue: number }>(`
+    SELECT
+      COUNT(*) as total_orders,
+      SUM(COALESCE(i_totals.raw_total, 0) * (1 - COALESCE(o.discount_percent, 0) / 100.0)) as total_revenue
+    ${orderBaseQuery}
+  `, params)
+
   const rows = await db.all<any>(`
     SELECT
       o.id,
@@ -641,23 +662,15 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
       u.id as user_id,
       COALESCE(u.name, u.email, 'Без оператора') as user_name,
       COALESCE(i_totals.raw_total, 0) * (1 - COALESCE(o.discount_percent, 0) / 100.0) as order_total
-    FROM orders o
-    LEFT JOIN users u ON u.id = o.userId
-    LEFT JOIN (
-      SELECT i.orderId as order_id, SUM(i.price * i.quantity) as raw_total
-      FROM items i
-      GROUP BY i.orderId
-    ) i_totals ON i_totals.order_id = o.id
-    WHERE ${where.join(' AND ')}
+    ${orderBaseQuery}
     ORDER BY COALESCE(o.createdAt, o.created_at) DESC
-    LIMIT ?
-  `, [...params, limit])
+    LIMIT ? OFFSET ?
+  `, [...params, limit, offset])
 
-  const summary = rows.reduce((acc: { total_orders: number; total_revenue: number }, row: any) => {
-    acc.total_orders += 1
-    acc.total_revenue += Number(row.order_total || 0)
-    return acc
-  }, { total_orders: 0, total_revenue: 0 })
+  const summary = {
+    total_orders: summaryRow?.total_orders ?? 0,
+    total_revenue: summaryRow?.total_revenue ?? 0,
+  }
 
   res.json({
     period: {
@@ -668,7 +681,8 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
       status: statusFilter,
       reason_filter: reasonFilter || null,
       department_id: departmentId ?? null,
-      limit
+      limit,
+      offset
     },
     summary,
     orders: rows

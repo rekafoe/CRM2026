@@ -110,6 +110,8 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
     total_revenue: 0,
   });
   const [drilldownReasonFilter, setDrilldownReasonFilter] = useState<string>('');
+  const [drilldownOffset, setDrilldownOffset] = useState(0);
+  const drilldownPageSize = 100;
   const [reasonStatsLoading, setReasonStatsLoading] = useState(false);
   const [orderReasonStats, setOrderReasonStats] = useState<{
     cancellation_total: number;
@@ -266,18 +268,20 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
     URL.revokeObjectURL(url);
   };
 
-  const loadDrilldownOrders = async (status: string, title?: string, reasonFilter?: string) => {
+  const loadDrilldownOrders = async (status: string, title?: string, reasonFilter?: string, offset = 0) => {
     setDrilldownLoading(true);
     if (title) setDrilldownTitle(title);
     setDrilldownStatus(status);
     setDrilldownReasonFilter(reasonFilter || '');
+    setDrilldownOffset(offset);
     try {
       const res = await getAnalyticsOrdersList({
         ...(dateFrom && dateTo ? { date_from: dateFrom, date_to: dateTo } : { period: String(period) }),
         status,
         reason_filter: reasonFilter || undefined,
         department_id: departmentId,
-        limit: 300,
+        limit: drilldownPageSize,
+        offset,
       });
       setDrilldownOrders(res.data?.orders ?? []);
       setDrilldownSummary(res.data?.summary ?? { total_orders: 0, total_revenue: 0 });
@@ -1139,7 +1143,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
                 <select
                   className="reports-filter-input"
                   value={drilldownStatus}
-                  onChange={(e) => void loadDrilldownOrders(e.target.value, undefined, drilldownReasonFilter || undefined)}
+                  onChange={(e) => void loadDrilldownOrders(e.target.value, undefined, drilldownReasonFilter || undefined, 0)}
                 >
                   <option value="all">Все</option>
                   <option value="revenue">В выручке</option>
@@ -1151,9 +1155,34 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
                 </select>
               </label>
               <div className="reports-user-info">
-                Заказов: <b>{drilldownSummary.total_orders}</b> • Сумма: <b>{drilldownSummary.total_revenue.toLocaleString('ru-RU')} BYN</b>
+                Всего заказов: <b>{drilldownSummary.total_orders}</b> • Общая сумма: <b>{Number(drilldownSummary.total_revenue || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BYN</b>
               </div>
             </div>
+            {drilldownSummary.total_orders > drilldownPageSize && (
+              <div className="reports-drilldown-pagination">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  disabled={drilldownOffset === 0 || drilldownLoading}
+                  onClick={() => void loadDrilldownOrders(drilldownStatus, undefined, drilldownReasonFilter || undefined, Math.max(0, drilldownOffset - drilldownPageSize))}
+                >
+                  ← Назад
+                </Button>
+                <span className="reports-drilldown-pagination__info">
+                  {drilldownOffset + 1}–{Math.min(drilldownOffset + drilldownPageSize, drilldownSummary.total_orders)} из {drilldownSummary.total_orders}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  disabled={drilldownOffset + drilldownPageSize >= drilldownSummary.total_orders || drilldownLoading}
+                  onClick={() => void loadDrilldownOrders(drilldownStatus, undefined, drilldownReasonFilter || undefined, drilldownOffset + drilldownPageSize)}
+                >
+                  Вперёд →
+                </Button>
+              </div>
+            )}
             <div className="reports-drilldown-table-wrap">
               {drilldownLoading ? (
                 <div className="reports-user-info">Загрузка...</div>

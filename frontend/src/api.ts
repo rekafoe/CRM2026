@@ -322,10 +322,10 @@ export const getOrderStatusFunnelAnalytics = (params?: AnalyticsPeriodParams) =>
     };
   }>('/reports/analytics/orders/status-funnel', { params });
 
-export const getAnalyticsOrdersList = (params?: AnalyticsPeriodParams & { status?: string; reason_filter?: string; department_id?: number; limit?: number }) =>
+export const getAnalyticsOrdersList = (params?: AnalyticsPeriodParams & { status?: string; reason_filter?: string; department_id?: number; limit?: number; offset?: number }) =>
   api.get<{
     period: { startDate: string; endDate?: string };
-    filters: { status: string; reason_filter?: string | null; department_id: number | null; limit: number };
+    filters: { status: string; reason_filter?: string | null; department_id: number | null; limit: number; offset: number };
     summary: { total_orders: number; total_revenue: number };
     orders: Array<{
       id: number;
