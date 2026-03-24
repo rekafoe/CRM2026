@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useReducer, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order } from '../types';
-import { getOrders, getOrderPoolSync, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder, getOrderStatuses, getOperatorsToday, updateOrderItem } from '../api';
+import { getOrders, getOrderPoolSync, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder, getOperatorsToday, updateOrderItem } from '../api';
+import { useOrderStatuses } from '../hooks/useOrderStatuses';
 
 const ORDER_POOL_LAST_SEEN_KEY = 'orderPoolLastSeenAt';
 import { parseNumberFlexible } from '../utils/numberInput';
@@ -214,7 +215,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [issuingOrderId, setIssuingOrderId] = useState<number | null>(null);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [operatorsToday, setOperatorsToday] = useState<Array<{ id: number; name: string }>>([]);
-  const [orderStatuses, setOrderStatuses] = useState<Array<{ id: number; name: string; color?: string; sort_order: number }>>([]);
+  const { statuses: orderStatuses } = useOrderStatuses();
   const [filters, dispatchFilters] = useReducer(filtersReducer, initialFilters);
   const orderIdsRef = useRef<Set<number>>(new Set());
   const selectedItems = selectedOrder?.items ?? [];
@@ -318,7 +319,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     if (isInitialized) return;
     loadOrders().then(() => setIsInitialized(true));
     getUsers().then(res => setAllUsers(res.data)).catch(err => logger.error('Failed to load users', err));
-    getOrderStatuses().then(res => setOrderStatuses(res.data ?? [])).catch(err => logger.error('Failed to load order statuses', err));
+    // статусы загружаются через useOrderStatuses (кэшируются на сессию)
   }, [isInitialized, loadOrders, logger]);
 
   const today = useMemo(() => {

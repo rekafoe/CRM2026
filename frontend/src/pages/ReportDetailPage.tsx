@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getFullDailyReport, updateOrderStatus, deleteOrder, getOrderStatuses, duplicateOrder } from '../api';
+import { getFullDailyReport, updateOrderStatus, deleteOrder, duplicateOrder } from '../api';
+import { useOrderStatuses } from '../hooks/useOrderStatuses';
 import { Order, DailyReport } from '../types';
 import { ProgressBar } from '../components/order/ProgressBar';
 import { OrderItem } from '../components/OrderItem';
@@ -18,7 +19,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
   onBack 
 }) => {
   const [report, setReport] = useState<DailyReport | null>(null);
-  const [statuses, setStatuses] = useState<Array<{ id: number; name: string; color?: string; sort_order: number }>>([]);
+  const { statuses } = useOrderStatuses();
   const [isLoading, setIsLoading] = useState(true);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const { requestReason, ReasonPromptModalElement } = useReasonPrompt();
@@ -35,9 +36,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
       const reportRes = await getFullDailyReport(reportDate, userId);
       setReport(reportRes.data);
 
-      // Загружаем статусы
-      const statusesRes = await getOrderStatuses();
-      setStatuses(statusesRes.data);
+      // статусы загружаются через useOrderStatuses (кэшируются на сессию)
     } catch (error) {
       console.error('Error loading report data:', error);
     } finally {
