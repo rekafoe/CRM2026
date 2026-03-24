@@ -39,11 +39,12 @@ export class LayoutCalculationService {
 
   /**
    * Проверяет, помещается ли продукт на лист
-   * Проверяет оба варианта: обычный и с поворотом на 90°
    * @param customMarginMm — отступ с каждой стороны (мм). По умолчанию 5 мм. Для плоттерной резки — 15 мм.
+   * @param customGapMm — зазор между стикерами (мм). По умолчанию 2 мм.
    */
-  static calculateLayout(productSize: ProductSize, sheetSize: SheetSize, customMarginMm?: number): LayoutResult {
+  static calculateLayout(productSize: ProductSize, sheetSize: SheetSize, customMarginMm?: number, customGapMm?: number): LayoutResult {
     const margin = customMarginMm ?? this.MARGINS.printerMargins;
+    const gap = customGapMm ?? this.MARGINS.layoutGap;
     const availableWidth = sheetSize.width - (margin * 2);
     const availableHeight = sheetSize.height - (margin * 2);
 
@@ -53,19 +54,21 @@ export class LayoutCalculationService {
       productSize.height,
       availableWidth,
       availableHeight,
-      sheetSize
+      sheetSize,
+      gap
     );
 
     // Вариант 2: с поворотом на 90°
     const variant2 = this.calculateSingleLayout(
-      productSize.height,  // поворот: высота становится шириной
-      productSize.width,   // поворот: ширина становится высотой
+      productSize.height,
+      productSize.width,
       availableWidth,
       availableHeight,
-      sheetSize
+      sheetSize,
+      gap
     );
 
-    // Выбираем вариант с меньшими отходами (более эффективное использование листа)
+    // Выбираем вариант с меньшими отходами
     const selected = variant1.wastePercentage <= variant2.wastePercentage ? variant1 : variant2;
 
     // Специальное правило для визиток 55×85: всегда поворот для 21 шт на лист
@@ -84,11 +87,12 @@ export class LayoutCalculationService {
     itemHeight: number,
     availableWidth: number,
     availableHeight: number,
-    sheetSize: SheetSize
+    sheetSize: SheetSize,
+    gap?: number
   ): LayoutResult {
-    // Отступ для раскладки: ширина + 2мм, высота + 2мм
-    const cols = Math.floor(availableWidth / (itemWidth + this.MARGINS.layoutGap));
-    const rows = Math.floor(availableHeight / (itemHeight + this.MARGINS.layoutGap));
+    const layoutGap = gap ?? this.MARGINS.layoutGap;
+    const cols = Math.floor(availableWidth / (itemWidth + layoutGap));
+    const rows = Math.floor(availableHeight / (itemHeight + layoutGap));
 
     // console.log(`🧮 Расчет раскладки ${itemWidth}×${itemHeight} на листе ${sheetSize.width}×${sheetSize.height}`);
     // console.log(`   Доступный размер: ${availableWidth}×${availableHeight} (принтер: ${this.MARGINS.printerMargins}мм с каждой стороны)`);
@@ -99,8 +103,8 @@ export class LayoutCalculationService {
     const fitsOnSheet = actualItemsPerSheet > 0;
 
     // Расчет процента отходов
-    const usedWidth = cols * (itemWidth + this.MARGINS.layoutGap) - this.MARGINS.layoutGap;
-    const usedHeight = rows * (itemHeight + this.MARGINS.layoutGap) - this.MARGINS.layoutGap;
+    const usedWidth = cols * (itemWidth + layoutGap) - layoutGap;
+    const usedHeight = rows * (itemHeight + layoutGap) - layoutGap;
     const usedArea = usedWidth * usedHeight;
     const totalArea = availableWidth * availableHeight;
     const wastePercentage = ((totalArea - usedArea) / totalArea) * 100;
@@ -127,13 +131,14 @@ export class LayoutCalculationService {
   /**
    * Находит оптимальный размер листа для продукта
    * @param customMarginMm — отступ с каждой стороны (мм). По умолчанию 5 мм.
+   * @param customGapMm — зазор между стикерами (мм). По умолчанию 2 мм.
    */
-  static findOptimalSheetSize(productSize: ProductSize, customMarginMm?: number): LayoutResult {
+  static findOptimalSheetSize(productSize: ProductSize, customMarginMm?: number, customGapMm?: number): LayoutResult {
     let bestResult: LayoutResult | null = null;
     let bestEfficiency = 0;
 
     for (const [sheetName, sheetSize] of Object.entries(this.SHEET_SIZES)) {
-      const result = this.calculateLayout(productSize, sheetSize, customMarginMm);
+      const result = this.calculateLayout(productSize, sheetSize, customMarginMm, customGapMm);
       
       if (result.fitsOnSheet) {
         const efficiency = result.itemsPerSheet / (result.wastePercentage + 1);

@@ -106,7 +106,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     return effectiveConfig.common_allowed_material_ids ?? []
   }, [selected, useOwnMaterials, effectiveConfig.common_allowed_material_ids])
 
-  // Превью раскладки для текущего размера (с учётом cut_margin_mm)
+  // Превью раскладки для текущего размера (с учётом cut_margin_mm и cut_gap_mm)
   const layoutPreview = useMemo(() => {
     if (!selected || !selected.width_mm || !selected.height_mm) return null
     const firstMat = allMaterials.find(
@@ -120,6 +120,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       { width: selected.width_mm, height: selected.height_mm },
       { width: Number((firstMat as any).sheet_width), height: Number((firstMat as any).sheet_height) },
       selected.cut_margin_mm,
+      selected.cut_gap_mm,
     )
     return {
       n,
@@ -775,6 +776,23 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                       />
                       <div className="text-muted text-xs mt-1">Пусто = 5 мм (стандарт). Для плоттерной резки — 15 мм.</div>
                     </FormField>
+                    <FormField label="Зазор между изделиями, мм">
+                      <input
+                        className="form-input form-input--compact"
+                        type="number"
+                        min="0"
+                        max="30"
+                        placeholder="2"
+                        title="Зазор между изделиями при раскладке (мм). По умолчанию 2 мм."
+                        value={selected.cut_gap_mm !== undefined ? String(selected.cut_gap_mm) : ''}
+                        onChange={(e) =>
+                          updateSize(selected.id, {
+                            cut_gap_mm: e.target.value !== '' ? Number(e.target.value) : undefined,
+                          })
+                        }
+                      />
+                      <div className="text-muted text-xs mt-1">Пусто = 2 мм (стандарт).</div>
+                    </FormField>
                   </div>
                   {layoutPreview && (
                     <div className="simplified-layout-preview">
@@ -782,8 +800,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                       <span className="simplified-layout-preview__value">
                         <strong>{layoutPreview.n} шт/лист</strong>
                         <span className="text-muted"> · {layoutPreview.matName} ({layoutPreview.sw}×{layoutPreview.sh} мм)</span>
-                        {selected.cut_margin_mm != null && selected.cut_margin_mm !== 5 && (
+                        {(selected.cut_margin_mm != null && selected.cut_margin_mm !== 5) && (
                           <span style={{ color: '#e65100', marginLeft: 6 }}>отступ {selected.cut_margin_mm} мм</span>
+                        )}
+                        {(selected.cut_gap_mm != null && selected.cut_gap_mm !== 2) && (
+                          <span style={{ color: '#e65100', marginLeft: 6 }}>зазор {selected.cut_gap_mm} мм</span>
                         )}
                       </span>
                     </div>

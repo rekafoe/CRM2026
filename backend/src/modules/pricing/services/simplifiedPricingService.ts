@@ -335,6 +335,9 @@ export class SimplifiedPricingService {
     const customMarginMm: number | undefined = (selectedSize as any).cut_margin_mm != null
       ? Number((selectedSize as any).cut_margin_mm)
       : undefined;
+    const customGapMm: number | undefined = (selectedSize as any).cut_gap_mm != null
+      ? Number((selectedSize as any).cut_gap_mm)
+      : undefined;
 
     // Учёт раскладки: use_layout=false → 1 изделие на лист (без оптимизации, для крупноформатных и т.п.)
     const useLayout = simplifiedConfig.use_layout !== false;
@@ -357,19 +360,20 @@ export class SimplifiedPricingService {
       const mw = materialSheet?.sheet_width != null && materialSheet.sheet_width > 0 ? Number(materialSheet.sheet_width) : 0;
       const mh = materialSheet?.sheet_height != null && materialSheet.sheet_height > 0 ? Number(materialSheet.sheet_height) : 0;
       if (mw > 0 && mh > 0) {
-        layoutCheck = LayoutCalculationService.calculateLayout(productSize, { width: mw, height: mh }, customMarginMm);
+        layoutCheck = LayoutCalculationService.calculateLayout(productSize, { width: mw, height: mh }, customMarginMm, customGapMm);
         logger.info('Раскладка по размеру листа выбранного материала', {
           material_id: normalizedConfig.material_id,
           sheet_width: mw,
           sheet_height: mh,
           itemsPerSheet: layoutCheck.itemsPerSheet,
           cut_margin_mm: customMarginMm,
+          cut_gap_mm: customGapMm,
         });
       } else {
-        layoutCheck = LayoutCalculationService.findOptimalSheetSize(productSize, customMarginMm);
+        layoutCheck = LayoutCalculationService.findOptimalSheetSize(productSize, customMarginMm, customGapMm);
       }
     } else {
-      layoutCheck = LayoutCalculationService.findOptimalSheetSize(productSize, customMarginMm);
+      layoutCheck = LayoutCalculationService.findOptimalSheetSize(productSize, customMarginMm, customGapMm);
     }
     const itemsPerSheet = Math.max(1, layoutCheck.itemsPerSheet || 1);
 

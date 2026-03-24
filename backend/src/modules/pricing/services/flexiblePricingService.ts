@@ -197,6 +197,9 @@ export class FlexiblePricingService {
       const flexCutMarginMm: number | undefined = (configuration as any).cut_margin_mm != null
         ? Number((configuration as any).cut_margin_mm)
         : undefined;
+      const flexCutGapMm: number | undefined = (configuration as any).cut_gap_mm != null
+        ? Number((configuration as any).cut_gap_mm)
+        : undefined;
       let layout: LayoutResult;
       if (configuration.material_id) {
         const db = await getDb();
@@ -207,19 +210,20 @@ export class FlexiblePricingService {
         const mw = materialSheet?.sheet_width != null && materialSheet.sheet_width > 0 ? Number(materialSheet.sheet_width) : 0;
         const mh = materialSheet?.sheet_height != null && materialSheet.sheet_height > 0 ? Number(materialSheet.sheet_height) : 0;
         if (mw > 0 && mh > 0) {
-          layout = LayoutCalculationService.calculateLayout(productSize, { width: mw, height: mh }, flexCutMarginMm);
+          layout = LayoutCalculationService.calculateLayout(productSize, { width: mw, height: mh }, flexCutMarginMm, flexCutGapMm);
           logger.info('Раскладка по размеру листа выбранного материала', {
             material_id: configuration.material_id,
             sheet_width: mw,
             sheet_height: mh,
             itemsPerSheet: layout.itemsPerSheet,
             cut_margin_mm: flexCutMarginMm,
+            cut_gap_mm: flexCutGapMm,
           });
         } else {
-          layout = LayoutCalculationService.findOptimalSheetSize(productSize, flexCutMarginMm);
+          layout = LayoutCalculationService.findOptimalSheetSize(productSize, flexCutMarginMm, flexCutGapMm);
         }
       } else {
-        layout = LayoutCalculationService.findOptimalSheetSize(productSize, flexCutMarginMm);
+        layout = LayoutCalculationService.findOptimalSheetSize(productSize, flexCutMarginMm, flexCutGapMm);
       }
       
       logger.info('📊 Результат расчета раскладки', {

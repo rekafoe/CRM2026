@@ -174,6 +174,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                       sides_mode: m.sides_mode,
                       ...(layoutMaterialId != null ? { material_id: layoutMaterialId } : {}),
                       ...(selected.cut_margin_mm != null ? { cut_margin_mm: selected.cut_margin_mm } : {}),
+                      ...(selected.cut_gap_mm != null ? { cut_gap_mm: selected.cut_gap_mm } : {}),
                     },
                   })
                   const data = r.data as { items_per_sheet?: number; tiers?: Array<{ min_qty: number; max_qty?: number; unit_price: number }> }

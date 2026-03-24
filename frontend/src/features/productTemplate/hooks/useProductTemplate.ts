@@ -37,6 +37,8 @@ export type SimplifiedSizeConfig = {
   max_qty?: number;
   /** Отступ под резку (мм) с каждой стороны. По умолчанию 5 мм. Для плоттерной резки — 15 мм. */
   cut_margin_mm?: number;
+  /** Зазор между стикерами при раскладке (мм). По умолчанию 2 мм. */
+  cut_gap_mm?: number;
   default_print?: Partial<SimplifiedPrintKey>;
   print_prices: SimplifiedPrintPrice[];
   allowed_material_ids: number[];

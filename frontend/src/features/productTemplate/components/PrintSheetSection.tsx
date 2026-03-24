@@ -15,11 +15,11 @@ export function computeItemsPerSheet(
   item: { width: number; height: number },
   sheet: { width: number; height: number },
   cutMarginMm?: number,
+  cutGapMm?: number,
 ): number {
   const MARGINS = {
     bleed: 2,
-    gap: 2,
-    // Отступ с каждой стороны: дефолт 5 мм (захват принтера), для плоттерной резки — 15 мм
+    gap: cutGapMm != null && cutGapMm >= 0 ? cutGapMm : 2,
     edgeMargin: cutMarginMm != null && cutMarginMm > 0 ? cutMarginMm : 5,
   }
 
@@ -103,9 +103,10 @@ const PrintSheetSection: React.FC<{
   trimHeight: string
   saving: boolean
   cutMarginMm?: number
+  cutGapMm?: number
   onChange: (patch: Partial<{ preset: Preset; width: string; height: string }>) => void
   onSave: () => Promise<void> | void
-}> = ({ preset, width, height, trimWidth, trimHeight, saving, cutMarginMm, onChange, onSave }) => {
+}> = ({ preset, width, height, trimWidth, trimHeight, saving, cutMarginMm, cutGapMm, onChange, onSave }) => {
   const sheet = useMemo(() => {
     const presetSize = getPresetSize(preset)
     const w = (presetSize?.width ?? Number(width)) || 0
@@ -115,8 +116,8 @@ const PrintSheetSection: React.FC<{
 
   const item = useMemo(() => ({ width: Number(trimWidth) || 0, height: Number(trimHeight) || 0 }), [trimWidth, trimHeight])
   const itemsPerSheet = useMemo(
-    () => (sheet.width > 0 && sheet.height > 0 && item.width > 0 && item.height > 0) ? computeItemsPerSheet(item, sheet, cutMarginMm) : 0,
-    [item, sheet, cutMarginMm],
+    () => (sheet.width > 0 && sheet.height > 0 && item.width > 0 && item.height > 0) ? computeItemsPerSheet(item, sheet, cutMarginMm, cutGapMm) : 0,
+    [item, sheet, cutMarginMm, cutGapMm],
   )
 
   const errors = useMemo(() => {
