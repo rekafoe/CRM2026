@@ -561,3 +561,232 @@
     min-height: 140px;
   }
 }
+
+/* ── Fabric canvas wrapper ── */
+.fabric-canvas-outer {
+  background: #e5e7eb;
+  padding: 32px;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.fabric-canvas-inner {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+  line-height: 0;
+}
+
+.fabric-guides-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* ── Toolbar additions ── */
+.design-editor-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-color, #e5e7eb);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.design-editor-toolbar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-primary, #111827);
+  transition: background 0.15s, border-color 0.15s;
+}
+.design-editor-toolbar-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.design-editor-toolbar-icon-btn:hover:not(:disabled) {
+  background: var(--bg-hover, #f3f4f6);
+}
+.design-editor-toolbar-icon-btn.is-active {
+  background: var(--color-primary, #2563eb);
+  border-color: var(--color-primary, #2563eb);
+  color: #fff;
+}
+
+.design-editor-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.design-editor-text-format {
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.design-editor-color-input {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  padding: 2px;
+  cursor: pointer;
+  background: #fff;
+}
+
+.design-editor-fmt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary, #111827);
+  transition: background 0.15s, border-color 0.15s;
+}
+.design-editor-fmt-btn:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+.design-editor-fmt-btn.is-active {
+  background: var(--color-primary, #2563eb);
+  border-color: var(--color-primary, #2563eb);
+  color: #fff;
+}
+
+.design-editor-align-group {
+  display: flex;
+  gap: 2px;
+}
+
+.design-editor-zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.design-editor-zoom-label {
+  padding: 4px 8px;
+  font-size: 12px;
+  min-width: 46px;
+  text-align: center;
+  border: none;
+  background: #fff;
+  cursor: pointer;
+  color: var(--text-secondary, #6b7280);
+}
+.design-editor-zoom-label:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+/* ── Panel styles ── */
+.design-editor-text-panel-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.design-editor-panel-row {
+  display: flex;
+  gap: 8px;
+}
+
+.design-editor-panel-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.design-editor-panel-field--grow {
+  flex: 1;
+}
+
+.design-editor-panel-field--size {
+  width: 72px;
+  flex-shrink: 0;
+}
+
+.design-editor-panel-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.design-editor-text-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.design-editor-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.design-editor-color-input--large {
+  width: 40px;
+  height: 36px;
+}
+
+.design-editor-color-value {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  font-family: monospace;
+}
+
+.design-editor-panel-add-text {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+/* ── Shapes panel ── */
+.design-editor-shapes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.design-editor-shape-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.design-editor-shape-btn:hover {
+  border-color: var(--color-primary, #2563eb);
+  background: #eff6ff;
+}
+
+.design-editor-shape-preview {
+  line-height: 0;
+}
+
+.design-editor-shape-label {
+  font-size: 11px;
+  color: var(--text-secondary, #6b7280);
+}

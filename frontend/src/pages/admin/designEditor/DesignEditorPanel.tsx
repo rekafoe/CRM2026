@@ -1,11 +1,11 @@
 import React from 'react';
 import { SIDEBAR_ITEMS } from './constants';
-import type { SidebarSection } from './types';
+import type { SidebarSection, SelectedObjProps } from './types';
 import { PhotoPanel } from './panels/PhotoPanel';
 import { TextPanel } from './panels/TextPanel';
+import { ShapesPanel } from './panels/ShapesPanel';
 import { CollagesPanel } from './panels/CollagesPanel';
 import { PlaceholderPanel } from './panels/PlaceholderPanel';
-import type { CanvasText } from './types';
 
 interface DesignEditorPanelProps {
   section: SidebarSection;
@@ -23,10 +23,17 @@ interface DesignEditorPanelProps {
   onPhotoHideUsedChange?: (v: boolean) => void;
   // Text
   onAddText?: () => void;
-  selectedText?: CanvasText | null;
+  selectedObj?: SelectedObjProps | null;
   onTextChange?: (text: string) => void;
   onFontChange?: (fontFamily: string) => void;
   onFontSizeChange?: (fontSize: number) => void;
+  onTextColorChange?: (color: string) => void;
+  onFontWeightToggle?: () => void;
+  onFontStyleToggle?: () => void;
+  onUnderlineToggle?: () => void;
+  onTextAlignChange?: (align: string) => void;
+  // Shapes
+  onAddShape?: (type: 'rect' | 'circle' | 'line' | 'triangle') => void;
   // Collages
   collagePhotoCount?: number;
   onCollagePhotoCountChange?: (v: number) => void;
@@ -52,10 +59,16 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
   photoHideUsed = false,
   onPhotoHideUsedChange,
   onAddText,
-  selectedText,
+  selectedObj,
   onTextChange,
   onFontChange,
   onFontSizeChange,
+  onTextColorChange,
+  onFontWeightToggle,
+  onFontStyleToggle,
+  onUnderlineToggle,
+  onTextAlignChange,
+  onAddShape,
   collagePhotoCount = 3,
   onCollagePhotoCountChange,
   collageFilterSuitable = false,
@@ -67,7 +80,13 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
 }) => {
   const title = SIDEBAR_ITEMS.find((i) => i.id === section)?.label ?? '';
 
-  if (section === 'collages' && onCollagePhotoCountChange && onCollageFilterSuitableChange && onCollagePaddingChange && onCollageSelectTemplate != null) {
+  if (
+    section === 'collages' &&
+    onCollagePhotoCountChange &&
+    onCollageFilterSuitableChange &&
+    onCollagePaddingChange &&
+    onCollageSelectTemplate != null
+  ) {
     return (
       <CollagesPanel
         onClose={onClose}
@@ -83,7 +102,15 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
     );
   }
 
-  if (section === 'photo' && onAddImage && onPhotoDrop && onPhotoDragOver && onPhotoSortChange && onPhotoAutofillChange && onPhotoHideUsedChange) {
+  if (
+    section === 'photo' &&
+    onAddImage &&
+    onPhotoDrop &&
+    onPhotoDragOver &&
+    onPhotoSortChange &&
+    onPhotoAutofillChange &&
+    onPhotoHideUsedChange
+  ) {
     return (
       <PhotoPanel
         onAddImage={onAddImage}
@@ -101,20 +128,46 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
     );
   }
 
-  if (section === 'text' && onAddText && onTextChange && onFontChange && onFontSizeChange) {
+  if (
+    section === 'text' &&
+    onAddText &&
+    onTextChange &&
+    onFontChange &&
+    onFontSizeChange &&
+    onTextColorChange &&
+    onFontWeightToggle &&
+    onFontStyleToggle &&
+    onUnderlineToggle &&
+    onTextAlignChange
+  ) {
     return (
       <TextPanel
         onAddText={onAddText}
-        selectedText={selectedText ?? null}
+        selectedObj={selectedObj ?? null}
         onTextChange={onTextChange}
         onFontChange={onFontChange}
         onFontSizeChange={onFontSizeChange}
+        onTextColorChange={onTextColorChange}
+        onFontWeightToggle={onFontWeightToggle}
+        onFontStyleToggle={onFontStyleToggle}
+        onUnderlineToggle={onUnderlineToggle}
+        onTextAlignChange={onTextAlignChange}
         onClose={onClose}
       />
     );
   }
 
-  const placeholderSections: SidebarSection[] = ['templates', 'background', 'stickers', 'cliparts', 'frames'];
+  if (section === 'shapes' && onAddShape) {
+    return <ShapesPanel onAddShape={onAddShape} onClose={onClose} />;
+  }
+
+  const placeholderSections: SidebarSection[] = [
+    'templates',
+    'background',
+    'stickers',
+    'cliparts',
+    'frames',
+  ];
   if (placeholderSections.includes(section)) {
     return <PlaceholderPanel title={title} onClose={onClose} />;
   }

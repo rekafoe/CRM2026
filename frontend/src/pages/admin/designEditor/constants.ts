@@ -3,18 +3,15 @@ import type { IconName } from '../../../components/ui/AppIcon';
 import type { DesignPage } from './types';
 
 /** Пустая страница по умолчанию */
-export const EMPTY_PAGE: DesignPage = { images: [], texts: [], photoFields: [] };
+export const EMPTY_PAGE: DesignPage = { fabricJSON: {} };
 
 /** Масштаб: 1 мм = N пикселей на экране (для превью) */
 export const MM_TO_PX = 96 / 25.4;
 
-/** Отступ области страницы от края Stage (px) */
-export const PAGE_OFFSET = 40;
-
-/** Отступ безопасной зоны от линии обрезки (мм) */
+/** Безопасная зона от линии обрезки (мм) */
 export const SAFE_ZONE_MM = 5;
 
-/** На узких экранах снижаем разрешение экспорта (мобильные) */
+/** Множитель экспорта для PNG (2x = retina) */
 export const getExportPixelRatio = () =>
   typeof window !== 'undefined' && window.innerWidth <= 768 ? 1 : 2;
 
@@ -30,10 +27,14 @@ export const TEXT_FONTS: { value: string; label: string }[] = [
   { value: 'PT Serif', label: 'PT Serif' },
 ];
 
+/** Кастомные свойства Fabric-объектов, которые сохраняются в JSON */
+export const FABRIC_CUSTOM_PROPS = ['id', 'isBackground', 'isPhotoField', 'locked'];
+
 /** Пункты меню сайдбара */
 export const SIDEBAR_ITEMS: { id: SidebarSection; label: string; icon: IconName }[] = [
   { id: 'photo', label: 'Фото', icon: 'image' },
   { id: 'text', label: 'Текст', icon: 'edit' },
+  { id: 'shapes', label: 'Фигуры', icon: 'box' },
   { id: 'templates', label: 'Шаблоны', icon: 'layers' },
   { id: 'background', label: 'Фон', icon: 'camera' },
   { id: 'collages', label: 'Коллажи', icon: 'scissors' },

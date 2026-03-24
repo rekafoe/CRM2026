@@ -1,48 +1,28 @@
-/** Элемент канваса: изображение */
-export interface CanvasImage {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  src: string;
-}
-
-/** Элемент канваса: текст */
-export interface CanvasText {
-  id: string;
-  x: number;
-  y: number;
-  text: string;
-  fontSize?: number;
-  fontFamily?: string;
-  /** Масштаб после ресайза через Transformer */
-  scaleX?: number;
-  scaleY?: number;
-}
-
-/** Поле для фото: пустая область, в которую можно перетащить изображение */
-export interface CanvasPhotoField {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  /** После дропа/выбора фото — URL изображения */
-  src?: string;
-}
-
-/** Данные одной страницы макета */
+/** Данные одной страницы макета (Fabric.js JSON snapshot) */
 export interface DesignPage {
-  images: CanvasImage[];
-  texts: CanvasText[];
-  photoFields: CanvasPhotoField[];
+  fabricJSON: Record<string, unknown>;
+}
+
+/** Свойства выбранного объекта на холсте (для тулбара / панелей) */
+export interface SelectedObjProps {
+  type: 'IText' | 'image' | 'rect' | 'circle' | 'line' | 'triangle' | 'photoField' | 'other';
+  text?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  fontWeight?: string;
+  fontStyle?: string;
+  underline?: boolean;
+  textAlign?: string;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
 }
 
 /** Раздел сайдбара редактора */
 export type SidebarSection =
   | 'photo'
   | 'text'
+  | 'shapes'
   | 'templates'
   | 'background'
   | 'collages'
@@ -56,9 +36,5 @@ export interface DesignState {
   pageWidth: number;
   pageHeight: number;
   pageCount: number;
-  pages: Array<{
-    images: Array<Pick<CanvasImage, 'id' | 'x' | 'y' | 'width' | 'height'>>;
-    texts: Array<Pick<CanvasText, 'id' | 'x' | 'y' | 'text' | 'fontSize' | 'fontFamily'>>;
-    photoFields: Array<Pick<CanvasPhotoField, 'id' | 'x' | 'y' | 'width' | 'height'> & { src?: string }>;
-  }>;
+  pages: Array<{ fabricJSON: Record<string, unknown> }>;
 }
