@@ -38,14 +38,6 @@ export const VALIDATION = {
 // Используйте: getPaperTypesFromWarehouse() из calculatorMaterialService
 
 // Статусы заказов
-export const ORDER_STATUSES = {
-  NEW: { id: 1, name: 'Новый', color: '#9e9e9e' },
-  IN_PRODUCTION: { id: 2, name: 'В производстве', color: '#1976d2' },
-  READY_TO_SHIP: { id: 3, name: 'Готов к отправке', color: '#ffa000' },
-  SHIPPED: { id: 4, name: 'Отправлен', color: '#7b1fa2' },
-  COMPLETED: { id: 5, name: 'Завершён', color: '#2e7d32' },
-} as const;
-
 // Роли пользователей
 export const USER_ROLES = {
   ADMIN: 'admin',

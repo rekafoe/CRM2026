@@ -5,6 +5,7 @@ import { useLogger } from '../../utils/logger';
 import { useToastNotifications } from '../Toast';
 import { LoadingSpinner } from '../LoadingSpinner';
 import { ErrorDisplay } from '../ErrorStates';
+import { useOrderStatuses } from '../../hooks/useOrderStatuses';
 import './OrdersManagement.css';
 
 interface OrdersManagementProps {
@@ -78,14 +79,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
     department_id: ''
   });
   
-  // Статусы заказов
-  const orderStatuses = [
-    { id: 1, name: 'Новый', color: '#9e9e9e' },
-    { id: 2, name: 'В производстве', color: '#1976d2' },
-    { id: 3, name: 'Готов к отправке', color: '#ffa000' },
-    { id: 4, name: 'Отправлен', color: '#7b1fa2' },
-    { id: 5, name: 'Завершён', color: '#2e7d32' }
-  ];
+  const { statuses: orderStatuses } = useOrderStatuses();
 
   // Загрузка заказов
   const loadOrders = useCallback(async (page = 1) => {

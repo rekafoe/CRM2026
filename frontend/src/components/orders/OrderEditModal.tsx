@@ -3,6 +3,7 @@ import { Order } from '../../types';
 import { useLogger } from '../../utils/logger';
 import { useToastNotifications } from '../Toast';
 import { LoadingSpinner } from '../LoadingSpinner';
+import { useOrderStatuses } from '../../hooks/useOrderStatuses';
 import './OrderEditModal.css';
 
 interface OrderEditModalProps {
@@ -42,14 +43,7 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
   
   const [errors, setErrors] = useState<Record<string, string>>({});
   
-  // Статусы заказов
-  const orderStatuses = [
-    { id: 1, name: 'Новый', color: '#9e9e9e' },
-    { id: 2, name: 'В производстве', color: '#1976d2' },
-    { id: 3, name: 'Готов к отправке', color: '#ffa000' },
-    { id: 4, name: 'Отправлен', color: '#7b1fa2' },
-    { id: 5, name: 'Завершён', color: '#2e7d32' }
-  ];
+  const { statuses: orderStatuses } = useOrderStatuses();
 
   // Инициализация формы при изменении заказа
   useEffect(() => {
