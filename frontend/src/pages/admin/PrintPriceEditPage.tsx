@@ -751,7 +751,7 @@ export const PrintPriceEditPage: React.FC = () => {
                         style={
                           tierModal.anchorElement
                             ? {
-                                position: 'absolute',
+                                position: 'fixed',
                                 top: `${tierModal.anchorElement.getBoundingClientRect().bottom + 5}px`,
                                 left: `${tierModal.anchorElement.getBoundingClientRect().left}px`,
                                 zIndex: 2003,
