@@ -129,22 +129,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     }
   }, [selected, allMaterials, effectiveAllowedMaterialIds])
 
-  // Превью раскладки для текущего размера (с учётом cut_margin_mm)
-  const layoutPreview = useMemo(() => {
-    if (!selected || !selected.width_mm || !selected.height_mm) return null
-    const matIds = effectiveAllowedMaterialIds
-    const mat = allMaterials.find(
-      (m: any) => matIds.includes(m.id) && Number(m.sheet_width) > 0 && Number(m.sheet_height) > 0,
-    )
-    if (!mat) return null
-    const n = computeItemsPerSheet(
-      { width: selected.width_mm, height: selected.height_mm },
-      { width: Number(mat.sheet_width), height: Number(mat.sheet_height) },
-      selected.cut_margin_mm,
-    )
-    return { n, matName: mat.name, sheetW: Number(mat.sheet_width), sheetH: Number(mat.sheet_height) }
-  }, [selected, effectiveAllowedMaterialIds, allMaterials])
-
   const otherSizesForPrintCopy = useMemo(
     () =>
       sizes
@@ -797,7 +781,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                       <span className="simplified-layout-preview__label">Раскладка</span>
                       <span className="simplified-layout-preview__value">
                         <strong>{layoutPreview.n} шт/лист</strong>
-                        <span className="text-muted"> · {layoutPreview.matName} ({layoutPreview.sheetW}×{layoutPreview.sheetH} мм)</span>
+                        <span className="text-muted"> · {layoutPreview.matName} ({layoutPreview.sw}×{layoutPreview.sh} мм)</span>
                         {selected.cut_margin_mm != null && selected.cut_margin_mm !== 5 && (
                           <span style={{ color: '#e65100', marginLeft: 6 }}>отступ {selected.cut_margin_mm} мм</span>
                         )}
