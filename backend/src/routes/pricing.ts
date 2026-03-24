@@ -366,6 +366,7 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
     material_id: materialIdQ,
     sheet_width_mm: layoutWq,
     sheet_height_mm: layoutHq,
+    cut_margin_mm: cutMarginQ,
   } = req.query
   if (!technology_code || !width_mm || !height_mm) {
     res.status(400).json({ error: 'technology_code, width_mm, height_mm обязательны' })
@@ -453,7 +454,8 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
       }
     }
 
-    const itemsPerSheet = calcItemsPerSheet(w, h, sheetW, sheetH)
+    const cutMarginMm = cutMarginQ != null && String(cutMarginQ).trim() !== '' ? Number(cutMarginQ) : undefined
+    const itemsPerSheet = calcItemsPerSheet(w, h, sheetW, sheetH, cutMarginMm)
     const tiers = await db.all<any>(`
       SELECT min_sheets, max_sheets, price_per_sheet FROM print_price_tiers
       WHERE print_price_id = ? AND price_mode = ?
@@ -476,8 +478,8 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
   }
 }))
 
-function calcItemsPerSheet(itemW: number, itemH: number, sheetW: number, sheetH: number): number {
-  const MARGIN = 5
+function calcItemsPerSheet(itemW: number, itemH: number, sheetW: number, sheetH: number, customMarginMm?: number): number {
+  const MARGIN = customMarginMm ?? 5
   const GAP = 2
   const aw = sheetW - MARGIN * 2
   const ah = sheetH - MARGIN * 2

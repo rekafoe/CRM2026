@@ -35,6 +35,10 @@ export type SimplifiedSizeConfig = {
   height_mm: number;
   min_qty?: number;
   max_qty?: number;
+  /** Отступ под резку (мм) с каждой стороны. По умолчанию 5 мм. Для наклеек с плоттером — 15 мм. */
+  cut_margin_mm?: number;
+  /** Отступ под резку (мм) с каждой стороны. По умолчанию 5 мм (принтерный отступ). Для плоттерной резки — 15 мм. */
+  cut_margin_mm?: number;
   default_print?: Partial<SimplifiedPrintKey>;
   print_prices: SimplifiedPrintPrice[];
   allowed_material_ids: number[];

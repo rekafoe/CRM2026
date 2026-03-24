@@ -11,18 +11,20 @@ export function getPresetSize(preset: Preset): { width: number; height: number }
   }
 }
 
-export function computeItemsPerSheet(item: { width: number; height: number }, sheet: { width: number; height: number }): number {
-  // Технические поля согласно layoutCalculationService
+export function computeItemsPerSheet(
+  item: { width: number; height: number },
+  sheet: { width: number; height: number },
+  cutMarginMm?: number,
+): number {
   const MARGINS = {
-    bleed: 2,      // 2мм на подрезку (bleed)
-    gap: 2,        // 2мм между элементами
-    gripper: 5     // 5мм на захват (только по ширине)
+    bleed: 2,
+    gap: 2,
+    // Отступ с каждой стороны: дефолт 5 мм (захват принтера), для плоттерной резки — 15 мм
+    edgeMargin: cutMarginMm != null && cutMarginMm > 0 ? cutMarginMm : 5,
   }
 
-  // Доступная область с учетом gripper margin (только по ширине)
-  // Не используем edge margins, так как они слишком строгие для некоторых размеров
-  const availableWidth = sheet.width - MARGINS.gripper
-  const availableHeight = sheet.height
+  const availableWidth = sheet.width - MARGINS.edgeMargin * 2
+  const availableHeight = sheet.height - MARGINS.edgeMargin * 2
 
   // Функция расчета для одной ориентации
   const calculateSingleLayout = (itemW: number, itemH: number): number => {
@@ -100,9 +102,10 @@ const PrintSheetSection: React.FC<{
   trimWidth: string
   trimHeight: string
   saving: boolean
+  cutMarginMm?: number
   onChange: (patch: Partial<{ preset: Preset; width: string; height: string }>) => void
   onSave: () => Promise<void> | void
-}> = ({ preset, width, height, trimWidth, trimHeight, saving, onChange, onSave }) => {
+}> = ({ preset, width, height, trimWidth, trimHeight, saving, cutMarginMm, onChange, onSave }) => {
   const sheet = useMemo(() => {
     const presetSize = getPresetSize(preset)
     const w = (presetSize?.width ?? Number(width)) || 0
@@ -111,7 +114,10 @@ const PrintSheetSection: React.FC<{
   }, [preset, width, height])
 
   const item = useMemo(() => ({ width: Number(trimWidth) || 0, height: Number(trimHeight) || 0 }), [trimWidth, trimHeight])
-  const itemsPerSheet = useMemo(() => (sheet.width > 0 && sheet.height > 0 && item.width > 0 && item.height > 0) ? computeItemsPerSheet(item, sheet) : 0, [item, sheet])
+  const itemsPerSheet = useMemo(
+    () => (sheet.width > 0 && sheet.height > 0 && item.width > 0 && item.height > 0) ? computeItemsPerSheet(item, sheet, cutMarginMm) : 0,
+    [item, sheet, cutMarginMm],
+  )
 
   const errors = useMemo(() => {
     const e: string[] = []
@@ -182,6 +188,7 @@ const PrintSheetSection: React.FC<{
           <div>
             <div>Изделие: {item.width}×{item.height} мм</div>
             <div>Лист: {sheet.width}×{sheet.height} мм {preset ? `(preset: ${preset})` : ''}</div>
+            {cutMarginMm != null && cutMarginMm !== 5 && <div style={{ color: '#e65100', fontSize: 12 }}>Отступ резки: {cutMarginMm} мм с каждой стороны</div>}
             <div><strong>Укладка:</strong> {itemsPerSheet > 0 ? `${itemsPerSheet} шт/лист` : '—'}</div>
             {errors.length > 0 && (
               <ul style={{ color: '#c62828', marginTop: 6 }}>

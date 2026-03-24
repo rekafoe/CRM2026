@@ -12,6 +12,7 @@ import { FinishingCard } from './FinishingCard'
 import { AddSizeModal, CopySizesModal } from './SizeModals'
 import { type Tier, defaultTiers, normalizeTiers } from '../utils/tierManagement'
 import { clonePrintBlockFromSize } from '../utils/clonePrintConfig'
+import { computeItemsPerSheet } from './PrintSheetSection'
 import './SimplifiedTemplateSection.css'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
@@ -104,6 +105,45 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     if (useOwnMaterials) return selected.allowed_material_ids ?? []
     return effectiveConfig.common_allowed_material_ids ?? []
   }, [selected, useOwnMaterials, effectiveConfig.common_allowed_material_ids])
+
+  // Превью раскладки для текущего размера (с учётом cut_margin_mm)
+  const layoutPreview = useMemo(() => {
+    if (!selected || !selected.width_mm || !selected.height_mm) return null
+    const firstMat = allMaterials.find(
+      (m: any) =>
+        effectiveAllowedMaterialIds.includes(m.id) &&
+        Number(m.sheet_width) > 0 &&
+        Number(m.sheet_height) > 0,
+    )
+    if (!firstMat) return null
+    const n = computeItemsPerSheet(
+      { width: selected.width_mm, height: selected.height_mm },
+      { width: Number((firstMat as any).sheet_width), height: Number((firstMat as any).sheet_height) },
+      selected.cut_margin_mm,
+    )
+    return {
+      n,
+      matName: (firstMat as any).name ?? '?',
+      sw: Number((firstMat as any).sheet_width),
+      sh: Number((firstMat as any).sheet_height),
+    }
+  }, [selected, allMaterials, effectiveAllowedMaterialIds])
+
+  // Превью раскладки для текущего размера (с учётом cut_margin_mm)
+  const layoutPreview = useMemo(() => {
+    if (!selected || !selected.width_mm || !selected.height_mm) return null
+    const matIds = effectiveAllowedMaterialIds
+    const mat = allMaterials.find(
+      (m: any) => matIds.includes(m.id) && Number(m.sheet_width) > 0 && Number(m.sheet_height) > 0,
+    )
+    if (!mat) return null
+    const n = computeItemsPerSheet(
+      { width: selected.width_mm, height: selected.height_mm },
+      { width: Number(mat.sheet_width), height: Number(mat.sheet_height) },
+      selected.cut_margin_mm,
+    )
+    return { n, matName: mat.name, sheetW: Number(mat.sheet_width), sheetH: Number(mat.sheet_height) }
+  }, [selected, effectiveAllowedMaterialIds, allMaterials])
 
   const otherSizesForPrintCopy = useMemo(
     () =>
@@ -734,7 +774,36 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                         }
                       />
                     </FormField>
+                    <FormField label="Отступ резки, мм">
+                      <input
+                        className="form-input form-input--compact"
+                        type="number"
+                        min="1"
+                        max="50"
+                        placeholder="5"
+                        title="Отступ с каждой стороны листа (мм). По умолчанию 5 мм. Для наклеек с плоттерной резкой — 15 мм."
+                        value={selected.cut_margin_mm !== undefined ? String(selected.cut_margin_mm) : ''}
+                        onChange={(e) =>
+                          updateSize(selected.id, {
+                            cut_margin_mm: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                      />
+                      <div className="text-muted text-xs mt-1">Пусто = 5 мм (стандарт). Для плоттерной резки — 15 мм.</div>
+                    </FormField>
                   </div>
+                  {layoutPreview && (
+                    <div className="simplified-layout-preview">
+                      <span className="simplified-layout-preview__label">Раскладка</span>
+                      <span className="simplified-layout-preview__value">
+                        <strong>{layoutPreview.n} шт/лист</strong>
+                        <span className="text-muted"> · {layoutPreview.matName} ({layoutPreview.sheetW}×{layoutPreview.sheetH} мм)</span>
+                        {selected.cut_margin_mm != null && selected.cut_margin_mm !== 5 && (
+                          <span style={{ color: '#e65100', marginLeft: 6 }}>отступ {selected.cut_margin_mm} мм</span>
+                        )}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <PrintPricesCard

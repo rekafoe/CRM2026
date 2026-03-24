@@ -194,6 +194,9 @@ export class FlexiblePricingService {
       });
 
       // Печатный лист = выбранный материал (если у материала заданы sheet_width/sheet_height), иначе SRA3/A3/A4
+      const flexCutMarginMm: number | undefined = (configuration as any).cut_margin_mm != null
+        ? Number((configuration as any).cut_margin_mm)
+        : undefined;
       let layout: LayoutResult;
       if (configuration.material_id) {
         const db = await getDb();
@@ -204,18 +207,19 @@ export class FlexiblePricingService {
         const mw = materialSheet?.sheet_width != null && materialSheet.sheet_width > 0 ? Number(materialSheet.sheet_width) : 0;
         const mh = materialSheet?.sheet_height != null && materialSheet.sheet_height > 0 ? Number(materialSheet.sheet_height) : 0;
         if (mw > 0 && mh > 0) {
-          layout = LayoutCalculationService.calculateLayout(productSize, { width: mw, height: mh });
+          layout = LayoutCalculationService.calculateLayout(productSize, { width: mw, height: mh }, flexCutMarginMm);
           logger.info('Раскладка по размеру листа выбранного материала', {
             material_id: configuration.material_id,
             sheet_width: mw,
             sheet_height: mh,
             itemsPerSheet: layout.itemsPerSheet,
+            cut_margin_mm: flexCutMarginMm,
           });
         } else {
-          layout = LayoutCalculationService.findOptimalSheetSize(productSize);
+          layout = LayoutCalculationService.findOptimalSheetSize(productSize, flexCutMarginMm);
         }
       } else {
-        layout = LayoutCalculationService.findOptimalSheetSize(productSize);
+        layout = LayoutCalculationService.findOptimalSheetSize(productSize, flexCutMarginMm);
       }
       
       logger.info('📊 Результат расчета раскладки', {

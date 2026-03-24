@@ -9,7 +9,6 @@ import PackagingSection from './components/PackagingSection';
 import RunSection from './components/RunSection';
 import MaterialsSection from './components/MaterialsSection';
 import OperationsSection from './components/OperationsSection/OperationsSection';
-import PrintSheetSection from './components/PrintSheetSection';
 import AllowedMaterialsSection from './components/AllowedMaterialsSection';
 import { AllowedPriceTypesSection } from './components/AllowedPriceTypesSection';
 import ParametersSection from './components/ParametersSection';

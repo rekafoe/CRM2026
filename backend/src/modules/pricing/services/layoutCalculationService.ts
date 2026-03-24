@@ -40,11 +40,12 @@ export class LayoutCalculationService {
   /**
    * Проверяет, помещается ли продукт на лист
    * Проверяет оба варианта: обычный и с поворотом на 90°
+   * @param customMarginMm — отступ с каждой стороны (мм). По умолчанию 5 мм. Для плоттерной резки — 15 мм.
    */
-  static calculateLayout(productSize: ProductSize, sheetSize: SheetSize): LayoutResult {
-    // Принтер не печатает ближе 5мм к краю с каждой стороны
-    const availableWidth = sheetSize.width - (this.MARGINS.printerMargins * 2);
-    const availableHeight = sheetSize.height - (this.MARGINS.printerMargins * 2);
+  static calculateLayout(productSize: ProductSize, sheetSize: SheetSize, customMarginMm?: number): LayoutResult {
+    const margin = customMarginMm ?? this.MARGINS.printerMargins;
+    const availableWidth = sheetSize.width - (margin * 2);
+    const availableHeight = sheetSize.height - (margin * 2);
 
     // Вариант 1: без поворота
     const variant1 = this.calculateSingleLayout(
@@ -125,13 +126,14 @@ export class LayoutCalculationService {
 
   /**
    * Находит оптимальный размер листа для продукта
+   * @param customMarginMm — отступ с каждой стороны (мм). По умолчанию 5 мм.
    */
-  static findOptimalSheetSize(productSize: ProductSize): LayoutResult {
+  static findOptimalSheetSize(productSize: ProductSize, customMarginMm?: number): LayoutResult {
     let bestResult: LayoutResult | null = null;
     let bestEfficiency = 0;
 
     for (const [sheetName, sheetSize] of Object.entries(this.SHEET_SIZES)) {
-      const result = this.calculateLayout(productSize, sheetSize);
+      const result = this.calculateLayout(productSize, sheetSize, customMarginMm);
       
       if (result.fitsOnSheet) {
         const efficiency = result.itemsPerSheet / (result.wastePercentage + 1);
