@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { Button, FormField, Alert } from '../../components/common';
@@ -743,7 +744,7 @@ export const PrintPriceEditPage: React.FC = () => {
                     </table>
 
                     {/* Модалка для добавления/редактирования диапазонов */}
-                    {tierModal.isOpen && (
+                    {tierModal.isOpen && createPortal(
                       <div
                         ref={tierModalRef}
                         className="simplified-tier-modal"
@@ -834,7 +835,8 @@ export const PrintPriceEditPage: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </div>,
+                      document.body
                     )}
                   </div>
                 )
