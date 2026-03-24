@@ -175,6 +175,8 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                       ...(layoutMaterialId != null ? { material_id: layoutMaterialId } : {}),
                       ...(selected.cut_margin_mm != null ? { cut_margin_mm: selected.cut_margin_mm } : {}),
                       ...(selected.cut_gap_mm != null ? { cut_gap_mm: selected.cut_gap_mm } : {}),
+                      ...(selected.items_per_sheet_override != null ? { items_per_sheet_override: selected.items_per_sheet_override } : {}),
+                      ...(selected.items_per_sheet_override != null ? { items_per_sheet_override: selected.items_per_sheet_override } : {}),
                     },
                   })
                   const data = r.data as { items_per_sheet?: number; tiers?: Array<{ min_qty: number; max_qty?: number; unit_price: number }> }

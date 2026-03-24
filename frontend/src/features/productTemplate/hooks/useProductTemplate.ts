@@ -39,6 +39,10 @@ export type SimplifiedSizeConfig = {
   cut_margin_mm?: number;
   /** Зазор между стикерами при раскладке (мм). По умолчанию 2 мм. */
   cut_gap_mm?: number;
+  /** Ручная норма вместимости (шт/лист). Если задана — перекрывает автоматический расчёт через cut_margin_mm / cut_gap_mm. */
+  items_per_sheet_override?: number;
+  /** Ручная норма вместимости на лист (шт). Если задана — override автоматического расчёта через cut_margin/cut_gap. */
+  items_per_sheet_override?: number;
   default_print?: Partial<SimplifiedPrintKey>;
   print_prices: SimplifiedPrintPrice[];
   allowed_material_ids: number[];

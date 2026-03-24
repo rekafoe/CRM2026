@@ -368,6 +368,7 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
     sheet_height_mm: layoutHq,
     cut_margin_mm: cutMarginQ,
     cut_gap_mm: cutGapQ,
+    items_per_sheet_override: itemsOverrideQ,
   } = req.query
   if (!technology_code || !width_mm || !height_mm) {
     res.status(400).json({ error: 'technology_code, width_mm, height_mm обязательны' })
@@ -457,7 +458,10 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
 
     const cutMarginMm = cutMarginQ != null && String(cutMarginQ).trim() !== '' ? Number(cutMarginQ) : undefined
     const cutGapMm = cutGapQ != null && String(cutGapQ).trim() !== '' ? Number(cutGapQ) : undefined
-    const itemsPerSheet = calcItemsPerSheet(w, h, sheetW, sheetH, cutMarginMm, cutGapMm)
+    const itemsOverride = itemsOverrideQ != null && String(itemsOverrideQ).trim() !== '' ? Number(itemsOverrideQ) : undefined
+    const itemsPerSheet = (itemsOverride != null && itemsOverride > 0)
+      ? itemsOverride
+      : calcItemsPerSheet(w, h, sheetW, sheetH, cutMarginMm, cutGapMm)
     const tiers = await db.all<any>(`
       SELECT min_sheets, max_sheets, price_per_sheet FROM print_price_tiers
       WHERE print_price_id = ? AND price_mode = ?

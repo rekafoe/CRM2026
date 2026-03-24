@@ -200,8 +200,21 @@ export class FlexiblePricingService {
       const flexCutGapMm: number | undefined = (configuration as any).cut_gap_mm != null
         ? Number((configuration as any).cut_gap_mm)
         : undefined;
+      const flexItemsOverride: number | undefined = (configuration as any).items_per_sheet_override != null
+        ? Number((configuration as any).items_per_sheet_override)
+        : undefined;
       let layout: LayoutResult;
-      if (configuration.material_id) {
+      if (flexItemsOverride != null && flexItemsOverride > 0) {
+        layout = {
+          fitsOnSheet: true,
+          itemsPerSheet: flexItemsOverride,
+          wastePercentage: 0,
+          recommendedSheetSize: productSize,
+          layout: { rows: 1, cols: flexItemsOverride, actualItemsPerSheet: flexItemsOverride },
+          cutsPerSheet: flexItemsOverride + 1,
+        };
+        logger.info('Раскладка: ручная норма вместимости', { productId, flexItemsOverride });
+      } else if (configuration.material_id) {
         const db = await getDb();
         const materialSheet = await db.get<{ sheet_width: number | null; sheet_height: number | null }>(
           `SELECT sheet_width, sheet_height FROM materials WHERE id = ?`,

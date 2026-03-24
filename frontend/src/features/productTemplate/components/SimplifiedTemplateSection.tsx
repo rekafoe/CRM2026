@@ -106,9 +106,13 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     return effectiveConfig.common_allowed_material_ids ?? []
   }, [selected, useOwnMaterials, effectiveConfig.common_allowed_material_ids])
 
-  // Превью раскладки для текущего размера (с учётом cut_margin_mm и cut_gap_mm)
+  // Превью раскладки для текущего размера (override имеет приоритет над cut_margin/cut_gap)
   const layoutPreview = useMemo(() => {
     if (!selected || !selected.width_mm || !selected.height_mm) return null
+    // Если задан ручной override — используем его без поиска материала
+    if (selected.items_per_sheet_override != null && selected.items_per_sheet_override > 0) {
+      return { n: selected.items_per_sheet_override, matName: null, sw: 0, sh: 0, isOverride: true }
+    }
     const firstMat = allMaterials.find(
       (m: any) =>
         effectiveAllowedMaterialIds.includes(m.id) &&
@@ -127,6 +131,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       matName: (firstMat as any).name ?? '?',
       sw: Number((firstMat as any).sheet_width),
       sh: Number((firstMat as any).sheet_height),
+      isOverride: false,
     }
   }, [selected, allMaterials, effectiveAllowedMaterialIds])
 
@@ -793,18 +798,44 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                       />
                       <div className="text-muted text-xs mt-1">Пусто = 2 мм (стандарт).</div>
                     </FormField>
+                    <FormField label="Норма вместимости на лист">
+                      <input
+                        className="form-input form-input--compact"
+                        type="number"
+                        min="1"
+                        placeholder="авто"
+                        title="Ручной override: сколько изделий помещается на лист. Перекрывает автоматический расчёт по отступам и зазорам."
+                        value={selected.items_per_sheet_override !== undefined ? String(selected.items_per_sheet_override) : ''}
+                        onChange={(e) =>
+                          updateSize(selected.id, {
+                            items_per_sheet_override: e.target.value !== '' ? Number(e.target.value) : undefined,
+                          })
+                        }
+                      />
+                      <div className="text-muted text-xs mt-1">
+                        Пусто = считать по отступу и зазору автоматически.
+                      </div>
+                    </FormField>
                   </div>
                   {layoutPreview && (
-                    <div className="simplified-layout-preview">
+                    <div className={`simplified-layout-preview${layoutPreview.isOverride ? ' simplified-layout-preview--override' : ''}`}>
                       <span className="simplified-layout-preview__label">Раскладка</span>
                       <span className="simplified-layout-preview__value">
                         <strong>{layoutPreview.n} шт/лист</strong>
-                        <span className="text-muted"> · {layoutPreview.matName} ({layoutPreview.sw}×{layoutPreview.sh} мм)</span>
-                        {(selected.cut_margin_mm != null && selected.cut_margin_mm !== 5) && (
-                          <span style={{ color: '#e65100', marginLeft: 6 }}>отступ {selected.cut_margin_mm} мм</span>
-                        )}
-                        {(selected.cut_gap_mm != null && selected.cut_gap_mm !== 2) && (
-                          <span style={{ color: '#e65100', marginLeft: 6 }}>зазор {selected.cut_gap_mm} мм</span>
+                        {layoutPreview.isOverride ? (
+                          <span style={{ color: '#7c3aed', marginLeft: 6 }}>ручная норма</span>
+                        ) : (
+                          <>
+                            {layoutPreview.matName && (
+                              <span className="text-muted"> · {layoutPreview.matName} ({layoutPreview.sw}×{layoutPreview.sh} мм)</span>
+                            )}
+                            {(selected.cut_margin_mm != null && selected.cut_margin_mm !== 5) && (
+                              <span style={{ color: '#e65100', marginLeft: 6 }}>отступ {selected.cut_margin_mm} мм</span>
+                            )}
+                            {(selected.cut_gap_mm != null && selected.cut_gap_mm !== 2) && (
+                              <span style={{ color: '#e65100', marginLeft: 6 }}>зазор {selected.cut_gap_mm} мм</span>
+                            )}
+                          </>
                         )}
                       </span>
                     </div>

@@ -338,11 +338,25 @@ export class SimplifiedPricingService {
     const customGapMm: number | undefined = (selectedSize as any).cut_gap_mm != null
       ? Number((selectedSize as any).cut_gap_mm)
       : undefined;
+    const itemsPerSheetOverride: number | undefined = (selectedSize as any).items_per_sheet_override != null
+      ? Number((selectedSize as any).items_per_sheet_override)
+      : undefined;
 
     // Учёт раскладки: use_layout=false → 1 изделие на лист (без оптимизации, для крупноформатных и т.п.)
     const useLayout = simplifiedConfig.use_layout !== false;
     let layoutCheck: { fitsOnSheet: boolean; itemsPerSheet: number; wastePercentage: number; recommendedSheetSize: { width: number; height: number }; layout: { rows: number; cols: number; actualItemsPerSheet: number }; cutsPerSheet: number };
-    if (!useLayout) {
+    if (itemsPerSheetOverride != null && itemsPerSheetOverride > 0) {
+      // Ручная норма вместимости — обходим расчёт раскладки
+      layoutCheck = {
+        fitsOnSheet: true,
+        itemsPerSheet: itemsPerSheetOverride,
+        wastePercentage: 0,
+        recommendedSheetSize: { width: productSize.width, height: productSize.height },
+        layout: { rows: 1, cols: itemsPerSheetOverride, actualItemsPerSheet: itemsPerSheetOverride },
+        cutsPerSheet: itemsPerSheetOverride + 1,
+      };
+      logger.info('Раскладка: использована ручная норма вместимости', { productId, itemsPerSheetOverride });
+    } else if (!useLayout) {
       layoutCheck = {
         fitsOnSheet: true,
         itemsPerSheet: 1,

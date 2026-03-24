@@ -1195,3 +1195,16 @@
   color: #15803d;
 }
 
+.simplified-layout-preview--override {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+
+.simplified-layout-preview--override .simplified-layout-preview__label {
+  color: #5b21b6;
+}
+
+.simplified-layout-preview--override .simplified-layout-preview__value {
+  color: #6d28d9;
+}
+
