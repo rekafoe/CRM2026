@@ -806,14 +806,16 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                         placeholder="авто"
                         title="Ручной override: сколько изделий помещается на лист. Перекрывает автоматический расчёт по отступам и зазорам."
                         value={selected.items_per_sheet_override !== undefined ? String(selected.items_per_sheet_override) : ''}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = e.target.value !== '' ? Number(e.target.value) : undefined
                           updateSize(selected.id, {
-                            items_per_sheet_override: e.target.value !== '' ? Number(e.target.value) : undefined,
+                            items_per_sheet_override: val,
+                            min_qty: val,
                           })
-                        }
+                        }}
                       />
                       <div className="text-muted text-xs mt-1">
-                        Пусто = считать по отступу и зазору автоматически.
+                        Пусто = считать по отступу и зазору автоматически. Значение также записывается в мин. тираж.
                       </div>
                     </FormField>
                   </div>
