@@ -154,7 +154,7 @@ type TierModalState = {
   tierIndex?: number
   isOpen: boolean
   boundary: string
-  anchorElement?: HTMLElement
+  anchorPos?: { top: number; left: number }
 }
 
 export const PrintPriceEditPage: React.FC = () => {
@@ -258,7 +258,6 @@ export const PrintPriceEditPage: React.FC = () => {
     boundary: '',
   });
   const tierModalRef = useRef<HTMLDivElement>(null);
-  const addRangeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!tierModal.isOpen) return;
@@ -498,13 +497,14 @@ export const PrintPriceEditPage: React.FC = () => {
                                 <div className="cell">
                                   <span
                                     style={{ cursor: 'pointer' }}
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
                                       setTierModal({
                                         type: 'edit',
                                         tierIndex: ti,
                                         isOpen: true,
                                         boundary: String(t.min_sheets),
-                                        anchorElement: undefined,
+                                        anchorPos: { top: rect.bottom + 5, left: rect.left },
                                       })
                                     }}
                                   >
@@ -531,18 +531,17 @@ export const PrintPriceEditPage: React.FC = () => {
                             <div className="cell">
                               <div className="simplified-row__add-range-wrapper">
                                 <button
-                                  ref={addRangeButtonRef}
                                   type="button"
                                   className="el-button el-button--info el-button--mini is-plain"
                                   style={{ width: '100%', marginLeft: '0px' }}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const button = e.currentTarget as HTMLElement
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
                                     setTierModal({
                                       type: 'add',
                                       isOpen: true,
                                       boundary: '',
-                                      anchorElement: button,
+                                      anchorPos: { top: rect.bottom + 5, left: rect.left },
                                     })
                                   }}
                                 >
@@ -749,11 +748,11 @@ export const PrintPriceEditPage: React.FC = () => {
                         ref={tierModalRef}
                         className="simplified-tier-modal"
                         style={
-                          tierModal.anchorElement
+                          tierModal.anchorPos
                             ? {
                                 position: 'fixed',
-                                top: `${tierModal.anchorElement.getBoundingClientRect().bottom + 5}px`,
-                                left: `${tierModal.anchorElement.getBoundingClientRect().left}px`,
+                                top: `${tierModal.anchorPos.top}px`,
+                                left: `${tierModal.anchorPos.left}px`,
                                 zIndex: 2003,
                               }
                             : {
