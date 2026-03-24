@@ -280,9 +280,6 @@ export function useProductTemplateInitial(): TemplateState {
 /** Сортировка размеров от меньшего к большему по площади (ширина×высота), затем по ширине, затем по высоте */
 export function sortSizesByArea(sizes: SimplifiedSizeConfig[]): SimplifiedSizeConfig[] {
   return [...sizes].sort((a, b) => {
-    const areaA = (a.width_mm ?? 0) * (a.height_mm ?? 0)
-    const areaB = (b.width_mm ?? 0) * (b.height_mm ?? 0)
-    if (areaA !== areaB) return areaA - areaB
     if ((a.width_mm ?? 0) !== (b.width_mm ?? 0)) return (a.width_mm ?? 0) - (b.width_mm ?? 0)
     return (a.height_mm ?? 0) - (b.height_mm ?? 0)
   })
