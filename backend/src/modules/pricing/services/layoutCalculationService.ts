@@ -43,8 +43,8 @@ export class LayoutCalculationService {
    * @param customGapMm — зазор между стикерами (мм). По умолчанию 2 мм.
    */
   static calculateLayout(productSize: ProductSize, sheetSize: SheetSize, customMarginMm?: number, customGapMm?: number): LayoutResult {
-    const margin = customMarginMm ?? this.MARGINS.printerMargins;
-    const gap = customGapMm ?? this.MARGINS.layoutGap;
+    const margin = (customMarginMm != null && customMarginMm > 0) ? customMarginMm : this.MARGINS.printerMargins;
+    const gap = (customGapMm != null && customGapMm >= 0) ? customGapMm : this.MARGINS.layoutGap;
     const availableWidth = sheetSize.width - (margin * 2);
     const availableHeight = sheetSize.height - (margin * 2);
 

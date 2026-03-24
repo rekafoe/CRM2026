@@ -107,32 +107,35 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   }, [selected, useOwnMaterials, effectiveConfig.common_allowed_material_ids])
 
   // Превью раскладки для текущего размера (override имеет приоритет над cut_margin/cut_gap)
+  // Формула точно соответствует layoutCalculationService на бэкенде
   const layoutPreview = useMemo(() => {
     if (!selected || !selected.width_mm || !selected.height_mm) return null
     // Если задан ручной override — используем его без поиска материала
     if (selected.items_per_sheet_override != null && selected.items_per_sheet_override > 0) {
-      return { n: selected.items_per_sheet_override, matName: null, sw: 0, sh: 0, isOverride: true }
+      return { n: selected.items_per_sheet_override, matName: null, sw: 0, sh: 0, isOverride: true, noMat: false }
     }
+    const hasMatWithoutSheet = allMaterials.some(
+      (m: any) => effectiveAllowedMaterialIds.includes(m.id) && !(Number(m.sheet_width) > 0 && Number(m.sheet_height) > 0),
+    )
     const firstMat = allMaterials.find(
       (m: any) =>
         effectiveAllowedMaterialIds.includes(m.id) &&
         Number(m.sheet_width) > 0 &&
         Number(m.sheet_height) > 0,
     )
-    if (!firstMat) return null
-    const n = computeItemsPerSheet(
-      { width: selected.width_mm, height: selected.height_mm },
-      { width: Number((firstMat as any).sheet_width), height: Number((firstMat as any).sheet_height) },
-      selected.cut_margin_mm,
-      selected.cut_gap_mm,
-    )
-    return {
-      n,
-      matName: (firstMat as any).name ?? '?',
-      sw: Number((firstMat as any).sheet_width),
-      sh: Number((firstMat as any).sheet_height),
-      isOverride: false,
-    }
+    if (!firstMat) return { n: 0, matName: null, sw: 0, sh: 0, isOverride: false, noMat: true, hasMatWithoutSheet }
+    // Точная формула бэкенда: floor((sheet - margin*2) / (item + gap)) × оба поворота
+    const margin = selected.cut_margin_mm != null && selected.cut_margin_mm > 0 ? selected.cut_margin_mm : 5
+    const gap = selected.cut_gap_mm != null && selected.cut_gap_mm >= 0 ? selected.cut_gap_mm : 2
+    const sw = Number((firstMat as any).sheet_width)
+    const sh = Number((firstMat as any).sheet_height)
+    const aw = sw - margin * 2
+    const ah = sh - margin * 2
+    const iw = selected.width_mm, ih = selected.height_mm
+    const n1 = Math.floor(aw / (iw + gap)) * Math.floor(ah / (ih + gap))
+    const n2 = Math.floor(aw / (ih + gap)) * Math.floor(ah / (iw + gap))
+    const n = Math.max(1, n1, n2)
+    return { n, matName: (firstMat as any).name ?? '?', sw, sh, isOverride: false, noMat: false, hasMatWithoutSheet: false }
   }, [selected, allMaterials, effectiveAllowedMaterialIds])
 
   const otherSizesForPrintCopy = useMemo(
@@ -776,6 +779,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                         onChange={(e) =>
                           updateSize(selected.id, {
                             cut_margin_mm: e.target.value ? Number(e.target.value) : undefined,
+                            // сбрасываем min_qty чтобы бэкенд пересчитал по новому отступу
+                            ...(selected.items_per_sheet_override == null ? { min_qty: undefined } : {}),
                           })
                         }
                       />
@@ -793,6 +798,8 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                         onChange={(e) =>
                           updateSize(selected.id, {
                             cut_gap_mm: e.target.value !== '' ? Number(e.target.value) : undefined,
+                            // сбрасываем min_qty чтобы бэкенд пересчитал по новому зазору
+                            ...(selected.items_per_sheet_override == null ? { min_qty: undefined } : {}),
                           })
                         }
                       />
@@ -819,7 +826,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                       </div>
                     </FormField>
                   </div>
-                  {layoutPreview && (
+                  {layoutPreview && !layoutPreview.noMat && (
                     <div className={`simplified-layout-preview${layoutPreview.isOverride ? ' simplified-layout-preview--override' : ''}`}>
                       <span className="simplified-layout-preview__label">Раскладка</span>
                       <span className="simplified-layout-preview__value">
@@ -840,6 +847,11 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                           </>
                         )}
                       </span>
+                    </div>
+                  )}
+                  {layoutPreview?.noMat && !layoutPreview.isOverride && (
+                    <div className="text-muted text-xs mt-1" style={{ color: '#92400e' }}>
+                      Превью недоступно — укажите «Ширина листа» и «Высота листа» в карточке разрешённого материала.
                     </div>
                   )}
                 </div>
