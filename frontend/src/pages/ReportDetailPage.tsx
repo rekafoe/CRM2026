@@ -19,7 +19,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
   onBack 
 }) => {
   const [report, setReport] = useState<DailyReport | null>(null);
-  const { statuses } = useOrderStatuses();
+  const { statuses, getName: getStatusName } = useOrderStatuses();
   const [isLoading, setIsLoading] = useState(true);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const { requestReason, ReasonPromptModalElement } = useReasonPrompt();
@@ -47,7 +47,9 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
   const handleStatusChange = async (orderId: number, newStatusId: number) => {
     try {
       let cancelReason: string | undefined;
-      if (Number(newStatusId) === 5) {
+      const newStatusName = getStatusName(newStatusId, '').toLowerCase();
+      const isCancellation = newStatusName.includes('отмен') || newStatusName.includes('cancel');
+      if (isCancellation) {
         cancelReason = (await requestReason({
           title: 'Причина отмены заказа',
           placeholder: 'Укажите причину отмены заказа',
