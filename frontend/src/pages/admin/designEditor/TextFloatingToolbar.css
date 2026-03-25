@@ -1,0 +1,193 @@
+.text-floating-toolbar {
+  position: fixed;
+  z-index: 10050;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  max-width: min(96vw, 920px);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.12), 0 0 1px rgba(15, 23, 42, 0.08);
+  transform: translate(-50%, calc(-100% - 10px));
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.text-floating-toolbar::after {
+  content: '';
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-top-color: #ffffff;
+  filter: drop-shadow(0 1px 0 #e5e7eb);
+  pointer-events: none;
+}
+
+.text-floating-toolbar__select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  color: #334155;
+}
+
+.text-floating-toolbar__select--font {
+  min-width: 132px;
+}
+
+.text-floating-toolbar__select--narrow {
+  min-width: 118px;
+}
+
+.text-floating-toolbar__select--tight {
+  min-width: 56px;
+  padding-right: 4px;
+}
+
+.text-floating-toolbar__size {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.text-floating-toolbar__size-input {
+  width: 44px;
+  border: none;
+  text-align: center;
+  font-size: 13px;
+  padding: 0 4px;
+  -moz-appearance: textfield;
+}
+
+.text-floating-toolbar__size-input::-webkit-outer-spin-button,
+.text-floating-toolbar__size-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.text-floating-toolbar__size-step {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #e5e7eb;
+}
+
+.text-floating-toolbar__step {
+  flex: 1;
+  min-width: 22px;
+  padding: 0 4px;
+  border: none;
+  background: #f8fafc;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  color: #475569;
+}
+
+.text-floating-toolbar__step:hover {
+  background: #f1f5f9;
+}
+
+.text-floating-toolbar__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.text-floating-toolbar__icon-btn:hover {
+  background: #f1f5f9;
+}
+
+.text-floating-toolbar__icon-btn.is-active {
+  background: #e0e7ff;
+  border-color: #c7d2fe;
+  color: #1e3a8a;
+}
+
+.text-floating-toolbar__icon-btn--danger {
+  color: #dc2626;
+}
+
+.text-floating-toolbar__icon-btn--danger:hover {
+  background: #fef2f2;
+}
+
+.text-floating-toolbar__ul {
+  text-decoration: underline;
+}
+
+.text-floating-toolbar__color {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+}
+
+.text-floating-toolbar__color input[type='color'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.text-floating-toolbar__color-swatch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.text-floating-toolbar__align {
+  display: inline-flex;
+  gap: 2px;
+  padding: 0 2px;
+}
+
+.text-floating-toolbar__fx {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f8fafc;
+  font-size: 12px;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.text-floating-toolbar__wand {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.text-floating-toolbar__sep {
+  width: 1px;
+  height: 22px;
+  margin: 0 2px;
+  background: #e5e7eb;
+}

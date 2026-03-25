@@ -367,6 +367,7 @@ const ProductTemplatePage: React.FC = () => {
                 showPagesConfig={product?.product_type === 'multi_page'}
                 types={simplifiedTypes}
                 services={simplifiedServices}
+                productId={productId}
               />
             )}
           </section>

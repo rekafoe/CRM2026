@@ -1208,3 +1208,214 @@
   color: #6d28d9;
 }
 
+/* ── SubtypeDesignsCard ── */
+.subtype-designs-card {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--bg-primary, #fff);
+  margin-top: 16px;
+}
+
+.subtype-designs-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.subtype-designs-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.subtype-designs-card__hint {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+}
+
+.subtype-designs-card__error {
+  font-size: 13px;
+  color: #dc2626;
+  margin: 0 0 8px;
+}
+
+.subtype-designs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.subtype-designs-item {
+  position: relative;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f9fafb;
+}
+
+.subtype-designs-item__preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+.subtype-designs-item__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.subtype-designs-item__no-preview {
+  color: #9ca3af;
+}
+
+.subtype-designs-item__name {
+  font-size: 11px;
+  color: var(--text-primary, #111827);
+  padding: 4px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subtype-designs-item__remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.subtype-designs-item:hover .subtype-designs-item__remove {
+  opacity: 1;
+}
+
+/* ── Modal ── */
+.subtype-designs-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.subtype-designs-modal {
+  background: var(--bg-primary, #fff);
+  border-radius: 12px;
+  width: 90vw;
+  max-width: 760px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+.subtype-designs-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  flex-shrink: 0;
+}
+
+.subtype-designs-modal__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.subtype-designs-modal__close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-secondary, #6b7280);
+  padding: 4px;
+}
+
+.subtype-designs-modal__hint {
+  padding: 20px;
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+  margin: 0;
+}
+
+.subtype-designs-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.subtype-designs-modal-item {
+  border: 2px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s;
+}
+
+.subtype-designs-modal-item.is-linked {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.subtype-designs-modal-item__preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.subtype-designs-modal-item__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  padding: 6px 8px 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subtype-designs-modal-item__cat {
+  font-size: 11px;
+  color: var(--text-secondary, #6b7280);
+  padding: 0 8px 6px;
+}
+
+.subtype-designs-modal-item button {
+  margin: 6px 8px 8px;
+  width: calc(100% - 16px);
+  font-size: 12px;
+}
+

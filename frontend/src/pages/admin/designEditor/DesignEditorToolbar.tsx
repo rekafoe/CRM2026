@@ -3,8 +3,11 @@ import { AppIcon } from '../../../components/ui/AppIcon';
 import { Button } from '../../../components/common';
 import { TEXT_FONTS } from './constants';
 import type { SelectedObjProps } from './types';
+import type { EditorMode } from './DesignEditorCanvas';
 
 interface DesignEditorToolbarProps {
+  mode: EditorMode;
+  onModeChange: (mode: EditorMode) => void;
   onAddText: () => void;
   selectedObj: SelectedObjProps | null;
   currentPage: number;
@@ -26,6 +29,7 @@ interface DesignEditorToolbarProps {
   onRedo: () => void;
   // Edit
   onDeleteSelected: () => void;
+  onDuplicateSelected: () => void;
   // Zoom
   zoom: number;
   onZoomIn: () => void;
@@ -39,9 +43,13 @@ interface DesignEditorToolbarProps {
   onFontStyleToggle: () => void;
   onUnderlineToggle: () => void;
   onTextAlignChange: (align: string) => void;
+  /** Скрыть блок форматирования текста (плавающая панель над текстом) */
+  suppressTextFormat?: boolean;
 }
 
 export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
+  mode,
+  onModeChange,
   onAddText,
   selectedObj,
   currentPage,
@@ -61,6 +69,7 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
   onUndo,
   onRedo,
   onDeleteSelected,
+  onDuplicateSelected,
   zoom,
   onZoomIn,
   onZoomOut,
@@ -72,13 +81,28 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
   onFontStyleToggle,
   onUnderlineToggle,
   onTextAlignChange,
+  suppressTextFormat = false,
 }) => {
   const isText = selectedObj?.type === 'IText';
+  const isBasic = mode === 'basic';
 
   return (
     <div className="design-editor-toolbar">
-      {/* ── История ── */}
-      <div className="design-editor-toolbar-group">
+      {/* ── Режим basic: упрощённая панель ── */}
+      {isBasic && (
+        <>
+          <span className="design-editor-toolbar-mode-badge">Режим заполнения</span>
+          <span title="Открыть полный редактор">
+            <Button variant="secondary" onClick={() => onModeChange('advanced')}>
+              <AppIcon name="edit" size="xs" /> Расширенный режим
+            </Button>
+          </span>
+          <div className="design-editor-toolbar-divider" />
+        </>
+      )}
+
+      {/* ── История (только в advanced) ── */}
+      {!isBasic && <div className="design-editor-toolbar-group">
         <button
           type="button"
           className="design-editor-toolbar-icon-btn"
@@ -101,22 +125,32 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
         <button
           type="button"
           className="design-editor-toolbar-icon-btn"
+          onClick={onDuplicateSelected}
+          title="Дублировать (Ctrl+D)"
+        >
+          <AppIcon name="copy" size="xs" />
+        </button>
+        <button
+          type="button"
+          className="design-editor-toolbar-icon-btn"
           onClick={onDeleteSelected}
           title="Удалить выбранное (Delete)"
         >
           <AppIcon name="x" size="xs" />
         </button>
-      </div>
+      </div>}
 
-      <div className="design-editor-toolbar-divider" />
+      {!isBasic && <div className="design-editor-toolbar-divider" />}
 
-      {/* ── Текст ── */}
+      {/* ── Текст (только в advanced) ── */}
+      {!isBasic && (
       <Button variant="secondary" onClick={onAddText}>
         <AppIcon name="edit" size="xs" /> Текст
       </Button>
+      )}
 
       {/* ── Форматирование текста ── */}
-      {isText && (
+      {isText && !suppressTextFormat && (
         <div className="design-editor-toolbar-group design-editor-text-format">
           <select
             className="design-editor-font-select"
@@ -217,8 +251,8 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
         </div>
       )}
 
-      {/* ── Зум ── */}
-      <div className="design-editor-toolbar-group design-editor-zoom-group">
+      {/* ── Зум (только в advanced) ── */}
+      {!isBasic && <div className="design-editor-toolbar-group design-editor-zoom-group">
         <button
           type="button"
           className="design-editor-toolbar-icon-btn"
@@ -243,9 +277,9 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
         >
           +
         </button>
-      </div>
+      </div>}
 
-      <div className="design-editor-toolbar-divider" />
+      {!isBasic && <div className="design-editor-toolbar-divider" />}
 
       {/* ── Виды / экспорт ── */}
       <span title="Линия обрезки и безопасная зона">

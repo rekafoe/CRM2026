@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { AppIcon } from './ui/AppIcon';
+import { filterLikelyImageFiles } from '../utils/imageFile';
 import '../styles/utilities.css';
 import './ImagePickerModal.css';
 
@@ -30,16 +31,31 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   const [activeTab, setActiveTab] = useState<'my-files' | 'photobank' | 'vk' | 'yandex'>('my-files');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /** Актуальный список для слияния при выборе с диска (до следующего рендера) */
+  const selectedFilesRef = useRef<File[]>([]);
+  selectedFilesRef.current = selectedFiles;
 
-  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    const images = files.filter((f) => f.type.startsWith('image/'));
-    setSelectedFiles((prev) => {
-      const next = [...prev, ...images];
-      return next.slice(-IMAGE_PICKER_MAX_SELECT);
-    });
-    e.target.value = '';
-  }, []);
+  /**
+   * После выбора в системном диалоге сразу передаём файлы в редактор и закрываем модалку.
+   * Иначе пользователь жмёт «Открыть» и не понимает, что нужна ещё кнопка «Выбрать» внизу.
+   */
+  const handleFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files ?? []);
+      e.target.value = '';
+      if (files.length === 0) return;
+      const images = filterLikelyImageFiles(files, { trustOsPicker: true });
+      if (images.length === 0) return;
+      const merged = [...selectedFilesRef.current, ...images].slice(-IMAGE_PICKER_MAX_SELECT);
+      onSelect(merged);
+      setSelectedFiles([]);
+      // После onSelect дать родителю применить setState, затем закрыть модалку
+      queueMicrotask(() => {
+        onClose();
+      });
+    },
+    [onSelect, onClose],
+  );
 
   const handleUploadFromComputer = useCallback(() => {
     fileInputRef.current?.click();
@@ -56,7 +72,9 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   const handleConfirm = useCallback(() => {
     onSelect(selectedFiles);
     setSelectedFiles([]);
-    onClose();
+    queueMicrotask(() => {
+      onClose();
+    });
   }, [onSelect, onClose, selectedFiles]);
 
   const handleClose = useCallback(() => {
@@ -65,10 +83,12 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
     onClose();
   }, [onClose]);
 
+  const wasOpenRef = React.useRef(false);
   React.useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       setSelectedFiles([...initialFiles]);
     }
+    wasOpenRef.current = isOpen;
   }, [isOpen, initialFiles]);
 
   React.useEffect(() => {
@@ -85,13 +105,11 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
     };
   }, [isOpen, handleClose]);
 
-  if (!isOpen) return null;
-
   const remaining = IMAGE_PICKER_MAX_SELECT - selectedFiles.length;
 
-  const content = (
+  const overlay = isOpen ? (
     <div className="image-picker-overlay" onClick={handleClose}>
-      <div className="image-picker-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="image-picker-modal" onClick={(e) => e.stopPropagation()}>
         <header className="image-picker-header">
           <ul className="image-picker-tabs" role="tablist">
             {TABS.map((tab) => (
@@ -224,18 +242,25 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
           </div>
         </footer>
       </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={handleFileInputChange}
-        style={{ display: 'none' }}
-        aria-hidden
-      />
     </div>
-  );
+  ) : null;
 
-  return createPortal(content, document.body);
+  return (
+    <>
+      {createPortal(
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileInputChange}
+          style={{ display: 'none' }}
+          aria-hidden
+          tabIndex={-1}
+        />,
+        document.body,
+      )}
+      {overlay != null && createPortal(overlay, document.body)}
+    </>
+  );
 };

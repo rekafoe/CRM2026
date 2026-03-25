@@ -1,9 +1,12 @@
 import React from 'react';
 import { SIDEBAR_ITEMS } from './constants';
-import type { SidebarSection, SelectedObjProps } from './types';
+import type { TextBlockPresetKind } from './constants';
+import type { SidebarSection, SelectedObjProps, SidebarPhotoItem, TextEffectsValues } from './types';
 import { PhotoPanel } from './panels/PhotoPanel';
 import { TextPanel } from './panels/TextPanel';
 import { ShapesPanel } from './panels/ShapesPanel';
+import { BackgroundPanel } from './panels/BackgroundPanel';
+import { ObjectPropsPanel } from './panels/ObjectPropsPanel';
 import { CollagesPanel } from './panels/CollagesPanel';
 import { PlaceholderPanel } from './panels/PlaceholderPanel';
 
@@ -15,25 +18,40 @@ interface DesignEditorPanelProps {
   onAddPhotoField?: () => void;
   onPhotoDrop?: (e: React.DragEvent) => void;
   onPhotoDragOver?: (e: React.DragEvent) => void;
+  onImageUrlSubmit?: (url: string) => Promise<void>;
   photoSort?: 'name' | 'date';
   onPhotoSortChange?: (v: 'name' | 'date') => void;
-  photoAutofill?: boolean;
-  onPhotoAutofillChange?: (v: boolean) => void;
-  photoHideUsed?: boolean;
-  onPhotoHideUsedChange?: (v: boolean) => void;
+  onAutofillPhotoFields?: () => void | Promise<void>;
+  photoLibrary?: SidebarPhotoItem[];
+  onLibraryPhotoClick?: (id: string) => void;
+  onLibraryPhotoRemove?: (id: string) => void;
   // Text
-  onAddText?: () => void;
   selectedObj?: SelectedObjProps | null;
   onTextChange?: (text: string) => void;
-  onFontChange?: (fontFamily: string) => void;
-  onFontSizeChange?: (fontSize: number) => void;
-  onTextColorChange?: (color: string) => void;
-  onFontWeightToggle?: () => void;
-  onFontStyleToggle?: () => void;
-  onUnderlineToggle?: () => void;
-  onTextAlignChange?: (align: string) => void;
+  onAddTextPreset?: (kind: TextBlockPresetKind) => void;
+  onApplyFont?: (fontFamily: string) => void;
+  /** Шрифты, уже встречающиеся в макете (панель «Используемые шрифты»). */
+  usedFonts?: string[];
+  onApplyTextColor?: (fill: string) => void;
+  onApplyEffects?: (v: TextEffectsValues) => void;
   // Shapes
   onAddShape?: (type: 'rect' | 'circle' | 'line' | 'triangle') => void;
+  // Background
+  onSetBackground?: (color: string) => void;
+  onSetBackgroundImage?: (dataUrl: string) => Promise<void>;
+  onClearBackground?: () => void;
+  canvasWidth?: number;
+  canvasHeight?: number;
+  // Object props
+  onSetObjProp?: (key: string, value: unknown) => void;
+  onDuplicateObj?: () => void;
+  onDeleteObj?: () => void;
+  onBringForward?: () => void;
+  onSendBackward?: () => void;
+  onBringToFront?: () => void;
+  onSendToBack?: () => void;
+  onFlipX?: () => void;
+  onFlipY?: () => void;
   // Collages
   collagePhotoCount?: number;
   onCollagePhotoCountChange?: (v: number) => void;
@@ -52,23 +70,35 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
   onAddPhotoField,
   onPhotoDrop,
   onPhotoDragOver,
+  onImageUrlSubmit,
   photoSort = 'name',
   onPhotoSortChange,
-  photoAutofill = false,
-  onPhotoAutofillChange,
-  photoHideUsed = false,
-  onPhotoHideUsedChange,
-  onAddText,
+  onAutofillPhotoFields,
+  photoLibrary = [],
+  onLibraryPhotoClick,
+  onLibraryPhotoRemove,
   selectedObj,
   onTextChange,
-  onFontChange,
-  onFontSizeChange,
-  onTextColorChange,
-  onFontWeightToggle,
-  onFontStyleToggle,
-  onUnderlineToggle,
-  onTextAlignChange,
+  onAddTextPreset,
+  onApplyFont,
+  usedFonts = [],
+  onApplyTextColor,
+  onApplyEffects,
   onAddShape,
+  onSetBackground,
+  onSetBackgroundImage,
+  onClearBackground,
+  canvasWidth = 340,
+  canvasHeight = 220,
+  onSetObjProp,
+  onDuplicateObj,
+  onDeleteObj,
+  onBringForward,
+  onSendBackward,
+  onBringToFront,
+  onSendToBack,
+  onFlipX,
+  onFlipY,
   collagePhotoCount = 3,
   onCollagePhotoCountChange,
   collageFilterSuitable = false,
@@ -102,27 +132,20 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
     );
   }
 
-  if (
-    section === 'photo' &&
-    onAddImage &&
-    onPhotoDrop &&
-    onPhotoDragOver &&
-    onPhotoSortChange &&
-    onPhotoAutofillChange &&
-    onPhotoHideUsedChange
-  ) {
+  if (section === 'photo' && onAddImage && onPhotoDrop && onPhotoDragOver && onPhotoSortChange) {
     return (
       <PhotoPanel
         onAddImage={onAddImage}
         onAddPhotoField={onAddPhotoField}
         onDrop={onPhotoDrop}
         onDragOver={onPhotoDragOver}
+        onImageUrlSubmit={onImageUrlSubmit}
         sortBy={photoSort}
         onSortChange={onPhotoSortChange}
-        autofill={photoAutofill}
-        onAutofillChange={onPhotoAutofillChange}
-        hideUsed={photoHideUsed}
-        onHideUsedChange={onPhotoHideUsedChange}
+        onAutofillPhotoFields={onAutofillPhotoFields}
+        libraryPhotos={photoLibrary}
+        onLibraryPhotoClick={onLibraryPhotoClick}
+        onLibraryPhotoRemove={onLibraryPhotoRemove}
         onClose={onClose}
       />
     );
@@ -130,28 +153,21 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
 
   if (
     section === 'text' &&
-    onAddText &&
     onTextChange &&
-    onFontChange &&
-    onFontSizeChange &&
-    onTextColorChange &&
-    onFontWeightToggle &&
-    onFontStyleToggle &&
-    onUnderlineToggle &&
-    onTextAlignChange
+    onAddTextPreset &&
+    onApplyFont &&
+    onApplyTextColor &&
+    onApplyEffects
   ) {
     return (
       <TextPanel
-        onAddText={onAddText}
         selectedObj={selectedObj ?? null}
+        usedFonts={usedFonts}
         onTextChange={onTextChange}
-        onFontChange={onFontChange}
-        onFontSizeChange={onFontSizeChange}
-        onTextColorChange={onTextColorChange}
-        onFontWeightToggle={onFontWeightToggle}
-        onFontStyleToggle={onFontStyleToggle}
-        onUnderlineToggle={onUnderlineToggle}
-        onTextAlignChange={onTextAlignChange}
+        onAddTextPreset={onAddTextPreset}
+        onApplyFont={onApplyFont}
+        onApplyTextColor={onApplyTextColor}
+        onApplyEffects={onApplyEffects}
         onClose={onClose}
       />
     );
@@ -161,9 +177,39 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
     return <ShapesPanel onAddShape={onAddShape} onClose={onClose} />;
   }
 
+  if (section === 'background') {
+    return (
+      <BackgroundPanel
+        onSetBackground={onSetBackground ?? (() => {})}
+        onSetBackgroundImage={onSetBackgroundImage ?? (() => Promise.resolve())}
+        onClearBackground={onClearBackground ?? (() => {})}
+        canvasWidth={canvasWidth}
+        canvasHeight={canvasHeight}
+        onClose={onClose}
+      />
+    );
+  }
+
+  if (section === 'object') {
+    return (
+      <ObjectPropsPanel
+        selectedObj={selectedObj ?? null}
+        onSetObjProp={onSetObjProp ?? (() => {})}
+        onDuplicate={onDuplicateObj ?? (() => {})}
+        onDelete={onDeleteObj ?? (() => {})}
+        onBringForward={onBringForward ?? (() => {})}
+        onSendBackward={onSendBackward ?? (() => {})}
+        onBringToFront={onBringToFront ?? (() => {})}
+        onSendToBack={onSendToBack ?? (() => {})}
+        onFlipX={onFlipX ?? (() => {})}
+        onFlipY={onFlipY ?? (() => {})}
+        onClose={onClose}
+      />
+    );
+  }
+
   const placeholderSections: SidebarSection[] = [
     'templates',
-    'background',
     'stickers',
     'cliparts',
     'frames',

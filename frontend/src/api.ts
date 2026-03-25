@@ -993,6 +993,10 @@ export type DesignTemplateInput = Omit<Partial<DesignTemplate>, 'spec' | 'is_act
   is_active?: boolean | number;
 };
 
+/** Прокси: скачать изображение по HTTPS (Я.Диск, Google Drive, прямая ссылка) — обход CORS в браузере */
+export const fetchImageFromUrl = (url: string) =>
+  api.post<Blob>('/images/from-url', { url }, { responseType: 'blob' });
+
 export const getDesignTemplates = () => api.get<DesignTemplate[]>('/design-templates');
 export const getDesignTemplatesByCategory = (category: string) =>
   api.get<DesignTemplate[]>(`/design-templates/category/${encodeURIComponent(category)}`);
@@ -1007,6 +1011,39 @@ export const uploadDesignTemplatePreview = (file: File) => {
   formData.append('preview', file);
   return api.post<{ filename: string; url: string }>('/design-templates/upload-preview', formData);
 };
+
+// ─── Subtype Design Templates API ──────────────────────────────────────────────
+// Привязка дизайн-шаблонов к подтипам продукта
+
+export interface SubtypeDesignLink {
+  id: number;
+  product_id: number;
+  type_id: number;
+  design_template_id: number;
+  sort_order: number;
+  created_at: string;
+  // joined from design_templates
+  name: string;
+  preview_url: string | null;
+  category: string | null;
+  is_active: number;
+}
+
+/** Список дизайнов, привязанных к подтипу */
+export const getSubtypeDesigns = (productId: number, typeId: number) =>
+  api.get<SubtypeDesignLink[]>(`/products/${productId}/subtype-designs?typeId=${typeId}`);
+
+/** Привязать дизайн-шаблон к подтипу */
+export const addSubtypeDesign = (productId: number, typeId: number, designTemplateId: number) =>
+  api.post<SubtypeDesignLink>(`/products/${productId}/subtype-designs`, { typeId, designTemplateId });
+
+/** Отвязать дизайн-шаблон от подтипа */
+export const removeSubtypeDesign = (productId: number, linkId: number) =>
+  api.delete(`/products/${productId}/subtype-designs/${linkId}`);
+
+/** Изменить порядок дизайнов подтипа */
+export const reorderSubtypeDesigns = (productId: number, typeId: number, orderedLinkIds: number[]) =>
+  api.put(`/products/${productId}/subtype-designs/reorder`, { typeId, orderedLinkIds });
 
 // Collage Templates API (шаблоны раскладки для коллажей в редакторе макетов)
 export interface CollageLayoutCell {

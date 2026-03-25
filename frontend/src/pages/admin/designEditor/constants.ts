@@ -15,6 +15,33 @@ export const SAFE_ZONE_MM = 5;
 export const getExportPixelRatio = () =>
   typeof window !== 'undefined' && window.innerWidth <= 768 ? 1 : 2;
 
+/** Пресеты при добавлении текста с сайдбара */
+export const TEXT_BLOCK_PRESETS = {
+  heading: {
+    label: 'Заголовок',
+    defaultText: 'Заголовок',
+    fontSize: 46,
+    fontWeight: 'bold' as const,
+    lineHeight: 1.12,
+  },
+  subtitle: {
+    label: 'Подзаголовок',
+    defaultText: 'Подзаголовок',
+    fontSize: 30,
+    fontWeight: 'bold' as const,
+    lineHeight: 1.2,
+  },
+  body: {
+    label: 'Обычный текст',
+    defaultText: 'Текст',
+    fontSize: 18,
+    fontWeight: 'normal' as const,
+    lineHeight: 1.45,
+  },
+} as const;
+
+export type TextBlockPresetKind = keyof typeof TEXT_BLOCK_PRESETS;
+
 /** Шрифты для текстовых блоков */
 export const TEXT_FONTS: { value: string; label: string }[] = [
   { value: 'Arial', label: 'Arial' },
@@ -35,7 +62,7 @@ export const SIDEBAR_ITEMS: { id: SidebarSection; label: string; icon: IconName 
   { id: 'photo', label: 'Фото', icon: 'image' },
   { id: 'text', label: 'Текст', icon: 'edit' },
   { id: 'shapes', label: 'Фигуры', icon: 'box' },
-  { id: 'templates', label: 'Шаблоны', icon: 'layers' },
+  { id: 'object', label: 'Объект', icon: 'layers' },
   { id: 'background', label: 'Фон', icon: 'camera' },
   { id: 'collages', label: 'Коллажи', icon: 'scissors' },
   { id: 'stickers', label: 'Стикеры', icon: 'tag' },

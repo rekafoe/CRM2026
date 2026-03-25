@@ -9,6 +9,7 @@ import type { UseSimplifiedTypesResult } from '../hooks/useSimplifiedTypes'
 import { PrintPricesCard } from './PrintPricesCard'
 import { MaterialsCard } from './MaterialsCard'
 import { FinishingCard } from './FinishingCard'
+import { SubtypeDesignsCard } from './SubtypeDesignsCard'
 import { AddSizeModal, CopySizesModal } from './SizeModals'
 import { type Tier, defaultTiers, normalizeTiers } from '../utils/tierManagement'
 import { clonePrintBlockFromSize } from '../utils/clonePrintConfig'
@@ -40,6 +41,8 @@ interface Props {
   showPagesConfig?: boolean
   types: UseSimplifiedTypesResult
   services: ServiceRow[]
+  /** ID продукта — нужен для привязки дизайнов к подтипу */
+  productId?: number
 }
 
 const uid = () => Date.now() + Math.floor(Math.random() * 1000)
@@ -71,6 +74,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   showPagesConfig = true,
   types,
   services,
+  productId,
 }) => {
   const {
     hasTypes,
@@ -899,6 +903,15 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   hasUserInteractedWithServicesRef={hasUserInteractedWithServicesRef}
                   isMobile={isMobile}
                 />
+
+                {productId && selectedTypeId != null && (
+                  <SubtypeDesignsCard
+                    productId={productId}
+                    typeId={Number(selectedTypeId)}
+                    subtypeSizes={sizes}
+                    pagesConfig={value.typeConfigs?.[String(selectedTypeId)]?.pages}
+                  />
+                )}
               </>
             )}
           </div>
