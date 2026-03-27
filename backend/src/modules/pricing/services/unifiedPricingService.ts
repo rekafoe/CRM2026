@@ -75,6 +75,12 @@ export interface UnifiedPricingResult {
   calculationMethod: 'flexible_operations' | 'fallback_legacy' | 'simplified';
   /** Предупреждения (например: формат не помещается на лист) */
   warnings?: string[];
+  breakdown?: {
+    coverPrice: number;
+    innerBlockPrice: number;
+    bindingPrice: number;
+    otherFinishingPrice: number;
+  };
 }
 
 export class UnifiedPricingService {
@@ -431,6 +437,7 @@ export class UnifiedPricingService {
       finalPrice: result.finalPrice,
       pricePerUnit: result.pricePerUnit,
       ...(result.tier_prices && result.tier_prices.length > 0 ? { tier_prices: result.tier_prices } : {}),
+      ...(result.breakdown ? { breakdown: result.breakdown } : {}),
       calculatedAt: result.calculatedAt,
       calculationMethod: 'simplified',
     };

@@ -615,6 +615,80 @@ router.get('/services', asyncHandler(async (_req, res) => {
   res.json(services.map(toServiceResponse))
 }))
 
+router.get('/bindings', asyncHandler(async (_req, res) => {
+  const { BindingPricingService } = await import('../modules/pricing/services/bindingPricingService')
+  const bindings = await BindingPricingService.listBindingsDetailed()
+  res.json(bindings.map((binding: any) => ({
+    ...toServiceResponse(binding),
+    variants: binding.variants,
+    tiers: binding.tiers,
+  })))
+}))
+
+router.post('/bindings', asyncHandler(async (req, res) => {
+  const { name, unit, price_unit, priceUnit, rate, currency, is_active, isActive, min_quantity, max_quantity, operator_percent, category_id, categoryId, material_id, qty_per_item } = req.body
+  const created = await ServiceManagementService.createBinding({
+    name,
+    type: 'bind',
+    operationType: 'bind',
+    unit,
+    priceUnit: price_unit ?? priceUnit,
+    rate: Number(rate ?? 0),
+    currency,
+    isActive: is_active !== undefined ? !!is_active : isActive,
+    minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
+    maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
+    operator_percent: operator_percent !== undefined && operator_percent !== '' ? Number(operator_percent) : undefined,
+    categoryId: category_id ?? categoryId,
+    material_id: material_id != null && material_id !== '' ? Number(material_id) : undefined,
+    qty_per_item: qty_per_item != null && qty_per_item !== '' ? Number(qty_per_item) : undefined,
+  })
+  res.status(201).json(toServiceResponse(created))
+}))
+
+router.put('/bindings/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { name, unit, price_unit, priceUnit, rate, is_active, isActive, min_quantity, max_quantity, operator_percent, category_id, categoryId, material_id, qty_per_item } = req.body
+  const updated = await ServiceManagementService.updateBinding(Number(id), {
+    name,
+    type: 'bind',
+    operationType: 'bind',
+    unit,
+    priceUnit: price_unit ?? priceUnit,
+    rate: rate !== undefined ? Number(rate) : undefined,
+    isActive: is_active !== undefined ? !!is_active : isActive,
+    minQuantity: min_quantity !== undefined ? Number(min_quantity) : undefined,
+    maxQuantity: max_quantity !== undefined ? Number(max_quantity) : undefined,
+    operator_percent: operator_percent !== undefined ? (operator_percent === '' || operator_percent === null ? undefined : Number(operator_percent)) : undefined,
+    categoryId: category_id !== undefined ? category_id : categoryId,
+    material_id: material_id !== undefined ? (material_id != null && material_id !== '' ? Number(material_id) : null) : undefined,
+    qty_per_item: qty_per_item !== undefined ? (qty_per_item != null && qty_per_item !== '' ? Number(qty_per_item) : null) : undefined,
+  })
+
+  if (!updated) {
+    res.status(404).json({ success: false, error: 'Binding not found' })
+    return
+  }
+
+  res.json(toServiceResponse(updated))
+}))
+
+router.delete('/bindings/:id', asyncHandler(async (req, res) => {
+  await ServiceManagementService.deleteBinding(Number(req.params.id))
+  res.json({ success: true })
+}))
+
+router.post('/bindings/quote', asyncHandler(async (req, res) => {
+  const { BindingPricingService } = await import('../modules/pricing/services/bindingPricingService')
+  const result = await BindingPricingService.quoteBinding({
+    serviceId: Number(req.body?.serviceId ?? req.body?.service_id),
+    variantId: req.body?.variantId ?? req.body?.variant_id,
+    quantity: Number(req.body?.quantity),
+    unitsPerItem: req.body?.unitsPerItem ?? req.body?.units_per_item,
+  })
+  res.json(result)
+}))
+
 // --- Категории послепечатных услуг (для группировки в services-management и выборе продукта) ---
 router.get('/service-categories', asyncHandler(async (_req, res) => {
   const categories = await ServiceManagementService.listServiceCategories()
@@ -1848,9 +1922,20 @@ router.post('/calculate', asyncHandler(async (req, res) => {
  *         description: Результат расчета
  */
 router.post('/multipage/calculate', asyncHandler(async (req, res) => {
-  const { MultipageProductService } = await import('../modules/pricing/services/multipageProductService')
-  const result = await MultipageProductService.calculate(req.body)
-  res.json(result)
+  const { MultipageProductService, MultipageValidationError } = await import('../modules/pricing/services/multipageProductService')
+  try {
+    const result = await MultipageProductService.calculate(req.body)
+    res.json(result)
+  } catch (error: any) {
+    if (error instanceof MultipageValidationError) {
+      res.status(400).json({
+        error: error.message,
+        details: error.details,
+      })
+      return
+    }
+    throw error
+  }
 }))
 
 /**

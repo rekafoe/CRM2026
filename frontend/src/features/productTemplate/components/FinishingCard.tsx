@@ -38,13 +38,22 @@ export const FinishingCard: React.FC<FinishingCardProps> = ({
   hasUserInteractedWithServicesRef,
   isMobile,
 }) => {
+  const titleWithHint = (label: string, hint: string) => (
+    <span className="simplified-label-with-hint">
+      <strong>{label}</strong>
+      <span className="simplified-label-hint" title={hint}>?</span>
+    </span>
+  )
+
   const [expanded, setExpanded] = useState(false)
   return (
   <div className={`simplified-card simplified-card--collapsible ${!expanded ? 'simplified-card--collapsed' : ''}`}>
     <div className="simplified-card__header" onClick={() => setExpanded((v) => !v)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setExpanded((v) => !v)}>
       <div>
-        <strong>Отделка (послепечатные услуги)</strong>
-        <div className="text-muted text-sm">Выберите услуги из списка. Цены загружаются из services-management. Отметьте услуги, которые нужно добавить в продукт.</div>
+        {titleWithHint(
+          'Отделка (послепечатные услуги)',
+          'Выберите услуги из списка. Цены загружаются из services-management. Отметьте услуги, которые нужно добавить в продукт.',
+        )}
       </div>
       <span className="simplified-card__header-toggle">{expanded ? 'Свернуть' : 'Развернуть'}</span>
     </div>

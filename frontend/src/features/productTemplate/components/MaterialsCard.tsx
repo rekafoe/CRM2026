@@ -41,6 +41,13 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
   updateEffectiveMaterials,
   setUseOwnMaterials,
 }) => {
+  const titleWithHint = (label: string, hint: string) => (
+    <span className="simplified-label-with-hint">
+      <strong>{label}</strong>
+      <span className="simplified-label-hint" title={hint}>?</span>
+    </span>
+  )
+
   const allowedBaseIds = selected.allowed_base_material_ids ?? []
   const baseMaterialsList = allMaterials.length > 0 ? allMaterials : allMaterialsFromAllPaperTypes
   const effectiveIds = effectiveAllowedMaterialIds ?? selected.allowed_material_ids ?? []
@@ -50,8 +57,10 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
   <div className="simplified-card">
     <div className="simplified-card__header">
       <div>
-        <strong>Материалы (разрешённые)</strong>
-        <div className="text-muted text-sm">Выберите тип бумаги, затем конкретные материалы. Цены подтягиваются со склада автоматически.</div>
+        {titleWithHint(
+          'Материалы (разрешённые)',
+          'Выберите тип бумаги, затем конкретные материалы. Цены подтягиваются со склада автоматически.',
+        )}
       </div>
     </div>
     <div className="simplified-card__content">
@@ -98,13 +107,20 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
       {selectedPaperTypeId && materialsForSelectedPaperType.length > 0 && (
         <>
           <div className="mt-3 mb-3" style={{ border: '1px solid #e5e7eb', borderRadius: '4px', padding: '12px' }}>
-            {hasCommonMaterialsFeature && !useOwnMaterials && (
-              <div className="text-muted text-sm mb-2" style={{ backgroundColor: '#f0f9ff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #bae6fd' }}>
-                <strong>Общие материалы типа.</strong> Список ниже — общий для всех размеров этого типа. Добавляйте и снимайте галочки — изменения применятся ко всем размерам, у которых не включены «свои материалы».
-              </div>
-            )}
             <div className="text-sm font-medium mb-2">
-              {hasCommonMaterialsFeature && !useOwnMaterials ? 'Общие материалы типа (отметьте разрешённые):' : 'Выберите разрешенные материалы:'}
+              {hasCommonMaterialsFeature && !useOwnMaterials ? (
+                <span className="simplified-label-with-hint">
+                  <span>Общие материалы типа (отметьте разрешённые):</span>
+                  <span
+                    className="simplified-label-hint"
+                    title="Список ниже — общий для всех размеров этого типа. Добавляйте и снимайте галочки — изменения применятся ко всем размерам, у которых не включены «свои материалы»."
+                  >
+                    ?
+                  </span>
+                </span>
+              ) : (
+                'Выберите разрешенные материалы:'
+              )}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
               {materialsForSelectedPaperType.map(m => {
@@ -156,7 +172,6 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
 
           {effectiveIds.length > 0 && (
             <div className="mt-3" style={{ fontSize: 13 }}>
-              <div className="text-muted text-sm mb-2">Цены подтягиваются со склада при расчёте заказа</div>
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 {allMaterialsFromAllPaperTypes
                   .filter(m => effectiveIds.includes(Number(m.id)))
@@ -204,13 +219,24 @@ const BaseMaterialsCollapsible: React.FC<{
   selected: SimplifiedSizeConfig
   updateSize: (sizeId: number | string, patch: Partial<SimplifiedSizeConfig>) => void
 }> = ({ baseMaterialsList, allowedBaseIds, selected, updateSize }) => {
+  const titleWithHint = (label: string, hint: string) => (
+    <span className="simplified-label-with-hint">
+      <span>{label}</span>
+      <span className="simplified-label-hint" title={hint}>?</span>
+    </span>
+  )
+
   const [expanded, setExpanded] = useState(false)
   return (
     <div className={`simplified-subsection simplified-subsection--collapsible mt-4 pt-4 ${!expanded ? 'simplified-subsection--collapsed' : ''}`} style={{ borderTop: '1px solid #e5e7eb' }}>
       <div className="simplified-subsection__header" onClick={() => setExpanded((v) => !v)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setExpanded((v) => !v)}>
         <div>
-          <div className="text-sm font-medium">Материалы-основы (заготовки)</div>
-          <div className="text-muted text-sm">Для сувенирки, сублимации: футболки, кружки и т.п. Расход: 1 шт на изделие.</div>
+          <div className="text-sm font-medium">
+            {titleWithHint(
+              'Материалы-основы (заготовки)',
+              'Для сувенирки, сублимации: футболки, кружки и т.п. Расход: 1 шт на изделие.',
+            )}
+          </div>
         </div>
         <span className="simplified-subsection__header-toggle">{expanded ? 'Свернуть' : 'Развернуть'}</span>
       </div>

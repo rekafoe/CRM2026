@@ -219,3 +219,47 @@
 - **Цена за изделие = finalPrice / тираж**
 
 Таким образом, многостраничный шаблон просчитывает стоимость так: страницы и двухсторонняя печать уменьшают число листов на изделие; печать и материал считаются по «объёму в листах» (effectivePrintQuantity); отделка — по тиражу и правилам каждой операции (за рез или за изделие).
+
+---
+
+## 10. Новая структура `simplified.multiPageStructure`
+
+Для `product_type = 'multi_page'` в `config_data.simplified` поддерживается дополнительный блок:
+
+```json
+{
+  "multiPageStructure": {
+    "innerBlock": {
+      "pagesSource": "parameter",
+      "fixedPages": 24
+    },
+    "cover": {
+      "mode": "none|self|separate",
+      "material_id": 123,
+      "qty_per_item": 1,
+      "print": {
+        "technology_code": "laser_prof",
+        "color_mode": "color",
+        "sides_mode": "duplex"
+      }
+    },
+    "binding": {
+      "service_id": 45,
+      "variant_id": 67,
+      "units_per_item": 1
+    }
+  }
+}
+```
+
+- `innerBlock` определяет источник страниц (`parameter`/`fixed`) для расчёта внутреннего блока.
+- `cover` включает отдельную модель обложки:
+  - `none` — без отдельной обложки;
+  - `self` — обложка считается от выбранных параметров блока;
+  - `separate` — используются отдельные настройки обложки.
+- `binding` выбирает переплёт из централизованного сервиса `post_processing_services` (`operation_type='bind'`), включая вариант и норму на изделие.
+
+### Backward compatibility
+
+- Если `multiPageStructure` отсутствует, используется legacy-логика `simplified` без изменений.
+- Для старых шаблонов migration не нужна: новый блок появляется только после явной настройки в админке.

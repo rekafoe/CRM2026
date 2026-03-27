@@ -12,6 +12,7 @@ import { PricingServiceRepository } from '../repositories/serviceRepository';
 import { LayoutCalculationService } from './layoutCalculationService';
 import { PrintPriceService } from './printPriceService';
 import { PriceTypeService } from './priceTypeService';
+import { BindingPricingService, BindingQuoteResult } from './bindingPricingService';
 
 export interface SimplifiedPricingResult {
   productId: number;
@@ -100,6 +101,12 @@ export interface SimplifiedPricingResult {
     cutsPerSheet?: number;
   };
   warnings?: string[];
+  breakdown?: {
+    coverPrice: number;
+    innerBlockPrice: number;
+    bindingPrice: number;
+    otherFinishingPrice: number;
+  };
 }
 
 interface SimplifiedQtyTier {
@@ -165,6 +172,33 @@ interface SimplifiedConfig {
   duplex_as_single_x2?: boolean;
   /** Учитывать стоимость материалов: false = materialPrice = 0 */
   include_material_cost?: boolean;
+  multiPageStructure?: {
+    innerBlock?: {
+      pagesSource?: 'parameter' | 'fixed';
+      fixedPages?: number;
+      print?: {
+        technology_code?: string;
+        color_mode?: 'color' | 'bw';
+        sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
+      };
+      material_id?: number;
+    };
+    cover?: {
+      mode?: 'none' | 'self' | 'separate';
+      print?: {
+        technology_code?: string;
+        color_mode?: 'color' | 'bw';
+        sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
+      };
+      material_id?: number;
+      qty_per_item?: number;
+    };
+    binding?: {
+      service_id?: number;
+      variant_id?: number;
+      units_per_item?: number;
+    };
+  };
 }
 
 export class SimplifiedPricingService {
@@ -182,6 +216,13 @@ export class SimplifiedPricingService {
       material_id?: number;
       /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
       base_material_id?: number;
+      cover_material_id?: number;
+      cover_print_technology?: string;
+      cover_print_color_mode?: 'color' | 'bw';
+      cover_print_sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
+      binding_service_id?: number;
+      binding_variant_id?: number;
+      binding_units_per_item?: number;
       finishing?: Array<{
         service_id: number;
         price_unit?: 'per_cut' | 'per_item';
@@ -223,6 +264,9 @@ export class SimplifiedPricingService {
       : templateConfig.config_data;
     
     const simplifiedConfig: SimplifiedConfig = configData.simplified || { sizes: [] };
+    const multiPageStructure = product.product_type === 'multi_page'
+      ? (simplifiedConfig.multiPageStructure || null)
+      : null;
     
     // Для продуктов с типами (typeConfigs) размеры берём из typeConfigs[typeId].sizes
     const typeId = (configuration as any).typeId ?? (configuration as any).type_id;
@@ -413,7 +457,12 @@ export class SimplifiedPricingService {
     }
 
     const usePagesMultiplier = product.product_type === 'multi_page';
-    const pagesCount = Number((configuration as any).pages);
+    const rawPagesCount = Number((configuration as any).pages);
+    const fixedPages = Number(multiPageStructure?.innerBlock?.fixedPages);
+    const pagesCount =
+      multiPageStructure?.innerBlock?.pagesSource === 'fixed' && Number.isFinite(fixedPages) && fixedPages > 0
+        ? fixedPages
+        : rawPagesCount;
     const effectivePages = usePagesMultiplier && Number.isFinite(pagesCount) && pagesCount > 0 ? pagesCount : 1;
     const sidesMode = normalizedConfig.print_sides_mode || 'single';
     const sheetsPerItem =
@@ -697,33 +746,61 @@ export class SimplifiedPricingService {
       });
     }
 
+    const configuredBindingServiceId = Number(
+      (configuration as any).binding_service_id ??
+      multiPageStructure?.binding?.service_id
+    );
+    const configuredBindingVariantIdRaw =
+      (configuration as any).binding_variant_id ??
+      multiPageStructure?.binding?.variant_id;
+    const configuredBindingVariantId =
+      configuredBindingVariantIdRaw != null && Number.isFinite(Number(configuredBindingVariantIdRaw))
+        ? Number(configuredBindingVariantIdRaw)
+        : undefined;
+    const configuredBindingUnitsRaw =
+      (configuration as any).binding_units_per_item ??
+      multiPageStructure?.binding?.units_per_item;
+    const configuredBindingUnits =
+      configuredBindingUnitsRaw != null && Number.isFinite(Number(configuredBindingUnitsRaw)) && Number(configuredBindingUnitsRaw) > 0
+        ? Number(configuredBindingUnitsRaw)
+        : 1;
+
+    const hasConfiguredBinding = Number.isFinite(configuredBindingServiceId) && configuredBindingServiceId > 0;
+    let effectiveFinishingToUse = [...finishingToUse];
+    if (hasConfiguredBinding) {
+      // Переплет считаем отдельным контуром через BindingPricingService.
+      effectiveFinishingToUse = effectiveFinishingToUse.filter(
+        (item) => Number(item.service_id) !== configuredBindingServiceId
+      );
+    }
+
     // При fallback: исключаем операции с min_quantity > quantity (пользователь не выбирал их явно)
-    const isFallbackFinishing = !(normalizedConfig.finishing && normalizedConfig.finishing.length > 0) && finishingToUse.length > 0;
-    if (isFallbackFinishing && finishingToUse.length > 0) {
-      const ids = [...new Set(finishingToUse.map((f: any) => Number(f?.service_id)).filter((id: number) => Number.isFinite(id)))];
+    const isFallbackFinishing = !(normalizedConfig.finishing && normalizedConfig.finishing.length > 0) && effectiveFinishingToUse.length > 0;
+    if (isFallbackFinishing && effectiveFinishingToUse.length > 0) {
+      const ids = [...new Set(effectiveFinishingToUse.map((f: any) => Number(f?.service_id)).filter((id: number) => Number.isFinite(id)))];
       if (ids.length > 0) {
         const limits = (await db.all(
           `SELECT id, min_quantity FROM post_processing_services WHERE id IN (${ids.map(() => '?').join(',')})`,
           ids
         )) as Array<{ id: number; min_quantity?: number | null }>;
         const minByService = new Map(limits.map((r) => [Number(r.id), Number(r.min_quantity ?? 1)]));
-        finishingToUse = finishingToUse.filter((f: any) => {
+        effectiveFinishingToUse = effectiveFinishingToUse.filter((f: any) => {
           const minQ = minByService.get(Number(f?.service_id)) ?? 1;
           return quantity >= minQ;
         });
       }
     }
 
-    if (finishingToUse.length > 0) {
+    if (effectiveFinishingToUse.length > 0) {
       logger.info('🔧 [SimplifiedPricingService] Используем finishing', {
         productId,
         quantity,
-        finishing: finishingToUse,
+        finishing: effectiveFinishingToUse,
         source: normalizedConfig.finishing?.length ? 'configuration' : 'selectedSize',
       });
       const uniqueServiceIds = Array.from(
         new Set(
-          finishingToUse
+          effectiveFinishingToUse
             .map(f => f.service_id)
             .filter((id): id is number => typeof id === 'number' && Number.isFinite(id))
         )
@@ -748,7 +825,7 @@ export class SimplifiedPricingService {
         // 🆕 Для услуг с вариантами используем тарифы варианта, иначе базовые тарифы услуги
         serviceTiersMap = new Map<string, SimplifiedQtyTier[]>(); // Ключ: "serviceId" или "serviceId:variantId"
         
-        for (const finConfig of finishingToUse) {
+        for (const finConfig of effectiveFinishingToUse) {
           const serviceId = Number(finConfig.service_id);
           const rawVid = (finConfig as any).variant_id;
           const variantId =
@@ -832,7 +909,7 @@ export class SimplifiedPricingService {
           serviceIds: Array.from(serviceTiersMap.keys()),
         });
 
-        for (const finConfig of finishingToUse) {
+        for (const finConfig of effectiveFinishingToUse) {
           const rawVid = (finConfig as any).variant_id;
           const variantId =
             rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
@@ -1086,8 +1163,49 @@ export class SimplifiedPricingService {
       }
     }
     
+    let coverPrice = 0;
+    if (usePagesMultiplier && multiPageStructure?.cover?.mode && multiPageStructure.cover.mode !== 'none') {
+      coverPrice = await this.calculateMultiPageCoverCost({
+        db,
+        quantity,
+        selectedSize,
+        includeMaterialCost,
+        configuration: normalizedConfig as any,
+        multiPageStructure,
+        selectedTypeConfig: typeConfig ?? undefined,
+      });
+    }
+
+    let configuredBindingQuote: BindingQuoteResult | null = null;
+    if (usePagesMultiplier && hasConfiguredBinding) {
+      try {
+        configuredBindingQuote = await BindingPricingService.quoteBinding({
+          serviceId: configuredBindingServiceId,
+          variantId: configuredBindingVariantId,
+          quantity,
+          unitsPerItem: configuredBindingUnits,
+        });
+      } catch (error) {
+        logger.warn('Не удалось рассчитать configured binding через BindingPricingService', {
+          productId,
+          serviceId: configuredBindingServiceId,
+          variantId: configuredBindingVariantId,
+          error: (error as Error).message,
+        });
+      }
+    }
+
+    const bindFromFinishing = finishingDetails
+      .filter((d) => String(d.operation_type || '').toLowerCase() === 'bind')
+      .reduce((sum, d) => sum + Number(d.priceForQuantity || 0), 0);
+    let bindingPrice = configuredBindingQuote ? configuredBindingQuote.total : bindFromFinishing;
+    let otherFinishingPrice = Math.max(
+      0,
+      finishingPrice - bindFromFinishing
+    );
+
     // 7. Рассчитываем итоги (округление до 2 знаков — как в buildTierPricesForConfig, чтобы финальная цена совпадала с «Цена» в диапазонах)
-    let subtotal = printPrice + materialPrice + finishingPrice;
+    let subtotal = printPrice + materialPrice + otherFinishingPrice + bindingPrice + coverPrice;
     let finalPrice = Math.round(subtotal * 100) / 100;
     let pricePerUnit = quantity > 0 ? Math.round((finalPrice / quantity) * 100) / 100 : 0;
     
@@ -1096,13 +1214,15 @@ export class SimplifiedPricingService {
       quantity,
       printPrice,
       materialPrice,
-      finishingPrice,
+      finishingPrice: otherFinishingPrice + bindingPrice,
+      bindingPrice,
+      coverPrice,
       subtotal,
       finalPrice,
       pricePerUnit,
       hasPrintConfig: !!(normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode),
       hasMaterialConfig: !!normalizedConfig.material_id,
-      hasFinishingConfig: finishingToUse.length > 0
+      hasFinishingConfig: effectiveFinishingToUse.length > 0 || hasConfiguredBinding
     });
     
     if (finalPrice === 0) {
@@ -1147,7 +1267,7 @@ export class SimplifiedPricingService {
       baseMaterialPricePerItem,
       serviceTiersMap: serviceTiersMap ?? new Map(),
       serviceLimitsMap: serviceLimitsMap ?? new Map(),
-      finishingConfig: finishingToUse,
+      finishingConfig: effectiveFinishingToUse,
       selectedSize,
       layoutCheck,
       itemsPerSheet,
@@ -1164,6 +1284,40 @@ export class SimplifiedPricingService {
       isRollPrint,
       metersPerItem,
     });
+    if (usePagesMultiplier && multiPageStructure && tierPricesResult.length > 0) {
+      for (const tierRow of tierPricesResult) {
+        const qtyForTier = Math.max(1, Number(tierRow.min_qty));
+        let tierCoverPrice = 0;
+        if (multiPageStructure.cover?.mode && multiPageStructure.cover.mode !== 'none') {
+          tierCoverPrice = await this.calculateMultiPageCoverCost({
+            db,
+            quantity: qtyForTier,
+            selectedSize,
+            includeMaterialCost,
+            configuration: normalizedConfig as any,
+            multiPageStructure,
+            selectedTypeConfig: typeConfig ?? undefined,
+          });
+        }
+
+        let tierBindingPrice = 0;
+        if (hasConfiguredBinding) {
+          try {
+            const tierBindingQuote = await BindingPricingService.quoteBinding({
+              serviceId: configuredBindingServiceId,
+              variantId: configuredBindingVariantId,
+              quantity: qtyForTier,
+              unitsPerItem: configuredBindingUnits,
+            });
+            tierBindingPrice = tierBindingQuote.total;
+          } catch {
+            tierBindingPrice = 0;
+          }
+        }
+        tierRow.total_price = Math.round(((tierRow.total_price ?? 0) + tierCoverPrice + tierBindingPrice) * 100) / 100;
+        tierRow.unit_price = qtyForTier > 0 ? Math.round((tierRow.total_price / qtyForTier) * 10000) / 10000 : tierRow.unit_price;
+      }
+    }
     
     // 8. Загружаем названия, плотность и тип бумаги материалов
     let materialName = `Material #${normalizedConfig.material_id}`;
@@ -1222,7 +1376,9 @@ export class SimplifiedPricingService {
       logger.info('Применяем множитель типа цены', { priceTypeKey, multiplier: priceTypeMult });
       printPrice *= priceTypeMult;
       materialPrice *= priceTypeMult;
-      finishingPrice *= priceTypeMult;
+      coverPrice *= priceTypeMult;
+      const scaledBindingPrice = bindingPrice * priceTypeMult;
+      const scaledOtherFinishingPrice = otherFinishingPrice * priceTypeMult;
       subtotal *= priceTypeMult;
       finalPrice *= priceTypeMult;
       pricePerUnit *= priceTypeMult;
@@ -1238,6 +1394,8 @@ export class SimplifiedPricingService {
         baseMaterialDetails.tier = { ...baseMaterialDetails.tier, price: baseMaterialDetails.tier.price * priceTypeMult };
         baseMaterialDetails.priceForQuantity *= priceTypeMult;
       }
+      bindingPrice = scaledBindingPrice;
+      const updatedOtherFinishingPrice = scaledOtherFinishingPrice;
       finishingDetails.forEach((d) => {
         d.tier = { ...d.tier, price: d.tier.price * priceTypeMult };
         d.priceForQuantity *= priceTypeMult;
@@ -1253,6 +1411,8 @@ export class SimplifiedPricingService {
         t.unit_price = Math.round(t.unit_price * 10000) / 10000;
         if (t.total_price != null) t.total_price = Math.round(t.total_price * 100) / 100;
       });
+      // Обновляем значения breakdown после применения множителя.
+      otherFinishingPrice = updatedOtherFinishingPrice;
     }
 
     return {
@@ -1280,15 +1440,25 @@ export class SimplifiedPricingService {
         material_id: normalizedConfig.base_material_id,
         material_name: selectedBaseMaterialName,
       } : undefined,
-      selectedFinishing: finishingDetails.map(d => ({
-        service_id: d.service_id,
-        service_name: d.service_name,
-        price_unit: d.price_unit || 'per_item',
-        units_per_item: quantity > 0 ? d.units_needed / quantity : 0,
-      })),
+      selectedFinishing: [
+        ...finishingDetails.map(d => ({
+          service_id: d.service_id,
+          service_name: d.service_name,
+          price_unit: d.price_unit || 'per_item',
+          units_per_item: quantity > 0 ? d.units_needed / quantity : 0,
+        })),
+        ...(configuredBindingQuote
+          ? [{
+              service_id: configuredBindingQuote.serviceId,
+              service_name: configuredBindingQuote.serviceName,
+              price_unit: configuredBindingQuote.priceUnit,
+              units_per_item: configuredBindingUnits,
+            }]
+          : []),
+      ],
       printPrice,
       materialPrice,
-      finishingPrice,
+      finishingPrice: otherFinishingPrice + bindingPrice,
       subtotal,
       finalPrice,
       pricePerUnit,
@@ -1301,6 +1471,16 @@ export class SimplifiedPricingService {
       calculationMethod: 'simplified',
       layout: layoutResult,
       warnings: warnings.length > 0 ? warnings : undefined,
+      ...(usePagesMultiplier && multiPageStructure
+        ? {
+            breakdown: {
+              coverPrice: Math.round(coverPrice * 100) / 100,
+              innerBlockPrice: Math.round((printPrice + materialPrice) * 100) / 100,
+              bindingPrice: Math.round(bindingPrice * 100) / 100,
+              otherFinishingPrice: Math.round(otherFinishingPrice * 100) / 100,
+            },
+          }
+        : {}),
       ...(operationMaterials.length > 0 ? { operationMaterials } : {}),
     };
   }
@@ -1483,6 +1663,85 @@ export class SimplifiedPricingService {
       return String(cfg).trim().toLowerCase();
     }
     return 'per_item';
+  }
+
+  private static async calculateMultiPageCoverCost(ctx: {
+    db: any;
+    quantity: number;
+    selectedSize: SimplifiedSizeConfig;
+    includeMaterialCost: boolean;
+    configuration: {
+      material_id?: number;
+      print_technology?: string;
+      print_color_mode?: 'color' | 'bw';
+      print_sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
+      cover_material_id?: number;
+      cover_print_technology?: string;
+      cover_print_color_mode?: 'color' | 'bw';
+      cover_print_sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
+    };
+    multiPageStructure: NonNullable<SimplifiedConfig['multiPageStructure']>;
+    selectedTypeConfig?: SimplifiedTypeConfig;
+  }): Promise<number> {
+    const cover = ctx.multiPageStructure.cover;
+    if (!cover || cover.mode === 'none') return 0;
+
+    const sidesMode =
+      ctx.configuration.cover_print_sides_mode ||
+      cover.print?.sides_mode ||
+      'duplex';
+    const technologyCode =
+      ctx.configuration.cover_print_technology ||
+      cover.print?.technology_code ||
+      ctx.configuration.print_technology;
+    const colorMode =
+      ctx.configuration.cover_print_color_mode ||
+      cover.print?.color_mode ||
+      ctx.configuration.print_color_mode ||
+      'color';
+    const coverMaterialId =
+      Number(
+        ctx.configuration.cover_material_id ??
+        cover.material_id ??
+        ctx.configuration.material_id
+      ) || 0;
+    const coverUnitsPerItem =
+      cover.qty_per_item != null && Number.isFinite(Number(cover.qty_per_item)) && Number(cover.qty_per_item) > 0
+        ? Number(cover.qty_per_item)
+        : 1;
+
+    let printPrice = 0;
+    if (technologyCode) {
+      const printPriceConfig = ctx.selectedSize.print_prices.find((p) =>
+        String(p.technology_code || '').toLowerCase() === String(technologyCode).toLowerCase() &&
+        String(p.color_mode || '').toLowerCase() === String(colorMode).toLowerCase() &&
+        String(p.sides_mode || '').toLowerCase() === String(sidesMode).toLowerCase()
+      );
+      if (printPriceConfig?.tiers?.length) {
+        const tier = this.findTierForQuantity(printPriceConfig.tiers, ctx.quantity);
+        const tierPrice = tier ? this.getPriceForQuantityTier(tier) : 0;
+        const sidesMultiplier = sidesMode === 'single' ? 2 : 1;
+        printPrice = tierPrice * ctx.quantity * coverUnitsPerItem * sidesMultiplier;
+      }
+    }
+
+    let materialPrice = 0;
+    if (ctx.includeMaterialCost && coverMaterialId > 0) {
+      const allowed = ctx.selectedTypeConfig
+        ? getEffectiveAllowedMaterialIds(ctx.selectedTypeConfig, ctx.selectedSize)
+        : (ctx.selectedSize.allowed_material_ids ?? []);
+      const materialAllowed = allowed.length === 0 || allowed.includes(coverMaterialId);
+      if (materialAllowed) {
+        const material = await ctx.db.get(
+          `SELECT sheet_price_single FROM materials WHERE id = ? AND is_active = 1`,
+          [coverMaterialId]
+        ) as { sheet_price_single?: number | null } | undefined;
+        const sheetPrice = Number(material?.sheet_price_single ?? 0);
+        materialPrice = sheetPrice * ctx.quantity * coverUnitsPerItem;
+      }
+    }
+
+    return Math.round((printPrice + materialPrice) * 100) / 100;
   }
 
   /**

@@ -14,6 +14,7 @@ import { AddSizeModal, CopySizesModal } from './SizeModals'
 import { type Tier, defaultTiers, normalizeTiers } from '../utils/tierManagement'
 import { clonePrintBlockFromSize } from '../utils/clonePrintConfig'
 import { computeItemsPerSheet } from './PrintSheetSection'
+import { ImprovedPrintingCalculatorModal } from '../../../components/calculator/ImprovedPrintingCalculatorModal'
 import './SimplifiedTemplateSection.css'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
@@ -30,6 +31,20 @@ type ServiceRow = {
   price_unit?: string 
 }
 
+export type BindingServiceRow = {
+  id: number;
+  name: string;
+  variants?: Array<{ id: number; variantName?: string; variant_name?: string }>;
+}
+
+export type SimplifiedEditorTab = 'print' | 'materials' | 'finishing' | 'design' | 'check'
+export type SimplifiedChecklistState = {
+  size: boolean
+  print: boolean
+  materials: boolean
+  finishing: boolean
+}
+
 export type { ServiceRow }
 
 interface Props {
@@ -43,6 +58,9 @@ interface Props {
   services: ServiceRow[]
   /** ID продукта — нужен для привязки дизайнов к подтипу */
   productId?: number
+  bindingServices?: BindingServiceRow[]
+  onEditorTabChange?: (tab: SimplifiedEditorTab) => void
+  onChecklistChange?: (checklist: SimplifiedChecklistState) => void
 }
 
 const uid = () => Date.now() + Math.floor(Math.random() * 1000)
@@ -75,6 +93,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   types,
   services,
   productId,
+  bindingServices = [],
+  onEditorTabChange,
+  onChecklistChange,
 }) => {
   const {
     hasTypes,
@@ -209,6 +230,22 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const [selectedPaperTypeId, setSelectedPaperTypeId] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [newPageToAdd, setNewPageToAdd] = useState('')
+  const [editorTab, setEditorTab] = useState<SimplifiedEditorTab>('print')
+
+  const multiPageStructure = value.multiPageStructure || {}
+  const multiPageCover = multiPageStructure.cover || { mode: 'none' }
+  const multiPageInnerBlock = multiPageStructure.innerBlock || { pagesSource: 'parameter' as const }
+  const multiPageBinding = multiPageStructure.binding || {}
+
+  const updateMultiPageStructure = useCallback((patch: Partial<NonNullable<SimplifiedConfig['multiPageStructure']>>) => {
+    onChange({
+      ...value,
+      multiPageStructure: {
+        ...(value.multiPageStructure || {}),
+        ...patch,
+      },
+    })
+  }, [onChange, value])
 
   const handleSelectType = useCallback(
     (typeId: ProductTypeId) => {
@@ -322,6 +359,77 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     if (copyFromTypeId == null) return []
     return value.typeConfigs?.[String(copyFromTypeId)]?.sizes ?? []
   }, [value.typeConfigs, copyFromTypeId])
+
+  const labelWithHint = useCallback((label: string, hint: string) => (
+    <span className="simplified-label-with-hint">
+      <span>{label}</span>
+      <span className="simplified-label-hint" title={hint}>?</span>
+    </span>
+  ), [])
+
+  const headerWithHint = useCallback((label: string, hint: string) => (
+    <span className="simplified-label-with-hint">
+      <strong>{label}</strong>
+      <span className="simplified-label-hint" title={hint}>?</span>
+    </span>
+  ), [])
+
+  const checklist = useMemo<SimplifiedChecklistState>(() => {
+    if (!selected) {
+      return {
+        size: false,
+        print: false,
+        materials: false,
+        finishing: false,
+      }
+    }
+    const hasPrint =
+      Array.isArray(selected.print_prices) &&
+      selected.print_prices.some((p) => Array.isArray(p.tiers) && p.tiers.some((t) => Number(t.unit_price ?? 0) > 0))
+    return {
+      size: Boolean(String(selected.label || '').trim() && selected.width_mm > 0 && selected.height_mm > 0),
+      print: hasPrint,
+      materials: effectiveAllowedMaterialIds.length > 0,
+      finishing: Array.isArray(selected.finishing) && selected.finishing.length > 0,
+    }
+  }, [selected, effectiveAllowedMaterialIds])
+
+  const quickTestPrintPreset = useMemo(() => {
+    if (!selected) return null
+    const pp = selected.print_prices || []
+    if (pp.length === 0) return null
+
+    const defaultTech = selected.default_print?.technology_code
+    const byDefaultTech = defaultTech
+      ? pp.filter((row) => String(row.technology_code || '').toLowerCase() === String(defaultTech).toLowerCase())
+      : pp
+    const nonZero = byDefaultTech.find((row) => (row.tiers || []).some((t) => Number(t.unit_price ?? 0) > 0))
+    const row = nonZero || byDefaultTech[0] || pp[0]
+    if (!row) return null
+    return {
+      technology: row.technology_code || defaultTech || '',
+      color: (row.color_mode as 'bw' | 'color') || 'color',
+      sides: row.sides_mode === 'duplex' || row.sides_mode === 'duplex_bw_back' ? 2 : 1,
+    }
+  }, [selected])
+
+  useEffect(() => {
+    setEditorTab('print')
+  }, [selectedSizeId])
+
+  useEffect(() => {
+    if (editorTab === 'design' && !(productId && selectedTypeId != null)) {
+      setEditorTab('print')
+    }
+  }, [editorTab, productId, selectedTypeId])
+
+  useEffect(() => {
+    onEditorTabChange?.(editorTab)
+  }, [editorTab, onEditorTabChange])
+
+  useEffect(() => {
+    onChecklistChange?.(checklist)
+  }, [checklist, onChecklistChange])
 
   const openCopySizesModal = useCallback(() => {
     if (!availableSourceTypes.length) return
@@ -543,8 +651,12 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     <div className="simplified-template simplified-template--pricing">
       <div className="simplified-template__header">
         <div>
-          <h3>Упрощённый калькулятор</h3>
-          <p className="text-muted text-sm">Настройка цен по размерам: печать (за изделие), материалы (за изделие) и отделка (за рез/биг/фальц).</p>
+          <h3>
+            {headerWithHint(
+              'Упрощённый калькулятор',
+              'Настройка цен по размерам: печать (за изделие), материалы (за изделие) и отделка (за рез/биг/фальц).',
+            )}
+          </h3>
         </div>
         <div className="simplified-template__header-actions">
           <Button
@@ -562,15 +674,17 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         <div className="simplified-card">
           <div className="simplified-card__header">
             <div>
-              <strong>Страницы (для многостраничных изделий)</strong>
-              <div className="text-muted text-sm">Привяжите к продукту варианты количества страниц — они появятся в калькуляторе.</div>
+              {headerWithHint(
+                'Страницы (для многостраничных изделий)',
+                'Привяжите к продукту варианты количества страниц — они появятся в калькуляторе.',
+              )}
             </div>
           </div>
           <div className="simplified-card__content simplified-pages-config">
             <FormField label="Привязанные варианты">
               <div className="simplified-pages-list">
                 {(pagesConfig.options || []).length === 0 ? (
-                  <span className="text-muted text-sm">Нет привязанных вариантов. Добавьте количество страниц ниже.</span>
+                  <span className="text-muted text-sm">Нет привязанных вариантов.</span>
                 ) : (
                   (pagesConfig.options || [])
                     .slice()
@@ -661,6 +775,211 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         </div>
       )}
 
+      {showPagesConfig && (
+        <div className="simplified-card">
+          <div className="simplified-card__header">
+            <div>
+              {headerWithHint(
+                'Структура многостраничного изделия',
+                'Настройка обложки, внутреннего блока и переплёта.',
+              )}
+            </div>
+          </div>
+          <div className="simplified-card__content simplified-form-grid">
+            <FormField label="Источник страниц внутреннего блока">
+              <select
+                className="form-select"
+                value={multiPageInnerBlock.pagesSource || 'parameter'}
+                onChange={(e) => updateMultiPageStructure({
+                  innerBlock: {
+                    ...multiPageInnerBlock,
+                    pagesSource: e.target.value as 'parameter' | 'fixed',
+                  }
+                })}
+              >
+                <option value="parameter">Из параметра pages</option>
+                <option value="fixed">Фиксированное значение</option>
+              </select>
+            </FormField>
+            {multiPageInnerBlock.pagesSource === 'fixed' && (
+              <FormField label="Фиксированное число страниц">
+                <input
+                  className="form-input form-input--compact"
+                  type="number"
+                  min="1"
+                  value={multiPageInnerBlock.fixedPages ?? ''}
+                  onChange={(e) => updateMultiPageStructure({
+                    innerBlock: {
+                      ...multiPageInnerBlock,
+                      fixedPages: e.target.value ? Number(e.target.value) : undefined,
+                    }
+                  })}
+                />
+              </FormField>
+            )}
+            <FormField label="Обложка">
+              <select
+                className="form-select"
+                value={multiPageCover.mode || 'none'}
+                onChange={(e) => updateMultiPageStructure({
+                  cover: {
+                    ...multiPageCover,
+                    mode: e.target.value as 'none' | 'self' | 'separate',
+                  }
+                })}
+              >
+                <option value="none">Без отдельной обложки</option>
+                <option value="self">Та же бумага/печать, что блок</option>
+                <option value="separate">Отдельные настройки обложки</option>
+              </select>
+            </FormField>
+            {multiPageCover.mode === 'separate' && (
+              <>
+                <FormField label="Материал обложки (ID)">
+                  <input
+                    className="form-input form-input--compact"
+                    type="number"
+                    min="1"
+                    value={multiPageCover.material_id ?? ''}
+                    onChange={(e) => updateMultiPageStructure({
+                      cover: {
+                        ...multiPageCover,
+                        material_id: e.target.value ? Number(e.target.value) : undefined,
+                      }
+                    })}
+                  />
+                </FormField>
+                <FormField label="Печать обложки: технология">
+                  <input
+                    className="form-input"
+                    value={multiPageCover.print?.technology_code || ''}
+                    onChange={(e) => updateMultiPageStructure({
+                      cover: {
+                        ...multiPageCover,
+                        print: {
+                          ...(multiPageCover.print || {}),
+                          technology_code: e.target.value || undefined,
+                        }
+                      }
+                    })}
+                    placeholder="Например: laser_prof"
+                  />
+                </FormField>
+              </>
+            )}
+            <FormField label="Экземпляров обложки на изделие">
+              <input
+                className="form-input form-input--compact"
+                type="number"
+                min="1"
+                value={multiPageCover.qty_per_item ?? 1}
+                onChange={(e) => updateMultiPageStructure({
+                  cover: {
+                    ...multiPageCover,
+                    qty_per_item: e.target.value ? Number(e.target.value) : 1,
+                  }
+                })}
+              />
+            </FormField>
+            <FormField label="Переплёт (service_id)">
+              <select
+                className="form-select"
+                value={multiPageBinding.service_id ?? ''}
+                onChange={(e) => {
+                  const nextServiceId = e.target.value ? Number(e.target.value) : undefined
+                  updateMultiPageStructure({
+                    binding: {
+                      ...multiPageBinding,
+                      service_id: nextServiceId,
+                      variant_id: undefined,
+                    }
+                  })
+                }}
+              >
+                <option value="">— Не выбран</option>
+                {bindingServices.map((binding) => (
+                  <option key={binding.id} value={binding.id}>{binding.name}</option>
+                ))}
+              </select>
+            </FormField>
+            {multiPageBinding.service_id && (
+              <FormField label="Вариант переплёта">
+                <select
+                  className="form-select"
+                  value={multiPageBinding.variant_id ?? ''}
+                  onChange={(e) => updateMultiPageStructure({
+                    binding: {
+                      ...multiPageBinding,
+                      variant_id: e.target.value ? Number(e.target.value) : undefined,
+                    }
+                  })}
+                >
+                  <option value="">— Базовый тариф услуги</option>
+                  {(bindingServices.find((b) => b.id === multiPageBinding.service_id)?.variants || []).map((variant) => {
+                    const label = variant.variantName || variant.variant_name || `Вариант #${variant.id}`
+                    return <option key={variant.id} value={variant.id}>{label}</option>
+                  })}
+                </select>
+              </FormField>
+            )}
+            <FormField label="Норма переплёта на изделие">
+              <input
+                className="form-input form-input--compact"
+                type="number"
+                min="1"
+                value={multiPageBinding.units_per_item ?? 1}
+                onChange={(e) => updateMultiPageStructure({
+                  binding: {
+                    ...multiPageBinding,
+                    units_per_item: e.target.value ? Number(e.target.value) : 1,
+                  }
+                })}
+              />
+            </FormField>
+          </div>
+        </div>
+      )}
+
+      <div className="product-tabs simplified-template__editor-tabs">
+        <button
+          type="button"
+          className={`product-tab ${editorTab === 'print' ? 'product-tab--active' : ''}`}
+          onClick={() => setEditorTab('print')}
+        >
+          Печать
+        </button>
+        <button
+          type="button"
+          className={`product-tab ${editorTab === 'materials' ? 'product-tab--active' : ''}`}
+          onClick={() => setEditorTab('materials')}
+        >
+          Материалы
+        </button>
+        <button
+          type="button"
+          className={`product-tab ${editorTab === 'finishing' ? 'product-tab--active' : ''}`}
+          onClick={() => setEditorTab('finishing')}
+        >
+          Отделка
+        </button>
+        {productId && selectedTypeId != null && (
+          <button
+            type="button"
+            className={`product-tab ${editorTab === 'design' ? 'product-tab--active' : ''}`}
+            onClick={() => setEditorTab('design')}
+          >
+            Дизайны
+          </button>
+        )}
+        <button
+          type="button"
+          className={`product-tab ${editorTab === 'check' ? 'product-tab--active' : ''}`}
+          onClick={() => setEditorTab('check')}
+        >
+          Проверка
+        </button>
+      </div>
+
       <div className="simplified-template__grid">
         <div className="simplified-template__sizes">
           <div className="simplified-template__sizes-header">
@@ -688,19 +1007,39 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
           </div>
           {sizes.length === 0 ? (
             <div className="simplified-template__sizes-empty text-muted text-sm" style={{ padding: 12 }}>
-              Нет размеров. Добавьте размер кнопкой выше или скопируйте из другого типа.
+              Нет размеров.
             </div>
           ) : (
             sizes.map(s => (
-              <button
+              <div
                 key={s.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 className={`simplified-size ${String(selectedSizeId) === String(s.id) ? 'simplified-size--active' : ''}`}
                 onClick={() => setSelectedSizeId(s.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelectedSizeId(s.id)
+                  }
+                }}
               >
-                <div className="simplified-size__label">{s.label}</div>
+                <div className="simplified-size__top">
+                  <div className="simplified-size__label">{s.label}</div>
+                  <button
+                    type="button"
+                    className="simplified-size__delete"
+                    title="Удалить размер"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeSize(s.id)
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
                 <div className="simplified-size__meta">{s.width_mm}×{s.height_mm}</div>
-              </button>
+              </div>
             ))
           )}
         </div>
@@ -708,43 +1047,41 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         <div className="simplified-template__editor">
           {!selected ? (
             <Alert type="info">
-              {sizes.length === 0 ? 'Добавьте размер в блоке слева.' : 'Выберите размер слева.'}
+              {sizes.length === 0 ? 'Добавьте размер.' : 'Выберите размер.'}
             </Alert>
           ) : (
               <>
-                <div className="simplified-card">
+                <div className="simplified-card simplified-card--size">
                   <div className="simplified-card__header">
                     <div>
-                      <strong>Размер</strong>
-                      <div className="text-muted text-sm">Название и габариты (мм)</div>
+                      {headerWithHint('Размер', 'Название и габариты (мм).')}
                     </div>
-                    <Button variant="error" size="sm" onClick={() => removeSize(selected.id)}>Удалить</Button>
                   </div>
                   <div className="simplified-card__content simplified-form-grid">
                     <FormField label="Название">
                       <input
-                        className="form-input"
+                        className="form-input simplified-size-input simplified-size-input--name"
                         value={selected.label}
                         onChange={(e) => updateSize(selected.id, { label: e.target.value })}
                       />
                     </FormField>
                     <FormField label="Ширина, мм">
                       <input
-                        className="form-input form-input--compact"
+                        className="form-input form-input--compact simplified-size-input"
                         value={String(selected.width_mm)}
                         onChange={(e) => updateSize(selected.id, { width_mm: Number(e.target.value) || 0 })}
                       />
                     </FormField>
                     <FormField label="Высота, мм">
                       <input
-                        className="form-input form-input--compact"
+                        className="form-input form-input--compact simplified-size-input"
                         value={String(selected.height_mm)}
                         onChange={(e) => updateSize(selected.id, { height_mm: Number(e.target.value) || 0 })}
                       />
                     </FormField>
-                    <FormField label="Мин. тираж">
+                    <FormField label={labelWithHint('Мин. тираж', 'Пусто = мин. по раскладке (1 лист). 1 = любой тираж, стоимость за полный лист.')}>
                       <input
-                        className="form-input form-input--compact"
+                        className="form-input form-input--compact simplified-size-input"
                         type="number"
                         min="1"
                         placeholder="по раскладке"
@@ -756,11 +1093,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                           })
                         }
                       />
-                      <div className="text-muted text-xs mt-1">Пусто — мин. по раскладке (шт/лист). 1 — любой тираж по цене полного листа.</div>
                     </FormField>
                     <FormField label="Макс. тираж">
                       <input
-                        className="form-input form-input--compact"
+                        className="form-input form-input--compact simplified-size-input"
                         type="number"
                         min="1"
                         value={selected.max_qty !== undefined ? String(selected.max_qty) : ''}
@@ -771,9 +1107,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                         }
                       />
                     </FormField>
-                    <FormField label="Отступ резки, мм">
+                    <FormField label={labelWithHint('Отступ резки, мм', 'Отступ с каждой стороны листа (мм). По умолчанию 5 мм. Для наклеек с плоттерной резкой — 15 мм.')}>
                       <input
-                        className="form-input form-input--compact"
+                        className="form-input form-input--compact simplified-size-input"
                         type="number"
                         min="1"
                         max="50"
@@ -788,11 +1124,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                           })
                         }
                       />
-                      <div className="text-muted text-xs mt-1">Пусто = 5 мм (стандарт). Для плоттерной резки — 15 мм.</div>
                     </FormField>
-                    <FormField label="Зазор между изделиями, мм">
+                    <FormField label={labelWithHint('Зазор между изделиями, мм', 'Зазор между изделиями при раскладке (мм). По умолчанию 2 мм.')}>
                       <input
-                        className="form-input form-input--compact"
+                        className="form-input form-input--compact simplified-size-input"
                         type="number"
                         min="0"
                         max="30"
@@ -807,11 +1142,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                           })
                         }
                       />
-                      <div className="text-muted text-xs mt-1">Пусто = 2 мм (стандарт).</div>
                     </FormField>
-                    <FormField label="Норма вместимости на лист">
+                    <FormField label={labelWithHint('Норма вместимости на лист', 'Ручной override: сколько изделий помещается на лист. Пусто = считать по отступу и зазору автоматически. Значение также записывается в мин. тираж.')}>
                       <input
-                        className="form-input form-input--compact"
+                        className="form-input form-input--compact simplified-size-input"
                         type="number"
                         min="1"
                         placeholder="авто"
@@ -825,9 +1159,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                           })
                         }}
                       />
-                      <div className="text-muted text-xs mt-1">
-                        Пусто = считать по отступу и зазору автоматически. Значение также записывается в мин. тираж.
-                      </div>
                     </FormField>
                   </div>
                   {layoutPreview && !layoutPreview.noMat && (
@@ -853,58 +1184,95 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                       </span>
                     </div>
                   )}
-                  {layoutPreview?.noMat && !layoutPreview.isOverride && (
-                    <div className="text-muted text-xs mt-1" style={{ color: '#92400e' }}>
-                      Превью недоступно — укажите «Ширина листа» и «Высота листа» в карточке разрешённого материала.
-                    </div>
-                  )}
                 </div>
 
-                <PrintPricesCard
-                  selected={selected}
-                  printTechs={printTechs}
-                  loadingLists={loadingLists}
-                  isMobile={isMobile}
-                  updateSize={updateSize}
-                  getSizeRanges={getSizeRanges}
-                  updateSizeRanges={updateSizeRanges}
-                  allMaterials={allMaterials}
-                  allowedMaterialIds={effectiveAllowedMaterialIds}
-                  otherSizesForPrintCopy={otherSizesForPrintCopy}
-                  onCopyPrintFromSize={handleCopyPrintFromSize}
-                />
+                {editorTab === 'check' && (
+                  <div className="simplified-card simplified-card--inline-calculator">
+                    <div className="simplified-card__header">
+                      <div>
+                        {headerWithHint(
+                          'Быстрый просчёт продукта',
+                          'Полноценный improved printing калькулятор внутри страницы для проверки расчёта.',
+                        )}
+                      </div>
+                    </div>
+                    <div className="simplified-card__content">
+                      {productId ? (
+                        <ImprovedPrintingCalculatorModal
+                          isOpen
+                          embedded
+                          readOnlyTestMode
+                          onClose={() => {}}
+                          onAddToOrder={() => {}}
+                          initialProductId={productId}
+                          initialTestConfig={{
+                            typeId: selectedTypeId != null ? Number(selectedTypeId) : undefined,
+                            sizeId: selected?.id,
+                            printTechnology: quickTestPrintPreset?.technology,
+                            printColorMode: quickTestPrintPreset?.color,
+                            sides: quickTestPrintPreset?.sides as 1 | 2 | undefined,
+                            quantity: selected?.min_qty && Number(selected.min_qty) > 0 ? Number(selected.min_qty) : 1,
+                            pages: showPagesConfig ? (pagesConfig.default ?? pagesConfig.options?.[0] ?? undefined) : undefined,
+                          }}
+                        />
+                      ) : (
+                        <Alert type="info">Невозможно открыть калькулятор: отсутствует ID продукта.</Alert>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-                <MaterialsCard
-                  selected={selected}
-                  loadingLists={loadingLists}
-                  selectedPaperTypeId={selectedPaperTypeId}
-                  setSelectedPaperTypeId={setSelectedPaperTypeId}
-                  paperTypes={paperTypes}
-                  materialsForSelectedPaperType={materialsForSelectedPaperType}
-                  allMaterialsFromAllPaperTypes={allMaterialsFromAllPaperTypes}
-                  allMaterials={allMaterials}
-                  hasUserInteractedWithMaterialsRef={hasUserInteractedWithMaterialsRef}
-                  updateSize={updateSize}
-                  hasCommonMaterialsFeature={hasTypes}
-                  useOwnMaterials={useOwnMaterials}
-                  effectiveAllowedMaterialIds={effectiveAllowedMaterialIds}
-                  updateEffectiveMaterials={updateEffectiveMaterials}
-                  setUseOwnMaterials={setUseOwnMaterials}
-                />
+                {editorTab === 'print' && (
+                  <PrintPricesCard
+                    selected={selected}
+                    printTechs={printTechs}
+                    loadingLists={loadingLists}
+                    isMobile={isMobile}
+                    updateSize={updateSize}
+                    getSizeRanges={getSizeRanges}
+                    updateSizeRanges={updateSizeRanges}
+                    allMaterials={allMaterials}
+                    allowedMaterialIds={effectiveAllowedMaterialIds}
+                    otherSizesForPrintCopy={otherSizesForPrintCopy}
+                    onCopyPrintFromSize={handleCopyPrintFromSize}
+                  />
+                )}
 
-                <FinishingCard
-                  selected={selected}
-                  loadingLists={loadingLists}
-                  services={services}
-                  loadLists={loadLists}
-                  getSizeRanges={getSizeRanges}
-                  updateSizeRanges={updateSizeRanges}
-                  updateSize={updateSize}
-                  hasUserInteractedWithServicesRef={hasUserInteractedWithServicesRef}
-                  isMobile={isMobile}
-                />
+                {editorTab === 'materials' && (
+                  <MaterialsCard
+                    selected={selected}
+                    loadingLists={loadingLists}
+                    selectedPaperTypeId={selectedPaperTypeId}
+                    setSelectedPaperTypeId={setSelectedPaperTypeId}
+                    paperTypes={paperTypes}
+                    materialsForSelectedPaperType={materialsForSelectedPaperType}
+                    allMaterialsFromAllPaperTypes={allMaterialsFromAllPaperTypes}
+                    allMaterials={allMaterials}
+                    hasUserInteractedWithMaterialsRef={hasUserInteractedWithMaterialsRef}
+                    updateSize={updateSize}
+                    hasCommonMaterialsFeature={hasTypes}
+                    useOwnMaterials={useOwnMaterials}
+                    effectiveAllowedMaterialIds={effectiveAllowedMaterialIds}
+                    updateEffectiveMaterials={updateEffectiveMaterials}
+                    setUseOwnMaterials={setUseOwnMaterials}
+                  />
+                )}
 
-                {productId && selectedTypeId != null && (
+                {editorTab === 'finishing' && (
+                  <FinishingCard
+                    selected={selected}
+                    loadingLists={loadingLists}
+                    services={services}
+                    loadLists={loadLists}
+                    getSizeRanges={getSizeRanges}
+                    updateSizeRanges={updateSizeRanges}
+                    updateSize={updateSize}
+                    hasUserInteractedWithServicesRef={hasUserInteractedWithServicesRef}
+                    isMobile={isMobile}
+                  />
+                )}
+
+                {editorTab === 'design' && productId && selectedTypeId != null && (
                   <SubtypeDesignsCard
                     productId={productId}
                     typeId={Number(selectedTypeId)}

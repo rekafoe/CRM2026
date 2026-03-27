@@ -1,6 +1,7 @@
 import { getDb } from '../../../db';
 import { logger } from '../../../utils/logger';
 import productSchemas from '../../../data/product_schemas.json';
+import { BindingPricingService } from './bindingPricingService';
 
 export interface MultipageCalculationParams {
   pages: number;
@@ -28,6 +29,16 @@ export interface MultipageCalculationResult {
   };
   sheets: number;
   warnings: string[];
+}
+
+export class MultipageValidationError extends Error {
+  readonly details: string[];
+
+  constructor(details: string[]) {
+    super('Некорректные параметры расчета');
+    this.name = 'MultipageValidationError';
+    this.details = details;
+  }
 }
 
 const schema = (productSchemas as any).schemas?.multipage;
@@ -63,6 +74,30 @@ const defaultPricing = schema?.pricing || {
   trimPrice: 2.0
 };
 
+const printTypeAliases: Record<string, string[]> = {
+  laser_bw: ['laser_bw', 'лазерная черно-белая', 'лазер ч/б', 'laser bw', 'laser black white'],
+  laser_color: ['laser_color', 'лазерная цветная', 'лазер цвет', 'laser color'],
+  digital_bw: ['digital_bw', 'цифровая черно-белая', 'цифровая ч/б', 'digital bw', 'digital black white'],
+  digital_color: ['digital_color', 'цифровая цветная', 'digital color'],
+  offset: ['offset', 'офсет', 'offset print'],
+};
+
+const bindingTypeAliases: Record<string, string[]> = {
+  none: ['none', 'без переплета', 'без переплёта'],
+  plastic_spring: ['plastic_spring', 'пластиковая пружина', 'пружина пластик', 'plastic spring'],
+  metal_spring: ['metal_spring', 'металлическая пружина', 'пружина металл', 'metal spring'],
+  hardcover: ['hardcover', 'твердый', 'твёрдый', 'hard cover', 'hardcover'],
+  simple_channel: ['simple_channel', 'симпл ченл', 'simple channel', 'channel'],
+  c_bind: ['c_bind', 'c-bind', 'c bind'],
+  staple: ['staple', 'на скобу', 'скоба'],
+  corner_staple: ['corner_staple', 'скоба в уголке', 'уголок', 'corner staple'],
+  rings: ['rings', 'кольца', 'на кольца'],
+  screws: ['screws', 'винты', 'на винты'],
+  softcover: ['softcover', 'мягкий', 'кбс', 'soft cover', 'softcover'],
+  archive: ['archive', 'архивный'],
+  folder: ['folder', 'в папку', 'папка'],
+};
+
 const normalizeLabel = (value: unknown) =>
   String(value ?? '')
     .toLowerCase()
@@ -75,10 +110,138 @@ const isLabelMatch = (source: string, target: string) => {
 };
 
 export class MultipageProductService {
+  private static getFieldConfig(fieldName: string) {
+    return schema?.fields?.find((field: any) => field.name === fieldName);
+  }
+
+  private static getFieldDefault<T>(fieldName: string, fallback: T): T {
+    const field = this.getFieldConfig(fieldName);
+    return (field?.default ?? fallback) as T;
+  }
+
+  private static getFieldEnumValues(fieldName: string): string[] {
+    const field = this.getFieldConfig(fieldName);
+    const enumValues = field?.enum ?? [];
+    return enumValues.map((item: any) => {
+      if (typeof item === 'string' || typeof item === 'number') {
+        return String(item);
+      }
+      return String(item?.value ?? '');
+    }).filter(Boolean);
+  }
+
+  private static normalizeInput(params: Partial<MultipageCalculationParams>): MultipageCalculationParams {
+    const errors: string[] = [];
+    const normalized: MultipageCalculationParams = {
+      pages: Number(params.pages ?? this.getFieldDefault('pages', 20)),
+      quantity: Number(params.quantity ?? 1),
+      format: String(params.format ?? this.getFieldDefault('format', 'A4')),
+      printType: String(params.printType ?? this.getFieldDefault('printType', 'laser_bw')),
+      bindingType: String(params.bindingType ?? this.getFieldDefault('bindingType', 'none')),
+      paperType: String(params.paperType ?? this.getFieldDefault('paperType', 'office_premium')),
+      paperDensity: Number(params.paperDensity ?? this.getFieldDefault('paperDensity', 80)),
+      duplex: Boolean(params.duplex ?? this.getFieldDefault('duplex', false)),
+      lamination: String(params.lamination ?? this.getFieldDefault('lamination', 'none')),
+      trimMargins: Boolean(params.trimMargins ?? this.getFieldDefault('trimMargins', false)),
+    };
+
+    if (!Number.isInteger(normalized.pages) || normalized.pages < 4) {
+      errors.push('pages должен быть целым числом не меньше 4');
+    }
+
+    if (!Number.isInteger(normalized.quantity) || normalized.quantity < 1) {
+      errors.push('quantity должен быть целым числом не меньше 1');
+    }
+
+    if (!Number.isFinite(normalized.paperDensity) || normalized.paperDensity <= 0) {
+      errors.push('paperDensity должен быть положительным числом');
+    }
+
+    const formatOptions = this.getFieldEnumValues('format');
+    if (formatOptions.length > 0 && !formatOptions.includes(normalized.format)) {
+      errors.push(`format должен быть одним из: ${formatOptions.join(', ')}`);
+    }
+
+    const printTypeOptions = this.getFieldEnumValues('printType');
+    if (printTypeOptions.length > 0 && !printTypeOptions.includes(normalized.printType)) {
+      errors.push(`printType должен быть одним из: ${printTypeOptions.join(', ')}`);
+    }
+
+    const bindingTypeOptions = this.getFieldEnumValues('bindingType');
+    if (bindingTypeOptions.length > 0 && !bindingTypeOptions.includes(normalized.bindingType)) {
+      errors.push(`bindingType должен быть одним из: ${bindingTypeOptions.join(', ')}`);
+    }
+
+    const paperTypeOptions = this.getFieldEnumValues('paperType');
+    if (paperTypeOptions.length > 0 && !paperTypeOptions.includes(normalized.paperType)) {
+      errors.push(`paperType должен быть одним из: ${paperTypeOptions.join(', ')}`);
+    }
+
+    const laminationOptions = this.getFieldEnumValues('lamination');
+    if (laminationOptions.length > 0 && !laminationOptions.includes(normalized.lamination)) {
+      errors.push(`lamination должен быть одним из: ${laminationOptions.join(', ')}`);
+    }
+
+    const paperDensityOptions = this.getFieldEnumValues('paperDensity').map((value) => Number(value));
+    if (paperDensityOptions.length > 0 && !paperDensityOptions.includes(normalized.paperDensity)) {
+      errors.push(`paperDensity должен быть одним из: ${paperDensityOptions.join(', ')}`);
+    }
+
+    if (errors.length > 0) {
+      throw new MultipageValidationError(errors);
+    }
+
+    return normalized;
+  }
+
+  private static findMappedKey(
+    sourceValue: unknown,
+    aliases: Record<string, string[]>
+  ): string | null {
+    const normalizedSource = normalizeLabel(sourceValue);
+    if (!normalizedSource) return null;
+
+    for (const [key, keyAliases] of Object.entries(aliases)) {
+      const normalizedKey = normalizeLabel(key.replace(/_/g, ' '));
+      if (normalizedSource.includes(normalizedKey)) {
+        return key;
+      }
+      if (keyAliases.some((alias) => normalizedSource.includes(normalizeLabel(alias)))) {
+        return key;
+      }
+    }
+
+    return null;
+  }
+
+  private static getBindingMatchScore(
+    serviceName: string,
+    bindingType: string,
+    bindingLabel: string
+  ): number {
+    const normalizedService = normalizeLabel(serviceName);
+    if (!normalizedService) return 0;
+
+    let score = 0;
+    const typeKey = normalizeLabel(bindingType.replace(/_/g, ' '));
+    const labelKey = normalizeLabel(bindingLabel);
+
+    if (normalizedService.includes(typeKey)) score += 4;
+    if (isLabelMatch(normalizedService, labelKey)) score += 3;
+
+    const aliases = bindingTypeAliases[bindingType] || [];
+    if (aliases.some((alias) => normalizedService.includes(normalizeLabel(alias)))) {
+      score += 5;
+    }
+
+    return score;
+  }
+
   /**
    * Рассчитать стоимость многостраничной продукции
    */
-  static async calculate(params: MultipageCalculationParams): Promise<MultipageCalculationResult> {
+  static async calculate(rawParams: Partial<MultipageCalculationParams>): Promise<MultipageCalculationResult> {
+    const params = this.normalizeInput(rawParams);
     const {
       pages,
       quantity,
@@ -166,7 +329,7 @@ export class MultipageProductService {
       
       // Получаем цены печати из post_processing_services
       const printServices = await db.all(`
-        SELECT name, price, operation_type
+        SELECT name, price, operation_type, price_unit
         FROM post_processing_services
         WHERE operation_type IN ('print', 'printing') AND is_active = 1
       `);
@@ -187,47 +350,27 @@ export class MultipageProductService {
       const bindingMap: Record<string, number> = { ...defaultPricing.bindingPrices };
 
       for (const service of printServices) {
-        const name = String(service.name || '').toLowerCase();
-        if (name.includes('лазер') && name.includes('ч/б')) {
-          printMap.laser_bw = { perPage: service.price, setup: 0 };
-        } else if (name.includes('лазер') && name.includes('цвет')) {
-          printMap.laser_color = { perPage: service.price, setup: 0 };
-        } else if (name.includes('цифр') && name.includes('ч/б')) {
-          printMap.digital_bw = { perPage: service.price, setup: 0 };
-        } else if (name.includes('цифр') && name.includes('цвет')) {
-          printMap.digital_color = { perPage: service.price, setup: 0 };
-        } else if (name.includes('офсет')) {
-          printMap.offset = { perPage: service.price, setup: 50 };
-        }
+        const mappedKey = this.findMappedKey(
+          `${service.name || ''} ${service.operation_type || ''} ${service.price_unit || ''}`,
+          printTypeAliases
+        );
+        if (!mappedKey) continue;
+
+        const perPage = Number(service.price);
+        if (!Number.isFinite(perPage)) continue;
+
+        printMap[mappedKey] = {
+          perPage,
+          setup: mappedKey === 'offset' ? (defaultPricing.printPrices.offset?.setup ?? 50) : 0
+        };
       }
 
       for (const service of bindingServices) {
-        const name = String(service.name || '').toLowerCase();
-        if (name.includes('пружин') && name.includes('пластик')) {
-          bindingMap.plastic_spring = service.price;
-        } else if (name.includes('пружин') && name.includes('металл')) {
-          bindingMap.metal_spring = service.price;
-        } else if (name.includes('твёрд') || name.includes('твердый')) {
-          bindingMap.hardcover = service.price;
-        } else if (name.includes('скоб') && !name.includes('угол')) {
-          bindingMap.staple = service.price;
-        } else if (name.includes('скоб') && name.includes('угол')) {
-          bindingMap.corner_staple = service.price;
-        } else if (name.includes('кольц')) {
-          bindingMap.rings = service.price;
-        } else if (name.includes('винт')) {
-          bindingMap.screws = service.price;
-        } else if (name.includes('мягк') || name.includes('кбс')) {
-          bindingMap.softcover = service.price;
-        } else if (name.includes('архив')) {
-          bindingMap.archive = service.price;
-        } else if (name.includes('папк')) {
-          bindingMap.folder = service.price;
-        } else if (name.includes('симпл') || name.includes('channel')) {
-          bindingMap.simple_channel = service.price;
-        } else if (name.includes('c-bind') || name.includes('cbind')) {
-          bindingMap.c_bind = service.price;
-        }
+        const mappedKey = this.findMappedKey(service.name, bindingTypeAliases);
+        const price = Number(service.price);
+        if (!mappedKey || !Number.isFinite(price)) continue;
+
+        bindingMap[mappedKey] = price;
       }
 
       return {
@@ -267,34 +410,21 @@ export class MultipageProductService {
       if (!services.length) return null;
 
       const normalizedBinding = normalizeLabel(bindingLabel);
-      const matched = services.find((service) =>
-        isLabelMatch(normalizeLabel(service.name), normalizedBinding)
-      );
+      const matched = services
+        .map((service) => ({
+          service,
+          score: this.getBindingMatchScore(service.name, bindingType, bindingLabel)
+        }))
+        .filter((entry) => entry.score > 0)
+        .sort((a, b) => b.score - a.score)[0]?.service;
       if (!matched) return null;
 
-      const tiers = await db.all<Array<{ min_quantity: number; price_per_unit: number; is_active: number }>>(
-        `
-        SELECT min_quantity, price_per_unit, is_active
-        FROM service_volume_prices
-        WHERE service_id = ? AND is_active = 1
-        ORDER BY min_quantity ASC
-      `,
-        [matched.id]
-      );
-
-      if (tiers.length > 0) {
-        let bestTier = tiers[0];
-        for (const tier of tiers) {
-          if (tier.min_quantity <= quantity) {
-            bestTier = tier;
-          } else {
-            break;
-          }
-        }
-        return bestTier.price_per_unit;
-      }
-
-      return Number.isFinite(matched.price) ? matched.price : null;
+      const quote = await BindingPricingService.quoteBinding({
+        serviceId: matched.id,
+        quantity,
+        unitsPerItem: 1,
+      });
+      return quote.units > 0 ? quote.total / quote.units : quote.unitPrice;
     } catch (error) {
       logger.warn('Error getting binding price from DB', { error, bindingType });
       return null;

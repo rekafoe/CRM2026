@@ -66,6 +66,17 @@ interface ImprovedPrintingCalculatorModalProps {
   initialProductId?: number | null;
   editContext?: EditContextPayload;
   onSubmitExisting?: (payload: { orderId: number; itemId: number; item: any }) => Promise<void>;
+  embedded?: boolean;
+  readOnlyTestMode?: boolean;
+  initialTestConfig?: {
+    typeId?: number | null;
+    sizeId?: number | string;
+    printTechnology?: string;
+    printColorMode?: 'bw' | 'color' | null;
+    sides?: 1 | 2;
+    quantity?: number;
+    pages?: number;
+  };
 }
 
 export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculatorModalProps> = ({
@@ -76,6 +87,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   initialProductId,
   editContext,
   onSubmitExisting,
+  embedded = false,
+  readOnlyTestMode = false,
+  initialTestConfig,
 }) => {
   const logger = useLogger('ImprovedPrintingCalculatorModal');
   const toast = useToastNotifications();
@@ -322,6 +336,50 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       applyProductTypeConfig(nextId);
     }
   }, [hasProductTypes, selectedProduct?.id, simplified?.types, simplified?.typeConfigs, defaultTypeId, selectedTypeId, applyProductTypeConfig]);
+
+  const prefillAppliedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isOpen || !embedded || !initialTestConfig || !selectedProduct?.id) return;
+    if (isCustomProduct || isPostprintProduct) return;
+
+    const prefillKey = JSON.stringify({
+      productId: selectedProduct.id,
+      typeId: initialTestConfig.typeId ?? null,
+      sizeId: initialTestConfig.sizeId ?? null,
+      tech: initialTestConfig.printTechnology ?? null,
+      color: initialTestConfig.printColorMode ?? null,
+      sides: initialTestConfig.sides ?? null,
+      quantity: initialTestConfig.quantity ?? null,
+      pages: initialTestConfig.pages ?? null,
+    });
+    if (prefillAppliedRef.current === prefillKey) return;
+    prefillAppliedRef.current = prefillKey;
+
+    if (initialTestConfig.typeId != null && Number.isFinite(Number(initialTestConfig.typeId))) {
+      const nextTypeId = Number(initialTestConfig.typeId);
+      setSelectedTypeId(nextTypeId);
+      applyProductTypeConfig(nextTypeId);
+    }
+
+    setSpecs((prev) => ({
+      ...prev,
+      ...(initialTestConfig.sizeId != null ? { size_id: initialTestConfig.sizeId } : {}),
+      ...(initialTestConfig.quantity != null && initialTestConfig.quantity > 0 ? { quantity: initialTestConfig.quantity } : {}),
+      ...(initialTestConfig.pages != null && initialTestConfig.pages > 0 ? { pages: initialTestConfig.pages } : {}),
+      ...(initialTestConfig.sides != null ? { sides: initialTestConfig.sides } : {}),
+    }));
+
+    if (initialTestConfig.printTechnology) setPrintTechnology(initialTestConfig.printTechnology);
+    if (initialTestConfig.printColorMode) setPrintColorMode(initialTestConfig.printColorMode);
+  }, [
+    isOpen,
+    embedded,
+    initialTestConfig,
+    selectedProduct?.id,
+    isCustomProduct,
+    isPostprintProduct,
+    applyProductTypeConfig,
+  ]);
 
   // Для продуктов без типов: начальные операции из schema.operations (is_required или is_default)
   useEffect(() => {
@@ -886,6 +944,10 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   // Добавление в заказ
   const handleAddToOrder = useCallback(
     async (customDescription?: string) => {
+      if (readOnlyTestMode) {
+        toast.info('Тестовый режим', 'Добавление в заказ отключено на странице шаблона.');
+        return;
+      }
       if (!result) return;
 
       const { apiItem, effectivePricePerItem } = buildOrderPayload({
@@ -955,6 +1017,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       toast,
       logger,
       onClose,
+      readOnlyTestMode,
     ]
   );
 
@@ -962,25 +1025,34 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   if (!isOpen) return null;
 
   return (
-    <div className="improved-printing-calculator-overlay" onClick={(e) => {
-      // Закрываем модалку при клике на overlay
-      if (e.target === e.currentTarget) {
-        onClose();
+    <div
+      className={embedded ? 'improved-printing-calculator-inline-shell' : 'improved-printing-calculator-overlay'}
+      onClick={
+        embedded
+          ? undefined
+          : (e) => {
+              // Закрываем модалку при клике на overlay
+              if (e.target === e.currentTarget) {
+                onClose();
+              }
+            }
       }
-    }}>
+    >
       {/* Обёртка: модалка + субтотал-бар одной шириной, без смещения */}
-      <div className="calculator-modal-wrapper">
+      <div className={`calculator-modal-wrapper${embedded ? ' calculator-modal-wrapper--embedded' : ''}`}>
       {/* Основной калькулятор */}
-      <div className="improved-printing-calculator">
+      <div className={`improved-printing-calculator${embedded ? ' improved-printing-calculator--embedded' : ''}`}>
         {/* Кнопка закрытия */}
-        <button
-          className="calculator-close-button"
-          onClick={onClose}
-          aria-label="Закрыть"
-          type="button"
-        >
-          <AppIcon name="x" size="lg" />
-        </button>
+        {!embedded && (
+          <button
+            className="calculator-close-button"
+            onClick={onClose}
+            aria-label="Закрыть"
+            type="button"
+          >
+            <AppIcon name="x" size="lg" />
+          </button>
+        )}
         {/* Основной контент */}
         <div className="calculator-content">
           <div className="calculator-main">

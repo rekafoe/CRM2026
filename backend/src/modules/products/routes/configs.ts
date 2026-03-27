@@ -47,6 +47,10 @@ export async function syncSimplifiedOperations(db: any, productId: number, confi
         typeIds.forEach((id) => serviceIds.add(id));
       }
     }
+    const bindingServiceId = simplified?.multiPageStructure?.binding?.service_id;
+    if (bindingServiceId != null && Number.isFinite(Number(bindingServiceId))) {
+      serviceIds.add(Number(bindingServiceId));
+    }
 
     const serviceIdList = Array.from(serviceIds);
     logger.info('[syncSimplifiedOperations] Синхронизация операций', { productId, serviceIdsCount: serviceIds.size });

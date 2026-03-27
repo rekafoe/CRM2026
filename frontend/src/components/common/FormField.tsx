@@ -2,7 +2,7 @@ import React from 'react';
 import '../../styles/utilities.css';
 
 interface FormFieldProps {
-  label?: string;
+  label?: React.ReactNode;
   error?: string;
   help?: string;
   required?: boolean;

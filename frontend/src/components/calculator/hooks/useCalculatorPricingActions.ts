@@ -994,6 +994,16 @@ export function useCalculatorPricingActions({
           errorMessage = err;
         }
         
+        if (
+          typeof errorMessage === 'string' &&
+          errorMessage.toLowerCase().includes('selected size not found in simplified config')
+        ) {
+          const expectedType = specs.typeId ?? specs.type_id ?? null;
+          errorMessage =
+            'Не удалось подобрать размер для расчёта. Проверьте выбранные тип/формат и размер в шаблоне, затем повторите расчёт.' +
+            (expectedType != null ? ` (type_id: ${expectedType})` : '');
+        }
+
         // Детальное логирование ошибки
         const errorDetails = {
           error: errorMessage,

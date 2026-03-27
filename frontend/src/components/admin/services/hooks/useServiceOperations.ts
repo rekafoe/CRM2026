@@ -5,6 +5,7 @@ import {
 } from '../../../../types/pricing';
 import {
   createPricingService,
+  createBindingService,
   updatePricingService,
   deletePricingService,
   createServiceVariant,
@@ -109,6 +110,67 @@ export function useServiceOperations({
     [] // Колбэки через ref, не добавляем в зависимости
   );
 
+  const createBinding = useCallback(
+    async (payload: {
+      name: string;
+      unit: string;
+      rate: number;
+      isActive: boolean;
+      hasVariants?: boolean;
+      minQuantity?: number;
+      maxQuantity?: number;
+      operator_percent?: number;
+      categoryId?: number | null;
+      material_id?: number | null;
+      qty_per_item?: number | null;
+    }) => {
+      try {
+        if (!payload.name.trim() || !payload.unit.trim()) {
+          callbacksRef.current.onError?.('Заполните обязательные поля: название, единица');
+          return null;
+        }
+
+        const createdService = await createBindingService({
+          name: payload.name.trim(),
+          type: 'postprint',
+          unit: payload.unit || 'item',
+          rate: Number.isFinite(payload.rate) ? payload.rate : 0,
+          isActive: payload.isActive,
+          operationType: 'bind',
+          minQuantity: payload.minQuantity,
+          maxQuantity: payload.maxQuantity,
+          operator_percent: payload.operator_percent,
+          categoryId: payload.categoryId,
+          material_id: payload.material_id,
+          qty_per_item: payload.qty_per_item,
+        });
+
+        if (payload.hasVariants) {
+          try {
+            await createServiceVariant(createdService.id, {
+              variantName: 'Новый тип',
+              parameters: {},
+              sortOrder: 0,
+              isActive: true,
+            });
+            callbacksRef.current.onServiceCreated?.(createdService.id);
+          } catch (variantError) {
+            console.error('Ошибка создания варианта переплёта:', variantError);
+          }
+        }
+
+        callbacksRef.current.onSuccess?.('Переплёт создан');
+        await callbacksRef.current.onReload?.();
+        return createdService;
+      } catch (e: unknown) {
+        console.error('Error creating binding:', e);
+        callbacksRef.current.onError?.(`Ошибка создания переплёта: ${getErrorMessage(e)}`);
+        return null;
+      }
+    },
+    []
+  );
+
   const deleteService = useCallback(
     async (id: number, serviceName: string) => {
       if (
@@ -132,6 +194,7 @@ export function useServiceOperations({
 
   return {
     createService,
+    createBinding,
     updateService,
     deleteService,
   };

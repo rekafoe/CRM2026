@@ -28,6 +28,34 @@ export type SimplifiedPagesConfig = {
   options: number[];
   default?: number;
 }
+
+export type MultiPageCoverMode = 'none' | 'self' | 'separate'
+
+export type MultiPageBlockPrintConfig = {
+  technology_code?: string;
+  color_mode?: 'color' | 'bw';
+  sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
+}
+
+export type MultiPageStructureConfig = {
+  innerBlock?: {
+    pagesSource?: 'parameter' | 'fixed';
+    fixedPages?: number;
+    print?: MultiPageBlockPrintConfig;
+    material_id?: number;
+  };
+  cover?: {
+    mode?: MultiPageCoverMode;
+    print?: MultiPageBlockPrintConfig;
+    material_id?: number;
+    qty_per_item?: number;
+  };
+  binding?: {
+    service_id?: number;
+    variant_id?: number;
+    units_per_item?: number;
+  };
+}
 export type SimplifiedSizeConfig = {
   id: number | string;
   label: string;
@@ -121,6 +149,7 @@ export type SimplifiedTypeConfig = {
 export type SimplifiedConfig = {
   sizes: SimplifiedSizeConfig[];
   pages?: SimplifiedPagesConfig;
+  multiPageStructure?: MultiPageStructureConfig;
   /** Типы продукта (варианты): если заданы, у каждого типа свой конфиг в typeConfigs */
   types?: ProductTypeVariant[];
   /** Конфиг по типам: typeId -> размеры и цены */

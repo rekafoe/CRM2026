@@ -325,6 +325,7 @@ export function compactSimplifiedForSite(simplified: any) {
     use_layout: simplified.use_layout,
     cutting: simplified.cutting,
     pages: simplified.pages || null,
+    multiPageStructure: simplified.multiPageStructure || null,
     sizes: Array.isArray(simplified.sizes) ? simplified.sizes.map(compactSize) : [],
     ...(compactTypes ? { types: compactTypes } : {}),
     ...(compactTypeConfigs ? { typeConfigs: compactTypeConfigs } : {}),
@@ -541,6 +542,11 @@ export function collectServiceIdsFromSimplified(simplified: any): number[] {
     for (const cfg of Object.values(simplified.typeConfigs) as any[]) {
       if (Array.isArray(cfg?.sizes)) cfg.sizes.forEach(addFromSize);
     }
+  }
+
+  const bindingServiceId = simplified?.multiPageStructure?.binding?.service_id;
+  if (bindingServiceId != null && Number.isFinite(Number(bindingServiceId))) {
+    ids.add(Number(bindingServiceId));
   }
 
   return Array.from(ids);

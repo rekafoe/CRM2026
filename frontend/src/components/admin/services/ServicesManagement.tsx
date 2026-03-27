@@ -44,6 +44,14 @@ const emptyServiceForm: ServiceFormState = {
   qtyPerItem: '1',
 };
 
+const bindingServiceForm: ServiceFormState = {
+  ...emptyServiceForm,
+  type: 'postprint',
+  operationType: 'bind',
+  unit: 'per_item',
+  hasVariants: true,
+};
+
 const serviceToFormState = (service: PricingService): ServiceFormState => ({
   name: service.name,
   type: service.type,
@@ -65,6 +73,7 @@ interface ServicesManagementProps {
 }
 
 const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = true }) => {
+  const [createMode, setCreateMode] = useState<'service' | 'binding'>('service');
   // Управление состоянием
   const {
     state,
@@ -209,7 +218,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
   }, [state.editingService, state.editingServiceForm, resetEditingService]); // serviceOperations через ref
 
   const handleServiceCreate = useCallback(async () => {
-    const created = await serviceOperationsRef.current.createService({
+    const payload = {
       name: state.newServiceForm.name.trim(),
       type: state.newServiceForm.type || 'postprint',
       unit: state.newServiceForm.unit || 'item',
@@ -229,13 +238,17 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
       categoryId: state.newServiceForm.categoryId !== '' ? state.newServiceForm.categoryId : undefined,
       material_id: state.newServiceForm.materialId !== '' ? state.newServiceForm.materialId : undefined,
       qty_per_item: state.newServiceForm.qtyPerItem !== '' && Number(state.newServiceForm.qtyPerItem) > 0 ? Number(state.newServiceForm.qtyPerItem) : undefined,
-    });
+    };
+    const created = createMode === 'binding'
+      ? await serviceOperationsRef.current.createBinding(payload)
+      : await serviceOperationsRef.current.createService(payload);
     
     if (created) {
       setShowCreateService(false);
+      setCreateMode('service');
       resetNewServiceForm(emptyServiceForm);
     }
-  }, [state.newServiceForm, setShowCreateService, resetNewServiceForm]); // serviceOperations через ref
+  }, [createMode, state.newServiceForm, setShowCreateService, resetNewServiceForm]); // serviceOperations через ref
 
   const handleServiceDelete = useCallback(async (id: number, serviceName: string) => {
     await serviceOperationsRef.current.deleteService(id, serviceName);
@@ -270,13 +283,29 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
     });
   }, [services, state.serviceSearch, state.typeFilter, state.sortBy, state.sortOrder]);
 
+  const bindingServices = useMemo(
+    () =>
+      filteredServices.filter(
+        (service) => (service.operationType ?? service.type ?? '').toLowerCase() === 'bind'
+      ),
+    [filteredServices]
+  );
+
+  const nonBindingServices = useMemo(
+    () =>
+      filteredServices.filter(
+        (service) => (service.operationType ?? service.type ?? '').toLowerCase() !== 'bind'
+      ),
+    [filteredServices]
+  );
+
   // Группировка по категориям для отображения (порядок: по sort_order категорий, затем "Без категории")
   const servicesByCategory = useMemo(() => {
     const order = new Map<number | null, number>();
     categories.forEach((c, i) => order.set(c.id, c.sortOrder ?? i));
     order.set(null, 1e9);
     const groups = new Map<string, { categoryId: number | null; categoryName: string; services: PricingService[] }>();
-    for (const s of filteredServices) {
+    for (const s of nonBindingServices) {
       const categoryId = s.categoryId ?? null;
       const categoryName = s.categoryName ?? 'Без категории';
       const key = categoryId !== null ? `id:${categoryId}` : 'none';
@@ -286,7 +315,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
     return Array.from(groups.values()).sort(
       (a, b) => (order.get(a.categoryId) ?? 1e9) - (order.get(b.categoryId) ?? 1e9)
     );
-  }, [filteredServices, categories]);
+  }, [nonBindingServices, categories]);
 
   // Рендеринг действий для строки услуги
   const renderActions = useCallback((service: PricingService) => (
@@ -390,7 +419,16 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               setSortBy(field);
               setSortOrder(order);
             }}
-            onCreateService={() => setShowCreateService(true)}
+            onCreateService={() => {
+              setCreateMode('service');
+              resetNewServiceForm(emptyServiceForm);
+              setShowCreateService(true);
+            }}
+            onCreateBinding={() => {
+              setCreateMode('binding');
+              resetNewServiceForm(bindingServiceForm);
+              setShowCreateService(true);
+            }}
           />
 
           <div className="svc-info-banner">
@@ -401,6 +439,20 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
           {filteredServices.length > 0 ? (
             <>
               <div className="services-table-container">
+                {bindingServices.length > 0 && (
+                  <div className="services-category-group">
+                    <h3 className="services-category-group__title">Переплёты</h3>
+                    <ServicesTable
+                      services={bindingServices}
+                      renderActions={renderActions}
+                      expandedServiceId={state.expandedServiceId}
+                      renderExpandedRow={renderExpandedRow}
+                      getServiceIcon={getServiceIcon}
+                      getServiceTypeLabel={getServiceTypeLabel}
+                      getUnitLabel={getUnitLabel}
+                    />
+                  </div>
+                )}
                 {servicesByCategory.map((group) => (
                   <div key={group.categoryId ?? 'none'} className="services-category-group">
                     <h3 className="services-category-group__title">{group.categoryName}</h3>
@@ -436,7 +488,14 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
                   : 'Начните с добавления первой услуги для настройки ценообразования'}
               </p>
               {!state.serviceSearch && state.typeFilter === 'all' && (
-                <Button variant="primary" onClick={() => setShowCreateService(true)}>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setCreateMode('service');
+                    resetNewServiceForm(emptyServiceForm);
+                    setShowCreateService(true);
+                  }}
+                >
                   + Добавить первую услугу
                 </Button>
               )}
@@ -447,13 +506,30 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
 
       {/* Модальное окно создания услуги */}
       {state.showCreateService && (
-        <Modal isOpen={true} title="Новая услуга" onClose={() => setShowCreateService(false)}>
+        <Modal
+          isOpen={true}
+          title={createMode === 'binding' ? 'Новый переплёт' : 'Новая услуга'}
+          onClose={() => {
+            setShowCreateService(false);
+            setCreateMode('service');
+          }}
+        >
           <ServiceForm value={state.newServiceForm} onChange={setNewServiceForm} categories={categories} materials={materials} />
           <Alert type="info" className="mt-4">
-            После создания услугу можно привязать к продукту в разделе управления продуктами.
+            {createMode === 'binding'
+              ? 'Переплёты создаются отдельно и автоматически относятся к операции bind и категории "Переплёты".'
+              : 'После создания услугу можно привязать к продукту в разделе управления продуктами.'}
           </Alert>
           <div className="flex justify-end gap-2 w-full mt-4 pt-4 border-t">
-            <Button variant="secondary" onClick={() => setShowCreateService(false)}>Отмена</Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowCreateService(false);
+                setCreateMode('service');
+              }}
+            >
+              Отмена
+            </Button>
             <Button variant="primary" onClick={handleServiceCreate}>Сохранить</Button>
           </div>
         </Modal>

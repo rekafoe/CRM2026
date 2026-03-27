@@ -144,7 +144,10 @@ export function useMultiPageCalculation() {
       setResult(response.data);
       return response.data;
     } catch (err: any) {
-      const message = err.response?.data?.error || 'Ошибка расчёта';
+      const details = err.response?.data?.details;
+      const message = Array.isArray(details) && details.length > 0
+        ? details.join('. ')
+        : err.response?.data?.error || 'Ошибка расчёта';
       setError(message);
       return null;
     } finally {

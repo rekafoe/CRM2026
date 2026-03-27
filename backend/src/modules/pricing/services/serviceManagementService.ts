@@ -17,6 +17,10 @@ export class ServiceManagementService {
     return PricingServiceRepository.listServices();
   }
 
+  static listBindings(): Promise<PricingServiceDTO[]> {
+    return PricingServiceRepository.listBindings();
+  }
+
   static listServiceCategories(): Promise<ServiceCategoryDTO[]> {
     return PricingServiceRepository.listServiceCategories();
   }
@@ -43,6 +47,18 @@ export class ServiceManagementService {
 
   static deleteService(id: number): Promise<void> {
     return PricingServiceRepository.deleteService(id);
+  }
+
+  static createBinding(payload: CreatePricingServiceDTO): Promise<PricingServiceDTO> {
+    return PricingServiceRepository.createBinding(payload);
+  }
+
+  static updateBinding(id: number, payload: UpdatePricingServiceDTO): Promise<PricingServiceDTO | null> {
+    return PricingServiceRepository.updateBinding(id, payload);
+  }
+
+  static deleteBinding(id: number): Promise<void> {
+    return PricingServiceRepository.deleteBinding(id);
   }
 
   static listServiceTiers(serviceId: number, variantId?: number): Promise<ServiceVolumeTierDTO[]> {

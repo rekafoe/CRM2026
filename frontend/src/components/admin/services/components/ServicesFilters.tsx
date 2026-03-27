@@ -14,6 +14,7 @@ interface ServicesFiltersProps {
   onTypeFilterChange: (value: string) => void;
   onSortChange: (field: 'name' | 'price' | 'type', order: 'asc' | 'desc') => void;
   onCreateService: () => void;
+  onCreateBinding?: () => void;
 }
 
 /**
@@ -29,6 +30,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
   onTypeFilterChange,
   onSortChange,
   onCreateService,
+  onCreateBinding,
 }) => {
   const availableTypes = [...new Set(services.map((s) => s.type))];
 
@@ -82,9 +84,16 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
           </select>
         </div>
 
-        <Button variant="primary" onClick={onCreateService}>
-          + Добавить услугу
-        </Button>
+        <div className="flex gap-2">
+          {onCreateBinding && (
+            <Button variant="secondary" onClick={onCreateBinding}>
+              + Добавить переплёт
+            </Button>
+          )}
+          <Button variant="primary" onClick={onCreateService}>
+            + Добавить услугу
+          </Button>
+        </div>
       </div>
 
       {/* Быстрые фильтры */}

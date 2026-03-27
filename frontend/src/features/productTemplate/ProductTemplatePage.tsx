@@ -1,7 +1,6 @@
-import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, StatusBadge, Alert, Modal } from '../../components/common';
-import { useDebounce } from '../../hooks/useDebounce';
+import { Button, Alert, Modal } from '../../components/common';
 import TrimSizeSection from './components/TrimSizeSection';
 import PriceRulesSection from './components/PriceRulesSection';
 import FinishingSection from './components/FinishingSection';
@@ -21,12 +20,16 @@ import { useProductOperations } from './hooks/useProductOperations';
 import { PrintTab, ProductPrintSettings } from '../../pages/admin/product-edit/PrintTab';
 import { updateProduct } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
-import { SimplifiedTemplateSection, type ServiceRow } from './components/SimplifiedTemplateSection';
+import { SimplifiedTemplateSection } from './components/SimplifiedTemplateSection';
+import type { SimplifiedChecklistState, SimplifiedEditorTab } from './components/SimplifiedTemplateSection';
 import { useSimplifiedTypes } from './hooks/useSimplifiedTypes';
-import { ProductTypesCard } from './components/ProductTypesCard';
-import { api } from '../../api';
+import { useTemplatePricingServices } from './hooks/useTemplatePricingServices';
+import { useTemplateAutoSave } from './hooks/useTemplateAutoSave';
 import { AppIcon } from '../../components/ui/AppIcon';
-import { ProductDuplicateModal, productCanBeDuplicated } from '../../components/admin/ProductDuplicateModal';
+import { ProductDuplicateModal } from '../../components/admin/ProductDuplicateModal';
+import { TemplateHeaderExtra } from './components/TemplateHeaderExtra';
+import { UnsavedChangesBanner } from './components/UnsavedChangesBanner';
+import { SimplifiedTemplateSidebar } from './components/SimplifiedTemplateSidebar';
 import { useUIStore } from '../../stores/uiStore';
 
 
@@ -44,15 +47,17 @@ const ProductTemplatePage: React.FC = () => {
 
   // Все useState хуки должны быть объявлены ДО вызова кастомных хуков
   const [showMetaModal, setShowMetaModal] = useState(false);
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [activeTab, setActiveTab] = useState<'main' | 'materials' | 'run' | 'operations' | 'print'>('main');
+  const [activeTab, setActiveTab] = useState<'base' | 'print' | 'materials' | 'pricing' | 'operations' | 'review'>('base');
   const [savingPrintSettings, setSavingPrintSettings] = useState(false);
   const [calcOptionsExpanded, setCalcOptionsExpanded] = useState(false);
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
-  const isInitialLoadRef = useRef(true);
-  const lastSavedStateRef = useRef<string>('');
-  const autoSaveInProgressRef = useRef(false);
+  const [simplifiedEditorTab, setSimplifiedEditorTab] = useState<SimplifiedEditorTab>('print');
+  const [simplifiedChecklist, setSimplifiedChecklist] = useState<SimplifiedChecklistState>({
+    size: false,
+    print: false,
+    materials: false,
+    finishing: false,
+  });
 
   // Кастомные хуки - ВАЖНО: порядок должен быть всегда одинаковым!
   const pageData = useProductTemplatePage(productId);
@@ -100,24 +105,7 @@ const ProductTemplatePage: React.FC = () => {
   );
   const simplifiedTypes = useSimplifiedTypes(state.simplified, handleSimplifiedChange);
 
-  const [simplifiedServices, setSimplifiedServices] = useState<ServiceRow[]>([]);
-  useEffect(() => {
-    if (product?.calculator_type !== 'simplified') return;
-    let cancelled = false;
-    api.get('/pricing/services').then(r => {
-      const data = (r.data as any)?.data ?? r.data ?? [];
-      const arr = Array.isArray(data) ? data : [];
-      const filtered = arr.filter((s: any) => {
-        if (!s || !s.id || !s.name) return false;
-        const excludedTypes = new Set(['print', 'printing']);
-        const opType = String(s.operation_type ?? s.operationType ?? s.type ?? s.service_type ?? '').toLowerCase();
-        if (!opType) return true;
-        return !excludedTypes.has(opType);
-      });
-      if (!cancelled) setSimplifiedServices(filtered);
-    }).catch(err => console.error('Ошибка загрузки услуг:', err));
-    return () => { cancelled = true; };
-  }, [product?.calculator_type]);
+  const { simplifiedServices, bindingServices } = useTemplatePricingServices(product?.calculator_type);
 
   const handleSelectType = useCallback(
     (typeId: any) => {
@@ -139,65 +127,17 @@ const ProductTemplatePage: React.FC = () => {
     constraints: state.constraints
   }), [state.trim_size, state.print_sheet, state.print_run, state.finishing, state.packaging, state.price_rules, state.constraints]);
 
-  const debouncedState = useDebounce(stateForAutoSave, 2500); // Сохраняем через 2.5 секунды после последнего изменения
-
-  // Автосохранение при изменениях (оптимизированное)
-  useEffect(() => {
-    // Пропускаем первую загрузку
-    if (isInitialLoadRef.current) {
-      if (!loading) {
-        isInitialLoadRef.current = false;
-        // Сохраняем начальное состояние после загрузки
-        lastSavedStateRef.current = JSON.stringify(debouncedState);
-      }
-      return;
-    }
-
-    // Не сохраняем, если еще загружаемся или уже сохраняем
-    if (loading || saving || !productId || autoSaveInProgressRef.current) {
-      return;
-    }
-
-    // Проверяем, изменилось ли состояние
-    const currentStateString = JSON.stringify(debouncedState);
-    const hasChanges = currentStateString !== lastSavedStateRef.current;
-    setHasUnsavedChanges(hasChanges);
-    
-    if (!hasChanges) {
-      return; // Нет изменений, не сохраняем
-    }
-
-    // Автосохранение
-    const autoSave = async () => {
-      if (autoSaveInProgressRef.current) return;
-      
-      try {
-        autoSaveInProgressRef.current = true;
-        setAutoSaveStatus('saving');
-        await persistTemplateConfig(''); // Пустое сообщение, чтобы не показывать alert
-        
-        // Обновляем последнее сохраненное состояние только после успешного сохранения
-        lastSavedStateRef.current = currentStateString;
-        setHasUnsavedChanges(false);
-        
-        setAutoSaveStatus('saved');
-        // Через 2 секунды убираем индикатор "Сохранено"
-        setTimeout(() => {
-          setAutoSaveStatus(prev => prev === 'saved' ? 'idle' : prev);
-        }, 2000);
-      } catch (error) {
-        console.error('Auto-save failed:', error);
-        setAutoSaveStatus('error');
-        setTimeout(() => {
-          setAutoSaveStatus('idle');
-        }, 3000);
-      } finally {
-        autoSaveInProgressRef.current = false;
-      }
-    };
-
-    void autoSave();
-  }, [debouncedState, loading, saving, productId, persistTemplateConfig]);
+  const {
+    autoSaveStatus,
+    hasUnsavedChanges,
+    triggerManualSave,
+  } = useTemplateAutoSave({
+    stateForAutoSave,
+    loading,
+    saving,
+    productId,
+    persistTemplateConfig,
+  });
 
 
 
@@ -205,6 +145,40 @@ const ProductTemplatePage: React.FC = () => {
 
   const pageTitle = state.meta.name || product?.name || 'Шаблон продукта';
   const pageIcon = state.meta.icon || product?.icon || '';
+  const hasTrimConfigured = Boolean(trimWidth && trimHeight && Number(trimWidth) > 0 && Number(trimHeight) > 0);
+  const hasParametersConfigured = parameters.length > 0;
+  const hasPrintConfigured = Boolean((product as any)?.print_settings && Object.keys((product as any).print_settings || {}).length > 0);
+  const hasMaterialsConfigured = materials.length > 0 || (state.constraints.overrides.allowedPaperTypes?.length ?? 0) > 0;
+  const hasPricingConfigured = Boolean(state.print_run.enabled || priceRules.length > 0);
+  const hasOperationsConfigured = operationsLength > 0;
+  type TabState = 'ready' | 'partial' | 'empty';
+
+  const tabStatus = useMemo<Record<'base' | 'print' | 'materials' | 'pricing' | 'operations' | 'review', TabState>>(() => ({
+    base: hasTrimConfigured && hasParametersConfigured ? 'ready' : (hasTrimConfigured || hasParametersConfigured ? 'partial' : 'empty'),
+    print: hasPrintConfigured ? 'ready' : 'partial',
+    materials: hasMaterialsConfigured ? 'ready' : 'empty',
+    pricing: hasPricingConfigured ? 'ready' : 'partial',
+    operations: hasOperationsConfigured ? 'ready' : 'empty',
+    review: hasTrimConfigured && hasParametersConfigured && hasMaterialsConfigured && hasOperationsConfigured ? 'ready' : 'partial',
+  }), [
+    hasMaterialsConfigured,
+    hasOperationsConfigured,
+    hasParametersConfigured,
+    hasPricingConfigured,
+    hasPrintConfigured,
+    hasTrimConfigured,
+  ]);
+
+  const tabStatusLabel: Record<TabState, string> = {
+    ready: 'Готово',
+    partial: 'Частично',
+    empty: 'Пусто',
+  };
+  const tabStatusColor: Record<TabState, string> = {
+    ready: '#10b981',
+    partial: '#f59e0b',
+    empty: '#94a3b8',
+  };
 
   return (
     <AdminPageLayout
@@ -213,162 +187,77 @@ const ProductTemplatePage: React.FC = () => {
       onBack={() => navigate('/adminpanel/products')}
       className="product-template-page"
       headerExtra={(
-        <>
-          {product && (
-            <StatusBadge
-              status={product.is_active ? 'Активен' : 'Отключен'}
-              color={product.is_active ? 'success' : 'error'}
-              size="sm"
-            />
-          )}
-          {!hasUnsavedChanges && autoSaveStatus !== 'idle' && (
-            <div className="auto-save-indicator" style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '12px',
-              color: autoSaveStatus === 'saved' ? '#10b981' : autoSaveStatus === 'error' ? '#ef4444' : '#64748b'
-            }}>
-              {autoSaveStatus === 'saving' && <span><AppIcon name="save" size="xs" /> Сохранение...</span>}
-              {autoSaveStatus === 'saved' && <span><AppIcon name="check" size="xs" /> Сохранено</span>}
-              {autoSaveStatus === 'error' && <span><AppIcon name="warning" size="xs" /> Ошибка сохранения</span>}
-            </div>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowMetaModal(true)}
-            icon={<span style={{ marginRight: '4px' }}><AppIcon name="edit" size="xs" /></span>}
-          >
-            Основные поля
-          </Button>
-          {product && productCanBeDuplicated(product) && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setDuplicateModalOpen(true)}
-              icon={<span style={{ marginRight: '4px' }}><AppIcon name="copy" size="xs" /></span>}
-            >
-              Копировать продукт
-            </Button>
-          )}
-        </>
+        <TemplateHeaderExtra
+          product={product}
+          hasUnsavedChanges={hasUnsavedChanges}
+          autoSaveStatus={autoSaveStatus}
+          onOpenMeta={() => setShowMetaModal(true)}
+          onOpenDuplicate={() => setDuplicateModalOpen(true)}
+        />
       )}
     >
     <div className="product-template product-template--admin-layout">
-      {/* Баннер несохранённых изменений, как в старой CRM */}
-      {hasUnsavedChanges && (
-        <div className="unsaved-changes-banner">
-          <div className="unsaved-changes-banner__content">
-            <span className="unsaved-changes-banner__text">Появились несохраненные изменения</span>
-            <Button 
-              variant="primary" 
-              size="sm"
-              onClick={async () => {
-                setAutoSaveStatus('saving');
-                await persistTemplateConfig('Шаблон сохранён');
-                setAutoSaveStatus('saved');
-                setHasUnsavedChanges(false);
-                setTimeout(() => setAutoSaveStatus('idle'), 2000);
-              }} 
-              disabled={saving}
-            >
-              {saving ? 'Сохранение…' : 'Сохранить'}
-            </Button>
-          </div>
-        </div>
-      )}
+      <UnsavedChangesBanner
+        visible={hasUnsavedChanges}
+        saving={saving}
+        onSave={() => triggerManualSave('Шаблон сохранён')}
+      />
 
       {product?.calculator_type === 'simplified' ? (
         <div className="product-template__body product-template__body--simplified-with-sidebar">
-          <aside className="product-template__sidebar">
-            <div className="template-summary-card">
-              <div className="template-summary-card__icon">{state.meta.icon || product?.icon || <AppIcon name="package" size="md" />}</div>
-              <div className="template-summary-card__name">{state.meta.name || product?.name || 'Без названия'}</div>
-              <ul className="template-summary-card__list">
-                {summaryStats.map((item) => (
-                  <li key={item.label}>
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                  </li>
-                ))}
-              </ul>
-              <div className="template-summary-card__meta">
-                Создан: {product?.created_at ? new Date(product.created_at).toLocaleDateString() : '—'}
-              </div>
-            </div>
-
-            <div className={`simplified-card simplified-card--collapsible ${!calcOptionsExpanded ? 'simplified-card--collapsed' : ''}`}>
-              <div className="simplified-card__header" onClick={() => setCalcOptionsExpanded((v) => !v)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCalcOptionsExpanded((v) => !v)}>
-                <div>
-                  <strong>Опции калькулятора</strong>
-                  <div className="text-muted text-sm">Чекбоксы, доступные при расчёте.</div>
-                </div>
-                <span className="simplified-card__header-toggle">{calcOptionsExpanded ? 'Свернуть' : 'Развернуть'}</span>
-              </div>
-              <div className="simplified-card__content">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={state.simplified.use_layout !== false}
-                    onChange={(e) => handleSimplifiedChange({ ...state.simplified, use_layout: e.target.checked })}
-                  />
-                  Раскладка на лист
-                </label>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={!!state.simplified.cutting}
-                    onChange={(e) => handleSimplifiedChange({ ...state.simplified, cutting: e.target.checked })}
-                  />
-                  Резка стопой
-                </label>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={state.simplified.duplex_as_single_x2 === true}
-                    onChange={(e) => handleSimplifiedChange({ ...state.simplified, duplex_as_single_x2: e.target.checked })}
-                  />
-                  Дуплекс как 2×односторонняя
-                </label>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={state.simplified.include_material_cost !== false}
-                    onChange={(e) => handleSimplifiedChange({ ...state.simplified, include_material_cost: e.target.checked })}
-                  />
-                  Учитывать стоимость материалов
-                </label>
-              </div>
-            </div>
-
-            <ProductTypesCard
-              value={state.simplified}
-              onChange={handleSimplifiedChange}
-              selectedTypeId={simplifiedTypes.selectedTypeId}
-              onSelectType={handleSelectType}
-              onAddType={simplifiedTypes.addType}
-              setDefaultType={simplifiedTypes.setDefaultType}
-              removeType={simplifiedTypes.removeType}
-              services={simplifiedServices}
-              allMaterials={allMaterials as any}
-            />
-          </aside>
+          <SimplifiedTemplateSidebar
+            product={product}
+            icon={state.meta.icon}
+            name={state.meta.name}
+            summaryStats={summaryStats}
+            value={state.simplified}
+            onChange={handleSimplifiedChange}
+            calcOptionsExpanded={calcOptionsExpanded}
+            onToggleCalcOptions={() => setCalcOptionsExpanded((v) => !v)}
+            types={simplifiedTypes}
+            onSelectType={handleSelectType}
+            services={simplifiedServices}
+            allMaterials={allMaterials as any}
+          />
 
           <section className="product-template__main">
             {loading && <Alert type="info">Загружаем данные шаблона…</Alert>}
             {!loading && (
-              <SimplifiedTemplateSection
-                value={state.simplified}
-                onChange={handleSimplifiedChange}
-                onSave={() => void persistTemplateConfig('Шаблон упрощённого калькулятора сохранён')}
-                saving={saving}
-                allMaterials={allMaterials as any}
-                showPagesConfig={product?.product_type === 'multi_page'}
-                types={simplifiedTypes}
-                services={simplifiedServices}
-                productId={productId}
-              />
+              <>
+                {simplifiedEditorTab === 'check' && (
+                  <div className="simplified-checklist-hint">
+                    {[
+                      { ok: simplifiedChecklist.size, label: 'Размер' },
+                      { ok: simplifiedChecklist.print, label: 'Печать' },
+                      { ok: simplifiedChecklist.materials, label: 'Материалы' },
+                      { ok: simplifiedChecklist.finishing, label: 'Отделка' },
+                    ].map((item) => (
+                      <span
+                        key={item.label}
+                        className={`simplified-checklist-hint__item ${item.ok ? 'is-ok' : 'is-missing'}`}
+                        title={item.ok ? `${item.label}: готово` : `${item.label}: требует настройки`}
+                      >
+                        <span>{item.ok ? '✓' : '•'}</span>
+                        <span>{item.label}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <SimplifiedTemplateSection
+                  value={state.simplified}
+                  onChange={handleSimplifiedChange}
+                  onSave={() => void persistTemplateConfig('Шаблон упрощённого калькулятора сохранён')}
+                  saving={saving}
+                  allMaterials={allMaterials as any}
+                  showPagesConfig={product?.product_type === 'multi_page'}
+                  types={simplifiedTypes}
+                  services={simplifiedServices}
+                  productId={productId}
+                  bindingServices={bindingServices}
+                  onEditorTabChange={setSimplifiedEditorTab}
+                  onChecklistChange={setSimplifiedChecklist}
+                />
+              </>
             )}
           </section>
         </div>
@@ -378,38 +267,45 @@ const ProductTemplatePage: React.FC = () => {
         <div className="product-tabs">
           <button
             type="button"
-            className={`product-tab ${activeTab === 'main' ? 'product-tab--active' : ''}`}
-            onClick={() => setActiveTab('main')}
+            className={`product-tab ${activeTab === 'base' ? 'product-tab--active' : ''}`}
+            onClick={() => setActiveTab('base')}
           >
-            Основные настройки
-          </button>
-          <button
-            type="button"
-            className={`product-tab ${activeTab === 'run' ? 'product-tab--active' : ''}`}
-            onClick={() => setActiveTab('run')}
-          >
-            Тираж
-          </button>
-          <button
-            type="button"
-            className={`product-tab ${activeTab === 'operations' ? 'product-tab--active' : ''}`}
-            onClick={() => setActiveTab('operations')}
-          >
-            Операции и цена
-          </button>
-          <button
-            type="button"
-            className={`product-tab ${activeTab === 'materials' ? 'product-tab--active' : ''}`}
-            onClick={() => setActiveTab('materials')}
-          >
-            Материалы
+            База <span style={{ color: tabStatusColor[tabStatus.base], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.base]}</span>
           </button>
           <button
             type="button"
             className={`product-tab ${activeTab === 'print' ? 'product-tab--active' : ''}`}
             onClick={() => setActiveTab('print')}
           >
-            Печать
+            Печать <span style={{ color: tabStatusColor[tabStatus.print], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.print]}</span>
+          </button>
+          <button
+            type="button"
+            className={`product-tab ${activeTab === 'materials' ? 'product-tab--active' : ''}`}
+            onClick={() => setActiveTab('materials')}
+          >
+            Материалы <span style={{ color: tabStatusColor[tabStatus.materials], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.materials]}</span>
+          </button>
+          <button
+            type="button"
+            className={`product-tab ${activeTab === 'pricing' ? 'product-tab--active' : ''}`}
+            onClick={() => setActiveTab('pricing')}
+          >
+            Тираж и цена <span style={{ color: tabStatusColor[tabStatus.pricing], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.pricing]}</span>
+          </button>
+          <button
+            type="button"
+            className={`product-tab ${activeTab === 'operations' ? 'product-tab--active' : ''}`}
+            onClick={() => setActiveTab('operations')}
+          >
+            Операции <span style={{ color: tabStatusColor[tabStatus.operations], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.operations]}</span>
+          </button>
+          <button
+            type="button"
+            className={`product-tab ${activeTab === 'review' ? 'product-tab--active' : ''}`}
+            onClick={() => setActiveTab('review')}
+          >
+            Проверка <span style={{ color: tabStatusColor[tabStatus.review], marginLeft: 6, fontSize: 11 }}>{tabStatusLabel[tabStatus.review]}</span>
           </button>
         </div>
 
@@ -420,7 +316,17 @@ const ProductTemplatePage: React.FC = () => {
         <div className="product-template__body">
           <aside className="product-template__sidebar">
             <div className="template-summary-card">
-              <div className="template-summary-card__icon">{state.meta.icon || product?.icon || <AppIcon name="package" size="md" />}</div>
+              <div className="template-summary-card__icon">
+                {product?.image_url ? (
+                  <img
+                    src={product.image_url}
+                    alt={state.meta.name || product?.name || 'Изображение продукта'}
+                    className="template-summary-card__image"
+                  />
+                ) : (
+                  state.meta.icon || product?.icon || <AppIcon name="package" size="md" />
+                )}
+              </div>
               <div className="template-summary-card__name">{state.meta.name || product?.name || 'Без названия'}</div>
               <ul className="template-summary-card__list">
                 {summaryStats.map((item) => (
@@ -453,7 +359,7 @@ const ProductTemplatePage: React.FC = () => {
               <>
                 {loadingLists && <Alert type="info">Обновляем связанные списки…</Alert>}
                 {/* Основные секции */}
-                {activeTab === 'main' && (
+                {activeTab === 'base' && (
                   <div className="template-sections-list">
                     {/* Секция: Формат в сложенном виде */}
                     <div className="template-section template-section--trim" id="section-format">
@@ -528,8 +434,8 @@ const ProductTemplatePage: React.FC = () => {
                 </div>
               )}
 
-              {/* Секция: Тираж */}
-              {activeTab === 'run' && (
+              {/* Секция: Тираж и правила цены */}
+              {activeTab === 'pricing' && (
                 <div className="template-sections-list">
                   <div className="template-section" id="section-run">
                     <div className="template-section__header">
@@ -543,6 +449,26 @@ const ProductTemplatePage: React.FC = () => {
                         saving={saving}
                         onChange={(patch) => dispatch({ type: 'setRun', patch })}
                         onSave={() => void persistTemplateConfig('Диапазон тиражей сохранён')}
+                      />
+                    </div>
+                  </div>
+                  <div className="template-section" id="section-price-rules">
+                    <div className="template-section__header">
+                      <h3 className="template-section__title">Правила цены</h3>
+                    </div>
+                    <div className="template-section__content">
+                      <PriceRulesSection
+                        rules={state.price_rules}
+                        saving={saving}
+                        onChangeRule={(index, patch) => {
+                          if (index < 0) {
+                            dispatch({ type: 'addRule', rule: patch as any });
+                            return;
+                          }
+                          dispatch({ type: 'updateRule', index, patch });
+                        }}
+                        onRemoveRule={(index) => dispatch({ type: 'removeRule', index })}
+                        onSave={() => void persistTemplateConfig('Правила цены сохранены')}
                       />
                     </div>
                   </div>
@@ -651,6 +577,34 @@ const ProductTemplatePage: React.FC = () => {
                         onBulkAdd={operations.handleBulkAdd}
                         onErrorDismiss={() => operations.setOperationError(null)}
                       />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'review' && (
+                <div className="template-sections-list">
+                  <div className="template-section">
+                    <div className="template-section__header">
+                      <h3 className="template-section__title">Проверка настройки листового шаблона</h3>
+                      <p className="template-section__description">
+                        Быстрый чек перед запуском продукта в работу.
+                      </p>
+                    </div>
+                    <div className="template-section__content">
+                      {[
+                        { ok: hasTrimConfigured, label: 'Формат (ширина/высота) задан' },
+                        { ok: hasParametersConfigured, label: 'Параметры калькулятора добавлены' },
+                        { ok: hasPrintConfigured, label: 'Настройки печати заданы' },
+                        { ok: hasMaterialsConfigured, label: 'Материалы или типы бумаги настроены' },
+                        { ok: hasPricingConfigured, label: 'Тираж/правила цены настроены' },
+                        { ok: hasOperationsConfigured, label: 'Операции добавлены' },
+                      ].map((item) => (
+                        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                          <span style={{ color: item.ok ? '#10b981' : '#ef4444', fontWeight: 700 }}>{item.ok ? '✓' : '×'}</span>
+                          <span>{item.label}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

@@ -63,6 +63,13 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
   otherSizesForPrintCopy = [],
   onCopyPrintFromSize,
 }) => {
+  const titleWithHint = (label: string, hint: string) => (
+    <span className="simplified-label-with-hint">
+      <strong>{label}</strong>
+      <span className="simplified-label-hint" title={hint}>?</span>
+    </span>
+  )
+
   const [copyPrintSourceId, setCopyPrintSourceId] = useState<string>('')
   const [tierModal, setTierModal] = useState<TierRangeModalState>({
     type: 'add',
@@ -105,8 +112,10 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
     <div className="simplified-card">
       <div className="simplified-card__header">
         <div>
-          <strong>Печать (цена за изделие)</strong>
-          <div className="text-muted text-sm">Выберите технологию печати, и система автоматически покажет все доступные вариации с диапазонами цен.</div>
+          {titleWithHint(
+            'Печать (цена за изделие)',
+            'Выберите технологию печати, и система автоматически покажет все доступные вариации с диапазонами цен.',
+          )}
           {otherSizesForPrintCopy.length > 0 && typeof onCopyPrintFromSize === 'function' && (
             <div
               className="simplified-print-copy-row"
@@ -207,9 +216,13 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
           </Button>
         )}
         {selected.default_print?.technology_code && selected.width_mm > 0 && selected.height_mm > 0 && (
-          <p className="text-muted text-xs mt-2 mb-0" style={{ maxWidth: 520 }}>
-            Раскладка при этом запросе: первый разрешённый для размера материал с заполненными «ширина и высота листа (мм)» в карточке склада; если таких нет — размер листа из централизованной цены печати (по умолчанию часто 320×450).
-          </p>
+          <span
+            className="simplified-label-hint"
+            title="Раскладка при этом запросе: первый разрешённый для размера материал с заполненными «ширина и высота листа (мм)» в карточке склада; если таких нет — размер листа из централизованной цены печати (по умолчанию часто 320×450)."
+            style={{ marginTop: 8 }}
+          >
+            ?
+          </span>
         )}
       </div>
       <div className="simplified-card__content">

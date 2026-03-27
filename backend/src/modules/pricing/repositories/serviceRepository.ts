@@ -15,6 +15,7 @@ import {
 } from '../dtos/service.dto';
 
 const DEFAULT_CURRENCY = 'BYN';
+const BINDINGS_CATEGORY_NAME = 'Переплёты';
 
 // post_processing_services.operation_type имеет CHECK constraint на фиксированный список значений.
 // Фронт/админка иногда присылает агрегированные типы (например "postprint"), которые в БД запрещены.
@@ -277,6 +278,60 @@ export class PricingServiceRepository {
     return rows.map(this.mapService);
   }
 
+  private static async ensureBindingsCategory(db: Database): Promise<number | null> {
+    const existing = await db.get<{ id: number }>(
+      `SELECT id FROM service_categories WHERE LOWER(name) = LOWER(?) LIMIT 1`,
+      BINDINGS_CATEGORY_NAME
+    );
+    if (existing?.id) return existing.id;
+
+    const maxSortRow = await db.get<{ maxSort: number }>(
+      `SELECT COALESCE(MAX(sort_order), 0) as maxSort FROM service_categories`
+    );
+    const nextSort = Number(maxSortRow?.maxSort ?? 0) + 1;
+    const created = await db.run(
+      `INSERT INTO service_categories (name, sort_order) VALUES (?, ?)`,
+      BINDINGS_CATEGORY_NAME,
+      nextSort
+    );
+    return created.lastID ?? null;
+  }
+
+  static async listBindings(): Promise<PricingServiceDTO[]> {
+    const db = await this.getConnection();
+    let hasOpPercent = false;
+    let hasCategoryId = false;
+    let hasMaterialId = false;
+    let hasQtyPerItem = false;
+    try { hasOpPercent = await hasColumn('post_processing_services', 'operator_percent'); } catch { /* ignore */ }
+    try { hasCategoryId = await hasColumn('post_processing_services', 'category_id'); } catch { /* ignore */ }
+    try { hasMaterialId = await hasColumn('post_processing_services', 'material_id'); } catch { /* ignore */ }
+    try { hasQtyPerItem = await hasColumn('post_processing_services', 'qty_per_item'); } catch { /* ignore */ }
+    const opPercentSel = hasOpPercent ? ', pps.operator_percent' : '';
+    const categorySel = hasCategoryId ? ', pps.category_id, sc.name as category_name' : '';
+    const materialSel = (hasMaterialId && hasQtyPerItem) ? `, ${hasCategoryId ? 'pps.' : ''}material_id, ${hasCategoryId ? 'pps.' : ''}qty_per_item` : '';
+    const joinCategory = hasCategoryId ? 'LEFT JOIN service_categories sc ON sc.id = pps.category_id' : '';
+    const fromTable = hasCategoryId ? 'post_processing_services pps' : 'post_processing_services';
+    const prefix = hasCategoryId ? 'pps.' : '';
+    const rows = await db.all<any[]>(`
+      SELECT
+        ${prefix}id,
+        ${prefix}name as service_name,
+        ${prefix}operation_type as service_type,
+        ${prefix}operation_type,
+        ${prefix}unit,
+        ${prefix}price_unit,
+        ${prefix}price as price_per_unit,
+        ${prefix}is_active,
+        ${prefix}min_quantity,
+        ${prefix}max_quantity${opPercentSel}${categorySel}${materialSel}
+      FROM ${fromTable} ${joinCategory}
+      WHERE ${prefix}operation_type = 'bind'
+      ORDER BY ${hasCategoryId ? 'sc.sort_order, sc.name, pps.name' : 'name'}
+    `);
+    return rows.map(this.mapService);
+  }
+
   static async getServiceById(id: number): Promise<PricingServiceDTO | null> {
     const db = await this.getConnection();
     let hasOpPercent = false;
@@ -298,6 +353,7 @@ export class PricingServiceRepository {
         ${prefix}id, 
         ${prefix}name as service_name, 
         ${prefix}operation_type as service_type, 
+        ${prefix}operation_type,
         ${prefix}unit, 
         ${prefix}price_unit,
         ${prefix}price as price_per_unit, 
@@ -399,6 +455,17 @@ export class PricingServiceRepository {
     return this.mapService(created);
   }
 
+  static async createBinding(payload: CreatePricingServiceDTO): Promise<PricingServiceDTO> {
+    const db = await this.getConnection();
+    const categoryId = await this.ensureBindingsCategory(db);
+    return this.createService({
+      ...payload,
+      type: 'bind',
+      operationType: 'bind',
+      categoryId: payload.categoryId ?? categoryId,
+    });
+  }
+
   static async updateService(id: number, payload: UpdatePricingServiceDTO): Promise<PricingServiceDTO | null> {
     const db = await this.getConnection();
     // ИЗМЕНЕНО: Обновляем post_processing_services
@@ -494,10 +561,42 @@ export class PricingServiceRepository {
     return updated ? this.mapService(updated) : null;
   }
 
+  static async updateBinding(id: number, payload: UpdatePricingServiceDTO): Promise<PricingServiceDTO | null> {
+    const db = await this.getConnection();
+    const existing = await db.get<{ operation_type?: string; category_id?: number | null }>(
+      `SELECT operation_type, category_id FROM post_processing_services WHERE id = ?`,
+      id
+    );
+    if (!existing || existing.operation_type !== 'bind') {
+      return null;
+    }
+    const categoryId = await this.ensureBindingsCategory(db);
+    return this.updateService(id, {
+      ...payload,
+      type: 'bind',
+      operationType: 'bind',
+      categoryId: payload.categoryId ?? existing.category_id ?? categoryId,
+    });
+  }
+
   static async deleteService(id: number): Promise<void> {
     const db = await this.getConnection();
     await db.run(`DELETE FROM service_volume_prices WHERE service_id = ?`, id);
     await db.run(`DELETE FROM post_processing_services WHERE id = ?`, id);
+  }
+
+  static async deleteBinding(id: number): Promise<void> {
+    const db = await this.getConnection();
+    const existing = await db.get<{ operation_type?: string }>(
+      `SELECT operation_type FROM post_processing_services WHERE id = ?`,
+      id
+    );
+    if (!existing || existing.operation_type !== 'bind') {
+      const err: any = new Error('Binding not found');
+      err.status = 404;
+      throw err;
+    }
+    await this.deleteService(id);
   }
 
   // --- Категории послепечатных услуг ---

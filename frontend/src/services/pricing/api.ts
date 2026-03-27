@@ -32,6 +32,24 @@ export interface CalculatePriceResponse {
   operations?: any[];
 }
 
+export interface BindingQuotePayload {
+  serviceId: number;
+  variantId?: number;
+  quantity: number;
+  unitsPerItem?: number;
+}
+
+export interface BindingQuoteResponse {
+  serviceId: number;
+  serviceName: string;
+  variantId?: number;
+  variantName?: string;
+  priceUnit: string;
+  unitPrice: number;
+  units: number;
+  total: number;
+}
+
 const mapService = (svc: any): PricingService => ({
   id: svc.id,
   name: svc.service_name ?? svc.name ?? '',
@@ -65,6 +83,13 @@ export async function getPricingServices(): Promise<PricingService[]> {
   return list.map(mapService);
 }
 
+export async function getBindingServices(): Promise<PricingService[]> {
+  const response = await api.get('/pricing/bindings');
+  const payload: any = (response.data as any)?.data ?? response.data ?? [];
+  const list = Array.isArray(payload) ? payload : [];
+  return list.map(mapService);
+}
+
 export async function createPricingService(payload: CreatePricingServicePayload): Promise<PricingService> {
   // Совместимость с существующей формой: поле unit в UI иногда содержит per_cut/per_sheet (это price_unit)
   const isPriceUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(payload.unit);
@@ -85,6 +110,28 @@ export async function createPricingService(payload: CreatePricingServicePayload)
     ...(payload.categoryId !== undefined && payload.categoryId !== null ? { category_id: payload.categoryId } : {}),
     ...(payload.material_id !== undefined && payload.material_id !== null ? { material_id: payload.material_id } : {}),
     ...(payload.qty_per_item !== undefined && payload.qty_per_item !== null ? { qty_per_item: payload.qty_per_item } : {}),
+  });
+  const data = (response.data as any)?.data ?? response.data;
+  return mapService(data);
+}
+
+export async function createBindingService(payload: CreatePricingServicePayload): Promise<PricingService> {
+  const isPriceUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(payload.unit);
+  const resolvedUnit = isPriceUnit ? 'item' : payload.unit;
+  const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
+
+  const response = await api.post('/pricing/bindings', {
+    name: payload.name,
+    unit: resolvedUnit,
+    price_unit: resolvedPriceUnit,
+    rate: payload.rate,
+    is_active: payload.isActive ?? true,
+    min_quantity: payload.minQuantity,
+    max_quantity: payload.maxQuantity,
+    operator_percent: payload.operator_percent,
+    category_id: payload.categoryId,
+    material_id: payload.material_id,
+    qty_per_item: payload.qty_per_item,
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapService(data);
@@ -114,8 +161,44 @@ export async function updatePricingService(id: number, payload: UpdatePricingSer
   return mapService(data);
 }
 
+export async function updateBindingService(id: number, payload: UpdatePricingServicePayload): Promise<PricingService> {
+  const isPriceUnit = payload.unit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(payload.unit) : false;
+  const resolvedUnit = payload.unit ? (isPriceUnit ? 'item' : payload.unit) : undefined;
+  const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
+
+  const response = await api.put(`/pricing/bindings/${id}`, {
+    name: payload.name,
+    unit: resolvedUnit,
+    price_unit: resolvedPriceUnit,
+    rate: payload.rate,
+    is_active: payload.isActive,
+    min_quantity: payload.minQuantity,
+    max_quantity: payload.maxQuantity,
+    operator_percent: payload.operator_percent !== undefined ? Number(payload.operator_percent) : undefined,
+    category_id: payload.categoryId,
+    material_id: payload.material_id,
+    qty_per_item: payload.qty_per_item,
+  });
+  const data = (response.data as any)?.data ?? response.data;
+  return mapService(data);
+}
+
 export async function deletePricingService(id: number): Promise<void> {
   await api.delete(`/pricing/services/${id}`);
+}
+
+export async function deleteBindingService(id: number): Promise<void> {
+  await api.delete(`/pricing/bindings/${id}`);
+}
+
+export async function quoteBindingService(payload: BindingQuotePayload): Promise<BindingQuoteResponse> {
+  const response = await api.post('/pricing/bindings/quote', {
+    service_id: payload.serviceId,
+    variant_id: payload.variantId,
+    quantity: payload.quantity,
+    units_per_item: payload.unitsPerItem,
+  });
+  return (response.data as any)?.data ?? response.data;
 }
 
 // --- Типы цен (price types) ---
@@ -450,9 +533,14 @@ export async function updateVariantPrice(serviceId: number, variantId: number | 
 export default {
   calculatePrice,
   getPricingServices,
+  getBindingServices,
   createPricingService,
+  createBindingService,
   updatePricingService,
+  updateBindingService,
   deletePricingService,
+  deleteBindingService,
+  quoteBindingService,
   getServiceVolumeTiers,
   createServiceVolumeTier,
   updateServiceVolumeTier,
