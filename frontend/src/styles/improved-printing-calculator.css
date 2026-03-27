@@ -299,6 +299,96 @@
   animation: none;
 }
 
+/* Компактный режим только для embedded quick test */
+.improved-printing-calculator--embedded .calculator-main {
+  padding: 12px;
+}
+
+.improved-printing-calculator--embedded .calculator-section-group {
+  margin-bottom: 8px;
+}
+
+.improved-printing-calculator--embedded .section-group-header {
+  padding: 10px 12px;
+}
+
+.improved-printing-calculator--embedded .section-group-header h3 {
+  font-size: 14px;
+}
+
+.improved-printing-calculator--embedded .section-group-content {
+  padding: 10px 12px;
+}
+
+.improved-printing-calculator--embedded .selected-product-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+  gap: 10px;
+}
+
+.improved-printing-calculator--embedded .selected-product-card .product-name {
+  font-size: 15px;
+  margin-bottom: 2px;
+}
+
+.improved-printing-calculator--embedded .selected-product-card .product-type {
+  font-size: 12px;
+}
+
+.improved-printing-calculator--embedded .product-icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+}
+
+.improved-printing-calculator--embedded .calculator-product-types {
+  margin-bottom: 8px;
+}
+
+.improved-printing-calculator--embedded .calculator-product-types__tabs {
+  gap: 6px;
+}
+
+.improved-printing-calculator--embedded .calculator-product-types__tab {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.improved-printing-calculator--embedded .param-group label {
+  font-size: 12px;
+}
+
+.improved-printing-calculator--embedded .form-control,
+.improved-printing-calculator--embedded .section-group-content .form-control,
+.improved-printing-calculator--embedded .section-group-content select,
+.improved-printing-calculator--embedded .section-group-content input {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+
+.improved-printing-calculator--embedded .quantity-controls {
+  gap: 6px;
+}
+
+.improved-printing-calculator--embedded .quantity-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  font-size: 14px;
+}
+
+.improved-printing-calculator--embedded .quantity-input {
+  padding: 6px 8px;
+  font-size: 14px;
+}
+
+.calculator-modal-wrapper--embedded > .calculator-subtotal-bar .form-section.result-section.compact {
+  padding: 8px 12px 10px !important;
+}
+
 .calculator-modal-wrapper--embedded > .calculator-subtotal-bar {
   border-radius: 0 0 12px 12px;
   box-shadow: none;

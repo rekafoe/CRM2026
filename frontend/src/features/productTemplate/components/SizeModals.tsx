@@ -17,7 +17,7 @@ export const AddSizeModal: React.FC<AddSizeModalProps> = ({
   setNewSize,
   onCommit,
 }) => (
-  <Modal isOpen={isOpen} onClose={onClose} title="Добавить размер" size="md">
+  <Modal isOpen={isOpen} onClose={onClose} title="Добавить размер" size="md" className="simplified-size-modal">
     <div className="simplified-add-size">
       <FormField label="Название" required>
         <input className="form-input" value={newSize.label} onChange={(e) => setNewSize({ ...newSize, label: e.target.value })} placeholder="Например: A4" />
@@ -63,7 +63,7 @@ export const CopySizesModal: React.FC<CopySizesModalProps> = ({
   typeConfigs,
   onCommit,
 }) => (
-  <Modal isOpen={isOpen} onClose={onClose} title="Скопировать размеры из другого типа" size="md">
+  <Modal isOpen={isOpen} onClose={onClose} title="Скопировать размеры из другого типа" size="md" className="simplified-size-modal">
     <div className="simplified-add-size">
       <FormField label="Тип-источник" required>
         <select

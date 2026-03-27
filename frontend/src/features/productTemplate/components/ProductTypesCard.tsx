@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Button } from '../../../components/common'
+import { Button, Modal } from '../../../components/common'
 import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
 import type { SimplifiedConfig, SimplifiedTypeConfig, ProductTypeVariant, ProductTypeId, SubtypeInitialDefaults, InitialOperation } from '../hooks/useProductTemplate'
 import { sortSizesByArea, getEffectiveAllowedMaterialIds } from '../hooks/useProductTemplate'
@@ -422,14 +422,78 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
 }) => {
   const hasTypes = Boolean(value.types?.length)
   const types = value.types ?? []
-  const [expandedTypeId, setExpandedTypeId] = useState<ProductTypeId | null>(selectedTypeId)
+  const [editingTypeId, setEditingTypeId] = useState<ProductTypeId | null>(null)
+  const [inlineEditingTypeId, setInlineEditingTypeId] = useState<ProductTypeId | null>(null)
+  const [inlineNameDraft, setInlineNameDraft] = useState('')
+  const [draftImageUrl, setDraftImageUrl] = useState('')
+  const [draftBriefDescription, setDraftBriefDescription] = useState('')
+  const [draftFullDescription, setDraftFullDescription] = useState('')
+  const [draftCharacteristicsText, setDraftCharacteristicsText] = useState('')
+  const [draftAdvantagesText, setDraftAdvantagesText] = useState('')
+  const prevTypeIdsRef = useRef<Array<string | number>>((value.types || []).map((t) => t.id))
+
+  const editingType = useMemo(
+    () => types.find((t) => t.id === editingTypeId) ?? null,
+    [types, editingTypeId]
+  )
 
   useEffect(() => {
-    // Если панель свёрнута вручную (expandedTypeId === null), не раскрываем её обратно автоматически.
-    if (expandedTypeId !== null && !types.some((t) => t.id === expandedTypeId)) {
-      setExpandedTypeId(selectedTypeId)
+    if (!editingType) return
+    setDraftImageUrl(editingType.image_url ?? '')
+    setDraftBriefDescription(editingType.briefDescription ?? '')
+    setDraftFullDescription(editingType.fullDescription ?? '')
+    setDraftCharacteristicsText(arrayToText(editingType.characteristics))
+    setDraftAdvantagesText(arrayToText(editingType.advantages))
+  }, [editingType?.id])
+
+  const openEditType = (typeId: ProductTypeId) => {
+    onSelectType(typeId)
+    setEditingTypeId(typeId)
+  }
+
+  const closeEditType = () => {
+    setEditingTypeId(null)
+  }
+
+  const applyTypeDraft = () => {
+    if (!editingType) return
+    const nextValue = updateType(value, editingType.id, {
+      image_url: draftImageUrl.trim() ? draftImageUrl : undefined,
+      briefDescription: draftBriefDescription.trim() ? draftBriefDescription : undefined,
+      fullDescription: draftFullDescription.trim() ? draftFullDescription : undefined,
+      characteristics: textToArray(draftCharacteristicsText),
+      advantages: textToArray(draftAdvantagesText),
+    })
+    onChange(nextValue)
+    closeEditType()
+  }
+
+  const startInlineNameEdit = (typeId: ProductTypeId, currentName: string) => {
+    setInlineEditingTypeId(typeId)
+    setInlineNameDraft(currentName)
+  }
+
+  const cancelInlineNameEdit = () => {
+    setInlineEditingTypeId(null)
+    setInlineNameDraft('')
+  }
+
+  const saveInlineNameEdit = (typeId: ProductTypeId, fallbackName: string) => {
+    const nextName = inlineNameDraft.trim() || fallbackName
+    onChange(updateType(value, typeId, { name: nextName }))
+    setInlineEditingTypeId(null)
+  }
+
+  useEffect(() => {
+    const prevIds = prevTypeIdsRef.current
+    const currentIds = types.map((t) => t.id)
+    const addedIds = currentIds.filter((id) => !prevIds.some((prevId) => String(prevId) === String(id)))
+    if (addedIds.length > 0) {
+      const newTypeId = addedIds[addedIds.length - 1] as ProductTypeId
+      openEditType(newTypeId)
     }
-  }, [expandedTypeId, selectedTypeId, types])
+    prevTypeIdsRef.current = currentIds
+  }, [types])
 
   return (
     <div className="simplified-card simplified-template__types">
@@ -452,125 +516,181 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                 key={t.id}
                 className={`simplified-template__type-tab ${selectedTypeId === t.id ? 'simplified-template__type-tab--active' : ''}`}
               >
-                <button
-                  type="button"
+                <div
                   className="simplified-template__type-tab-btn"
-                  onClick={() => {
-                    onSelectType(t.id)
-                    setExpandedTypeId((prev) => (prev === t.id ? null : t.id))
+                  onClick={() => onSelectType(t.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onSelectType(t.id)
+                    }
                   }}
                 >
-                  <span className="simplified-template__type-tab-name">{t.name}</span>
-                  {t.default && <span className="simplified-template__type-badge">по умолчанию</span>}
-                  <span className="simplified-template__type-toggle">{expandedTypeId === t.id ? 'Свернуть' : 'Развернуть'}</span>
-                </button>
-                {expandedTypeId === t.id && (
-                  <div className="simplified-template__type-panel">
-                    <div className="simplified-template__type-actions">
-                      <input
-                        type="text"
-                        className="form-input form-input--sm"
-                        value={t.name}
-                        onChange={(e) => {
-                          const name = e.target.value || t.name
-                          onChange(updateType(value, t.id, { name }))
-                        }}
-                        placeholder="Название типа"
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setDefaultType(t.id)}
-                        disabled={!!t.default}
-                      >
-                        По умолчанию
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="error"
-                        size="sm"
-                        onClick={() => removeType(t.id)}
-                        disabled={value.types!.length <= 1}
-                      >
-                        Удалить
-                      </Button>
-                    </div>
-                    <div className="simplified-template__type-website-content">
-                      <div className="simplified-template__type-website-title">
-                        Контент для сайта
-                      </div>
-                      <div className="simplified-template__type-website-field">
-                        <label>Изображение</label>
-                        <SubtypeImageUploader
-                          imageUrl={t.image_url}
-                          subtypeName={t.name}
-                          onUploaded={(url) => onChange(updateType(value, t.id, { image_url: url || undefined }))}
-                        />
-                      </div>
-                      <div className="simplified-template__type-website-field">
-                        <label>Краткое описание</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={t.briefDescription ?? ''}
-                          onChange={(e) =>
-                            onChange(updateType(value, t.id, { briefDescription: e.target.value || undefined }))
-                          }
-                          placeholder="Одна строка для карточки (например: Цветные на плотной бумаге)"
-                        />
-                      </div>
-                      <div className="simplified-template__type-website-field">
-                        <label>Полное описание</label>
-                        <textarea
-                          className="form-input"
-                          rows={3}
-                          value={t.fullDescription ?? ''}
-                          onChange={(e) =>
-                            onChange(updateType(value, t.id, { fullDescription: e.target.value || undefined }))
-                          }
-                          placeholder="Текст для страницы продукта"
-                        />
-                      </div>
-                      <div className="simplified-template__type-website-field">
-                        <label>Характеристики</label>
-                        <textarea
-                          className="form-input"
-                          rows={3}
-                          value={arrayToText(t.characteristics)}
-                          onChange={(e) =>
-                            onChange(updateType(value, t.id, { characteristics: textToArray(e.target.value) }))
-                          }
-                          placeholder="Один пункт на строку (например: Размер: 90×50 мм)"
-                        />
-                      </div>
-                      <div className="simplified-template__type-website-field">
-                        <label>Преимущества</label>
-                        <textarea
-                          className="form-input"
-                          rows={2}
-                          value={arrayToText(t.advantages)}
-                          onChange={(e) =>
-                            onChange(updateType(value, t.id, { advantages: textToArray(e.target.value) }))
-                          }
-                          placeholder="Один пункт на строку (например: Высокое качество печати)"
-                        />
-                      </div>
-                    </div>
-                    <TypeInitialDefaults
-                      value={value}
-                      typeId={t.id}
-                      onChange={onChange}
-                      services={services}
-                      allMaterials={allMaterials ?? []}
+                  {inlineEditingTypeId === t.id ? (
+                    <input
+                      type="text"
+                      className="form-input simplified-template__type-tab-name-input"
+                      value={inlineNameDraft}
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setInlineNameDraft(e.target.value)}
+                      onBlur={() => saveInlineNameEdit(t.id, t.name)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          saveInlineNameEdit(t.id, t.name)
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault()
+                          cancelInlineNameEdit()
+                        }
+                      }}
                     />
-                  </div>
-                )}
+                  ) : (
+                    <span
+                      className="simplified-template__type-tab-name"
+                      onDoubleClick={(e) => {
+                        e.stopPropagation()
+                        startInlineNameEdit(t.id, t.name)
+                      }}
+                      title="Двойной клик для редактирования"
+                    >
+                      {t.name}
+                    </span>
+                  )}
+                  {t.default && <span className="simplified-template__type-badge">по умолчанию</span>}
+                  <span className="simplified-template__type-row-actions">
+                    <button
+                      type="button"
+                      className="simplified-template__type-icon-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEditType(t.id)
+                      }}
+                      title="Редактировать подтип"
+                      aria-label="Редактировать подтип"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      className="simplified-template__type-icon-btn simplified-template__type-icon-btn--danger"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeType(t.id)
+                        if (editingTypeId === t.id) closeEditType()
+                      }}
+                      title="Удалить подтип"
+                      aria-label="Удалить подтип"
+                      disabled={value.types!.length <= 1}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
+      <Modal
+        isOpen={!!editingType}
+        onClose={closeEditType}
+        title={editingType ? `Редактирование подтипа: ${editingType.name}` : 'Редактирование подтипа'}
+        size="lg"
+        className="simplified-template__type-edit-modal"
+      >
+        {editingType && (
+          <div className="simplified-template__type-modal">
+            <div className="simplified-template__type-modal-scroll">
+              <div className="simplified-template__type-modal-top-actions">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setDefaultType(editingType.id)}
+                  disabled={!!editingType.default}
+                >
+                  По умолчанию
+                </Button>
+              </div>
+              <section className="simplified-template__type-modal-section">
+                <div className="simplified-template__type-website-content">
+                  <div className="simplified-template__type-website-title">
+                    Контент для сайта
+                  </div>
+                  <div className="simplified-template__type-website-field">
+                    <label>Изображение</label>
+                    <SubtypeImageUploader
+                      imageUrl={draftImageUrl || undefined}
+                      subtypeName={editingType.name}
+                      onUploaded={(url) => setDraftImageUrl(url || '')}
+                    />
+                  </div>
+                  <div className="simplified-template__type-website-field">
+                    <label>Краткое описание</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={draftBriefDescription}
+                      onChange={(e) => setDraftBriefDescription(e.target.value)}
+                      placeholder="Одна строка для карточки (например: Цветные на плотной бумаге)"
+                    />
+                  </div>
+                  <div className="simplified-template__type-website-field">
+                    <label>Полное описание</label>
+                    <textarea
+                      className="form-input"
+                      rows={3}
+                      value={draftFullDescription}
+                      onChange={(e) => setDraftFullDescription(e.target.value)}
+                      placeholder="Текст для страницы продукта"
+                    />
+                  </div>
+                  <div className="simplified-template__type-website-field">
+                    <label>Характеристики</label>
+                    <textarea
+                      className="form-input"
+                      rows={3}
+                      value={draftCharacteristicsText}
+                      onChange={(e) => setDraftCharacteristicsText(e.target.value)}
+                      placeholder="Один пункт на строку (например: Размер: 90×50 мм)"
+                    />
+                  </div>
+                  <div className="simplified-template__type-website-field">
+                    <label>Преимущества</label>
+                    <textarea
+                      className="form-input"
+                      rows={2}
+                      value={draftAdvantagesText}
+                      onChange={(e) => setDraftAdvantagesText(e.target.value)}
+                      placeholder="Один пункт на строку (например: Высокое качество печати)"
+                    />
+                  </div>
+                </div>
+              </section>
+              <section className="simplified-template__type-modal-section">
+                <TypeInitialDefaults
+                  value={value}
+                  typeId={editingType.id}
+                  onChange={onChange}
+                  services={services}
+                  allMaterials={allMaterials ?? []}
+                />
+              </section>
+            </div>
+            <div className="simplified-template__type-modal-actions">
+              <Button type="button" variant="secondary" size="sm" onClick={closeEditType}>
+                Отмена
+              </Button>
+              <Button type="button" variant="primary" size="sm" onClick={applyTypeDraft}>
+                Сохранить
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

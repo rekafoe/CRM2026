@@ -58,6 +58,21 @@
   margin-bottom: 4px;
 }
 
+/* Для simplified убираем визуальный "разрез" между вкладками и контентом */
+.simplified-template .simplified-template__editor-tabs.product-tabs {
+  border-bottom: none !important;
+  border-radius: 12px !important;
+  padding-bottom: 2px;
+}
+
+.simplified-template .simplified-template__editor-tabs .product-tab {
+  border-radius: 999px !important;
+}
+
+.simplified-template .simplified-template__editor-tabs .product-tab--active::after {
+  display: none !important;
+}
+
 .simplified-card--inline-calculator .simplified-card__content {
   padding: 0;
 }
@@ -447,7 +462,55 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-height: 44px;
+}
+
+.simplified-template__type-row-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  flex: 0 0 auto;
+}
+
+.simplified-template__type-icon-btn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text-secondary, #4b5563);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+}
+
+.simplified-template__type-icon-btn:hover {
+  border-color: var(--accent-primary, #1976d2);
+  color: var(--accent-primary, #1976d2);
+}
+
+.simplified-template__type-icon-btn--danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fff5f5;
+}
+
+.simplified-template__type-icon-btn--danger:hover:not(:disabled) {
+  color: #fff;
+  border-color: #dc2626;
+  background: #dc2626;
+}
+
+.simplified-template__type-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .simplified-template__type-toggle {
@@ -463,6 +526,21 @@
 .simplified-template__type-tab-name {
   font-weight: 600;
   color: var(--text-primary, #111827);
+  border-bottom: 1px dashed transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  cursor: text;
+}
+
+.simplified-template__type-tab-name:hover {
+  color: var(--accent-primary, #1976d2);
+  border-bottom-color: rgba(25, 118, 210, 0.45);
+}
+
+.simplified-template__type-tab-name-input {
+  width: 220px;
+  max-width: 50%;
+  height: 30px;
+  padding: 4px 8px;
 }
 
 .simplified-template__type-badge {
@@ -488,6 +566,94 @@
 
 .simplified-template__type-actions .form-input--sm {
   max-width: 200px;
+}
+
+.simplified-template__type-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.simplified-template__type-edit-modal {
+  width: min(1320px, 98vw);
+  max-height: 98vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.simplified-template__type-edit-modal .modal-header {
+  padding: 6px 10px !important;
+}
+
+.simplified-template__type-edit-modal .modal-header h2 {
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.simplified-template__type-edit-modal .modal-close-btn {
+  min-height: 24px;
+  height: 24px;
+  padding: 0 6px;
+}
+
+.simplified-template__type-edit-modal .modal-body {
+  padding: 4px 8px !important;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.simplified-template__type-modal-scroll {
+  overflow-y: auto;
+  padding-right: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.simplified-template__type-modal-top-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+
+.simplified-template__type-modal-section {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.simplified-template__type-modal-section + .simplified-template__type-modal-section {
+  margin-top: 6px;
+}
+
+.simplified-template__type-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 4px 0 0;
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  z-index: 1;
+}
+
+.simplified-template__type-modal-actions .btn {
+  min-height: 28px;
+  padding: 4px 10px;
+}
+
+.simplified-template__type-edit-modal .simplified-template__type-actions {
+  padding: 6px 8px;
+}
+
+.simplified-template__type-edit-modal .simplified-template__type-website-content {
+  padding: 8px 10px;
+  gap: 6px;
 }
 
 .simplified-template__type-website-content {
@@ -760,6 +926,96 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* Модалки размеров: локальные аккуратные стили поверх глобальных */
+.simplified-size-modal {
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 14px 34px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.simplified-size-modal .modal-header {
+  padding: 14px 18px !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(248, 250, 252, 0.65) 100%);
+}
+
+.simplified-size-modal .modal-header h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+}
+
+.simplified-size-modal .modal-close-btn {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(148, 163, 184, 0.45) !important;
+  background: rgba(241, 245, 249, 0.9) !important;
+  color: #334155 !important;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none !important;
+}
+
+.simplified-size-modal .modal-close-btn:hover {
+  background: rgba(226, 232, 240, 0.95) !important;
+  border-color: rgba(100, 116, 139, 0.5) !important;
+}
+
+.simplified-size-modal .modal-body {
+  padding: 16px 18px 18px !important;
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.simplified-size-modal .form-input,
+.simplified-size-modal .form-select,
+.simplified-size-modal textarea {
+  background: rgba(255, 255, 255, 0.78) !important;
+  border: 1px solid rgba(148, 163, 184, 0.4) !important;
+  border-radius: 12px !important;
+  color: #0f172a;
+}
+
+.simplified-size-modal .simplified-add-size__actions {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.simplified-size-modal .simplified-add-size__actions .btn-secondary {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border: 1px solid rgba(148, 163, 184, 0.45) !important;
+  color: #0f172a !important;
+}
+
+.simplified-size-modal .simplified-add-size__actions .btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: rgba(100, 116, 139, 0.5) !important;
+}
+
+.simplified-size-modal .simplified-add-size__actions .btn-primary {
+  background: rgba(59, 130, 246, 0.28) !important;
+  border: 1px solid rgba(59, 130, 246, 0.42) !important;
+  color: #1d4ed8 !important;
+}
+
+.simplified-size-modal .simplified-add-size__actions .btn-primary:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.36) !important;
+  border-color: rgba(59, 130, 246, 0.52) !important;
 }
 
 .simplified-add-size__actions {
@@ -1494,5 +1750,78 @@
   margin: 6px 8px 8px;
   width: calc(100% - 16px);
   font-size: 12px;
+}
+
+/* =========================
+   Simplified liquid glass overrides
+   ========================= */
+.product-template .simplified-template .btn,
+.product-template .simplified-template__save-btn,
+.product-template .simplified-template__action-btn {
+  border-radius: 999px !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 2px 8px rgba(15, 23, 42, 0.08) !important;
+}
+
+.product-template .simplified-template .btn-primary,
+.product-template .simplified-template__save-btn {
+  background: rgba(59, 130, 246, 0.26) !important;
+  border: 1px solid rgba(59, 130, 246, 0.42) !important;
+  color: #1d4ed8 !important;
+}
+
+.product-template .simplified-template .btn-primary:hover:not(:disabled),
+.product-template .simplified-template__save-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.36) !important;
+  border-color: rgba(59, 130, 246, 0.54) !important;
+}
+
+.product-template .simplified-template .btn-secondary,
+.product-template .simplified-template__action-btn,
+.product-template .simplified-template__sizes-actions .btn {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border: 1px solid rgba(148, 163, 184, 0.38) !important;
+  color: #0f172a !important;
+}
+
+.product-template .simplified-template .btn-secondary:hover:not(:disabled),
+.product-template .simplified-template__action-btn:hover:not(:disabled),
+.product-template .simplified-template__sizes-actions .btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(100, 116, 139, 0.44) !important;
+}
+
+.product-template .simplified-template .btn-error,
+.product-template .simplified-template .btn[class*="error"] {
+  background: rgba(239, 68, 68, 0.2) !important;
+  border: 1px solid rgba(239, 68, 68, 0.42) !important;
+  color: #b91c1c !important;
+}
+
+.product-template .simplified-template .btn-error:hover:not(:disabled),
+.product-template .simplified-template .btn[class*="error"]:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.3) !important;
+  border-color: rgba(220, 38, 38, 0.5) !important;
+}
+
+.product-template .simplified-template .simplified-card,
+.product-template .simplified-template .simplified-template__sizes,
+.product-template .simplified-template .simplified-row,
+.product-template .simplified-template .simplified-finishing-item,
+.product-template .simplified-template .simplified-print-group {
+  background: rgba(255, 255, 255, 0.74) !important;
+  border: 1px solid rgba(148, 163, 184, 0.32) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 8px 24px rgba(15, 23, 42, 0.07) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.product-template .simplified-template .form-input,
+.product-template .simplified-template textarea,
+.product-template .simplified-template select {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(148, 163, 184, 0.42) !important;
+  border-radius: 12px !important;
 }
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { FormField, Alert } from '../../../components/common'
+import { FormField, Alert, Button } from '../../../components/common'
 import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
 import type { PaperTypeForCalculator } from '../../../services/calculatorMaterialService'
 import type { SimplifiedSizeConfig } from '../hooks/useProductTemplate'
@@ -193,6 +193,29 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
                   })}
               </ul>
             </div>
+          )}
+
+          {effectiveIds.length === 0 && (
+            <Alert type="info" className="mt-3">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>Материалы ещё не выбраны для этого размера.</span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const first = materialsForSelectedPaperType[0]
+                    if (!first) return
+                    hasUserInteractedWithMaterialsRef.current = true
+                    if (!effectiveIds.includes(Number(first.id))) {
+                      setEffectiveIds([...effectiveIds, Number(first.id)])
+                    }
+                  }}
+                >
+                  Выбрать материал
+                </Button>
+              </div>
+            </Alert>
           )}
         </>
       )}

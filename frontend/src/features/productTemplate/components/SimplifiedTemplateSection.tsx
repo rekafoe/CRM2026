@@ -414,10 +414,6 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   }, [selected])
 
   useEffect(() => {
-    setEditorTab('print')
-  }, [selectedSizeId])
-
-  useEffect(() => {
     if (editorTab === 'design' && !(productId && selectedTypeId != null)) {
       setEditorTab('print')
     }
@@ -1051,140 +1047,140 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
             </Alert>
           ) : (
               <>
-                <div className="simplified-card simplified-card--size">
-                  <div className="simplified-card__header">
-                    <div>
-                      {headerWithHint('Размер', 'Название и габариты (мм).')}
+                {editorTab === 'print' && (
+                  <div className="simplified-card simplified-card--size">
+                    <div className="simplified-card__header">
+                      <div>
+                        {headerWithHint('Размер', 'Название и габариты (мм).')}
+                      </div>
                     </div>
-                  </div>
-                  <div className="simplified-card__content simplified-form-grid">
-                    <FormField label="Название">
-                      <input
-                        className="form-input simplified-size-input simplified-size-input--name"
-                        value={selected.label}
-                        onChange={(e) => updateSize(selected.id, { label: e.target.value })}
-                      />
-                    </FormField>
-                    <FormField label="Ширина, мм">
-                      <input
-                        className="form-input form-input--compact simplified-size-input"
-                        value={String(selected.width_mm)}
-                        onChange={(e) => updateSize(selected.id, { width_mm: Number(e.target.value) || 0 })}
-                      />
-                    </FormField>
-                    <FormField label="Высота, мм">
-                      <input
-                        className="form-input form-input--compact simplified-size-input"
-                        value={String(selected.height_mm)}
-                        onChange={(e) => updateSize(selected.id, { height_mm: Number(e.target.value) || 0 })}
-                      />
-                    </FormField>
-                    <FormField label={labelWithHint('Мин. тираж', 'Пусто = мин. по раскладке (1 лист). 1 = любой тираж, стоимость за полный лист.')}>
-                      <input
-                        className="form-input form-input--compact simplified-size-input"
-                        type="number"
-                        min="1"
-                        placeholder="по раскладке"
-                        title="Пусто = мин. по раскладке (1 лист). 1 = любой тираж, стоимость за полный лист."
-                        value={selected.min_qty !== undefined ? String(selected.min_qty) : ''}
-                        onChange={(e) =>
-                          updateSize(selected.id, {
-                            min_qty: e.target.value ? Number(e.target.value) : undefined,
-                          })
-                        }
-                      />
-                    </FormField>
-                    <FormField label="Макс. тираж">
-                      <input
-                        className="form-input form-input--compact simplified-size-input"
-                        type="number"
-                        min="1"
-                        value={selected.max_qty !== undefined ? String(selected.max_qty) : ''}
-                        onChange={(e) =>
-                          updateSize(selected.id, {
-                            max_qty: e.target.value ? Number(e.target.value) : undefined,
-                          })
-                        }
-                      />
-                    </FormField>
-                    <FormField label={labelWithHint('Отступ резки, мм', 'Отступ с каждой стороны листа (мм). По умолчанию 5 мм. Для наклеек с плоттерной резкой — 15 мм.')}>
-                      <input
-                        className="form-input form-input--compact simplified-size-input"
-                        type="number"
-                        min="1"
-                        max="50"
-                        placeholder="5"
-                        title="Отступ с каждой стороны листа (мм). По умолчанию 5 мм. Для наклеек с плоттерной резкой — 15 мм."
-                        value={selected.cut_margin_mm !== undefined ? String(selected.cut_margin_mm) : ''}
-                        onChange={(e) =>
-                          updateSize(selected.id, {
-                            cut_margin_mm: e.target.value ? Number(e.target.value) : undefined,
-                            // сбрасываем min_qty чтобы бэкенд пересчитал по новому отступу
-                            ...(selected.items_per_sheet_override == null ? { min_qty: undefined } : {}),
-                          })
-                        }
-                      />
-                    </FormField>
-                    <FormField label={labelWithHint('Зазор между изделиями, мм', 'Зазор между изделиями при раскладке (мм). По умолчанию 2 мм.')}>
-                      <input
-                        className="form-input form-input--compact simplified-size-input"
-                        type="number"
-                        min="0"
-                        max="30"
-                        placeholder="2"
-                        title="Зазор между изделиями при раскладке (мм). По умолчанию 2 мм."
-                        value={selected.cut_gap_mm !== undefined ? String(selected.cut_gap_mm) : ''}
-                        onChange={(e) =>
-                          updateSize(selected.id, {
-                            cut_gap_mm: e.target.value !== '' ? Number(e.target.value) : undefined,
-                            // сбрасываем min_qty чтобы бэкенд пересчитал по новому зазору
-                            ...(selected.items_per_sheet_override == null ? { min_qty: undefined } : {}),
-                          })
-                        }
-                      />
-                    </FormField>
-                    <FormField label={labelWithHint('Норма вместимости на лист', 'Ручной override: сколько изделий помещается на лист. Пусто = считать по отступу и зазору автоматически. Значение также записывается в мин. тираж.')}>
-                      <input
-                        className="form-input form-input--compact simplified-size-input"
-                        type="number"
-                        min="1"
-                        placeholder="авто"
-                        title="Ручной override: сколько изделий помещается на лист. Перекрывает автоматический расчёт по отступам и зазорам."
-                        value={selected.items_per_sheet_override !== undefined ? String(selected.items_per_sheet_override) : ''}
-                        onChange={(e) => {
-                          const val = e.target.value !== '' ? Number(e.target.value) : undefined
-                          updateSize(selected.id, {
-                            items_per_sheet_override: val,
-                            min_qty: val,
-                          })
-                        }}
-                      />
-                    </FormField>
-                  </div>
-                  {layoutPreview && !layoutPreview.noMat && (
-                    <div className={`simplified-layout-preview${layoutPreview.isOverride ? ' simplified-layout-preview--override' : ''}`}>
-                      <span className="simplified-layout-preview__label">Раскладка</span>
-                      <span className="simplified-layout-preview__value">
-                        <strong>{layoutPreview.n} шт/лист</strong>
-                        {layoutPreview.isOverride ? (
-                          <span style={{ color: '#7c3aed', marginLeft: 6 }}>ручная норма</span>
-                        ) : (
-                          <>
-                            {layoutPreview.matName && (
-                              <span className="text-muted"> · {layoutPreview.matName} ({layoutPreview.sw}×{layoutPreview.sh} мм)</span>
-                            )}
-                            {(selected.cut_margin_mm != null && selected.cut_margin_mm !== 5) && (
-                              <span style={{ color: '#e65100', marginLeft: 6 }}>отступ {selected.cut_margin_mm} мм</span>
-                            )}
-                            {(selected.cut_gap_mm != null && selected.cut_gap_mm !== 2) && (
-                              <span style={{ color: '#e65100', marginLeft: 6 }}>зазор {selected.cut_gap_mm} мм</span>
-                            )}
-                          </>
-                        )}
-                      </span>
+                    <div className="simplified-card__content simplified-form-grid">
+                      <FormField label="Название">
+                        <input
+                          className="form-input simplified-size-input simplified-size-input--name"
+                          value={selected.label}
+                          onChange={(e) => updateSize(selected.id, { label: e.target.value })}
+                        />
+                      </FormField>
+                      <FormField label="Ширина, мм">
+                        <input
+                          className="form-input form-input--compact simplified-size-input"
+                          value={String(selected.width_mm)}
+                          onChange={(e) => updateSize(selected.id, { width_mm: Number(e.target.value) || 0 })}
+                        />
+                      </FormField>
+                      <FormField label="Высота, мм">
+                        <input
+                          className="form-input form-input--compact simplified-size-input"
+                          value={String(selected.height_mm)}
+                          onChange={(e) => updateSize(selected.id, { height_mm: Number(e.target.value) || 0 })}
+                        />
+                      </FormField>
+                      <FormField label={labelWithHint('Мин. тираж', 'Пусто = мин. по раскладке (1 лист). 1 = любой тираж, стоимость за полный лист.')}>
+                        <input
+                          className="form-input form-input--compact simplified-size-input"
+                          type="number"
+                          min="1"
+                          placeholder="по раскладке"
+                          title="Пусто = мин. по раскладке (1 лист). 1 = любой тираж, стоимость за полный лист."
+                          value={selected.min_qty !== undefined ? String(selected.min_qty) : ''}
+                          onChange={(e) =>
+                            updateSize(selected.id, {
+                              min_qty: e.target.value ? Number(e.target.value) : undefined,
+                            })
+                          }
+                        />
+                      </FormField>
+                      <FormField label="Макс. тираж">
+                        <input
+                          className="form-input form-input--compact simplified-size-input"
+                          type="number"
+                          min="1"
+                          value={selected.max_qty !== undefined ? String(selected.max_qty) : ''}
+                          onChange={(e) =>
+                            updateSize(selected.id, {
+                              max_qty: e.target.value ? Number(e.target.value) : undefined,
+                            })
+                          }
+                        />
+                      </FormField>
+                      <FormField label={labelWithHint('Отступ резки, мм', 'Отступ с каждой стороны листа (мм). По умолчанию 5 мм. Для наклеек с плоттерной резкой — 15 мм.')}>
+                        <input
+                          className="form-input form-input--compact simplified-size-input"
+                          type="number"
+                          min="1"
+                          max="50"
+                          placeholder="5"
+                          title="Отступ с каждой стороны листа (мм). По умолчанию 5 мм. Для наклеек с плоттерной резкой — 15 мм."
+                          value={selected.cut_margin_mm !== undefined ? String(selected.cut_margin_mm) : ''}
+                          onChange={(e) =>
+                            updateSize(selected.id, {
+                              cut_margin_mm: e.target.value ? Number(e.target.value) : undefined,
+                              ...(selected.items_per_sheet_override == null ? { min_qty: undefined } : {}),
+                            })
+                          }
+                        />
+                      </FormField>
+                      <FormField label={labelWithHint('Зазор между изделиями, мм', 'Зазор между изделиями при раскладке (мм). По умолчанию 2 мм.')}>
+                        <input
+                          className="form-input form-input--compact simplified-size-input"
+                          type="number"
+                          min="0"
+                          max="30"
+                          placeholder="2"
+                          title="Зазор между изделиями при раскладке (мм). По умолчанию 2 мм."
+                          value={selected.cut_gap_mm !== undefined ? String(selected.cut_gap_mm) : ''}
+                          onChange={(e) =>
+                            updateSize(selected.id, {
+                              cut_gap_mm: e.target.value !== '' ? Number(e.target.value) : undefined,
+                              ...(selected.items_per_sheet_override == null ? { min_qty: undefined } : {}),
+                            })
+                          }
+                        />
+                      </FormField>
+                      <FormField label={labelWithHint('Норма вместимости на лист', 'Ручной override: сколько изделий помещается на лист. Пусто = считать по отступу и зазору автоматически. Значение также записывается в мин. тираж.')}>
+                        <input
+                          className="form-input form-input--compact simplified-size-input"
+                          type="number"
+                          min="1"
+                          placeholder="авто"
+                          title="Ручной override: сколько изделий помещается на лист. Перекрывает автоматический расчёт по отступам и зазорам."
+                          value={selected.items_per_sheet_override !== undefined ? String(selected.items_per_sheet_override) : ''}
+                          onChange={(e) => {
+                            const val = e.target.value !== '' ? Number(e.target.value) : undefined
+                            updateSize(selected.id, {
+                              items_per_sheet_override: val,
+                              min_qty: val,
+                            })
+                          }}
+                        />
+                      </FormField>
                     </div>
-                  )}
-                </div>
+                    {layoutPreview && !layoutPreview.noMat && (
+                      <div className={`simplified-layout-preview${layoutPreview.isOverride ? ' simplified-layout-preview--override' : ''}`}>
+                        <span className="simplified-layout-preview__label">Раскладка</span>
+                        <span className="simplified-layout-preview__value">
+                          <strong>{layoutPreview.n} шт/лист</strong>
+                          {layoutPreview.isOverride ? (
+                            <span style={{ color: '#7c3aed', marginLeft: 6 }}>ручная норма</span>
+                          ) : (
+                            <>
+                              {layoutPreview.matName && (
+                                <span className="text-muted"> · {layoutPreview.matName} ({layoutPreview.sw}×{layoutPreview.sh} мм)</span>
+                              )}
+                              {(selected.cut_margin_mm != null && selected.cut_margin_mm !== 5) && (
+                                <span style={{ color: '#e65100', marginLeft: 6 }}>отступ {selected.cut_margin_mm} мм</span>
+                              )}
+                              {(selected.cut_gap_mm != null && selected.cut_gap_mm !== 2) && (
+                                <span style={{ color: '#e65100', marginLeft: 6 }}>зазор {selected.cut_gap_mm} мм</span>
+                              )}
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {editorTab === 'check' && (
                   <div className="simplified-card simplified-card--inline-calculator">

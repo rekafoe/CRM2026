@@ -61,11 +61,8 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
         <div className="template-summary-card__meta">
           Создан: {product?.created_at ? new Date(product.created_at).toLocaleDateString() : '—'}
         </div>
-      </div>
-
-      <div className={`simplified-card simplified-card--collapsible ${!calcOptionsExpanded ? 'simplified-card--collapsed' : ''}`}>
         <div
-          className="simplified-card__header"
+          className="template-summary-card__calc-header"
           onClick={onToggleCalcOptions}
           role="button"
           tabIndex={0}
@@ -77,42 +74,44 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
               <span className="simplified-label-hint" title="Чекбоксы, доступные при расчёте.">?</span>
             </span>
           </div>
-          <span className="simplified-card__header-toggle">{calcOptionsExpanded ? 'Свернуть' : 'Развернуть'}</span>
+          <span className="template-summary-card__calc-toggle">{calcOptionsExpanded ? 'Свернуть' : 'Развернуть'}</span>
         </div>
-        <div className="simplified-card__content">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={value.use_layout !== false}
-              onChange={(e) => onChange({ ...value, use_layout: e.target.checked })}
-            />
-            Раскладка на лист
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={!!value.cutting}
-              onChange={(e) => onChange({ ...value, cutting: e.target.checked })}
-            />
-            Резка стопой
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={value.duplex_as_single_x2 === true}
-              onChange={(e) => onChange({ ...value, duplex_as_single_x2: e.target.checked })}
-            />
-            Дуплекс как 2×односторонняя
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={value.include_material_cost !== false}
-              onChange={(e) => onChange({ ...value, include_material_cost: e.target.checked })}
-            />
-            Учитывать стоимость материалов
-          </label>
-        </div>
+        {calcOptionsExpanded && (
+          <div className="template-summary-card__calc-content">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={value.use_layout !== false}
+                onChange={(e) => onChange({ ...value, use_layout: e.target.checked })}
+              />
+              Раскладка на лист
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={!!value.cutting}
+                onChange={(e) => onChange({ ...value, cutting: e.target.checked })}
+              />
+              Резка стопой
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={value.duplex_as_single_x2 === true}
+                onChange={(e) => onChange({ ...value, duplex_as_single_x2: e.target.checked })}
+              />
+              Дуплекс как 2×односторонняя
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={value.include_material_cost !== false}
+                onChange={(e) => onChange({ ...value, include_material_cost: e.target.checked })}
+              />
+              Учитывать стоимость материалов
+            </label>
+          </div>
+        )}
       </div>
 
       <ProductTypesCard

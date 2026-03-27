@@ -21,12 +21,13 @@ export const TemplateHeaderExtra: React.FC<TemplateHeaderExtraProps> = ({
   onOpenMeta,
   onOpenDuplicate,
 }) => (
-  <>
+  <div className="template-header-extra">
     {product && (
       <StatusBadge
         status={product.is_active ? 'Активен' : 'Отключен'}
         color={product.is_active ? 'success' : 'error'}
         size="sm"
+        className="template-topbar-status"
       />
     )}
 
@@ -67,6 +68,7 @@ export const TemplateHeaderExtra: React.FC<TemplateHeaderExtraProps> = ({
     <Button
       variant="secondary"
       size="sm"
+      className="template-topbar-btn"
       onClick={onOpenMeta}
       icon={
         <span style={{ marginRight: '4px' }}>
@@ -81,6 +83,7 @@ export const TemplateHeaderExtra: React.FC<TemplateHeaderExtraProps> = ({
       <Button
         variant="secondary"
         size="sm"
+        className="template-topbar-btn"
         onClick={onOpenDuplicate}
         icon={
           <span style={{ marginRight: '4px' }}>
@@ -91,6 +94,6 @@ export const TemplateHeaderExtra: React.FC<TemplateHeaderExtraProps> = ({
         Копировать продукт
       </Button>
     )}
-  </>
+  </div>
 );
 
