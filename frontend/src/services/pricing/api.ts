@@ -313,7 +313,7 @@ export async function deleteServiceVolumeTier(serviceId: number, tierId: number)
 export async function calculatePrice(payload: CalculatePriceRequest): Promise<CalculatePriceResponse> {
   try {
     const params = { ...(payload.params || {}) } as Record<string, unknown>;
-    // SimplifiedPricingService / FlexiblePricingService читают множитель из configuration.priceType, не с корня тела.
+    // Текущий production-расчёт читает множитель из configuration.priceType, не с корня тела.
     if (payload.channel && params.priceType == null && params.price_type == null) {
       params.priceType = payload.channel;
     }

@@ -13,6 +13,21 @@ export const uploadsDir = process.env.UPLOADS_DIR
 // Файлы заказов (макеты клиентов) — в отдельной папке, НЕ отдаются через /api/uploads (безопасность)
 export const orderFilesDir = path.join(uploadsDir, 'orders')
 
+const MAX_UPLOAD_FILE_SIZE_BYTES = Number(process.env.UPLOAD_MAX_FILE_SIZE_BYTES || 25 * 1024 * 1024)
+const MAX_UPLOAD_FIELDS = Number(process.env.UPLOAD_MAX_FIELDS || 50)
+const SAFE_STORED_FILENAME_RE = /^[a-zA-Z0-9._-]+$/
+const allowedUploadMimes = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/tiff',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+])
+
 // Ensure directories exist
 try {
   fs.mkdirSync(uploadsDir, { recursive: true })
@@ -28,10 +43,57 @@ export const storage = multer.diskStorage({
   }
 })
 
-export const upload = multer({ storage })
+function defaultFileFilter(_req: any, file: any, cb: (error: Error | null, acceptFile: boolean) => void): void {
+  const mime = String(file?.mimetype || '').toLowerCase()
+  const ext = path.extname(String(file?.originalname || '')).toLowerCase()
+  const extAllowed = ['.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.pdf', '.doc', '.docx', '.xls', '.xlsx']
+  const accepted = allowedUploadMimes.has(mime) && extAllowed.includes(ext)
+  if (!accepted) {
+    cb(new Error('Unsupported file type'), false)
+    return
+  }
+  cb(null, true)
+}
+
+const multerCommonOptions = {
+  limits: {
+    fileSize: MAX_UPLOAD_FILE_SIZE_BYTES,
+    fields: MAX_UPLOAD_FIELDS,
+  },
+  fileFilter: defaultFileFilter,
+}
+
+export const upload = multer({ storage, ...multerCommonOptions })
 
 /** Multer в памяти — тело не пишется на диск до явной записи. Исправляет случай, когда файлы сохранялись 0 КБ (stream уже прочитан до multer). */
-export const uploadMemory = multer({ storage: multer.memoryStorage() })
+export const uploadMemory = multer({ storage: multer.memoryStorage(), ...multerCommonOptions })
+
+export function isSafeStoredFilename(filename: string): boolean {
+  if (!filename) return false
+  if (!SAFE_STORED_FILENAME_RE.test(filename)) return false
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) return false
+  return true
+}
+
+export function resolveSafeFilePath(baseDir: string, filename: string): string | null {
+  if (!isSafeStoredFilename(filename)) return null
+  const resolvedBase = path.resolve(baseDir)
+  const resolvedPath = path.resolve(baseDir, filename)
+  if (resolvedPath !== resolvedBase && !resolvedPath.startsWith(`${resolvedBase}${path.sep}`)) {
+    return null
+  }
+  return resolvedPath
+}
+
+export function resolveSafeExistingPath(baseDirs: string[], filename: string): string | null {
+  for (const dir of baseDirs) {
+    const candidate = resolveSafeFilePath(dir, filename)
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate
+    }
+  }
+  return null
+}
 
 /** Преобразует название подтипа в slug для имени файла (латиница, дефисы). */
 function toSlug(name: string): string {

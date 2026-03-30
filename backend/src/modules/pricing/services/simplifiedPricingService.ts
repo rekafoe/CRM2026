@@ -2,7 +2,7 @@
  * 🎯 Упрощённый калькулятор цен
  * 
  * Используется для продуктов с calculator_type='simplified'
- * Рассчитывает цены напрямую из config_data.simplified без FlexiblePricingService
+ * Рассчитывает цены напрямую из config_data.simplified
  */
 
 import { getDb } from '../../../db';

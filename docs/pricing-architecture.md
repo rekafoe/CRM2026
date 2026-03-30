@@ -46,9 +46,9 @@
 - `calculatePrice(productId, configuration, quantity)` - главный метод расчета
 
 **Логика:**
-1. Проверяет, есть ли у продукта операции
-2. Если есть → использует `FlexiblePricingService`
-3. Если нет → фоллбэк на legacy систему
+1. Проверяет тип калькулятора у продукта
+2. Для `calculator_type='simplified'` использует `SimplifiedPricingService`
+3. Для остальных типов возвращает `422` (расчёт заблокирован до миграции)
 4. Возвращает унифицированный результат
 
 **Пример использования:**
@@ -61,21 +61,15 @@ const result = await UnifiedPricingService.calculatePrice(
   quantity
 );
 
-console.log(result.calculationMethod); 
-// 'flexible_operations' или 'fallback_legacy'
+console.log(result.calculationMethod);
+// 'simplified'
 ```
 
-### 2. FlexiblePricingService (Новая система)
+### 2. SimplifiedPricingService (Активная система)
 
-**Файл:** `backend/src/modules/pricing/services/flexiblePricingService.ts`
+**Файл:** `backend/src/modules/pricing/services/simplifiedPricingService.ts`
 
-**Назначение:** Расчет через систему операций (печать, резка, ламинация и т.п.)
-
-**Особенности:**
-- ✅ Без хардкода - все операции из БД
-- ✅ Поддержка правил ценообразования
-- ✅ Условия применения операций
-- ✅ 6 типов единиц измерения
+**Назначение:** Расчёт по `config_data.simplified` (включая multi_page структуру)
 
 **Таблицы:**
 - `post_processing_services` - операции
@@ -248,11 +242,11 @@ const result = await UnifiedPricingService.calculatePrice(
 
 ```typescript
 // НЕ ИСПОЛЬЗУЙТЕ напрямую!
-import { FlexiblePricingService } from './modules/pricing';
+import { SimplifiedPricingService } from './modules/pricing';
 import { RealPricingService } from './modules/pricing'; // DELETED!
 
 // Эти сервисы для внутреннего использования
-const result = await FlexiblePricingService.calculatePrice(...);
+const result = await SimplifiedPricingService.calculatePrice(...);
 ```
 
 ## 🔧 Добавление новой операции
@@ -298,7 +292,7 @@ POST /api/products/1/operations
 
 ### Активные:
 - ✅ `UnifiedPricingService` - главный
-- ✅ `FlexiblePricingService` - новая система
+- ✅ `SimplifiedPricingService` - активный механизм расчёта
 - ✅ `DynamicPricingService` - настройки
 - ✅ `LayoutCalculationService` - раскладка
 - ✅ `PriceHistoryService` - история

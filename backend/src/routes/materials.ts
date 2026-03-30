@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { MaterialController } from '../modules/warehouse/controllers/materialController'
-import { asyncHandler, authenticate } from '../middleware'
+import { asyncHandler, authenticate, AuthenticatedRequest } from '../middleware'
 
 const router = Router()
 
@@ -16,21 +16,24 @@ router.get('/moves', authenticate, asyncHandler(MaterialController.getMaterialMo
 router.get('/moves/stats', authenticate, asyncHandler(MaterialController.getMaterialMovesStats))
 router.post('/spend', authenticate, asyncHandler(MaterialController.spendMaterial))
 
-// Параметризованные маршруты (в конце!)
-router.get('/:id', asyncHandler(MaterialController.getMaterialById))
-router.post('/', authenticate, asyncHandler(MaterialController.createOrUpdateMaterial))
-router.put('/:id', authenticate, asyncHandler(MaterialController.updateMaterial))
-router.delete('/:id', authenticate, asyncHandler(MaterialController.deleteMaterial))
-
-// Временный endpoint для тестирования калькулятора
+// Временный endpoint для тестирования калькулятора (статический маршрут должен быть до /:id)
 router.get('/test-calculator', asyncHandler(async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    res.status(404).json({ error: 'Not Found' })
+    return
+  }
+  const user = (req as AuthenticatedRequest).user
+  if (!user || user.role !== 'admin') {
+    res.status(403).json({ error: 'Forbidden' })
+    return
+  }
   try {
     const { getDb } = await import('../config/database')
     const db = await getDb()
-    
+
     // Проверяем, есть ли таблица product_material_rules
     const tables = await db.all("SELECT name FROM sqlite_master WHERE type='table' AND name='product_material_rules'")
-    
+
     if (tables.length === 0) {
       // Создаем таблицу
       await db.exec(`
@@ -47,24 +50,24 @@ router.get('/test-calculator', asyncHandler(async (req, res) => {
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `)
-      
+
       // Добавляем тестовые данные
       const materials = await db.all("SELECT id, name FROM materials LIMIT 2")
       if (materials.length > 0) {
         await db.run(`
-          INSERT INTO product_material_rules 
+          INSERT INTO product_material_rules
           (product_type, product_name, material_id, qty_per_item, calculation_type, is_required, notes)
-          VALUES 
+          VALUES
           ('flyers', 'Листовки A6', ${materials[0].id}, 1, 'per_sheet', 1, 'Бумага для печати'),
           ('flyers', 'Листовки A6', ${materials[1]?.id || materials[0].id}, 0.1, 'per_sheet', 1, 'Краска для печати'),
           ('business_cards', 'Визитки', ${materials[0].id}, 1, 'per_sheet', 1, 'Бумага для визиток')
         `)
       }
     }
-    
+
     // Получаем типы продуктов
     const types = await db.all("SELECT product_type, COUNT(*) as count FROM product_material_rules GROUP BY product_type")
-    
+
     res.json({
       success: true,
       message: 'Калькулятор инициализирован',
@@ -75,5 +78,11 @@ router.get('/test-calculator', asyncHandler(async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }))
+
+// Параметризованные маршруты (в конце!)
+router.get('/:id', asyncHandler(MaterialController.getMaterialById))
+router.post('/', authenticate, asyncHandler(MaterialController.createOrUpdateMaterial))
+router.put('/:id', authenticate, asyncHandler(MaterialController.updateMaterial))
+router.delete('/:id', authenticate, asyncHandler(MaterialController.deleteMaterial))
 
 export default router

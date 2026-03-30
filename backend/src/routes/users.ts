@@ -5,15 +5,28 @@ import { hashPassword } from '../utils'
 
 const router = Router()
 
+function requireAdmin(req: AuthenticatedRequest, res: any, next: any) {
+  const actor = req.user
+  if (!actor) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+  if (actor.role !== 'admin') {
+    res.status(403).json({ message: 'Forbidden' })
+    return
+  }
+  next()
+}
+
 // GET /api/users — список пользователей
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', requireAdmin, asyncHandler(async (req, res) => {
   const db = await getDb()
   const users = await db.all<any>('SELECT id, name FROM users ORDER BY name')
   res.json(users)
 }))
 
 // GET /api/users/operators-today?date=YYYY-MM-DD — операторы, работающие в указанную дату (по user_shifts)
-router.get('/operators-today', asyncHandler(async (req, res) => {
+router.get('/operators-today', requireAdmin, asyncHandler(async (req, res) => {
   const date = String((req.query as any)?.date ?? '').trim().slice(0, 10)
   const targetDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
@@ -33,7 +46,7 @@ router.get('/operators-today', asyncHandler(async (req, res) => {
 }))
 
 // GET /api/users/all — полный список пользователей с деталями
-router.get('/all', asyncHandler(async (req, res) => {
+router.get('/all', requireAdmin, asyncHandler(async (req, res) => {
   const db = await getDb()
   const users = await db.all<any>(`
     SELECT u.id, u.name, u.email, u.role, u.created_at,
@@ -48,7 +61,7 @@ router.get('/all', asyncHandler(async (req, res) => {
 }))
 
 // POST /api/users — создать пользователя
-router.post('/', asyncHandler(async (req, res) => {
+router.post('/', requireAdmin, asyncHandler(async (req, res) => {
   const { name, email, password, role, department_id } = req.body
   const db = await getDb()
 
@@ -81,7 +94,7 @@ router.post('/', asyncHandler(async (req, res) => {
 }))
 
 // PUT /api/users/:id — обновить пользователя
-router.put('/:id', asyncHandler(async (req, res) => {
+router.put('/:id', requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const { name, email, role, department_id } = req.body
   const db = await getDb()
@@ -104,7 +117,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
 }))
 
 // DELETE /api/users/:id — удалить пользователя
-router.delete('/:id', asyncHandler(async (req, res) => {
+router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params
   const db = await getDb()
 
@@ -151,7 +164,7 @@ router.post('/:id/reset-token', asyncHandler(async (req, res) => {
 }))
 
 // POST /api/users/fix-existing — исправить существующих пользователей (одноразовая функция)
-router.post('/fix-existing', asyncHandler(async (req, res) => {
+router.post('/fix-existing', requireAdmin, asyncHandler(async (req, res) => {
   const db = await getDb()
 
   // Найти пользователей с пустыми API токенами

@@ -8,7 +8,7 @@ const PricingServicePage: React.FC = () => {
       <div className="management-header">
         <div>
           <h2>💰 Pricing Service</h2>
-          <p className="subtitle">Единый центр ценообразования (Unified + Flexible)</p>
+          <p className="subtitle">Единый центр ценообразования (Unified + Simplified)</p>
         </div>
       </div>
 
@@ -20,7 +20,7 @@ const PricingServicePage: React.FC = () => {
             <h3>Настройки и источники</h3>
             <ul>
               <li>UnifiedPricingService как источник истины</li>
-              <li>Поддержка FlexiblePricingService (операции)</li>
+              <li>SimplifiedPricingService как активный расчётный движок</li>
               <li>Констрейнты и автоподбор материалов</li>
             </ul>
           </div>

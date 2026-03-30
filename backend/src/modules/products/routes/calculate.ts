@@ -69,20 +69,24 @@ const validateRateLimit = rateLimiter.middleware({
  *             schema:
  *               type: object
  *               properties:
- *                 productId: { type: integer }
- *                 productName: { type: string }
- *                 quantity: { type: integer }
- *                 finalPrice: { type: number }
- *                 pricePerUnit: { type: number }
- *                 tier_prices:
- *                   type: array
- *                   description: Цены за единицу по диапазонам тиража (от min_qty шт)
- *                   items:
- *                     type: object
- *                     properties:
- *                       min_qty: { type: integer }
- *                       max_qty: { type: integer, nullable: true }
- *                       unit_price: { type: number }
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     productId: { type: integer }
+ *                     productName: { type: string }
+ *                     quantity: { type: integer }
+ *                     finalPrice: { type: number }
+ *                     pricePerUnit: { type: number }
+ *                     tier_prices:
+ *                       type: array
+ *                       description: Цены за единицу по диапазонам тиража (от min_qty шт)
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           min_qty: { type: integer }
+ *                           max_qty: { type: integer, nullable: true }
+ *                           unit_price: { type: number }
  *       404: { description: Продукт не найден }
  *       500: { description: Ошибка расчёта }
  */
@@ -95,16 +99,21 @@ router.post('/:productId/calculate', calculateRateLimit, async (req, res) => {
 
     const { UnifiedPricingService } = await import('../../pricing/services/unifiedPricingService');
     const result = await UnifiedPricingService.calculatePrice(
-      parseInt(productId),
+      parseInt(productId, 10),
       configuration,
       configuration.quantity
     );
 
     logger.info('Price calculated', { finalPrice: result.finalPrice, method: result.calculationMethod });
-    res.json(result);
+    res.json({ success: true, data: result });
   } catch (error) {
-    logger.error('Error calculating product price', error);
-    res.status(500).json({ error: 'Failed to calculate product price' });
+    logger.error('Error calculating product price', { productId: req.params.productId, error });
+    const status = typeof (error as any)?.status === 'number' ? (error as any).status : 500;
+    res.status(status).json({
+      success: false,
+      message: status === 500 ? 'Ошибка расчета цены' : (error as Error)?.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 });
 

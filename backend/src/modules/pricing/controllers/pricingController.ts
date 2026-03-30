@@ -471,7 +471,7 @@ export class PricingController {
     res.json({ success: true })
   })
 
-  // --- Product Types (replacement for enhanced-calculator) ---
+  // --- Product Types (legacy replacement endpoint) ---
   static getProductTypes = asyncHandler(async (req: Request, res: Response) => {
     await PricingController.ensureOperationNormsTable()
     const db = await getDb()

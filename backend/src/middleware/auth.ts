@@ -9,63 +9,53 @@ export interface AuthenticatedRequest extends Request {
   }
 }
 
-export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
-  console.log(`🔍 Auth middleware: ${req.method} ${req.path}`);
-  
-  const openPaths = [
-    // infra / health
-    /^\/$/,
-    /^\/health$/,
-    // Загруженные файлы (макеты, PDF) — доступ без авторизации для скачивания по прямой ссылке
-    /^\/api\/uploads\//,
-    // Swagger documentation
-    /^\/api-docs/,
-    /^\/api-docs\.json$/,
-    // public widget needs these
-    /^\/api\/presets/,
-    /^\/api\/orders\/[0-9]+\/items$/,
-    /^\/api\/orders\/[0-9]+\/prepay$/,
-    /^\/api\/webhooks\/bepaid$/,
-    // auth endpoints
-    /^\/api\/auth\/login$/,
-    /^\/api\/auth\/me$/,
-    // backward compat
-    /^\/login$/,
-    // temporary for testing calculator
-    /^\/api\/universal-calculator/,
-    /^\/api\/materials\/test-calculator$/,
-    /^\/api\/debug-routes$/,
-    // pricing policy endpoints (all pricing routes are public for management)
-    /^\/api\/pricing/,
-    // enhanced calculator endpoints
-    /^\/api\/enhanced-calculator/,
-    // 🆕 Calculator material endpoints (for public access)
-    // materials: только GET /api/materials открыт (см. ниже метод-проверку)
-    /^\/api\/suppliers$/,
-    /^\/api\/product-configs$/,
-    // 🆕 Notifications endpoints (temporary for testing)
-    /^\/api\/notifications/,
-    // 🆕 Photo orders endpoints (temporary for testing)
-    /^\/api\/photo-orders/,
-    // Публичный эндпоинт заказов с сайта (проверка по WEBSITE_ORDER_API_KEY в middleware маршрута)
-    /^\/api\/orders\/from-website$/,
-    // Создание заказа с сайта с файлами в одном запросе
-    /^\/api\/orders\/from-website\/with-files$/,
-    // Загрузка файлов к заказу с сайта (тот же API-ключ)
-    /^\/api\/orders\/from-website\/[0-9]+\/files$/,
-    // 🆕 Products and printing technologies for calculator
-    /^\/api\/products/,
-    /^\/api\/printing-technologies/,
-    /^\/api\/operations/,
-    /^\/api\/printers/,
-    /^\/api\/reports/,
-    /^\/api\/daily-reports/,
-    /^\/api\/material-categories/,
-    /^\/api\/suppliers/,
-    /^\/api\/notifications/,
-    /^\/api\/warehouse-reports/
-  ]
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
+interface PublicRouteRule {
+  method: Method
+  path: RegExp
+}
+
+const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
+  // infra / docs
+  { method: 'GET', path: /^\/$/ },
+  { method: 'GET', path: /^\/health$/ },
+  { method: 'GET', path: /^\/api-docs(?:\/.*)?$/ },
+  { method: 'GET', path: /^\/api-docs\.json$/ },
+  // auth
+  { method: 'POST', path: /^\/api\/auth\/login$/ },
+  { method: 'GET', path: /^\/api\/auth\/me$/ },
+  { method: 'POST', path: /^\/login$/ },
+  // website/public calculator
+  { method: 'GET', path: /^\/api\/presets(?:\/.*)?$/ },
+  { method: 'GET', path: /^\/api\/products$/ },
+  { method: 'GET', path: /^\/api\/products\/category\/[0-9]+$/ },
+  { method: 'GET', path: /^\/api\/products\/[0-9]+\/schema$/ },
+  { method: 'GET', path: /^\/api\/products\/[0-9]+\/tier-prices$/ },
+  { method: 'POST', path: /^\/api\/products\/[0-9]+\/calculate$/ },
+  { method: 'POST', path: /^\/api\/products\/[0-9]+\/validate-size$/ },
+  { method: 'POST', path: /^\/api\/pricing\/calculate$/ },
+  { method: 'GET', path: /^\/api\/materials$/ },
+  { method: 'GET', path: /^\/api\/paper-types(?:\/.*)?$/ },
+  { method: 'GET', path: /^\/api\/material-categories$/ },
+  { method: 'GET', path: /^\/api\/material-categories\/stats$/ },
+  { method: 'GET', path: /^\/api\/material-categories\/[0-9]+$/ },
+  { method: 'GET', path: /^\/api\/printing-technologies$/ },
+  // webhooks / website orders
+  { method: 'POST', path: /^\/api\/webhooks\/bepaid$/ },
+  { method: 'POST', path: /^\/api\/orders\/from-website$/ },
+  { method: 'POST', path: /^\/api\/orders\/from-website\/with-files$/ },
+  { method: 'POST', path: /^\/api\/orders\/from-website\/[0-9]+\/files$/ },
+  { method: 'GET', path: /^\/api\/orders\/[0-9]+\/items$/ },
+  { method: 'GET', path: /^\/api\/orders\/[0-9]+\/prepay$/ },
+]
+
+function isPublicRoute(req: Request): boolean {
+  const method = req.method.toUpperCase() as Method
+  return PUBLIC_ROUTE_RULES.some((rule) => rule.method === method && rule.path.test(req.path))
+}
+
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   // Пересчёт ЗП: всегда пропускаем запрос в обработчик (авторизация там: admin или secret)
   const isRecalcPath = req.path.endsWith('/earnings/recalculate') || req.path === '/earnings/recalculate'
 
@@ -76,13 +66,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
   const isOpenPath = isRecalcPath
     || isPostOrderFilesWithWebsiteKey
-    || openPaths.some(r => r.test(req.path))
-    || req.path === '/from-website' // в подмаршруте /orders path = /from-website
-    || (req.path === '/api/materials' && req.method === 'GET')
-    || (req.path.startsWith('/api/paper-types') && req.method === 'GET')
-    || ((req.path === '/api/material-categories' || req.path === '/api/material-categories/stats') && req.method === 'GET')
-    || (/^\/api\/material-categories\/[0-9]+$/.test(req.path) && req.method === 'GET');
-  console.log(`🔍 Is open path: ${isOpenPath}`);
+    || isPublicRoute(req)
   
   if (isOpenPath) {
     // Open path = анонимный доступ разрешён, но если токен передан — попробуем определить пользователя
@@ -104,8 +88,6 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         // игнорируем: для open-path не обязаны валидировать токен
       }
     }
-
-    console.log(`✅ Allowing access to ${req.path}`);
     return next();
   }
   

@@ -11,6 +11,7 @@ import { uploadsApiKeyMiddleware } from './middleware/uploadsApiKey'
 import { performanceMiddleware, performanceLoggingMiddleware } from './middleware/performance'
 import { compressionMiddleware } from './middleware/compression'
 import { cachePresets } from './middleware/httpCache'
+import { authRateLimit, generalRateLimit } from './middleware/rateLimiter'
 import routes from './routes'
 import { TelegramService } from './services/telegramService'
 import { StockMonitoringService } from './services/stockMonitoringService'
@@ -33,8 +34,22 @@ dotenv.config()
 
 const app = express()
 
+function assertProductionSecurityEnv(): void {
+  if (config.nodeEnv !== 'production') return
+
+  const websiteApiKey = String(process.env.WEBSITE_ORDER_API_KEY || '').trim()
+  if (!websiteApiKey) {
+    throw new Error('WEBSITE_ORDER_API_KEY must be set in production')
+  }
+
+  if (config.jwtSecret === 'change-me-in-production') {
+    logger.warn('JWT_SECRET uses default value in production. Set a strong secret.')
+  }
+}
+
 // За прокси (Railway и др.) req.protocol должен быть https
 app.set('trust proxy', 1)
+app.use(generalRateLimit)
 
 // Middleware: CORS — несколько origin через запятую в CORS_ORIGIN (напр. CRM фронт + printcore.by)
 app.use(cors({ origin: config.corsOrigin }))
@@ -96,8 +111,9 @@ try {
 app.use(compressionMiddleware) // Сжатие ответов
 app.use(performanceMiddleware) // Мониторинг производительности
 app.use(performanceLoggingMiddleware) // Логирование производительности
-app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ extended: true, limit: '50mb' }))
+const bodyLimit = process.env.REQUEST_BODY_LIMIT || '2mb'
+app.use(express.json({ limit: bodyLimit }))
+app.use(express.urlencoded({ extended: true, limit: bodyLimit }))
 
 // Static files — только публичные картинки (продукты, категории, подтипы).
 // Файлы заказов (orders/) НЕ отдаются — только через GET /api/orders/:id/files/:fileId/download
@@ -136,7 +152,8 @@ app.get('/', (req, res) => {
 })
 
 // Backward compatibility: некоторые клиенты шлют POST /login вместо /api/auth/login
-app.post('/login', asyncHandler(AuthController.login))
+app.post('/login', authRateLimit, asyncHandler(AuthController.login))
+app.post('/api/auth/login', authRateLimit)
 
 // Authentication middleware
 app.use(authMiddleware)
@@ -150,6 +167,7 @@ app.use(errorHandler)
 // Initialize database and start server
 async function startServer() {
   try {
+    assertProductionSecurityEnv()
     await initDB()
     logger.info('Database initialized')
     

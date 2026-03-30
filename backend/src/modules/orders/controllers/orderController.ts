@@ -35,6 +35,12 @@ function normalizeWebsiteItems(items: any[]): Array<{ type: string; params: Reco
   }))
 }
 
+function getSafeServerErrorMessage(fallback: string, error: any): string {
+  return process.env.NODE_ENV === 'production'
+    ? fallback
+    : (error?.message ?? fallback)
+}
+
 export class OrderController {
   static async getAllOrders(req: Request, res: Response) {
     try {
@@ -61,8 +67,7 @@ export class OrderController {
       const msg = error?.message ?? String(error)
       logger.error('Error in /api/orders', { error: msg, stack: error?.stack })
       res.status(500).json({ 
-        error: 'Failed to load orders', 
-        details: msg 
+        error: getSafeServerErrorMessage('Failed to load orders', error),
       })
     }
   }
@@ -118,7 +123,7 @@ export class OrderController {
       
       res.status(201).json(order)
     } catch (error: any) {
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: getSafeServerErrorMessage('Ошибка создания заказа', error) })
     }
   }
 
@@ -198,7 +203,7 @@ export class OrderController {
     } catch (error: any) {
       logger.error('createOrderFromWebsite error', { error: error?.message, stack: error?.stack })
       res.status(500).json({
-        error: error?.message ?? 'Ошибка создания заказа',
+        error: getSafeServerErrorMessage('Ошибка создания заказа', error),
         message: 'Internal server error'
       })
     }
@@ -331,7 +336,7 @@ export class OrderController {
     } catch (error: any) {
       logger.error('createOrderFromWebsiteWithFiles error', { error: error?.message, stack: error?.stack })
       res.status(500).json({
-        error: error?.message ?? 'Ошибка создания заказа',
+        error: getSafeServerErrorMessage('Ошибка создания заказа', error),
         message: 'Internal server error'
       })
     }
@@ -366,8 +371,7 @@ export class OrderController {
       })
     } catch (error: any) {
       res.status(500).json({ 
-        error: error.message,
-        details: 'Ошибка создания заказа с автоматическим списанием'
+        error: getSafeServerErrorMessage('Ошибка создания заказа с автоматическим списанием', error),
       })
     }
   }
@@ -384,7 +388,7 @@ export class OrderController {
       res.json(updated)
     } catch (error: any) {
       logger.error(`Error updating order ${req.params.id} status`, error)
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: getSafeServerErrorMessage('Ошибка обновления статуса заказа', error) })
     }
   }
 
@@ -404,7 +408,7 @@ export class OrderController {
       const updated = await OrderService.updateOrderCustomer(id, customerId)
       res.json(updated)
     } catch (error: any) {
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: getSafeServerErrorMessage('Ошибка обновления клиента заказа', error) })
     }
   }
 
@@ -419,7 +423,7 @@ export class OrderController {
       const updated = await OrderService.updateOrderDiscount(id, discount_percent)
       res.json(updated)
     } catch (error: any) {
-      res.status(500).json({ error: error.message })
+      res.status(500).json({ error: getSafeServerErrorMessage('Ошибка обновления скидки заказа', error) })
     }
   }
 
@@ -511,8 +515,7 @@ export class OrderController {
     } catch (error: any) {
       logger.error('Error adding order item', error)
       res.status(500).json({ 
-        error: 'Failed to add item to order', 
-        details: error.message 
+        error: getSafeServerErrorMessage('Failed to add item to order', error),
       })
     }
   }
@@ -538,8 +541,7 @@ export class OrderController {
     } catch (error: any) {
       logger.error('Error searching orders', error)
       res.status(500).json({ 
-        error: 'Failed to search orders', 
-        details: error.message 
+        error: getSafeServerErrorMessage('Failed to search orders', error),
       })
     }
   }
@@ -558,8 +560,7 @@ export class OrderController {
     } catch (error: any) {
       logger.error('Error getting orders stats', error)
       res.status(500).json({ 
-        error: 'Failed to get orders stats', 
-        details: error.message 
+        error: getSafeServerErrorMessage('Failed to get orders stats', error),
       })
     }
   }
@@ -584,8 +585,7 @@ export class OrderController {
     } catch (error: any) {
       logger.error('Error bulk updating order status', error)
       res.status(500).json({ 
-        error: 'Failed to bulk update order status', 
-        details: error.message 
+        error: getSafeServerErrorMessage('Failed to bulk update order status', error),
       })
     }
   }
@@ -615,8 +615,7 @@ export class OrderController {
     } catch (error: any) {
       logger.error('Error bulk deleting orders', error)
       res.status(500).json({ 
-        error: 'Failed to bulk delete orders', 
-        details: error.message 
+        error: getSafeServerErrorMessage('Failed to bulk delete orders', error),
       })
     }
   }
@@ -641,8 +640,7 @@ export class OrderController {
     } catch (error: any) {
       logger.error('Error exporting orders', error)
       res.status(500).json({ 
-        error: 'Failed to export orders', 
-        details: error.message 
+        error: getSafeServerErrorMessage('Failed to export orders', error),
       })
     }
   }

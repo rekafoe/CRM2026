@@ -11,13 +11,23 @@ import { isWebsiteOrderApiKeyValid } from './websiteOrderApiKey'
 const API_KEY_QUERY = 'api_key'
 
 export async function uploadsApiKeyMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const isProduction = process.env.NODE_ENV === 'production'
+  const allowQueryApiKey = process.env.UPLOADS_ALLOW_QUERY_API_KEY === 'true' || process.env.UPLOADS_ALLOW_QUERY_API_KEY === '1'
+
   // UPLOADS_PUBLIC=true — картинки доступны всем (сайт, img src без ключа)
   if (process.env.UPLOADS_PUBLIC === 'true' || process.env.UPLOADS_PUBLIC === '1') {
     return next()
   }
   const envKey = process.env.WEBSITE_ORDER_API_KEY || ''
-  // Если ключ не настроен — открытый доступ (для dev / обратная совместимость)
+  // Fail-closed для production: без ключа доступ к uploads запрещен
   if (!envKey.trim()) {
+    if (isProduction) {
+      res.status(503).json({
+        error: 'Uploads are not configured',
+        message: 'WEBSITE_ORDER_API_KEY is not set',
+      })
+      return
+    }
     return next()
   }
 
@@ -26,10 +36,12 @@ export async function uploadsApiKeyMiddleware(req: Request, res: Response, next:
     return next()
   }
 
-  // Проверяем ключ в query (?api_key=xxx) — для img src, где нельзя передать заголовки
-  const queryKey = (req.query[API_KEY_QUERY] as string)?.trim()
-  if (queryKey && queryKey === envKey) {
-    return next()
+  // Проверяем ключ в query (?api_key=xxx): по умолчанию выключено в production
+  if (!isProduction || allowQueryApiKey) {
+    const queryKey = (req.query[API_KEY_QUERY] as string)?.trim()
+    if (queryKey && queryKey === envKey) {
+      return next()
+    }
   }
 
   // Проверяем токен пользователя CRM (Authorization Bearer)
@@ -49,6 +61,8 @@ export async function uploadsApiKeyMiddleware(req: Request, res: Response, next:
 
   res.status(401).json({
     error: 'Unauthorized',
-    message: 'Для доступа к файлам укажите X-API-Key, Authorization: Bearer <key> или ?api_key=<key>',
+    message: (!isProduction || allowQueryApiKey)
+      ? 'Для доступа к файлам укажите X-API-Key, Authorization: Bearer <key> или ?api_key=<key>'
+      : 'Для доступа к файлам укажите X-API-Key или Authorization: Bearer <key>',
   })
 }

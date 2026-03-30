@@ -9,6 +9,7 @@ interface ApiError extends Error {
 
 export const errorHandler = (err: ApiError, req: Request, res: Response, _next: NextFunction) => {
   const showStack = (config.nodeEnv !== 'production') && config.showErrorStack
+  const isProduction = config.nodeEnv === 'production'
   const timestamp = new Date().toISOString()
   
   // Определяем тип ошибки и статус
@@ -32,6 +33,10 @@ export const errorHandler = (err: ApiError, req: Request, res: Response, _next: 
   } else if (err.name === 'ConflictError') {
     status = 409
     code = 'CONFLICT'
+  }
+  if (isProduction && status >= 500) {
+    message = 'Internal Server Error'
+    code = 'INTERNAL_ERROR'
   }
   
   const payload: any = { 

@@ -299,7 +299,7 @@ export async function checkMaterialAvailability(
  * Рассчитывает ПРИМЕРНУЮ стоимость материалов для отображения в интерфейсе выбора
  * 
  * НЕ ИСПОЛЬЗУЕТСЯ для финального расчета цены!
- * Финальный расчет происходит ТОЛЬКО на бэкенде через FlexiblePricingService
+ * Финальный расчет происходит ТОЛЬКО на бэкенде через UnifiedPricingService
  */
 export async function calculateMaterialCost(
   paperType: string,

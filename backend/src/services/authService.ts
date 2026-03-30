@@ -9,8 +9,6 @@ export class AuthService {
     }
 
     const hashedPassword = hashPassword(password)
-    console.log(`🔍 Checking user with email: ${email}`)
-    console.log(`🔍 Password hash: ${hashedPassword.substring(0, 20)}...`)
     
     const db = await getDb()
     
@@ -21,13 +19,8 @@ export class AuthService {
     )
     
     if (!userExists) {
-      console.log(`❌ User not found with email: ${email}`)
       throw new Error('Неверные данные')
     }
-    
-    console.log(`🔍 User found, checking password hash...`)
-    console.log(`🔍 Stored hash: ${userExists.password_hash?.substring(0, 20) || 'NULL'}...`)
-    console.log(`🔍 Provided hash: ${hashedPassword.substring(0, 20)}...`)
     
     const user = await db.get<{ id: number; api_token: string; name: string; role: string }>(
       'SELECT id, api_token, name, role FROM users WHERE email = ? AND password_hash = ?',
@@ -36,7 +29,6 @@ export class AuthService {
     )
 
     if (!user) {
-      console.log(`❌ Password mismatch for user: ${email}`)
       throw new Error('Неверные данные')
     }
 

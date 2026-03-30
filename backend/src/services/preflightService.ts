@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import sharp from 'sharp'
 import { PDFDocument } from 'pdf-lib'
-import { orderFilesDir, uploadsDir } from '../config/upload'
+import { orderFilesDir, resolveSafeExistingPath, uploadsDir } from '../config/upload'
 
 const PREFLIGHT_MIME_TYPES = [
   'application/pdf',
@@ -215,11 +215,7 @@ async function preflightImage(
 }
 
 function resolveFilePath(filename: string): string | null {
-  for (const dir of [orderFilesDir, uploadsDir]) {
-    const p = path.join(dir, filename)
-    if (fs.existsSync(p)) return p
-  }
-  return null
+  return resolveSafeExistingPath([orderFilesDir, uploadsDir], filename)
 }
 
 /**

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../../../db';
-import { asyncHandler } from '../../../middleware';
+import { asyncHandler, AuthenticatedRequest } from '../../../middleware';
 import { ParameterPresetService } from '../services/parameterPresetService';
 import { logger } from '../../../utils/logger';
 import { extractMinUnitPrice } from './helpers';
@@ -8,6 +8,13 @@ import { extractMinUnitPrice } from './helpers';
 const router = Router();
 
 router.get('/debug', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not Found' });
+  }
+  const user = (req as AuthenticatedRequest).user;
+  if (!user || user.role !== 'admin') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   try {
     const db = await getDb();
     const tables = await db.all(`

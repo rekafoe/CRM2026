@@ -1,11 +1,9 @@
 import { Router } from 'express'
-import path from 'path'
-import fs from 'fs'
 import { OrderController } from '../modules/orders/controllers/orderController'
 import { OrderItemController } from '../modules/orders/controllers/orderItemController'
 import { asyncHandler, authenticate } from '../middleware'
 import { requireWebsiteOrderApiKey, isWebsiteOrderApiKeyValid } from '../middleware/websiteOrderApiKey'
-import { upload, uploadMemory, saveBufferToOrderFiles, orderFilesDir, uploadsDir } from '../config/upload'
+import { upload, uploadMemory, saveBufferToOrderFiles, orderFilesDir, uploadsDir, resolveSafeExistingPath, resolveSafeFilePath } from '../config/upload'
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
 import { hasColumn } from '../utils/tableSchemaCache'
@@ -514,15 +512,12 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
     res.status(404).json({ message: 'Файл не найден' })
     return
   }
-  let filePath = path.join(orderFilesDir, String(row.filename))
-  if (!fs.existsSync(filePath)) {
-    const fallback = path.join(uploadsDir, String(row.filename))
-    if (fs.existsSync(fallback)) filePath = fallback
-    else {
-      res.status(404).json({ message: 'Файл не найден на диске' })
-      return
-    }
+  const filePath = resolveSafeExistingPath([orderFilesDir, uploadsDir], String(row.filename))
+  if (!filePath) {
+    res.status(404).json({ message: 'Файл не найден на диске' })
+    return
   }
+  const fs = await import('fs')
   const buffer = fs.readFileSync(filePath)
   const displayName = (row.originalName || row.filename).trim() || row.filename
   res.setHeader('Content-Disposition', `attachment; filename="${displayName.replace(/"/g, '%22')}"; filename*=UTF-8''${encodeURIComponent(displayName)}`)
@@ -565,14 +560,13 @@ router.get('/:id/files/:fileId/preflight', asyncHandler(async (req, res) => {
 router.delete('/:orderId/files/:fileId', asyncHandler(async (req, res) => {
   const orderId = Number(req.params.orderId)
   const fileId = Number(req.params.fileId)
-  const { orderFilesDir, uploadsDir } = await import('../config/upload')
-  const path = await import('path')
   const fs = await import('fs')
   const db = await getDb()
   const row = await db.get<any>('SELECT filename FROM order_files WHERE id = ? AND orderId = ?', fileId, orderId)
   if (row && row.filename) {
     for (const dir of [orderFilesDir, uploadsDir]) {
-      const p = path.join(dir, String(row.filename))
+      const p = resolveSafeFilePath(dir, String(row.filename))
+      if (!p) continue
       try { fs.unlinkSync(p); break } catch {}
     }
   }

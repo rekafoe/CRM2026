@@ -223,11 +223,12 @@ API позволяет управлять операциями (печать, р
 
 ### Расчет цены
 
-#### POST `/api/products/:productId/calculate?useFlexiblePricing=true`
+#### POST `/api/products/:productId/calculate`
 Рассчитать цену продукта
 
-**Query Parameters:**
-- `useFlexiblePricing` (optional) - использовать гибкую систему операций (`true`) или старый метод (`false`, по умолчанию)
+**Ограничения:**
+- Поддерживаются только продукты с `calculator_type='simplified'`
+- Для остальных продуктов возвращается `422`
 
 **Request Body:**
 ```json
@@ -243,74 +244,18 @@ API позволяет управлять операциями (печать, р
 }
 ```
 
-**Response (гибкая система):**
+**Response (успех):**
 ```json
 {
-  "productId": 1,
-  "productName": "Визитки 90x50",
-  "quantity": 100,
-  "productSize": {
-    "width": 90,
-    "height": 50
-  },
-  "layout": {
-    "fitsOnSheet": true,
-    "itemsPerSheet": 10,
-    "recommendedSheetSize": {
-      "width": 320,
-      "height": 450
-    }
-  },
-  "materials": [
-    {
-      "materialId": 1,
-      "materialName": "Бумага мелованная 350г",
-      "quantity": 10,
-      "unitPrice": 0.40,
-      "totalCost": 4.00
-    }
-  ],
-  "operations": [
-    {
-      "operationId": 1,
-      "operationName": "Цифровая цветная печать",
-      "operationType": "print",
-      "priceUnit": "per_sheet",
-      "unitPrice": 0.15,
-      "quantity": 10,
-      "setupCost": 0,
-      "totalCost": 1.50
-    },
-    {
-      "operationId": 3,
-      "operationName": "Резка на гильотине",
-      "operationType": "cut",
-      "priceUnit": "per_sheet",
-      "unitPrice": 0.01,
-      "quantity": 10,
-      "setupCost": 5,
-      "totalCost": 5.10
-    },
-    {
-      "operationId": 5,
-      "operationName": "Ламинация глянцевая",
-      "operationType": "laminate",
-      "priceUnit": "per_sheet",
-      "unitPrice": 0.25,
-      "quantity": 10,
-      "setupCost": 10,
-      "totalCost": 12.50
-    }
-  ],
-  "materialCost": 4.00,
-  "operationsCost": 19.10,
-  "setupCosts": 15.00,
-  "subtotal": 23.10,
-  "markup": 2.2,
-  "discountPercent": 0,
-  "discountAmount": 0,
-  "finalPrice": 50.82,
-  "pricePerUnit": 0.51
+  "success": true,
+  "data": {
+    "productId": 1,
+    "productName": "Визитки 90x50",
+    "quantity": 100,
+    "finalPrice": 50.82,
+    "pricePerUnit": 0.51,
+    "calculationMethod": "simplified"
+  }
 }
 ```
 
@@ -374,7 +319,7 @@ POST /api/products/1/operations
 }
 
 # 4. Рассчитать цену
-POST /api/products/1/calculate?useFlexiblePricing=true
+POST /api/products/1/calculate
 {
   "quantity": 100,
   "parameters": {

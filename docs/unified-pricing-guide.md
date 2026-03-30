@@ -6,7 +6,7 @@
 Было несколько сервисов ценообразования:
 - `PricingService` (deprecated)
 - `RealPricingService` (старая система)
-- `FlexiblePricingService` (новая система)
+- `FlexiblePricingService` (удален)
 - `DynamicPricingService` (настройки из БД)
 
 ### Решение: UnifiedPricingService
@@ -14,8 +14,8 @@
 Создан **единый сервис** `UnifiedPricingService`, который:
 
 ✅ Автоматически выбирает метод расчета:
-- Если у продукта есть операции → использует `FlexiblePricingService` (новая система)
-- Если нет операций → фоллбэк на старую систему (для обратной совместимости)
+- Если `calculator_type='simplified'` → использует `SimplifiedPricingService`
+- Для остальных типов возвращает бизнес-ошибку `422`
 
 ✅ Унифицированный результат:
 ```typescript
@@ -45,7 +45,7 @@
   
   // Метаданные
   calculatedAt: string;
-  calculationMethod: 'flexible_operations' | 'fallback_legacy';
+  calculationMethod: 'simplified';
 }
 ```
 
@@ -326,8 +326,8 @@ import { RealPricingService } from './modules/pricing';
 const result = await RealPricingService.calculateRealPrice(...);
 
 // ❌ Deprecated
-import { FlexiblePricingService } from './modules/pricing';
-const result = await FlexiblePricingService.calculatePrice(...);
+import { SimplifiedPricingService } from './modules/pricing';
+const result = await SimplifiedPricingService.calculatePrice(...); // вызывать напрямую не нужно
 ```
 
 ### Новый код (ИСПОЛЬЗОВАТЬ):
@@ -340,9 +340,9 @@ const result = await UnifiedPricingService.calculatePrice(
   quantity
 );
 
-// Сервис автоматически выберет правильный метод!
+// Сервис использует только simplified-метод!
 console.log(result.calculationMethod); 
-// 'flexible_operations' или 'fallback_legacy'
+// 'simplified'
 ```
 
 ---

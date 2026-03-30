@@ -1,5 +1,7 @@
 # Архитектура сервисов ценообразования в CRM
 
+> ⚠️ Обновление: документ частично исторический. Текущий production-поток расчёта — только `UnifiedPricingService -> SimplifiedPricingService`; legacy ветки `FlexiblePricingService` и `/api/universal-calculator/*` удалены.
+
 ## 🎯 Обзор
 
 В системе существует **4 сервиса**, связанных с расчетом цен. Вот полная картина:
