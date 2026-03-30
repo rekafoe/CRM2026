@@ -1,15 +1,26 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../config/constants';
 
+/** Тот же хост, что destination для /api/* в frontend/vercel.json */
+const VERCEL_REWRITE_API_BASE = 'https://crm2026-production.up.railway.app/api';
+
 /**
  * Полный https://…/api для multipart: обходит Vercel rewrite на тот же origin (/api),
  * из‑за которого POST upload часто отдаёт 400 (multer не видит файл).
+ * Env имеет приоритет; на *.vercel.app без env — автоматический прямой вызов Railway.
  */
 function resolveDirectApiBaseForMultipart(): string | null {
   const uploadOnly = import.meta.env.VITE_UPLOAD_API_URL?.trim();
   if (uploadOnly && /^https?:\/\//i.test(uploadOnly)) return uploadOnly.replace(/\/$/, '');
   const api = import.meta.env.VITE_API_URL?.trim();
   if (api && /^https?:\/\//i.test(api)) return api.replace(/\/$/, '');
+  if (typeof window !== 'undefined') {
+    const h = window.location.hostname;
+    const rel = (API_BASE_URL || '/api').trim();
+    if (rel.startsWith('/') && (h === 'printcrm.vercel.app' || h.endsWith('.vercel.app'))) {
+      return VERCEL_REWRITE_API_BASE.replace(/\/$/, '');
+    }
+  }
   return null;
 }
 
