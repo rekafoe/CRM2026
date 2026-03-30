@@ -775,8 +775,11 @@ export class OrderService {
     await db.run('BEGIN')
     try {
       // Узнаем источник заказа (для онлайн/телеграм делаем мягкую отмену)
-      const ord = await db.get<{ source?: string; status?: number; created_date?: string; number?: string }>(
-        'SELECT source, status, number, COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
+      const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
+      const ord = await db.get<{ source?: string; status?: number; created_date?: string; number?: string; userId?: number | null; is_cancelled?: number }>(
+        hasIsCancelled
+          ? 'SELECT source, status, number, userId, is_cancelled, COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?'
+          : 'SELECT source, status, number, userId, COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
         [id]
       )
       if (!ord) {
@@ -784,8 +787,11 @@ export class OrderService {
         throw new Error('Заказ не найден')
       }
 
-      // Если онлайн/телеграм — не удаляем, а переводим в пул: статус 0, снимаем привязку и ставим is_cancelled=1
-      if (ord && (ord.source === 'website' || ord.source === 'telegram')) {
+      // Если онлайн/телеграм и заказ ещё не в пуле — мягко отменяем.
+      // Если уже в пуле (status=0, userId=NULL), удаляем полностью, чтобы он исчезал из отчётов.
+      const isWebsiteLike = ord && (ord.source === 'website' || ord.source === 'telegram')
+      const isAlreadyInPool = Number(ord?.status ?? -1) === 0 && (ord?.userId == null)
+      if (isWebsiteLike && !isAlreadyInPool) {
         await this.recordCancellationEvent(db, {
           orderId: id,
           orderNumber: ord?.number ?? null,
@@ -795,7 +801,11 @@ export class OrderService {
           reason: reasonText,
           userId
         })
-        await db.run('UPDATE orders SET status = 0, userId = NULL, is_cancelled = 1, updatedAt = datetime("now") WHERE id = ?', [id])
+        if (hasIsCancelled) {
+          await db.run('UPDATE orders SET status = 0, userId = NULL, is_cancelled = 1, updatedAt = datetime("now") WHERE id = ?', [id])
+        } else {
+          await db.run('UPDATE orders SET status = 0, userId = NULL, updatedAt = datetime("now") WHERE id = ?', [id])
+        }
         await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
         await db.run('COMMIT')
         if (ord?.created_date) {
