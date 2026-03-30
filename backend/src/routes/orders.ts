@@ -3,7 +3,7 @@ import { OrderController } from '../modules/orders/controllers/orderController'
 import { OrderItemController } from '../modules/orders/controllers/orderItemController'
 import { asyncHandler, authenticate } from '../middleware'
 import { requireWebsiteOrderApiKey, isWebsiteOrderApiKeyValid } from '../middleware/websiteOrderApiKey'
-import { upload, uploadMemory, saveBufferToOrderFiles, orderFilesDir, uploadsDir, resolveSafeExistingPath, resolveSafeFilePath } from '../config/upload'
+import { upload, uploadMemory, uploadOrderFilesMemory, saveBufferToOrderFiles, orderFilesDir, uploadsDir, resolveSafeExistingPath, resolveSafeFilePath } from '../config/upload'
 import { getDb } from '../config/database'
 import { PDFReportService } from '../services/pdfReportService'
 import { hasColumn } from '../utils/tableSchemaCache'
@@ -104,10 +104,10 @@ router.post('/from-website', requireWebsiteOrderApiKey, asyncHandler(OrderContro
 
 // Создание заказа с сайта + файлы в одном запросе (multipart/form-data; файлы опциональны).
 // Используем uploadMemory + ручная запись буфера, чтобы файлы не сохранялись как 0 КБ.
-router.post('/from-website/with-files', requireWebsiteOrderApiKey, uploadMemory.array('file', 20), asyncHandler(OrderController.createOrderFromWebsiteWithFiles))
+router.post('/from-website/with-files', requireWebsiteOrderApiKey, uploadOrderFilesMemory.any(), asyncHandler(OrderController.createOrderFromWebsiteWithFiles))
 
 // Загрузка файлов к заказу с сайта (тот же API-ключ; только заказы с source=website)
-router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, uploadMemory.single('file'), asyncHandler(async (req, res) => {
+router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, uploadOrderFilesMemory.single('file'), asyncHandler(async (req, res) => {
   const orderId = Number(req.params.orderId)
   const f = (req as any).file as { buffer?: Buffer; originalname?: string; mimetype?: string } | undefined
   if (!f) {
@@ -152,7 +152,7 @@ router.post('/:id/files', (req, res, next) => {
     return next()
   }
   return authenticate(req, res, next)
-}, uploadMemory.single('file'), asyncHandler(async (req, res) => {
+}, uploadOrderFilesMemory.single('file'), asyncHandler(async (req, res) => {
   const orderId = Number(req.params.id)
   const f = (req as any).file as { buffer?: Buffer; originalname?: string; mimetype?: string } | undefined
   if (!f) { res.status(400).json({ message: 'Файл не получен' }); return }

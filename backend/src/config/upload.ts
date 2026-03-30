@@ -15,6 +15,7 @@ export const orderFilesDir = path.join(uploadsDir, 'orders')
 
 const MAX_UPLOAD_FILE_SIZE_BYTES = Number(process.env.UPLOAD_MAX_FILE_SIZE_BYTES || 25 * 1024 * 1024)
 const MAX_UPLOAD_FIELDS = Number(process.env.UPLOAD_MAX_FIELDS || 50)
+const MAX_UPLOAD_FILES = Number(process.env.UPLOAD_MAX_FILES || 20)
 const SAFE_STORED_FILENAME_RE = /^[a-zA-Z0-9._-]+$/
 const allowedUploadMimes = new Set([
   'image/jpeg',
@@ -59,6 +60,7 @@ const multerCommonOptions = {
   limits: {
     fileSize: MAX_UPLOAD_FILE_SIZE_BYTES,
     fields: MAX_UPLOAD_FIELDS,
+    files: MAX_UPLOAD_FILES,
   },
   fileFilter: defaultFileFilter,
 }
@@ -67,6 +69,20 @@ export const upload = multer({ storage, ...multerCommonOptions })
 
 /** Multer в памяти — тело не пишется на диск до явной записи. Исправляет случай, когда файлы сохранялись 0 КБ (stream уже прочитан до multer). */
 export const uploadMemory = multer({ storage: multer.memoryStorage(), ...multerCommonOptions })
+
+/**
+ * Загрузка файлов макетов заказа (website/CRM):
+ * - сохраняем лимиты размера/кол-ва файлов
+ * - не применяем жесткий MIME/extension фильтр, чтобы не ломать реальные клиентские форматы
+ */
+export const uploadOrderFilesMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: MAX_UPLOAD_FILE_SIZE_BYTES,
+    fields: MAX_UPLOAD_FIELDS,
+    files: MAX_UPLOAD_FILES,
+  },
+})
 
 export function isSafeStoredFilename(filename: string): boolean {
   if (!filename) return false
