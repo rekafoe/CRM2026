@@ -41,8 +41,5 @@
   "bugs": {
     "url": "https://github.com/username/crm-system/issues"
   },
-  "homepage": "https://github.com/username/crm-system#readme",
-  "dependencies": {
-    "sqlite3": "^5.1.7"
-  }
+  "homepage": "https://github.com/username/crm-system#readme"
 }
