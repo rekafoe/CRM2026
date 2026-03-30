@@ -1768,7 +1768,7 @@ export class SimplifiedPricingService {
       return a.max_qty - b.max_qty;
     });
     
-    logger.info('findTierForQuantity: поиск диапазона', {
+    logger.debug('findTierForQuantity: поиск диапазона', {
       quantity,
       tiersCount: sortedTiers.length,
       tiers: sortedTiers.map(t => ({ min_qty: t.min_qty, max_qty: t.max_qty, unit_price: t.unit_price }))
@@ -1777,7 +1777,7 @@ export class SimplifiedPricingService {
     for (const tier of sortedTiers) {
       if (quantity >= tier.min_qty) {
         if (tier.max_qty === undefined || quantity <= tier.max_qty) {
-          logger.info('findTierForQuantity: найден диапазон', {
+          logger.debug('findTierForQuantity: найден диапазон', {
             quantity,
             tier: { min_qty: tier.min_qty, max_qty: tier.max_qty, unit_price: tier.unit_price }
           });

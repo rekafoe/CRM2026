@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Product } from '../../../services/products';
 import { calculatePrice as unifiedCalculatePrice } from '../../../services/pricing';
 import { parseFormatToTrimSize } from '../../../utils/formatUtils';
@@ -110,6 +110,7 @@ export function useCalculatorPricingActions({
   const [appliedDiscount, setAppliedDiscount] = useState<any>(null);
   const [userInteracted, setUserInteracted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const calcRequestSeqRef = useRef(0);
 
   const calculatePriceViaBackend = useCallback(
     async (productId: number, configuration: any, quantity: number): Promise<any> => {
@@ -148,6 +149,7 @@ export function useCalculatorPricingActions({
 
       setError(null);
 
+      let requestSeq: number | null = null;
       try {
         if (!selectedProduct?.id) {
           throw new Error('Необходимо выбрать продукт из базы данных для расчета цены');
@@ -406,11 +408,16 @@ export function useCalculatorPricingActions({
           logger.info('ℹ️ Продукт без печати — расчёт без параметров печати', { productId: selectedProduct.id });
         }
 
+        requestSeq = ++calcRequestSeqRef.current;
         const pricingResult = await calculatePriceViaBackend(
           selectedProduct.id,
           configuration,
           specs.quantity,
         );
+
+        if (requestSeq !== calcRequestSeqRef.current) {
+          return;
+        }
 
         const backendResult: any = pricingResult;
         
@@ -978,6 +985,9 @@ export function useCalculatorPricingActions({
           toast.success('Расчет выполнен успешно!');
         }
       } catch (err: any) {
+        if (requestSeq != null && requestSeq !== calcRequestSeqRef.current) {
+          return;
+        }
         // Извлекаем сообщение об ошибке из ответа бэкенда
         let errorMessage = 'Неизвестная ошибка расчета';
         
@@ -1054,18 +1064,6 @@ export function useCalculatorPricingActions({
       validationErrors,
     ],
   );
-
-  useEffect(() => {
-    if (!userInteracted) return;
-    if (!isValid || specs.quantity <= 0) return;
-    if (Object.keys(validationErrors).length > 0) return;
-
-    const timeoutId = setTimeout(() => {
-      void calculateCost(false);
-    }, 120);
-
-    return () => clearTimeout(timeoutId);
-  }, [userInteracted, specs, isValid, validationErrors, calculateCost]);
 
   return {
     result,

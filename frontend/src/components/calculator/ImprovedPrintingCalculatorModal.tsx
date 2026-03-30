@@ -509,7 +509,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     onCalculate: calculateCost,
     debounceMs: 500,
     customFormat, // ✅ Передаем кастомный формат для отслеживания изменений
-    isCustomFormat // ✅ Передаем флаг кастомного формата
+    isCustomFormat, // ✅ Передаем флаг кастомного формата
+    printTechnology,
+    printColorMode,
   });
 
   // 🆕 При смене продукта сбрасываем завязанные на схему поля упрощенного продукта,
@@ -567,57 +569,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     setPrintColorMode(null);
   }, [selectedProduct?.id, editContext]);
 
-  // 🆕 Автопересчет при изменении параметров печати
-  // Параметры печати передаются в configuration при расчете,
-  // поэтому useAutoCalculate не отслеживает их изменения напрямую
-  // Нужен отдельный useEffect для пересчета при изменении параметров печати
-  const prevPrintTechRef = useRef<string>('');
-  const prevPrintColorRef = useRef<'bw' | 'color' | null>(null);
-  const isFirstRenderRef = useRef(true);
-  const calculationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  useEffect(() => {
-    // Пропускаем первый рендер
-    if (isFirstRenderRef.current) {
-      isFirstRenderRef.current = false;
-      prevPrintTechRef.current = printTechnology;
-      prevPrintColorRef.current = printColorMode;
-      return;
-    }
-    
-    // Проверяем, действительно ли изменились параметры печати
-    const techChanged = prevPrintTechRef.current !== printTechnology;
-    const colorChanged = prevPrintColorRef.current !== printColorMode;
-    
-    if (!techChanged && !colorChanged) {
-      return; // Параметры не изменились, не пересчитываем
-    }
-    
-    // Обновляем refs
-    prevPrintTechRef.current = printTechnology;
-    prevPrintColorRef.current = printColorMode;
-    
-    // Отменяем предыдущий таймаут, если был
-    if (calculationTimeoutRef.current) {
-      clearTimeout(calculationTimeoutRef.current);
-    }
-    
-    // Вызываем расчет только если все условия выполнены (включая режим редактирования)
-    if ((userInteracted || !!editContext?.item) && selectedProduct?.id != null && isValid && !isCustomProduct) {
-      // Debounce для избежания множественных вызовов
-      calculationTimeoutRef.current = setTimeout(() => {
-        instantCalculate();
-        calculationTimeoutRef.current = null;
-      }, 300);
-    }
-    
-    return () => {
-      if (calculationTimeoutRef.current) {
-        clearTimeout(calculationTimeoutRef.current);
-        calculationTimeoutRef.current = null;
-      }
-    };
-  }, [printTechnology, printColorMode, userInteracted, editContext?.item, selectedProduct?.id, isValid, instantCalculate, isCustomProduct]);
+  // Параметры печати учтены в ключе useAutoCalculate (printTechnology / printColorMode) — отдельный эффект не нужен
 
   // Автопересчёт при установке/смене material_id или при смене подтипа (typeId).
   // material_id выставляется асинхронно MaterialsSection после загрузки материалов,
@@ -640,10 +592,11 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
     prevCalcTriggerRef.current = current;
 
-    if ((materialChanged || typeChanged) && isValid) {
+    // При userInteracted или редактировании пересчёт уже даёт useAutoCalculate по изменению specs
+    if ((materialChanged || typeChanged) && isValid && !userInteracted && !editContext?.item) {
       void calculateCost(false);
     }
-  }, [specs.material_id, specs.typeId, specs.size_id, selectedProduct?.id, isValid, calculateCost, isCustomProduct, isPostprintProduct]);
+  }, [specs.material_id, specs.typeId, specs.size_id, selectedProduct?.id, isValid, calculateCost, isCustomProduct, isPostprintProduct, userInteracted, editContext?.item]);
 
   const editModeCalculatedRef = useRef(false);
   useEffect(() => {

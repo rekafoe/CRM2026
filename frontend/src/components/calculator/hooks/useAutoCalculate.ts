@@ -51,6 +51,9 @@ interface UseAutoCalculateParams {
   debounceMs?: number;
   customFormat?: { width: string; height: string };
   isCustomFormat?: boolean;
+  /** Параметры печати не входят в specs — включаем в ключ, чтобы пересчёт шёл при смене техники/цвета */
+  printTechnology?: string;
+  printColorMode?: 'bw' | 'color' | null;
 }
 
 export function useAutoCalculate({
@@ -61,7 +64,9 @@ export function useAutoCalculate({
   onCalculate,
   debounceMs = 500,
   customFormat,
-  isCustomFormat
+  isCustomFormat,
+  printTechnology,
+  printColorMode,
 }: UseAutoCalculateParams) {
   const isFirstRender = useRef(true);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,7 +80,11 @@ export function useAutoCalculate({
   }, [specs]);
   
   // Создаем стабильный ключ из specs, включая кастомный формат
-  const specsKey = useMemo(() => getSpecsKey(specs, customFormat, isCustomFormat), [specs, customFormat, isCustomFormat]);
+  const specsKey = useMemo(
+    () =>
+      `${getSpecsKey(specs, customFormat, isCustomFormat)}|print:${printTechnology ?? ''}|color:${printColorMode ?? ''}`,
+    [specs, customFormat, isCustomFormat, printTechnology, printColorMode],
+  );
   
   // Ref для стабильной ссылки на onCalculate и других зависимостей
   const onCalculateRef = useRef(onCalculate);
