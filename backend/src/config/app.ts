@@ -13,9 +13,35 @@ function parseCorsOrigin(): string[] {
     .filter(Boolean);
 }
 
+/** Vercel CRM (и preview *.vercel.app) — прямой fetch на Railway для multipart upload */
+const VERCEL_APP_ORIGIN_RE = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i
+
 /** Список разрешённых Origin для CORS */
 export function getCorsAllowedOrigins(): string[] {
   return parseCorsOrigin();
+}
+
+/**
+ * Динамический origin для cors(): env + любой https://*.vercel.app (иначе preflight fetch с printcrm → Railway падает).
+ */
+export function corsDynamicOrigin(
+  origin: string | undefined,
+  callback: (err: Error | null, allow?: boolean) => void
+): void {
+  const allowed = getCorsAllowedOrigins()
+  if (!origin) {
+    callback(null, true)
+    return
+  }
+  if (allowed.includes(origin)) {
+    callback(null, true)
+    return
+  }
+  if (VERCEL_APP_ORIGIN_RE.test(origin)) {
+    callback(null, true)
+    return
+  }
+  callback(null, false)
 }
 
 export const config = {

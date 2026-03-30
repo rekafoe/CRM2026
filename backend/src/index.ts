@@ -3,7 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import swaggerUi from 'swagger-ui-express'
 import { initDB } from './config/database'
-import { config, getCorsAllowedOrigins } from './config/app'
+import { config, corsDynamicOrigin, getCorsAllowedOrigins } from './config/app'
 import { uploadsDir } from './config/upload'
 import { authMiddleware, errorHandler, asyncHandler } from './middleware'
 import { uploadsApiKeyMiddleware } from './middleware/uploadsApiKey'
@@ -54,7 +54,7 @@ const corsAllowed = getCorsAllowedOrigins()
 logger.info('CORS allowed origins', { origins: corsAllowed })
 app.use(
   cors({
-    origin: corsAllowed,
+    origin: corsDynamicOrigin,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'Accept'],
     optionsSuccessStatus: 204,
