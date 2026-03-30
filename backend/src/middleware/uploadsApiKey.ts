@@ -10,6 +10,9 @@ import { isWebsiteOrderApiKeyValid } from './websiteOrderApiKey'
 
 const API_KEY_QUERY = 'api_key'
 
+/** Файлы в корне uploads (маркетинг: продукты, категории, подтипы). <img src> не шлёт заголовки с ключом. */
+const PUBLIC_IMAGE_FILE = /\.(png|jpe?g|gif|webp|svg|avif|ico)$/i
+
 export async function uploadsApiKeyMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   const isProduction = process.env.NODE_ENV === 'production'
   const allowQueryApiKey = process.env.UPLOADS_ALLOW_QUERY_API_KEY === 'true' || process.env.UPLOADS_ALLOW_QUERY_API_KEY === '1'
@@ -17,6 +20,15 @@ export async function uploadsApiKeyMiddleware(req: Request, res: Response, next:
   // UPLOADS_PUBLIC=true — картинки доступны всем (сайт, img src без ключа)
   if (process.env.UPLOADS_PUBLIC === 'true' || process.env.UPLOADS_PUBLIC === '1') {
     return next()
+  }
+
+  // Публичное чтение изображений по GET/HEAD: иначе внешний сайт не может показать картинки подтипов (401 без ключа).
+  // Каталог orders/ отсекается в index.ts (blockOrdersPath) до static — сюда не попадает.
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    const rel = (req.path || '').replace(/^\/+/, '')
+    if (rel && PUBLIC_IMAGE_FILE.test(rel)) {
+      return next()
+    }
   }
   const envKey = process.env.WEBSITE_ORDER_API_KEY || ''
   // Fail-closed для production: без ключа доступ к uploads запрещен

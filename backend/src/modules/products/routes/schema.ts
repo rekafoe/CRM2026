@@ -5,6 +5,7 @@ import { getTableColumns } from '../../../utils/tableSchemaCache';
 import {
   normalizeConfigDataForPersistence,
   normalizeSimplifiedTypeIds,
+  sortSimplifiedTypesStable,
   compactSimplifiedForSite,
   collectMaterialIdsFromSimplified,
   collectServiceIdsFromSimplified,
@@ -398,7 +399,9 @@ router.get('/:productId/schema', async (req, res) => {
       logger.warn('Failed to load product operations', { productId, error });
     }
 
-    const normalizedSimplified = normalizeSimplifiedTypeIds(templateConfigData?.simplified);
+    const normalizedSimplified = sortSimplifiedTypesStable(
+      normalizeSimplifiedTypeIds(templateConfigData?.simplified),
+    );
 
     // Для simplified с typeConfigs: подгружаем материалы из allowed_material_ids с density и paper_type_name.
     // Иначе на фронте приходят тип материала, но не плотности (подтип «Дизайнерские открытки» и др.).
@@ -461,7 +464,12 @@ router.get('/:productId/schema', async (req, res) => {
     };
 
     if (isCompact) {
-      const compactSimplified = compactSimplifiedForSite(schema.template.simplified);
+      const forwardedProto = (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim();
+      const protocol = forwardedProto || req.protocol || 'https';
+      const host = req.get('host') || '';
+      const originFromEnv = process.env.PUBLIC_API_BASE_URL?.trim();
+      const publicOrigin = originFromEnv || (host ? `${protocol}://${host}` : undefined);
+      const compactSimplified = compactSimplifiedForSite(schema.template.simplified, { publicOrigin });
       const materialIds = collectMaterialIdsFromSimplified(schema.template.simplified);
       let compactMaterials: Array<{ id: number; name: string; density?: number; paper_type_name?: string; unit?: string }> = [];
       if (materialIds.length > 0) {

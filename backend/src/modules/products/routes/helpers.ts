@@ -254,9 +254,63 @@ function compactFinishingItem(f: any) {
   };
 }
 
+export type CompactSimplifiedForSiteOptions = {
+  /**
+   * Origin API (например https://api.example.com), без завершающего /.
+   * Нужен, чтобы относительные image_url (/api/uploads/...) работали на внешнем сайте с другим доменом.
+   */
+  publicOrigin?: string;
+};
+
+/**
+ * Стабильный порядок подтипов (по id, затем по имени).
+ * Без этого порядок массива types в JSON мог не совпадать с порядком при перезагрузке,
+ * а на сайте с key={index} картинки «перепрыгивали» между карточками.
+ */
+export function sortSimplifiedTypesStable(simplified: any): any {
+  if (!simplified || !Array.isArray(simplified.types) || simplified.types.length === 0) return simplified;
+  const types = [...simplified.types].sort((a: any, b: any) => {
+    const ai = Number(a?.id);
+    const bi = Number(b?.id);
+    const aNum = Number.isFinite(ai);
+    const bNum = Number.isFinite(bi);
+    if (aNum && bNum && ai !== bi) return ai - bi;
+    if (aNum && !bNum) return -1;
+    if (!aNum && bNum) return 1;
+    return String(a?.name ?? '').localeCompare(String(b?.name ?? ''), 'ru');
+  });
+  return { ...simplified, types };
+}
+
+/** Относительный URL загрузки → абсолютный для каталога на другом origin. */
+export function absolutizeMediaUrl(url: string | null | undefined, publicOrigin?: string): string | undefined {
+  if (url == null || typeof url !== 'string') return undefined;
+  const u = url.trim();
+  if (!u) return undefined;
+  if (/^https?:\/\//i.test(u)) return u;
+  const origin = publicOrigin?.replace(/\/$/, '');
+  if (!origin) return u;
+  if (u.startsWith('/')) return `${origin}${u}`;
+  return `${origin}/${u}`;
+}
+
 /** Строит компактный simplified для сайта: без тиражных прайсов и тяжёлых блоков. */
-export function compactSimplifiedForSite(simplified: any) {
+export function compactSimplifiedForSite(simplified: any, options?: CompactSimplifiedForSiteOptions) {
   if (!simplified || typeof simplified !== 'object') return null;
+  const publicOrigin = options?.publicOrigin;
+  const simplifiedOrdered = sortSimplifiedTypesStable(simplified) ?? simplified;
+
+  let globalMinUnit: number | null = null;
+  if (Array.isArray(simplifiedOrdered.sizes) && simplifiedOrdered.sizes.length > 0) {
+    const p = minUnitPriceForSizes(simplifiedOrdered.sizes);
+    if (p != null) globalMinUnit = p;
+  }
+  if (simplifiedOrdered.typeConfigs && typeof simplifiedOrdered.typeConfigs === 'object') {
+    for (const cfg of Object.values(simplifiedOrdered.typeConfigs) as any[]) {
+      const p = cfg?.sizes ? minUnitPriceForSizes(cfg.sizes) : null;
+      if (p != null && (globalMinUnit === null || p < globalMinUnit)) globalMinUnit = p;
+    }
+  }
 
   const compactSize = (size: any) => {
     const base: Record<string, any> = {
@@ -289,9 +343,12 @@ export function compactSimplifiedForSite(simplified: any) {
     return base;
   };
 
-  const compactTypes = Array.isArray(simplified.types)
-    ? simplified.types.map((t: any) => {
-        const cfg = simplified.typeConfigs?.[String(t?.id)];
+  const compactTypes = Array.isArray(simplifiedOrdered.types)
+    ? simplifiedOrdered.types.map((t: any) => {
+        const cfg = simplifiedOrdered.typeConfigs?.[String(t?.id)];
+        let minPrice = cfg?.sizes ? minUnitPriceForSizes(cfg.sizes) : null;
+        if (minPrice == null && globalMinUnit != null) minPrice = globalMinUnit;
+        const rawImg = t?.image_url;
         return {
           id: t?.id,
           name: t?.name,
@@ -300,21 +357,21 @@ export function compactSimplifiedForSite(simplified: any) {
           fullDescription: t?.fullDescription,
           characteristics: Array.isArray(t?.characteristics) ? t.characteristics : undefined,
           advantages: Array.isArray(t?.advantages) ? t.advantages : undefined,
-          image_url: t?.image_url || undefined,
-          min_unit_price: cfg?.sizes ? minUnitPriceForSizes(cfg.sizes) : null,
+          image_url: absolutizeMediaUrl(rawImg, publicOrigin) ?? undefined,
+          min_unit_price: minPrice,
         };
       })
     : undefined;
 
   const compactTypeConfigs =
-    simplified.typeConfigs && typeof simplified.typeConfigs === 'object'
+    simplifiedOrdered.typeConfigs && typeof simplifiedOrdered.typeConfigs === 'object'
       ? Object.fromEntries(
-          Object.entries(simplified.typeConfigs).map(([key, cfg]: [string, any]) => [
+          Object.entries(simplifiedOrdered.typeConfigs).map(([key, cfg]: [string, any]) => [
             key,
             {
               sizes: Array.isArray(cfg?.sizes) ? cfg.sizes.map(compactSize) : [],
               ...(Array.isArray(cfg?.common_allowed_material_ids) ? { common_allowed_material_ids: cfg.common_allowed_material_ids } : {}),
-              pages: cfg?.pages || simplified.pages || null,
+              pages: cfg?.pages || simplifiedOrdered.pages || null,
               initial: cfg?.initial || undefined,
             },
           ])
@@ -322,11 +379,11 @@ export function compactSimplifiedForSite(simplified: any) {
       : undefined;
 
   return {
-    use_layout: simplified.use_layout,
-    cutting: simplified.cutting,
-    pages: simplified.pages || null,
-    multiPageStructure: simplified.multiPageStructure || null,
-    sizes: Array.isArray(simplified.sizes) ? simplified.sizes.map(compactSize) : [],
+    use_layout: simplifiedOrdered.use_layout,
+    cutting: simplifiedOrdered.cutting,
+    pages: simplifiedOrdered.pages || null,
+    multiPageStructure: simplifiedOrdered.multiPageStructure || null,
+    sizes: Array.isArray(simplifiedOrdered.sizes) ? simplifiedOrdered.sizes.map(compactSize) : [],
     ...(compactTypes ? { types: compactTypes } : {}),
     ...(compactTypeConfigs ? { typeConfigs: compactTypeConfigs } : {}),
   };
