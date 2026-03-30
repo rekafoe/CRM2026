@@ -214,6 +214,7 @@ router.get('/category/:categoryId', async (req, res) => {
       ${whereClause}
       ORDER BY p.name
     `, queryParams);
+
     res.json(products);
   } catch (error) {
     logger.error('Error fetching products by category', error);

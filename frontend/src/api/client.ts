@@ -1,49 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../config/constants';
 
-/** Полный URL для пути API (как у axios baseURL + path). */
-function joinApiPath(path: string): string {
-  const base = API_BASE_URL.replace(/\/$/, '');
-  const p = path.startsWith('/') ? path : `/${path}`;
-  if (base.startsWith('http')) return `${base}${p}`;
-  return `${base}${p}`;
-}
-
-/**
- * POST multipart без axios: для FormData браузер сам ставит boundary (и через Vercel rewrite не ломается).
- * Axios с дефолтным JSON Content-Type иногда даёт 400 на multer.
- */
-export async function postFormData<T>(path: string, formData: FormData): Promise<T> {
-  const url = joinApiPath(path);
-  const token = localStorage.getItem('crmToken');
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-  const text = await res.text();
-  if (res.status === 401) {
-    localStorage.removeItem('crmToken');
-    localStorage.removeItem('crmRole');
-    localStorage.removeItem('crmSessionDate');
-    localStorage.removeItem('crmUserId');
-    window.location.href = '/login';
-    throw new Error('Unauthorized');
-  }
-  if (!res.ok) {
-    let errMsg = res.statusText;
-    try {
-      const j = JSON.parse(text) as { error?: string; message?: string };
-      errMsg = j.error || j.message || errMsg;
-    } catch {
-      if (text) errMsg = text.slice(0, 300);
-    }
-    throw new Error(`${res.status}: ${errMsg}`);
-  }
-  const json = text ? JSON.parse(text) : {};
-  return ((json as { data?: T }).data ?? json) as T;
-}
-
 // Создаем базовый HTTP клиент (без дефолтного Content-Type — для JSON axios выставит сам)
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

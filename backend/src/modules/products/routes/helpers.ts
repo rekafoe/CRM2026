@@ -254,14 +254,6 @@ function compactFinishingItem(f: any) {
   };
 }
 
-export type CompactSimplifiedForSiteOptions = {
-  /**
-   * Origin API (например https://api.example.com), без завершающего /.
-   * Нужен, чтобы относительные image_url (/api/uploads/...) работали на внешнем сайте с другим доменом.
-   */
-  publicOrigin?: string;
-};
-
 /**
  * Стабильный порядок подтипов (по id, затем по имени).
  * Без этого порядок массива types в JSON мог не совпадать с порядком при перезагрузке,
@@ -282,22 +274,10 @@ export function sortSimplifiedTypesStable(simplified: any): any {
   return { ...simplified, types };
 }
 
-/** Относительный URL загрузки → абсолютный для каталога на другом origin. */
-export function absolutizeMediaUrl(url: string | null | undefined, publicOrigin?: string): string | undefined {
-  if (url == null || typeof url !== 'string') return undefined;
-  const u = url.trim();
-  if (!u) return undefined;
-  if (/^https?:\/\//i.test(u)) return u;
-  const origin = publicOrigin?.replace(/\/$/, '');
-  if (!origin) return u;
-  if (u.startsWith('/')) return `${origin}${u}`;
-  return `${origin}/${u}`;
-}
-
-/** Строит компактный simplified для сайта: без тиражных прайсов и тяжёлых блоков. */
-export function compactSimplifiedForSite(simplified: any, options?: CompactSimplifiedForSiteOptions) {
+/** Строит компактный simplified для сайта: без тиражных прайсов и тяжёлых блоков.
+ *  image_url подтипов — как в БД (обычно /api/uploads/...), чтобы прокси printcore.by подставлял свой префикс. */
+export function compactSimplifiedForSite(simplified: any) {
   if (!simplified || typeof simplified !== 'object') return null;
-  const publicOrigin = options?.publicOrigin;
   const simplifiedOrdered = sortSimplifiedTypesStable(simplified) ?? simplified;
 
   let globalMinUnit: number | null = null;
@@ -357,7 +337,8 @@ export function compactSimplifiedForSite(simplified: any, options?: CompactSimpl
           fullDescription: t?.fullDescription,
           characteristics: Array.isArray(t?.characteristics) ? t.characteristics : undefined,
           advantages: Array.isArray(t?.advantages) ? t.advantages : undefined,
-          image_url: absolutizeMediaUrl(rawImg, publicOrigin) ?? undefined,
+          image_url:
+            typeof rawImg === 'string' && rawImg.trim() ? rawImg.trim() : undefined,
           min_unit_price: minPrice,
         };
       })

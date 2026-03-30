@@ -464,12 +464,7 @@ router.get('/:productId/schema', async (req, res) => {
     };
 
     if (isCompact) {
-      const forwardedProto = (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0]?.trim();
-      const protocol = forwardedProto || req.protocol || 'https';
-      const host = req.get('host') || '';
-      const originFromEnv = process.env.PUBLIC_API_BASE_URL?.trim();
-      const publicOrigin = originFromEnv || (host ? `${protocol}://${host}` : undefined);
-      const compactSimplified = compactSimplifiedForSite(schema.template.simplified, { publicOrigin });
+      const compactSimplified = compactSimplifiedForSite(schema.template.simplified);
       const materialIds = collectMaterialIdsFromSimplified(schema.template.simplified);
       let compactMaterials: Array<{ id: number; name: string; density?: number; paper_type_name?: string; unit?: string }> = [];
       if (materialIds.length > 0) {
