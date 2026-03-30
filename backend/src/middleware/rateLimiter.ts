@@ -39,6 +39,10 @@ class RateLimiter {
     } = options
 
     return (req: Request, res: Response, next: NextFunction) => {
+      // CORS preflight не должен учитываться в лимите: иначе 429 без CORS-заголовков ломает браузер
+      if (req.method === 'OPTIONS') {
+        return next()
+      }
       const bearerToken = this.extractBearerToken(req)
       const isAuthenticatedRequest = Boolean(bearerToken)
       const effectiveMax = isAuthenticatedRequest && Number.isFinite(Number(maxAuthenticated))

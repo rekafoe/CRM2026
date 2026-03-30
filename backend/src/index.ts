@@ -3,7 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import swaggerUi from 'swagger-ui-express'
 import { initDB } from './config/database'
-import { config } from './config/app'
+import { config, getCorsAllowedOrigins } from './config/app'
 import { uploadsDir } from './config/upload'
 import { authMiddleware, errorHandler, asyncHandler } from './middleware'
 import { uploadsApiKeyMiddleware } from './middleware/uploadsApiKey'
@@ -49,8 +49,17 @@ function assertProductionSecurityEnv(): void {
 app.set('trust proxy', 1)
 app.use(generalRateLimit)
 
-// Middleware: CORS — несколько origin через запятую в CORS_ORIGIN (напр. CRM фронт + printcore.by)
-app.use(cors({ origin: config.corsOrigin }))
+// CORS: список origin из CORS_ORIGIN (несколько через запятую). На Railway должен совпадать с URL фронта (напр. https://mirfotocrm.vercel.app).
+const corsAllowed = getCorsAllowedOrigins()
+logger.info('CORS allowed origins', { origins: corsAllowed })
+app.use(
+  cors({
+    origin: corsAllowed,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'Accept'],
+    optionsSuccessStatus: 204,
+  })
+)
 
 // Swagger JSON endpoint (ДО compressionMiddleware)
 // Отдаём спецификацию с server URL из запроса, чтобы «Try it out» шёл к API, а не к /api-docs/

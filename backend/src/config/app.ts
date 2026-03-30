@@ -1,14 +1,21 @@
-function parseCorsOrigin(): string | string[] {
+function parseCorsOrigin(): string[] {
   const raw = process.env.CORS_ORIGIN;
   if (!raw) {
-    return process.env.NODE_ENV === 'production'
-      ? 'https://your-domain.com'
-      : 'http://localhost:5173';
+    const fallback =
+      process.env.NODE_ENV === 'production'
+        ? 'https://your-domain.com'
+        : 'http://localhost:5173';
+    return [fallback];
   }
-  if (raw.includes(',')) {
-    return raw.split(',').map((s) => s.trim()).filter(Boolean);
-  }
-  return raw.trim();
+  return raw
+    .split(/[,\n;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Список разрешённых Origin для CORS */
+export function getCorsAllowedOrigins(): string[] {
+  return parseCorsOrigin();
 }
 
 export const config = {
