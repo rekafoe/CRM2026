@@ -10,6 +10,23 @@ export const apiClient = axios.create({
   },
 });
 
+// FormData: убираем Content-Type, чтобы браузер/axios выставили multipart с boundary.
+// Иначе остаётся application/json из defaults — multer не видит файл (400).
+apiClient.interceptors.request.use(
+  (config) => {
+    if (config.data instanceof FormData) {
+      const h = config.headers;
+      if (h && typeof (h as any).delete === 'function') {
+        (h as any).delete('Content-Type');
+      } else if (h) {
+        delete (h as Record<string, unknown>)['Content-Type'];
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // Интерцептор для добавления токена авторизации
 apiClient.interceptors.request.use(
   (config) => {

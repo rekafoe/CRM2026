@@ -8,6 +8,19 @@ const api = axios.create({ baseURL: API_BASE_URL });
 // 🆕 Экспортируем api для использования в других компонентах
 export { api };
 
+// FormData: не фиксировать Content-Type — нужен boundary (см. api/client.ts)
+api.interceptors.request.use((config) => {
+  if (config.data instanceof FormData) {
+    const h = config.headers;
+    if (h && typeof (h as any).delete === 'function') {
+      (h as any).delete('Content-Type');
+    } else if (h) {
+      delete (h as Record<string, unknown>)['Content-Type'];
+    }
+  }
+  return config;
+});
+
 // Attach auth token from localStorage for protected endpoints
 api.interceptors.request.use((config) => {
   try {

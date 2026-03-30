@@ -238,9 +238,7 @@ export async function uploadProductImage(
   const formData = new FormData();
   formData.append('image', file);
   if (subtypeName) formData.append('subtypeName', subtypeName);
-  const response = await apiClient.post('/products/upload-image', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const response = await apiClient.post('/products/upload-image', formData);
   return (response.data as any)?.data || response.data;
 }
 
