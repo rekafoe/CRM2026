@@ -10,6 +10,7 @@ import { hasColumn } from '../utils/tableSchemaCache'
 import { getLastWebsiteOrderAt } from '../utils/poolSync'
 import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 import { runPreflight, parseTargetFormatFromParams } from '../services/preflightService'
+import { OrderService } from '../modules/orders/services/orderService'
 
 const router = Router()
 
@@ -335,6 +336,7 @@ router.put('/:id/discount', asyncHandler(OrderController.updateOrderDiscount))
 router.put('/:id/payment-channel', asyncHandler(OrderController.updateOrderPaymentChannel))
 router.put('/:id/notes', asyncHandler(OrderController.updateOrderNotes))
 router.put('/:id/assignees', asyncHandler(OrderController.updateOrderAssignees))
+router.get('/:id/activity', asyncHandler(OrderController.getOrderActivity))
 router.delete('/:id', asyncHandler(OrderController.deleteOrder))
 router.post('/:id/duplicate', asyncHandler(OrderController.duplicateOrder))
 router.post('/:id/cancel-online', asyncHandler(OrderController.cancelOnline))
@@ -445,44 +447,24 @@ router.patch('/:orderId/items/:itemId', asyncHandler(OrderItemController.updateI
 router.post('/reassign/:number', asyncHandler(async (req, res) => {
   const param = req.params.number;
   const { userId } = req.body;
+  const authUser = (req as any).user as { id?: number } | undefined;
   
   if (!userId) {
     res.status(400).json({ message: 'userId is required' });
     return;
   }
-
+  const targetUserId = Number(userId);
+  if (!Number.isFinite(targetUserId)) {
+    res.status(400).json({ message: 'userId must be a number' });
+    return;
+  }
+  const result = await OrderService.reassignOrderByNumber(param, targetUserId, authUser?.id);
   const db = await getDb();
-  let order: { id: number; number?: string; status?: number } | undefined;
-
-  const siteOrderMatch = /^site-ord-(\d+)$/i.exec(param);
-  if (siteOrderMatch) {
-    const orderId = parseInt(siteOrderMatch[1], 10);
-    order = await db.get('SELECT id, number, status FROM orders WHERE id = ? AND source = ?', orderId, 'website');
-  }
-  if (!order) {
-    order = await db.get('SELECT id, number, status FROM orders WHERE number = ?', param);
-  }
-  
-  if (!order) {
-    res.status(404).json({ message: 'Order not found' });
-    return;
-  }
-
-  const status = Number(order.status);
-  if (status !== 0 && status !== 1) {
-    res.status(400).json({ message: 'Переназначить заказ можно только при статусе «Ожидает» (0 или 1)' });
-    return;
-  }
-
   const currentDate = new Date().toISOString();
-  let hasResponsible = false;
-  try {
-    hasResponsible = await hasColumn('orders', 'responsible_user_id');
-  } catch { /* ignore */ }
+  await db.run('UPDATE orders SET created_at = ?, updated_at = datetime(\'now\') WHERE id = ?', currentDate, result.id);
+  const hasResponsible = await hasColumn('orders', 'responsible_user_id').catch(() => false);
   if (hasResponsible) {
-    await db.run('UPDATE orders SET userId = ?, responsible_user_id = ?, created_at = ?, updated_at = datetime(\'now\') WHERE id = ?', userId, userId, currentDate, order.id);
-  } else {
-    await db.run('UPDATE orders SET userId = ?, created_at = ? WHERE id = ?', userId, currentDate, order.id);
+    await db.run('UPDATE orders SET responsible_user_id = ?, updated_at = datetime(\'now\') WHERE id = ?', targetUserId, result.id);
   }
   res.json({ success: true, message: 'Order reassigned successfully' });
 }));

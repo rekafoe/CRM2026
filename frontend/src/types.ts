@@ -120,6 +120,26 @@ export interface Order {
   issued_by_me?: boolean | number;
 }
 
+export interface OrderActivityEvent {
+  id: string;
+  order_id: number;
+  event_type: string;
+  message: string;
+  old_value?: string | null;
+  new_value?: string | null;
+  comment?: string | null;
+  user_id?: number | null;
+  user_name?: string | null;
+  created_at: string;
+  meta?: Record<string, unknown> | null;
+}
+
+export interface OrderActivityResponse {
+  order_id: number;
+  notes: string;
+  events: OrderActivityEvent[];
+}
+
 export interface PresetExtra {
   name: string;
   price: number;

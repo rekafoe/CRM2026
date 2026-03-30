@@ -57,6 +57,41 @@ export class OrderService {
     );
   }
 
+  private static async recordOrderActivity(
+    db: any,
+    payload: {
+      orderId: number;
+      eventType: string;
+      message?: string | null;
+      oldValue?: string | null;
+      newValue?: string | null;
+      comment?: string | null;
+      userId?: number | null;
+      meta?: Record<string, unknown> | null;
+    }
+  ) {
+    const exists = await db.get(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='order_activity_events'"
+    );
+    if (!exists) return;
+    const metaJson = payload.meta ? JSON.stringify(payload.meta) : null;
+    await db.run(
+      `INSERT INTO order_activity_events
+      (order_id, event_type, message, old_value, new_value, comment, user_id, meta_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [
+        payload.orderId,
+        payload.eventType,
+        payload.message ?? null,
+        payload.oldValue ?? null,
+        payload.newValue ?? null,
+        payload.comment ?? null,
+        payload.userId ?? null,
+        metaJson,
+      ]
+    );
+  }
+
   private static buildDefaultReadyDate(baseDate?: string) {
     const date = baseDate ? new Date(baseDate) : new Date()
     if (isNaN(date.getTime())) {
@@ -536,9 +571,10 @@ export class OrderService {
   }
 
   /** Обновить контактёра и/или ответственного заказа */
-  static async updateOrderAssignees(id: number, contact_user_id?: number | null, responsible_user_id?: number | null): Promise<Order> {
+  static async updateOrderAssignees(id: number, contact_user_id?: number | null, responsible_user_id?: number | null, actorUserId?: number): Promise<Order> {
     const db = await getDb();
-    const order = await db.get<Order>('SELECT id FROM orders WHERE id = ?', [id]);
+    const existing = await db.get<any>('SELECT id, contact_user_id, responsible_user_id FROM orders WHERE id = ?', [id]);
+    const order = existing as Order | undefined;
     if (!order) {
       throw new Error('Заказ не найден');
     }
@@ -566,13 +602,34 @@ export class OrderService {
       `UPDATE orders SET ${updates.join(', ')}, updated_at = datetime("now") WHERE id = ?`,
       values
     );
+    if (hasContact && contact_user_id !== undefined && Number(existing.contact_user_id ?? 0) !== Number(contact_user_id ?? 0)) {
+      await this.recordOrderActivity(db, {
+        orderId: id,
+        eventType: 'contact_user_changed',
+        message: 'Изменён контактёр заказа',
+        oldValue: existing.contact_user_id != null ? String(existing.contact_user_id) : null,
+        newValue: contact_user_id != null ? String(contact_user_id) : null,
+        userId: actorUserId ?? null,
+      });
+    }
+    if (hasResponsible && responsible_user_id !== undefined && Number(existing.responsible_user_id ?? 0) !== Number(responsible_user_id ?? 0)) {
+      await this.recordOrderActivity(db, {
+        orderId: id,
+        eventType: 'responsible_user_changed',
+        message: 'Изменён ответственный по заказу',
+        oldValue: existing.responsible_user_id != null ? String(existing.responsible_user_id) : null,
+        newValue: responsible_user_id != null ? String(responsible_user_id) : null,
+        userId: actorUserId ?? null,
+      });
+    }
     return OrderService.orderForApi(await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
   }
 
   /** Обновить примечания заказа */
-  static async updateOrderNotes(id: number, notes: string | null): Promise<Order> {
+  static async updateOrderNotes(id: number, notes: string | null, actorUserId?: number): Promise<Order> {
     const db = await getDb();
-    const order = await db.get<Order>('SELECT id FROM orders WHERE id = ?', [id]);
+    const existing = await db.get<any>('SELECT id, notes FROM orders WHERE id = ?', [id]);
+    const order = existing as Order | undefined;
     if (!order) {
       throw new Error('Заказ не найден');
     }
@@ -589,8 +646,142 @@ export class OrderService {
       'UPDATE orders SET notes = ?, updated_at = datetime("now") WHERE id = ?',
       [notes ?? null, id]
     );
+    const oldNotes = typeof existing.notes === 'string' ? existing.notes : '';
+    const newNotes = typeof notes === 'string' ? notes : '';
+    if (oldNotes !== newNotes) {
+      await this.recordOrderActivity(db, {
+        orderId: id,
+        eventType: 'notes_updated',
+        message: 'Обновлены примечания',
+        oldValue: oldNotes.slice(0, 280) || null,
+        newValue: newNotes.slice(0, 280) || null,
+        userId: actorUserId ?? null,
+      });
+    }
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id]);
     return OrderService.orderForApi(updated) as Order;
+  }
+
+  static async getOrderActivity(orderId: number) {
+    const db = await getDb();
+    const order = await db.get<any>(
+      `SELECT id, number, source, userId, notes, COALESCE(createdAt, created_at) as created_at
+       FROM orders WHERE id = ?`,
+      [orderId]
+    );
+    if (!order) {
+      throw new Error('Заказ не найден');
+    }
+
+    const events: Array<{
+      id: string;
+      order_id: number;
+      event_type: string;
+      message: string;
+      old_value?: string | null;
+      new_value?: string | null;
+      comment?: string | null;
+      user_id?: number | null;
+      user_name?: string | null;
+      created_at: string;
+      meta?: Record<string, unknown> | null;
+    }> = [];
+
+    events.push({
+      id: `created-${order.id}`,
+      order_id: order.id,
+      event_type: 'created',
+      message: `Заказ создан (${order.source || 'crm'})`,
+      old_value: null,
+      new_value: null,
+      comment: null,
+      user_id: order.userId ?? null,
+      user_name: null,
+      created_at: String(order.created_at || new Date().toISOString()),
+      meta: { source: order.source ?? 'crm' },
+    });
+
+    const hasActivity = !!(await db.get(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='order_activity_events'"
+    ));
+    if (hasActivity) {
+      const activityRows = await db.all<any>(
+        `SELECT a.id, a.order_id, a.event_type, a.message, a.old_value, a.new_value, a.comment, a.user_id, a.meta_json, a.created_at,
+                COALESCE(u.name, u.email, 'Система') as user_name
+         FROM order_activity_events a
+         LEFT JOIN users u ON u.id = a.user_id
+         WHERE a.order_id = ?
+         ORDER BY a.created_at DESC, a.id DESC`,
+        [orderId]
+      );
+      for (const row of activityRows as any[]) {
+        let meta: Record<string, unknown> | null = null;
+        if (row.meta_json) {
+          try {
+            meta = JSON.parse(row.meta_json);
+          } catch {
+            meta = null;
+          }
+        }
+        events.push({
+          id: `activity-${row.id}`,
+          order_id: Number(row.order_id),
+          event_type: String(row.event_type || 'activity'),
+          message: String(row.message || 'Изменение заказа'),
+          old_value: row.old_value ?? null,
+          new_value: row.new_value ?? null,
+          comment: row.comment ?? null,
+          user_id: row.user_id ?? null,
+          user_name: row.user_name ?? null,
+          created_at: String(row.created_at || ''),
+          meta,
+        });
+      }
+    }
+
+    const hasCancellation = !!(await db.get(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='order_cancellation_events'"
+    ));
+    if (hasCancellation) {
+      const cancellationRows = await db.all<any>(
+        `SELECT e.id, e.order_id, e.event_type, e.reason, e.status_before, e.user_id, e.created_at,
+                COALESCE(u.name, u.email, 'Система') as user_name
+         FROM order_cancellation_events e
+         LEFT JOIN users u ON u.id = e.user_id
+         WHERE e.order_id = ?
+         ORDER BY e.created_at DESC, e.id DESC`,
+        [orderId]
+      );
+      for (const row of cancellationRows as any[]) {
+        const eventType = row.event_type === 'delete' ? 'deleted' : 'cancelled';
+        const message = row.event_type === 'delete' ? 'Заказ удалён' : 'Заказ отменён и перемещён в пул';
+        events.push({
+          id: `cancel-${row.id}`,
+          order_id: Number(row.order_id),
+          event_type: eventType,
+          message,
+          old_value: row.status_before != null ? String(row.status_before) : null,
+          new_value: row.event_type === 'delete' ? 'deleted' : 'status=0',
+          comment: row.reason ?? null,
+          user_id: row.user_id ?? null,
+          user_name: row.user_name ?? null,
+          created_at: String(row.created_at || ''),
+          meta: { event_type: row.event_type },
+        });
+      }
+    }
+
+    events.sort((a, b) => {
+      const at = new Date(a.created_at).getTime();
+      const bt = new Date(b.created_at).getTime();
+      return bt - at;
+    });
+
+    return {
+      order_id: order.id,
+      notes: typeof order.notes === 'string' ? order.notes : '',
+      events,
+    };
   }
 
   /**
@@ -699,16 +890,16 @@ export class OrderService {
   }
 
   // Переназначение заказа по номеру (ORD-XXXX) или site-ord-<id>. Допускаются первый статус (0 или 1).
-  static async reassignOrderByNumber(orderNumber: string, targetUserId: number) {
+  static async reassignOrderByNumber(orderNumber: string, targetUserId: number, actorUserId?: number) {
     const db = await getDb()
     const siteMatch = /^site-ord-(\d+)$/i.exec(orderNumber)
-    let row: { id: number; status: number } | undefined
+    let row: { id: number; status: number; userId?: number | null } | undefined
     if (siteMatch) {
       const orderId = parseInt(siteMatch[1], 10)
-      row = await db.get<{ id: number; status: number }>('SELECT id, status FROM orders WHERE id = ? AND source = ?', [orderId, 'website'])
+      row = await db.get<{ id: number; status: number; userId?: number | null }>('SELECT id, status, userId FROM orders WHERE id = ? AND source = ?', [orderId, 'website'])
     }
     if (!row) {
-      row = await db.get<{ id: number; status: number }>('SELECT id, status FROM orders WHERE number = ?', [orderNumber])
+      row = await db.get<{ id: number; status: number; userId?: number | null }>('SELECT id, status, userId FROM orders WHERE number = ?', [orderNumber])
     }
     if (!row) {
       throw new Error('Заказ не найден')
@@ -717,7 +908,21 @@ export class OrderService {
     if (statusId !== 0 && statusId !== 1) {
       throw new Error('Переназначение доступно только для заказов в статусе «ожидает» (0 или 1)')
     }
+    const previousUserId = row.userId != null && Number.isFinite(Number(row.userId)) ? Number(row.userId) : null
     await db.run('UPDATE orders SET userId = ?, updatedAt = datetime("now") WHERE id = ?', [targetUserId, row.id])
+    await this.recordOrderActivity(db, {
+      orderId: row.id,
+      eventType: 'reassign',
+      message: previousUserId == null ? 'Заказ взяли в работу' : 'Заказ переназначен',
+      oldValue: previousUserId != null ? String(previousUserId) : null,
+      newValue: String(targetUserId),
+      userId: actorUserId ?? null,
+      meta: {
+        previous_user_id: previousUserId,
+        target_user_id: targetUserId,
+        action: previousUserId == null ? 'take' : 'reassign',
+      }
+    })
     return { id: row.id, userId: targetUserId }
   }
 

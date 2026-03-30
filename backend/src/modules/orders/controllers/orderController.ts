@@ -446,12 +446,13 @@ export class OrderController {
   static async updateOrderNotes(req: Request, res: Response) {
     try {
       const id = Number(req.params.id)
+      const authUser = (req as any).user as { id?: number } | undefined
       const { notes } = req.body as { notes?: string | null }
       if (isNaN(id)) {
         res.status(400).json({ error: 'Неверный ID заказа' })
         return
       }
-      const updated = await OrderService.updateOrderNotes(id, notes ?? null)
+      const updated = await OrderService.updateOrderNotes(id, notes ?? null, authUser?.id)
       res.json(updated)
     } catch (error: any) {
       const status = error.message?.includes('не найден') ? 404 : 400
@@ -462,13 +463,29 @@ export class OrderController {
   static async updateOrderAssignees(req: Request, res: Response) {
     try {
       const id = Number(req.params.id)
+      const authUser = (req as any).user as { id?: number } | undefined
       const { contact_user_id, responsible_user_id } = req.body as { contact_user_id?: number | null; responsible_user_id?: number | null }
       if (isNaN(id)) {
         res.status(400).json({ error: 'Неверный ID заказа' })
         return
       }
-      const updated = await OrderService.updateOrderAssignees(id, contact_user_id, responsible_user_id)
+      const updated = await OrderService.updateOrderAssignees(id, contact_user_id, responsible_user_id, authUser?.id)
       res.json(updated)
+    } catch (error: any) {
+      const status = error.message?.includes('не найден') ? 404 : 400
+      res.status(status).json({ error: error.message })
+    }
+  }
+
+  static async getOrderActivity(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id)
+      if (isNaN(id)) {
+        res.status(400).json({ error: 'Неверный ID заказа' })
+        return
+      }
+      const data = await OrderService.getOrderActivity(id)
+      res.json(data)
     } catch (error: any) {
       const status = error.message?.includes('не найден') ? 404 : 400
       res.status(status).json({ error: error.message })

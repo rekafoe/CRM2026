@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { calculatePrice as unifiedCalculatePrice } from './services/pricing';
-import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer, DocumentTemplate, TemplateData } from './types';
+import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer, DocumentTemplate, TemplateData, OrderActivityResponse } from './types';
 import { API_BASE_URL } from './config/constants';
 
 const api = axios.create({ baseURL: API_BASE_URL });
@@ -94,6 +94,9 @@ export const reassignOrderByNumber = (number: string, userId: number) =>
 
 export const cancelOnlineOrder = (id: number, cancelReason: string) =>
   api.post(`/orders/${id}/cancel-online`, { cancel_reason: cancelReason });
+
+export const getOrderActivity = (id: number) =>
+  api.get<OrderActivityResponse>(`/orders/${id}/activity`);
 
 /** Выдать заказ: 100% остатка → предоплата, debt_closed, статус 7. issued_on — дата выдачи (YYYY-MM-DD), чтобы заказ попал в «Выданные заказы» за выбранный день. */
 export const issueOrder = (id: number, issuedOn?: string) =>

@@ -6,6 +6,7 @@ interface RateLimitOptions {
   message?: string
   skipSuccessfulRequests?: boolean
   skipFailedRequests?: boolean
+  keyPrefix?: string
 }
 
 interface RateLimitEntry {
@@ -30,11 +31,12 @@ class RateLimiter {
       max,
       message = 'Too many requests, please try again later',
       skipSuccessfulRequests = false,
-      skipFailedRequests = false
+      skipFailedRequests = false,
+      keyPrefix = 'global'
     } = options
 
     return (req: Request, res: Response, next: NextFunction) => {
-      const key = this.getKey(req)
+      const key = this.getKey(req, keyPrefix)
       const now = Date.now()
       
       // Получаем или создаем запись для этого ключа
@@ -101,10 +103,13 @@ class RateLimiter {
     }
   }
 
-  private getKey(req: Request): string {
-    // Используем IP адрес как ключ
-    const ip = req.ip || req.connection.remoteAddress || 'unknown'
-    return `rate_limit:${ip}`
+  private getKey(req: Request, keyPrefix: string): string {
+    // Используем реальный клиентский IP за прокси (первый в X-Forwarded-For)
+    const xffRaw = req.headers['x-forwarded-for']
+    const xff = Array.isArray(xffRaw) ? xffRaw[0] : xffRaw
+    const forwardedIp = typeof xff === 'string' ? xff.split(',')[0].trim() : ''
+    const ip = forwardedIp || req.ip || req.connection.remoteAddress || 'unknown'
+    return `rate_limit:${keyPrefix}:${ip}`
   }
 
   private cleanup(): void {
@@ -160,25 +165,29 @@ const rateLimiter = new RateLimiter()
 export const generalRateLimit = rateLimiter.middleware({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
   max: Number(process.env.RATE_LIMIT_MAX || 100),
-  message: 'Too many requests from this IP, please try again later'
+  message: 'Too many requests from this IP, please try again later',
+  keyPrefix: 'general'
 })
 
 export const strictRateLimit = rateLimiter.middleware({
   windowMs: 15 * 60 * 1000, // 15 минут
   max: 20, // 20 запросов за 15 минут
-  message: 'Rate limit exceeded for this endpoint'
+  message: 'Rate limit exceeded for this endpoint',
+  keyPrefix: 'strict'
 })
 
 export const authRateLimit = rateLimiter.middleware({
   windowMs: 15 * 60 * 1000, // 15 минут
   max: 5, // 5 попыток входа за 15 минут
-  message: 'Too many authentication attempts, please try again later'
+  message: 'Too many authentication attempts, please try again later',
+  keyPrefix: 'auth'
 })
 
 export const apiRateLimit = rateLimiter.middleware({
   windowMs: 1 * 60 * 1000, // 1 минута
   max: 60, // 60 запросов в минуту
-  message: 'API rate limit exceeded'
+  message: 'API rate limit exceeded',
+  keyPrefix: 'api'
 })
 
 export { rateLimiter }

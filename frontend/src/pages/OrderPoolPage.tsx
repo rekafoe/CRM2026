@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useReducer, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Order } from '../types';
-import { getOrders, getOrderPoolSync, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder, getOperatorsToday, updateOrderItem } from '../api';
+import { Order, OrderActivityEvent } from '../types';
+import { getOrders, getOrderPoolSync, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder, getOperatorsToday, updateOrderItem, getOrderActivity, updateOrderNotes } from '../api';
 import { useOrderStatuses } from '../hooks/useOrderStatuses';
 
 const ORDER_POOL_LAST_SEEN_KEY = 'orderPoolLastSeenAt';
@@ -215,6 +215,10 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [issuingOrderId, setIssuingOrderId] = useState<number | null>(null);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [operatorsToday, setOperatorsToday] = useState<Array<{ id: number; name: string }>>([]);
+  const [orderActivity, setOrderActivity] = useState<OrderActivityEvent[]>([]);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [activityLoading, setActivityLoading] = useState(false);
   const { statuses: orderStatuses } = useOrderStatuses();
   const [filters, dispatchFilters] = useReducer(filtersReducer, initialFilters);
   const orderIdsRef = useRef<Set<number>>(new Set());
@@ -341,6 +345,30 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     },
     [loadOrders, toast]
   );
+
+  const loadSelectedOrderActivity = useCallback(async (orderId: number) => {
+    try {
+      setActivityLoading(true);
+      const res = await getOrderActivity(orderId);
+      setOrderActivity(Array.isArray(res.data?.events) ? res.data.events : []);
+      setNotesDraft(typeof res.data?.notes === 'string' ? res.data.notes : '');
+    } catch (err) {
+      logger.error('Failed to load order activity', err);
+      setOrderActivity([]);
+      setNotesDraft(selectedOrder?.notes ?? '');
+    } finally {
+      setActivityLoading(false);
+    }
+  }, [logger, selectedOrder?.notes]);
+
+  useEffect(() => {
+    if (!selectedOrder?.id) {
+      setOrderActivity([]);
+      setNotesDraft('');
+      return;
+    }
+    void loadSelectedOrderActivity(selectedOrder.id);
+  }, [selectedOrder?.id, loadSelectedOrderActivity]);
 
 
   /** При открытии страницы пула — помечаем как просмотренное (убираем бейдж "new" на главной) */
@@ -620,6 +648,29 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     [toast, logger, updateOrderInList]
   );
 
+  const handleSaveNotes = useCallback(async () => {
+    if (!selectedOrder) return;
+    try {
+      setNotesSaving(true);
+      await updateOrderNotes(selectedOrder.id, notesDraft.trim() ? notesDraft : null);
+      updateOrderInList(selectedOrder.id, { notes: notesDraft.trim() ? notesDraft : '' });
+      await loadSelectedOrderActivity(selectedOrder.id);
+      toast.success('Сохранено', 'Примечания обновлены');
+    } catch (err: any) {
+      logger.error('Failed to save notes', err);
+      toast.error('Ошибка', err?.message ?? 'Не удалось сохранить примечания');
+    } finally {
+      setNotesSaving(false);
+    }
+  }, [selectedOrder, notesDraft, updateOrderInList, loadSelectedOrderActivity, toast, logger]);
+
+  const formatActivityDate = useCallback((value?: string) => {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleString('ru-RU');
+  }, []);
+
   if (loading) return <div className="loading-overlay">Загрузка...</div>;
   if (error) return <div className="error-message">{error}</div>;
 
@@ -880,6 +931,56 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               prepaymentStatus={selectedOrder.prepaymentStatus}
               paymentMethod={selectedOrder.paymentMethod}
             />
+            <div className="order-activity-panel">
+              <div className="order-activity-panel__header">
+                <h3>Примечания и история</h3>
+                <button
+                  type="button"
+                  className="order-activity-panel__save-btn"
+                  onClick={() => void handleSaveNotes()}
+                  disabled={notesSaving}
+                >
+                  {notesSaving ? 'Сохранение...' : 'Сохранить примечания'}
+                </button>
+              </div>
+              <textarea
+                className="order-activity-panel__notes"
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                placeholder="Добавьте примечание по заказу..."
+                rows={3}
+              />
+
+              <div className="order-activity-panel__timeline">
+                {activityLoading ? (
+                  <div className="order-activity-panel__empty">Загрузка истории...</div>
+                ) : orderActivity.length === 0 ? (
+                  <div className="order-activity-panel__empty">История пока пустая</div>
+                ) : (
+                  orderActivity.map((event) => (
+                    <div key={event.id} className="order-activity-event">
+                      <div className="order-activity-event__top">
+                        <span className="order-activity-event__title">{event.message}</span>
+                        <span className="order-activity-event__date">{formatActivityDate(event.created_at)}</span>
+                      </div>
+                      <div className="order-activity-event__meta">
+                        {event.user_name || 'Система'}
+                      </div>
+                      {event.comment && (
+                        <div className="order-activity-event__comment">{event.comment}</div>
+                      )}
+                      {event.old_value != null && event.new_value != null && (
+                        <div className="order-activity-event__change">
+                          <span>{event.old_value}</span>
+                          <span className="arrow">→</span>
+                          <span>{event.new_value}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </>
         ) : (
           <p className="text-center text-gray-500">Выберите заказ из списка для просмотра деталей.</p>
