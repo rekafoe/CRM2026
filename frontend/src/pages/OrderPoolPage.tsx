@@ -222,6 +222,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const { statuses: orderStatuses } = useOrderStatuses();
   const [filters, dispatchFilters] = useReducer(filtersReducer, initialFilters);
   const orderIdsRef = useRef<Set<number>>(new Set());
+  const activityRequestSeqRef = useRef(0);
+  const activityOrderIdRef = useRef<number | null>(null);
   const selectedItems = selectedOrder?.items ?? [];
   const userNameById = useMemo(() => {
     const map = new Map<number, string>();
@@ -346,29 +348,40 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     [loadOrders, toast]
   );
 
-  const loadSelectedOrderActivity = useCallback(async (orderId: number) => {
+  const loadSelectedOrderActivity = useCallback(async (orderId: number, fallbackNotes = '') => {
+    const requestSeq = ++activityRequestSeqRef.current;
+    activityOrderIdRef.current = orderId;
     try {
       setActivityLoading(true);
       const res = await getOrderActivity(orderId);
+      if (requestSeq !== activityRequestSeqRef.current) return;
       setOrderActivity(Array.isArray(res.data?.events) ? res.data.events : []);
       setNotesDraft(typeof res.data?.notes === 'string' ? res.data.notes : '');
     } catch (err) {
+      if (requestSeq !== activityRequestSeqRef.current) return;
       logger.error('Failed to load order activity', err);
       setOrderActivity([]);
-      setNotesDraft(selectedOrder?.notes ?? '');
+      setNotesDraft(fallbackNotes);
     } finally {
-      setActivityLoading(false);
+      if (requestSeq === activityRequestSeqRef.current) {
+        setActivityLoading(false);
+      }
     }
-  }, [logger, selectedOrder?.notes]);
+  }, [logger]);
 
   useEffect(() => {
     if (!selectedOrder?.id) {
+      activityRequestSeqRef.current += 1;
+      activityOrderIdRef.current = null;
       setOrderActivity([]);
       setNotesDraft('');
       return;
     }
-    void loadSelectedOrderActivity(selectedOrder.id);
-  }, [selectedOrder?.id, loadSelectedOrderActivity]);
+    const orderId = selectedOrder.id;
+    const fallbackNotes = selectedOrder.notes ?? '';
+    if (activityLoading && activityOrderIdRef.current === orderId) return;
+    void loadSelectedOrderActivity(orderId, fallbackNotes);
+  }, [selectedOrder?.id]);
 
 
   /** При открытии страницы пула — помечаем как просмотренное (убираем бейдж "new" на главной) */
@@ -654,7 +667,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       setNotesSaving(true);
       await updateOrderNotes(selectedOrder.id, notesDraft.trim() ? notesDraft : null);
       updateOrderInList(selectedOrder.id, { notes: notesDraft.trim() ? notesDraft : '' });
-      await loadSelectedOrderActivity(selectedOrder.id);
+      await loadSelectedOrderActivity(selectedOrder.id, notesDraft.trim() ? notesDraft : '');
       toast.success('Сохранено', 'Примечания обновлены');
     } catch (err: any) {
       logger.error('Failed to save notes', err);
