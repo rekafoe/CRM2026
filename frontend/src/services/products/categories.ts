@@ -2,7 +2,7 @@
  * Сервис для работы с категориями продуктов
  */
 
-import { api, apiClient } from '../../api/client';
+import { api, postMultipartUpload } from '../../api/client';
 import { ProductCategory } from './types';
 import { SimpleCache } from './utils/cache';
 import { apiRequestSafe } from './utils/apiHelpers';
@@ -67,8 +67,10 @@ export async function updateProductCategory(
 export async function uploadCategoryImage(file: File): Promise<{ image_url: string; filename: string; size: number }> {
   const formData = new FormData();
   formData.append('image', file);
-  const response = await apiClient.post('/products/categories/upload-image', formData);
-  return (response.data as any)?.data || response.data;
+  return postMultipartUpload<{ image_url: string; filename: string; size: number }>(
+    '/products/categories/upload-image',
+    formData
+  );
 }
 
 /**

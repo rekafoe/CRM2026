@@ -1,6 +1,59 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../config/constants';
 
+/**
+ * Полный https://…/api для multipart: обходит Vercel rewrite на тот же origin (/api),
+ * из‑за которого POST upload часто отдаёт 400 (multer не видит файл).
+ */
+function resolveDirectApiBaseForMultipart(): string | null {
+  const uploadOnly = import.meta.env.VITE_UPLOAD_API_URL?.trim();
+  if (uploadOnly && /^https?:\/\//i.test(uploadOnly)) return uploadOnly.replace(/\/$/, '');
+  const api = import.meta.env.VITE_API_URL?.trim();
+  if (api && /^https?:\/\//i.test(api)) return api.replace(/\/$/, '');
+  return null;
+}
+
+/**
+ * POST multipart: при наличии VITE_UPLOAD_API_URL или абсолютного VITE_API_URL — fetch на Railway;
+ * иначе axios (локально или когда весь фронт уже на полном API URL).
+ */
+export async function postMultipartUpload<T>(relativePath: string, formData: FormData): Promise<T> {
+  const path = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+  const base = resolveDirectApiBaseForMultipart();
+  if (base) {
+    const url = `${base}${path}`;
+    const token = localStorage.getItem('crmToken');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    const text = await res.text();
+    if (res.status === 401) {
+      localStorage.removeItem('crmToken');
+      localStorage.removeItem('crmRole');
+      localStorage.removeItem('crmSessionDate');
+      localStorage.removeItem('crmUserId');
+      window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
+    if (!res.ok) {
+      let errMsg = res.statusText;
+      try {
+        const j = JSON.parse(text) as { error?: string; message?: string };
+        errMsg = j.error || j.message || errMsg;
+      } catch {
+        if (text) errMsg = text.slice(0, 300);
+      }
+      throw new Error(`${res.status}: ${errMsg}`);
+    }
+    const json = text ? JSON.parse(text) : {};
+    return ((json as { data?: T }).data ?? json) as T;
+  }
+  const response = await apiClient.post<T>(path, formData);
+  return ((response.data as any)?.data ?? response.data) as T;
+}
+
 // Создаем базовый HTTP клиент (без дефолтного Content-Type — для JSON axios выставит сам)
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
