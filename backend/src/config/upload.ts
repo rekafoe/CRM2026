@@ -13,7 +13,8 @@ export const uploadsDir = process.env.UPLOADS_DIR
 // Файлы заказов (макеты клиентов) — в отдельной папке, НЕ отдаются через /api/uploads (безопасность)
 export const orderFilesDir = path.join(uploadsDir, 'orders')
 
-const MAX_UPLOAD_FILE_SIZE_BYTES = Number(process.env.UPLOAD_MAX_FILE_SIZE_BYTES || 25 * 1024 * 1024)
+/** Лимит тела для multer (и согласованная проверка в handlers после приёма файла) */
+export const MAX_UPLOAD_FILE_SIZE_BYTES = Number(process.env.UPLOAD_MAX_FILE_SIZE_BYTES || 25 * 1024 * 1024)
 const MAX_UPLOAD_FIELDS = Number(process.env.UPLOAD_MAX_FIELDS || 50)
 const MAX_UPLOAD_FILES = Number(process.env.UPLOAD_MAX_FILES || 20)
 const SAFE_STORED_FILENAME_RE = /^[a-zA-Z0-9._-]+$/

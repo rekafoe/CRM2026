@@ -4,7 +4,7 @@ import { logger } from '../../../utils/logger';
 import { getCachedData, invalidateCacheByPattern } from '../../../utils/dataCache';
 import { hasColumn } from '../../../utils/tableSchemaCache';
 import { extractMinUnitPrice } from './helpers';
-import { uploadMemory, saveBufferToUploads } from '../../../config/upload';
+import { MAX_UPLOAD_FILE_SIZE_BYTES, uploadMemory, saveBufferToUploads } from '../../../config/upload';
 
 const router = Router();
 
@@ -162,9 +162,9 @@ router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'Допустимы только изображения (JPEG, PNG, WebP, GIF, SVG)' });
     }
 
-    const maxSize = 5 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return res.status(400).json({ error: 'Максимальный размер файла — 5 МБ' });
+    if (file.size > MAX_UPLOAD_FILE_SIZE_BYTES) {
+      const mb = Math.round(MAX_UPLOAD_FILE_SIZE_BYTES / (1024 * 1024))
+      return res.status(400).json({ error: `Максимальный размер файла — ${mb} МБ (UPLOAD_MAX_FILE_SIZE_BYTES)` });
     }
 
     const saved = saveBufferToUploads(file.buffer, file.originalname);

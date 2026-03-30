@@ -5,7 +5,7 @@ import { ProductServiceLinkService } from '../services/serviceLinkService';
 import { logger } from '../../../utils/logger';
 import { getTableColumns, hasColumn } from '../../../utils/tableSchemaCache';
 import { invalidateCacheByPattern } from '../../../utils/dataCache';
-import { uploadMemory, saveBufferToUploads } from '../../../config/upload';
+import { MAX_UPLOAD_FILE_SIZE_BYTES, uploadMemory, saveBufferToUploads } from '../../../config/upload';
 import {
   toServiceLinkResponse,
   attachOperationsFromNorms,
@@ -158,8 +158,9 @@ router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
     if (!allowedMime.includes(file.mimetype)) {
       return res.status(400).json({ error: 'Допустимы только изображения (JPEG, PNG, WebP, GIF, SVG)' });
     }
-    if (file.size > 5 * 1024 * 1024) {
-      return res.status(400).json({ error: 'Максимальный размер файла — 5 МБ' });
+    if (file.size > MAX_UPLOAD_FILE_SIZE_BYTES) {
+      const mb = Math.round(MAX_UPLOAD_FILE_SIZE_BYTES / (1024 * 1024))
+      return res.status(400).json({ error: `Максимальный размер файла — ${mb} МБ (UPLOAD_MAX_FILE_SIZE_BYTES)` });
     }
     const subtypeName = (req.body?.subtypeName as string)?.trim() || undefined;
     const saved = saveBufferToUploads(file.buffer, file.originalname, subtypeName);
