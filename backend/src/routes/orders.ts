@@ -461,10 +461,36 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
   const result = await OrderService.reassignOrderByNumber(param, targetUserId, authUser?.id);
   const db = await getDb();
   const currentDate = new Date().toISOString();
-  await db.run('UPDATE orders SET created_at = ?, updated_at = datetime(\'now\') WHERE id = ?', currentDate, result.id);
+  const hasCreatedAt = await hasColumn('orders', 'createdAt').catch(() => false);
+  const hasCreatedAtSnake = await hasColumn('orders', 'created_at').catch(() => false);
+  const hasUpdatedAt = await hasColumn('orders', 'updatedAt').catch(() => false);
+  const hasUpdatedAtSnake = await hasColumn('orders', 'updated_at').catch(() => false);
+
+  // Для видимости в текущем рабочем отчёте переносим "дату оформления" на момент назначения,
+  // но делаем это безопасно для разных схем БД (camelCase/snake_case).
+  if (hasCreatedAt && hasUpdatedAt) {
+    await db.run('UPDATE orders SET createdAt = ?, updatedAt = datetime(\'now\') WHERE id = ?', currentDate, result.id);
+  } else if (hasCreatedAt && hasUpdatedAtSnake) {
+    await db.run('UPDATE orders SET createdAt = ?, updated_at = datetime(\'now\') WHERE id = ?', currentDate, result.id);
+  } else if (hasCreatedAtSnake && hasUpdatedAtSnake) {
+    await db.run('UPDATE orders SET created_at = ?, updated_at = datetime(\'now\') WHERE id = ?', currentDate, result.id);
+  } else if (hasCreatedAtSnake && hasUpdatedAt) {
+    await db.run('UPDATE orders SET created_at = ?, updatedAt = datetime(\'now\') WHERE id = ?', currentDate, result.id);
+  } else if (hasCreatedAt) {
+    await db.run('UPDATE orders SET createdAt = ? WHERE id = ?', currentDate, result.id);
+  } else if (hasCreatedAtSnake) {
+    await db.run('UPDATE orders SET created_at = ? WHERE id = ?', currentDate, result.id);
+  }
+
   const hasResponsible = await hasColumn('orders', 'responsible_user_id').catch(() => false);
   if (hasResponsible) {
-    await db.run('UPDATE orders SET responsible_user_id = ?, updated_at = datetime(\'now\') WHERE id = ?', targetUserId, result.id);
+    if (hasUpdatedAtSnake) {
+      await db.run('UPDATE orders SET responsible_user_id = ?, updated_at = datetime(\'now\') WHERE id = ?', targetUserId, result.id);
+    } else if (hasUpdatedAt) {
+      await db.run('UPDATE orders SET responsible_user_id = ?, updatedAt = datetime(\'now\') WHERE id = ?', targetUserId, result.id);
+    } else {
+      await db.run('UPDATE orders SET responsible_user_id = ? WHERE id = ?', targetUserId, result.id);
+    }
   }
   res.json({ success: true, message: 'Order reassigned successfully' });
 }));

@@ -909,7 +909,19 @@ export class OrderService {
       throw new Error('Переназначение доступно только для заказов в статусе «ожидает» (0 или 1)')
     }
     const previousUserId = row.userId != null && Number.isFinite(Number(row.userId)) ? Number(row.userId) : null
-    await db.run('UPDATE orders SET userId = ?, updatedAt = datetime("now") WHERE id = ?', [targetUserId, row.id])
+    let hasUpdatedAt = false
+    let hasUpdatedAtSnake = false
+    try {
+      hasUpdatedAt = await hasColumn('orders', 'updatedAt')
+      hasUpdatedAtSnake = await hasColumn('orders', 'updated_at')
+    } catch { /* ignore */ }
+    if (hasUpdatedAt) {
+      await db.run('UPDATE orders SET userId = ?, updatedAt = datetime("now") WHERE id = ?', [targetUserId, row.id])
+    } else if (hasUpdatedAtSnake) {
+      await db.run('UPDATE orders SET userId = ?, updated_at = datetime("now") WHERE id = ?', [targetUserId, row.id])
+    } else {
+      await db.run('UPDATE orders SET userId = ? WHERE id = ?', [targetUserId, row.id])
+    }
     await this.recordOrderActivity(db, {
       orderId: row.id,
       eventType: 'reassign',
