@@ -2,7 +2,7 @@
  * Сервис для работы с продуктами
  */
 
-import { api, apiClient } from '../../api/client';
+import { api, postFormData } from '../../api/client';
 import { Product, ProductWithDetails } from './types';
 import { KeyedCache, SimpleCache } from './utils/cache';
 import { apiRequest, apiRequestSafe, extractData } from './utils/apiHelpers';
@@ -238,8 +238,10 @@ export async function uploadProductImage(
   const formData = new FormData();
   formData.append('image', file);
   if (subtypeName) formData.append('subtypeName', subtypeName);
-  const response = await apiClient.post('/products/upload-image', formData);
-  return (response.data as any)?.data || response.data;
+  return postFormData<{ image_url: string; filename: string; size: number }>(
+    '/products/upload-image',
+    formData
+  );
 }
 
 /**

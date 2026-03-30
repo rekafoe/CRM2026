@@ -8,10 +8,22 @@ export const createApiClient = (baseURL: string = API_BASE_URL): AxiosInstance =
   const client = axios.create({
     baseURL,
     timeout: 10000,
-    headers: {
-      'Content-Type': 'application/json',
-    },
   });
+
+  client.interceptors.request.use(
+    (config) => {
+      if (config.data instanceof FormData) {
+        const h = config.headers;
+        if (h && typeof (h as any).delete === 'function') {
+          (h as any).delete('Content-Type');
+        } else if (h) {
+          delete (h as Record<string, unknown>)['Content-Type'];
+        }
+      }
+      return config;
+    },
+    (error) => Promise.reject(error)
+  );
 
   // Интерцептор для добавления токена авторизации
   client.interceptors.request.use(
