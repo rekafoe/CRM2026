@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AppIcon } from '../ui/AppIcon';
-import { AIService } from '../../services/aiService';
 import { Product } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import { useLogger } from '../../utils/logger';
@@ -35,7 +34,7 @@ import { PostprintServicesForm } from './components/PostprintServicesForm';
 import { usePostprintServices } from './hooks/usePostprintServices';
 import { useCustomProduct } from './hooks/useCustomProduct';
 import { useProductSelection } from './hooks/useProductSelection';
-import { buildOrderPayload, buildAITrainingData } from './utils/orderPayloadBuilder';
+import { buildOrderPayload } from './utils/orderPayloadBuilder';
 
 const createInitialSpecs = (initialProductType?: string): ProductSpecs => ({
   productType: initialProductType || 'flyers',
@@ -868,32 +867,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   // Загрузка пресета
   
 
-  // Обучение ИИ на данных заказа
-  const trainAIOnOrder = useCallback((orderData: any) => {
-    try {
-      AIService.addTrainingData({
-        productType: orderData.productType,
-        format: orderData.format,
-        quantity: orderData.quantity,
-        paperType: orderData.paperType,
-        paperDensity: orderData.paperDensity,
-        lamination: orderData.lamination,
-        urgency: orderData.urgency || 'standard',
-        customerType: orderData.customerType || 'regular',
-        finalPrice: orderData.finalPrice,
-        timestamp: new Date(),
-        marketConditions: {
-          demandLevel: 0.5, // Базовое значение, можно улучшить
-          competitionLevel: 0.5,
-          seasonality: 0.5
-        }
-      });
-      logger.info('ИИ обучен на данных заказа', { orderData });
-    } catch (error) {
-      logger.error('Ошибка обучения ИИ на заказе', error);
-    }
-  }, [logger]);
-
   // Добавление в заказ
   const handleAddToOrder = useCallback(
     async (customDescription?: string) => {
@@ -903,7 +876,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       }
       if (!result) return;
 
-      const { apiItem, effectivePricePerItem } = buildOrderPayload({
+      const { apiItem } = buildOrderPayload({
         result,
         selectedProduct,
         getProductionDays,
@@ -916,8 +889,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       if (customDescription) {
         apiItem.params.description = customDescription;
       }
-
-      trainAIOnOrder(buildAITrainingData(result, effectivePricePerItem));
 
       try {
         if (isEditMode && editContext && onSubmitExisting) {
@@ -962,7 +933,6 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       customFormat,
       printTechnology,
       printColorMode,
-      trainAIOnOrder,
       isEditMode,
       editContext,
       onSubmitExisting,

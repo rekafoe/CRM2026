@@ -182,17 +182,3 @@ export function buildOrderPayload({
     : result.pricePerItem;
   return { apiItem, effectivePricePerItem, description };
 }
-
-export function buildAITrainingData(result: CalculationResult, effectivePricePerItem: number) {
-  return {
-    productType: result.specifications.productType,
-    format: result.specifications.format,
-    quantity: result.specifications.quantity,
-    paperType: result.specifications.paperType,
-    paperDensity: result.specifications.paperDensity,
-    lamination: result.specifications.lamination,
-    urgency: result.specifications.priceType,
-    customerType: result.specifications.customerType,
-    finalPrice: effectivePricePerItem,
-  };
-}

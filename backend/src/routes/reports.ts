@@ -236,6 +236,33 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
     }))
   }
 
+  // Сумма в кассу за этот день по заказу: при выдаче — остаток из debt_closed_events, иначе вся предоплата на дату.
+  // Иначе после issue prepaymentAmount = полный итог заказа и «выручка за день» завышается (дубль с днём предоплаты).
+  if (hasDebtClosed) {
+    try {
+      const debtRows = (await db.all(
+        'SELECT order_id, amount FROM debt_closed_events WHERE closed_date = ?',
+        d
+      )) as Array<{ order_id: number; amount: number }>
+      const byOrder = new Map<number, number>()
+      for (const r of debtRows) {
+        byOrder.set(Number(r.order_id), Number(r.amount))
+      }
+      for (const order of orders) {
+        const oid = Number(order.id)
+        order.cash_from_issue_today = byOrder.has(oid) ? byOrder.get(oid)! : null
+      }
+    } catch {
+      for (const order of orders) {
+        order.cash_from_issue_today = null
+      }
+    }
+  } else {
+    for (const order of orders) {
+      order.cash_from_issue_today = null
+    }
+  }
+
   let issuedOrdersTotal = 0
   let issuedByOperators: Array<{ user_id: number; user_name: string; amount: number }> = []
   if (hasDebtClosed) {
@@ -294,10 +321,20 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
   const dateExpr = hasPrepaymentUpdatedAt
     ? "COALESCE(o.prepaymentUpdatedAt, o.created_at, o.createdAt)"
     : "COALESCE(o.created_at, o.createdAt)"
+  let hasDebtClosedCash = false
+  try {
+    hasDebtClosedCash = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
+  } catch { /* ignore */ }
+  const cashDayExpr = `substr(${dateExpr},1,10)`
+  const prepaymentSelect = hasDebtClosedCash
+    ? `CASE WHEN EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ${cashDayExpr})
+            THEN (SELECT COALESCE(SUM(d.amount), 0) FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ${cashDayExpr})
+            ELSE COALESCE(o.prepaymentAmount, 0) END as prepayment`
+    : `COALESCE(o.prepaymentAmount, 0) as prepayment`
   const orders = await db.all<any>(
     `SELECT substr(${dateExpr},1,10) as date,
             o.userId as user_id,
-            COALESCE(o.prepaymentAmount, 0) as prepayment
+            ${prepaymentSelect}
        FROM orders o
       WHERE substr(${dateExpr},1,7) = ?
         AND COALESCE(o.prepaymentAmount, 0) > 0

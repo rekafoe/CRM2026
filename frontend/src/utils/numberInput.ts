@@ -22,6 +22,20 @@ export function parseNumberFlexible(value: number | string | null | undefined, f
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/** Касса за выбранный день по заказу: при выдаче бэкенд отдаёт cash_from_issue_today (остаток из debt_closed_events), иначе — предоплата. */
+export function cashIncrementForRegisterDay(order: {
+  cash_from_issue_today?: number | null;
+  prepaymentAmount?: string | number | null;
+  prepayment_amount?: string | number | null;
+}): number {
+  const v = order.cash_from_issue_today;
+  if (v !== null && v !== undefined) {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
+}
+
 export function normalizeEmptyStringsToNull<T extends Record<string, any>>(obj: T): T {
   const out: any = Array.isArray(obj) ? [...obj] : { ...obj };
   for (const key of Object.keys(out)) {

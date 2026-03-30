@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { getCurrentUser, getUsers } from '../api';
-import { parseNumberFlexible } from '../utils/numberInput';
+import { cashIncrementForRegisterDay } from '../utils/numberInput';
 import { AppIcon } from '../components/ui/AppIcon';
 import './CountersPage.css';
 
@@ -190,8 +190,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         if (Number(order.status) === 1) return sum; // Ожидающий — не в кассу
         const channel = (order.payment_channel || 'cash').toLowerCase();
         if (channel !== 'cash') return sum;
-        const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
-        const orderAmount = prepayment > 0 ? prepayment : 0;
+        const orderAmount = cashIncrementForRegisterDay(order);
         const rawUserId = order.userId ?? order.user_id ?? null;
         const userId = rawUserId != null ? Number(rawUserId) : null;
         if (userId && !Number.isNaN(userId)) {
