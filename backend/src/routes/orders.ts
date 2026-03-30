@@ -700,6 +700,11 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
     hasPrepaymentUpdatedAt = false
   }
   const rawAmount = (req.body as any)?.amount
+  // Локальная дата/время: отчёты и счётчики режут prepaymentUpdatedAt по substr(...,1,10); datetime('now') в SQLite — UTC и даёт сдвиг дня.
+  const todayRow = await db.get<{ d: string }>("SELECT date('now','localtime') as d")
+  const todayLocal = (todayRow?.d ?? new Date().toISOString().slice(0, 10)).slice(0, 10)
+  const prepaymentMoment = `${todayLocal} 12:00:00`
+
   const wantsClear = rawAmount === 0 || rawAmount === '0' || rawAmount === '' || rawAmount === null
   if (wantsClear) {
     const clearSql = hasPrepaymentUpdatedAt
@@ -709,7 +714,7 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
                paymentUrl = NULL,
                paymentId = NULL,
                paymentMethod = NULL,
-               prepaymentUpdatedAt = datetime('now'),
+               prepaymentUpdatedAt = datetime('now','localtime'),
                updated_at = datetime('now')
          WHERE id = ?`
       : `UPDATE orders
@@ -742,9 +747,13 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   }
 
   const updateSql = hasPrepaymentUpdatedAt
-    ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?'
+    ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?'
     : 'UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = ?, paymentUrl = ?, paymentId = ?, paymentMethod = ?, updated_at = datetime(\'now\') WHERE id = ?'
-  await db.run(updateSql, amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, id)
+  if (hasPrepaymentUpdatedAt) {
+    await db.run(updateSql, amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, prepaymentMoment, id)
+  } else {
+    await db.run(updateSql, amount, prepaymentStatus, paymentUrl, paymentId, paymentMethod, id)
+  }
 
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   res.json(orderForApi(updated))

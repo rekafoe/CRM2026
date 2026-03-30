@@ -190,7 +190,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         if (Number(order.status) === 1) return sum; // Ожидающий — не в кассу
         const channel = (order.payment_channel || 'cash').toLowerCase();
         if (channel !== 'cash') return sum;
-        const orderAmount = cashIncrementForRegisterDay(order);
+        const orderAmount = cashIncrementForRegisterDay(order, selectedDate);
         const rawUserId = order.userId ?? order.user_id ?? null;
         const userId = rawUserId != null ? Number(rawUserId) : null;
         if (userId && !Number.isNaN(userId)) {

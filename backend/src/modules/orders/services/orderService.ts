@@ -827,8 +827,8 @@ export class OrderService {
         hasPrepaymentUpdatedAt = false
       }
       const updateSql = hasPrepaymentUpdatedAt
-        ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime("now"), updated_at = datetime("now") WHERE id = ?'
-        : 'UPDATE orders SET prepaymentAmount = ?, updated_at = datetime("now") WHERE id = ?'
+        ? 'UPDATE orders SET prepaymentAmount = ?, prepaymentUpdatedAt = datetime(\'now\',\'localtime\'), updated_at = datetime(\'now\',\'localtime\') WHERE id = ?'
+        : 'UPDATE orders SET prepaymentAmount = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?'
       await db.run(updateSql, newTotal, id)
     }
 
