@@ -6,6 +6,9 @@ import { Request, Response } from 'express';
 import { getDb } from '../../../db';
 import { logger } from '../../../utils/logger';
 import { hasColumn, getTableColumns } from '../../../utils/tableSchemaCache';
+import { getCachedData, invalidateCache } from '../../../utils/dataCache';
+
+const OPERATIONS_LIST_CACHE_KEY = 'operations_post_processing_all';
 
 export class OperationsController {
   /**
@@ -17,22 +20,38 @@ export class OperationsController {
       const db = await getDb();
       const { operation_type, is_active } = req.query;
 
-      let query = 'SELECT * FROM post_processing_services WHERE 1=1';
-      const params: any[] = [];
+      const hasFilters = operation_type !== undefined || is_active !== undefined;
 
-      if (operation_type) {
-        query += ' AND operation_type = ?';
-        params.push(operation_type);
+      let operations: any[];
+
+      if (!hasFilters) {
+        operations = await getCachedData(
+          OPERATIONS_LIST_CACHE_KEY,
+          async () => {
+            const rows = await db.all(
+              'SELECT * FROM post_processing_services ORDER BY operation_type, name'
+            );
+            return rows;
+          },
+          5 * 60 * 1000
+        );
+      } else {
+        let query = 'SELECT * FROM post_processing_services WHERE 1=1';
+        const params: any[] = [];
+
+        if (operation_type) {
+          query += ' AND operation_type = ?';
+          params.push(operation_type);
+        }
+
+        if (is_active !== undefined) {
+          query += ' AND is_active = ?';
+          params.push(is_active === 'true' ? 1 : 0);
+        }
+
+        query += ' ORDER BY operation_type, name';
+        operations = await db.all(query, params);
       }
-
-      if (is_active !== undefined) {
-        query += ' AND is_active = ?';
-        params.push(is_active === 'true' ? 1 : 0);
-      }
-
-      query += ' ORDER BY operation_type, name';
-
-      const operations = await db.all(query, params);
 
       // Парсим JSON поля
       const parsedOperations = operations.map((op: any) => ({
@@ -165,6 +184,8 @@ export class OperationsController {
 
       logger.info('Операция создана', { operationId: result.lastID, name });
 
+      invalidateCache(OPERATIONS_LIST_CACHE_KEY);
+
       res.status(201).json({
         success: true,
         data: {
@@ -275,6 +296,8 @@ export class OperationsController {
       }
 
       logger.info('Операция обновлена', { operationId: id, name: name || operation.name });
+
+      invalidateCache(OPERATIONS_LIST_CACHE_KEY);
 
       res.json({
         success: true,
@@ -404,6 +427,8 @@ export class OperationsController {
       await db.run('DELETE FROM post_processing_services WHERE id = ?', [id]);
 
       logger.info('Операция удалена', { operationId: id, name: operation.name });
+
+      invalidateCache(OPERATIONS_LIST_CACHE_KEY);
 
       res.json({
         success: true,

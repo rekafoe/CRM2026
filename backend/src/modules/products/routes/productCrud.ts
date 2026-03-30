@@ -57,8 +57,7 @@ async function copyChildRowsByProductId(
 ): Promise<void> {
   if (!(await tableExists(db, table))) return;
 
-  const info = await db.all(`PRAGMA table_info(${table})`);
-  const allCols = (info as Array<{ name: string }>).map((r) => r.name);
+  const allCols = [...(await getTableColumns(table))];
   if (!allCols.includes('product_id')) return;
 
   const insertCols = allCols.filter((c) => c !== 'id');
@@ -77,8 +76,7 @@ async function insertDuplicateProductRow(
   source: Record<string, unknown>,
   newName: string,
 ): Promise<number> {
-  const info = await db.all(`PRAGMA table_info(products)`);
-  const allCols = (info as Array<{ name: string }>).map((r) => r.name).filter((c) => c !== 'id');
+  const allCols = [...(await getTableColumns('products'))].filter((c) => c !== 'id');
   const omitDefaults = new Set(['created_at', 'updated_at']);
 
   const cols: string[] = [];
@@ -101,8 +99,7 @@ async function insertDuplicateProductRow(
 async function deleteAllProductRelatedRows(db: SqliteDb, productId: number | string): Promise<void> {
   for (const table of PRODUCT_RELATED_TABLES) {
     if (!(await tableExists(db, table))) continue;
-    const info = await db.all(`PRAGMA table_info(${table})`);
-    const cols = (info as Array<{ name: string }>).map((r) => r.name);
+    const cols = [...(await getTableColumns(table))];
     if (!cols.includes('product_id')) continue;
     await db.run(`DELETE FROM ${table} WHERE product_id = ?`, [productId]);
   }

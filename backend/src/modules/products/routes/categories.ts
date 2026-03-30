@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../../../db';
 import { logger } from '../../../utils/logger';
 import { getCachedData, invalidateCacheByPattern } from '../../../utils/dataCache';
+import { hasColumn } from '../../../utils/tableSchemaCache';
 import { extractMinUnitPrice } from './helpers';
 import { uploadMemory, saveBufferToUploads } from '../../../config/upload';
 
@@ -109,8 +110,7 @@ router.post('/', async (req, res) => {
     const { name, icon, description, sort_order, image_url } = req.body;
     const db = await getDb();
 
-    const cols = await db.all("PRAGMA table_info('product_categories')") as any[];
-    const hasImageUrl = cols.some((c: any) => c.name === 'image_url');
+    const hasImageUrl = await hasColumn('product_categories', 'image_url').catch(() => false);
 
     const columns = ['name', 'icon', 'description', 'sort_order'];
     const values: any[] = [name, icon, description, sort_order || 0];
@@ -213,8 +213,7 @@ router.put('/:id', async (req, res) => {
     const { name, icon, description, sort_order, is_active, image_url } = req.body;
     const db = await getDb();
 
-    const cols = await db.all("PRAGMA table_info('product_categories')") as any[];
-    const hasImageUrl = cols.some((c: any) => c.name === 'image_url');
+    const hasImageUrl = await hasColumn('product_categories', 'image_url').catch(() => false);
 
     const setParts = ['name = ?', 'icon = ?', 'description = ?', 'sort_order = ?', 'is_active = ?'];
     const values: any[] = [name, icon, description, sort_order, is_active];

@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { OrderPool } from '../orders/OrderPool';
 import { UserOrderPage } from '../orders/UserOrderPage';
-import { CountersPage } from '../../pages/CountersPage';
 import { DateSwitchContainer } from '../orders/DateSwitchContainer';
 import { AppIcon } from '../ui/AppIcon';
 import type { Order } from '../../types';
+
+const LazyCountersPage = lazy(() =>
+  import('../../pages/CountersPage').then((m) => ({ default: m.CountersPage }))
+);
 
 interface PageModalsProps {
   // Modal states
@@ -123,7 +126,9 @@ export const PageModals: React.FC<PageModalsProps> = ({
               </button>
             </div>
             <div className="new-order-management-content">
-              <CountersPage />
+              <Suspense fallback={<div className="loading-overlay">Загрузка...</div>}>
+                <LazyCountersPage />
+              </Suspense>
             </div>
           </div>
         </div>

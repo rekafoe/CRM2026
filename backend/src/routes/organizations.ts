@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { asyncHandler, AuthenticatedRequest } from '../middleware';
 import { getDb } from '../config/database';
 import { authenticate } from '../middleware/auth';
+import { hasColumn } from '../utils/tableSchemaCache';
 
 const router = Router();
 
@@ -61,7 +62,7 @@ router.post('/', authenticate, asyncHandler(async (req, res) => {
   if (is_default) {
     await db.run('UPDATE organizations SET is_default = 0');
   }
-  const hasWorkSchedule = (await db.all("PRAGMA table_info('organizations')") as Array<{ name: string }>).some((c) => c.name === 'work_schedule');
+  const hasWorkSchedule = await hasColumn('organizations', 'work_schedule').catch(() => false);
   const wsCol = hasWorkSchedule ? ', work_schedule' : '';
   const wsVal = hasWorkSchedule ? ', ?' : '';
   const result = await db.run(
@@ -82,7 +83,7 @@ router.put('/:id', authenticate, asyncHandler(async (req, res) => {
   if (is_default) {
     await db.run('UPDATE organizations SET is_default = 0 WHERE id != ?', id);
   }
-  const hasWorkSchedule = (await db.all("PRAGMA table_info('organizations')") as Array<{ name: string }>).some((c) => c.name === 'work_schedule');
+  const hasWorkSchedule = await hasColumn('organizations', 'work_schedule').catch(() => false);
   const wsSet = hasWorkSchedule ? ', work_schedule = ?' : '';
   await db.run(
     `UPDATE organizations SET

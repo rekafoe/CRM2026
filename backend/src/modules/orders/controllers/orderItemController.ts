@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { getDb } from '../../../config/database'
 import { AuthenticatedRequest } from '../../../middleware'
-import { hasColumn } from '../../../utils/tableSchemaCache'
+import { hasColumn, getTableColumns } from '../../../utils/tableSchemaCache'
 import { Item } from '../../../models'
 import { itemRowSelect, mapItemRowToItem } from '../../../models/mappers/itemMapper'
 import { EarningsService } from '../../../services/earningsService'
@@ -578,10 +578,9 @@ export class OrderItemController {
       // Имя колонки принтера может быть printerId или printer_id — запрос existing должен использовать его
       let printerIdCol = 'printerId'
       try {
-        const rawCols = await db.all<{ name: string }>('PRAGMA table_info(items)')
-        const cols = Array.isArray(rawCols) ? rawCols : []
-        const printerCol = cols.find((c) => c.name.toLowerCase().includes('printer'))
-        if (printerCol?.name) printerIdCol = printerCol.name
+        const cols = [...(await getTableColumns('items'))]
+        const printerCol = cols.find((c) => c.toLowerCase().includes('printer'))
+        if (printerCol) printerIdCol = printerCol
       } catch (_) {}
       logger.info('🖨️ [updateItem] Колонка принтера в items', { printerIdCol })
 

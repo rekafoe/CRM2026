@@ -465,6 +465,7 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
   const hasCreatedAtSnake = await hasColumn('orders', 'created_at').catch(() => false);
   const hasUpdatedAt = await hasColumn('orders', 'updatedAt').catch(() => false);
   const hasUpdatedAtSnake = await hasColumn('orders', 'updated_at').catch(() => false);
+  const hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt').catch(() => false);
 
   // Для видимости в текущем рабочем отчёте переносим "дату оформления" на момент назначения,
   // но делаем это безопасно для разных схем БД (camelCase/snake_case).
@@ -480,6 +481,18 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
     await db.run('UPDATE orders SET createdAt = ? WHERE id = ?', currentDate, result.id);
   } else if (hasCreatedAtSnake) {
     await db.run('UPDATE orders SET created_at = ? WHERE id = ?', currentDate, result.id);
+  }
+
+  // Отчёты используют prepaymentUpdatedAt как приоритетную дату (если колонка существует).
+  // При назначении из пула обновляем её тоже, чтобы заказ сразу попадал в текущий отчётный день.
+  if (hasPrepaymentUpdatedAt) {
+    if (hasUpdatedAt) {
+      await db.run('UPDATE orders SET prepaymentUpdatedAt = ?, updatedAt = datetime(\'now\') WHERE id = ?', currentDate, result.id);
+    } else if (hasUpdatedAtSnake) {
+      await db.run('UPDATE orders SET prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?', currentDate, result.id);
+    } else {
+      await db.run('UPDATE orders SET prepaymentUpdatedAt = ? WHERE id = ?', currentDate, result.id);
+    }
   }
 
   const hasResponsible = await hasColumn('orders', 'responsible_user_id').catch(() => false);

@@ -46,7 +46,7 @@ router.get('/test', handler)
 ## Структура документации
 
 - **Конфигурация Swagger**: `src/config/swagger.ts`
-- **Интеграция**: `src/index_old.ts`
+- **Интеграция**: `src/index.ts`
 - **Примеры аннотаций**: 
   - `src/routes/auth.ts`
   - `src/routes/pricing.ts`

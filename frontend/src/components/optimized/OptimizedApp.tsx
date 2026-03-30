@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef, Suspense, lazy } from "react";
 import { Order } from "../../types";
 import {
   getOrders,
@@ -15,7 +15,9 @@ import { useNavigate } from 'react-router-dom';
 import AddItemModal from "../AddItemModal";
 import { PrepaymentModal } from "../PrepaymentModal";
 import { FeatureFlaggedCalculator } from "../calculator/FeatureFlaggedCalculator";
-import { CountersPage } from "../../pages/CountersPage";
+const LazyCountersPage = lazy(() =>
+  import("../../pages/CountersPage").then((m) => ({ default: m.CountersPage }))
+);
 import { useToastNotifications } from "../Toast";
 import { useLogger } from "../../utils/logger";
 import "../../styles/admin-page-layout.css";
@@ -819,7 +821,9 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
               </button>
             </div>
             <div className="new-order-management-content">
-              <CountersPage isModal />
+              <Suspense fallback={<div className="loading-overlay">Загрузка...</div>}>
+                <LazyCountersPage isModal />
+              </Suspense>
             </div>
           </div>
         </div>

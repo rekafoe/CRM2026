@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
+import { OrderRepository } from '../repositories/orderRepository'
 
 const router = Router()
 
@@ -225,19 +226,13 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
     hasDebtClosed ? [d, d] : [d]
   )
 
-  let hasExecutorUserId = false
-  try {
-    hasExecutorUserId = await hasColumn('items', 'executor_user_id')
-  } catch { /* ignore */ }
-  const itemExecutorSel = hasExecutorUserId ? 'executor_user_id' : 'NULL as executor_user_id'
+  const orderIds = orders.map((o: { id: number }) => o.id)
+  const itemsByOrderId = await OrderRepository.getItemsByOrderIds(orderIds)
   for (const order of orders) {
-    const items = await db.all<any>(
-      `SELECT id, orderId, type, params, price, quantity, printerId, sides, sheets, waste, clicks, ${itemExecutorSel} FROM items WHERE orderId = ?`,
-      order.id
-    )
+    const items = itemsByOrderId.get(order.id) ?? []
     order.items = items.map((item: any) => ({
       ...item,
-      params: item.params ? JSON.parse(item.params) : {}
+      params: item.params && typeof item.params === 'object' ? item.params : {},
     }))
   }
 

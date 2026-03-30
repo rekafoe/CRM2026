@@ -1,9 +1,7 @@
 import React, { lazy, Suspense, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { NotificationsManager } from '../components/notifications/NotificationsManager';
-import { AdminProductManager } from '../components/calculator/AdminProductManager';
 import AdminDashboard from '../components/admin/AdminDashboard';
-import { ServicesManagementPage } from './admin/ServicesManagementPage';
 import { DailyActivityOverview } from '../components/admin/DailyActivityOverview';
 import SystemFeaturesPanel from '../components/admin/SystemFeaturesPanel';
 import { useCurrentUser } from '../hooks/useCurrentUser';
@@ -54,6 +52,12 @@ const UserManagement = lazy(() =>
 const MultiPageProductEditor = lazy(() => import('./admin/MultiPageProductEditor'));
 const PreflightPage = lazy(() =>
   import('./admin/PreflightPage').then((m) => ({ default: m.PreflightPage }))
+);
+const ServicesManagementPage = lazy(() =>
+  import('./admin/ServicesManagementPage').then((m) => ({ default: m.ServicesManagementPage }))
+);
+const AdminProductManager = lazy(() =>
+  import('../components/calculator/AdminProductManager').then((m) => ({ default: m.AdminProductManager }))
 );
 const DesignTemplatesPage = lazy(() =>
   import('./admin/DesignTemplatesPage').then((m) => ({ default: m.DesignTemplatesPage }))
