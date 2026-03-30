@@ -1,13 +1,24 @@
 import { Request, Response, NextFunction } from 'express'
 import { gzip, deflate } from 'zlib'
 
+function isUploadsOrStaticPath(req: Request): boolean {
+  const path = req.path || ''
+  const base = (req.originalUrl || '').split('?')[0] || path
+  return (
+    path.startsWith('/api/uploads') ||
+    path.startsWith('/uploads') ||
+    base.startsWith('/api/uploads') ||
+    base.startsWith('/uploads')
+  )
+}
+
 export function compressionMiddleware(req: Request, res: Response, next: NextFunction) {
   // Исключаем Swagger UI из сжатия, чтобы избежать проблем с отображением
   if (req.path.startsWith('/api-docs')) {
     return next()
   }
-  // Не сжимаем изображения и файлы — PNG/JPEG уже сжаты, повторное gzip ломает отображение
-  if (req.path.startsWith('/api/uploads') || req.path.startsWith('/uploads')) {
+  // Не сжимаем изображения и файлы — PNG/JPEG уже сжаты; gzip + бинарники даёт сбои у HTTP/2/прокси
+  if (isUploadsOrStaticPath(req)) {
     return next()
   }
   // Не сжимаем скачивание файлов заказов — отдаём бинарные данные как есть

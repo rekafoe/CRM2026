@@ -115,14 +115,7 @@ try {
   logger.error('Ошибка при настройке Swagger UI', { error: error.message, stack: error.stack })
 }
 
-app.use(compressionMiddleware) // Сжатие ответов
-app.use(performanceMiddleware) // Мониторинг производительности
-app.use(performanceLoggingMiddleware) // Логирование производительности
-const bodyLimit = process.env.REQUEST_BODY_LIMIT || '2mb'
-app.use(express.json({ limit: bodyLimit }))
-app.use(express.urlencoded({ extended: true, limit: bodyLimit }))
-
-// Static files — только публичные картинки (продукты, категории, подтипы).
+// Статика картинок ДО compression — иначе у части клиентов/HTTP2 прокси возможны ERR_HTTP2_PROTOCOL_ERROR на PNG.
 // Файлы заказов (orders/) НЕ отдаются — только через GET /api/orders/:id/files/:fileId/download
 const blockOrdersPath = (_req: express.Request, res: express.Response, next: express.NextFunction) => {
   const p = (_req.path || '').replace(/^\/+/, '')
@@ -133,7 +126,6 @@ const blockOrdersPath = (_req: express.Request, res: express.Response, next: exp
   next()
 }
 app.use('/uploads', blockOrdersPath, asyncHandler(uploadsApiKeyMiddleware), express.static(uploadsDir))
-// GET /api/uploads/ без имени файла — подсказка (иначе "Cannot GET")
 app.get('/api/uploads', (req, res) => {
   res.status(400).json({
     error: 'Filename required',
@@ -147,6 +139,13 @@ app.get('/api/uploads/', (req, res) => {
   })
 })
 app.use('/api/uploads', blockOrdersPath, asyncHandler(uploadsApiKeyMiddleware), express.static(uploadsDir))
+
+app.use(compressionMiddleware) // Сжатие ответов (не затрагивает маршруты выше)
+app.use(performanceMiddleware) // Мониторинг производительности
+app.use(performanceLoggingMiddleware) // Логирование производительности
+const bodyLimit = process.env.REQUEST_BODY_LIMIT || '2mb'
+app.use(express.json({ limit: bodyLimit }))
+app.use(express.urlencoded({ extended: true, limit: bodyLimit }))
 
 // Health check (before auth middleware)
 app.get('/health', (req, res) => {
