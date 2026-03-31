@@ -522,6 +522,9 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
+                    // Не перехватывать пробел/Enter у полей ввода и кнопок — иначе пробел не вставляется в название
+                    const el = e.target as HTMLElement
+                    if (el.closest('input, textarea, select, button, a, [contenteditable="true"]')) return
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
                       onSelectType(t.id)
