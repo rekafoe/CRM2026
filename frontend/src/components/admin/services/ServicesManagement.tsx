@@ -74,6 +74,7 @@ interface ServicesManagementProps {
 
 const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = true }) => {
   const [createMode, setCreateMode] = useState<'service' | 'binding'>('service');
+  const [createSubmitting, setCreateSubmitting] = useState(false);
   // Управление состоянием
   const {
     state,
@@ -217,38 +218,53 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
     resetEditingService();
   }, [state.editingService, state.editingServiceForm, resetEditingService]); // serviceOperations через ref
 
+  const createFormValid = useMemo(() => {
+    const f = state.newServiceForm;
+    const nameOk = f.name.trim().length > 0;
+    const unitOk = (f.unit || '').trim().length > 0;
+    const rateNum = Number(f.rate);
+    const rateOk = f.rate !== '' && Number.isFinite(rateNum) && rateNum >= 0;
+    return nameOk && unitOk && rateOk;
+  }, [state.newServiceForm]);
+
   const handleServiceCreate = useCallback(async () => {
-    const payload = {
-      name: state.newServiceForm.name.trim(),
-      type: state.newServiceForm.type || 'postprint',
-      unit: state.newServiceForm.unit || 'item',
-      rate: Number(state.newServiceForm.rate || 0),
-      isActive: state.newServiceForm.isActive,
-      hasVariants: state.newServiceForm.hasVariants,
-      operationType: state.newServiceForm.operationType || 'other', // 🆕
-      minQuantity: state.newServiceForm.minQuantity
-        ? Number(state.newServiceForm.minQuantity)
-        : undefined,
-      maxQuantity: state.newServiceForm.maxQuantity
-        ? Number(state.newServiceForm.maxQuantity)
-        : undefined,
-      operator_percent: state.newServiceForm.operatorPercent !== ''
-        ? Number(state.newServiceForm.operatorPercent) || 0
-        : undefined,
-      categoryId: state.newServiceForm.categoryId !== '' ? state.newServiceForm.categoryId : undefined,
-      material_id: state.newServiceForm.materialId !== '' ? state.newServiceForm.materialId : undefined,
-      qty_per_item: state.newServiceForm.qtyPerItem !== '' && Number(state.newServiceForm.qtyPerItem) > 0 ? Number(state.newServiceForm.qtyPerItem) : undefined,
-    };
-    const created = createMode === 'binding'
-      ? await serviceOperationsRef.current.createBinding(payload)
-      : await serviceOperationsRef.current.createService(payload);
-    
-    if (created) {
-      setShowCreateService(false);
-      setCreateMode('service');
-      resetNewServiceForm(emptyServiceForm);
+    if (createSubmitting || !createFormValid) return;
+    setCreateSubmitting(true);
+    try {
+      const payload = {
+        name: state.newServiceForm.name.trim(),
+        type: state.newServiceForm.type || 'postprint',
+        unit: state.newServiceForm.unit || 'item',
+        rate: Number(state.newServiceForm.rate || 0),
+        isActive: state.newServiceForm.isActive,
+        hasVariants: state.newServiceForm.hasVariants,
+        operationType: state.newServiceForm.operationType || 'other',
+        minQuantity: state.newServiceForm.minQuantity
+          ? Number(state.newServiceForm.minQuantity)
+          : undefined,
+        maxQuantity: state.newServiceForm.maxQuantity
+          ? Number(state.newServiceForm.maxQuantity)
+          : undefined,
+        operator_percent: state.newServiceForm.operatorPercent !== ''
+          ? Number(state.newServiceForm.operatorPercent) || 0
+          : undefined,
+        categoryId: state.newServiceForm.categoryId !== '' ? state.newServiceForm.categoryId : undefined,
+        material_id: state.newServiceForm.materialId !== '' ? state.newServiceForm.materialId : undefined,
+        qty_per_item: state.newServiceForm.qtyPerItem !== '' && Number(state.newServiceForm.qtyPerItem) > 0 ? Number(state.newServiceForm.qtyPerItem) : undefined,
+      };
+      const created = createMode === 'binding'
+        ? await serviceOperationsRef.current.createBinding(payload)
+        : await serviceOperationsRef.current.createService(payload);
+
+      if (created) {
+        setShowCreateService(false);
+        setCreateMode('service');
+        resetNewServiceForm(emptyServiceForm);
+      }
+    } finally {
+      setCreateSubmitting(false);
     }
-  }, [createMode, state.newServiceForm, setShowCreateService, resetNewServiceForm]); // serviceOperations через ref
+  }, [createSubmitting, createFormValid, createMode, state.newServiceForm, setShowCreateService, resetNewServiceForm]);
 
   const handleServiceDelete = useCallback(async (id: number, serviceName: string) => {
     await serviceOperationsRef.current.deleteService(id, serviceName);
@@ -504,34 +520,94 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         </div>
       )}
 
-      {/* Модальное окно создания услуги */}
+      {/* Модальное окно создания услуги / переплёта */}
       {state.showCreateService && (
         <Modal
           isOpen={true}
-          title={createMode === 'binding' ? 'Новый переплёт' : 'Новая услуга'}
+          title="Создание записи"
+          size="lg"
+          className="services-create-modal"
           onClose={() => {
             setShowCreateService(false);
             setCreateMode('service');
+            setCreateSubmitting(false);
+            resetNewServiceForm(emptyServiceForm);
           }}
         >
-          <ServiceForm value={state.newServiceForm} onChange={setNewServiceForm} categories={categories} materials={materials} />
-          <Alert type="info" className="mt-4">
-            {createMode === 'binding'
-              ? 'Переплёты создаются отдельно и автоматически относятся к операции bind и категории "Переплёты".'
-              : 'После создания услугу можно привязать к продукту в разделе управления продуктами.'}
-          </Alert>
-          <div className="flex justify-end gap-2 w-full mt-4 pt-4 border-t">
-            <Button
-              variant="secondary"
+          <div className="services-create-modal__tabs" role="tablist" aria-label="Тип записи">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={createMode === 'service'}
+              className={`services-create-modal__tab${createMode === 'service' ? ' is-active' : ''}`}
               onClick={() => {
-                setShowCreateService(false);
                 setCreateMode('service');
+                resetNewServiceForm(emptyServiceForm);
               }}
             >
-              Отмена
-            </Button>
-            <Button variant="primary" onClick={handleServiceCreate}>Сохранить</Button>
+              Услуга
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={createMode === 'binding'}
+              className={`services-create-modal__tab${createMode === 'binding' ? ' is-active' : ''}`}
+              onClick={() => {
+                setCreateMode('binding');
+                resetNewServiceForm(bindingServiceForm);
+              }}
+            >
+              Переплёт
+            </button>
           </div>
+          <p className="services-create-modal__lead">
+            {createMode === 'binding'
+              ? 'Переплёт попадает в блок «Переплёты», операция на бэкенде — bind. Варианты (сложная услуга) настраиваются после создания.'
+              : 'Укажите название, единицу и цену. После создания привяжите услугу к продукту в карточке продукта.'}
+          </p>
+          <form
+            className="services-create-modal__form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleServiceCreate();
+            }}
+          >
+            <ServiceForm
+              value={state.newServiceForm}
+              onChange={setNewServiceForm}
+              categories={categories}
+              materials={materials}
+              variant={createMode === 'binding' ? 'binding' : 'default'}
+              autoFocusName
+            />
+            <Alert type="info" className="mt-4">
+              {createMode === 'binding'
+                ? 'Тип postprint и операция bind подставляются автоматически. Категорию при необходимости задайте в «Редактировать».'
+                : 'Категория нужна для удобной группировки в списке услуг при настройке продукта.'}
+            </Alert>
+            <div className="services-create-modal__footer">
+              <Button
+                variant="secondary"
+                type="button"
+                disabled={createSubmitting}
+                onClick={() => {
+                  setShowCreateService(false);
+                  setCreateMode('service');
+                  resetNewServiceForm(emptyServiceForm);
+                }}
+              >
+                Отмена
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                loading={createSubmitting}
+                disabled={!createFormValid}
+              >
+                Создать
+              </Button>
+            </div>
+          </form>
         </Modal>
       )}
 

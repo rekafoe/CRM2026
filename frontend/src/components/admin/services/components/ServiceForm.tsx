@@ -24,6 +24,10 @@ interface ServiceFormProps {
   value: ServiceFormState;
   onChange: (next: ServiceFormState) => void;
   disabled?: boolean;
+  /** default — полная форма; binding — переплёт: скрыты лишние поля (тип и операция фиксированы на бэкенде) */
+  variant?: 'default' | 'binding';
+  /** Автофокус в поле «Название» (модалка создания) */
+  autoFocusName?: boolean;
   typeOptions?: Array<{ value: PricingServiceType; label: string }>;
   unitOptions?: Array<{ value: string; label: string }>;
   categories?: Array<{ id: number; name: string }>;
@@ -69,10 +73,14 @@ const operationTypeOptions = [
   { value: 'delivery', label: 'delivery (доставка)' },
 ];
 
+const inputClass = 'form-input w-full';
+
 const ServiceForm: React.FC<ServiceFormProps> = ({
   value,
   onChange,
   disabled = false,
+  variant = 'default',
+  autoFocusName = false,
   typeOptions = defaultTypeOptions,
   unitOptions = defaultUnitOptions,
   categories = [],
@@ -82,12 +90,23 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
     onChange({ ...value, [field]: fieldValue });
   };
 
+  const isBinding = variant === 'binding';
+
   return (
-    <div className="grid gap-3">
-      {categories.length > 0 && (
+    <div className="grid gap-3 service-form-grid">
+      {isBinding && (
+        <div className="service-form-binding-hint" role="status">
+          <strong>Переплёт</strong>
+          <span className="service-form-binding-hint__muted">
+            Тип услуги postprint и операция bind задаются при сохранении. Категорию при необходимости укажите в
+            редактировании услуги.
+          </span>
+        </div>
+      )}
+      {!isBinding && categories.length > 0 && (
         <FormField label="Категория" help="Группировка в выборе продукта и калькуляторе">
           <select
-            className="px-2 py-1 border rounded w-full"
+            className={inputClass}
             value={value.categoryId === '' ? '' : value.categoryId}
             disabled={disabled}
             onChange={(e) => updateField('categoryId', e.target.value === '' ? '' : Number(e.target.value))}
@@ -103,43 +122,50 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
       )}
       <FormField label="Название" required>
         <input
-          className="px-2 py-1 border rounded w-full"
+          className={inputClass}
           value={value.name}
           disabled={disabled}
+          autoFocus={autoFocusName}
+          autoComplete="off"
+          placeholder={isBinding ? 'Например: Брошюровка на скобу' : 'Название услуги'}
           onChange={(e) => updateField('name', e.target.value)}
         />
       </FormField>
-      <FormField label="Тип" help="print — печать, postprint — послепечатные, other — прочее">
-        <select
-          className="px-2 py-1 border rounded w-full"
-          value={value.type}
-          disabled={disabled}
-          onChange={(e) => updateField('type', e.target.value as PricingServiceType)}
-        >
-          {typeOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </FormField>
-      <FormField label="Тип операции" help="Строгий тип операции для расчета цены (laminate — ламинация, cut — резка, и т.д.)">
-        <select
-          className="px-2 py-1 border rounded w-full"
-          value={value.operationType || 'other'}
-          disabled={disabled}
-          onChange={(e) => updateField('operationType', e.target.value)}
-        >
-          {operationTypeOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </FormField>
+      {!isBinding && (
+        <>
+          <FormField label="Тип" help="print — печать, postprint — послепечатные, other — прочее">
+            <select
+              className={inputClass}
+              value={value.type}
+              disabled={disabled}
+              onChange={(e) => updateField('type', e.target.value as PricingServiceType)}
+            >
+              {typeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Тип операции" help="Строгий тип операции для расчета цены (laminate — ламинация, cut — резка, и т.д.)">
+            <select
+              className={inputClass}
+              value={value.operationType || 'other'}
+              disabled={disabled}
+              onChange={(e) => updateField('operationType', e.target.value)}
+            >
+              {operationTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        </>
+      )}
       <FormField label="Тип услуги" help="Простая — без вариантов, Сложная — с вариантами (например, ламинация с разными типами и плотностью)">
         <select
-          className="px-2 py-1 border rounded w-full"
+          className={inputClass}
           value={value.hasVariants ? 'complex' : 'simple'}
           disabled={disabled}
           onChange={(e) => updateField('hasVariants', e.target.value === 'complex')}
@@ -148,9 +174,16 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
           <option value="complex">Сложная</option>
         </select>
       </FormField>
-      <FormField label="Единица" help="per_cut — за рез (умный расчет), per_item — за изделие, per_sheet — за лист, fixed — фиксированная цена">
+      <FormField
+        label="Единица"
+        help={
+          isBinding
+            ? 'Для переплёта чаще всего: per_item (за изделие) или fixed'
+            : 'per_cut — за рез (умный расчет), per_item — за изделие, per_sheet — за лист, fixed — фиксированная цена'
+        }
+      >
         <select
-          className="px-2 py-1 border rounded w-full"
+          className={inputClass}
           value={value.unit}
           disabled={disabled}
           onChange={(e) => updateField('unit', e.target.value)}
@@ -166,17 +199,19 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
         <input
           type="number"
           step="0.01"
-          className="px-2 py-1 border rounded w-full"
+          min="0"
+          className={inputClass}
           value={value.rate}
           disabled={disabled}
           onChange={(e) => updateField('rate', e.target.value)}
+          placeholder="0"
         />
       </FormField>
       <FormField label="Мин. тираж">
         <input
           type="number"
           min="1"
-          className="px-2 py-1 border rounded w-full"
+          className={inputClass}
           value={value.minQuantity}
           disabled={disabled}
           onChange={(e) => updateField('minQuantity', e.target.value)}
@@ -187,7 +222,7 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
         <input
           type="number"
           min="1"
-          className="px-2 py-1 border rounded w-full"
+          className={inputClass}
           value={value.maxQuantity}
           disabled={disabled}
           onChange={(e) => updateField('maxQuantity', e.target.value)}
@@ -200,7 +235,7 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
           step="0.1"
           min="0"
           max="100"
-          className="px-2 py-1 border rounded w-full"
+          className={inputClass}
           value={value.operatorPercent || ''}
           disabled={disabled}
           onChange={(e) => updateField('operatorPercent', e.target.value)}
@@ -211,7 +246,7 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
         <>
           <FormField label="Материал для списания" help="При выполнении операции этот материал будет списываться со склада">
             <select
-              className="px-2 py-1 border rounded w-full"
+              className={inputClass}
               value={value.materialId === '' ? '' : value.materialId}
               disabled={disabled}
               onChange={(e) => updateField('materialId', e.target.value === '' ? '' : Number(e.target.value))}
@@ -229,7 +264,7 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
               type="number"
               step="0.01"
               min="0"
-              className="px-2 py-1 border rounded w-full"
+              className={inputClass}
               value={value.qtyPerItem}
               disabled={disabled}
               onChange={(e) => updateField('qtyPerItem', e.target.value)}
