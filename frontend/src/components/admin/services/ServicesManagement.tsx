@@ -525,7 +525,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         <Modal
           isOpen={true}
           title="Создание записи"
-          size="lg"
+          size="md"
           className="services-create-modal"
           onClose={() => {
             setShowCreateService(false);
@@ -616,6 +616,8 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         <Modal
           isOpen={true}
           title="Редактирование услуги"
+          size="md"
+          className="services-edit-modal"
           onClose={resetEditingService}
         >
           <ServiceForm value={state.editingServiceForm} onChange={setEditingServiceForm} categories={categories} materials={materials} />

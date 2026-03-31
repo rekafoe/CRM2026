@@ -1,0 +1,29 @@
+/* Сетка формы услуги: пары полей, без лишней ширины инпутов */
+.service-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.service-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 480px) {
+  .service-form__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.service-form__full {
+  width: 100%;
+  min-width: 0;
+}
+
+.service-form__row .form-group,
+.service-form__full .form-group {
+  min-width: 0;
+}

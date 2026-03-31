@@ -654,7 +654,18 @@
 /* =================================
    Модалка: создание услуги / переплёта
    ================================= */
+/* utilities.css задаёт .modal-content { max-width: 90vw } — из‑за этого окно на всю ширину */
+.modal-content.services-create-modal,
+.modal-content.services-edit-modal {
+  max-width: min(calc(32rem * 1.4), calc(100vw - 24px));
+  width: 100%;
+}
+
 .services-create-modal {
+  max-height: min(92vh, 900px);
+}
+
+.services-edit-modal {
   max-height: min(92vh, 900px);
 }
 
@@ -664,6 +675,12 @@
   flex-direction: column;
   max-height: calc(92vh - 120px);
   overflow: hidden;
+}
+
+.services-edit-modal .modal-body {
+  padding-top: 12px;
+  max-height: calc(92vh - 120px);
+  overflow-y: auto;
 }
 
 .services-create-modal__tabs {
