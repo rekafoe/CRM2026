@@ -9,6 +9,8 @@ interface RateLimitOptions {
   skipSuccessfulRequests?: boolean
   skipFailedRequests?: boolean
   keyPrefix?: string
+  /** Не учитывать запрос в лимите (например GET статики картинок — иначе страница с N img даёт N «ударов» за одно открытие) */
+  skip?: (req: Request) => boolean
 }
 
 interface RateLimitEntry {
@@ -35,12 +37,16 @@ class RateLimiter {
       message = 'Too many requests, please try again later',
       skipSuccessfulRequests = false,
       skipFailedRequests = false,
-      keyPrefix = 'global'
+      keyPrefix = 'global',
+      skip,
     } = options
 
     return (req: Request, res: Response, next: NextFunction) => {
       // CORS preflight не должен учитываться в лимите: иначе 429 без CORS-заголовков ломает браузер
       if (req.method === 'OPTIONS') {
+        return next()
+      }
+      if (skip?.(req)) {
         return next()
       }
       const bearerToken = this.extractBearerToken(req)
@@ -190,12 +196,24 @@ class RateLimiter {
 const rateLimiter = new RateLimiter()
 
 // Предустановленные лимиты для разных типов запросов (из env или дефолты)
+/** GET/HEAD картинок из uploads — не считаем в общий лимит: одна страница = десятки параллельных img без Authorization */
+function skipRateLimitForPublicUploadStatic(req: Request): boolean {
+  const m = req.method
+  if (m !== 'GET' && m !== 'HEAD') return false
+  const p = ((req.originalUrl || req.url || '') as string).split('?')[0]
+  if (p.startsWith('/api/uploads/')) return true
+  // /uploads/* кроме заказов (orders/ режется отдельным middleware)
+  if (p.startsWith('/uploads/') && !p.startsWith('/uploads/orders/')) return true
+  return false
+}
+
 export const generalRateLimit = rateLimiter.middleware({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
   max: Number(process.env.RATE_LIMIT_MAX || 100),
   maxAuthenticated: Number(process.env.RATE_LIMIT_AUTH_MAX || 1000),
   message: 'Too many requests from this IP, please try again later',
-  keyPrefix: 'general'
+  keyPrefix: 'general',
+  skip: skipRateLimitForPublicUploadStatic,
 })
 
 export const strictRateLimit = rateLimiter.middleware({
