@@ -207,10 +207,14 @@ function skipRateLimitForPublicUploadStatic(req: Request): boolean {
   return false
 }
 
+/** Окно по умолчанию 30 с: счётчик обнуляется часто — не «зависаешь» на 15 мин после серии запросов */
+const DEFAULT_RATE_WINDOW_MS = 30 * 1000
+
 export const generalRateLimit = rateLimiter.middleware({
-  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
-  max: Number(process.env.RATE_LIMIT_MAX || 100),
-  maxAuthenticated: Number(process.env.RATE_LIMIT_AUTH_MAX || 1000),
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || DEFAULT_RATE_WINDOW_MS),
+  // Лимиты «за окно» (см. RATE_LIMIT_WINDOW_MS). При окне 30 с — запас на параллельные GET тяжёлой страницы
+  max: Number(process.env.RATE_LIMIT_MAX || 150),
+  maxAuthenticated: Number(process.env.RATE_LIMIT_AUTH_MAX || 500),
   message: 'Too many requests from this IP, please try again later',
   keyPrefix: 'general',
   skip: skipRateLimitForPublicUploadStatic,

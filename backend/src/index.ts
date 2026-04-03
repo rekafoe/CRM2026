@@ -47,9 +47,8 @@ function assertProductionSecurityEnv(): void {
 
 // За прокси (Railway и др.) req.protocol должен быть https
 app.set('trust proxy', 1)
-app.use(generalRateLimit)
 
-// CORS: список origin из CORS_ORIGIN (несколько через запятую). На Railway должен совпадать с URL фронта (напр. https://mirfotocrm.vercel.app).
+// CORS ДО generalRateLimit: иначе при 429 ответ уходит без Access-Control-Allow-Origin → в консоли «blocked by CORS», хотя причина — лимит запросов.
 const corsAllowed = getCorsAllowedOrigins()
 logger.info('CORS allowed origins', { origins: corsAllowed })
 app.use(
@@ -60,6 +59,8 @@ app.use(
     optionsSuccessStatus: 204,
   })
 )
+
+app.use(generalRateLimit)
 
 // Swagger JSON endpoint (ДО compressionMiddleware)
 // Отдаём спецификацию с server URL из запроса, чтобы «Try it out» шёл к API, а не к /api-docs/
