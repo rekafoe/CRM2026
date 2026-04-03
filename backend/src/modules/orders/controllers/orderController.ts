@@ -6,7 +6,7 @@ import { getDb } from '../../../config/database'
 import { saveBufferToOrderFiles } from '../../../config/upload'
 import { setLastWebsiteOrderAt } from '../../../utils/poolSync'
 
-/** Приводит item.params к объекту: JSON-строка парсится, объект возвращается как есть, чтобы в CRM попадали все поля (printSize, paperType, withWhiteBorders и т.д.) */
+/** Приводит item.params к объекту: JSON-строка парсится, объект возвращается как есть, чтобы в CRM попадали все поля (printSize, paperType, withWhiteBorders, no_layout и т.д.). */
 function normalizeItemParams(params: unknown): Record<string, unknown> {
   if (params == null) return {}
   if (typeof params === 'object' && !Array.isArray(params)) return { ...params } as Record<string, unknown>

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Item } from '../../types';
 import { usePriceTypeLabels } from '../../hooks/pricing/usePriceTypeLabels';
+import { itemParamsHasNoLayout } from './orderItemUtils';
 
 interface ParameterSummaryItem {
   label: string;
@@ -46,6 +47,7 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
   const priceTypeLabels = usePriceTypeLabels();
   const priceTypeKey = item.params?.priceType ?? (item.params as any)?.price_type ?? item.params?.urgency ?? orderPriceType;
   const priceTypeLabel = priceTypeKey ? priceTypeLabels[String(priceTypeKey).toLowerCase()] : undefined;
+  const noLayout = itemParamsHasNoLayout(item.params);
 
   return (
     <div className="order-item-horizontal">
@@ -92,6 +94,15 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
           <span className="separator">|</span>
           <span className="detail-item price-type urgency">
             {priceTypeLabel ? `⚡ ${priceTypeLabel.displayLabel}` : `⚡ ${priceTypeKey}`}
+          </span>
+        </>
+      )}
+
+      {noLayout && (
+        <>
+          <span className="separator">|</span>
+          <span className="detail-item no-layout" title="Передано с сайта; на сумму заказа в CRM не влияет">
+            Нет макета
           </span>
         </>
       )}

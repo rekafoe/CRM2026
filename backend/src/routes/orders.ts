@@ -30,6 +30,7 @@ function orderForApi(order: any): any {
  *       Авторизация по API-ключу в заголовке X-API-Key или Authorization Bearer.
  *       Заказ создаётся с source=website, userId=null и попадает в пул заказов (unassigned).
  *       Переменная окружения WEBSITE_ORDER_API_KEY. Если не задана — эндпоинт возвращает 503.
+ *       POST /api/orders/from-website/with-files (multipart/form-data): те же поля (customerName, customerPhone, …, items как JSON-строка или массив); в каждой позиции params — как описано ниже (в т.ч. no_layout).
  *     tags: [Orders]
  *     security: []
  *     parameters:
@@ -72,8 +73,18 @@ function orderForApi(order: any): any {
  *                     type:
  *                       type: string
  *                     params:
- *                       type: string
- *                       description: JSON-строка параметров
+ *                       oneOf:
+ *                         - type: string
+ *                           description: JSON-строка; парсится в объект (все поля сохраняются в позиции)
+ *                         - type: object
+ *                           description: Параметры позиции; дополнительные поля не отбрасываются
+ *                           additionalProperties: true
+ *                           properties:
+ *                             no_layout:
+ *                               type: boolean
+ *                               description: |
+ *                                 true — у клиента нет готового макета (метаданные для производства).
+ *                                 На расчёт суммы в CRM не влияет: итог по позиции задаётся полями price и quantity.
  *                     price:
  *                       type: number
  *                     quantity:

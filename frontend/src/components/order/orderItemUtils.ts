@@ -1,5 +1,14 @@
 import type { Item } from '../../types';
 
+/** Метка с сайта: нет макета (не влияет на цену в CRM). Допустимы no_layout или layout_missing. */
+export const itemParamsHasNoLayout = (params: Item['params'] | Record<string, unknown> | null | undefined): boolean => {
+  const p = params as Record<string, unknown> | null | undefined;
+  if (!p || typeof p !== 'object') return false;
+  if (p.no_layout === true) return true;
+  if (p.layout_missing === true) return true;
+  return false;
+};
+
 // Определяем, что описание сгенерировано автоматически калькулятором
 export const isAutoDescription = (desc: string | undefined | null): boolean => {
   if (!desc) return false;

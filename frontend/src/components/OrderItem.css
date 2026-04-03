@@ -65,6 +65,7 @@
 .detail-item { color: #fff; background: #4b5563; padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px; flex-shrink: 0; white-space: nowrap; }
 .detail-item.urgency { background: #fff3cd; color: #856404; font-weight: 600; }
 .detail-item.customer { background: #d1ecf1; color: #0c5460; font-weight: 600; }
+.detail-item.no-layout { background: #fde68a; color: #78350f; font-weight: 600; }
 .order-parameter-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
 .order-sheet-info { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: #0f172a; margin-bottom: 6px; }
 @media (max-width: 768px) { .order-item-horizontal { padding: 6px 8px; font-size: 12px; gap: 2px; } .separator { margin: 0 2px; } .detail-item { font-size: 10px; padding: 1px 3px; } .item-name { font-size: 13px; } }
