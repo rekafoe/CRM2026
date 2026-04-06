@@ -29,6 +29,7 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   // website/public calculator
   { method: 'GET', path: /^\/api\/presets(?:\/.*)?$/ },
   { method: 'GET', path: /^\/api\/products$/ },
+  { method: 'GET', path: /^\/api\/products\/categories\/?$/ },
   { method: 'GET', path: /^\/api\/products\/category\/[0-9]+$/ },
   { method: 'GET', path: /^\/api\/products\/[0-9]+\/schema$/ },
   { method: 'GET', path: /^\/api\/products\/[0-9]+\/tier-prices$/ },
