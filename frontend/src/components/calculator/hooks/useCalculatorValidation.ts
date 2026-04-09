@@ -20,6 +20,11 @@ interface UseCalculatorValidationParams {
   effectiveSizes?: Array<{ id: string; min_qty?: number; max_qty?: number; [key: string]: any }>;
   /** Варианты страниц текущего типа (для упрощённых продуктов с типами) */
   effectivePagesOptions?: number[];
+  /** Разрешить значение не из списка options (с проверкой min/max/step). false — только пресеты */
+  pagesAllowCustom?: boolean;
+  pagesMin?: number;
+  pagesMax?: number;
+  pagesStep?: number;
 }
 
 function computeErrors(params: {
@@ -32,6 +37,10 @@ function computeErrors(params: {
   /** Размеры с уже подставленными effective allowed_material_ids (как в MaterialsSection) */
   effectiveSizes?: Array<{ id: string; allowed_material_ids?: number[]; [key: string]: any }>;
   backendProductSchema?: any | null;
+  pagesAllowCustom?: boolean;
+  pagesMin?: number;
+  pagesMax?: number;
+  pagesStep?: number;
 }): Record<string, string> {
   const {
     specs,
@@ -42,6 +51,10 @@ function computeErrors(params: {
     operationLimits,
     effectiveSizes,
     backendProductSchema,
+    pagesAllowCustom,
+    pagesMin,
+    pagesMax,
+    pagesStep,
   } = params;
   const errors: Record<string, string> = {};
 
@@ -70,11 +83,40 @@ function computeErrors(params: {
   }
 
   const needsPages = Array.isArray(schemaPagesEnum) && schemaPagesEnum.length > 0;
-  if (needsPages && (!specs.pages || specs.pages < 4)) {
-    errors.pages = 'Количество страниц должно быть не менее 4';
-  }
-  if (needsPages && specs.pages && specs.pages % 4 !== 0) {
-    errors.pages = 'Количество страниц должно быть кратно 4';
+  const p = specs.pages != null ? Number(specs.pages) : NaN;
+  const inPresetList = needsPages && Number.isFinite(p) && schemaPagesEnum!.includes(p);
+  const canCustom =
+    pagesAllowCustom === true ||
+    (pagesAllowCustom !== false && needsPages && (pagesMin != null || pagesMax != null || pagesStep != null));
+
+  if (needsPages && (!specs.pages || !Number.isFinite(p) || p < 1)) {
+    errors.pages = 'Укажите количество страниц';
+  } else if (needsPages && Number.isFinite(p)) {
+    if (!inPresetList) {
+      if (!canCustom) {
+        errors.pages = 'Выберите количество страниц из списка';
+      } else {
+        const opts = schemaPagesEnum!;
+        const inferredMin = pagesMin ?? Math.min(...opts);
+        const inferredMax = pagesMax ?? Math.max(...opts);
+        if (p < inferredMin) {
+          errors.pages = `Не менее ${inferredMin} стр.`;
+        } else if (p > inferredMax) {
+          errors.pages = `Не более ${inferredMax} стр.`;
+        }
+        const step = pagesStep;
+        if (step != null && step > 0 && p % step !== 0) {
+          errors.pages = `Количество страниц должно быть кратно ${step}`;
+        } else if (
+          step == null &&
+          opts.length > 0 &&
+          opts.every((x) => x % 4 === 0) &&
+          p % 4 !== 0
+        ) {
+          errors.pages = 'Количество страниц должно быть кратно 4';
+        }
+      }
+    }
   }
 
   if (sizeLimits || operationLimits) {
@@ -109,6 +151,10 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
     customFormat = { width: '', height: '' },
     effectiveSizes,
     effectivePagesOptions,
+    pagesAllowCustom,
+    pagesMin,
+    pagesMax,
+    pagesStep,
   } = params;
 
   const schemaPagesEnum = useMemo(() => {
@@ -169,10 +215,26 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
         operationLimits: getOperationLimits(nextSpecs.selectedOperations),
         effectiveSizes,
         backendProductSchema,
+        pagesAllowCustom,
+        pagesMin,
+        pagesMax,
+        pagesStep,
       });
       return { errors, isValid: Object.keys(errors).length === 0 };
     },
-    [schemaPagesEnum, isCustomFormat, customFormat, getSizeLimits, getOperationLimits, effectiveSizes, backendProductSchema],
+    [
+      schemaPagesEnum,
+      isCustomFormat,
+      customFormat,
+      getSizeLimits,
+      getOperationLimits,
+      effectiveSizes,
+      backendProductSchema,
+      pagesAllowCustom,
+      pagesMin,
+      pagesMax,
+      pagesStep,
+    ],
   );
 
   const validationErrors = useMemo(() => {

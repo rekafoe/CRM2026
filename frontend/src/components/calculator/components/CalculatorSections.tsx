@@ -33,7 +33,6 @@ interface CalculatorSectionsProps {
   currentConfig?: { name?: string } | null;
   onOpenProductSelector: () => void;
   effectiveSizes?: Array<{ id: string; label?: string; width_mm: number; height_mm: number; [key: string]: any }>;
-  effectivePages?: { options?: number[]; default?: number };
   productTypes?: Array<{ id: number; name: string; default?: boolean }>;
   selectedTypeId?: number | null;
   onSelectType?: (typeId: number) => void;
@@ -41,6 +40,20 @@ interface CalculatorSectionsProps {
   materialSelectionResetKey?: string;
   /** Для simplified + подтипы: только эти operation_id из схемы показывать в «Операции» */
   allowedOperationIds?: number[];
+  effectivePages?: {
+    options?: number[];
+    default?: number;
+    allowCustom?: boolean;
+    min?: number;
+    max?: number;
+    step?: number;
+  };
+  bindingServiceId?: number;
+  bindingVariants?: Array<{ id: number; variantName?: string; variant_name?: string }>;
+  bindingVariantId?: number;
+  bindingUnitsPerItem?: number;
+  onBindingVariantChange?: (variantId: number | undefined) => void;
+  onBindingUnitsChange?: (units: number | undefined) => void;
 }
 
 export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(({
@@ -71,6 +84,13 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   onSelectType,
   materialSelectionResetKey,
   allowedOperationIds,
+  effectivePages,
+  bindingServiceId,
+  bindingVariants,
+  bindingVariantId,
+  bindingUnitsPerItem,
+  onBindingVariantChange,
+  onBindingUnitsChange,
 }) => {
   const hasEffectiveSizes = Array.isArray(effectiveSizes) && effectiveSizes.length > 0;
   const showTypeSelector = Array.isArray(productTypes) && productTypes.length > 0 && onSelectType != null;
@@ -127,6 +147,13 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           schema={backendProductSchema}
           effectiveSizes={effectiveSizes}
           itemsPerSheet={result?.layout?.itemsPerSheet}
+          effectivePages={effectivePages}
+          bindingServiceId={bindingServiceId}
+          bindingVariants={bindingVariants}
+          bindingVariantId={bindingVariantId}
+          bindingUnitsPerItem={bindingUnitsPerItem}
+          onBindingVariantChange={onBindingVariantChange}
+          onBindingUnitsChange={onBindingUnitsChange}
         />
 
         <div className="unified-params-row">

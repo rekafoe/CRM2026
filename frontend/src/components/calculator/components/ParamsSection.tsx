@@ -27,6 +27,22 @@ interface ParamsSectionProps {
   effectiveSizes?: Array<{ id: string; label?: string; width_mm: number; height_mm: number; min_qty?: number; max_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> }>;
   /** Штук на листе — для подсказки «следующее изменение цены» */
   itemsPerSheet?: number;
+  /** Страницы из шаблона (подтип/корень): options, allowCustom, min/max/step */
+  effectivePages?: {
+    options?: number[];
+    default?: number;
+    allowCustom?: boolean;
+    min?: number;
+    max?: number;
+    step?: number;
+  };
+  /** Переплёт для multi_page: услуга из шаблона + варианты из API */
+  bindingServiceId?: number;
+  bindingVariants?: Array<{ id: number; variantName?: string; variant_name?: string }>;
+  bindingVariantId?: number;
+  bindingUnitsPerItem?: number;
+  onBindingVariantChange?: (variantId: number | undefined) => void;
+  onBindingUnitsChange?: (units: number | undefined) => void;
 }
 
 export const ParamsSection: React.FC<ParamsSectionProps> = ({
@@ -41,6 +57,13 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   schema,
   effectiveSizes: effectiveSizesProp,
   itemsPerSheet,
+  effectivePages: effectivePagesProp,
+  bindingServiceId,
+  bindingVariants = [],
+  bindingVariantId,
+  bindingUnitsPerItem,
+  onBindingVariantChange,
+  onBindingUnitsChange,
 }) => {
   const hasField = (name: string) => !!schema?.fields?.some(f => f.name === name);
   const getEnum = (name: string): any[] => schema?.fields?.find(f => f.name === name)?.enum || [];
@@ -263,24 +286,148 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
         </div>
         )}
 
-        {/* Страницы (для буклетов) */}
-        {hasField('pages') && (
-        <div className="param-group">
-          <label>
-            {getLabel('pages', 'Страницы')}
-            {isRequired('pages') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
-          </label>
-          <select
-            value={specs.pages ?? 4}
-            onChange={(e) => updateSpecs({ pages: parseInt(e.target.value, 10) })}
-            className="form-control"
-            required={isRequired('pages')}
-          >
-            {getEnum('pages').map((p: number) => (
-              <option key={p} value={p}>{p} стр.</option>
-            ))}
-          </select>
-        </div>
+        {/* Страницы: пресеты из шаблона + произвольное число (если разрешено) */}
+        {(() => {
+          const fromTemplate = Array.isArray(effectivePagesProp?.options)
+            ? effectivePagesProp!.options!.map((n) => Number(n)).filter((n) => Number.isFinite(n))
+            : [];
+          const fromSchema = (getEnum('pages') as number[]) || [];
+          const allowedOptions = fromTemplate.length > 0 ? fromTemplate : fromSchema;
+          const showPages =
+            hasField('pages') ||
+            allowedOptions.length > 0 ||
+            effectivePagesProp?.allowCustom === true;
+          if (!showPages) return null;
+
+          const allowCustom = effectivePagesProp?.allowCustom !== false;
+          const minBound =
+            effectivePagesProp?.min ??
+            (allowedOptions.length > 0 ? Math.min(...allowedOptions) : (getMin('pages') ?? 4));
+          const maxBound =
+            effectivePagesProp?.max ??
+            (allowedOptions.length > 0 ? Math.max(...allowedOptions) : (getMax('pages') ?? 500));
+          const stepHint = effectivePagesProp?.step;
+          const current = Number(specs.pages ?? allowedOptions[0] ?? minBound ?? 4);
+          const selectValue = allowedOptions.includes(current) ? current : '';
+
+          if (allowedOptions.length === 0 && hasField('pages')) {
+            const fe = getEnum('pages') as number[];
+            if (fe.length > 0) {
+              return (
+                <div className="param-group">
+                  <label>
+                    {getLabel('pages', 'Страницы')}
+                    {isRequired('pages') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
+                  </label>
+                  <select
+                    value={specs.pages ?? fe[0]}
+                    onChange={(e) => updateSpecs({ pages: parseInt(e.target.value, 10) })}
+                    className="form-control"
+                    required={isRequired('pages')}
+                  >
+                    {fe.map((p: number) => (
+                      <option key={p} value={p}>
+                        {p} стр.
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            }
+          }
+
+          if (allowedOptions.length === 0 && !allowCustom) {
+            return null;
+          }
+
+          return (
+            <div className="param-group param-group--pages">
+              <label>
+                {getLabel('pages', 'Страницы')}
+                {isRequired('pages') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
+              </label>
+              {allowedOptions.length > 0 && (
+                <select
+                  value={selectValue === '' ? String(allowedOptions[0]) : String(selectValue)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    updateSpecs({ pages: parseInt(v, 10) }, true);
+                  }}
+                  className="form-control"
+                  required={isRequired('pages') && !allowCustom}
+                >
+                  {allowedOptions.map((p: number) => (
+                    <option key={p} value={p}>
+                      {p} стр.
+                    </option>
+                  ))}
+                  {allowCustom && !allowedOptions.includes(current) && (
+                    <option value={String(current)}>{current} стр. (вручную)</option>
+                  )}
+                </select>
+              )}
+              {allowCustom && (
+                <div className="param-group param-group--inline" style={{ marginTop: 8 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Другое количество (стр.)
+                    {stepHint != null ? `, кратно ${stepHint}` : ''}
+                    {allowedOptions.length > 0 ? `: от ${minBound} до ${maxBound}` : ''}
+                  </label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    min={minBound}
+                    max={maxBound}
+                    step={stepHint ?? 1}
+                    value={Number.isFinite(current) ? current : ''}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '') return;
+                      const n = parseInt(raw, 10);
+                      if (!Number.isFinite(n)) return;
+                      updateSpecs({ pages: n }, true);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {bindingServiceId != null && bindingVariants.length > 0 && (
+          <div className="param-group param-group--binding">
+            <label>Переплёт</label>
+            <select
+              className="form-control"
+              value={bindingVariantId != null && Number.isFinite(bindingVariantId) ? String(bindingVariantId) : ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                onBindingVariantChange?.(v === '' ? undefined : Number(v));
+              }}
+            >
+              <option value="">— Выберите вариант —</option>
+              {bindingVariants.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.variantName ?? (v as any).variant_name ?? `Вариант #${v.id}`}
+                </option>
+              ))}
+            </select>
+            {onBindingUnitsChange != null && (
+              <div style={{ marginTop: 8 }}>
+                <label style={{ fontSize: 12 }}>Единиц переплёта на изделие</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="form-control"
+                  value={bindingUnitsPerItem ?? 1}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    onBindingUnitsChange(Number.isFinite(n) && n > 0 ? n : 1);
+                  }}
+                />
+              </div>
+            )}
+          </div>
         )}
 
         {/* Магнитные (для визиток) */}

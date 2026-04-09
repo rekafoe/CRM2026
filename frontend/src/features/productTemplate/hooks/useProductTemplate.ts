@@ -27,6 +27,12 @@ export type SimplifiedFinishingPrice = {
 export type SimplifiedPagesConfig = {
   options: number[];
   default?: number;
+  /** Разрешить ввод количества страниц вручную (не только из options). По умолчанию в калькуляторе — да, если не задано явно false */
+  allowCustom?: boolean;
+  min?: number;
+  max?: number;
+  /** Шаг для произвольного ввода (например 4 для брошюр) */
+  step?: number;
 }
 
 export type MultiPageCoverMode = 'none' | 'self' | 'separate'

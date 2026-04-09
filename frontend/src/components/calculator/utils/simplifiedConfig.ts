@@ -7,7 +7,14 @@
  */
 export interface EffectiveSimplifiedConfig {
   sizes: Array<{ id: string; label?: string; width_mm: number; height_mm: number; [key: string]: any }>;
-  pages?: { options?: number[]; default?: number };
+  pages?: {
+    options?: number[];
+    default?: number;
+    allowCustom?: boolean;
+    min?: number;
+    max?: number;
+    step?: number;
+  };
 }
 
 /**

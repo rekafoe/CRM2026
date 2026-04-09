@@ -35,6 +35,7 @@ import { usePostprintServices } from './hooks/usePostprintServices';
 import { useCustomProduct } from './hooks/useCustomProduct';
 import { useProductSelection } from './hooks/useProductSelection';
 import { buildOrderPayload } from './utils/orderPayloadBuilder';
+import { getServiceVariants } from '../../services/pricing/api';
 
 const createInitialSpecs = (initialProductType?: string): ProductSpecs => ({
   productType: initialProductType || 'flyers',
@@ -196,6 +197,20 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   }, [hasProductTypes, selectedTypeId, simplified?.typeConfigs]);
   const effectiveSizes = effectiveConfig.sizes;
   const effectivePagesOptions = effectiveConfig.pages?.options;
+  const effectivePagesConfig = effectiveConfig.pages;
+
+  const [bindingVariants, setBindingVariants] = useState<Array<{ id: number; variantName?: string }>>([]);
+  const bindingTemplate = simplified?.multiPageStructure?.binding;
+  useEffect(() => {
+    const sid = bindingTemplate?.service_id;
+    if (sid == null || isCustomProduct || isPostprintProduct) {
+      setBindingVariants([]);
+      return;
+    }
+    getServiceVariants(Number(sid))
+      .then((list) => setBindingVariants(Array.isArray(list) ? list : []))
+      .catch(() => setBindingVariants([]));
+  }, [bindingTemplate?.service_id, selectedProduct?.id, isCustomProduct, isPostprintProduct]);
 
   type SizeWithPrices = { id: string; width_mm: number; height_mm: number; min_qty?: number; print_prices?: Array<{ tiers?: Array<{ min_qty?: number }> }> };
 
@@ -290,11 +305,21 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
           ? Number(initial.base_material_id)
           : undefined;
 
+      const pagesCfg = cfg?.pages ?? simplified?.pages;
+      const pageOptions = Array.isArray(pagesCfg?.options) ? pagesCfg.options.map((n: number) => Number(n)) : [];
+      const defaultPages =
+        pagesCfg?.default != null && Number.isFinite(Number(pagesCfg.default))
+          ? Number(pagesCfg.default)
+          : pageOptions.length > 0
+            ? pageOptions[0]
+            : prev.pages ?? 4;
+
       return {
         ...prev,
         typeId: typeId ?? undefined,
         typeName: typeVariant?.name ?? undefined,
         ...(firstSize ? { size_id: firstSize.id, format: `${firstSize.width_mm}×${firstSize.height_mm}` } : {}),
+        ...(pageOptions.length > 0 || pagesCfg?.default != null ? { pages: defaultPages } : {}),
         quantity: initial?.quantity ?? autoQty,
         ...(isNewType
           ? {
@@ -309,7 +334,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         ...(initial?.roundCorners !== undefined ? { roundCorners: initial.roundCorners } : {}),
       };
     });
-  }, [simplified?.types, simplified?.typeConfigs, backendProductSchema?.operations, setSpecs]);
+  }, [simplified?.types, simplified?.typeConfigs, simplified?.pages, backendProductSchema?.operations, setSpecs]);
 
   // Выбор начального подтипа (тип материала): только при невалидном selectedTypeId, и не применяем один и тот же nextId повторно — иначе цикл смены типа.
   const lastAppliedTypeIdRef = useRef<number | null>(null);
@@ -449,6 +474,10 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     customFormat,
     effectiveSizes: effectiveSizes?.length ? effectiveSizes : undefined,
     effectivePagesOptions: Array.isArray(effectivePagesOptions) && effectivePagesOptions.length > 0 ? effectivePagesOptions : undefined,
+    pagesAllowCustom: effectivePagesConfig?.allowCustom !== false,
+    pagesMin: effectivePagesConfig?.min,
+    pagesMax: effectivePagesConfig?.max,
+    pagesStep: effectivePagesConfig?.step,
   });
 
   const getProductionTime = useCallback(() => {
@@ -549,6 +578,15 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         delete next.paperType;
         // Также сбрасываем плотность, так как она зависит от типа бумаги
         next.paperDensity = 0;
+      }
+      delete next.binding_service_id;
+      delete next.binding_variant_id;
+      delete next.binding_units_per_item;
+      const bind = sim?.multiPageStructure?.binding;
+      if (bind?.service_id) {
+        next.binding_service_id = Number(bind.service_id);
+        if (bind.variant_id != null) next.binding_variant_id = Number(bind.variant_id);
+        if (bind.units_per_item != null) next.binding_units_per_item = Number(bind.units_per_item);
       }
       return next;
     });
@@ -1051,6 +1089,20 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                     : undefined
                 }
                 allowedOperationIds={subtypeAllowedOperationIds}
+                bindingServiceId={
+                  simplified?.multiPageStructure?.binding?.service_id != null
+                    ? Number(simplified.multiPageStructure.binding.service_id)
+                    : undefined
+                }
+                bindingVariants={bindingVariants}
+                bindingVariantId={(specs as any).binding_variant_id}
+                bindingUnitsPerItem={(specs as any).binding_units_per_item}
+                onBindingVariantChange={(variantId) =>
+                  setSpecs((s) => ({ ...s, binding_variant_id: variantId }))
+                }
+                onBindingUnitsChange={(units) =>
+                  setSpecs((s) => ({ ...s, binding_units_per_item: units }))
+                }
               />
             )}
 
