@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { getPrintTechnologies, getPrinters } from '../../../api';
+import { getPrintTechnologies } from '../../../api';
 import { apiCache } from '../../../utils/apiCache';
 import { Product } from '../../../services/products';
 
@@ -36,8 +36,6 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
   materialInFirstColumn,
 }) => {
   const [printTechnologies, setPrintTechnologies] = useState<Array<{ code: string; name: string; pricing_mode: string; supports_duplex?: number | boolean }>>([]);
-  const [printers, setPrinters] = useState<Array<{ id: number; name: string; technology_code?: string | null; color_mode?: 'bw' | 'color' | 'both' }>>([]);
-  const [loading, setLoading] = useState(true);
 
   // Загружаем типы печати
   useEffect(() => {
@@ -59,40 +57,6 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
         });
     }
   }, []);
-
-  // Загружаем принтеры для получения разрешенных типов печати и режимов цвета
-  useEffect(() => {
-    if (!selectedProduct?.id) {
-      setPrinters([]);
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-
-    (async () => {
-      try {
-        const resp = await getPrinters();
-        if (cancelled) return;
-        
-        const printersList = Array.isArray(resp.data) ? resp.data : [];
-        setPrinters(printersList);
-      } catch (error) {
-        if (!cancelled) {
-          setPrinters([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedProduct?.id]);
 
   // Получаем разрешенные типы печати из цен печати размера/продукта и constraints
   const allowedPrintTechnologies = useMemo(() => {
@@ -156,33 +120,14 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       }
     }
 
-    // 3) Fallback: если есть операции печати, но нет явных настроек - используем принтеры
-    const operations = backendProductSchema?.operations || [];
-    const hasPrintOperations = operations.some((op: any) => 
-      op.operationType === 'print' || op.type === 'print' || op.operation_type === 'print'
-    );
-    
-    if (hasPrintOperations && printers.length > 0) {
-      const uniqueTechCodes = new Set(
-        printers
-          .map(p => p.technology_code)
-          .filter((code): code is string => Boolean(code))
-      );
-      return printTechnologies.filter((tech) => {
-        const inPrinters = uniqueTechCodes.has(tech.code);
-        if (!inPrinters) return false;
-        return constrainedCodes ? constrainedCodes.has(tech.code) : true;
-      });
-    }
-
-    // 4) Если заданы constraints, но не нашли в ценах/принтерах — показываем только их
+    // 3) Если заданы constraints, но не нашли в ценах — показываем только их
     if (constrainedCodes && constrainedCodes.size > 0) {
       return printTechnologies.filter((tech) => constrainedCodes.has(tech.code));
     }
 
-    // 5) Если ничего не найдено - возвращаем пустой массив (не показываем лишние технологии)
+    // 4) Если ничего не найдено — пусто (без подстановки из справочника принтеров)
     return [];
-  }, [printTechnologies, printers, backendProductSchema, effectiveSizesProp, selectedSizeId]);
+  }, [printTechnologies, backendProductSchema, effectiveSizesProp, selectedSizeId]);
 
   // Получаем информацию о выбранной технологии печати
   const selectedPrintTechnology = useMemo(() => {
@@ -245,7 +190,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
            code.includes('inkjet') && (code.includes('pigment') || name.includes('пигмент'));
   }, [selectedPrintTechnology]);
 
-  // Получаем разрешенные режимы цвета для выбранного типа печати
+  // Режимы цвета только из шаблона (print_prices). Без подстановки из принтеров — иначе расчёт расходится с ценами.
   const allowedColorModes = useMemo(() => {
     if (!printTechnology) {
       return [];
@@ -256,59 +201,52 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
       return ['color'];
     }
 
-    const colorModes = new Set<'bw' | 'color'>();
+    const collectFromPrintPrices = (list: any[] | undefined, into: Set<'bw' | 'color'>) => {
+      if (!Array.isArray(list)) return;
+      list.forEach((priceConfig: any) => {
+        const tech = priceConfig.technology_code || priceConfig.technologyCode;
+        if (tech !== printTechnology) return;
+        const mode = priceConfig.color_mode ?? priceConfig.colorMode;
+        const normalized =
+          mode === 'bw' || mode === 'color'
+            ? mode
+            : String(mode).toLowerCase() === 'bw'
+              ? 'bw'
+              : String(mode).toLowerCase() === 'color'
+                ? 'color'
+                : null;
+        if (normalized) into.add(normalized);
+      });
+    };
 
-    // 1) Из принтеров с этой технологией
-    const printersForTech = printers.filter(p => p.technology_code === printTechnology);
-    printersForTech.forEach(printer => {
-      const mode = printer.color_mode;
-      if (mode === 'bw' || mode === 'color') {
-        colorModes.add(mode);
-      } else if (mode === 'both') {
-        colorModes.add('bw');
-        colorModes.add('color');
-      }
-    });
+    const orderModes = (set: Set<'bw' | 'color'>): Array<'bw' | 'color'> => {
+      const out: Array<'bw' | 'color'> = [];
+      if (set.has('color')) out.push('color');
+      if (set.has('bw')) out.push('bw');
+      return out;
+    };
 
-    // 2) Fallback: из шаблона продукта (print_prices)
-    if (colorModes.size === 0) {
-      const template = backendProductSchema?.template;
-      const collectFromPrintPrices = (list: any[] | undefined) => {
-        if (!Array.isArray(list)) return;
-        list.forEach((priceConfig: any) => {
-          const tech = priceConfig.technology_code || priceConfig.technologyCode;
-          if (tech !== printTechnology) return;
-          const mode = priceConfig.color_mode ?? priceConfig.colorMode;
-          const normalized = mode === 'bw' || mode === 'color' ? mode : String(mode).toLowerCase() === 'bw' ? 'bw' : String(mode).toLowerCase() === 'color' ? 'color' : null;
-          if (normalized) colorModes.add(normalized);
-        });
-      };
-      const sizesForColor = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
-        ? effectiveSizesProp
-        : template?.simplified?.sizes;
-      if (Array.isArray(sizesForColor)) {
-        const targetSizes = selectedSizeId 
-          ? sizesForColor.filter((s: any) => String(s.id) === String(selectedSizeId))
-          : sizesForColor;
-        targetSizes.forEach((size: any) => collectFromPrintPrices(size.print_prices));
-      }
-      const configData = template?.config_data || template;
-      if (configData?.print_prices) collectFromPrintPrices(configData.print_prices);
+    const fromTemplate = new Set<'bw' | 'color'>();
+    const template = backendProductSchema?.template;
+    const sizesForColor = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
+      ? effectiveSizesProp
+      : template?.simplified?.sizes;
+    if (Array.isArray(sizesForColor)) {
+      const targetSizes = selectedSizeId
+        ? sizesForColor.filter((s: any) => String(s.id) === String(selectedSizeId))
+        : sizesForColor;
+      targetSizes.forEach((size: any) => collectFromPrintPrices(size.print_prices, fromTemplate));
     }
+    const configData = template?.config_data || template;
+    if (configData?.print_prices) collectFromPrintPrices(configData.print_prices, fromTemplate);
 
-    // 3) Если всё ещё пусто — для выбранной технологии предлагаем оба режима (чтобы не зависать на «Загрузка режимов печати...»)
-    if (colorModes.size === 0 && allowedPrintTechnologies.some(t => t.code === printTechnology)) {
-      colorModes.add('bw');
-      colorModes.add('color');
-    }
-
-    return Array.from(colorModes);
-  }, [printTechnology, printers, isColorOnly, backendProductSchema, allowedPrintTechnologies, effectiveSizesProp, selectedSizeId]);
+    return orderModes(fromTemplate);
+  }, [printTechnology, isColorOnly, backendProductSchema, effectiveSizesProp, selectedSizeId]);
 
   // 🆕 Устанавливаем дефолтные значения для селекторов печати
   useEffect(() => {
-    if (!selectedProduct?.id || loading) return;
-    
+    if (!selectedProduct?.id) return;
+
     if (allowedPrintTechnologies.length > 0) {
       const isCurrentValid = printTechnology && allowedPrintTechnologies.some(t => t.code === printTechnology);
       // Устанавливаем первый тип печати, если не выбран или выбран недопустимый
@@ -316,20 +254,22 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
         onPrintTechnologyChange(allowedPrintTechnologies[0].code);
       }
     }
-  }, [selectedProduct?.id, loading, allowedPrintTechnologies, printTechnology, onPrintTechnologyChange]);
+  }, [selectedProduct?.id, allowedPrintTechnologies, printTechnology, onPrintTechnologyChange]);
 
   // 🆕 Устанавливаем первый режим цвета, если тип печати выбран, но режим не выбран или недопустим
   useEffect(() => {
-    if (!printTechnology || loading) return;
-    
+    if (!printTechnology) return;
+
     if (allowedColorModes.length > 0) {
       const isCurrentValid = printColorMode && allowedColorModes.includes(printColorMode);
       if (!isCurrentValid) {
         const firstMode = allowedColorModes[0];
         onPrintColorModeChange(firstMode === 'bw' ? 'bw' : firstMode === 'color' ? 'color' : null);
       }
+    } else if (printColorMode != null) {
+      onPrintColorModeChange(null);
     }
-  }, [printTechnology, loading, allowedColorModes, printColorMode, onPrintColorModeChange]);
+  }, [printTechnology, allowedColorModes, printColorMode, onPrintColorModeChange]);
 
   // 🆕 Если технология не поддерживает двухстороннюю печать - устанавливаем sides = 1
   useEffect(() => {
@@ -340,32 +280,12 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
     }
   }, [printTechnology, supportsDuplex, sides, onSidesChange]);
 
-  if (loading) {
-    return (
-      <div className="form-section compact" style={{ padding: 0, border: 'none', background: 'transparent' }}>
-        <div className="form-control" style={{ color: '#666' }}>
-          Загрузка типов печати...
-        </div>
-      </div>
-    );
-  }
-
   // Если продукт не выбран, не показываем раздел печати
   if (!selectedProduct?.id) {
     return (
       <div className="form-section compact" style={{ padding: 0, border: 'none', background: 'transparent' }}>
         <div className="form-control" style={{ color: '#666' }}>
           Выберите продукт для настройки параметров печати
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="form-section compact" style={{ padding: 0, border: 'none', background: 'transparent' }}>
-        <div className="form-control" style={{ color: '#666' }}>
-          Загрузка параметров печати...
         </div>
       </div>
     );
@@ -473,7 +393,7 @@ export const PrintingSettingsSection: React.FC<PrintingSettingsSectionProps> = (
                 Режим печати <span style={{ color: 'red' }}>*</span>
               </label>
               <div className="form-control" style={{ color: '#666' }}>
-                Загрузка режимов печати...
+                Нет доступных режимов: задайте строки печати (print_prices) в шаблоне продукта для выбранного размера и технологии.
               </div>
             </div>
           )
