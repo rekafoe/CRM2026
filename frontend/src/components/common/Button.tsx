@@ -12,6 +12,7 @@ interface ButtonProps {
   className?: string;
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right';
+  title?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({ 
@@ -24,7 +25,8 @@ export const Button: React.FC<ButtonProps> = ({
   type = 'button',
   className = '',
   icon,
-  iconPosition = 'left'
+  iconPosition = 'left',
+  title,
 }) => {
   const getVariantClasses = (variant: string) => {
     switch (variant) {
@@ -89,6 +91,7 @@ export const Button: React.FC<ButtonProps> = ({
       className={`${baseClasses} ${variantClasses} ${sizeClasses} ${disabledClasses} ${className}`}
       onClick={handleClick}
       disabled={disabled || loading}
+      title={title}
     >
       {renderContent()}
     </button>
