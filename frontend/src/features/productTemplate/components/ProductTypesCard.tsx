@@ -22,10 +22,21 @@ const updateTypeConfig = (
   patch: Partial<SimplifiedTypeConfig>
 ): SimplifiedConfig => {
   const key = String(typeId)
-  const prev = value.typeConfigs?.[key] ?? { sizes: [] }
+  const base = value.typeConfigs ?? {}
+  const prev = base[key] ?? { sizes: [] }
+  let next: SimplifiedTypeConfig = { ...prev, ...patch }
+  if (Object.prototype.hasOwnProperty.call(patch, 'allowed_price_types')) {
+    const v = patch.allowed_price_types
+    if (v === undefined) {
+      const { allowed_price_types: _drop, ...rest } = next
+      next = rest
+    } else if (Array.isArray(v)) {
+      next = { ...next, allowed_price_types: v.slice() }
+    }
+  }
   return {
     ...value,
-    typeConfigs: { ...value.typeConfigs, [key]: { ...prev, ...patch } },
+    typeConfigs: { ...base, [key]: next },
   }
 }
 

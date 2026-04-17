@@ -188,8 +188,24 @@ function parseLegacyTypeId(id: unknown, fallbackIndex: number): ProductTypeId {
   return Date.now() + fallbackIndex;
 }
 
+/** Копия allowed_price_types на каждый подтип — иначе один массив в памяти у всех typeConfigs ломает переключение чипов. */
+function typeConfigWithOwnPriceTypes(cfg: SimplifiedTypeConfig): SimplifiedTypeConfig {
+  if (!Array.isArray(cfg.allowed_price_types)) return { ...cfg };
+  return { ...cfg, allowed_price_types: cfg.allowed_price_types.slice() };
+}
+
 function normalizeSimplifiedTypeIds(value: SimplifiedConfig): SimplifiedConfig {
-  if (!Array.isArray(value.types) || value.types.length === 0) return value;
+  if (!Array.isArray(value.types) || value.types.length === 0) {
+    if (value.typeConfigs && typeof value.typeConfigs === 'object') {
+      return {
+        ...value,
+        typeConfigs: Object.fromEntries(
+          Object.entries(value.typeConfigs).map(([k, cfg]) => [k, typeConfigWithOwnPriceTypes(cfg)])
+        ),
+      }
+    }
+    return value
+  }
 
   const idMap = new Map<string, ProductTypeId>();
   const normalizedTypes = value.types.map((t, index) => {
@@ -202,7 +218,8 @@ function normalizeSimplifiedTypeIds(value: SimplifiedConfig): SimplifiedConfig {
   if (value.typeConfigs && typeof value.typeConfigs === 'object') {
     for (const [oldKey, cfg] of Object.entries(value.typeConfigs)) {
       const mapped = idMap.get(String(oldKey));
-      normalizedTypeConfigs[mapped != null ? toTypeConfigKey(mapped) : String(oldKey)] = cfg as SimplifiedTypeConfig;
+      const newKey = mapped != null ? toTypeConfigKey(mapped) : String(oldKey);
+      normalizedTypeConfigs[newKey] = typeConfigWithOwnPriceTypes(cfg as SimplifiedTypeConfig);
     }
   }
 
