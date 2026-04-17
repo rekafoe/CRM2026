@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getProductionDaysByPriceType, getProductionTimeLabelFromDays } from '../utils/time';
 import { getPriceTypes } from '../../../services/pricing';
 import type { PriceType } from '../../../types/pricing';
+import { getEffectiveAllowedPriceTypes } from '../utils/simplifiedConfig';
 
 const formatMultiplier = (m: number) => {
   if (m >= 1) return `×${m} (+${((m - 1) * 100).toFixed(0)}%)`;
@@ -9,18 +10,41 @@ const formatMultiplier = (m: number) => {
 };
 
 interface Props {
-  specs: { priceType: string; customerType: string; pages?: number; productionDays?: number } & Record<string, any>;
+  specs: { priceType: string; customerType: string; pages?: number; productionDays?: number; typeId?: number } & Record<string, any>;
   updateSpecs: (updates: Record<string, any>, instant?: boolean) => void;
   backendProductSchema: any | null;
+  /** Подтип simplified: ограничение allowed_price_types из typeConfigs */
+  subtypeIdForPriceTypes?: number | null;
 }
 
-export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, backendProductSchema }) => {
+export const AdvancedSettingsSection: React.FC<Props> = ({
+  specs,
+  updateSpecs,
+  backendProductSchema,
+  subtypeIdForPriceTypes = null,
+}) => {
   const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
 
-  const allowedKeys = useMemo(() => {
+  const productConstraint = useMemo(() => {
     const arr = backendProductSchema?.constraints?.allowed_price_types;
-    return Array.isArray(arr) && arr.length > 0 ? arr : ['standard', 'online'];
+    return Array.isArray(arr) ? arr.filter((k: unknown): k is string => typeof k === 'string' && k.length > 0) : [];
   }, [backendProductSchema?.constraints?.allowed_price_types]);
+
+  const intersectedKeys = useMemo(() => {
+    const typeId = subtypeIdForPriceTypes ?? specs.typeId ?? null;
+    const sim = backendProductSchema?.template?.simplified;
+    let subtypeAllowed: string[] | undefined;
+    if (typeId != null && sim?.typeConfigs?.[String(typeId)]?.allowed_price_types) {
+      const raw = sim.typeConfigs[String(typeId)].allowed_price_types;
+      subtypeAllowed = Array.isArray(raw) ? raw.filter((k: unknown): k is string => typeof k === 'string') : undefined;
+    }
+    return getEffectiveAllowedPriceTypes({ productAllowed: productConstraint, subtypeAllowed });
+  }, [
+    productConstraint,
+    backendProductSchema?.template?.simplified,
+    subtypeIdForPriceTypes,
+    specs.typeId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,6 +53,14 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
+
+  const allowedKeys = useMemo(() => {
+    if (intersectedKeys.length > 0) return intersectedKeys;
+    if (productConstraint.length === 0) {
+      return priceTypes.filter((pt) => pt.isActive).map((pt) => pt.key);
+    }
+    return [];
+  }, [intersectedKeys, productConstraint, priceTypes]);
 
   const priceTypeOptions = useMemo(() => {
     const byKey = new Map(priceTypes.map((pt) => [pt.key, pt]));
@@ -40,17 +72,18 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
       .filter((o) => o);
   }, [priceTypes, allowedKeys]);
 
-  const currentPriceType = specs.priceType || 'standard';
-  const isValidPriceType = allowedKeys.includes(currentPriceType);
-  const effectivePriceType = isValidPriceType ? currentPriceType : allowedKeys[0] ?? 'standard';
+  const currentPriceType = specs.priceType ?? '';
+  const isValidPriceType = allowedKeys.length > 0 && allowedKeys.includes(currentPriceType);
+  const effectivePriceType = isValidPriceType ? currentPriceType : (allowedKeys[0] ?? '');
   const prevEffectiveRef = useRef(effectivePriceType);
 
   useEffect(() => {
+    if (allowedKeys.length === 0) return;
     if (!isValidPriceType && currentPriceType !== effectivePriceType && prevEffectiveRef.current !== effectivePriceType) {
       prevEffectiveRef.current = effectivePriceType;
       updateSpecs({ priceType: effectivePriceType }, true);
     }
-  }, [isValidPriceType, currentPriceType, effectivePriceType, updateSpecs]);
+  }, [allowedKeys.length, isValidPriceType, currentPriceType, effectivePriceType, updateSpecs]);
 
   return (
     <div className="form-section advanced-settings compact">
@@ -62,10 +95,15 @@ export const AdvancedSettingsSection: React.FC<Props> = ({ specs, updateSpecs, b
             value={effectivePriceType}
             onChange={(e) => updateSpecs({ priceType: e.target.value }, true)}
             className="form-control"
+            disabled={allowedKeys.length === 0}
           >
-            {priceTypeOptions.map((opt) => (
-              <option key={opt.key} value={opt.key}>{opt.label}</option>
-            ))}
+            {allowedKeys.length === 0 ? (
+              <option value="">Нет доступных типов цен</option>
+            ) : (
+              priceTypeOptions.map((opt) => (
+                <option key={opt.key} value={opt.key}>{opt.label}</option>
+              ))
+            )}
           </select>
         </div>
 

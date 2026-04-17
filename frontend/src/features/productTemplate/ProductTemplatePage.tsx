@@ -218,6 +218,7 @@ const ProductTemplatePage: React.FC = () => {
             onSelectType={handleSelectType}
             services={simplifiedServices}
             allMaterials={allMaterials as any}
+            productAllowedPriceTypes={state.constraints.overrides.allowedPriceTypes}
           />
 
           <section className="product-template__main">
@@ -493,7 +494,7 @@ const ProductTemplatePage: React.FC = () => {
                         />
                         <h4 className="materials-column__title" style={{ marginTop: '24px' }}>Разрешенные типы цен</h4>
                         <AllowedPriceTypesSection
-                          selectedKeys={state.constraints.overrides.allowedPriceTypes ?? ['standard', 'online']}
+                          selectedKeys={state.constraints.overrides.allowedPriceTypes ?? []}
                           saving={saving}
                           onChange={(keys) => dispatch({ type: 'setOverrides', patch: { allowedPriceTypes: keys } })}
                           onSave={() => void persistTemplateConfig('Разрешённые типы цен сохранены')}

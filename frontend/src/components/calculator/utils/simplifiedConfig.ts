@@ -64,6 +64,49 @@ export function collectAllowedOperationIdsForTypeConfig(
   return ids;
 }
 
+/** Строковые ключи из неизвестного значения (для JSON с шаблона). */
+function filterStringKeys(arr: unknown): string[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter((x): x is string => typeof x === 'string' && x.length > 0);
+}
+
+function sameStringSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const s = new Set(a);
+  return b.every((x) => s.has(x));
+}
+
+/**
+ * Эффективные ключи типа цены: сначала ограничение продукта, затем пересечение с allowed_price_types подтипа (если задано).
+ */
+export function getEffectiveAllowedPriceTypes(params: {
+  productAllowed: string[] | null | undefined;
+  subtypeAllowed: string[] | null | undefined;
+}): string[] {
+  const product = filterStringKeys(params.productAllowed);
+  const sub = filterStringKeys(params.subtypeAllowed);
+  if (sub.length === 0) return product;
+  if (product.length === 0) return sub;
+  const subSet = new Set(sub);
+  return product.filter((k) => subSet.has(k));
+}
+
+export function subtypePriceTypesMatchProduct(
+  subtypeAllowed: string[] | null | undefined,
+  productAllowed: string[] | null | undefined
+): boolean {
+  const base = filterStringKeys(productAllowed);
+  const sub = filterStringKeys(subtypeAllowed);
+  if (sub.length === 0) return true;
+  if (base.length === 0) return false;
+  return sameStringSet(orderedKeys(sub, base), base);
+}
+
+function orderedKeys(keys: string[], orderRef: string[]): string[] {
+  const set = new Set(keys);
+  return orderRef.filter((k) => set.has(k));
+}
+
 export function getEffectiveSimplifiedConfig(
   simplified: {
     sizes?: EffectiveSimplifiedConfig['sizes'];

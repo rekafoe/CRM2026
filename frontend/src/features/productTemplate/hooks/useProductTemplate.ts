@@ -145,6 +145,11 @@ export type SimplifiedTypeConfig = {
   common_allowed_material_ids?: number[];
   pages?: SimplifiedPagesConfig;
   initial?: SubtypeInitialDefaults;
+  /**
+   * Подмножество типов цен для этого подтипа (ключи из справочника price_types).
+   * Не задано или пусто — для подтипа действуют все типы цен, разрешённые для продукта.
+   */
+  allowed_price_types?: string[];
 }
 
 /**
@@ -223,7 +228,7 @@ export interface TemplateState {
     overrides: {
       includeIds: number[] // Старое поле для обратной совместимости
       allowedPaperTypes: string[] // Новое поле для типов бумаги из склада
-      allowedPriceTypes: string[] // Разрешённые типы цен (standard, online и др.)
+      allowedPriceTypes: string[] // Ключи из справочника price_types; пусто — без ограничения на уровне продукта
     }
   }
   finishing: Array<{ name: string }>
@@ -301,7 +306,7 @@ export function useProductTemplateInitial(): TemplateState {
     print_sheet: { preset: '', width: '', height: '' },
     constraints: {
       materials: { allowedCategoriesCsv: '', densityMin: '', densityMax: '', finishesCsv: '', onlyPaper: true },
-      overrides: { includeIds: [], allowedPaperTypes: [], allowedPriceTypes: ['standard', 'online'] }
+      overrides: { includeIds: [], allowedPaperTypes: [], allowedPriceTypes: [] }
     },
     finishing: [],
     packaging: [],

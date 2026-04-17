@@ -232,9 +232,10 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
         />
 
         <AdvancedSettingsSection
-          specs={{ priceType: specs.priceType, customerType: specs.customerType, pages: specs.pages, productionDays: specs.productionDays, magnetic: specs.magnetic, cutting: specs.cutting, folding: specs.folding, roundCorners: specs.roundCorners } as any}
+          specs={{ priceType: specs.priceType, customerType: specs.customerType, pages: specs.pages, productionDays: specs.productionDays, magnetic: specs.magnetic, cutting: specs.cutting, folding: specs.folding, roundCorners: specs.roundCorners, typeId: specs.typeId } as any}
           updateSpecs={updateSpecs as any}
           backendProductSchema={backendProductSchema}
+          subtypeIdForPriceTypes={showTypeSelector ? (selectedTypeId ?? specs.typeId ?? null) : null}
         />
       </div>
     </div>

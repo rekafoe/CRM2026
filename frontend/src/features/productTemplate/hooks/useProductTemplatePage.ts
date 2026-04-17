@@ -263,7 +263,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
               ? overridesAny.allowed_price_types.filter((k: any): k is string => typeof k === 'string')
               : Array.isArray((constraints as any).allowed_price_types)
                 ? (constraints as any).allowed_price_types.filter((k: any): k is string => typeof k === 'string')
-                : ['standard', 'online']
+                : []
             dispatch({ type: 'setOverrides', patch: { includeIds, allowedPaperTypes, allowedPriceTypes } })
           }
         }
@@ -353,9 +353,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
     overrides: { 
       include_ids: state.constraints.overrides.includeIds, // Старое поле для обратной совместимости
       allowed_paper_types: state.constraints.overrides.allowedPaperTypes, // Новое поле для типов бумаги
-      allowed_price_types: state.constraints.overrides.allowedPriceTypes?.length
-        ? state.constraints.overrides.allowedPriceTypes
-        : ['standard', 'online']
+      allowed_price_types: state.constraints.overrides.allowedPriceTypes ?? []
     }
   }), [state.print_sheet.preset, state.print_sheet.width, state.print_sheet.height, state.constraints.overrides.includeIds, state.constraints.overrides.allowedPaperTypes, state.constraints.overrides.allowedPriceTypes])
 

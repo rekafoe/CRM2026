@@ -54,7 +54,7 @@ export const AllowedPriceTypesSection: React.FC<AllowedPriceTypesSectionProps> =
       <div className="form-section__header">
         <h3>Разрешённые типы цен</h3>
         <p className="form-section__subtitle">
-          Выберите типы цен, доступные в калькуляторе для этого продукта. По умолчанию: стандарт и онлайн.
+          Выберите типы цен для этого продукта. Пустой список — в калькуляторе используются все активные типы из справочника (с учётом ограничений подтипа).
         </p>
       </div>
       <div className="form-section__content">
@@ -65,7 +65,7 @@ export const AllowedPriceTypesSection: React.FC<AllowedPriceTypesSectionProps> =
                 type="checkbox"
                 checked={selectedKeys.includes(pt.key)}
                 onChange={() => toggle(pt.key)}
-                disabled={pt.isSystem && !selectedKeys.includes(pt.key) && selectedKeys.length <= 1}
+                disabled={pt.isSystem && selectedKeys.includes(pt.key) && selectedKeys.length <= 1}
               />
               <span className="apt-label">
                 {pt.name} ({formatMultiplier(pt.multiplier)})

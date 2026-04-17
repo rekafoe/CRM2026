@@ -10,7 +10,7 @@ interface PriceTypesTabProps {
 }
 
 export const PriceTypesTab: React.FC<PriceTypesTabProps> = ({ productId, onRegisterSave }) => {
-  const [allowedPriceTypes, setAllowedPriceTypes] = useState<string[]>(['standard', 'online']);
+  const [allowedPriceTypes, setAllowedPriceTypes] = useState<string[]>([]);
   const [templateConfigId, setTemplateConfigId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,13 +25,16 @@ export const PriceTypesTab: React.FC<PriceTypesTabProps> = ({ productId, onRegis
       if (config) {
         setTemplateConfigId(config.id);
         const overrides = (config.constraints as any)?.overrides;
-        const arr = Array.isArray(overrides?.allowed_price_types)
+        const fromOverrides = Array.isArray(overrides?.allowed_price_types)
           ? overrides.allowed_price_types.filter((k: any): k is string => typeof k === 'string')
-          : null;
-        setAllowedPriceTypes(arr && arr.length > 0 ? arr : ['standard', 'online']);
+          : [];
+        const fromConstraints = Array.isArray((config.constraints as any)?.allowed_price_types)
+          ? (config.constraints as any).allowed_price_types.filter((k: any): k is string => typeof k === 'string')
+          : [];
+        setAllowedPriceTypes(fromOverrides.length > 0 ? fromOverrides : fromConstraints);
       } else {
         setTemplateConfigId(null);
-        setAllowedPriceTypes(['standard', 'online']);
+        setAllowedPriceTypes([]);
       }
     } catch (e: any) {
       setError(e?.message || 'Не удалось загрузить настройки');

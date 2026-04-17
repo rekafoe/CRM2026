@@ -4,6 +4,7 @@ import type { CalculatorMaterial } from '../../../services/calculatorMaterialSer
 import type { SimplifiedConfig, SimplifiedTypeConfig, ProductTypeVariant, ProductTypeId, SubtypeInitialDefaults, InitialOperation } from '../hooks/useProductTemplate'
 import { sortSizesByArea, getEffectiveAllowedMaterialIds } from '../hooks/useProductTemplate'
 import { uploadProductImage } from '../../../services/products'
+import { SubtypeAllowedPriceTypesField } from './SubtypeAllowedPriceTypesField'
 import './SimplifiedTemplateSection.css'
 
 const updateType = (
@@ -53,6 +54,8 @@ export interface ProductTypesCardProps {
   removeType: (id: ProductTypeId) => void
   services?: ServiceInfo[]
   allMaterials?: CalculatorMaterial[]
+  /** Ключи типов цен, разрешённые для продукта; пусто — в подтипе ориентир на активные типы из справочника */
+  productAllowedPriceTypes?: string[]
 }
 
 /** Собирает уникальные service_id из finishing всех размеров конфига типа, резолвит имена через services */
@@ -419,6 +422,7 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
   removeType,
   services = [],
   allMaterials = [],
+  productAllowedPriceTypes,
 }) => {
   const hasTypes = Boolean(value.types?.length)
   const types = value.types ?? []
@@ -672,6 +676,15 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                     />
                   </div>
                 </div>
+              </section>
+              <section className="simplified-template__type-modal-section">
+                <SubtypeAllowedPriceTypesField
+                  productAllowedKeys={productAllowedPriceTypes ?? []}
+                  subtypeExplicit={value.typeConfigs?.[String(editingType.id)]?.allowed_price_types}
+                  onChange={(keys) =>
+                    onChange(updateTypeConfig(value, editingType.id, { allowed_price_types: keys }))
+                  }
+                />
               </section>
               <section className="simplified-template__type-modal-section">
                 <TypeInitialDefaults

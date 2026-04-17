@@ -459,7 +459,7 @@ router.get('/:productId/schema', async (req, res) => {
           ? templateConstraints.allowed_price_types
           : Array.isArray(templateConstraints?.overrides?.allowed_price_types)
             ? templateConstraints.overrides.allowed_price_types
-            : ['standard', 'online'],
+            : [],
       },
     };
 

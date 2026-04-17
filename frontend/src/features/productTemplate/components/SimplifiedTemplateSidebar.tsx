@@ -19,6 +19,7 @@ interface SimplifiedTemplateSidebarProps {
   onSelectType: (typeId: any) => void;
   services: ServiceRow[];
   allMaterials: any[];
+  productAllowedPriceTypes?: string[];
 }
 
 export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps> = ({
@@ -34,6 +35,7 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
   onSelectType,
   services,
   allMaterials,
+  productAllowedPriceTypes,
 }) => {
   return (
     <aside className="product-template__sidebar">
@@ -124,6 +126,7 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
         removeType={types.removeType}
         services={services}
         allMaterials={allMaterials}
+        productAllowedPriceTypes={productAllowedPriceTypes}
       />
     </aside>
   );
