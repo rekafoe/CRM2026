@@ -8,18 +8,60 @@ interface MetaSectionProps {
   icon: string;
   operator_percent: string;
   category_id?: number;
+  /** ЧПУ для URL калькулятора на сайте */
+  route_key?: string;
+  /** Показать подсказку, где задать key подтипов (упрощённый калькулятор) */
+  showSubtypeUrlKeyHint?: boolean;
   categories?: ProductCategory[];
   saving: boolean;
-  onChange: (patch: Partial<{ name: string; description: string; icon: string; operator_percent: string; category_id?: number }>) => void;
+  onChange: (patch: Partial<{
+    name: string;
+    description: string;
+    icon: string;
+    operator_percent: string;
+    category_id?: number;
+    route_key?: string;
+  }>) => void;
   onSave: () => Promise<void> | void;
 }
 
-const MetaSection: React.FC<MetaSectionProps> = ({ name, description, icon, operator_percent, category_id, categories = [], saving, onChange, onSave }) => {
+const MetaSection: React.FC<MetaSectionProps> = ({
+  name,
+  description,
+  icon,
+  operator_percent,
+  category_id,
+  route_key = '',
+  showSubtypeUrlKeyHint = false,
+  categories = [],
+  saving,
+  onChange,
+  onSave,
+}) => {
   const hasChanges = name.trim().length > 0;
 
   return (
     <div className="form-section">
       <div className="form-section__content">
+        <FormField
+          label="Ключ URL продукта (route_key)"
+          help="Латиница, цифры, дефис — сегмент ссылки на калькулятор вместо числового id. Должен быть уникален."
+        >
+          <input
+            className="form-input"
+            value={route_key}
+            onChange={(e) => onChange({ route_key: e.target.value })}
+            placeholder="например: fotopechat"
+            autoComplete="off"
+          />
+        </FormField>
+
+        {showSubtypeUrlKeyHint && (
+          <Alert type="info">
+            Ключ подтипа для URL (key): на этой же странице шаблона в левой колонке выберите тип и под списком заполните поле «Ключ URL выбранного подтипа» — затем сохраните шаблон.
+          </Alert>
+        )}
+
         <FormField label="Название продукта" required help="Отображается в каталоге и калькуляторе">
           <input
             className="form-input"

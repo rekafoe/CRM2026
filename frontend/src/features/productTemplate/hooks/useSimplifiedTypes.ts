@@ -63,7 +63,7 @@ export function useSimplifiedTypes(
 
   useEffect(() => {
     if (hasTypes && value.types?.length) {
-      const valid = value.types.some(t => t.id === selectedTypeId)
+      const valid = value.types.some((t) => String(t.id) === String(selectedTypeId))
       if (!valid) setSelectedTypeId(defaultTypeId ?? value.types[0]?.id ?? null)
     } else {
       if (selectedTypeId !== null) setSelectedTypeId(null)
@@ -130,7 +130,7 @@ export function useSimplifiedTypes(
       if (!value.types?.length) return
       onChange({
         ...value,
-        types: value.types.map(t => ({ ...t, default: t.id === id })),
+        types: value.types.map((t) => ({ ...t, default: String(t.id) === String(id) })),
       })
     },
     [value, onChange],
@@ -139,7 +139,7 @@ export function useSimplifiedTypes(
   const removeType = useCallback(
     (id: ProductTypeId) => {
       if (!value.types || value.types.length <= 1) return
-      const nextTypes = value.types.filter(t => t.id !== id)
+      const nextTypes = value.types.filter((t) => String(t.id) !== String(id))
       const nextConfigs = { ...value.typeConfigs }
       delete nextConfigs[String(id)]
       const hasDefault = nextTypes.some(t => t.default)
@@ -148,7 +148,7 @@ export function useSimplifiedTypes(
         types: hasDefault ? nextTypes : nextTypes.map((t, i) => ({ ...t, default: i === 0 })),
         typeConfigs: nextConfigs,
       })
-      if (selectedTypeId === id) {
+      if (String(selectedTypeId) === String(id)) {
         const nextId = nextTypes[0]?.id ?? null
         setSelectedTypeId(nextId)
         const cfg = nextId != null ? nextConfigs[String(nextId)] : undefined

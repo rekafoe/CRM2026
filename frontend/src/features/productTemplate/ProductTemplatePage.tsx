@@ -641,11 +641,14 @@ const ProductTemplatePage: React.FC = () => {
           icon={state.meta.icon}
           operator_percent={state.meta.operator_percent}
           category_id={state.meta.category_id}
+          route_key={state.meta.route_key ?? ''}
+          showSubtypeUrlKeyHint={isSimplifiedTemplateProduct}
           categories={categories}
           saving={saving}
           onChange={(patch) => dispatch({ type: 'setMeta', patch })}
           onSave={async () => {
             await handleMetaSave();
+            await refreshProduct();
             setShowMetaModal(false);
           }}
         />

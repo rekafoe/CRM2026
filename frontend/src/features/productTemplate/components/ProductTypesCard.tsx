@@ -13,7 +13,7 @@ const updateType = (
   patch: Partial<ProductTypeVariant>
 ): SimplifiedConfig => ({
   ...value,
-  types: value.types!.map((x) => (x.id === typeId ? { ...x, ...patch } : x)),
+  types: value.types!.map((x) => (String(x.id) === String(typeId) ? { ...x, ...patch } : x)),
 })
 
 const updateTypeConfig = (
@@ -484,7 +484,10 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
   )
 
   const selectedVariant = useMemo(
-    () => (selectedTypeId != null ? types.find((t) => t.id === selectedTypeId) ?? null : null),
+    () =>
+      selectedTypeId != null
+        ? types.find((t) => String(t.id) === String(selectedTypeId)) ?? null
+        : null,
     [types, selectedTypeId]
   )
 
@@ -569,7 +572,7 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
             {types.map((t: ProductTypeVariant) => (
               <div
                 key={t.id}
-                className={`simplified-template__type-tab ${selectedTypeId === t.id ? 'simplified-template__type-tab--active' : ''}`}
+                className={`simplified-template__type-tab ${String(selectedTypeId) === String(t.id) ? 'simplified-template__type-tab--active' : ''}`}
               >
                 <div
                   className="simplified-template__type-tab-btn"

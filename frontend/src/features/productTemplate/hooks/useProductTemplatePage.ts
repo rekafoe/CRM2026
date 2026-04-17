@@ -167,6 +167,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
               ? String((details as any)?.operator_percent)
               : '',
             category_id: (details as any)?.category_id ?? undefined,
+            route_key: (details as any)?.route_key != null ? String((details as any).route_key) : '',
           } })
           void loadParameterPresets(details)
         } else {
@@ -522,15 +523,19 @@ export default function useProductTemplatePage(productId: number | undefined): U
         state.meta.operator_percent !== ''
           ? Number(state.meta.operator_percent)
           : undefined
+      const rk = state.meta.route_key?.trim()
+        ? state.meta.route_key.trim().toLowerCase()
+        : null
       await updateProduct(productId, {
         name: state.meta.name,
         description: state.meta.description,
         icon: state.meta.icon,
         category_id: state.meta.category_id ?? 0,
+        route_key: rk,
         ...(operatorPercentValue !== undefined && Number.isFinite(operatorPercentValue)
           ? { operator_percent: operatorPercentValue }
           : {})
-      })
+      } as any)
       alert('Основные данные обновлены')
     } catch (error) {
       console.error('Failed to update product metadata', error)
@@ -538,7 +543,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
     } finally {
       setSaving(false)
     }
-  }, [productId, state.meta.name, state.meta.description, state.meta.icon, state.meta.operator_percent, state.meta.category_id])
+  }, [productId, state.meta.name, state.meta.description, state.meta.icon, state.meta.operator_percent, state.meta.category_id, state.meta.route_key])
 
   const refreshMaterials = useCallback(async (id: number) => {
     const fresh = await getProductMaterials(id)
@@ -808,8 +813,16 @@ export default function useProductTemplatePage(productId: number | undefined): U
   const refreshProduct = useCallback(async () => {
     if (!productId) return
     const details = await getProductDetails(productId)
-    if (details) setProduct(details)
-  }, [productId])
+    if (details) {
+      setProduct(details)
+      dispatch({
+        type: 'setMeta',
+        patch: {
+          route_key: (details as any)?.route_key != null ? String((details as any).route_key) : '',
+        },
+      })
+    }
+  }, [productId, dispatch])
 
   return {
     state,

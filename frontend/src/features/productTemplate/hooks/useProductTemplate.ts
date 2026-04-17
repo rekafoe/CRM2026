@@ -264,7 +264,15 @@ function normalizeSimplifiedTypeIds(value: SimplifiedConfig): SimplifiedConfig {
 }
 
 export interface TemplateState {
-  meta: { name: string; description: string; icon: string; operator_percent: string; category_id?: number }
+  meta: {
+    name: string
+    description: string
+    icon: string
+    operator_percent: string
+    category_id?: number
+    /** ЧПУ продукта; сохраняется через updateProduct вместе с основными полями */
+    route_key?: string
+  }
   trim_size: { width: string; height: string }
   print_sheet: { preset: 'SRA3' | 'A3' | 'А4' | '' ; width: string; height: string }
   constraints: {
@@ -351,7 +359,7 @@ function reducer(state: TemplateState, action: Action): TemplateState {
 
 export function useProductTemplateInitial(): TemplateState {
   return {
-    meta: { name: '', description: '', icon: '', operator_percent: '' },
+    meta: { name: '', description: '', icon: '', operator_percent: '', route_key: '' },
     trim_size: { width: '', height: '' },
     print_sheet: { preset: '', width: '', height: '' },
     constraints: {
