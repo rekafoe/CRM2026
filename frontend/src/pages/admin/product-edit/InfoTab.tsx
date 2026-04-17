@@ -60,6 +60,7 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
     <div className="product-tab-panel">
       <Alert type="info">
         Измените базовые данные продукта. После сохранения они сразу будут доступны в каталоге и модулях расчёта.
+        ЧПУ для калькулятора на сайте: поле «Ключ URL (продукт)» ниже (route_key). Ключ подтипа (key) задаётся в шаблоне продукта → типы → ✎ у подтипа.
       </Alert>
       {loading && <Alert type="info">Загружаем данные продукта…</Alert>}
       <div className="product-form-grid">

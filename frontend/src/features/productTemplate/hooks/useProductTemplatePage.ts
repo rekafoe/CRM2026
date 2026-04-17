@@ -727,8 +727,12 @@ export default function useProductTemplatePage(productId: number | undefined): U
 
   const summaryStats = useMemo(() => {
     const isSimplified = (product as any)?.calculator_type === 'simplified'
+    const routeKeyDisplay = (product as any)?.route_key?.trim()
+      ? String((product as any).route_key).trim()
+      : 'не задан'
     const base = [
       { label: 'ID продукта', value: productId || '—' },
+      { label: 'Ключ URL продукта (route_key)', value: routeKeyDisplay },
       { label: 'Шаблон', value: templateConfigId ? 'Настроен' : '—' },
     ]
     if (isSimplified) {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { AppIcon } from '../../../components/ui/AppIcon';
 import { ProductTypesCard } from './ProductTypesCard';
 import type { SimplifiedConfig } from '../hooks/useProductTemplate';
@@ -115,6 +116,20 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
           </div>
         )}
       </div>
+
+      {product?.id != null && (
+        <div className="template-url-keys-hint simplified-card" style={{ marginTop: 12, padding: '12px 14px' }}>
+          <strong style={{ display: 'block', marginBottom: 8 }}>ЧПУ для ссылок на сайте</strong>
+          <p className="text-muted text-sm" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>
+            <strong>route_key</strong> (продукт):{' '}
+            <Link to={`/adminpanel/products/${product.id}/edit`}>карточка продукта</Link>
+            {' → вкладка «Основное» → поле «Ключ URL (продукт)». '}
+          </p>
+          <p className="text-muted text-sm" style={{ margin: 0, lineHeight: 1.45 }}>
+            <strong>key</strong> (подтип): в списке ниже нажмите ✎ у типа → в модалке сверху поле «Ключ URL (подтип)».
+          </p>
+        </div>
+      )}
 
       <ProductTypesCard
         value={value}

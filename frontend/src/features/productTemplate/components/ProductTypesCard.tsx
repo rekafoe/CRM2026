@@ -551,6 +551,7 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
           <strong>Типы продукта</strong>
           <div className="text-muted text-sm">
             Варианты внутри продукта (например: односторонние, с ламинацией). У каждого типа — свой набор размеров и цен.
+            Ключ подтипа для URL (key) задаётся в модалке по кнопке ✎ — поле «Ключ URL (подтип)» вверху.
           </div>
         </div>
         <Button type="button" variant="secondary" size="sm" onClick={onAddType}>
@@ -612,6 +613,11 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                     </span>
                   )}
                   {t.default && <span className="simplified-template__type-badge">по умолчанию</span>}
+                  {t.key?.trim() ? (
+                    <span className="simplified-template__type-badge" title="Ключ URL подтипа (key)">
+                      {String(t.key).trim().toLowerCase()}
+                    </span>
+                  ) : null}
                   <span className="simplified-template__type-row-actions">
                     <button
                       type="button"
