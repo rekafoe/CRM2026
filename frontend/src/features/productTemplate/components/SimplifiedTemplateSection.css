@@ -584,26 +584,31 @@
 }
 
 .simplified-template__type-edit-modal .modal-header {
-  padding: 6px 10px !important;
+  padding: 14px 18px !important;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
 }
 
 .simplified-template__type-edit-modal .modal-header h2 {
-  font-size: 15px;
-  line-height: 1.25;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: var(--text-primary, #0f172a);
 }
 
 .simplified-template__type-edit-modal .modal-close-btn {
-  min-height: 24px;
-  height: 24px;
-  padding: 0 6px;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 8px;
 }
 
 .simplified-template__type-edit-modal .modal-body {
-  padding: 4px 8px !important;
+  padding: 16px 18px 14px !important;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background: var(--bg-secondary, #f8fafc);
 }
 
 .simplified-template__type-modal-scroll {
@@ -616,42 +621,153 @@
 .simplified-template__type-modal-top-actions {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 6px;
+  margin-bottom: 12px;
 }
 
-.simplified-template__type-modal-section {
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
+/* Модалка подтипа: секции-карточки */
+.subtype-edit-panel {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
   background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
   overflow: hidden;
 }
 
-.simplified-template__type-modal-section + .simplified-template__type-modal-section {
-  margin-top: 6px;
+.subtype-edit-panel + .subtype-edit-panel {
+  margin-top: 14px;
+}
+
+.subtype-edit-panel__header {
+  padding: 14px 18px 12px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.subtype-edit-panel__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+  letter-spacing: -0.01em;
+}
+
+.subtype-edit-panel__lede {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary, #64748b);
+  max-width: 68ch;
+}
+
+.subtype-edit-panel__body {
+  padding: 16px 18px 18px;
+}
+
+.subtype-edit-panel__body--compact-top {
+  padding-top: 12px;
+}
+
+.simplified-template__type-website-content--in-panel {
+  border-top: none;
+  padding: 0;
+  gap: 14px;
+  background: transparent;
+}
+
+.simplified-template__type-edit-modal .simplified-template__type-website-content--in-panel .simplified-template__type-website-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #334155);
+}
+
+/* Чипы типов цен в модалке подтипа */
+.subtype-price-types-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.subtype-price-types-field__hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary, #64748b);
+  line-height: 1.45;
+}
+
+.subtype-price-types-field__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary, #334155);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.subtype-price-types-field__chip:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.subtype-price-types-field__chip--checked {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+.subtype-price-types-field__chip input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: #2563eb;
+}
+
+.subtype-price-types-field__chip-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1.25;
+}
+
+.subtype-price-types-field__name {
+  font-weight: 600;
+}
+
+.subtype-price-types-field__mult {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #64748b);
 }
 
 .simplified-template__type-modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 4px 0 0;
+  gap: 10px;
+  padding: 12px 0 4px;
+  margin-top: 4px;
   position: sticky;
   bottom: 0;
-  background: #fff;
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-secondary, #f8fafc);
+  border-top: 1px solid var(--border-color, #e2e8f0);
   z-index: 1;
 }
 
 .simplified-template__type-modal-actions .btn {
-  min-height: 28px;
-  padding: 4px 10px;
+  min-height: 36px;
+  padding: 8px 16px;
 }
 
 .simplified-template__type-edit-modal .simplified-template__type-actions {
   padding: 6px 8px;
 }
 
-.simplified-template__type-edit-modal .simplified-template__type-website-content {
+.simplified-template__type-edit-modal .simplified-template__type-website-content:not(.simplified-template__type-website-content--in-panel) {
   padding: 8px 10px;
   gap: 6px;
 }

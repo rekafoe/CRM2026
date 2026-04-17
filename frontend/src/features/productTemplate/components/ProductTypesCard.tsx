@@ -87,7 +87,9 @@ const TypeInitialDefaults: React.FC<{
   onChange: (next: SimplifiedConfig) => void
   services: ServiceInfo[]
   allMaterials: CalculatorMaterial[]
-}> = ({ value, typeId, onChange, services, allMaterials }) => {
+  /** Без верхнего заголовка — заголовок снаружи в панели модалки */
+  embedded?: boolean
+}> = ({ value, typeId, onChange, services, allMaterials, embedded }) => {
   const cfg = value.typeConfigs?.[String(typeId)]
   const initial = cfg?.initial ?? {} as Partial<SubtypeInitialDefaults>
   const sizes = cfg?.sizes ?? []
@@ -175,10 +177,18 @@ const TypeInitialDefaults: React.FC<{
   }
 
   return (
-    <div className="simplified-template__type-website-content">
-      <div className="simplified-template__type-website-title">
-        Начальные значения калькулятора (для сайта)
-      </div>
+    <div
+      className={
+        embedded
+          ? 'simplified-template__type-website-content simplified-template__type-website-content--in-panel'
+          : 'simplified-template__type-website-content'
+      }
+    >
+      {!embedded && (
+        <div className="simplified-template__type-website-title">
+          Начальные значения калькулятора (для сайта)
+        </div>
+      )}
       <div className="simplified-template__type-website-field">
         <label>Размер по умолчанию</label>
         <select
@@ -622,20 +632,24 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                   По умолчанию
                 </Button>
               </div>
-              <section className="simplified-template__type-modal-section">
-                <div className="simplified-template__type-website-content">
-                  <div className="simplified-template__type-website-title">
-                    Контент для сайта
-                  </div>
-                  <div className="simplified-template__type-website-field">
+              <section className="subtype-edit-panel">
+                <header className="subtype-edit-panel__header">
+                  <h3 className="subtype-edit-panel__title">Контент для сайта</h3>
+                  <p className="subtype-edit-panel__lede">
+                    Фото, тексты и списки для карточки и страницы этого варианта на сайте.
+                  </p>
+                </header>
+                <div className="subtype-edit-panel__body">
+                  <div className="simplified-template__type-website-content simplified-template__type-website-content--in-panel">
+                    <div className="simplified-template__type-website-field">
                     <label>Изображение</label>
                     <SubtypeImageUploader
                       imageUrl={draftImageUrl || undefined}
                       subtypeName={editingType.name}
                       onUploaded={(url) => setDraftImageUrl(url || '')}
                     />
-                  </div>
-                  <div className="simplified-template__type-website-field">
+                    </div>
+                    <div className="simplified-template__type-website-field">
                     <label>Краткое описание</label>
                     <input
                       type="text"
@@ -644,8 +658,8 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                       onChange={(e) => setDraftBriefDescription(e.target.value)}
                       placeholder="Одна строка для карточки (например: Цветные на плотной бумаге)"
                     />
-                  </div>
-                  <div className="simplified-template__type-website-field">
+                    </div>
+                    <div className="simplified-template__type-website-field">
                     <label>Полное описание</label>
                     <textarea
                       className="form-input"
@@ -654,8 +668,8 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                       onChange={(e) => setDraftFullDescription(e.target.value)}
                       placeholder="Текст для страницы продукта"
                     />
-                  </div>
-                  <div className="simplified-template__type-website-field">
+                    </div>
+                    <div className="simplified-template__type-website-field">
                     <label>Характеристики</label>
                     <textarea
                       className="form-input"
@@ -664,8 +678,8 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                       onChange={(e) => setDraftCharacteristicsText(e.target.value)}
                       placeholder="Один пункт на строку (например: Размер: 90×50 мм)"
                     />
-                  </div>
-                  <div className="simplified-template__type-website-field">
+                    </div>
+                    <div className="simplified-template__type-website-field">
                     <label>Преимущества</label>
                     <textarea
                       className="form-input"
@@ -674,26 +688,45 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                       onChange={(e) => setDraftAdvantagesText(e.target.value)}
                       placeholder="Один пункт на строку (например: Высокое качество печати)"
                     />
+                    </div>
                   </div>
                 </div>
               </section>
-              <section className="simplified-template__type-modal-section">
-                <SubtypeAllowedPriceTypesField
-                  productAllowedKeys={productAllowedPriceTypes ?? []}
-                  subtypeExplicit={value.typeConfigs?.[String(editingType.id)]?.allowed_price_types}
-                  onChange={(keys) =>
-                    onChange(updateTypeConfig(value, editingType.id, { allowed_price_types: keys }))
-                  }
-                />
+              <section className="subtype-edit-panel">
+                <header className="subtype-edit-panel__header">
+                  <h3 className="subtype-edit-panel__title">Типы цен</h3>
+                  <p className="subtype-edit-panel__lede">
+                    Какие варианты цены показывать в калькуляторе для этого подтипа. Без снятия галочек действует
+                    список у продукта (вкладка «Материалы»); если там пусто — все активные типы из справочника.
+                  </p>
+                </header>
+                <div className="subtype-edit-panel__body subtype-edit-panel__body--compact-top">
+                  <SubtypeAllowedPriceTypesField
+                    productAllowedKeys={productAllowedPriceTypes ?? []}
+                    subtypeExplicit={value.typeConfigs?.[String(editingType.id)]?.allowed_price_types}
+                    onChange={(keys) =>
+                      onChange(updateTypeConfig(value, editingType.id, { allowed_price_types: keys }))
+                    }
+                  />
+                </div>
               </section>
-              <section className="simplified-template__type-modal-section">
-                <TypeInitialDefaults
-                  value={value}
-                  typeId={editingType.id}
-                  onChange={onChange}
-                  services={services}
-                  allMaterials={allMaterials ?? []}
-                />
+              <section className="subtype-edit-panel">
+                <header className="subtype-edit-panel__header">
+                  <h3 className="subtype-edit-panel__title">Значения по умолчанию</h3>
+                  <p className="subtype-edit-panel__lede">
+                    Предзаполнение полей калькулятора на сайте при выборе этого подтипа.
+                  </p>
+                </header>
+                <div className="subtype-edit-panel__body">
+                  <TypeInitialDefaults
+                    embedded
+                    value={value}
+                    typeId={editingType.id}
+                    onChange={onChange}
+                    services={services}
+                    allMaterials={allMaterials ?? []}
+                  />
+                </div>
               </section>
             </div>
             <div className="simplified-template__type-modal-actions">

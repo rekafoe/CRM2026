@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getPriceTypes } from '../../../services/pricing';
 import type { PriceType } from '../../../types/pricing';
 import { subtypePriceTypesMatchProduct } from '../../../components/calculator/utils/simplifiedConfig';
-import './AllowedPriceTypesSection.css';
 
 const formatMultiplier = (m: number) => {
   if (m >= 1) return `×${m} (+${((m - 1) * 100).toFixed(0)}%)`;
@@ -16,9 +15,7 @@ function sameKeySet(a: string[], b: string[]): boolean {
 }
 
 interface SubtypeAllowedPriceTypesFieldProps {
-  /** Разрешённые для продукта ключи; пустой массив — ориентир на активные типы из справочника */
   productAllowedKeys: string[];
-  /** Явное ограничение подтипа; undefined — без отдельного ограничения (как пул у продукта или весь справочник) */
   subtypeExplicit: string[] | undefined;
   onChange: (next: string[] | undefined) => void;
 }
@@ -83,43 +80,39 @@ export const SubtypeAllowedPriceTypesField: React.FC<SubtypeAllowedPriceTypesFie
   };
 
   if (loading) {
-    return <p className="form-section__subtitle">Загрузка типов цен…</p>;
+    return <p className="subtype-price-types-field__hint">Загрузка типов цен…</p>;
   }
 
   if (options.length === 0) {
     return (
-      <p className="form-section__subtitle">
+      <p className="subtype-price-types-field__hint">
         Нет активных типов цен в справочнике. Добавьте их в разделе ценообразования.
       </p>
     );
   }
 
   return (
-    <div className="form-section allowed-price-types-section">
-      <div className="form-section__header">
-        <h3>Типы цен для этого подтипа</h3>
-        <p className="form-section__subtitle">
-          Без отдельного списка у подтипа действует пул у продукта; если у продукта список пуст — доступны все
-          активные типы из справочника. Снимите лишние чекбоксы, чтобы сузить подтип.
-        </p>
-      </div>
-      <div className="form-section__content">
-        <div className="apt-list">
-          {options.map((pt) => (
-            <label key={pt.key} className="apt-item">
-              <input
-                type="checkbox"
-                checked={effectiveSelected.includes(pt.key)}
-                onChange={() => toggle(pt.key)}
-                disabled={pt.isSystem && effectiveSelected.includes(pt.key) && effectiveSelected.length <= 1}
-              />
-              <span className="apt-label">
-                {pt.name} ({formatMultiplier(pt.multiplier)})
-              </span>
-            </label>
-          ))}
-        </div>
-      </div>
+    <div className="subtype-price-types-field" role="group" aria-label="Типы цен для подтипа">
+      {options.map((pt) => {
+        const checked = effectiveSelected.includes(pt.key);
+        return (
+          <label
+            key={pt.key}
+            className={`subtype-price-types-field__chip${checked ? ' subtype-price-types-field__chip--checked' : ''}`}
+          >
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={() => toggle(pt.key)}
+              disabled={pt.isSystem && checked && effectiveSelected.length <= 1}
+            />
+            <span className="subtype-price-types-field__chip-text">
+              <span className="subtype-price-types-field__name">{pt.name}</span>
+              <span className="subtype-price-types-field__mult">{formatMultiplier(pt.multiplier)}</span>
+            </span>
+          </label>
+        );
+      })}
     </div>
   );
 };
