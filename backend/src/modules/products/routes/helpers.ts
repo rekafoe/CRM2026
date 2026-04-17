@@ -40,24 +40,62 @@ export function parseSubproductTypeId(raw: unknown, fallbackIndex: number): numb
   return fallbackIndex;
 }
 
+function typeConfigWithOwnPriceTypesClone(cfg: any): any {
+  if (!cfg || typeof cfg !== 'object') return cfg;
+  if (!Array.isArray(cfg.allowed_price_types)) return { ...cfg };
+  return { ...cfg, allowed_price_types: cfg.allowed_price_types.slice() };
+}
+
 export function normalizeSimplifiedTypeIds(simplified: any): any {
   if (!simplified || !Array.isArray(simplified.types) || simplified.types.length === 0) return simplified || null;
 
-  const idMap = new Map<string, number>();
-  const normalizedTypes = simplified.types.map((t: any, index: number) => {
-    const nextId = parseSubproductTypeId(t?.id, index + 1);
-    idMap.set(String(t?.id), nextId);
-    return { ...t, id: nextId };
+  const sourceTypeConfigs =
+    simplified.typeConfigs && typeof simplified.typeConfigs === 'object' ? simplified.typeConfigs : {};
+
+  const usedNewIds = new Set<number>();
+  const desiredIds: number[] = simplified.types.map((t: any, index: number) =>
+    parseSubproductTypeId(t?.id, index + 1)
+  );
+  const uniqueNewIds = desiredIds.map((id) => {
+    let candidate = id;
+    let guard = 0;
+    while (usedNewIds.has(candidate) && guard < 100000) {
+      candidate += 1;
+      guard += 1;
+    }
+    usedNewIds.add(candidate);
+    return candidate;
   });
 
+  const normalizedTypes = simplified.types.map((t: any, index: number) => ({ ...t, id: uniqueNewIds[index] }));
+
+  const firstIndexByOldKey = new Map<string, number>();
+  simplified.types.forEach((t: any, index: number) => {
+    const ok = String(t?.id);
+    if (!firstIndexByOldKey.has(ok)) firstIndexByOldKey.set(ok, index);
+  });
+
+  const rowOldKeys = new Set(simplified.types.map((t: any) => String(t?.id)));
   const normalizedTypeConfigs: Record<string, any> = {};
-  const sourceTypeConfigs =
-    simplified.typeConfigs && typeof simplified.typeConfigs === 'object'
-      ? simplified.typeConfigs
-      : {};
+
+  for (let i = 0; i < simplified.types.length; i++) {
+    const oldKey = String(simplified.types[i]?.id);
+    const newKey = String(uniqueNewIds[i]);
+    const rawCfg = (sourceTypeConfigs as Record<string, any>)[oldKey];
+    const isDuplicateRow = firstIndexByOldKey.get(oldKey) !== i;
+    let base: any;
+    if (rawCfg != null) {
+      base = isDuplicateRow ? JSON.parse(JSON.stringify(rawCfg)) : { ...rawCfg };
+    } else {
+      base = { sizes: [] };
+    }
+    normalizedTypeConfigs[newKey] = typeConfigWithOwnPriceTypesClone(base);
+  }
+
   for (const [oldKey, cfg] of Object.entries(sourceTypeConfigs)) {
-    const mapped = idMap.get(String(oldKey));
-    normalizedTypeConfigs[String(mapped ?? oldKey)] = cfg;
+    if (rowOldKeys.has(oldKey)) continue;
+    if (Object.prototype.hasOwnProperty.call(normalizedTypeConfigs, oldKey)) continue;
+    normalizedTypeConfigs[oldKey] = typeConfigWithOwnPriceTypesClone(cfg);
   }
 
   return {

@@ -207,20 +207,51 @@ function normalizeSimplifiedTypeIds(value: SimplifiedConfig): SimplifiedConfig {
     return value
   }
 
-  const idMap = new Map<string, ProductTypeId>();
-  const normalizedTypes = value.types.map((t, index) => {
-    const nextId = parseLegacyTypeId((t as any).id, index + 1);
-    idMap.set(String((t as any).id), nextId);
-    return { ...t, id: nextId };
-  });
+  const sourceTypeConfigs: Record<string, SimplifiedTypeConfig> =
+    value.typeConfigs && typeof value.typeConfigs === 'object' ? value.typeConfigs : {}
 
-  const normalizedTypeConfigs: Record<string, SimplifiedTypeConfig> = {};
-  if (value.typeConfigs && typeof value.typeConfigs === 'object') {
-    for (const [oldKey, cfg] of Object.entries(value.typeConfigs)) {
-      const mapped = idMap.get(String(oldKey));
-      const newKey = mapped != null ? toTypeConfigKey(mapped) : String(oldKey);
-      normalizedTypeConfigs[newKey] = typeConfigWithOwnPriceTypes(cfg as SimplifiedTypeConfig);
+  const usedNewIds = new Set<ProductTypeId>()
+  const desiredIds = value.types.map((t, index) => parseLegacyTypeId((t as any).id, index + 1))
+  const uniqueNewIds: ProductTypeId[] = desiredIds.map((id) => {
+    let candidate = id
+    let guard = 0
+    while (usedNewIds.has(candidate) && guard < 100000) {
+      candidate += 1
+      guard += 1
     }
+    usedNewIds.add(candidate)
+    return candidate
+  })
+
+  const normalizedTypes = value.types.map((t, index) => ({ ...t, id: uniqueNewIds[index] }))
+
+  const firstIndexByOldKey = new Map<string, number>()
+  value.types.forEach((t, index) => {
+    const ok = String((t as any).id)
+    if (!firstIndexByOldKey.has(ok)) firstIndexByOldKey.set(ok, index)
+  })
+
+  const rowOldKeys = new Set(value.types.map((t) => String((t as any).id)))
+  const normalizedTypeConfigs: Record<string, SimplifiedTypeConfig> = {}
+
+  for (let i = 0; i < value.types.length; i++) {
+    const oldKey = String((value.types[i] as any).id)
+    const newKey = toTypeConfigKey(uniqueNewIds[i])
+    const rawCfg = sourceTypeConfigs[oldKey]
+    const isDuplicateRow = firstIndexByOldKey.get(oldKey) !== i
+    let base: SimplifiedTypeConfig
+    if (rawCfg != null) {
+      base = isDuplicateRow ? (JSON.parse(JSON.stringify(rawCfg)) as SimplifiedTypeConfig) : { ...rawCfg }
+    } else {
+      base = { sizes: [] }
+    }
+    normalizedTypeConfigs[newKey] = typeConfigWithOwnPriceTypes(base)
+  }
+
+  for (const [oldKey, cfg] of Object.entries(sourceTypeConfigs)) {
+    if (rowOldKeys.has(oldKey)) continue
+    if (Object.prototype.hasOwnProperty.call(normalizedTypeConfigs, oldKey)) continue
+    normalizedTypeConfigs[oldKey] = typeConfigWithOwnPriceTypes(cfg as SimplifiedTypeConfig)
   }
 
   return {
