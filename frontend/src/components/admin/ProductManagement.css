@@ -509,6 +509,7 @@
 
 .products-table {
   width: 100%;
+  min-width: 1280px;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -532,13 +533,13 @@
 
 .products-table thead th:nth-child(1) { width: 3%; }
 .products-table thead th:nth-child(2) { width: 4%; }
-.products-table thead th:nth-child(3) { width: 24%; }
-.products-table thead th:nth-child(4) { width: 12%; }
+.products-table thead th:nth-child(3) { width: 18%; }
+.products-table thead th:nth-child(4) { width: 11%; }
 .products-table thead th:nth-child(5) { width: 8%; }
 .products-table thead th:nth-child(6) { width: 8%; }
 .products-table thead th:nth-child(7) { width: 4%; }
-.products-table thead th:nth-child(8) { width: 15%; }
-.products-table thead th:nth-child(9) { width: 22%; }
+.products-table thead th:nth-child(8) { width: 10%; }
+.products-table thead th:nth-child(9) { width: 34%; }
 
 .products-table thead th {
   border-right: 1px solid rgba(255, 255, 255, 0.2);
@@ -587,6 +588,9 @@
 
 .products-table tbody td:last-child {
   border-right: none;
+  width: 34%;
+  padding: 8px 10px;
+  min-width: 0;
   overflow: visible;
 }
 
@@ -620,33 +624,37 @@
 
 .products-table .row-actions {
   display: flex;
-  gap: 4px;
   flex-wrap: nowrap;
+  gap: 6px;
   justify-content: flex-end;
   align-items: center;
-  min-width: 0;
-}
-
-.products-table tbody td:last-child {
-  width: 22%;
-  padding: 8px 10px;
-  min-width: 0;
+  width: max-content;
+  margin-left: auto;
 }
 
 .products-table .row-actions .lg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   white-space: nowrap;
-  padding: 5px 8px;
+  padding: 6px 10px;
   font-size: 11px;
-  min-width: 0;
+  line-height: 1.15;
+  gap: 5px;
+  flex-shrink: 0;
   border-radius: 8px;
 }
 
+.products-table .row-actions .lg-btn .app-icon {
+  flex-shrink: 0;
+}
+
 .products-table .row-actions .lg-btn.row-actions__toggle-btn {
-  min-width: 52px;
-  width: 52px;
+  min-width: 56px;
+  width: auto;
   justify-content: center;
-  gap: 2px;
-  padding: 5px 6px;
+  gap: 4px;
+  padding: 6px 8px;
 }
 
 .btn-setup-status {
@@ -827,10 +835,6 @@
   .products-table thead th,
   .products-table tbody td {
     padding: 10px 12px;
-  }
-
-  .products-table .row-actions {
-    flex-direction: column;
   }
 }
 

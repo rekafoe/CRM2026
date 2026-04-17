@@ -29,6 +29,26 @@ const updateTypeConfig = (
   }
 }
 
+/** Заголовок секции в модалке подтипа: шаг, название, краткий текст */
+const SubtypePanelHeader: React.FC<{
+  step: number
+  title: string
+  lede: string
+  ledeTitle?: string
+}> = ({ step, title, lede, ledeTitle }) => (
+  <header className="subtype-edit-panel__header">
+    <span className="subtype-edit-panel__step" aria-hidden>
+      {step}
+    </span>
+    <div className="subtype-edit-panel__header-main">
+      <h3 className="subtype-edit-panel__title">{title}</h3>
+      <p className="subtype-edit-panel__lede" title={ledeTitle}>
+        {lede}
+      </p>
+    </div>
+  </header>
+)
+
 /** Преобразует массив в текст (один пункт на строку) и обратно */
 const arrayToText = (arr: string[] | undefined): string =>
   Array.isArray(arr) ? arr.filter(Boolean).join('\n') : ''
@@ -180,7 +200,7 @@ const TypeInitialDefaults: React.FC<{
     <div
       className={
         embedded
-          ? 'simplified-template__type-website-content simplified-template__type-website-content--in-panel'
+          ? 'simplified-template__type-website-content simplified-template__type-website-content--in-panel subtype-defaults-root'
           : 'simplified-template__type-website-content'
       }
     >
@@ -614,92 +634,103 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
       <Modal
         isOpen={!!editingType}
         onClose={closeEditType}
-        title={editingType ? `Редактирование подтипа: ${editingType.name}` : 'Редактирование подтипа'}
-        size="lg"
+        title={editingType ? `Подтип: ${editingType.name}` : 'Редактирование подтипа'}
+        headerExtra={
+          editingType ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setDefaultType(editingType.id)}
+              disabled={!!editingType.default}
+              title="Сделать этот вариант подтипом по умолчанию в списке и калькуляторе"
+            >
+              По умолчанию
+            </Button>
+          ) : undefined
+        }
+        size="xl"
         className="simplified-template__type-edit-modal"
+        headerClassName="subtype-edit-modal__header-bar"
+        bodyClassName="p-0"
       >
         {editingType && (
           <div className="simplified-template__type-modal">
-            <div className="simplified-template__type-modal-scroll">
-              <div className="simplified-template__type-modal-top-actions">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setDefaultType(editingType.id)}
-                  disabled={!!editingType.default}
-                >
-                  По умолчанию
-                </Button>
-              </div>
+            <div className="simplified-template__type-modal-scroll subtype-edit-modal__scroll">
               <section className="subtype-edit-panel">
-                <header className="subtype-edit-panel__header">
-                  <h3 className="subtype-edit-panel__title">Контент для сайта</h3>
-                  <p className="subtype-edit-panel__lede">
-                    Фото, тексты и списки для карточки и страницы этого варианта на сайте.
-                  </p>
-                </header>
+                <SubtypePanelHeader
+                  step={1}
+                  title="Контент для сайта"
+                  lede="Изображение, описания и списки для витрины."
+                />
                 <div className="subtype-edit-panel__body">
-                  <div className="simplified-template__type-website-content simplified-template__type-website-content--in-panel">
-                    <div className="simplified-template__type-website-field">
-                    <label>Изображение</label>
-                    <SubtypeImageUploader
-                      imageUrl={draftImageUrl || undefined}
-                      subtypeName={editingType.name}
-                      onUploaded={(url) => setDraftImageUrl(url || '')}
-                    />
+                  <div className="subtype-edit-website-layout">
+                    <div className="subtype-edit-website-layout__image">
+                      <div className="simplified-template__type-website-field">
+                        <label>Изображение</label>
+                        <SubtypeImageUploader
+                          imageUrl={draftImageUrl || undefined}
+                          subtypeName={editingType.name}
+                          onUploaded={(url) => setDraftImageUrl(url || '')}
+                        />
+                      </div>
                     </div>
-                    <div className="simplified-template__type-website-field">
-                    <label>Краткое описание</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={draftBriefDescription}
-                      onChange={(e) => setDraftBriefDescription(e.target.value)}
-                      placeholder="Одна строка для карточки (например: Цветные на плотной бумаге)"
-                    />
+                    <div className="subtype-edit-website-layout__pair">
+                      <div className="simplified-template__type-website-field">
+                        <label>Краткое описание</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={draftBriefDescription}
+                          onChange={(e) => setDraftBriefDescription(e.target.value)}
+                          placeholder="Строка для карточки товара"
+                        />
+                      </div>
+                      <div className="simplified-template__type-website-field">
+                        <label>Полное описание</label>
+                        <textarea
+                          className="form-input"
+                          rows={4}
+                          value={draftFullDescription}
+                          onChange={(e) => setDraftFullDescription(e.target.value)}
+                          placeholder="Текст для страницы продукта"
+                        />
+                      </div>
                     </div>
-                    <div className="simplified-template__type-website-field">
-                    <label>Полное описание</label>
-                    <textarea
-                      className="form-input"
-                      rows={3}
-                      value={draftFullDescription}
-                      onChange={(e) => setDraftFullDescription(e.target.value)}
-                      placeholder="Текст для страницы продукта"
-                    />
+                    <div className="subtype-edit-website-layout__full">
+                      <div className="simplified-template__type-website-field">
+                        <label>Характеристики</label>
+                        <textarea
+                          className="form-input"
+                          rows={4}
+                          value={draftCharacteristicsText}
+                          onChange={(e) => setDraftCharacteristicsText(e.target.value)}
+                          placeholder="Один пункт на строку"
+                        />
+                      </div>
                     </div>
-                    <div className="simplified-template__type-website-field">
-                    <label>Характеристики</label>
-                    <textarea
-                      className="form-input"
-                      rows={3}
-                      value={draftCharacteristicsText}
-                      onChange={(e) => setDraftCharacteristicsText(e.target.value)}
-                      placeholder="Один пункт на строку (например: Размер: 90×50 мм)"
-                    />
-                    </div>
-                    <div className="simplified-template__type-website-field">
-                    <label>Преимущества</label>
-                    <textarea
-                      className="form-input"
-                      rows={2}
-                      value={draftAdvantagesText}
-                      onChange={(e) => setDraftAdvantagesText(e.target.value)}
-                      placeholder="Один пункт на строку (например: Высокое качество печати)"
-                    />
+                    <div className="subtype-edit-website-layout__full">
+                      <div className="simplified-template__type-website-field">
+                        <label>Преимущества</label>
+                        <textarea
+                          className="form-input"
+                          rows={3}
+                          value={draftAdvantagesText}
+                          onChange={(e) => setDraftAdvantagesText(e.target.value)}
+                          placeholder="Один пункт на строку"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               </section>
               <section className="subtype-edit-panel">
-                <header className="subtype-edit-panel__header">
-                  <h3 className="subtype-edit-panel__title">Типы цен</h3>
-                  <p className="subtype-edit-panel__lede">
-                    Какие варианты цены показывать в калькуляторе для этого подтипа. Без снятия галочек действует
-                    список у продукта (вкладка «Материалы»); если там пусто — все активные типы из справочника.
-                  </p>
-                </header>
+                <SubtypePanelHeader
+                  step={2}
+                  title="Типы цен"
+                  lede="Доступные варианты в калькуляторе для этого подтипа."
+                  ledeTitle="Без отдельного списка действует набор у продукта (вкладка «Материалы»). Если там пусто — все активные типы из справочника."
+                />
                 <div className="subtype-edit-panel__body subtype-edit-panel__body--compact-top">
                   <SubtypeAllowedPriceTypesField
                     productAllowedKeys={productAllowedPriceTypes ?? []}
@@ -711,12 +742,11 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                 </div>
               </section>
               <section className="subtype-edit-panel">
-                <header className="subtype-edit-panel__header">
-                  <h3 className="subtype-edit-panel__title">Значения по умолчанию</h3>
-                  <p className="subtype-edit-panel__lede">
-                    Предзаполнение полей калькулятора на сайте при выборе этого подтипа.
-                  </p>
-                </header>
+                <SubtypePanelHeader
+                  step={3}
+                  title="Значения по умолчанию"
+                  lede="Предзаполнение калькулятора на сайте при выборе этого подтипа."
+                />
                 <div className="subtype-edit-panel__body">
                   <TypeInitialDefaults
                     embedded

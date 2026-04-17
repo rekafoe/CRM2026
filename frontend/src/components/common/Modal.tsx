@@ -6,6 +6,12 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  /** Кнопки или действия справа от заголовка (до крестика) */
+  headerExtra?: React.ReactNode;
+  /** Классы тела модалки (по умолчанию p-6). Для форм с собственными отступами — например p-0 */
+  bodyClassName?: string;
+  /** Классы шапки (по умолчанию p-6). Компактная модалка — свой класс без крупного p-6 */
+  headerClassName?: string;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
@@ -16,6 +22,9 @@ export const Modal: React.FC<ModalProps> = ({
   isOpen, 
   onClose, 
   title, 
+  headerExtra,
+  bodyClassName,
+  headerClassName,
   children, 
   size = 'md',
   className = '',
@@ -60,18 +69,21 @@ export const Modal: React.FC<ModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {title && (
-          <div className="modal-header flex items-center justify-between p-6 border-b border-color">
-            <h2 className="text-xl font-semibold text-primary">{title}</h2>
+          <div className={`modal-header flex items-center gap-3 border-b border-color ${headerClassName ?? 'p-6'}`}>
+            <h2 className="text-xl font-semibold text-primary flex-1 min-w-0">{title}</h2>
+            {headerExtra != null && headerExtra !== false && (
+              <div className="modal-header__extra flex shrink-0 items-center gap-2">{headerExtra}</div>
+            )}
             <button 
               onClick={onClose}
-              className="modal-close-btn btn btn-sm btn-secondary"
+              className="modal-close-btn btn btn-sm btn-secondary shrink-0"
               aria-label="Закрыть"
             >
               ×
             </button>
           </div>
         )}
-        <div className="modal-body p-6">
+        <div className={`modal-body ${bodyClassName ?? 'p-6'}`}>
           {children}
         </div>
       </div>

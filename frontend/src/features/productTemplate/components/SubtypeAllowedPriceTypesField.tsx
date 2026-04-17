@@ -108,6 +108,9 @@ export const SubtypeAllowedPriceTypesField: React.FC<SubtypeAllowedPriceTypesFie
             />
             <span className="subtype-price-types-field__chip-text">
               <span className="subtype-price-types-field__name">{pt.name}</span>
+              <span className="subtype-price-types-field__sep" aria-hidden>
+                ·
+              </span>
               <span className="subtype-price-types-field__mult">{formatMultiplier(pt.multiplier)}</span>
             </span>
           </label>
