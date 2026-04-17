@@ -1,7 +1,7 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { AppIcon } from '../../../components/ui/AppIcon';
 import { ProductTypesCard } from './ProductTypesCard';
+import { TemplateProductRouteKey } from './TemplateProductRouteKey';
 import type { SimplifiedConfig } from '../hooks/useProductTemplate';
 import type { UseSimplifiedTypesResult } from '../hooks/useSimplifiedTypes';
 import type { ServiceRow } from './SimplifiedTemplateSection';
@@ -21,6 +21,9 @@ interface SimplifiedTemplateSidebarProps {
   services: ServiceRow[];
   allMaterials: any[];
   productAllowedPriceTypes?: string[];
+  /** Явное сохранение route_key с шаблона */
+  productNumericId?: number;
+  onProductRouteKeySaved?: () => void;
 }
 
 export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps> = ({
@@ -37,9 +40,18 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
   services,
   allMaterials,
   productAllowedPriceTypes,
+  productNumericId,
+  onProductRouteKeySaved,
 }) => {
   return (
     <aside className="product-template__sidebar">
+      {productNumericId != null && product && (
+        <TemplateProductRouteKey
+          productId={productNumericId}
+          routeKey={(product as { route_key?: string | null }).route_key}
+          onSaved={onProductRouteKeySaved}
+        />
+      )}
       <div className="template-summary-card">
         <div className="template-summary-card__icon">
           {product?.image_url ? (
@@ -116,20 +128,6 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
           </div>
         )}
       </div>
-
-      {product?.id != null && (
-        <div className="template-url-keys-hint simplified-card" style={{ marginTop: 12, padding: '12px 14px' }}>
-          <strong style={{ display: 'block', marginBottom: 8 }}>ЧПУ для ссылок на сайте</strong>
-          <p className="text-muted text-sm" style={{ margin: '0 0 8px', lineHeight: 1.45 }}>
-            <strong>route_key</strong> (продукт):{' '}
-            <Link to={`/adminpanel/products/${product.id}/edit`}>карточка продукта</Link>
-            {' → вкладка «Основное» → поле «Ключ URL (продукт)». '}
-          </p>
-          <p className="text-muted text-sm" style={{ margin: 0, lineHeight: 1.45 }}>
-            <strong>key</strong> (подтип): в списке ниже нажмите ✎ у типа → в модалке сверху поле «Ключ URL (подтип)».
-          </p>
-        </div>
-      )}
 
       <ProductTypesCard
         value={value}

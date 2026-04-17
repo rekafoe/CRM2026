@@ -483,6 +483,11 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
     [types, editingTypeId]
   )
 
+  const selectedVariant = useMemo(
+    () => (selectedTypeId != null ? types.find((t) => t.id === selectedTypeId) ?? null : null),
+    [types, selectedTypeId]
+  )
+
   useEffect(() => {
     if (!editingType) return
     setDraftImageUrl(editingType.image_url ?? '')
@@ -650,6 +655,31 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
               </div>
             ))}
           </div>
+          {selectedTypeId != null && selectedVariant && (
+            <div
+              className="simplified-template__subtype-key-panel"
+              style={{ paddingTop: 12, borderTop: '1px solid var(--border-subtle, rgba(0,0,0,0.1))' }}
+            >
+              <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
+                Ключ URL выбранного подтипа (key)
+              </label>
+              <input
+                type="text"
+                className="form-input form-input--full"
+                value={typeof selectedVariant.key === 'string' ? selectedVariant.key : ''}
+                onChange={(e) => {
+                  const v = e.target.value.trim().toLowerCase()
+                  onChange(updateType(value, selectedTypeId, { key: v || undefined }))
+                }}
+                placeholder="например: glossy"
+                autoComplete="off"
+                onClick={(e) => e.stopPropagation()}
+              />
+              <p className="text-muted text-sm" style={{ marginTop: 6 }}>
+                Сохраняется в шаблоне (кнопка сохранения / автосохранение). Должен быть уникален в системе.
+              </p>
+            </div>
+          )}
         </div>
       )}
       <Modal

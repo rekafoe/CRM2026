@@ -88,8 +88,16 @@ const ProductTemplatePage: React.FC = () => {
     handleRemoveMaterial,
     handleAddParameter,
     handleUpdateParameter,
-    handleRemoveParameter
+    handleRemoveParameter,
+    refreshProduct,
   } = pageData;
+
+  /** Упрощённый шаблон: calculator_type=simplified или product_type=multi_page (как на бэкенде). */
+  const isSimplifiedTemplateProduct = useMemo(() => {
+    if (!product) return false
+    const p = product as { calculator_type?: string; product_type?: string }
+    return p.calculator_type === 'simplified' || p.product_type === 'multi_page'
+  }, [product])
 
   const trimWidth = state.trim_size.width;
   const trimHeight = state.trim_size.height;
@@ -105,7 +113,9 @@ const ProductTemplatePage: React.FC = () => {
   );
   const simplifiedTypes = useSimplifiedTypes(state.simplified, handleSimplifiedChange);
 
-  const { simplifiedServices, bindingServices } = useTemplatePricingServices(product?.calculator_type);
+  const { simplifiedServices, bindingServices } = useTemplatePricingServices(
+    isSimplifiedTemplateProduct ? 'simplified' : product?.calculator_type,
+  );
 
   const handleSelectType = useCallback(
     (typeId: any) => {
@@ -203,7 +213,7 @@ const ProductTemplatePage: React.FC = () => {
         onSave={() => triggerManualSave('Шаблон сохранён')}
       />
 
-      {product?.calculator_type === 'simplified' ? (
+      {isSimplifiedTemplateProduct ? (
         <div className="product-template__body product-template__body--simplified-with-sidebar">
           <SimplifiedTemplateSidebar
             product={product}
@@ -219,6 +229,8 @@ const ProductTemplatePage: React.FC = () => {
             services={simplifiedServices}
             allMaterials={allMaterials as any}
             productAllowedPriceTypes={state.constraints.overrides.allowedPriceTypes}
+            productNumericId={productId}
+            onProductRouteKeySaved={() => void refreshProduct()}
           />
 
           <section className="product-template__main">

@@ -64,6 +64,7 @@ export interface UseProductTemplatePageResult {
   handleUpdateParameter: (param: Partial<ProductParameter> & { id: number }) => Promise<void>
   handleRemoveParameter: (param: { id: number; name?: string; label?: string }) => Promise<void>
   handleQuickTestCalculate: (payload: QuickTestPayload) => Promise<unknown>
+  refreshProduct: () => Promise<void>
 }
 
 export default function useProductTemplatePage(productId: number | undefined): UseProductTemplatePageResult {
@@ -726,7 +727,9 @@ export default function useProductTemplatePage(productId: number | undefined): U
   )
 
   const summaryStats = useMemo(() => {
-    const isSimplified = (product as any)?.calculator_type === 'simplified'
+    const isSimplified =
+      (product as any)?.calculator_type === 'simplified' ||
+      (product as any)?.product_type === 'multi_page'
     const routeKeyDisplay = (product as any)?.route_key?.trim()
       ? String((product as any).route_key).trim()
       : 'не задан'
@@ -802,6 +805,12 @@ export default function useProductTemplatePage(productId: number | undefined): U
 
   const currentMaterialId = (state.test.params as Record<string, unknown>)?.material_id as number | undefined
 
+  const refreshProduct = useCallback(async () => {
+    if (!productId) return
+    const details = await getProductDetails(productId)
+    if (details) setProduct(details)
+  }, [productId])
+
   return {
     state,
     dispatch,
@@ -829,7 +838,8 @@ export default function useProductTemplatePage(productId: number | undefined): U
     handleAddParameter,
     handleUpdateParameter,
     handleRemoveParameter,
-    handleQuickTestCalculate
+    handleQuickTestCalculate,
+    refreshProduct,
   }
 }
 
