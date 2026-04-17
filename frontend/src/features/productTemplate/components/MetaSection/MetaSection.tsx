@@ -43,22 +43,24 @@ const MetaSection: React.FC<MetaSectionProps> = ({
   return (
     <div className="form-section">
       <div className="form-section__content">
-        <FormField
-          label="Ключ URL продукта (route_key)"
-          help="Латиница, цифры, дефис — сегмент ссылки на калькулятор вместо числового id. Должен быть уникален."
-        >
-          <input
-            className="form-input"
-            value={route_key}
-            onChange={(e) => onChange({ route_key: e.target.value })}
-            placeholder="например: fotopechat"
-            autoComplete="off"
-          />
-        </FormField>
+        {!showSubtypeUrlKeyHint && (
+          <FormField
+            label="Ключ URL продукта (route_key)"
+            help="Латиница, цифры, дефис — сегмент ссылки на калькулятор вместо числового id. Должен быть уникален."
+          >
+            <input
+              className="form-input"
+              value={route_key}
+              onChange={(e) => onChange({ route_key: e.target.value })}
+              placeholder="например: fotopechat"
+              autoComplete="off"
+            />
+          </FormField>
+        )}
 
         {showSubtypeUrlKeyHint && (
           <Alert type="info">
-            Ключ подтипа для URL (key): на этой же странице шаблона в левой колонке выберите тип и под списком заполните поле «Ключ URL выбранного подтипа» — затем сохраните шаблон.
+            Ключ продукта для URL (route_key) задаётся в левой колонке над карточкой сводки. Ключ подтипа (key) — в модалке подтипа (кнопка ✎ у типа), затем сохраните шаблон.
           </Alert>
         )}
 
