@@ -92,6 +92,8 @@ export type ProductTypeId = number;
 export type ProductTypeVariant = {
   id: ProductTypeId;
   name: string;
+  /** Сегмент URL для подтипа на сайте (латиница, цифры, дефис); глобально не должен совпадать с route_key других продуктов и key других подтипов */
+  key?: string;
   /** Имена полей калькулятора для этого типа (опционально; если пусто — все поля из схемы) */
   fieldNames?: string[];
   default?: boolean;

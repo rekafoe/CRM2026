@@ -96,6 +96,26 @@ export async function getProductDetails(productId: number): Promise<ProductWithD
 /**
  * Обновить продукт
  */
+/** Разрешить продукт по route_key (ЧПУ), GET /api/products/by-route-key/:key */
+export async function getProductByRouteKey(routeKey: string): Promise<{
+  id: number;
+  name: string;
+  route_key: string | null;
+  category_id?: number;
+  calculator_type?: string;
+  product_type?: string;
+  is_active?: number;
+} | null> {
+  const k = routeKey.trim().toLowerCase();
+  if (!k) return null;
+  try {
+    const response = await api.get(`/products/by-route-key/${encodeURIComponent(k)}`);
+    return extractData(response, null);
+  } catch {
+    return null;
+  }
+}
+
 export async function updateProduct(
   productId: number,
   data: Partial<Product>

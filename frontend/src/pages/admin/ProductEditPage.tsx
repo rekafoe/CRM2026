@@ -42,7 +42,17 @@ const ProductEditPage: React.FC = () => {
   const [savingPrintSettings, setSavingPrintSettings] = useState(false);
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
-  const [form, setForm] = useState<{ name: string; description?: string; icon?: string; image_url?: string; calculator_type?: string; product_type?: string; category_id?: number; operator_percent?: string }>({ name: '' });
+  const [form, setForm] = useState<{
+    name: string;
+    description?: string;
+    icon?: string;
+    image_url?: string;
+    calculator_type?: string;
+    product_type?: string;
+    category_id?: number;
+    operator_percent?: string;
+    route_key?: string;
+  }>({ name: '' });
   const [saving, setSaving] = useState(false);
   const savePriceTypesRef = useRef<(() => Promise<void>) | null>(null);
   const registerPriceTypesSave = useCallback((fn: (() => Promise<void>) | null) => {
@@ -92,6 +102,7 @@ const ProductEditPage: React.FC = () => {
       product_type: (product as any)?.product_type || '',
       category_id: (product as any)?.category_id,
       operator_percent: (product as any)?.operator_percent !== undefined ? String((product as any)?.operator_percent) : '',
+      route_key: (product as any)?.route_key != null ? String((product as any).route_key) : '',
     });
   }, [product]);
 
@@ -99,7 +110,7 @@ const ProductEditPage: React.FC = () => {
     if (!productId || !form.name) return;
     try {
       setSaving(true);
-      const { name, description, icon, image_url, calculator_type, product_type, operator_percent, category_id } = form;
+      const { name, description, icon, image_url, calculator_type, product_type, operator_percent, category_id, route_key } = form;
       const resolvedCalculatorType = product_type === 'multi_page' ? 'simplified' : calculator_type;
       const operatorPercentValue = operator_percent !== undefined && operator_percent !== ''
         ? Number(operator_percent)
@@ -112,6 +123,7 @@ const ProductEditPage: React.FC = () => {
         calculator_type: resolvedCalculatorType,
         product_type,
         category_id: category_id ?? null,
+        route_key: route_key?.trim() ? route_key.trim().toLowerCase() : null,
         ...(operatorPercentValue !== undefined && Number.isFinite(operatorPercentValue)
           ? { operator_percent: operatorPercentValue }
           : {}),
@@ -127,7 +139,7 @@ const ProductEditPage: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [productId, form.name, form.description, form.icon, form.image_url, form.calculator_type, form.product_type, form.operator_percent, form.category_id, reloadData, activeTab]);
+  }, [productId, form.name, form.description, form.icon, form.image_url, form.calculator_type, form.product_type, form.operator_percent, form.category_id, form.route_key, reloadData, activeTab]);
 
   const handleFormChange = useCallback((field: string, value: string) => {
     if (field === 'category_id') {
@@ -155,10 +167,11 @@ const ProductEditPage: React.FC = () => {
 
   const summaryData = useMemo(() => ([
     { label: 'ID продукта', value: product?.id ?? '—' },
+    { label: 'Ключ URL', value: form.route_key?.trim() || (product as any)?.route_key || '—' },
     { label: 'Категория', value: (product as any)?.category_name ?? '—' },
     { label: 'Тип продукции', value: form.product_type || (product as any)?.product_type || '—' },
     { label: 'Тип калькулятора', value: form.calculator_type || (product as any)?.calculator_type || '—' }
-  ]), [product, form.product_type, form.calculator_type]);
+  ]), [product, form.product_type, form.calculator_type, form.route_key]);
 
   const tabs = useMemo(() => ([
     { key: 'info' as const, label: 'Основное' },

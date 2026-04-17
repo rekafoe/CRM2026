@@ -367,9 +367,14 @@ export function compactSimplifiedForSite(simplified: any) {
         let minPrice = cfg?.sizes ? minUnitPriceForSizes(cfg.sizes) : null;
         if (minPrice == null && globalMinUnit != null) minPrice = globalMinUnit;
         const rawImg = t?.image_url;
+        const slug =
+          typeof t?.key === 'string' && String(t.key).trim()
+            ? String(t.key).trim().toLowerCase()
+            : undefined;
         return {
           id: t?.id,
           name: t?.name,
+          ...(slug ? { key: slug } : {}),
           default: !!t?.default,
           briefDescription: t?.briefDescription,
           fullDescription: t?.fullDescription,

@@ -9,6 +9,7 @@ import {
   normalizeConfigDataForPersistence,
   ensureProductTemplateConfigsTable,
 } from './helpers';
+import { assertSubtypeKeysAllowedForTemplate } from '../utils/routeKeys';
 
 const router = Router();
 
@@ -234,6 +235,15 @@ router.post('/:productId/configs', asyncHandler(async (req, res) => {
   const { name, config_data, constraints, is_active } = req.body || {};
   const normalizedConfigData = normalizeConfigDataForPersistence(config_data);
   const db = await ensureProductTemplateConfigsTable();
+  if (normalizedConfigData?.simplified) {
+    try {
+      await assertSubtypeKeysAllowedForTemplate(db, Number(productId), normalizedConfigData.simplified);
+    } catch (e: any) {
+      const code = e?.statusCode === 409 ? 409 : 400;
+      res.status(code).json({ error: e?.message || 'Ошибка валидации ключей подтипов' });
+      return;
+    }
+  }
   const now = new Date().toISOString();
   const result = await db.run(
     `INSERT INTO product_template_configs (product_id, name, config_data, constraints, is_active, created_at, updated_at)
@@ -295,6 +305,15 @@ router.put('/:productId/configs/:configId', asyncHandler(async (req, res) => {
   const { name, config_data, constraints, is_active } = req.body || {};
   const normalizedConfigData = normalizeConfigDataForPersistence(config_data);
   const db = await ensureProductTemplateConfigsTable();
+  if (normalizedConfigData?.simplified) {
+    try {
+      await assertSubtypeKeysAllowedForTemplate(db, Number(productId), normalizedConfigData.simplified);
+    } catch (e: any) {
+      const code = e?.statusCode === 409 ? 409 : 400;
+      res.status(code).json({ error: e?.message || 'Ошибка валидации ключей подтипов' });
+      return;
+    }
+  }
   const now = new Date().toISOString();
   await db.run(
     `UPDATE product_template_configs

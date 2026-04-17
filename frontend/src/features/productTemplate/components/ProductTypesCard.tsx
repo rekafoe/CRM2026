@@ -475,6 +475,7 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
   const [draftFullDescription, setDraftFullDescription] = useState('')
   const [draftCharacteristicsText, setDraftCharacteristicsText] = useState('')
   const [draftAdvantagesText, setDraftAdvantagesText] = useState('')
+  const [draftSubtypeKey, setDraftSubtypeKey] = useState('')
   const prevTypeIdsRef = useRef<Array<string | number>>((value.types || []).map((t) => t.id))
 
   const editingType = useMemo(
@@ -489,7 +490,8 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
     setDraftFullDescription(editingType.fullDescription ?? '')
     setDraftCharacteristicsText(arrayToText(editingType.characteristics))
     setDraftAdvantagesText(arrayToText(editingType.advantages))
-  }, [editingType?.id])
+    setDraftSubtypeKey(editingType.key ?? '')
+  }, [editingType?.id, editingType?.key])
 
   const openEditType = (typeId: ProductTypeId) => {
     onSelectType(typeId)
@@ -502,12 +504,14 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
 
   const applyTypeDraft = () => {
     if (!editingType) return
+    const keyTrim = draftSubtypeKey.trim().toLowerCase()
     const nextValue = updateType(value, editingType.id, {
       image_url: draftImageUrl.trim() ? draftImageUrl : undefined,
       briefDescription: draftBriefDescription.trim() ? draftBriefDescription : undefined,
       fullDescription: draftFullDescription.trim() ? draftFullDescription : undefined,
       characteristics: textToArray(draftCharacteristicsText),
       advantages: textToArray(draftAdvantagesText),
+      key: keyTrim || undefined,
     })
     onChange(nextValue)
     closeEditType()
@@ -675,6 +679,20 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                   lede="Изображение, описания и списки для витрины."
                 />
                 <div className="subtype-edit-panel__body">
+                  <div className="simplified-template__type-website-field" style={{ marginBottom: 12 }}>
+                    <label>Ключ URL (подтип)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={draftSubtypeKey}
+                      onChange={(e) => setDraftSubtypeKey(e.target.value)}
+                      placeholder="латиница, цифры, дефис — уникален в системе"
+                      autoComplete="off"
+                    />
+                    <p className="text-muted text-sm" style={{ marginTop: 6 }}>
+                      Не должен совпадать с ключом другого продукта или подтипа. Пусто — только числовой id в ссылках.
+                    </p>
+                  </div>
                   <div className="subtype-edit-website-layout">
                     <div className="subtype-edit-website-layout__image">
                       <div className="simplified-template__type-website-field">

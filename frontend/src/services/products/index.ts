@@ -24,6 +24,7 @@ export {
   getProductsByCategory,
   getAllProducts,
   getProductDetails,
+  getProductByRouteKey,
   updateProduct,
   createProduct,
   createProductWithSetup,

@@ -14,6 +14,7 @@ import {
   DEFAULT_COLOR_MODE_OPTIONS,
   normalizeConfigDataForPersistence,
 } from './helpers';
+import { assertProductRouteKeyAllowed, normalizeProductRouteKey } from '../utils/routeKeys';
 
 const router = Router();
 
@@ -88,6 +89,7 @@ async function insertDuplicateProductRow(
     if (col === 'name') vals.push(newName.trim());
     else if (col === 'is_active') vals.push(0);
     else if (col === 'active_for_site') vals.push(0);
+    else if (col === 'route_key') vals.push(null);
     else vals.push(source[col] ?? null);
   }
 
@@ -172,6 +174,36 @@ router.post('/upload-image', uploadMemory.single('image'), async (req, res) => {
   } catch (error) {
     logger.error('Error uploading product image', error);
     res.status(500).json({ error: 'Ошибка загрузки изображения' });
+  }
+});
+
+/**
+ * Разрешение продукта по route_key (ЧПУ для калькулятора на сайте).
+ * Должен быть объявлен до GET /:productId.
+ */
+router.get('/by-route-key/:key', async (req, res) => {
+  try {
+    const raw = req.params.key;
+    const key = normalizeProductRouteKey(raw);
+    if (!key) {
+      return res.status(400).json({ error: 'Укажите непустой ключ' });
+    }
+    const db = await getDb();
+    if (!(await hasColumn('products', 'route_key'))) {
+      return res.status(501).json({ error: 'Колонка route_key не поддерживается БД' });
+    }
+    const row = await db.get(
+      `SELECT id, name, route_key, category_id, calculator_type, product_type, is_active
+       FROM products WHERE lower(trim(route_key)) = ? LIMIT 1`,
+      [key],
+    );
+    if (!row) {
+      return res.status(404).json({ error: 'Продукт с таким ключом не найден' });
+    }
+    res.json(row);
+  } catch (error) {
+    logger.error('Error resolving product by route_key', error);
+    res.status(500).json({ error: 'Failed to resolve product' });
   }
 });
 
@@ -481,7 +513,18 @@ router.post('/:productId/duplicate', asyncHandler(async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { category_id, name, description, icon, calculator_type, product_type, operator_percent, image_url, active_for_site } = req.body;
+    const {
+      category_id,
+      name,
+      description,
+      icon,
+      calculator_type,
+      product_type,
+      operator_percent,
+      image_url,
+      active_for_site,
+      route_key,
+    } = req.body;
     const resolvedCalculatorType = product_type === 'multi_page' ? 'simplified' : calculator_type;
     const db = await getDb();
 
@@ -519,6 +562,7 @@ router.post('/', async (req, res) => {
     const hasOperatorPercentCol = await hasColumn('products', 'operator_percent');
     const hasImageUrlCol = await hasColumn('products', 'image_url');
     const hasActiveForSiteCol = await hasColumn('products', 'active_for_site');
+    const hasRouteKeyCol = await hasColumn('products', 'route_key');
     const insertColumns = ['category_id', 'name', 'description', 'icon', 'calculator_type', 'product_type'];
     const insertValues: any[] = [resolvedCategoryId, name.trim(), description ?? null, icon ?? null, resolvedCalculatorType || 'product', product_type || 'sheet_single'];
 
@@ -533,6 +577,14 @@ router.post('/', async (req, res) => {
     if (hasActiveForSiteCol) {
       insertColumns.push('active_for_site');
       insertValues.push(active_for_site === true || active_for_site === 1 ? 1 : 0);
+    }
+    if (hasRouteKeyCol) {
+      const rk = normalizeProductRouteKey(route_key);
+      if (rk) {
+        await assertProductRouteKeyAllowed(db, rk, -1);
+      }
+      insertColumns.push('route_key');
+      insertValues.push(rk);
     }
 
     const placeholders = insertColumns.map(() => '?').join(', ');
@@ -596,16 +648,32 @@ router.put('/:id', async (req, res) => {
     const updates = req.body;
     if (updates?.product_type === 'multi_page') updates.calculator_type = 'simplified';
     const db = await getDb();
+    const productIdNum = Number(id);
 
     const hasOperatorPercentCol = await hasColumn('products', 'operator_percent');
     const hasImageUrlCol = await hasColumn('products', 'image_url');
     const hasActiveForSiteCol = await hasColumn('products', 'active_for_site');
+    const hasRouteKeyCol = await hasColumn('products', 'route_key');
+    if (hasRouteKeyCol && updates.route_key !== undefined) {
+      const rk = normalizeProductRouteKey(updates.route_key);
+      if (rk) {
+        try {
+          await assertProductRouteKeyAllowed(db, rk, productIdNum);
+        } catch (e: any) {
+          const code = e?.statusCode === 409 ? 409 : 400;
+          res.status(code).json({ error: e?.message || 'Недопустимый route_key' });
+          return;
+        }
+      }
+    }
+
     const allowedFields = [
       'category_id', 'name', 'description', 'icon', 'is_active',
       'product_type', 'calculator_type', 'setup_status', 'print_settings',
       ...(hasImageUrlCol ? ['image_url'] : []),
       ...(hasOperatorPercentCol ? ['operator_percent'] : []),
       ...(hasActiveForSiteCol ? ['active_for_site'] : []),
+      ...(hasRouteKeyCol ? ['route_key'] : []),
     ];
     const setFields: string[] = [];
     const values: any[] = [];
@@ -615,6 +683,7 @@ router.put('/:id', async (req, res) => {
         setFields.push(`${field} = ?`);
         let val = field === 'print_settings' && typeof updates[field] === 'object' ? JSON.stringify(updates[field]) : updates[field];
         if (field === 'active_for_site') val = val === true || val === 1 ? 1 : 0;
+        if (field === 'route_key') val = normalizeProductRouteKey(updates.route_key);
         values.push(val);
       }
     }

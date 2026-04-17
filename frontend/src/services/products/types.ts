@@ -27,6 +27,8 @@ export interface Product {
   is_active: boolean;
   /** Показывать в каталоге на сайте (при запросе с forSite=1) */
   active_for_site?: boolean | number;
+  /** ЧПУ-сегмент для URL калькулятора (латиница, цифры, дефис); глобально уникален с key подтипов */
+  route_key?: string | null;
   created_at: string;
   updated_at: string;
   category_name?: string;

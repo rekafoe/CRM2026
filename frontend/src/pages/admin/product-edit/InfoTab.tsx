@@ -15,6 +15,7 @@ interface InfoTabProps {
     product_type?: string;
     category_id?: number;
     operator_percent?: string;
+    route_key?: string;
   };
   product: any;
   saving: boolean;
@@ -67,6 +68,18 @@ export const InfoTab: React.FC<InfoTabProps> = React.memo(({
             className="form-input form-input--full"
             value={form.name}
             onChange={(e) => onFormChange('name', e.target.value)}
+          />
+        </FormField>
+        <FormField
+          label="Ключ URL (продукт)"
+          help="Латиница, цифры, дефис — для ссылки на калькулятор вместо числового id. Должен быть уникален среди всех продуктов и не совпадать с ключами подтипов."
+        >
+          <input
+            className="form-input form-input--full"
+            value={form.route_key ?? ''}
+            onChange={(e) => onFormChange('route_key', e.target.value)}
+            placeholder="например: fotopechat"
+            autoComplete="off"
           />
         </FormField>
         <FormField label="Иконка" help="Эмодзи или короткий символ">
