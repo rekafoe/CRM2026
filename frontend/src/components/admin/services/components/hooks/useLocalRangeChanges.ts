@@ -352,56 +352,55 @@ export function useLocalRangeChanges(
 
   // 🆕 Локальное обновление имени варианта (для новых и существующих вариантов)
   const updateVariantName = useCallback((variantId: number, newName: string) => {
-    setLocalVariants(prev => {
-      const variant = prev.find(v => v.id === variantId);
+    let oldNameForQueue: string | undefined;
+    let parametersSnapshot: Record<string, any> | undefined;
+    setLocalVariants((prev) => {
+      const variant = prev.find((v) => v.id === variantId);
       if (!variant) return prev;
-      
+
       const oldName = variant.variantName;
-      
+      oldNameForQueue = oldName;
+      parametersSnapshot = variant.parameters;
+
       // Обновляем все варианты с таким именем (т.к. variantName может быть общим для группы)
-      return prev.map(v => 
-        v.variantName === oldName ? { ...v, variantName: newName } : v
-      );
+      return prev.map((v) => (v.variantName === oldName ? { ...v, variantName: newName } : v));
     });
-    
-    setVariantChanges(prev => {
+
+    setVariantChanges((prev) => {
       // Проверяем, есть ли уже изменение для этого варианта
-      const existingChange = prev.find(c => 
-        (c.type === 'create' || c.type === 'update') && c.variantId === variantId
+      const existingChange = prev.find(
+        (c) => (c.type === 'create' || c.type === 'update') && c.variantId === variantId
       );
-      
+
       if (existingChange) {
         // Обновляем существующее изменение
-        return prev.map(c =>
+        return prev.map((c) =>
           (c.type === 'create' || c.type === 'update') && c.variantId === variantId
             ? { ...c, variantName: newName }
             : c
         );
-      } else {
-        // Проверяем, является ли вариант новым
-        const isNewVariant = prev.some(c => c.type === 'create' && c.variantId === variantId);
-        if (isNewVariant) {
-          // Для новых вариантов обновляем изменение create
-          return prev.map(c =>
-            c.type === 'create' && c.variantId === variantId
-              ? { ...c, variantName: newName }
-              : c
-          );
-        } else {
-          // Для существующих вариантов создаем изменение update
-          const variant = localVariants.find(v => v.id === variantId);
-          return [...prev, {
-            type: 'update' as const,
-            variantId,
-            variantName: newName,
-            oldVariantName: variant?.variantName,
-            parameters: variant?.parameters,
-          }];
-        }
       }
+      // Проверяем, является ли вариант новым
+      const isNewVariant = prev.some((c) => c.type === 'create' && c.variantId === variantId);
+      if (isNewVariant) {
+        return prev.map((c) =>
+          c.type === 'create' && c.variantId === variantId ? { ...c, variantName: newName } : c
+        );
+      }
+      // Существующий вариант с сервера — oldName/parameters из того же шага, что и setLocalVariants
+      return [
+        ...prev,
+        {
+          type: 'update' as const,
+          variantId,
+          variantName: newName,
+          oldVariantName: oldNameForQueue,
+          parameters: parametersSnapshot,
+        },
+      ];
     });
     setHasUnsavedChanges(true);
-  }, [localVariants]);
+  }, []);
 
   // 🆕 Локальное обновление параметров варианта (для новых и существующих вариантов)
   const updateVariantParams = useCallback((variantId: number, params: Record<string, any>) => {

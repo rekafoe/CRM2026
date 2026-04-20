@@ -72,7 +72,9 @@ export function useVariantsTable(serviceId: number): UseVariantsTableResult {
               break;
             case 'update':
               if (change.variantId) {
-                if (change.variantName != null && change.oldVariantName != null) {
+                // Имя: не требуем oldVariantName — операция сама берёт текущее имя из состояния сервера.
+                // Иначе при undefined в очереди API не вызывался, reload() подтягивал старое «Новый тип».
+                if (change.variantName != null) {
                   await operations.updateVariantName(change.variantId, change.variantName);
                 }
                 if (change.parameters) {
