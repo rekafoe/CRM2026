@@ -25,8 +25,9 @@ export interface TierRangeModalState {
  */
 export interface GroupedVariants {
   level0: VariantWithTiers[];
-  level1: Map<number, VariantWithTiers[]>; // key = parent variant id
-  level2: Map<number, VariantWithTiers[]>; // key = parent variant id
+  /** ключ — variantParentMapKey(id родителя) */
+  level1: Map<string, VariantWithTiers[]>;
+  level2: Map<string, VariantWithTiers[]>;
 }
 
 /**

@@ -1,5 +1,12 @@
 import { VariantWithTiers, GroupedVariants, VariantsByType } from './ServiceVariantsTable.types';
 
+/** Ключ Map для связи родитель→дети (id из БД и из JSON могут отличаться number/string). */
+export function variantParentMapKey(id: unknown): string {
+  if (id === null || id === undefined) return '';
+  const n = Number(id);
+  return Number.isFinite(n) ? String(n) : String(id);
+}
+
 /**
  * Определяет уровень вложенности варианта
  */
@@ -26,10 +33,7 @@ export function getVariantLevel(variant: VariantWithTiers): number {
 export function groupVariantsByType(variants: VariantWithTiers[]): VariantsByType {
   const grouped: VariantsByType = {};
 
-  variants.forEach((variant) => {
-    const level = getVariantLevel(variant);
-    const typeName = variant.variantName;
-
+  const ensure = (typeName: string): GroupedVariants => {
     if (!grouped[typeName]) {
       grouped[typeName] = {
         level0: [],
@@ -37,29 +41,35 @@ export function groupVariantsByType(variants: VariantWithTiers[]): VariantsByTyp
         level2: new Map(),
       };
     }
+    return grouped[typeName];
+  };
 
-    if (level === 0) {
-      grouped[typeName].level0.push(variant);
-    } else if (level === 1) {
-      // Для уровня 1, родителем является вариант из level 0
-      const parentLevel0 = grouped[typeName].level0[0];
-      if (parentLevel0) {
-        const parentId = parentLevel0.id;
-        if (!grouped[typeName].level1.has(parentId)) {
-          grouped[typeName].level1.set(parentId, []);
-        }
-        grouped[typeName].level1.get(parentId)!.push(variant);
-      }
-    } else if (level === 2) {
-      // Для уровня 2, родителем является вариант из level 1
-      const parentVariantId = variant.parameters?.parentVariantId;
-      if (parentVariantId) {
-        if (!grouped[typeName].level2.has(parentVariantId)) {
-          grouped[typeName].level2.set(parentVariantId, []);
-        }
-        grouped[typeName].level2.get(parentVariantId)!.push(variant);
-      }
-    }
+  // Сначала только корни (0), иначе дочерние строки при раннем порядке в массиве терялись
+  variants.forEach((variant) => {
+    if (getVariantLevel(variant) !== 0) return;
+    ensure(variant.variantName).level0.push(variant);
+  });
+
+  variants.forEach((variant) => {
+    if (getVariantLevel(variant) !== 1) return;
+    const typeName = variant.variantName;
+    const g = ensure(typeName);
+    const parentLevel0 = g.level0[0];
+    if (!parentLevel0) return;
+    const pk = variantParentMapKey(parentLevel0.id);
+    if (!g.level1.has(pk)) g.level1.set(pk, []);
+    g.level1.get(pk)!.push(variant);
+  });
+
+  variants.forEach((variant) => {
+    if (getVariantLevel(variant) !== 2) return;
+    const typeName = variant.variantName;
+    const g = ensure(typeName);
+    const parentVariantId = variant.parameters?.parentVariantId;
+    if (parentVariantId === null || parentVariantId === undefined || parentVariantId === '') return;
+    const pk = variantParentMapKey(parentVariantId);
+    if (!g.level2.has(pk)) g.level2.set(pk, []);
+    g.level2.get(pk)!.push(variant);
   });
 
   return grouped;

@@ -17,6 +17,7 @@ import {
   groupVariantsByType,
   calculateCommonRanges,
   createVariantsIndexMap,
+  variantParentMapKey,
 } from './ServiceVariantsTable.utils';
 import {
   ServiceVariantsTableProps,
@@ -388,7 +389,7 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
 
                         {Array.from(typeGroup.level1.entries()).map(([, level1Variants]) =>
                           level1Variants.map((variant) => {
-                            const level2Variants = typeGroup.level2.get(variant.id) || [];
+                            const level2Variants = typeGroup.level2.get(variantParentMapKey(variant.id)) || [];
                             return (
                               <React.Fragment key={variant.id}>
                                 <VariantRowLevel1

@@ -385,44 +385,46 @@ export function useLocalRangeChanges(
 
   // 🆕 Локальное обновление параметров варианта (для новых и существующих вариантов)
   const updateVariantParams = useCallback((variantId: number, params: Record<string, any>) => {
-    setLocalVariants(prev => prev.map(v => 
-      v.id === variantId ? { ...v, parameters: params } : v
-    ));
-    
+    setLocalVariants(prev =>
+      prev.map(v =>
+        v.id === variantId ? { ...v, parameters: { ...v.parameters, ...params } } : v
+      )
+    );
+
     setVariantChanges(prev => {
-      // Проверяем, есть ли уже изменение для этого варианта
-      const existingChange = prev.find(c => 
-        (c.type === 'create' || c.type === 'update') && c.variantId === variantId
+      const mergeParams = (base: Record<string, any> | undefined) => ({ ...base, ...params });
+
+      const existingChange = prev.find(
+        c => (c.type === 'create' || c.type === 'update') && c.variantId === variantId
       );
-      
+
       if (existingChange) {
-        // Обновляем существующее изменение
         return prev.map(c =>
           (c.type === 'create' || c.type === 'update') && c.variantId === variantId
-            ? { ...c, parameters: params }
+            ? { ...c, parameters: mergeParams(c.parameters) }
             : c
         );
-      } else {
-        // Проверяем, является ли вариант новым
-        const isNewVariant = prev.some(c => c.type === 'create' && c.variantId === variantId);
-        if (isNewVariant) {
-          // Для новых вариантов обновляем изменение create
-          return prev.map(c =>
-            c.type === 'create' && c.variantId === variantId
-              ? { ...c, parameters: params }
-              : c
-          );
-        } else {
-          // Для существующих вариантов создаем изменение update
-          const variant = localVariants.find(v => v.id === variantId);
-          return [...prev, {
-            type: 'update' as const,
-            variantId,
-            variantName: variant?.variantName,
-            parameters: params,
-          }];
-        }
       }
+
+      const isNewVariant = prev.some(c => c.type === 'create' && c.variantId === variantId);
+      if (isNewVariant) {
+        return prev.map(c =>
+          c.type === 'create' && c.variantId === variantId
+            ? { ...c, parameters: mergeParams(c.parameters) }
+            : c
+        );
+      }
+
+      const variant = localVariants.find(v => v.id === variantId);
+      return [
+        ...prev,
+        {
+          type: 'update' as const,
+          variantId,
+          variantName: variant?.variantName,
+          parameters: mergeParams(variant?.parameters),
+        },
+      ];
     });
   }, [localVariants]);
 
