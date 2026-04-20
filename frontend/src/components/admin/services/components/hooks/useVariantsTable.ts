@@ -138,7 +138,12 @@ export function useVariantsTable(serviceId: number): UseVariantsTableResult {
         syncWithExternalRef.current(serverVariants);
       } else {
         const p = current.pendingChanges;
-        if (p.priceChanges.length === 0 && p.rangeChanges.length === 0) {
+        // Пока есть несохранённые правки по вариантам — не подмешиваем tiers с сервера (меньше гонок с UI).
+        if (
+          p.priceChanges.length === 0 &&
+          p.rangeChanges.length === 0 &&
+          p.variantChanges.length === 0
+        ) {
           current.mergeTiersFromServer(serverVariants);
         }
       }

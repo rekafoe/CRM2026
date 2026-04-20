@@ -406,15 +406,16 @@ export async function updateServiceVariant(serviceId: number, variantId: number 
     throw new Error(`Invalid variantId: ${variantId}`);
   }
   
-  const response = await api.put(`/pricing/services/${serviceId}/variants/${normalizedVariantId}`, {
-    variant_name: payload.variantName,
-    parameters: payload.parameters,
-    sort_order: payload.sortOrder,
-    is_active: payload.isActive,
-    ...(payload.material_id !== undefined ? { material_id: payload.material_id } : {}),
-    ...(payload.qty_per_item !== undefined ? { qty_per_item: payload.qty_per_item } : {}),
-    ...(payload.parentVariantId !== undefined ? { parent_variant_id: payload.parentVariantId } : {}),
-  });
+  const body: Record<string, unknown> = {};
+  if (payload.variantName !== undefined) body.variant_name = payload.variantName;
+  if (payload.parameters !== undefined) body.parameters = payload.parameters;
+  if (payload.sortOrder !== undefined) body.sort_order = payload.sortOrder;
+  if (payload.isActive !== undefined) body.is_active = payload.isActive;
+  if (payload.material_id !== undefined) body.material_id = payload.material_id;
+  if (payload.qty_per_item !== undefined) body.qty_per_item = payload.qty_per_item;
+  if (payload.parentVariantId !== undefined) body.parent_variant_id = payload.parentVariantId;
+
+  const response = await api.put(`/pricing/services/${serviceId}/variants/${normalizedVariantId}`, body);
   const data = (response.data as any)?.data ?? response.data;
   return mapVariant(data);
 }

@@ -173,8 +173,8 @@ export function useVariantOperations(
       );
 
       const v = variants.find((x) => x.id === variantId);
+      // Не передаём variantName: иначе после updateVariantName второй PUT затрёт имя устаревшим значением из closure.
       await updateServiceVariant(serviceId, variantId, {
-        variantName: v?.variantName || '',
         parameters: params,
         material_id: v?.material_id ?? undefined,
         qty_per_item: v?.qty_per_item ?? undefined,
@@ -196,7 +196,6 @@ export function useVariantOperations(
       const v = variants.find((x) => x.id === variantId);
       const parentPayload = v ? variantParentVariantIdForPayload(v) : undefined;
       await updateServiceVariant(serviceId, variantId, {
-        variantName: v?.variantName ?? '',
         parameters: v?.parameters ?? {},
         material_id: material_id ?? undefined,
         qty_per_item,

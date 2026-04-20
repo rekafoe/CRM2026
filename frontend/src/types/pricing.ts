@@ -72,9 +72,10 @@ export interface ServiceVariant {
   parentVariantId?: number | null;
 }
 
+/** PUT варианта: поля опциональны — на бэкенде не переданное не затирает колонку */
 export interface ServiceVariantPayload {
-  variantName: string;
-  parameters: Record<string, any>;
+  variantName?: string;
+  parameters?: Record<string, any>;
   sortOrder?: number;
   isActive?: boolean;
   material_id?: number | null;
