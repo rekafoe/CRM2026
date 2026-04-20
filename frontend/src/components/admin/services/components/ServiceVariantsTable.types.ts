@@ -61,11 +61,11 @@ export interface VariantRowLevel0Props {
   isEditingName: boolean;
   editingNameValue: string;
   onNameChange: (value: string) => void;
-  onNameEditStart: () => void;
+  onNameEditStart: (variantId: number, currentName: string) => void;
   onNameEditCancel: () => void;
-  onNameSave: () => void;
-  onDelete: () => void;
-  onCreateChild: () => void;
+  onNameSave: (firstVariantId: number) => void;
+  onDelete: (typeName: string, variantIds: number[]) => void;
+  onCreateChild: (typeName: string) => void;
   onCreateSibling: () => void;
   serviceId?: number;
 }
@@ -81,14 +81,12 @@ export interface VariantRowLevel1Props {
   isEditingParams: boolean;
   editingParamsValue: Record<string, any>;
   onParamsChange: (key: string, value: any) => void;
-  onParamsEditStart: () => void;
+  onParamsEditStart: (variantId: number, initialType: string) => void;
   onParamsEditCancel: () => void;
-  onParamsSave: () => void;
-  onPriceChange: (minQty: number, newPrice: number) => void;
-  onDelete: () => void;
-  onCreateChild: () => void;
-  onCreateSibling: () => void;
-  serviceId: number;
+  onParamsSave: (variantId: number) => void;
+  onDelete: (variantId: number, level2ChildIds: number[]) => void;
+  onCreateChild: (typeName: string, parentId: number) => void;
+  onCreateSibling: (typeName: string) => void;
 }
 
 /**
@@ -101,12 +99,12 @@ export interface VariantRowLevel2Props {
   isEditingParams: boolean;
   editingParamsValue: Record<string, any>;
   onParamsChange: (key: string, value: any) => void;
-  onParamsEditStart: () => void;
+  onParamsEditStart: (variantId: number, initialSubType: string) => void;
   onParamsEditCancel: () => void;
-  onParamsSave: () => void;
-  onPriceChange: (minQty: number, newPrice: number) => void;
-  onDelete: () => void;
-  onCreateSibling: () => void;
+  onParamsSave: (variantId: number) => void;
+  onPriceChange: (variantId: number, minQty: number, newPrice: number) => void;
+  onDelete: (variantId: number) => void;
+  onCreateSibling: (typeName: string, parentVariantId: number | string | undefined) => void;
   serviceId?: number;
   hoveredRangeIndex?: number | null;
   onRangeHover?: (index: number | null) => void;

@@ -17,6 +17,39 @@ import {
 const DEFAULT_CURRENCY = 'BYN';
 const BINDINGS_CATEGORY_NAME = 'Переплёты';
 
+function parseServiceVariantParameters(raw: unknown): Record<string, any> {
+  if (raw == null) return {};
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, any>;
+  if (typeof raw === 'string') {
+    try {
+      const p = JSON.parse(raw);
+      return p && typeof p === 'object' ? p : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function normalizeParentVariantId(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function parametersWithParentSync(
+  parameters: Record<string, any>,
+  parentId: number | null
+): Record<string, any> {
+  const out = { ...parameters };
+  if (parentId !== null) {
+    out.parentVariantId = parentId;
+  } else {
+    delete out.parentVariantId;
+  }
+  return out;
+}
+
 // post_processing_services.operation_type имеет CHECK constraint на фиксированный список значений.
 // Фронт/админка иногда присылает агрегированные типы (например "postprint"), которые в БД запрещены.
 // Поэтому нормализуем тип перед записью.
@@ -158,6 +191,16 @@ export class PricingServiceRepository {
 
     // Создаем индекс для быстрого поиска по service_id
     await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_variants_service_id ON service_variants(service_id)`);
+    try {
+      if (!(await hasColumn('service_variants', 'parent_variant_id'))) {
+        await db.run(`ALTER TABLE service_variants ADD COLUMN parent_variant_id INTEGER`);
+        await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_variants_parent_variant_id ON service_variants(parent_variant_id)`);
+        await PricingServiceRepository.backfillParentVariantIds(db);
+        invalidateTableSchemaCache('service_variants');
+      }
+    } catch {
+      // ignore
+    }
     await db.exec(`CREATE INDEX IF NOT EXISTS idx_service_volume_prices_variant_id ON service_volume_prices(variant_id)`);
     
     // Создаем новые оптимизированные таблицы (если их еще нет - миграция создаст их)
@@ -838,64 +881,98 @@ export class PricingServiceRepository {
     await db.run(`DELETE FROM service_volume_prices WHERE id = ?`, tierId);
   }
 
+  /** Однократный перенос parentVariantId из JSON parameters в колонку */
+  private static async backfillParentVariantIds(db: Database): Promise<void> {
+    const rows = await db.all<{ id: number; parameters: string | null }[]>(
+      `SELECT id, parameters FROM service_variants WHERE parent_variant_id IS NULL`
+    );
+    for (const row of rows) {
+      const p = parseServiceVariantParameters(row.parameters);
+      const pid = normalizeParentVariantId(p.parentVariantId);
+      if (pid === null) continue;
+      await db.run(`UPDATE service_variants SET parent_variant_id = ? WHERE id = ?`, pid, row.id);
+    }
+  }
+
   // Методы для работы с вариантами услуг
   static async listServiceVariants(serviceId: number): Promise<ServiceVariantDTO[]> {
     const db = await this.getConnection();
     await this.ensureSchema(db);
     let hasMaterialId = false;
     let hasQtyPerItem = false;
+    let hasParentVariantId = false;
     try { hasMaterialId = await hasColumn('service_variants', 'material_id'); } catch { /* ignore */ }
     try { hasQtyPerItem = await hasColumn('service_variants', 'qty_per_item'); } catch { /* ignore */ }
+    try { hasParentVariantId = await hasColumn('service_variants', 'parent_variant_id'); } catch { /* ignore */ }
     const materialCols = hasMaterialId && hasQtyPerItem ? ', material_id, qty_per_item' : '';
+    const parentCol = hasParentVariantId ? ', parent_variant_id' : '';
     const rows = await db.all<any[]>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${materialCols}
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentCol}${materialCols}
        FROM service_variants 
        WHERE service_id = ? 
        ORDER BY sort_order, id`,
       serviceId,
     );
-    return rows.map(row => ({
-      id: row.id,
-      serviceId: row.service_id,
-      variantName: row.variant_name,
-      parameters: typeof row.parameters === 'string' ? JSON.parse(row.parameters) : (row.parameters || {}),
-      sortOrder: row.sort_order || 0,
-      isActive: row.is_active !== undefined ? !!row.is_active : true,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      ...(hasMaterialId && row.material_id != null ? { material_id: row.material_id } : {}),
-      ...(hasQtyPerItem && row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
-    }));
+    return rows.map((row) => {
+      const paramsRaw = parseServiceVariantParameters(row.parameters);
+      const parentColVal = hasParentVariantId ? normalizeParentVariantId(row.parent_variant_id) : null;
+      const parentFromJson = normalizeParentVariantId(paramsRaw.parentVariantId);
+      const parentResolved = parentColVal !== null ? parentColVal : parentFromJson;
+      const parameters = parametersWithParentSync(paramsRaw, parentResolved);
+      return {
+        id: row.id,
+        serviceId: row.service_id,
+        variantName: row.variant_name,
+        parameters,
+        sortOrder: row.sort_order || 0,
+        isActive: row.is_active !== undefined ? !!row.is_active : true,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        ...(hasParentVariantId ? { parentVariantId: parentResolved } : {}),
+        ...(hasMaterialId && row.material_id != null ? { material_id: row.material_id } : {}),
+        ...(hasQtyPerItem && row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
+      };
+    });
   }
 
   static async createServiceVariant(serviceId: number, payload: CreateServiceVariantDTO): Promise<ServiceVariantDTO> {
     const db = await this.getConnection();
+    await this.ensureSchema(db);
     let hasMaterialId = false;
     let hasQtyPerItem = false;
+    let hasParentVariantId = false;
     try { hasMaterialId = await hasColumn('service_variants', 'material_id'); } catch { /* ignore */ }
     try { hasQtyPerItem = await hasColumn('service_variants', 'qty_per_item'); } catch { /* ignore */ }
+    try { hasParentVariantId = await hasColumn('service_variants', 'parent_variant_id'); } catch { /* ignore */ }
     const includeMaterial = hasMaterialId && hasQtyPerItem;
     const materialIdVal = payload.material_id != null && Number.isFinite(Number(payload.material_id)) ? Number(payload.material_id) : null;
     const qtyPerItemVal = payload.qty_per_item != null && Number.isFinite(Number(payload.qty_per_item)) ? Number(payload.qty_per_item) : 1;
-    const insertCols = includeMaterial
-      ? 'service_id, variant_name, parameters, sort_order, is_active, material_id, qty_per_item'
-      : 'service_id, variant_name, parameters, sort_order, is_active';
-    const insertPlaces = includeMaterial ? '?, ?, ?, ?, ?, ?, ?' : '?, ?, ?, ?, ?';
+    const parentId = normalizeParentVariantId(payload.parentVariantId ?? payload.parameters?.parentVariantId);
+    const paramsMerged = parametersWithParentSync(payload.parameters || {}, parentId);
+
+    let insertCols = 'service_id, variant_name, parameters, sort_order, is_active';
     const insertParams: any[] = [
       serviceId,
       payload.variantName,
-      JSON.stringify(payload.parameters || {}),
+      JSON.stringify(paramsMerged),
       payload.sortOrder ?? 0,
       payload.isActive === undefined || payload.isActive ? 1 : 0,
     ];
-    if (includeMaterial) { insertParams.push(materialIdVal); insertParams.push(qtyPerItemVal); }
-    const result = await db.run(
-      `INSERT INTO service_variants (${insertCols}) VALUES (${insertPlaces})`,
-      ...insertParams
-    );
+    if (hasParentVariantId) {
+      insertCols += ', parent_variant_id';
+      insertParams.push(parentId);
+    }
+    if (includeMaterial) {
+      insertCols += ', material_id, qty_per_item';
+      insertParams.push(materialIdVal, qtyPerItemVal);
+    }
+    const insertPlaces = insertParams.map(() => '?').join(',');
+    const result = await db.run(`INSERT INTO service_variants (${insertCols}) VALUES (${insertPlaces})`, ...insertParams);
+
+    const parentSel = hasParentVariantId ? ', parent_variant_id' : '';
     const materialSel = includeMaterial ? ', material_id, qty_per_item' : '';
     const row = await db.get<any>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${materialSel}
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentSel}${materialSel}
        FROM service_variants 
        WHERE id = ?`,
       result.lastID,
@@ -903,15 +980,21 @@ export class PricingServiceRepository {
     if (!row) {
       throw new Error('Failed to retrieve created service variant');
     }
+    const paramsRaw = parseServiceVariantParameters(row.parameters);
+    const parentColVal = hasParentVariantId ? normalizeParentVariantId(row.parent_variant_id) : null;
+    const parentFromJson = normalizeParentVariantId(paramsRaw.parentVariantId);
+    const parentResolved = parentColVal !== null ? parentColVal : parentFromJson;
+    const parameters = parametersWithParentSync(paramsRaw, parentResolved);
     return {
       id: row.id,
       serviceId: row.service_id,
       variantName: row.variant_name,
-      parameters: typeof row.parameters === 'string' ? JSON.parse(row.parameters) : (row.parameters || {}),
+      parameters,
       sortOrder: row.sort_order || 0,
       isActive: row.is_active !== undefined ? !!row.is_active : true,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      ...(hasParentVariantId ? { parentVariantId: parentResolved } : {}),
       ...(row.material_id != null ? { material_id: row.material_id } : {}),
       ...(row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
     };
@@ -926,29 +1009,65 @@ export class PricingServiceRepository {
     }
     let hasMaterialId = false;
     let hasQtyPerItem = false;
+    let hasParentVariantId = false;
     try { hasMaterialId = await hasColumn('service_variants', 'material_id'); } catch { /* ignore */ }
     try { hasQtyPerItem = await hasColumn('service_variants', 'qty_per_item'); } catch { /* ignore */ }
+    try { hasParentVariantId = await hasColumn('service_variants', 'parent_variant_id'); } catch { /* ignore */ }
+
+    const currentParsed = parseServiceVariantParameters(current.parameters);
+    const mergedParams =
+      payload.parameters !== undefined ? { ...currentParsed, ...payload.parameters } : currentParsed;
+
+    let parentResolved: number | null;
+    if (payload.parentVariantId !== undefined) {
+      parentResolved = normalizeParentVariantId(payload.parentVariantId);
+    } else if (hasParentVariantId) {
+      const fromMerged = normalizeParentVariantId(mergedParams.parentVariantId);
+      const fromCol = normalizeParentVariantId(current.parent_variant_id);
+      parentResolved = fromMerged !== null ? fromMerged : fromCol;
+    } else {
+      parentResolved = normalizeParentVariantId(mergedParams.parentVariantId);
+    }
+
+    const paramsFinal = parametersWithParentSync(mergedParams, parentResolved);
+
     const materialIdUpdate = hasMaterialId && payload.material_id !== undefined ? ', material_id = ?' : '';
     const qtyPerItemUpdate = hasQtyPerItem && payload.qty_per_item !== undefined ? ', qty_per_item = ?' : '';
+
+    let setSql =
+      'variant_name = ?, parameters = ?, sort_order = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP';
     const updateParams: any[] = [
       payload.variantName ?? current.variant_name,
-      payload.parameters !== undefined ? JSON.stringify(payload.parameters) : current.parameters,
+      JSON.stringify(paramsFinal),
       payload.sortOrder !== undefined ? payload.sortOrder : current.sort_order,
       payload.isActive !== undefined ? (payload.isActive ? 1 : 0) : current.is_active,
     ];
-    if (materialIdUpdate) updateParams.push(payload.material_id != null && Number.isFinite(Number(payload.material_id)) ? Number(payload.material_id) : null);
-    if (qtyPerItemUpdate) updateParams.push(payload.qty_per_item != null && Number.isFinite(Number(payload.qty_per_item)) ? Number(payload.qty_per_item) : (current.qty_per_item ?? 1));
+    if (hasParentVariantId) {
+      setSql += ', parent_variant_id = ?';
+      updateParams.push(parentResolved);
+    }
+    if (materialIdUpdate) {
+      setSql += ', material_id = ?';
+      updateParams.push(
+        payload.material_id != null && Number.isFinite(Number(payload.material_id)) ? Number(payload.material_id) : null
+      );
+    }
+    if (qtyPerItemUpdate) {
+      setSql += ', qty_per_item = ?';
+      updateParams.push(
+        payload.qty_per_item != null && Number.isFinite(Number(payload.qty_per_item))
+          ? Number(payload.qty_per_item)
+          : (current.qty_per_item ?? 1)
+      );
+    }
     updateParams.push(variantId);
-    await db.run(
-      `UPDATE service_variants 
-       SET variant_name = ?, parameters = ?, sort_order = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP${materialIdUpdate}${qtyPerItemUpdate}
-       WHERE id = ?`,
-      ...updateParams
-    );
 
-    const materialSel = (hasMaterialId && hasQtyPerItem) ? ', material_id, qty_per_item' : '';
+    await db.run(`UPDATE service_variants SET ${setSql} WHERE id = ?`, ...updateParams);
+
+    const parentSel = hasParentVariantId ? ', parent_variant_id' : '';
+    const materialSel = hasMaterialId && hasQtyPerItem ? ', material_id, qty_per_item' : '';
     const updated = await db.get<any>(
-      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${materialSel}
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentSel}${materialSel}
        FROM service_variants 
        WHERE id = ?`,
       variantId,
@@ -956,15 +1075,22 @@ export class PricingServiceRepository {
     if (!updated) {
       return null;
     }
+    const paramsRaw = parseServiceVariantParameters(updated.parameters);
+    const parentColVal = hasParentVariantId ? normalizeParentVariantId(updated.parent_variant_id) : null;
+    const parentFromJson = normalizeParentVariantId(paramsRaw.parentVariantId);
+    const parentResolvedOut = parentColVal !== null ? parentColVal : parentFromJson;
+    const parameters = parametersWithParentSync(paramsRaw, parentResolvedOut);
+
     return {
       id: updated.id,
       serviceId: updated.service_id,
       variantName: updated.variant_name,
-      parameters: typeof updated.parameters === 'string' ? JSON.parse(updated.parameters) : (updated.parameters || {}),
+      parameters,
       sortOrder: updated.sort_order || 0,
       isActive: updated.is_active !== undefined ? !!updated.is_active : true,
       createdAt: updated.created_at,
       updatedAt: updated.updated_at,
+      ...(hasParentVariantId ? { parentVariantId: parentResolvedOut } : {}),
       ...(updated.material_id != null ? { material_id: updated.material_id } : {}),
       ...(updated.qty_per_item != null ? { qty_per_item: Number(updated.qty_per_item) } : {}),
     };

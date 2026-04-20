@@ -94,6 +94,8 @@ export interface ServiceVariantDTO {
   updatedAt?: string;
   material_id?: number | null;
   qty_per_item?: number | null;
+  /** Родитель в дереве вариантов (уровень 2 → уровень 1); дублируется в parameters.parentVariantId для совместимости */
+  parentVariantId?: number | null;
 }
 
 export interface CreateServiceVariantDTO {
@@ -103,6 +105,7 @@ export interface CreateServiceVariantDTO {
   isActive?: boolean;
   material_id?: number | null;
   qty_per_item?: number | null;
+  parentVariantId?: number | null;
 }
 
 export interface UpdateServiceVariantDTO {
@@ -112,5 +115,6 @@ export interface UpdateServiceVariantDTO {
   isActive?: boolean;
   material_id?: number | null;
   qty_per_item?: number | null;
+  parentVariantId?: number | null;
 }
 

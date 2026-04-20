@@ -68,6 +68,8 @@ export interface ServiceVariant {
   updatedAt?: string;
   material_id?: number | null;
   qty_per_item?: number | null;
+  /** Родитель в дереве вариантов (дублируется в parameters.parentVariantId для совместимости) */
+  parentVariantId?: number | null;
 }
 
 export interface ServiceVariantPayload {
@@ -77,6 +79,7 @@ export interface ServiceVariantPayload {
   isActive?: boolean;
   material_id?: number | null;
   qty_per_item?: number | null;
+  parentVariantId?: number | null;
 }
 
 export interface CreatePricingServicePayload {

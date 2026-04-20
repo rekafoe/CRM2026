@@ -337,17 +337,41 @@ const mapVariant = (data: any): ServiceVariant => {
     ? parseInt(rawId.split(':')[0], 10) 
     : Number(rawId);
   
+  const parametersRaw =
+    typeof data.parameters === 'string' ? JSON.parse(data.parameters) : (data.parameters || {});
+  const fromColumn = data.parent_variant_id ?? data.parentVariantId;
+  const fromParams = parametersRaw?.parentVariantId;
+  const parentRaw =
+    fromColumn !== undefined && fromColumn !== null && fromColumn !== ''
+      ? fromColumn
+      : fromParams !== undefined && fromParams !== null && fromParams !== ''
+        ? fromParams
+        : undefined;
+  const parentN =
+    parentRaw !== undefined && parentRaw !== null && parentRaw !== ''
+      ? Number(parentRaw)
+      : undefined;
+  const parentFinal =
+    parentN !== undefined && Number.isFinite(parentN) && parentN > 0 ? parentN : undefined;
+  const parameters = { ...parametersRaw };
+  if (parentFinal !== undefined) {
+    parameters.parentVariantId = parentFinal;
+  } else {
+    delete parameters.parentVariantId;
+  }
+
   return {
     id: isNaN(normalizedId) ? 0 : normalizedId,
     serviceId: data.serviceId ?? data.service_id,
     variantName: data.variantName ?? data.variant_name ?? '',
-    parameters: typeof data.parameters === 'string' ? JSON.parse(data.parameters) : (data.parameters || {}),
+    parameters,
     sortOrder: data.sortOrder ?? data.sort_order ?? 0,
     isActive: data.isActive ?? data.is_active ?? true,
     createdAt: data.createdAt ?? data.created_at,
     updatedAt: data.updatedAt ?? data.updated_at,
     material_id: data.material_id != null ? Number(data.material_id) : undefined,
     qty_per_item: data.qty_per_item != null ? Number(data.qty_per_item) : undefined,
+    ...(parentFinal !== undefined ? { parentVariantId: parentFinal } : {}),
   };
 };
 
@@ -366,6 +390,7 @@ export async function createServiceVariant(serviceId: number, payload: ServiceVa
     is_active: payload.isActive ?? true,
     ...(payload.material_id !== undefined && payload.material_id !== null ? { material_id: payload.material_id } : {}),
     ...(payload.qty_per_item !== undefined && payload.qty_per_item !== null ? { qty_per_item: payload.qty_per_item } : {}),
+    ...(payload.parentVariantId !== undefined ? { parent_variant_id: payload.parentVariantId } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapVariant(data);
@@ -388,6 +413,7 @@ export async function updateServiceVariant(serviceId: number, variantId: number 
     is_active: payload.isActive,
     ...(payload.material_id !== undefined ? { material_id: payload.material_id } : {}),
     ...(payload.qty_per_item !== undefined ? { qty_per_item: payload.qty_per_item } : {}),
+    ...(payload.parentVariantId !== undefined ? { parent_variant_id: payload.parentVariantId } : {}),
   });
   const data = (response.data as any)?.data ?? response.data;
   return mapVariant(data);

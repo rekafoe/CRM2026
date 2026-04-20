@@ -15,8 +15,10 @@ import {
   updateVariantPrice as updateVariantPriceAPI,
 } from '../../../../../services/pricing';
 import { PriceRangeUtils } from '../../../../../hooks/usePriceRanges';
-
-console.log('useVariantOperations: createServiceVariant function:', createServiceVariant);
+import {
+  parentVariantIdForApiPayload,
+  variantParentVariantIdForPayload,
+} from '../../../../../utils/serviceVariantParent';
 
 type Tier = { min_qty: number; max_qty?: number; unit_price: number };
 
@@ -64,11 +66,13 @@ export function useVariantOperations(
       const currentVariants = variantsRef.current;
       const maxSortOrder = currentVariants.length > 0 ? Math.max(...currentVariants.map(v => v.sortOrder)) : 0;
 
+      const parentPayload = parentVariantIdForApiPayload(parameters);
       const newVariant = await createServiceVariant(serviceId, {
         variantName,
         parameters,
         sortOrder: maxSortOrder + 1,
         isActive: true,
+        ...(parentPayload !== undefined ? { parentVariantId: parentPayload } : {}),
       });
 
       // Создаем вариант с tiers для немедленного отображения
@@ -138,14 +142,16 @@ export function useVariantOperations(
       // Обновляем на сервере
       const variantsToUpdate = variants.filter((v) => v.variantName === oldName);
       await Promise.all(
-        variantsToUpdate.map((v) =>
-          updateServiceVariant(serviceId, v.id, {
+        variantsToUpdate.map((v) => {
+          const parentPayload = variantParentVariantIdForPayload(v);
+          return updateServiceVariant(serviceId, v.id, {
             variantName: newName,
             parameters: v.parameters,
             material_id: v.material_id ?? undefined,
             qty_per_item: v.qty_per_item ?? undefined,
-          })
-        )
+            ...(parentPayload !== undefined ? { parentVariantId: parentPayload } : {}),
+          });
+        })
       );
     } catch (err) {
       console.error('Ошибка обновления названия варианта:', err);
@@ -157,8 +163,13 @@ export function useVariantOperations(
 
   const updateVariantParams = useCallback(async (variantId: number, params: Record<string, any>) => {
     try {
+      const parentPayload = parentVariantIdForApiPayload(params);
       setVariants((prev) =>
-        prev.map((v) => (v.id === variantId ? { ...v, parameters: params } : v))
+        prev.map((v) =>
+          v.id === variantId
+            ? { ...v, parameters: params, ...(parentPayload !== undefined ? { parentVariantId: parentPayload } : {}) }
+            : v
+        )
       );
 
       const v = variants.find((x) => x.id === variantId);
@@ -167,6 +178,7 @@ export function useVariantOperations(
         parameters: params,
         material_id: v?.material_id ?? undefined,
         qty_per_item: v?.qty_per_item ?? undefined,
+        ...(parentPayload !== undefined ? { parentVariantId: parentPayload } : {}),
       });
     } catch (err) {
       console.error('Ошибка обновления параметров варианта:', err);
@@ -182,11 +194,13 @@ export function useVariantOperations(
         prev.map((v) => (v.id === variantId ? { ...v, material_id: material_id ?? undefined, qty_per_item } : v))
       );
       const v = variants.find((x) => x.id === variantId);
+      const parentPayload = v ? variantParentVariantIdForPayload(v) : undefined;
       await updateServiceVariant(serviceId, variantId, {
         variantName: v?.variantName ?? '',
         parameters: v?.parameters ?? {},
         material_id: material_id ?? undefined,
         qty_per_item,
+        ...(parentPayload !== undefined ? { parentVariantId: parentPayload } : {}),
       });
     } catch (err) {
       console.error('Ошибка обновления материала варианта:', err);

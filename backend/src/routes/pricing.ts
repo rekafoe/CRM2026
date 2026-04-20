@@ -1134,6 +1134,14 @@ router.delete('/services/:serviceId/tiers/:tierId', asyncHandler(async (req, res
 }))
 
 // --- Service variants ---
+function parseParentVariantIdFromBody(body: Record<string, any>): number | null | undefined {
+  if (body.parent_variant_id === undefined && body.parentVariantId === undefined) return undefined
+  const v = body.parent_variant_id !== undefined ? body.parent_variant_id : body.parentVariantId
+  if (v === null || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 const toVariantResponse = (variant: any) => ({
   id: variant.id,
   serviceId: variant.serviceId,
@@ -1151,6 +1159,8 @@ const toVariantResponse = (variant: any) => ({
   updated_at: variant.updatedAt,
   material_id: variant.material_id ?? null,
   qty_per_item: variant.qty_per_item != null ? Number(variant.qty_per_item) : null,
+  parentVariantId: variant.parentVariantId ?? null,
+  parent_variant_id: variant.parentVariantId ?? null,
 })
 
 router.get('/services/:serviceId/variants', asyncHandler(async (req, res) => {
@@ -1162,6 +1172,7 @@ router.get('/services/:serviceId/variants', asyncHandler(async (req, res) => {
 router.post('/services/:serviceId/variants', asyncHandler(async (req, res) => {
   const { serviceId } = req.params
   const { variant_name, variantName, parameters, sort_order, sortOrder, is_active, isActive, material_id, qty_per_item } = req.body
+  const parsedParent = parseParentVariantIdFromBody(req.body)
   const variant = await ServiceManagementService.createServiceVariant(Number(serviceId), {
     variantName: variant_name ?? variantName ?? '',
     parameters: parameters ?? {},
@@ -1169,6 +1180,7 @@ router.post('/services/:serviceId/variants', asyncHandler(async (req, res) => {
     isActive: is_active !== undefined ? !!is_active : isActive,
     material_id: material_id != null && material_id !== '' ? Number(material_id) : undefined,
     qty_per_item: qty_per_item != null && qty_per_item !== '' ? Number(qty_per_item) : undefined,
+    ...(parsedParent !== undefined ? { parentVariantId: parsedParent } : {}),
   })
   res.status(201).json(toVariantResponse(variant))
 }))
@@ -1186,6 +1198,7 @@ router.put('/services/:serviceId/variants/:variantId', asyncHandler(async (req, 
   }
   
   const { variant_name, variantName, parameters, sort_order, sortOrder, is_active, isActive, material_id, qty_per_item } = req.body
+  const parsedParent = parseParentVariantIdFromBody(req.body)
   const updated = await ServiceManagementService.updateServiceVariant(normalizedVariantId, {
     variantName: variant_name ?? variantName,
     parameters,
@@ -1193,6 +1206,7 @@ router.put('/services/:serviceId/variants/:variantId', asyncHandler(async (req, 
     isActive: is_active !== undefined ? !!is_active : isActive,
     material_id: material_id !== undefined ? (material_id != null && material_id !== '' ? Number(material_id) : null) : undefined,
     qty_per_item: qty_per_item !== undefined ? (qty_per_item != null && qty_per_item !== '' ? Number(qty_per_item) : null) : undefined,
+    ...(parsedParent !== undefined ? { parentVariantId: parsedParent } : {}),
   })
 
   if (!updated) {

@@ -85,6 +85,25 @@ export function useLocalRangeChanges(
     setNextVariantId(maxId + 1);
   }, []);
 
+  /**
+   * Подтянуть с сервера только tiers для совпадающих variant.id (структура диапазонов и цены с сервера).
+   * Параметры, имя и очередь сохранения не меняются.
+   * Не вызывать при несохранённых правках цен/диапазонов — иначе затрутся локальные правки.
+   */
+  const mergeTiersFromServer = useCallback((server: VariantWithTiers[]) => {
+    setLocalVariants((prev) => {
+      const serverById = new Map(server.map((v) => [v.id, v]));
+      return prev.map((local) => {
+        const s = serverById.get(local.id);
+        if (!s) return local;
+        return {
+          ...local,
+          tiers: (s.tiers || []).map((tier) => ({ ...tier })),
+        };
+      });
+    });
+  }, []);
+
   // Локальное добавление диапазона
   const addRangeBoundary = useCallback((boundary: number) => {
     const currentVariants = [...localVariants];
@@ -393,7 +412,7 @@ export function useLocalRangeChanges(
     );
 
     setVariantChanges(prev => {
-      const mergeParams = (base: Record<string, any> | undefined) => ({ ...base, ...params });
+      const mergeParams = (base: Record<string, any> | undefined) => ({ ...(base ?? {}), ...params });
 
       const existingChange = prev.find(
         c => (c.type === 'create' || c.type === 'update') && c.variantId === variantId
@@ -481,5 +500,6 @@ export function useLocalRangeChanges(
     saveChanges,
     cancelChanges,
     syncWithExternal,
+    mergeTiersFromServer,
   };
 }

@@ -1,3 +1,4 @@
+import { getParentVariantId } from '../../../../utils/serviceVariantParent';
 import { VariantWithTiers, GroupedVariants, VariantsByType } from './ServiceVariantsTable.types';
 
 /** Ключ Map для связи родитель→дети (id из БД и из JSON могут отличаться number/string). */
@@ -7,70 +8,76 @@ export function variantParentMapKey(id: unknown): string {
   return Number.isFinite(n) ? String(n) : String(id);
 }
 
+function hasParentVariantId(v: VariantWithTiers): boolean {
+  const id = getParentVariantId(v);
+  return id !== null && id !== undefined && id !== '';
+}
+
+/** Непустые type/density — признак дочернего варианта относительно корня группы. */
+function hasNonEmptyTypeOrDensity(v: VariantWithTiers): boolean {
+  const p = v.parameters || {};
+  const t = typeof p.type === 'string' ? p.type.trim() : '';
+  const d = typeof p.density === 'string' ? p.density.trim() : '';
+  return Boolean(t || d);
+}
+
 /**
- * Определяет уровень вложенности варианта
+ * Один корень на группу (variantName): сначала варианты без parent и без type/density,
+ * иначе — самый ранний по id среди вариантов без parent (чтобы не пропадала таблица).
  */
-export function getVariantLevel(variant: VariantWithTiers): number {
-  const params = variant.parameters || {};
-  
-  // Уровень 2: есть parentVariantId (внучатый вариант)
-  if (params.parentVariantId) {
-    return 2;
-  }
-  
-  // Уровень 1: есть непустые type или density (дочерний вариант)
-  if ((params.type && params.type.trim()) || (params.density && params.density.trim())) {
-    return 1;
-  }
-  
-  // Уровень 0: родительский вариант (тип)
-  return 0;
+function pickRootForGroup(group: VariantWithTiers[]): VariantWithTiers | undefined {
+  const noParent = group.filter((v) => !hasParentVariantId(v));
+  if (noParent.length === 0) return undefined;
+  const explicitRoots = noParent.filter((v) => !hasNonEmptyTypeOrDensity(v));
+  const pickMinId = (list: VariantWithTiers[]) =>
+    [...list].sort((a, b) => Number(a.id) - Number(b.id))[0];
+  if (explicitRoots.length > 0) return pickMinId(explicitRoots);
+  return pickMinId(noParent);
 }
 
 /**
  * Группирует варианты по типам и уровням
  */
 export function groupVariantsByType(variants: VariantWithTiers[]): VariantsByType {
+  const byName = new Map<string, VariantWithTiers[]>();
+  for (const v of variants) {
+    const name = v.variantName;
+    if (!byName.has(name)) byName.set(name, []);
+    byName.get(name)!.push(v);
+  }
+
   const grouped: VariantsByType = {};
 
-  const ensure = (typeName: string): GroupedVariants => {
-    if (!grouped[typeName]) {
-      grouped[typeName] = {
-        level0: [],
-        level1: new Map(),
-        level2: new Map(),
-      };
+  for (const [typeName, group] of byName) {
+    const root = pickRootForGroup(group);
+    const level0: VariantWithTiers[] = root ? [root] : [];
+    const level1 = new Map<string, VariantWithTiers[]>();
+    const level2 = new Map<string, VariantWithTiers[]>();
+
+    if (root) {
+      const pkRoot = variantParentMapKey(root.id);
+      const siblings = group
+        .filter((v) => !hasParentVariantId(v) && v.id !== root.id)
+        .sort((a, b) => Number(a.id) - Number(b.id));
+      if (siblings.length > 0) {
+        level1.set(pkRoot, siblings);
+      }
     }
-    return grouped[typeName];
-  };
 
-  // Сначала только корни (0), иначе дочерние строки при раннем порядке в массиве терялись
-  variants.forEach((variant) => {
-    if (getVariantLevel(variant) !== 0) return;
-    ensure(variant.variantName).level0.push(variant);
-  });
+    for (const v of group) {
+      if (!hasParentVariantId(v)) continue;
+      const parentVariantId = getParentVariantId(v);
+      const pk = variantParentMapKey(parentVariantId);
+      if (!level2.has(pk)) level2.set(pk, []);
+      level2.get(pk)!.push(v);
+    }
 
-  variants.forEach((variant) => {
-    if (getVariantLevel(variant) !== 1) return;
-    const typeName = variant.variantName;
-    const g = ensure(typeName);
-    const parentLevel0 = g.level0[0];
-    if (!parentLevel0) return;
-    const pk = variantParentMapKey(parentLevel0.id);
-    if (!g.level1.has(pk)) g.level1.set(pk, []);
-    g.level1.get(pk)!.push(variant);
-  });
+    for (const [, arr] of level2) {
+      arr.sort((a, b) => Number(a.id) - Number(b.id));
+    }
 
-  variants.forEach((variant) => {
-    if (getVariantLevel(variant) !== 2) return;
-    const typeName = variant.variantName;
-    const g = ensure(typeName);
-    const parentVariantId = variant.parameters?.parentVariantId;
-    if (parentVariantId === null || parentVariantId === undefined || parentVariantId === '') return;
-    const pk = variantParentMapKey(parentVariantId);
-    if (!g.level2.has(pk)) g.level2.set(pk, []);
-    g.level2.get(pk)!.push(variant);
-  });
+    grouped[typeName] = { level0, level1, level2 };
+  }
 
   return grouped;
 }
