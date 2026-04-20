@@ -44,11 +44,24 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   const tierModal = useTierModal();
   const operations = useVariantOperations(serviceId, serverVariants, setVariants, setError, reload, invalidateCache);
   const [isSaving, setIsSaving] = React.useState(false);
+  const isSavingRef = React.useRef(false);
   const [hoveredRangeIndex, setHoveredRangeIndex] = React.useState<number | null>(null);
+  const [autoSaveHint, setAutoSaveHint] = React.useState<'idle' | 'saving' | 'saved'>('idle');
+  const autoSaveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const AUTO_SAVE_MS = 1100;
+
+  const clearAutoSaveTimer = React.useCallback(() => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+  }, []);
 
   // Один вызов применяет все несохранённые изменения (варианты → диапазоны → цены)
   const saveChangesToServer = useCallback(async (pending: PendingChanges) => {
     setIsSaving(true);
+    isSavingRef.current = true;
     try {
       const { variantChanges, rangeChanges, priceChanges } = pending;
 
@@ -94,13 +107,15 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         );
       }
 
+      invalidateCache();
       await reload();
     } catch (err) {
       throw err;
     } finally {
       setIsSaving(false);
+      isSavingRef.current = false;
     }
-  }, [operations, reload]);
+  }, [operations, reload, invalidateCache]);
 
   const localChanges = useLocalRangeChanges(serverVariants, saveChangesToServer);
 
@@ -128,6 +143,55 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
       }
     }
   }, [serverVariants]);
+
+  const pendingSnapshot = useMemo(
+    () => JSON.stringify(localChanges.pendingChanges),
+    [localChanges.pendingChanges]
+  );
+
+  // Автосохранение с задержкой: без полноэкранной загрузки (reload silent в useServiceVariants)
+  React.useEffect(() => {
+    if (!localChanges.hasUnsavedChanges) return;
+    const p = localChanges.pendingChanges;
+    if (
+      p.variantChanges.length === 0 &&
+      p.rangeChanges.length === 0 &&
+      p.priceChanges.length === 0
+    ) {
+      return;
+    }
+
+    clearAutoSaveTimer();
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      void (async () => {
+        const cur = localChangesRef.current;
+        const pending = cur.pendingChanges;
+        if (
+          !cur.hasUnsavedChanges ||
+          (pending.variantChanges.length === 0 &&
+            pending.rangeChanges.length === 0 &&
+            pending.priceChanges.length === 0)
+        ) {
+          return;
+        }
+        if (isSavingRef.current) return;
+        try {
+          setAutoSaveHint('saving');
+          await cur.saveChanges();
+          setAutoSaveHint('saved');
+          window.setTimeout(() => setAutoSaveHint('idle'), 1800);
+        } catch {
+          setAutoSaveHint('idle');
+          setError('Не удалось сохранить изменения');
+        }
+      })();
+    }, AUTO_SAVE_MS);
+
+    return clearAutoSaveTimer;
+  }, [localChanges.hasUnsavedChanges, pendingSnapshot, clearAutoSaveTimer, setError]);
+
+  React.useEffect(() => () => clearAutoSaveTimer(), [clearAutoSaveTimer]);
 
   // Используем локальные варианты
   const variants = localChanges.localVariants;
@@ -218,36 +282,56 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
               </div>
             )}
           </div>
+          {autoSaveHint !== 'idle' && (
+            <span
+              className={
+                autoSaveHint === 'saved'
+                  ? 'service-variants-save-hint service-variants-save-hint--ok'
+                  : 'service-variants-save-hint service-variants-save-hint--saving'
+              }
+            >
+              {autoSaveHint === 'saving' ? 'Сохранение…' : 'Сохранено'}
+            </span>
+          )}
           {localChanges.hasUnsavedChanges && (
             <div className="service-variants-actions">
-              <span className="service-variants-changes">
-                Есть несохраненные изменения ({localChanges.pendingChanges.variantChanges.length} вариантов, {localChanges.pendingChanges.rangeChanges.length} диапазонов, {localChanges.pendingChanges.priceChanges.length} цен)
-              </span>
+              {autoSaveHint === 'idle' && (
+                <span className="service-variants-actions-muted">
+                  Будет сохранено автоматически
+                </span>
+              )}
               <Button
-                variant="success"
+                variant="secondary"
                 size="sm"
                 disabled={isSaving}
                 onClick={async () => {
+                  clearAutoSaveTimer();
                   try {
+                    setAutoSaveHint('saving');
                     await localChanges.saveChanges();
                     setError(null);
+                    setAutoSaveHint('saved');
+                    window.setTimeout(() => setAutoSaveHint('idle'), 1800);
                   } catch (err) {
+                    setAutoSaveHint('idle');
                     setError('Не удалось сохранить изменения');
                   }
                 }}
               >
-                {isSaving ? '⏳ Сохранение...' : '💾 Сохранить'}
+                Сохранить сейчас
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => {
                   if (confirm('Отменить все несохраненные изменения?')) {
+                    clearAutoSaveTimer();
                     localChanges.cancelChanges();
+                    setAutoSaveHint('idle');
                   }
                 }}
               >
-                ↶ Отменить
+                Отменить
               </Button>
             </div>
           )}

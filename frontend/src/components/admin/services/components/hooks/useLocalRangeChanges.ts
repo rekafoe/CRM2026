@@ -381,6 +381,7 @@ export function useLocalRangeChanges(
         }
       }
     });
+    setHasUnsavedChanges(true);
   }, [localVariants]);
 
   // 🆕 Локальное обновление параметров варианта (для новых и существующих вариантов)
@@ -426,6 +427,7 @@ export function useLocalRangeChanges(
         },
       ];
     });
+    setHasUnsavedChanges(true);
   }, [localVariants]);
 
   // Сохранение: один вызов onSaveChanges(pending) применяет все изменения

@@ -65,6 +65,24 @@
   font-weight: 500;
 }
 
+.service-variants-save-hint {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.service-variants-save-hint--saving {
+  color: var(--text-secondary);
+}
+
+.service-variants-save-hint--ok {
+  color: #059669;
+}
+
+.service-variants-actions-muted {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .service-variants-empty {
   text-align: center;
   padding: 24px;

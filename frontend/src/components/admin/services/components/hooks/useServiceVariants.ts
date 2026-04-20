@@ -23,11 +23,14 @@ export function useServiceVariants(serviceId: number) {
   const cacheRef = useRef(cache);
   cacheRef.current = cache;
 
-  const loadVariants = useCallback(async () => {
+  const loadVariants = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError(null);
-      
+
       // Проверяем кэш через ref для избежания зависимостей
       const cachedTiers = cacheRef.current.get(serviceId);
       
@@ -59,13 +62,18 @@ export function useServiceVariants(serviceId: number) {
       setError(errorMessage);
       // Не скрываем ошибку автоматически - пользователь должен видеть проблему
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [serviceId]); // cache через ref, не добавляем в зависимости
 
   useEffect(() => {
-    void loadVariants();
+    void loadVariants(undefined);
   }, [loadVariants]);
+
+  /** Обновление данных без полноэкранного «Загрузка…» (после сохранения и автосохранения). */
+  const reloadSilent = useCallback(() => loadVariants({ silent: true }), [loadVariants]);
 
 
   const invalidateCache = useCallback(() => {
@@ -78,7 +86,8 @@ export function useServiceVariants(serviceId: number) {
     loading,
     error,
     setError,
-    reload: loadVariants,
+    reload: reloadSilent,
+    reloadWithSpinner: loadVariants,
     invalidateCache,
   };
 }
