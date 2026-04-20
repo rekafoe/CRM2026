@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../../../services/products';
 import { getAllVariantTiers, getPricingServices, getServiceVariants, getServiceVolumeTiers } from '../../../services/pricing';
 import { ServiceVolumeTier } from '../../../types/pricing';
+import type { ServiceVariant } from '../../../types/pricing';
+import { getParentVariantId } from '../../../utils/serviceVariantParent';
+import type { PostprintServiceOption, PostprintVariantOption } from '../components/postprintTypes';
 import { POSTPRINT_PRODUCT_ID } from '../components/DynamicProductSelector';
 
 interface PostprintOperation {
@@ -15,30 +18,6 @@ interface PostprintOperation {
   tiers: ServiceVolumeTier[];
   minQuantity?: number;
   maxQuantity?: number;
-  categoryName?: string;
-}
-
-interface PostprintVariantOption {
-  key: string;
-  variantId: number;
-  label: string;
-  parameters: Record<string, any>;
-  tiers: ServiceVolumeTier[];
-  minQuantity?: number;
-  maxQuantity?: number;
-}
-
-interface PostprintServiceOption {
-  serviceId: number;
-  name: string;
-  unit: string;
-  priceUnit?: string;
-  rate: number;
-  tiers: ServiceVolumeTier[];
-  variants: PostprintVariantOption[];
-  minQuantity?: number;
-  maxQuantity?: number;
-  categoryId?: number | null;
   categoryName?: string;
 }
 
@@ -155,6 +134,18 @@ export function usePostprintServices({
         const params = variant.parameters || {};
         return Object.keys(params).length > 0;
       };
+
+      const collectParentIdsWithChildren = (list: ServiceVariant[]) => {
+        const ids = new Set<number>();
+        for (const variant of list) {
+          const p = getParentVariantId(variant);
+          if (p == null || p === '') continue;
+          const n = Number(p);
+          if (Number.isFinite(n) && n > 0) ids.add(n);
+        }
+        return ids;
+      };
+
       await Promise.all(
         sourceServices.map(async (service) => {
           const [variants, tiers] = await Promise.all([
@@ -164,7 +155,18 @@ export function usePostprintServices({
           const variantTiersMap = variants.length > 0 ? await getAllVariantTiers(service.id) : {};
           const activeTiers = tiers.filter((tier) => tier.isActive !== false);
           const activeVariants = variants.filter((variant) => variant.isActive !== false);
+          const parentIdsWithChildren = collectParentIdsWithChildren(activeVariants);
           const displayableVariants = activeVariants.filter(isDisplayableVariant);
+          /** В расчёт и количество — только листья; узлы-родители только для группировки в UI */
+          const leafDisplayableVariants = displayableVariants.filter(
+            (v) => !parentIdsWithChildren.has(v.id)
+          );
+          const variantsForPricing =
+            parentIdsWithChildren.size > 0 && leafDisplayableVariants.length === 0
+              ? displayableVariants
+              : parentIdsWithChildren.size > 0
+                ? leafDisplayableVariants
+                : displayableVariants;
           const getVariantTiers = (variantId: number) =>
             (variantTiersMap[variantId] || []).filter((tier) => tier.isActive !== false);
           const serviceLabel = normalizeLabel(service.name);
@@ -182,15 +184,33 @@ export function usePostprintServices({
             categoryId: (service as { categoryId?: number | null }).categoryId ?? null,
             categoryName: (service as { categoryName?: string }).categoryName ?? 'Без категории',
           };
-          if (!hasNumericServiceName && displayableVariants.length > 0) {
-            displayableVariants.forEach((variant) => {
+
+          if (parentIdsWithChildren.size > 0 && leafDisplayableVariants.length > 0) {
+            const parentRows = activeVariants
+              .filter((v) => parentIdsWithChildren.has(v.id))
+              .map((v) => ({
+                id: v.id,
+                label: getVariantLabel(v) || normalizeLabel(v.variantName) || `Вариант ${v.id}`,
+              }))
+              .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
+            if (parentRows.length > 0) {
+              serviceOption.parentVariants = parentRows;
+            }
+          }
+
+          if (!hasNumericServiceName && variantsForPricing.length > 0) {
+            variantsForPricing.forEach((variant) => {
               const variantLabel = getVariantLabel(variant) || 'Вариант';
               const variantTiers = getVariantTiers(variant.id);
+              const p = getParentVariantId(variant);
+              const parentVariantId =
+                p != null && p !== '' && Number.isFinite(Number(p)) ? Number(p) : null;
               serviceOption.variants.push({
                 key: `${service.id}:${variant.id}`,
                 variantId: variant.id,
                 label: variantLabel,
                 parameters: variant.parameters || {},
+                parentVariantId,
                 tiers: variantTiers,
                 minQuantity: service.minQuantity,
                 maxQuantity: service.maxQuantity,
