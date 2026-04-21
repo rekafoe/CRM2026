@@ -6,6 +6,7 @@ import { Button, FormField, Alert } from '../../components/common';
 import { api } from '../../api';
 import type { PrintPrice, PrintPriceTier } from '../../components/admin/hooks/usePricingManagementState';
 import '../../components/admin/PricingManagement.css';
+import { getTierModalAnchorStyle } from '../../features/productTemplate/utils/tierModalAnchorStyle';
 
 const PRICE_MODES = [
   { key: 'color_single', label: 'Цвет, односторонняя' },
@@ -155,7 +156,7 @@ type TierModalState = {
   tierIndex?: number
   isOpen: boolean
   boundary: string
-  anchorPos?: { top: number; left: number }
+  anchorElement?: HTMLElement
 }
 
 export const PrintPriceEditPage: React.FC = () => {
@@ -275,7 +276,7 @@ export const PrintPriceEditPage: React.FC = () => {
         if (buttonText.includes('Диапазон')) return;
       }
 
-      setTierModal((prev) => ({ ...prev, isOpen: false, tierIndex: undefined }));
+      setTierModal((prev) => ({ ...prev, isOpen: false, tierIndex: undefined, anchorElement: undefined }));
     };
 
     const timeoutId = setTimeout(() => {
@@ -499,13 +500,12 @@ export const PrintPriceEditPage: React.FC = () => {
                                   <span
                                     style={{ cursor: 'pointer' }}
                                     onClick={(e) => {
-                                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
                                       setTierModal({
                                         type: 'edit',
                                         tierIndex: ti,
                                         isOpen: true,
                                         boundary: String(t.min_sheets),
-                                        anchorPos: { top: rect.bottom + 5, left: rect.left },
+                                        anchorElement: e.currentTarget as HTMLElement,
                                       })
                                     }}
                                   >
@@ -537,12 +537,11 @@ export const PrintPriceEditPage: React.FC = () => {
                                   style={{ width: '100%', marginLeft: '0px' }}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
                                     setTierModal({
                                       type: 'add',
                                       isOpen: true,
                                       boundary: '',
-                                      anchorPos: { top: rect.bottom + 5, left: rect.left },
+                                      anchorElement: e.currentTarget as HTMLElement,
                                     })
                                   }}
                                 >
@@ -749,13 +748,8 @@ export const PrintPriceEditPage: React.FC = () => {
                         ref={tierModalRef}
                         className="simplified-tier-modal"
                         style={
-                          tierModal.anchorPos
-                            ? {
-                                position: 'fixed',
-                                top: `${tierModal.anchorPos.top}px`,
-                                left: `${tierModal.anchorPos.left}px`,
-                                zIndex: 2003,
-                              }
+                          tierModal.anchorElement
+                            ? getTierModalAnchorStyle(tierModal.anchorElement)
                             : {
                                 position: 'fixed',
                                 top: '50%',
@@ -775,7 +769,7 @@ export const PrintPriceEditPage: React.FC = () => {
                               className="simplified-tier-modal__close"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setTierModal({ type: 'add', isOpen: false, boundary: '', tierIndex: undefined });
+                                setTierModal({ type: 'add', isOpen: false, boundary: '', tierIndex: undefined, anchorElement: undefined });
                               }}
                               title="Закрыть"
                             >
@@ -803,7 +797,7 @@ export const PrintPriceEditPage: React.FC = () => {
                                 size="sm"
                                 onClick={(e) => {
                                   e?.stopPropagation();
-                                  setTierModal({ type: 'add', isOpen: false, boundary: '', tierIndex: undefined });
+                                  setTierModal({ type: 'add', isOpen: false, boundary: '', tierIndex: undefined, anchorElement: undefined });
                                 }}
                               >
                                 Отменить
@@ -827,7 +821,7 @@ export const PrintPriceEditPage: React.FC = () => {
                                   }
 
                                   updateAllModesRanges(newRanges)
-                                  setTierModal({ type: 'add', isOpen: false, boundary: '', tierIndex: undefined })
+                                  setTierModal({ type: 'add', isOpen: false, boundary: '', tierIndex: undefined, anchorElement: undefined })
                                 }}
                               >
                                 {tierModal.type === 'add' ? 'Добавить' : 'Сохранить'}

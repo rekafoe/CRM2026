@@ -5,6 +5,7 @@ import { api } from '../../../api'
 import type { SimplifiedSizeConfig } from '../hooks/useProductTemplate'
 import { PriceCell } from './PriceCell'
 import { type Tier, defaultTiers, addRangeBoundary, editRangeBoundary, removeRange, normalizeTiers } from '../utils/tierManagement'
+import { getTierModalAnchorStyle } from '../utils/tierModalAnchorStyle'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
 
@@ -471,13 +472,13 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
                           <div className="cell">
                             <span
                               style={{ cursor: 'pointer' }}
-                              onClick={() => {
+                              onClick={(e) => {
                                 setTierModal({
                                   type: 'edit',
                                   tierIndex: ti,
                                   isOpen: true,
                                   boundary: String(t.min_qty),
-                                  anchorElement: undefined
+                                  anchorElement: e.currentTarget as HTMLElement,
                                 })
                               }}
                             >
@@ -602,12 +603,7 @@ export const PrintPricesCard: React.FC<PrintPricesCardProps> = ({
           <div
             ref={tierModalRef}
             className="simplified-tier-modal"
-            style={tierModal.anchorElement ? {
-              position: 'absolute',
-              top: `${tierModal.anchorElement.getBoundingClientRect().bottom + 5}px`,
-              left: `${tierModal.anchorElement.getBoundingClientRect().left}px`,
-              zIndex: 2003
-            } : {
+            style={tierModal.anchorElement ? getTierModalAnchorStyle(tierModal.anchorElement) : {
               position: 'fixed',
               top: '50%',
               left: '50%',

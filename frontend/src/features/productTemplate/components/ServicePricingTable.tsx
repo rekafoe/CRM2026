@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { FormField, Button } from '../../../components/common'
 import { getServiceVolumeTiers, getServiceVariants, getAllVariantTiers } from '../../../services/pricing/api'
 import type { ServiceVolumeTier, ServiceVariant } from '../../../types/pricing'
+import { getTierModalAnchorStyle } from '../utils/tierModalAnchorStyle'
 
 // Типы для работы с диапазонами
 export type Tier = { min_qty: number; max_qty?: number; unit_price: number }
@@ -423,13 +424,13 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
                       <>
                         <span
                           style={{ cursor: 'pointer' }}
-                          onClick={() => {
+                          onClick={(e) => {
                             setTierModal({
                               type: 'edit',
                               tierIndex: ti,
                               isOpen: true,
                               boundary: String(t.min_qty),
-                              anchorElement: undefined
+                              anchorElement: e.currentTarget as HTMLElement,
                             })
                           }}
                         >
@@ -682,12 +683,7 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
         <div
           ref={tierModalRef}
           className="simplified-tier-modal"
-          style={tierModal.anchorElement ? {
-            position: 'absolute',
-            top: `${tierModal.anchorElement.getBoundingClientRect().bottom + 5}px`,
-            left: `${tierModal.anchorElement.getBoundingClientRect().left}px`,
-            zIndex: 2003
-          } : {
+          style={tierModal.anchorElement ? getTierModalAnchorStyle(tierModal.anchorElement) : {
             position: 'fixed',
             top: '50%',
             left: '50%',
