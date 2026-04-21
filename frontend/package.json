@@ -8,6 +8,7 @@
     "build:widget": "vite --config vite.widget.config.ts build"
   },
   "dependencies": {
+    "@floating-ui/react": "^0.26.0",
     "@tanstack/react-query": "^5.89.0",
     "@tanstack/react-query-devtools": "^5.89.0",
     "axios": "^1.12.2",

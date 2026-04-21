@@ -6,7 +6,7 @@ import { Button, FormField, Alert } from '../../components/common';
 import { api } from '../../api';
 import type { PrintPrice, PrintPriceTier } from '../../components/admin/hooks/usePricingManagementState';
 import '../../components/admin/PricingManagement.css';
-import { getTierModalAnchorStyle } from '../../features/productTemplate/utils/tierModalAnchorStyle';
+import { useTierRangeFloating, TIER_RANGE_POPOVER_Z_INDEX, tierModalFloatingRef } from '../../features/productTemplate/hooks/useTierRangeFloating';
 
 const PRICE_MODES = [
   { key: 'color_single', label: 'Цвет, односторонняя' },
@@ -260,6 +260,10 @@ export const PrintPriceEditPage: React.FC = () => {
     boundary: '',
   });
   const tierModalRef = useRef<HTMLDivElement>(null);
+  const tierRangeFloating = useTierRangeFloating(
+    tierModal.anchorElement ?? null,
+    Boolean(tierModal.isOpen && tierModal.anchorElement)
+  );
 
   useEffect(() => {
     if (!tierModal.isOpen) return;
@@ -745,17 +749,17 @@ export const PrintPriceEditPage: React.FC = () => {
                     {/* Модалка для добавления/редактирования диапазонов */}
                     {tierModal.isOpen && createPortal(
                       <div
-                        ref={tierModalRef}
+                        ref={tierModalFloatingRef(tierModalRef, tierRangeFloating.setFloating, Boolean(tierModal.anchorElement))}
                         className="simplified-tier-modal"
                         style={
                           tierModal.anchorElement
-                            ? getTierModalAnchorStyle(tierModal.anchorElement)
+                            ? (tierRangeFloating.floatingStyles ?? { position: 'fixed' as const, zIndex: TIER_RANGE_POPOVER_Z_INDEX })
                             : {
                                 position: 'fixed',
                                 top: '50%',
                                 left: '50%',
                                 transform: 'translate(-50%, -50%)',
-                                zIndex: 2003,
+                                zIndex: TIER_RANGE_POPOVER_Z_INDEX,
                               }
                         }
                         onMouseDown={(e) => e.stopPropagation()}

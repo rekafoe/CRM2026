@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { FormField, Button } from '../../../components/common'
 import { getServiceVolumeTiers, getServiceVariants, getAllVariantTiers } from '../../../services/pricing/api'
 import type { ServiceVolumeTier, ServiceVariant } from '../../../types/pricing'
-import { getTierModalAnchorStyle } from '../utils/tierModalAnchorStyle'
+import { useTierRangeFloating, TIER_RANGE_POPOVER_Z_INDEX, tierModalFloatingRef } from '../hooks/useTierRangeFloating'
 
 // Типы для работы с диапазонами
 export type Tier = { min_qty: number; max_qty?: number; unit_price: number }
@@ -216,6 +217,10 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
   })
   const tierModalRef = useRef<HTMLDivElement>(null)
   const addRangeButtonRef = useRef<HTMLButtonElement>(null)
+  const tierRangeFloating = useTierRangeFloating(
+    tierModal.anchorElement ?? null,
+    Boolean(tierModal.isOpen && rangesEditable && tierModal.anchorElement)
+  )
   const [servicesWithTiers, setServicesWithTiers] = useState<ServiceWithTiers[]>([])
   const [loadingTiers, setLoadingTiers] = useState(false)
   // Варианты услуг (любая услуга с вариантами — не привязываем к типу)
@@ -678,91 +683,93 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
         </tbody>
       </table>
 
-      {/* Модалка для добавления/редактирования диапазонов */}
-      {tierModal.isOpen && rangesEditable && (
-        <div
-          ref={tierModalRef}
-          className="simplified-tier-modal"
-          style={tierModal.anchorElement ? getTierModalAnchorStyle(tierModal.anchorElement) : {
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 2003
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
-            <div className="simplified-tier-modal__header">
-              <strong>{tierModal.type === 'add' ? 'Добавить диапазон' : 'Редактировать диапазон'}</strong>
-              <button
-                type="button"
-                className="simplified-tier-modal__close"
-                onClick={(e: React.MouseEvent) => {
-                  e.stopPropagation()
-                  setTierModal({ type: 'add', isOpen: false, boundary: '' })
-                }}
-                title="Закрыть"
-              >
-                ×
-              </button>
-            </div>
-            <div className="simplified-tier-modal__body">
-              <FormField label="Граница диапазона">
-                <input
-                  className="form-input form-input--compact"
-                  type="number"
-                  min="1"
-                  step="1"
-                  placeholder="Граница диапазона"
-                  value={tierModal.boundary}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTierModal({ ...tierModal, boundary: e.target.value })}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      if (tierModal.type === 'add') {
-                        handleAddRange()
-                      } else {
-                        handleEditRange()
+      {/* Портал в body: иначе fixed позиционируется относительно предка с transform/backdrop-filter */}
+      {tierModal.isOpen && rangesEditable && typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={tierModalFloatingRef(tierModalRef, tierRangeFloating.setFloating, Boolean(tierModal.anchorElement))}
+            className="simplified-tier-modal"
+            style={tierModal.anchorElement ? (tierRangeFloating.floatingStyles ?? { position: 'fixed' as const, zIndex: TIER_RANGE_POPOVER_Z_INDEX }) : {
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: TIER_RANGE_POPOVER_Z_INDEX
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="simplified-tier-modal__content" onClick={(e) => e.stopPropagation()}>
+              <div className="simplified-tier-modal__header">
+                <strong>{tierModal.type === 'add' ? 'Добавить диапазон' : 'Редактировать диапазон'}</strong>
+                <button
+                  type="button"
+                  className="simplified-tier-modal__close"
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    setTierModal({ type: 'add', isOpen: false, boundary: '' })
+                  }}
+                  title="Закрыть"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="simplified-tier-modal__body">
+                <FormField label="Граница диапазона">
+                  <input
+                    className="form-input form-input--compact"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="Граница диапазона"
+                    value={tierModal.boundary}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTierModal({ ...tierModal, boundary: e.target.value })}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        if (tierModal.type === 'add') {
+                          handleAddRange()
+                        } else {
+                          handleEditRange()
+                        }
                       }
+                    }}
+                    autoFocus
+                  />
+                </FormField>
+              </div>
+              <div className="simplified-tier-modal__footer">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={(e?: React.MouseEvent<Element>) => {
+                    e?.stopPropagation()
+                    setTierModal({ type: 'add', isOpen: false, boundary: '' })
+                  }}
+                >
+                  Отменить
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={(e?: React.MouseEvent<Element>) => {
+                    e?.stopPropagation()
+                    if (tierModal.type === 'add') {
+                      handleAddRange()
+                    } else {
+                      handleEditRange()
                     }
                   }}
-                  autoFocus
-                />
-              </FormField>
+                >
+                  {tierModal.type === 'add' ? 'Добавить' : 'Сохранить'}
+                </Button>
+              </div>
             </div>
-            <div className="simplified-tier-modal__footer">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={(e?: React.MouseEvent<Element>) => {
-                  e?.stopPropagation()
-                  setTierModal({ type: 'add', isOpen: false, boundary: '' })
-                }}
-              >
-                Отменить
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={(e?: React.MouseEvent<Element>) => {
-                  e?.stopPropagation()
-                  if (tierModal.type === 'add') {
-                    handleAddRange()
-                  } else {
-                    handleEditRange()
-                  }
-                }}
-              >
-                {tierModal.type === 'add' ? 'Добавить' : 'Сохранить'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }
