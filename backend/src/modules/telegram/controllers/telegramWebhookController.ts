@@ -748,7 +748,7 @@ export class TelegramWebhookController {
                    `💡 *Выберите размер фотографии:*\n` +
                    `Нажмите на кнопку с нужным размером ниже ⬇️`;
 
-    const keyboard = TelegramBotCommands.getSizeSelectionKeyboard();
+    const keyboard = await TelegramBotCommands.getSizeSelectionKeyboard();
     await TelegramService.editMessageWithKeyboard(chatId, messageId, message, keyboard);
   }
 

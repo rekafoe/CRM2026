@@ -17,18 +17,13 @@ export const MINIAPP_CLIENT_PART2 = `
     sel.onchange = function () { out.checkoutType = sel.value; render(); };
     addField(form, 'Тип', sel);
     if (!isLeg) {
-      var i1 = document.createElement('input');
-      i1.name = 'fn';
-      i1.type = 'text';
-      i1.required = true;
-      i1.setAttribute('autocomplete', 'given-name');
-      addField(form, 'Имя', i1);
-      var i2 = document.createElement('input');
-      i2.name = 'ln';
-      i2.type = 'text';
-      i2.required = true;
-      i2.setAttribute('autocomplete', 'family-name');
-      addField(form, 'Фамилия', i2);
+      var tg = out.me && out.me.telegram;
+      if (tg) {
+        var who = (tg.first_name || '—') + (tg.last_name ? ' ' + tg.last_name : '') + (tg.username ? ' (@' + tg.username + ')' : '');
+        box.appendChild(h('p', 'Контакт в заказе: ' + esc(who) + ' (как в Telegram; имя на сервере подставится из профиля).', 'hint'));
+      } else {
+        box.appendChild(h('p', 'Вход через Telegram: имя для заказа подставит сервер по вашему профилю.', 'hint'));
+      }
     } else {
       var c1 = document.createElement('input');
       c1.name = 'co';
@@ -39,14 +34,24 @@ export const MINIAPP_CLIENT_PART2 = `
     var ph = document.createElement('input');
     ph.name = 'phone';
     ph.type = 'tel';
-    ph.required = true;
     ph.setAttribute('autocomplete', 'tel');
-    addField(form, 'Телефон', ph);
-    var em = document.createElement('input');
-    em.name = 'email';
-    em.type = 'email';
-    em.setAttribute('autocomplete', 'email');
-    addField(form, 'Email (необяз.)', em);
+    var crmPhone = out.me && out.me.crm && out.me.crm.phone;
+    if (crmPhone) {
+      ph.value = String(crmPhone);
+      ph.removeAttribute('required');
+      addField(form, 'Телефон', ph);
+      form.appendChild(h('p', 'Подставлен из CRM; при необходимости измените.', 'hint'));
+    } else {
+      ph.required = true;
+      addField(form, 'Телефон', ph);
+    }
+    if (isLeg) {
+      var em = document.createElement('input');
+      em.name = 'email';
+      em.type = 'email';
+      em.setAttribute('autocomplete', 'email');
+      addField(form, 'Email (необяз.)', em);
+    }
     var no = document.createElement('textarea');
     no.name = 'notes';
     no.rows = 2;
@@ -66,13 +71,13 @@ export const MINIAPP_CLIENT_PART2 = `
     var fd = new FormData(f);
     var isLeg = String(fd.get('cust-type') || '') === 'legal';
     var phone = String(fd.get('phone') || '').trim();
+    if (!phone && out.me && out.me.crm && out.me.crm.phone) phone = String(out.me.crm.phone).trim();
     var customer;
     if (isLeg) {
       customer = { type: 'legal', company_name: String(fd.get('co') || '').trim(), phone: phone, email: String(fd.get('email') || '').trim() || undefined, notes: String(fd.get('notes') || '').trim() || undefined };
       if (!customer.company_name) { out.checkoutMsg = 'Укажите компанию'; render(); return; }
     } else {
-      customer = { type: 'individual', first_name: String(fd.get('fn') || '').trim(), last_name: String(fd.get('ln') || '').trim(), phone: phone, email: String(fd.get('email') || '').trim() || undefined, notes: String(fd.get('notes') || '').trim() || undefined };
-      if (!customer.first_name && !customer.last_name) { out.checkoutMsg = 'Укажите имя/фамилию'; render(); return; }
+      customer = { type: 'individual', phone: phone, notes: String(fd.get('notes') || '').trim() || undefined };
     }
     if (!phone) { out.checkoutMsg = 'Укажите телефон'; render(); return; }
     var subBtn = f.querySelector('button[type=submit]');
@@ -127,6 +132,7 @@ export const MINIAPP_CLIENT_PART2 = `
     else if (out.view === 'catalog') main.appendChild(renderCatalog());
     else if (out.view === 'cart') main.appendChild(renderCart());
     else if (out.view === 'orders') main.appendChild(renderOrders());
+    else if (out.view === 'order_detail') main.appendChild(renderOrderDetail());
     else if (out.view === 'checkout') main.appendChild(renderCheckout());
     else if (out.view === 'calculator') main.appendChild(renderCalculator());
   }
@@ -164,8 +170,8 @@ export const MINIAPP_CLIENT_PART2 = `
       })
       .then(function (me) {
         if (me) {
-          if (me.telegram) out.me = { telegram: me.telegram };
-          else if (me.me && me.me.telegram) out.me = { telegram: me.me.telegram };
+          if (me.telegram) out.me = { telegram: me.telegram, crm: me.crm != null ? me.crm : null };
+          else if (me.me && me.me.telegram) out.me = { telegram: me.me.telegram, crm: me.crm != null ? me.crm : null };
           out.err = null;
         }
         render();

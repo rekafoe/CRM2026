@@ -5,6 +5,7 @@ export interface Order {
   number: string;
   status: number;
   created_at: string;
+  source?: 'crm' | 'website' | 'telegram' | 'mini_app';
   customerName?: string;
   customerPhone?: string;
   customerEmail?: string;

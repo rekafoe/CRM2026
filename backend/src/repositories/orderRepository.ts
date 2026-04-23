@@ -430,6 +430,27 @@ export const OrderRepository = {
     }) as unknown as Order[]
   },
 
+  /**
+   * Фото-заказы Telegram-бота (photo_orders) — в общем пуле наравне с orders, без отдельного сценария.
+   * Исключаем только завершённые/отклонённые; назначенные (userId) тоже в списке, как у CRM-заказов.
+   */
+  async listPhotoOrdersForPool(): Promise<PhotoOrderRow[]> {
+    const db = await getDb()
+    const hasUserId = await hasColumn('photo_orders', 'userId')
+    const uidSel = hasUserId ? 'userId' : 'NULL as userId'
+    try {
+      const rows = await db.all<PhotoOrderRow>(
+        `SELECT id, status, ${uidSel}, created_at, first_name, chat_id, total_price, selected_size, processing_options, quantity
+         FROM photo_orders
+         WHERE lower(coalesce(status, '')) NOT IN ('completed', 'rejected')
+         ORDER BY datetime(created_at) DESC`
+      )
+      return Array.isArray(rows) ? rows : []
+    } catch {
+      return []
+    }
+  },
+
   async listAssignedOrdersForUser(userId: number): Promise<any[]> {
     const db = await getDb()
     try {
@@ -514,8 +535,10 @@ export const OrderRepository = {
   async getPhotoOrderById(id: number): Promise<PhotoOrderRow | undefined> {
     const db = await getDb()
     try {
+      const hasUid = await hasColumn('photo_orders', 'userId')
+      const uidSel = hasUid ? 'userId' : 'NULL as userId'
       const row = await db.get<PhotoOrderRow>(
-        `SELECT id, status, created_at, first_name, chat_id, total_price, selected_size, processing_options, quantity
+        `SELECT id, status, ${uidSel}, created_at, first_name, chat_id, total_price, selected_size, processing_options, quantity
          FROM photo_orders WHERE id = ?`,
         [id]
       )
@@ -532,9 +555,11 @@ export const OrderRepository = {
     if (ids.length === 0) return map
     const db = await getDb()
     try {
+      const hasUid = await hasColumn('photo_orders', 'userId')
+      const uidSel = hasUid ? 'userId' : 'NULL as userId'
       const placeholders = ids.map(() => '?').join(',')
       const rows = await db.all<PhotoOrderRow>(
-        `SELECT id, status, created_at, first_name, chat_id, total_price, selected_size, processing_options, quantity
+        `SELECT id, status, ${uidSel}, created_at, first_name, chat_id, total_price, selected_size, processing_options, quantity
          FROM photo_orders WHERE id IN (${placeholders})`,
         ...ids
       )

@@ -1,3 +1,4 @@
+import { buildOrderNumberFromSourceAndId } from '../../../utils/orderNumberGenerator'
 import { getDb } from '../../../config/database'
 import { getCurrentTimestamp, getTodayString } from '../../../utils/date'
 import { hasColumn } from '../../../utils/tableSchemaCache'
@@ -9,10 +10,15 @@ import { AutoMaterialDeductionService } from '../../warehouse/services/autoMater
 import { OrderRepository } from '../../../repositories/orderRepository'
 import { itemRowSelect, mapItemRowToItem } from '../../../models/mappers/itemMapper'
 import { EarningsService } from '../../../services/earningsService'
-import { mapPhotoOrderToOrder, mapPhotoOrderToVirtualItem } from '../../../models/mappers/telegramPhotoOrderMapper'
+import {
+  mapPhotoOrderToOrder,
+  mapPhotoOrderToVirtualItem,
+  photoOrderRowToPoolOrder,
+} from '../../../models/mappers/telegramPhotoOrderMapper'
 import { PriceTypeService } from '../../pricing/services/priceTypeService'
 import { tryEnqueueOrderStatusEmail } from '../../../services/orderStatusEmailService'
 import { tryScheduleOrderStatusSms } from '../../../services/orderStatusSmsService'
+import { tryNotifyTelegramOrderStatusForMiniappOrder } from '../../../services/miniappOrderStatusTelegramService'
 
 export class OrderService {
   private static normalizeReasonCode(reason: string): string {
@@ -194,7 +200,21 @@ export class OrderService {
 
   /** Все заказы без фильтра по пользователю (для пула заказов). Batch loading — устранение N+1. */
   static async getAllOrdersForPool() {
-    const orders = (await OrderRepository.listAllOrders()) as Order[]
+    const fromOrders = (await OrderRepository.listAllOrders()) as Order[]
+    const orderIds = new Set(fromOrders.map((o) => o.id))
+    const photoRows = await OrderRepository.listPhotoOrdersForPool()
+    const fromPhoto: Order[] = []
+    for (const row of photoRows) {
+      if (orderIds.has(row.id)) {
+        continue
+      }
+      fromPhoto.push(photoOrderRowToPoolOrder(row))
+    }
+    const orders = [...fromPhoto, ...fromOrders].sort((a, b) => {
+      const ta = new Date(a.created_at).getTime()
+      const tb = new Date(b.created_at).getTime()
+      return tb - ta
+    })
     const telegramIds = orders.filter((o) => o.paymentMethod === 'telegram').map((o) => o.id)
     const websiteIds = orders.filter((o) => o.paymentMethod !== 'telegram').map((o) => o.id)
     const [itemsByOrderId, photoOrdersById] = await Promise.all([
@@ -204,7 +224,7 @@ export class OrderService {
     for (const order of orders) {
       if (order.paymentMethod === 'telegram') {
         const photo = photoOrdersById.get(order.id)
-        order.items = photo ? [mapPhotoOrderToVirtualItem(photo)] : []
+        order.items = photo ? [mapPhotoOrderToVirtualItem(photo)] : order.items ?? []
       } else {
         order.items = itemsByOrderId.get(order.id) ?? []
       }
@@ -292,7 +312,7 @@ export class OrderService {
           ]
         )
     const id = (insertRes as any).lastID!
-    const number = `ORD-${String(id).padStart(4, '0')}`
+    const number = buildOrderNumberFromSourceAndId(source || 'crm', id)
     await db.run('UPDATE orders SET number = ? WHERE id = ?', [number, id])
 
     const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
@@ -911,6 +931,11 @@ export class OrderService {
           source: 'website',
         });
         void tryScheduleOrderStatusSms({ orderId: id, newStatusId });
+        void tryNotifyTelegramOrderStatusForMiniappOrder({
+          orderId: id,
+          oldStatusId,
+          newStatusId: Number(status),
+        });
 
         const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
         const updated: Order = { ...(raw as Order), items: [] }
@@ -921,17 +946,56 @@ export class OrderService {
     }
   }
 
-  // Переназначение заказа по номеру (ORD-XXXX) или site-ord-<id>. Допускаются первый статус (0 или 1).
+  // Переназначение по номеру: ORD-*, MAP-*, site-ord-*, тг tg-ord-* (photo_orders) — одна и та же логика userId.
   static async reassignOrderByNumber(orderNumber: string, targetUserId: number, actorUserId?: number) {
     const db = await getDb()
-    const siteMatch = /^site-ord-(\d+)$/i.exec(orderNumber)
+    const trimmed = String(orderNumber || '').trim()
+    const siteMatch = /^site-ord-(\d+)$/i.exec(trimmed)
     let row: { id: number; status: number; userId?: number | null } | undefined
     if (siteMatch) {
       const orderId = parseInt(siteMatch[1], 10)
       row = await db.get<{ id: number; status: number; userId?: number | null }>('SELECT id, status, userId FROM orders WHERE id = ? AND source = ?', [orderId, 'website'])
     }
     if (!row) {
-      row = await db.get<{ id: number; status: number; userId?: number | null }>('SELECT id, status, userId FROM orders WHERE number = ?', [orderNumber])
+      row = await db.get<{ id: number; status: number; userId?: number | null }>('SELECT id, status, userId FROM orders WHERE number = ?', [trimmed])
+    }
+    if (!row) {
+      const tgMatch = /^tg-ord-(\d+)$/i.exec(trimmed)
+      if (tgMatch) {
+        const photoId = parseInt(tgMatch[1], 10)
+        const hasUid = await hasColumn('photo_orders', 'userId')
+        if (!hasUid) {
+          throw new Error('Нужна миграция: колонка photo_orders.userId (перезапустите backend после деплоя)')
+        }
+        const po = await db.get<{ id: number; status: string | null; userId: number | null }>(
+          'SELECT id, status, userId FROM photo_orders WHERE id = ?',
+          [photoId]
+        )
+        if (!po) {
+          throw new Error('Заказ не найден')
+        }
+        const st = String(po.status || '').toLowerCase()
+        if (st === 'completed' || st === 'rejected') {
+          throw new Error('Переназначение недоступно для завершённого заказа')
+        }
+        const previousUserId = po.userId != null && Number.isFinite(Number(po.userId)) ? Number(po.userId) : null
+        await db.run('UPDATE photo_orders SET userId = ?, updated_at = datetime("now") WHERE id = ?', [targetUserId, photoId])
+        await this.recordOrderActivity(db, {
+          orderId: photoId,
+          eventType: 'reassign',
+          message: previousUserId == null ? 'Заказ взяли в работу' : 'Заказ переназначен',
+          oldValue: previousUserId != null ? String(previousUserId) : null,
+          newValue: String(targetUserId),
+          userId: actorUserId ?? null,
+          meta: {
+            previous_user_id: previousUserId,
+            target_user_id: targetUserId,
+            action: previousUserId == null ? 'take' : 'reassign',
+            orderKind: 'photo_telegram',
+          },
+        })
+        return { id: photoId, userId: targetUserId }
+      }
     }
     if (!row) {
       throw new Error('Заказ не найден')
@@ -1304,6 +1368,11 @@ export class OrderService {
           source: 'website',
         });
         void tryScheduleOrderStatusSms({ orderId: row.id, newStatusId: n });
+        void tryNotifyTelegramOrderStatusForMiniappOrder({
+          orderId: row.id,
+          oldStatusId: old,
+          newStatusId: n,
+        });
       }
     }
     

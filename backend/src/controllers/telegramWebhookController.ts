@@ -696,7 +696,7 @@ export class TelegramWebhookController {
    */
   private static async handleSizeSelectionSimplified(chatId: string, data: string, messageId: number) {
     const sizeName = data.replace('size_', '');
-    const result = savePhotoOrderSessionSimplified(chatId, sizeName);
+    const result = await savePhotoOrderSessionSimplified(chatId, sizeName);
     if (!result.ok) {
       await TelegramService.sendMessageToUser(chatId, '❌ Неверный размер фотографии');
       return;

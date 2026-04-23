@@ -2,6 +2,27 @@
  * Генератор номеров заказов
  */
 
+/** Префикс публичного номера по `orders.source` (OrderService.createOrder). Заказы из CRM — `ORD`. */
+const SOURCE_ORDER_NUMBER_PREFIX: Record<string, string> = {
+  website: 'WEB',
+  mini_app: 'MAP',
+  telegram: 'TG',
+  crm: 'ORD',
+}
+
+/**
+ * Номер заказа после INSERT: `{ПРЕФИКС}-{id}` (id с ведущими нулями, мин. 4 знака).
+ * Неизвестный source → `ORD`.
+ */
+export function buildOrderNumberFromSourceAndId(
+  source: string | null | undefined,
+  id: number
+): string {
+  const key = String(source || 'crm').toLowerCase().trim()
+  const prefix = SOURCE_ORDER_NUMBER_PREFIX[key] ?? 'ORD'
+  return `${prefix}-${String(id).padStart(4, '0')}`
+}
+
 interface OrderNumberOptions {
   source: 'website' | 'telegram' | 'manual';
   year?: number;

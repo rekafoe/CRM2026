@@ -455,7 +455,7 @@ router.post('/:id/items', asyncHandler(OrderItemController.addItem))
 router.delete('/:orderId/items/:itemId', asyncHandler(OrderItemController.deleteItem))
 router.patch('/:orderId/items/:itemId', asyncHandler(OrderItemController.updateItem))
 
-// Order reassignment: по номеру (ORD-XXXX) или по site-ord-<id> для заказов с сайта. Только при status=1 (ожидающий).
+// Переназначение по номеру (ORD-*, site-ord-*, tg-ord-*). Для tg-ord — photo_orders, без UPDATE orders с тем же id
 router.post('/reassign/:number', asyncHandler(async (req, res) => {
   const param = req.params.number;
   const { userId } = req.body;
@@ -471,6 +471,10 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
     return;
   }
   const result = await OrderService.reassignOrderByNumber(param, targetUserId, authUser?.id);
+  if (/^tg-ord-/i.test(String(param).trim())) {
+    res.json({ success: true, message: 'Order reassigned successfully' });
+    return;
+  }
   const db = await getDb();
   const currentDate = new Date().toISOString();
   const hasCreatedAt = await hasColumn('orders', 'createdAt').catch(() => false);

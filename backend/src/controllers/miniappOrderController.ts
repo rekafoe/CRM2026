@@ -5,6 +5,7 @@ import {
   getMiniappOrderDetail,
   listMiniappOrders,
 } from '../services/miniappOrderService';
+import { getMiniappOrderFileForDownload } from '../services/miniappOrderFileDownloadService';
 
 function miniChatId(req: Request): string | null {
   return (req as AuthenticatedRequest).miniApp?.telegramUserId?.trim() || null;
@@ -26,6 +27,35 @@ export class MiniappOrderController {
       orders,
       meta: { telegram_orders: available, ...(available ? {} : { hint: 'Apply DB migrations (telegram_chat_id on orders)' }) },
     });
+  }
+
+  static async downloadFile(req: Request, res: Response) {
+    const chatId = miniChatId(req);
+    if (!chatId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const orderId = parseInt(String(req.params.orderId), 10);
+    const fileId = parseInt(String(req.params.fileId), 10);
+    if (!Number.isFinite(orderId) || orderId < 1 || !Number.isFinite(fileId) || fileId < 1) {
+      res.status(400).json({ error: 'Invalid orderId or fileId' });
+      return;
+    }
+    const result = await getMiniappOrderFileForDownload(chatId, orderId, fileId);
+    if (result.ok === false) {
+      res.status(result.status).json({ error: result.message, message: result.message });
+      return;
+    }
+    const displayName = result.displayName;
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${String(displayName).replace(/"/g, '%22')}"; filename*=UTF-8''${encodeURIComponent(displayName)}`
+    );
+    res.setHeader('Content-Length', String(result.buffer.length));
+    if (result.mime) {
+      res.setHeader('Content-Type', result.mime);
+    }
+    res.send(result.buffer);
   }
 
   static async getOne(req: Request, res: Response) {

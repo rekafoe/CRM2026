@@ -15,16 +15,16 @@ const MODE_LABEL: Record<string, string> = {
 /**
  * Сохраняет сессию с дефолтами и возвращает текст + цена/размеры для ответа в чат.
  */
-export function savePhotoOrderSessionSimplified(
+export async function savePhotoOrderSessionSimplified(
   chatId: string,
   sizeName: string
-): { ok: true; text: string } | { ok: false; error: string } {
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   const size = ImageProcessingService.getSizeByName(sizeName)
   if (!size) {
     return { ok: false, error: 'Неверный размер' }
   }
 
-  const prices = PhotoOrderService.getAllPrices()
+  const prices = await PhotoOrderService.getAllPrices()
   const pricePer = prices[sizeName] ?? 0
   const priceRub = (pricePer / 100).toFixed(0)
   const totalRub = ((pricePer * PHOTO_ORDER_DEFAULT_QTY) / 100).toFixed(0)

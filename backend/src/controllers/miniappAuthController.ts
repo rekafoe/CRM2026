@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { CustomerService } from '../modules/customers/services/customerService';
 import { TelegramUserService } from '../services/telegramUserService';
 import { verifyTelegramInitData } from '../utils/telegramInitData';
 import { signMiniAppSession } from '../utils/miniAppSession';
@@ -94,6 +95,19 @@ export class MiniappAuthController {
       return;
     }
 
+    const crmId = await TelegramUserService.getCrmCustomerIdByChatId(m.telegramUserId);
+    let crm: { customer_id: number; phone: string | null; email: string | null } | null = null;
+    if (crmId) {
+      const cust = await CustomerService.getCustomerById(crmId);
+      if (cust) {
+        crm = {
+          customer_id: cust.id,
+          phone: cust.phone && String(cust.phone).trim() ? String(cust.phone).trim() : null,
+          email: cust.email && String(cust.email).trim() ? String(cust.email).trim() : null,
+        };
+      }
+    }
+
     res.json({
       telegram: {
         id: row.id,
@@ -103,6 +117,7 @@ export class MiniappAuthController {
         last_name: row.last_name,
         role: row.role,
       },
+      crm,
     });
   }
 }

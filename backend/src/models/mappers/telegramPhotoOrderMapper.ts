@@ -4,6 +4,7 @@ import { Order } from '../../models/Order'
 export type PhotoOrderRow = {
   id: number
   status: number
+  userId?: number | null
   created_at: string
   first_name: string
   chat_id: string
@@ -44,6 +45,28 @@ export function mapPhotoOrderToOrder(row: PhotoOrderRow): Order {
     paymentMethod: 'telegram',
     items: [],
   }
+}
+
+/**
+ * Заказ из photo_orders для общего пула CRM (таблица orders не содержит эти строки).
+ * Статус 1 — как у «ожидающих» заказов из orders, чтобы фильтр пула (0/1) показывал фото-заказы.
+ */
+export function photoOrderRowToPoolOrder(row: PhotoOrderRow): Order {
+  const uid = row.userId != null && Number.isFinite(Number(row.userId)) ? Number(row.userId) : undefined
+  return {
+    id: row.id,
+    number: `tg-ord-${row.id}`,
+    status: 1,
+    created_at: row.created_at,
+    customerName: row.first_name,
+    customerPhone: row.chat_id,
+    prepaymentAmount: row.total_price / 100.0,
+    prepaymentStatus: 'paid',
+    paymentMethod: 'telegram',
+    source: 'telegram',
+    userId: uid,
+    items: [mapPhotoOrderToVirtualItem(row)],
+  } as Order
 }
 
 

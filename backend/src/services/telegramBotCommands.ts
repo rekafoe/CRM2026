@@ -521,7 +521,7 @@ export class TelegramBotCommands {
                      `*Размер:*`;
 
       // Отправляем сообщение с inline клавиатурой
-      await TelegramService.sendMessageWithKeyboard(chatId, message, TelegramBotCommands.getSizeSelectionKeyboard());
+      await TelegramService.sendMessageWithKeyboard(chatId, message, await TelegramBotCommands.getSizeSelectionKeyboard());
 
       return '📸 Отправлено меню выбора размера';
     } catch (error) {
@@ -533,9 +533,9 @@ export class TelegramBotCommands {
   /**
    * Создание клавиатуры для выбора размера
    */
-  static getSizeSelectionKeyboard() {
+  static async getSizeSelectionKeyboard() {
     const sizes = ImageProcessingService.getAvailableSizes();
-    const prices = PhotoOrderService.getAllPrices();
+    const prices = await PhotoOrderService.getAllPrices();
 
     const keyboard = {
       inline_keyboard: sizes.map(size => {

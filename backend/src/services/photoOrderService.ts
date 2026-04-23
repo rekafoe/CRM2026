@@ -32,16 +32,18 @@ export interface CreatePhotoOrderRequest {
 }
 
 export class PhotoOrderService {
-  // Цены за печать (в копейках)
-  private static readonly PRICES: Record<string, number> = {
-    '9x13': 1500,    // 15 рублей
-    '10x15': 2000,   // 20 рублей
-    '13x18': 3000,   // 30 рублей
-    '15x21': 4000,   // 40 рублей
-    '18x24': 6000,   // 60 рублей
-    '20x30': 8000,   // 80 рублей
-    '21x29.7': 10000 // 100 рублей
-  };
+  private static async getPriceFromDb(sizeName: string): Promise<number | null> {
+    try {
+      const db = await getDb();
+      const row = await db.get(
+        `SELECT price_kopecks FROM photo_print_prices WHERE size_name = ? AND is_active = 1 ORDER BY updated_at DESC LIMIT 1`,
+        [sizeName]
+      );
+      return row ? Number((row as { price_kopecks: number }).price_kopecks) : null;
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Создание нового заказа фото
@@ -51,7 +53,13 @@ export class PhotoOrderService {
       console.log(`📸 Creating photo order for ${request.chatId}`);
       
       const db = await getDb();
-      const totalPrice = this.PRICES[request.selectedSize.name] * request.quantity;
+      const unit = await this.getPriceFromDb(request.selectedSize.name);
+      if (unit == null || !Number.isFinite(unit) || unit < 0) {
+        throw new Error(
+          `Нет цены в photo_print_prices для размера «${request.selectedSize.name}». Добавьте строку в БД.`
+        );
+      }
+      const totalPrice = unit * request.quantity;
       
       // Создаем заказ в базе данных
       const result = await db.run(`
@@ -185,18 +193,25 @@ export class PhotoOrderService {
     }
   }
 
-  /**
-   * Получение цены за размер
-   */
-  static getPriceForSize(sizeName: string): number {
-    return this.PRICES[sizeName] || 0;
+  static async getPriceForSize(sizeName: string): Promise<number> {
+    const p = await this.getPriceFromDb(sizeName);
+    return p ?? 0;
   }
 
-  /**
-   * Получение всех цен
-   */
-  static getAllPrices(): Record<string, number> {
-    return { ...this.PRICES };
+  static async getAllPrices(): Promise<Record<string, number>> {
+    try {
+      const db = await getDb();
+      const rows = await db.all(
+        `SELECT size_name, price_kopecks FROM photo_print_prices WHERE is_active = 1`
+      ) as { size_name: string; price_kopecks: number }[];
+      const map: Record<string, number> = {};
+      rows.forEach((r) => {
+        map[r.size_name] = Number(r.price_kopecks);
+      });
+      return map;
+    } catch {
+      return {};
+    }
   }
 
   /**

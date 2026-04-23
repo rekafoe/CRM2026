@@ -34,17 +34,6 @@ export interface CreatePhotoOrderRequest {
 }
 
 export class PhotoOrderService {
-  // Цены за печать (в копейках) — фолбэк
-  private static readonly PRICES: Record<string, number> = {
-    '9x13': 1500,    // 15 рублей
-    '10x15': 2000,   // 20 рублей
-    '13x18': 3000,   // 30 рублей
-    '15x21': 4000,   // 40 рублей
-    '18x24': 6000,   // 60 рублей
-    '20x30': 8000,   // 80 рублей
-    '21x29.7': 10000 // 100 рублей
-  };
-
   private static async getPriceFromDb(sizeName: string): Promise<number | null> {
     try {
       const db = await getDb();
@@ -67,8 +56,12 @@ export class PhotoOrderService {
       
       const db = await getDb();
       const dbPrice = await this.getPriceFromDb(request.selectedSize.name);
-      const unitPrice = dbPrice ?? this.PRICES[request.selectedSize.name] ?? 0;
-      const totalPrice = unitPrice * request.quantity;
+      if (dbPrice == null || !Number.isFinite(dbPrice) || dbPrice < 0) {
+        throw new Error(
+          `Нет цены в photo_print_prices для размера «${request.selectedSize.name}». Добавьте строку в БД.`
+        );
+      }
+      const totalPrice = dbPrice * request.quantity;
       
       // Создаем заказ в базе данных
       const result = await db.run(
@@ -214,7 +207,7 @@ export class PhotoOrderService {
    */
   static async getPriceForSize(sizeName: string): Promise<number> {
     const dbPrice = await this.getPriceFromDb(sizeName);
-    return dbPrice ?? (this.PRICES[sizeName] || 0);
+    return dbPrice ?? 0;
   }
 
   /**
@@ -226,13 +219,13 @@ export class PhotoOrderService {
       const rows = await db.all(
         `SELECT size_name, price_kopecks FROM photo_print_prices WHERE is_active = 1`
       );
-      const map: Record<string, number> = { ...this.PRICES };
-      (rows as any[]).forEach(r => {
+      const map: Record<string, number> = {};
+      (rows as { size_name: string; price_kopecks: number }[]).forEach((r) => {
         map[r.size_name] = Number(r.price_kopecks);
       });
       return map;
     } catch (e) {
-      return { ...this.PRICES };
+      return {};
     }
   }
 

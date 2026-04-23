@@ -7,7 +7,9 @@ export const MINIAPP_CLIENT_PART1 = `
     cart: [], view: 'profile', err: null, load: false, checkoutMsg: null, checkoutType: 'individual',
     checkoutLoading: false,
     calcPid: null, calcName: '', calcListItem: null, calcSchema: null, calcErr: null, calcLoading: false, calcResult: null,
-    calcForm: { typeId: null, sizeId: null, matId: null, qty: 100, printKey: '' }
+    calcForm: { typeId: null, sizeId: null, matId: null, qty: 100, printKey: '' },
+    orderDetailId: null, orderDetailData: null, orderDetailErr: null, orderDetailLoading: false,
+    orderFileMsg: null, orderUploadLoading: false
   };
   var nav, main;
   function $(id) { return document.getElementById(id); }
@@ -26,9 +28,16 @@ export const MINIAPP_CLIENT_PART1 = `
     nav.innerHTML = '';
     for (var i = 0; i < tabs.length; i++) {
       (function (key, label) {
-        var b = h('button', esc(label), 'tab' + (out.view === key ? ' tab-on' : ''));
+        var b = h('button', esc(label), 'tab' + ((out.view === key || (key === 'orders' && out.view === 'order_detail')) ? ' tab-on' : ''));
         b.type = 'button';
         b.onclick = function () {
+          if (out.view === 'order_detail') {
+            out.orderDetailId = null;
+            out.orderDetailData = null;
+            out.orderDetailErr = null;
+            out.orderFileMsg = null;
+            out.orderUploadLoading = false;
+          }
           out.view = key;
           out.checkoutMsg = null;
           if (key === 'catalog' && !out.products) loadProducts();
@@ -105,6 +114,9 @@ export const MINIAPP_CLIENT_PART1 = `
     box.appendChild(h('p', 'Имя: ' + esc(t.first_name || '—') + (t.last_name ? ' ' + esc(t.last_name) : ''), 'line'));
     box.appendChild(h('p', 'Username: ' + (t.username ? '@' + esc(t.username) : '—'), 'line'));
     box.appendChild(h('p', 'Статус: ' + esc(t.role || 'клиент'), 'line'));
+    if (out.me.crm && out.me.crm.phone) {
+      box.appendChild(h('p', 'Телефон в CRM: ' + esc(out.me.crm.phone), 'line'));
+    }
     return box;
   }
   function renderCatalog() {
@@ -174,6 +186,17 @@ export const MINIAPP_CLIENT_PART1 = `
         var t = esc(o.number) + (o.status_name ? ' — ' + esc(o.status_name) : ' — статус ' + o.status);
         row.appendChild(h('div', t, 'card-title'));
         if (o.created_at) row.appendChild(h('div', esc(o.created_at), 'muted'));
+        var op = h('button', 'Открыть', 'primary');
+        op.type = 'button';
+        op.onclick = function () {
+          out.view = 'order_detail';
+          out.orderDetailId = o.id;
+          out.orderDetailData = null;
+          out.orderDetailErr = null;
+          out.orderFileMsg = null;
+          if (typeof loadOrderDetail === 'function') loadOrderDetail(); else render();
+        };
+        row.appendChild(op);
         box.appendChild(row);
       })(list[j]);
     }

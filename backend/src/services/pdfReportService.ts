@@ -1,5 +1,6 @@
 import { MaterialService } from './materialService';
 import { getDb } from '../config/database';
+import { buildOrderNumberFromSourceAndId } from '../utils/orderNumberGenerator';
 import * as fs from 'fs';
 import * as path from 'path';
 import puppeteer, { Browser } from 'puppeteer';
@@ -466,7 +467,7 @@ export class PDFReportService {
       const debt = Math.max(0, calculatedTotalAmount - prepaymentAmount);
 
       const resolvedExecutedBy = order.executedByName || executedBy || undefined;
-      const orderNumber = order.number || `ORD-${order.id}`;
+      const orderNumber = order.number || buildOrderNumberFromSourceAndId((order as { source?: string | null }).source, order.id);
       const mappedItems = (Array.isArray(items) ? items : []).map(item => {
           let params: any = {};
           try {
@@ -2006,7 +2007,7 @@ export class PDFReportService {
       const managerName = order.managerName || 'Менеджер';
       const html = this.generateReceiptHTML({
         receiptNumber: receiptNum,
-        orderNumber: order.number || `ORD-${order.id}`,
+        orderNumber: order.number || buildOrderNumberFromSourceAndId((order as { source?: string | null }).source, order.id),
         orderDate: createdDate,
         items: receiptItems,
         totalAmount: totalAmount,

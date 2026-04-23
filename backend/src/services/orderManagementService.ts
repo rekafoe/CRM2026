@@ -181,13 +181,20 @@ export class OrderManagementService {
         VALUES (?, ?, ?, 'pending', datetime('now'))
       `, [page.id, orderId, orderType]);
 
-            // Обновляем статус заказа в соответствующей таблице
+            // Фото-заказы: строковый статус + userId (как в orders)
             if (orderType === 'telegram') {
-              await db.run(`
-                UPDATE photo_orders 
-                SET status = 2, updated_at = datetime('now')
-                WHERE id = ?
-              `, [orderId]);
+              const hasPoUid = await hasColumn('photo_orders', 'userId');
+              if (hasPoUid) {
+                await db.run(
+                  `UPDATE photo_orders SET status = 'approved', userId = ?, updated_at = datetime('now') WHERE id = ?`,
+                  [userId, orderId]
+                );
+              } else {
+                await db.run(
+                  `UPDATE photo_orders SET status = 'approved', updated_at = datetime('now') WHERE id = ?`,
+                  [orderId]
+                );
+              }
             } else if (orderType === 'website') {
               await db.run(`
                 UPDATE orders 
@@ -224,13 +231,11 @@ export class OrderManagementService {
         WHERE order_id = ? AND order_type = ?
       `, [notes, orderId, orderType]);
 
-            // Обновляем статус в соответствующей таблице
             if (orderType === 'telegram') {
-              await db.run(`
-                UPDATE photo_orders 
-                SET status = 5, updated_at = datetime('now')
-                WHERE id = ?
-              `, [orderId]);
+              await db.run(
+                `UPDATE photo_orders SET status = 'completed', updated_at = datetime('now') WHERE id = ?`,
+                [orderId]
+              );
             } else if (orderType === 'website') {
               await db.run(`
                 UPDATE orders 

@@ -48,7 +48,7 @@ export class PhotoOrderController {
   static async getAvailableSizes(req: Request, res: Response) {
     try {
       const sizes = ImageProcessingService.getAvailableSizes();
-      const prices = PhotoOrderService.getAllPrices();
+      const prices = await PhotoOrderService.getAllPrices();
 
       const sizesWithPrices = sizes.map(size => ({
         ...size,

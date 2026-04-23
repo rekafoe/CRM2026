@@ -37,6 +37,37 @@ export type MiniappCheckoutBody = {
   };
 };
 
+/** ФИО физ. лица из Telegram, если в запросе не переданы (миниапп: только телефон + комментарий). */
+async function enrichIndividualFromTelegram(
+  chatId: string,
+  c: Extract<MiniappCustomerBody, { type: 'individual' }>
+): Promise<Extract<MiniappCustomerBody, { type: 'individual' }>> {
+  if (c.first_name?.trim() || c.last_name?.trim()) {
+    return c;
+  }
+  const row = await TelegramUserService.getUserByChatId(chatId);
+  const firstTg = (row?.first_name && String(row.first_name).trim()) || '';
+  const lastTg = (row?.last_name && String(row.last_name).trim()) || '';
+  if (firstTg || lastTg) {
+    return { ...c, first_name: firstTg || undefined, last_name: lastTg || undefined };
+  }
+  const un = (row?.username && String(row.username).trim()) || '';
+  if (un) {
+    return { ...c, first_name: un, last_name: '' };
+  }
+  return { ...c, first_name: 'Клиент', last_name: '' };
+}
+
+async function enrichCustomerForMiniapp(
+  chatId: string,
+  c: MiniappCustomerBody
+): Promise<MiniappCustomerBody> {
+  if (c.type === 'individual') {
+    return enrichIndividualFromTelegram(chatId, c);
+  }
+  return c;
+}
+
 function orderContactFromCustomer(c: Customer): {
   customerName: string;
   customerPhone?: string;
@@ -62,22 +93,30 @@ async function ensureCustomerForChat(
   chatId: string,
   c: MiniappCustomerBody
 ): Promise<Customer> {
-  const phone = String(c.phone || '').trim();
+  let phone = String(c.phone || '').trim();
+  if (!phone) {
+    const crmId = await TelegramUserService.getCrmCustomerIdByChatId(chatId);
+    if (crmId) {
+      const cust = await CustomerService.getCustomerById(crmId);
+      if (cust?.phone) phone = String(cust.phone).trim();
+    }
+  }
   if (!phone) {
     const err = new Error('MINIAPP_PHONE_REQUIRED');
     (err as any).code = 'MINIAPP_PHONE_REQUIRED';
     throw err;
   }
+  const cWithPhone = { ...c, phone } as MiniappCustomerBody;
 
   let existingId = await TelegramUserService.getCrmCustomerIdByChatId(chatId);
-  if (c.type === 'individual') {
-    if (!c.first_name?.trim() && !c.last_name?.trim()) {
+  if (cWithPhone.type === 'individual') {
+    if (!cWithPhone.first_name?.trim() && !cWithPhone.last_name?.trim()) {
       const err = new Error('MINIAPP_NAME_REQUIRED');
       (err as any).code = 'MINIAPP_NAME_REQUIRED';
       throw err;
     }
   }
-  if (c.type === 'legal' && !c.company_name?.trim()) {
+  if (cWithPhone.type === 'legal' && !cWithPhone.company_name?.trim()) {
     const err = new Error('MINIAPP_COMPANY_REQUIRED');
     (err as any).code = 'MINIAPP_COMPANY_REQUIRED';
     throw err;
@@ -87,24 +126,24 @@ async function ensureCustomerForChat(
     const ex = await CustomerService.getCustomerById(existingId);
     if (ex) {
       await CustomerService.updateCustomer(existingId, {
-        type: c.type,
-        ...(c.type === 'individual'
+        type: cWithPhone.type,
+        ...(cWithPhone.type === 'individual'
           ? {
-              first_name: c.first_name,
-              last_name: c.last_name,
-              middle_name: c.middle_name,
+              first_name: cWithPhone.first_name,
+              last_name: cWithPhone.last_name,
+              middle_name: cWithPhone.middle_name,
             }
           : {
-              company_name: c.company_name,
-              legal_name: c.legal_name,
-              tax_id: c.tax_id,
-              bank_details: c.bank_details,
-              authorized_person: c.authorized_person,
+              company_name: cWithPhone.company_name,
+              legal_name: cWithPhone.legal_name,
+              tax_id: cWithPhone.tax_id,
+              bank_details: cWithPhone.bank_details,
+              authorized_person: cWithPhone.authorized_person,
             }),
-        phone: c.phone,
-        email: c.email,
-        address: c.address,
-        notes: c.notes,
+        phone: cWithPhone.phone,
+        email: cWithPhone.email,
+        address: cWithPhone.address,
+        notes: cWithPhone.notes,
       });
       const updated = await CustomerService.getCustomerById(existingId);
       if (updated) return updated;
@@ -113,16 +152,16 @@ async function ensureCustomerForChat(
     existingId = null;
   }
 
-  if (c.type === 'individual') {
+  if (cWithPhone.type === 'individual') {
     const created = await CustomerService.createCustomer({
       type: 'individual',
-      first_name: c.first_name,
-      last_name: c.last_name,
-      middle_name: c.middle_name,
-      phone: c.phone,
-      email: c.email,
-      address: c.address,
-      notes: c.notes,
+      first_name: cWithPhone.first_name,
+      last_name: cWithPhone.last_name,
+      middle_name: cWithPhone.middle_name,
+      phone: cWithPhone.phone,
+      email: cWithPhone.email,
+      address: cWithPhone.address,
+      notes: cWithPhone.notes,
     });
     await TelegramUserService.setCrmCustomerIdByChatId(chatId, created.id);
     return created;
@@ -130,15 +169,15 @@ async function ensureCustomerForChat(
 
   const created = await CustomerService.createCustomer({
     type: 'legal',
-    company_name: c.company_name,
-    legal_name: c.legal_name,
-    tax_id: c.tax_id,
-    bank_details: c.bank_details,
-    authorized_person: c.authorized_person,
-    phone: c.phone,
-    email: c.email,
-    address: c.address,
-    notes: c.notes,
+    company_name: cWithPhone.company_name,
+    legal_name: cWithPhone.legal_name,
+    tax_id: cWithPhone.tax_id,
+    bank_details: cWithPhone.bank_details,
+    authorized_person: cWithPhone.authorized_person,
+    phone: cWithPhone.phone,
+    email: cWithPhone.email,
+    address: cWithPhone.address,
+    notes: cWithPhone.notes,
   });
   await TelegramUserService.setCrmCustomerIdByChatId(chatId, created.id);
   return created;
@@ -168,7 +207,8 @@ export async function submitMiniappCheckout(telegramChatId: string, body: Miniap
     }
   }
 
-  const customer = await ensureCustomerForChat(telegramChatId, body.customer);
+  const customerPayload = await enrichCustomerForMiniapp(telegramChatId, body.customer);
+  const customer = await ensureCustomerForChat(telegramChatId, customerPayload);
   const { customerName, customerPhone, customerEmail } = orderContactFromCustomer(customer);
 
   const prepayment =
