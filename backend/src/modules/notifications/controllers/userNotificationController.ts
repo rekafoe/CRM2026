@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { UserNotificationService } from '../services/userNotificationService';
 import { logger } from '../../../utils/logger';
+import { starMarkdownToHtml } from '../../../utils/telegramText';
 
 export class UserNotificationController {
   /**
@@ -349,8 +350,8 @@ export class UserNotificationController {
             },
             body: JSON.stringify({
               chat_id: user.chat_id,
-              text: message,
-              parse_mode: 'Markdown'
+              text: starMarkdownToHtml(message),
+              parse_mode: 'HTML'
             })
           });
 

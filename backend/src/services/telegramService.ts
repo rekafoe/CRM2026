@@ -1,6 +1,7 @@
 // Используем встроенный fetch (Node.js 18+)
 import { TelegramUserService } from './telegramUserService';
 import { previewTelegramText } from '../utils/telegramBotApi';
+import { starMarkdownToHtml } from '../utils/telegramText';
 
 export interface TelegramConfig {
   botToken: string;
@@ -146,8 +147,8 @@ export class TelegramService {
         },
         body: JSON.stringify({
           chat_id: this.config.chatId,
-          text: message,
-          parse_mode: 'Markdown',
+          text: starMarkdownToHtml(message),
+          parse_mode: 'HTML',
           disable_web_page_preview: true
         })
       });
@@ -326,8 +327,8 @@ export class TelegramService {
         },
         body: JSON.stringify({
           chat_id: chatId,
-          text: message,
-          parse_mode: 'Markdown'
+          text: starMarkdownToHtml(message),
+          parse_mode: 'HTML'
         })
       });
 
@@ -605,8 +606,8 @@ export class TelegramService {
         },
         body: JSON.stringify({
           chat_id: chatId,
-          text: message,
-          parse_mode: 'Markdown',
+          text: starMarkdownToHtml(message),
+          parse_mode: 'HTML',
           reply_markup: keyboard
         }),
       });
@@ -646,8 +647,8 @@ export class TelegramService {
         body: JSON.stringify({
           chat_id: chatId,
           message_id: messageId,
-          text: message,
-          parse_mode: 'Markdown',
+          text: starMarkdownToHtml(message),
+          parse_mode: 'HTML',
           reply_markup: keyboard
         }),
       });

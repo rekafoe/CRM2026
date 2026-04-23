@@ -13,6 +13,20 @@ export interface BotCommand {
   handler: (chatId: string, userId: string, args?: string[]) => Promise<string>;
 }
 
+/** Пользователи часто пишут слитно, без _ — приводим к каноническому имени */
+const TELEGRAM_COMMAND_ALIASES: Readonly<Record<string, string>> = {
+  '/orderphoto': '/order_photo',
+  '/myorders': '/my_orders',
+  '/stockpdf': '/stock_pdf',
+  '/stockreport': '/stock_report',
+};
+
+function resolveTelegramCommandName(firstToken: string): string {
+  const base = firstToken.includes('@') ? (firstToken.split('@')[0] as string) : firstToken;
+  const key = base.toLowerCase();
+  return TELEGRAM_COMMAND_ALIASES[key] ?? key;
+}
+
 export class TelegramBotCommands {
   private static commands: BotCommand[] = [
     {
@@ -382,7 +396,7 @@ export class TelegramBotCommands {
 
       const parts = text.trim().split(/\s+/);
       const firstToken = parts[0] || '';
-      const command = firstToken.includes('@') ? (firstToken.split('@')[0] as string) : firstToken;
+      const command = resolveTelegramCommandName(firstToken);
       const args = parts.slice(1);
       const cmd = TelegramBotCommands.commands.find((c) => c.command === command);
 

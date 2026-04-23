@@ -1,6 +1,7 @@
 import { getDb } from '../../../db';
 import { TelegramService } from '../../telegram/services/telegramService';
 import { logger } from '../../../utils/logger';
+import { starMarkdownToHtml } from '../../../utils/telegramText';
 
 export interface User {
   id: number;
@@ -248,8 +249,8 @@ export class UserNotificationService {
         },
         body: JSON.stringify({
           chat_id: chatId,
-          text: message,
-          parse_mode: 'Markdown',
+          text: starMarkdownToHtml(message),
+          parse_mode: 'HTML',
           disable_web_page_preview: true
         })
       });
@@ -386,8 +387,8 @@ export class UserNotificationService {
           },
           body: JSON.stringify({
             chat_id: user.chat_id,
-            text: message,
-            parse_mode: 'Markdown'
+            text: starMarkdownToHtml(message),
+            parse_mode: 'HTML'
           })
         });
 
