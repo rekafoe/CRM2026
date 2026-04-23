@@ -1,12 +1,14 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import helmet from 'helmet'
 import swaggerUi from 'swagger-ui-express'
 import { initDB } from './config/database'
 import { config, corsDynamicOrigin, getCorsAllowedOrigins } from './config/app'
 import { uploadsDir } from './config/upload'
 import { authMiddleware, errorHandler, asyncHandler } from './middleware'
 import { uploadsApiKeyMiddleware } from './middleware/uploadsApiKey'
+import { blockSensitiveStaticPath } from './middleware/blockSensitiveStaticPath'
 import { performanceMiddleware, performanceLoggingMiddleware } from './middleware/performance'
 import { compressionMiddleware } from './middleware/compression'
 import { authRateLimit, generalRateLimit } from './middleware/rateLimiter'
@@ -48,6 +50,14 @@ function assertProductionSecurityEnv(): void {
 
 // За прокси (Railway и др.) req.protocol должен быть https
 app.set('trust proxy', 1)
+
+// Базовые заголовки: не отдаём HTML-политикой ломаем API/Swagger (JSON).
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
 // CORS ДО generalRateLimit: иначе при 429 ответ уходит без Access-Control-Allow-Origin → в консоли «blocked by CORS», хотя причина — лимит запросов.
 const corsAllowed = getCorsAllowedOrigins()
@@ -127,7 +137,13 @@ const blockOrdersPath = (_req: express.Request, res: express.Response, next: exp
   }
   next()
 }
-app.use('/uploads', blockOrdersPath, asyncHandler(uploadsApiKeyMiddleware), express.static(uploadsDir))
+app.use(
+  '/uploads',
+  blockOrdersPath,
+  blockSensitiveStaticPath,
+  asyncHandler(uploadsApiKeyMiddleware),
+  express.static(uploadsDir)
+)
 app.get('/api/uploads', (req, res) => {
   res.status(400).json({
     error: 'Filename required',
@@ -140,7 +156,13 @@ app.get('/api/uploads/', (req, res) => {
     message: 'Use /api/uploads/{filename} — e.g. /api/uploads/photo-123.jpg',
   })
 })
-app.use('/api/uploads', blockOrdersPath, asyncHandler(uploadsApiKeyMiddleware), express.static(uploadsDir))
+app.use(
+  '/api/uploads',
+  blockOrdersPath,
+  blockSensitiveStaticPath,
+  asyncHandler(uploadsApiKeyMiddleware),
+  express.static(uploadsDir)
+)
 
 app.use(compressionMiddleware) // Сжатие ответов (не затрагивает маршруты выше)
 app.use(performanceMiddleware) // Мониторинг производительности
