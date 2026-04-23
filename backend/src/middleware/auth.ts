@@ -34,6 +34,8 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'GET', path: /^\/api\/products\/parameter-presets\/?$/ },
   { method: 'GET', path: /^\/api\/products\/categories\/?$/ },
   { method: 'GET', path: /^\/api\/products\/category\/[0-9]+\/?$/ },
+  // Один сегмент — slug (напр. /api/products/photo), не числовой id; детали в handler по route_key
+  { method: 'GET', path: /^\/api\/products\/[a-z][-a-z0-9]*\/?$/ },
   { method: 'GET', path: /^\/api\/products\/[0-9]+\/schema\/?$/ },
   { method: 'GET', path: /^\/api\/products\/[0-9]+\/tier-prices\/?$/ },
   { method: 'POST', path: /^\/api\/products\/[0-9]+\/calculate$/ },

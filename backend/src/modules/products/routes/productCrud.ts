@@ -226,17 +226,51 @@ router.get('/by-route-key/:key', async (req, res) => {
  *             schema: { $ref: '#/components/schemas/Product' }
  *       404: { description: Продукт не найден }
  */
+function parsePositiveProductId(raw: string): number | null {
+  if (!/^\d+$/.test(raw)) return null
+  const n = parseInt(raw, 10)
+  return n > 0 ? n : null
+}
+
 router.get('/:productId', async (req, res) => {
   try {
-    const { productId } = req.params;
-    const db = await getDb();
+    const { productId: rawId } = req.params
+    const db = await getDb()
 
-    const product = await db.get(`
+    const fromDigits = parsePositiveProductId(rawId)
+    let resolvedId: number
+    if (fromDigits != null) {
+      resolvedId = fromDigits
+    } else {
+      const key = normalizeProductRouteKey(rawId)
+      if (!key) {
+        res.status(400).json({ error: 'Invalid product id' })
+        return
+      }
+      if (!(await hasColumn('products', 'route_key'))) {
+        res.status(400).json({ error: 'Product id must be numeric' })
+        return
+      }
+      const keyRow = await db.get<{ id: number }>(
+        'SELECT id FROM products WHERE lower(trim(route_key)) = ? LIMIT 1',
+        [key],
+      )
+      if (!keyRow) {
+        res.status(404).json({ error: 'Product not found' })
+        return
+      }
+      resolvedId = keyRow.id
+    }
+
+    const product = await db.get(
+      `
       SELECT p.*, pc.name as category_name, pc.icon as category_icon
       FROM products p
       LEFT JOIN product_categories pc ON p.category_id = pc.id
       WHERE p.id = ?
-    `, [productId]);
+    `,
+      [resolvedId],
+    )
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
@@ -244,8 +278,8 @@ router.get('/:productId', async (req, res) => {
 
     const parameters = await db.all(`
       SELECT * FROM product_parameters WHERE product_id = ? ORDER BY sort_order
-    `, [productId]);
-    let postProcessingServices = (await ProductServiceLinkService.list(Number(productId))).map(toServiceLinkResponse);
+    `, [resolvedId]);
+    let postProcessingServices = (await ProductServiceLinkService.list(resolvedId)).map(toServiceLinkResponse);
 
     if (!postProcessingServices.length) {
       try {
@@ -254,11 +288,11 @@ router.get('/:productId', async (req, res) => {
           JOIN product_post_processing ppp ON pps.id = ppp.service_id
           WHERE ppp.product_id = ? AND pps.is_active = 1
           ORDER BY pps.name
-        `, [productId]);
+        `, [resolvedId]);
         postProcessingServices = legacyServices.map((svc: any) =>
           toServiceLinkResponse({
             id: svc.id,
-            productId: Number(productId),
+            productId: resolvedId,
             serviceId: svc.id,
             isRequired: false,
             defaultQuantity: svc.min_quantity ?? null,
