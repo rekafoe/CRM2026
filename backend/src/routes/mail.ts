@@ -3,7 +3,12 @@ import { asyncHandler } from '../middleware';
 import type { AuthenticatedRequest } from '../middleware/auth';
 import { getSmtpConfig } from '../config/mail';
 import { getDb } from '../config/database';
-import { enqueueMail, getMailOutboxStats, processMailOutboxBatch } from '../services/mailOutboxService';
+import {
+  enqueueMail,
+  getMailOutboxStats,
+  listMailJobsForOrder,
+  processMailOutboxBatch,
+} from '../services/mailOutboxService';
 
 const router = Router();
 
@@ -41,6 +46,24 @@ router.get(
     if (!requireAdmin(req as AuthenticatedRequest, res)) return;
     const stats = await getMailOutboxStats();
     res.json(stats);
+  })
+);
+
+/**
+ * GET /api/mail/jobs?orderId= — логи писем по заказу (context_order_id).
+ */
+router.get(
+  '/jobs',
+  asyncHandler(async (req, res) => {
+    if (!requireAdmin(req as AuthenticatedRequest, res)) return;
+    const orderId = Number((req.query as { orderId?: string }).orderId);
+    if (!Number.isFinite(orderId)) {
+      res.status(400).json({ error: 'orderId query required' });
+      return;
+    }
+    const limit = Number((req.query as { limit?: string }).limit) || 30;
+    const jobs = await listMailJobsForOrder(orderId, limit);
+    res.json({ jobs });
   })
 );
 

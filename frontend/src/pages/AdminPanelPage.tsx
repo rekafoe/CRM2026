@@ -54,6 +54,9 @@ const MultiPageProductEditor = lazy(() => import('./admin/MultiPageProductEditor
 const PreflightPage = lazy(() =>
   import('./admin/PreflightPage').then((m) => ({ default: m.PreflightPage }))
 );
+const MailNotificationsPage = lazy(() =>
+  import('./admin/MailNotificationsPage').then((m) => ({ default: m.MailNotificationsPage }))
+);
 const ServicesManagementPage = lazy(() =>
   import('./admin/ServicesManagementPage').then((m) => ({ default: m.ServicesManagementPage }))
 );
@@ -253,6 +256,14 @@ const AdminPanelHome: React.FC = () => {
             </button>
             <button
               className="admin-link-card"
+              onClick={() => navigate('/adminpanel/mail-notifications')}
+            >
+              <span className="link-icon"><AppIcon name="document" size="md" circle /></span>
+              <span className="link-title">Почта (заказы)</span>
+              <span className="link-desc">SMTP, тест, правила писем при смене статуса</span>
+            </button>
+            <button
+              className="admin-link-card"
               onClick={() => navigate('/adminpanel/counters')}
             >
               <span className="link-icon"><AppIcon name="receipt" size="md" circle /></span>
@@ -364,6 +375,10 @@ export const AdminPanelPage: React.FC = () => {
           
           {/* Уведомления */}
           <Route path="/notifications" element={<NotificationsPage onBack={() => window.history.back()} />} />
+          <Route
+            path="/mail-notifications"
+            element={<MailNotificationsPage onBack={() => window.history.back()} />}
+          />
           
           <Route path="*" element={<Navigate to="/adminpanel" replace />} />
         </Routes>

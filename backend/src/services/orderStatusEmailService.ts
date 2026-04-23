@@ -92,6 +92,7 @@ export async function tryEnqueueOrderStatusEmail(params: {
       text: bodyText,
       jobType: 'transactional',
       idempotencyKey,
+      contextOrderId: order.id,
       payload: {
         type: 'order_status',
         orderId: order.id,

@@ -15,6 +15,8 @@ export interface EnqueueMailInput {
   idempotencyKey?: string;
   payload?: Record<string, unknown>;
   maxAttempts?: number;
+  /** Для отчёта/фильтра: заказ CRM (уведомления о статусе) */
+  contextOrderId?: number | null;
 }
 
 function retryDelaySec(attempts: number): number {
@@ -40,12 +42,17 @@ export async function enqueueMail(input: EnqueueMailInput): Promise<{ id: number
     }
   }
 
+  const ctx =
+    input.contextOrderId != null && Number.isFinite(Number(input.contextOrderId))
+      ? Number(input.contextOrderId)
+      : null;
+
   try {
     const r = await db.run(
       `INSERT INTO mail_jobs (
         job_type, to_email, subject, body_html, body_text, status,
-        idempotency_key, max_attempts, payload_json, next_attempt_at
-      ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+        idempotency_key, max_attempts, payload_json, next_attempt_at, context_order_id
+      ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
       jobType,
       input.to,
       input.subject,
@@ -54,7 +61,8 @@ export async function enqueueMail(input: EnqueueMailInput): Promise<{ id: number
       input.idempotencyKey ?? null,
       maxAttempts,
       payloadJson,
-      null
+      null,
+      ctx
     );
     return { id: r.lastID ?? 0 };
   } catch (e: unknown) {
@@ -220,4 +228,37 @@ export async function getMailOutboxStats(): Promise<{
     failed: Number(f?.c ?? 0),
     sent24h: Number(s?.c ?? 0),
   };
+}
+
+export interface MailJobListRow {
+  id: number;
+  to_email: string;
+  subject: string;
+  status: string;
+  attempts: number;
+  last_error: string | null;
+  job_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Письма в очереди, связанные с заказом (context_order_id).
+ */
+export async function listMailJobsForOrder(
+  orderId: number,
+  limit: number = 30
+): Promise<MailJobListRow[]> {
+  const db = await getDb();
+  const lim = Math.min(100, Math.max(1, limit));
+  const rows = (await db.all(
+    `SELECT id, to_email, subject, status, attempts, last_error, job_type, created_at, updated_at
+     FROM mail_jobs
+     WHERE context_order_id = ?
+     ORDER BY id DESC
+     LIMIT ?`,
+    orderId,
+    lim
+  )) as MailJobListRow[];
+  return Array.isArray(rows) ? rows : [];
 }

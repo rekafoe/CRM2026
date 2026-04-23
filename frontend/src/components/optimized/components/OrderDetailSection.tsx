@@ -10,6 +10,7 @@ import { generateOrderBlankPdf, generateCommodityReceiptPdf, generateCommodityRe
 import { parseNumberFlexible } from '../../../utils/numberInput';
 import { CustomerSelector } from '../../customers/CustomerSelector';
 import { AppIcon } from '../../ui/AppIcon';
+import { OrderMailLogPanel } from '../../orders/OrderMailLogPanel';
 
 interface OrderDetailSectionProps {
   selectedOrder: Order;
@@ -642,6 +643,10 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
         prepaymentStatus={selectedOrder.prepaymentStatus}
         paymentMethod={selectedOrder.paymentMethod === 'telegram' ? 'online' : selectedOrder.paymentMethod}
       />
+
+      {currentUser?.role === 'admin' && (
+        <OrderMailLogPanel key={selectedOrder.id} orderId={selectedOrder.id} />
+      )}
     </>
   );
 });
