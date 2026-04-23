@@ -34,8 +34,11 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'GET', path: /^\/api\/products\/parameter-presets\/?$/ },
   { method: 'GET', path: /^\/api\/products\/categories\/?$/ },
   { method: 'GET', path: /^\/api\/products\/category\/[0-9]+\/?$/ },
-  // Один сегмент — slug (напр. /api/products/photo), не числовой id; детали в handler по route_key
-  { method: 'GET', path: /^\/api\/products\/[a-z][-a-z0-9]*\/?$/ },
+  // Один сегмент — route_key (напр. /api/products/fotopechat). Не пересекаемся с /category/…, /categories, служебными путями
+  {
+    method: 'GET',
+    path: /^\/api\/products\/(?!category$|categories$|parameter-presets$|by-route-key$|upload-image$|debug$)[a-z][-a-z0-9]*\/?$/,
+  },
   { method: 'GET', path: /^\/api\/products\/[0-9]+\/schema\/?$/ },
   { method: 'GET', path: /^\/api\/products\/[0-9]+\/tier-prices\/?$/ },
   { method: 'POST', path: /^\/api\/products\/[0-9]+\/calculate$/ },
@@ -60,9 +63,31 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/prepay$/ },
 ]
 
+/**
+ * Путь для PUBLIC_ROUTE_RULES: за прокси иногда (req.path или оба) — без /api, только /products/...;
+ * иначе правила /api/products/... никогда не срабатывают → 401 и «пустой» каталог на сайте.
+ */
+function getAuthPathname(req: Request): string {
+  const p = req.path || ''
+  const noQuery = (req.originalUrl || '').split('?')[0] || ''
+  let pick: string
+  if (p.startsWith('/api') || p === '') {
+    pick = p || noQuery
+  } else if (noQuery.startsWith('/api')) {
+    pick = noQuery
+  } else {
+    pick = p
+  }
+  if (!pick.startsWith('/api') && (pick === '/products' || pick.startsWith('/products/'))) {
+    return '/api' + pick
+  }
+  return pick
+}
+
 function isPublicRoute(req: Request): boolean {
   const method = req.method.toUpperCase() as Method
-  return PUBLIC_ROUTE_RULES.some((rule) => rule.method === method && rule.path.test(req.path))
+  const pathname = getAuthPathname(req)
+  return PUBLIC_ROUTE_RULES.some((rule) => rule.method === method && rule.path.test(pathname))
 }
 
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
