@@ -46,6 +46,39 @@ export interface UpdateTelegramUserRequest {
   };
 }
 
+const DEFAULT_NOTIFICATION_PREFS: TelegramUser['notification_preferences'] = {
+  low_stock: true,
+  new_orders: true,
+  system_alerts: true
+};
+
+function safeParseNotificationPreferences(raw: unknown): TelegramUser['notification_preferences'] {
+  if (raw == null || raw === '') return { ...DEFAULT_NOTIFICATION_PREFS };
+  if (typeof raw === 'string') {
+    const t = raw.trim();
+    if (!t) return { ...DEFAULT_NOTIFICATION_PREFS };
+    try {
+      const p = JSON.parse(t) as Record<string, boolean>;
+      return { ...DEFAULT_NOTIFICATION_PREFS, ...p };
+    } catch {
+      return { ...DEFAULT_NOTIFICATION_PREFS };
+    }
+  }
+  if (typeof raw === 'object' && raw !== null) {
+    return { ...DEFAULT_NOTIFICATION_PREFS, ...(raw as object) } as TelegramUser['notification_preferences'];
+  }
+  return { ...DEFAULT_NOTIFICATION_PREFS };
+}
+
+/** В БД/старом коде роль "user" — в боте команды завязаны на "client" */
+export function effectiveBotRole(dbRole: string | null | undefined): string {
+  const r = (dbRole || '').trim();
+  if (!r) return 'client';
+  const low = r.toLowerCase();
+  if (low === 'user') return 'client';
+  return low;
+}
+
 export class TelegramUserService {
   /**
    * Получение всех Telegram пользователей
@@ -137,9 +170,9 @@ export class TelegramUserService {
 
     return {
       ...user,
-      notification_preferences: typeof user.notification_preferences === 'string'
-        ? JSON.parse(user.notification_preferences)
-        : user.notification_preferences
+      is_active: !!user.is_active,
+      notifications_enabled: !!user.notifications_enabled,
+      notification_preferences: safeParseNotificationPreferences(user.notification_preferences)
     };
   }
 
@@ -169,7 +202,7 @@ export class TelegramUserService {
       userData.username || null,
       userData.first_name || null,
       userData.last_name || null,
-      userData.role || 'user',
+      userData.role || 'client',
       userData.notifications_enabled !== false ? 1 : 0,
       JSON.stringify(preferences)
     ]);

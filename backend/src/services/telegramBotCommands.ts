@@ -1,4 +1,4 @@
-import { TelegramUserService } from './telegramUserService';
+import { TelegramUserService, effectiveBotRole } from './telegramUserService';
 import { MaterialService } from './materialService';
 import { TelegramService } from './telegramService';
 import { PDFReportService } from './pdfReportService';
@@ -80,11 +80,11 @@ export class TelegramBotCommands {
                `💡 Для получения дополнительных возможностей обратитесь к администратору.`;
       }
 
-      const roleEmoji = user.role === 'admin' ? '👑' : 
-                       user.role === 'manager' ? '👨‍💼' : '👤';
+      const r = effectiveBotRole(user.role);
+      const roleEmoji = r === 'admin' ? '👑' : r === 'manager' ? '👨‍💼' : '👤';
       
       return `👋 Привет, ${user.first_name || 'пользователь'}!\n\n` +
-             `${roleEmoji} Ваша роль: ${user.role}\n` +
+             `${roleEmoji} Ваша роль: ${r}\n` +
              `📋 Доступные команды:\n` +
              `/help - показать все команды\n` +
              `/profile - информация о профиле\n\n` +
@@ -106,11 +106,12 @@ export class TelegramBotCommands {
         return '❌ Пользователь не найден. Обратитесь к администратору.';
       }
 
-      const availableCommands = this.commands.filter(cmd => 
-        cmd.roles.includes(user.role)
+      const effRole = effectiveBotRole(user.role);
+      const availableCommands = TelegramBotCommands.commands.filter((cmd) =>
+        cmd.roles.includes(effRole)
       );
 
-      let helpText = `📋 Доступные команды для роли "${user.role}":\n\n`;
+      let helpText = `📋 Доступные команды для роли "${effRole}":\n\n`;
       
       availableCommands.forEach(cmd => {
         helpText += `${cmd.command} - ${cmd.description}\n`;
@@ -136,7 +137,7 @@ export class TelegramBotCommands {
         return '❌ Пользователь не найден.';
       }
 
-      if (!['manager', 'admin'].includes(user.role)) {
+      if (!['manager', 'admin'].includes(effectiveBotRole(user.role))) {
         return '❌ У вас нет прав для выполнения этой команды.';
       }
 
@@ -186,7 +187,7 @@ export class TelegramBotCommands {
         return '❌ Пользователь не найден.';
       }
 
-      if (user.role !== 'admin') {
+      if (effectiveBotRole(user.role) !== 'admin') {
         return '❌ Эта команда доступна только администраторам.';
       }
 
@@ -211,7 +212,7 @@ export class TelegramBotCommands {
       } else {
         // Если файл не отправился, отправляем текстовый отчет
         console.log('📄 File sending failed, sending text report instead...');
-        const textReport = await this.handleStockReport(chatId, userId);
+        const textReport = await TelegramBotCommands.handleStockReport(chatId, userId);
         return `❌ Не удалось отправить PDF файл. Отправляю текстовый отчет:\n\n${textReport}`;
       }
     } catch (error) {
@@ -231,7 +232,7 @@ export class TelegramBotCommands {
         return '❌ Пользователь не найден.';
       }
 
-      if (user.role !== 'admin') {
+      if (effectiveBotRole(user.role) !== 'admin') {
         return '❌ Эта команда доступна только администраторам.';
       }
 
@@ -342,8 +343,8 @@ export class TelegramBotCommands {
         return '❌ Пользователь не найден.';
       }
 
-      const roleEmoji = user.role === 'admin' ? '👑' : 
-                       user.role === 'manager' ? '👨‍💼' : '👤';
+      const r = effectiveBotRole(user.role);
+      const roleEmoji = r === 'admin' ? '👑' : r === 'manager' ? '👨‍💼' : '👤';
       
       const notificationsStatus = user.notifications_enabled ? '✅ Включены' : '❌ Отключены';
       
@@ -358,7 +359,7 @@ export class TelegramBotCommands {
       return `👤 Информация о профиле:\n\n` +
              `👤 Имя: ${user.first_name || 'Не указано'}\n` +
              `📝 Username: @${user.username || 'Не указан'}\n` +
-             `${roleEmoji} Роль: ${user.role}\n` +
+             `${roleEmoji} Роль: ${r}\n` +
              `📱 Chat ID: ${user.chat_id}\n` +
              `🔔 Уведомления: ${notificationsStatus}\n` +
              `📅 Регистрация: ${new Date(user.created_at).toLocaleString('ru-RU')}` +
@@ -379,8 +380,11 @@ export class TelegramBotCommands {
         return null; // Не команда, пропускаем
       }
 
-      const [command, ...args] = text.split(' ');
-      const cmd = this.commands.find(c => c.command === command);
+      const parts = text.trim().split(/\s+/);
+      const firstToken = parts[0] || '';
+      const command = firstToken.includes('@') ? (firstToken.split('@')[0] as string) : firstToken;
+      const args = parts.slice(1);
+      const cmd = TelegramBotCommands.commands.find((c) => c.command === command);
 
       if (!cmd) {
         return `❌ Неизвестная команда: ${command}\n\n` +
@@ -393,9 +397,10 @@ export class TelegramBotCommands {
         return '❌ Пользователь не найден. Обратитесь к администратору.';
       }
 
-      if (!cmd.roles.includes(user.role)) {
+      const effRole = effectiveBotRole(user.role);
+      if (!cmd.roles.includes(effRole)) {
         return `❌ У вас нет прав для выполнения команды ${command}.\n\n` +
-               `Ваша роль: ${user.role}\n` +
+               `Ваша роль: ${effRole}\n` +
                `Требуемые роли: ${cmd.roles.join(', ')}`;
       }
 
@@ -606,7 +611,7 @@ export class TelegramBotCommands {
    * Получение списка команд для настройки бота
    */
   static getBotCommands(): Array<{command: string, description: string}> {
-    return this.commands.map(cmd => ({
+    return TelegramBotCommands.commands.map((cmd) => ({
       command: cmd.command,
       description: cmd.description
     }));
