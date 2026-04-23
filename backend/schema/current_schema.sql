@@ -469,16 +469,19 @@ CREATE TABLE IF NOT EXISTS stock_alerts (
 -- УВЕДОМЛЕНИЯ И TELEGRAM
 -- ============================================
 
+-- Соответствует миграции 20260501120000_create_telegram_users_and_settings
 CREATE TABLE IF NOT EXISTS telegram_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  telegram_id INTEGER UNIQUE NOT NULL,
+  chat_id TEXT NOT NULL UNIQUE,
   username TEXT,
   first_name TEXT,
   last_name TEXT,
-  role TEXT DEFAULT 'user',
-  is_active INTEGER DEFAULT 1,
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
+  is_active INTEGER NOT NULL DEFAULT 1,
+  role TEXT NOT NULL DEFAULT 'user',
+  notifications_enabled INTEGER NOT NULL DEFAULT 1,
+  notification_preferences TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS telegram_settings (
