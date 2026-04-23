@@ -28,11 +28,14 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'POST', path: /^\/login$/ },
   // website/public calculator
   { method: 'GET', path: /^\/api\/presets(?:\/.*)?$/ },
-  { method: 'GET', path: /^\/api\/products$/ },
+  // Витрина/калькулятор: trailing slash, ЧПУ по route_key, пресеты (анонимно без 401)
+  { method: 'GET', path: /^\/api\/products\/?$/ },
+  { method: 'GET', path: /^\/api\/products\/by-route-key\/[^/]+\/?$/ },
+  { method: 'GET', path: /^\/api\/products\/parameter-presets\/?$/ },
   { method: 'GET', path: /^\/api\/products\/categories\/?$/ },
-  { method: 'GET', path: /^\/api\/products\/category\/[0-9]+$/ },
-  { method: 'GET', path: /^\/api\/products\/[0-9]+\/schema$/ },
-  { method: 'GET', path: /^\/api\/products\/[0-9]+\/tier-prices$/ },
+  { method: 'GET', path: /^\/api\/products\/category\/[0-9]+\/?$/ },
+  { method: 'GET', path: /^\/api\/products\/[0-9]+\/schema\/?$/ },
+  { method: 'GET', path: /^\/api\/products\/[0-9]+\/tier-prices\/?$/ },
   { method: 'POST', path: /^\/api\/products\/[0-9]+\/calculate$/ },
   { method: 'POST', path: /^\/api\/products\/[0-9]+\/validate-size$/ },
   { method: 'POST', path: /^\/api\/pricing\/calculate$/ },
