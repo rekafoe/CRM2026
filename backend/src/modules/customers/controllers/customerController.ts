@@ -232,11 +232,11 @@ export class CustomerController {
       phone,
       email,
       address,
-      notes
+      notes,
+      marketing_opt_in
     } = req.body
 
-    try {
-      const customer = await CustomerService.updateCustomer(id, {
+    const payload: Parameters<typeof CustomerService.updateCustomer>[1] = {
         type,
         first_name,
         last_name,
@@ -250,7 +250,13 @@ export class CustomerController {
         email,
         address,
         notes
-      })
+    }
+    if (marketing_opt_in === 0 || marketing_opt_in === 1) {
+      payload.marketing_opt_in = marketing_opt_in
+    }
+
+    try {
+      const customer = await CustomerService.updateCustomer(id, payload)
 
       res.json(customer)
     } catch (error: any) {

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware';
 import type { AuthenticatedRequest } from '../middleware/auth';
+import { mailBroadcastRateLimit } from '../middleware/rateLimiter';
 import { getSmtpConfig } from '../config/mail';
 import { getDb } from '../config/database';
 import {
@@ -9,8 +10,20 @@ import {
   listMailJobsForOrder,
   processMailOutboxBatch,
 } from '../services/mailOutboxService';
+import {
+  countMarketingOptIn,
+  getPublicApiBaseUrl,
+  unsubscribeByToken,
+} from '../services/customerEmailMarketingService';
+import { enqueueMarketingTemplateBroadcast } from '../services/mailMarketingBroadcastService';
 
 const router = Router();
+
+function unsubscribeHtmlPage(ok: boolean, message: string): string {
+  const title = ok ? 'Отписка' : 'Ошибка';
+  const p = message.replace(/</g, '&lt;');
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${title}</title></head><body><p>${p}</p></body></html>`;
+}
 
 function requireAdmin(req: AuthenticatedRequest, res: import('express').Response): boolean {
   const user = req.user;
@@ -20,6 +33,34 @@ function requireAdmin(req: AuthenticatedRequest, res: import('express').Response
   }
   return true;
 }
+
+/**
+ * GET /api/mail/unsubscribe?token= — публичная отписка (без токена CRM).
+ * Дублирование в public routes в auth.ts.
+ */
+router.get(
+  '/unsubscribe',
+  asyncHandler(async (req, res) => {
+    const token = String((req.query as { token?: string }).token || '').trim();
+    const r = await unsubscribeByToken(token);
+    const wantsJson = (req.headers.accept || '').includes('application/json');
+    if (r.ok) {
+      if (wantsJson) {
+        res.json({ ok: true });
+        return;
+      }
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.status(200).send(unsubscribeHtmlPage(true, 'Вы отписались от рассылки. Спасибо.'));
+      return;
+    }
+    if (wantsJson) {
+      res.status(400).json({ ok: false, error: r.error || 'unsubscribe failed' });
+      return;
+    }
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.status(400).send(unsubscribeHtmlPage(false, r.error || 'Ссылка недействительна или устарела.'));
+  })
+);
 
 /**
  * GET /api/mail/config — проверка, настроен ли SMTP (без секретов).
@@ -133,6 +174,56 @@ router.patch(
  * POST /api/mail/test — поставить тестовое письмо в очередь.
  * body: { to: string, subject?: string }
  */
+/**
+ * GET /api/mail/marketing/segment — размер сегмента (согласие + email) для рассылки (admin).
+ */
+router.get(
+  '/marketing/segment',
+  asyncHandler(async (req, res) => {
+    if (!requireAdmin(req as AuthenticatedRequest, res)) return;
+    const count = await countMarketingOptIn();
+    const cap = (() => {
+      const n = Number(process.env.MAIL_MARKETING_BROADCAST_MAX);
+      if (Number.isFinite(n) && n > 0) return Math.min(10_000, n);
+      return 500;
+    })();
+    res.json({
+      count,
+      maxBroadcast: cap,
+      publicApiBaseUrlConfigured: Boolean(getPublicApiBaseUrl()),
+    });
+  })
+);
+
+/**
+ * POST /api/mail/marketing/broadcast — поставить в очередь рассылку по шаблону (admin, rate limit).
+ * body: { templateId: number }
+ */
+router.post(
+  '/marketing/broadcast',
+  mailBroadcastRateLimit,
+  asyncHandler(async (req, res) => {
+    if (!requireAdmin(req as AuthenticatedRequest, res)) return;
+    const c = getSmtpConfig();
+    if (!c.configured) {
+      res.status(503).json({ error: 'SMTP not configured' });
+      return;
+    }
+    const templateId = Number((req.body as { templateId?: number })?.templateId);
+    if (!Number.isFinite(templateId) || templateId < 1) {
+      res.status(400).json({ error: 'templateId (positive number) required' });
+      return;
+    }
+    try {
+      const r = await enqueueMarketingTemplateBroadcast(templateId);
+      res.json(r);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'broadcast failed';
+      res.status(400).json({ error: msg });
+    }
+  })
+);
+
 router.post(
   '/test',
   asyncHandler(async (req, res) => {

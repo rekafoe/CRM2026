@@ -241,4 +241,13 @@ export const apiRateLimit = rateLimiter.middleware({
   keyPrefix: 'api'
 })
 
+/** Редкий запуск массовой рассылки (admin). */
+export const mailBroadcastRateLimit = rateLimiter.middleware({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  maxAuthenticated: 5,
+  message: 'Слишком частый запуск рассылки, попробуйте позже',
+  keyPrefix: 'mail-broadcast',
+})
+
 export { rateLimiter }

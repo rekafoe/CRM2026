@@ -1,6 +1,6 @@
 import { getDb } from '../config/database';
 import { getMailTransporter } from './mailTransportService';
-import { getSmtpConfig } from '../config/mail';
+import { getMarketingSendDelayMs, getSmtpConfig } from '../config/mail';
 import { logger } from '../utils/logger';
 
 export type MailJobType = 'transactional' | 'marketing';
@@ -162,8 +162,9 @@ export async function processOneMailJob(): Promise<boolean> {
     body_text: string | null;
     attempts: number;
     max_attempts: number;
+    job_type: string;
   }>(
-    'SELECT to_email, subject, body_html, body_text, attempts, max_attempts FROM mail_jobs WHERE id = ?',
+    'SELECT to_email, subject, body_html, body_text, attempts, max_attempts, job_type FROM mail_jobs WHERE id = ?',
     id
   );
   if (!job) {
@@ -183,7 +184,13 @@ export async function processOneMailJob(): Promise<boolean> {
       text: job.body_text ?? (job.body_html ? undefined : ''),
     });
     await markSent(id);
-    logger.info('Mail job sent', { id, to: job.to_email });
+    logger.info('Mail job sent', { id, to: job.to_email, jobType: job.job_type });
+    if (job.job_type === 'marketing') {
+      const d = getMarketingSendDelayMs();
+      if (d > 0) {
+        await new Promise((r) => setTimeout(r, d));
+      }
+    }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     logger.warn('Mail job send failed', { id, error: msg });

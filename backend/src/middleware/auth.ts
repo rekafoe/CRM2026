@@ -22,6 +22,7 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'GET', path: /^\/health$/ },
   { method: 'GET', path: /^\/api-docs(?:\/.*)?$/ },
   { method: 'GET', path: /^\/api-docs\.json$/ },
+  { method: 'GET', path: /^\/api\/mail\/unsubscribe\/?$/ },
   // auth
   { method: 'POST', path: /^\/api\/auth\/login$/ },
   { method: 'GET', path: /^\/api\/auth\/me$/ },

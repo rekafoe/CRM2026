@@ -41,3 +41,10 @@ export function isMailOutboxWorkerEnabled(): boolean {
   const v = String(process.env.MAIL_OUTBOX_ENABLED ?? 'true').toLowerCase();
   return v === 'true' || v === '1' || v === 'yes';
 }
+
+/** Пауза после успешной отправки marketing-задания (мс, снижает «шлейф»). По умолчанию 2 с. */
+export function getMarketingSendDelayMs(): number {
+  const raw = Number(process.env.MAIL_MARKETING_SEND_DELAY_MS);
+  if (Number.isFinite(raw) && raw >= 0) return Math.min(60_000, raw);
+  return 2000;
+}

@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto'
 import { getDb } from '../../../config/database'
 
 // Интерфейс Customer определен локально, так как shared/types может быть недоступен в backend
@@ -16,6 +17,10 @@ export interface Customer {
   email?: string;
   address?: string;
   notes?: string;
+  /** 1 = согласен на маркетинг; учитывается вместе с email_unsubscribed_at */
+  marketing_opt_in?: number;
+  email_unsubscribed_at?: string | null;
+  unsubscribe_token?: string;
   created_at: string;
   updated_at: string;
   /** Дата последнего заказа (по данным БД) */
@@ -226,14 +231,16 @@ export class CustomerService {
       }
     }
 
+    const unsubToken = randomBytes(24).toString('hex')
     const result = await db.run(
       `INSERT INTO customers (
         type, first_name, last_name, middle_name,
         company_name, legal_name, tax_id,
         bank_details, authorized_person,
         phone, email, address, notes,
+        marketing_opt_in, unsubscribe_token,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.type,
         data.first_name || null,
@@ -248,6 +255,8 @@ export class CustomerService {
         data.email || null,
         data.address || null,
         data.notes || null,
+        0,
+        unsubToken,
         now,
         now
       ]
@@ -281,6 +290,7 @@ export class CustomerService {
       email?: string
       address?: string
       notes?: string
+      marketing_opt_in?: 0 | 1
     }
   ): Promise<Customer> {
     const db = await getDb()
@@ -307,6 +317,9 @@ export class CustomerService {
       }
     }
 
+    const mOptIn =
+      data.marketing_opt_in !== undefined ? data.marketing_opt_in : (existing as Customer).marketing_opt_in ?? 0
+
     await db.run(
       `UPDATE customers SET
         type = ?,
@@ -322,6 +335,7 @@ export class CustomerService {
         email = ?,
         address = ?,
         notes = ?,
+        marketing_opt_in = ?,
         updated_at = ?
       WHERE id = ?`,
       [
@@ -338,6 +352,7 @@ export class CustomerService {
         data.email !== undefined ? data.email : existing.email,
         data.address !== undefined ? data.address : existing.address,
         data.notes !== undefined ? data.notes : existing.notes,
+        mOptIn,
         now,
         id
       ]
@@ -409,6 +424,9 @@ export class CustomerService {
       email: row.email || undefined,
       address: row.address || undefined,
       notes: row.notes || undefined,
+      marketing_opt_in: row.marketing_opt_in == null ? 0 : Number(row.marketing_opt_in),
+      email_unsubscribed_at: row.email_unsubscribed_at ?? null,
+      unsubscribe_token: row.unsubscribe_token || undefined,
       created_at: row.created_at,
       updated_at: row.updated_at
     }
