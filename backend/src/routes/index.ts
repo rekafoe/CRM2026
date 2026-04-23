@@ -30,6 +30,7 @@ import designTemplatesRoutes from './designTemplates'
 import collageTemplatesRoutes from './collageTemplates'
 import subtypeDesignsRoutes from './subtypeDesigns'
 import imageUrlFetchRoutes from './imageUrlFetch'
+import mailRoutes from './mail'
 
 const router = Router()
 
@@ -62,6 +63,7 @@ router.use('/organizations', organizationsRoutes)
 router.use('/design-templates', designTemplatesRoutes)
 router.use('/collage-templates', collageTemplatesRoutes)
 router.use('/images', imageUrlFetchRoutes)
+router.use('/mail', mailRoutes)
 router.use('/products/:productId/subtype-designs', subtypeDesignsRoutes)
 
 console.log('Routes setup complete')

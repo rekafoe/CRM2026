@@ -19,6 +19,7 @@ import { EarningsService } from './services/earningsService'
 import { startOrderFilesCleanup } from './services/orderFilesCleanupService'
 import { startStorageMonitor } from './services/storageMonitorService'
 import { logger } from './utils/logger'
+import { startMailOutboxWorker } from './services/mailOutboxWorker'
 import { AuthController } from './controllers'
 import { swaggerSpec } from './config/swagger'
 
@@ -243,6 +244,7 @@ async function startServer() {
       logger.warn('UPLOADS_DIR not set — images (products, categories, subtypes) will be lost on redeploy. Create a Railway Volume, mount it (e.g. /data/uploads), set UPLOADS_DIR=/data/uploads.')
     }
     app.listen(port, () => {
+      startMailOutboxWorker()
       logger.info(`Server running on port ${port}`)
       logger.info(`Uploads directory: ${uploadsDir}`)
       logger.info(`Telegram notifications: ${telegramConfig.enabled ? 'enabled' : 'disabled'}`)
