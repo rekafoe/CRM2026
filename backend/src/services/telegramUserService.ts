@@ -223,15 +223,41 @@ export class TelegramUserService {
     }
 
     if (updateFields.length === 0) {
-      console.log('⚠️ No fields to update, returning existing user');
-      const user = await this.getUserByChatId(userData.username || '');
-      if (!user) {
-        throw new Error('User not found');
+      const existing = await db.get(
+        `SELECT 
+          id, chat_id, username, first_name, last_name,
+          is_active, role, notifications_enabled, notification_preferences,
+          created_at, updated_at
+        FROM telegram_users WHERE id = ?`,
+        [id]
+      ) as {
+        id: number
+        chat_id: string
+        username?: string
+        first_name?: string
+        last_name?: string
+        is_active: number
+        role: string
+        notifications_enabled: number
+        notification_preferences: string | object
+        created_at: string
+        updated_at: string
+      } | undefined
+      if (!existing) {
+        throw new Error('Telegram user not found');
       }
-      return user;
+      return {
+        ...existing,
+        is_active: !!existing.is_active,
+        notifications_enabled: !!existing.notifications_enabled,
+        notification_preferences:
+          typeof existing.notification_preferences === 'string'
+            ? JSON.parse(existing.notification_preferences)
+            : (existing.notification_preferences as TelegramUser['notification_preferences'])
+      };
     }
 
-    updateFields.push('updated_at = CURRENT_TIMESTAMP');
+    updateFields.push('updated_at = datetime(\'now\')');
     values.push(id);
 
     await db.run(`

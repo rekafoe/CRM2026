@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { TelegramUserService } from '../services/telegramUserService';
+import { TelegramUserService, type UpdateTelegramUserRequest } from '../services/telegramUserService';
 import { TelegramSettingsService } from '../services/telegramSettingsService';
 import { TelegramBotCommands } from '../services/telegramBotCommands';
 import { TelegramService } from '../services/telegramService';
@@ -322,20 +322,20 @@ export class TelegramWebhookController {
    * Обновление информации о пользователе
    */
   private static async updateUserInfo(user: any, from: any, chat: any) {
-    const updates: any = {};
-    
-    // Обновляем только если данные изменились
-    if (user.username !== from.username) {
-      updates.username = from.username;
+    const updates: UpdateTelegramUserRequest = {};
+    const same = (a: string | null | undefined, b: string | undefined) =>
+      (a ?? '').trim() === (b ?? '').trim();
+
+    if (!same(user.username, from.username)) {
+      updates.username = from.username ?? undefined;
     }
-    if (user.first_name !== from.first_name) {
-      updates.first_name = from.first_name;
+    if (!same(user.first_name, from.first_name)) {
+      updates.first_name = from.first_name ?? undefined;
     }
-    if (user.last_name !== from.last_name) {
-      updates.last_name = from.last_name;
+    if (!same(user.last_name, from.last_name)) {
+      updates.last_name = from.last_name ?? undefined;
     }
 
-    // Если есть изменения, обновляем пользователя
     if (Object.keys(updates).length > 0) {
       console.log(`🔄 Updating user info:`, updates);
       await TelegramUserService.updateUser(user.id, updates);
