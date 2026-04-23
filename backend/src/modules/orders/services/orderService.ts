@@ -11,6 +11,7 @@ import { itemRowSelect, mapItemRowToItem } from '../../../models/mappers/itemMap
 import { EarningsService } from '../../../services/earningsService'
 import { mapPhotoOrderToOrder, mapPhotoOrderToVirtualItem } from '../../../models/mappers/telegramPhotoOrderMapper'
 import { PriceTypeService } from '../../pricing/services/priceTypeService'
+import { tryEnqueueOrderStatusEmail } from '../../../services/orderStatusEmailService'
 
 export class OrderService {
   private static normalizeReasonCode(reason: string): string {
@@ -858,6 +859,11 @@ export class OrderService {
       const orderInOrders = await db.get('SELECT id FROM orders WHERE id = ?', [id])
       
       if (orderInOrders) {
+        const prevRow = await db.get<{ status: number }>(
+          'SELECT status FROM orders WHERE id = ?',
+          [id]
+        );
+        const oldStatusId = Number(prevRow?.status ?? 0);
         // Статус 5 в order_statuses = «Передан в ПВЗ», не отмена. Запись в order_cancellation_events
         // только при deleteOrder (handleDeleteOrder). Отмена через статус не используется.
         // Обновляем обычный заказ
@@ -879,6 +885,14 @@ export class OrderService {
             await UnifiedWarehouseService.confirmReservations(reservationIds)
           }
         }
+
+        const newStatusId = Number(status);
+        void tryEnqueueOrderStatusEmail({
+          orderId: id,
+          oldStatusId,
+          newStatusId,
+          source: 'website',
+        });
         
         const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
         const updated: Order = { ...(raw as Order), items: [] }
@@ -1250,12 +1264,28 @@ export class OrderService {
     }
     
     const placeholders = orderIds.map(() => '?').join(',')
+    const before = (await db.all(
+      `SELECT id, status FROM orders WHERE id IN (${placeholders})`,
+      orderIds
+    )) as { id: number; status: number }[];
     const params = [newStatus, ...orderIds]
     
     await db.run(
       `UPDATE orders SET status = ? WHERE id IN (${placeholders})`,
       ...params
     )
+    const n = Number(newStatus);
+    for (const row of before) {
+      const old = Number(row.status);
+      if (old !== n) {
+        void tryEnqueueOrderStatusEmail({
+          orderId: row.id,
+          oldStatusId: old,
+          newStatusId: n,
+          source: 'website',
+        });
+      }
+    }
     
     return { updatedCount: orderIds.length, newStatus }
   }

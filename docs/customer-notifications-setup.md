@@ -2,7 +2,7 @@
 
 Документ описывает, как настроить отправку уведомлений клиентам о готовности заказа (email и при необходимости SMS).
 
-**Сейчас в бэкенде:** очередь **`mail_jobs`**, **nodemailer** по переменным `SMTP_*`, фоновая обработка в процессе API (`mailOutboxWorker`), тест: **admin** — `POST /api/mail/test` с телом `{"to":"user@example.com"}` (Bearer). Автоматическая отправка при смене статуса заказа **ещё подключается** (следующие фазы).
+**Сейчас в бэкенде:** очередь **`mail_jobs`**, **nodemailer** (`SMTP_*`), воркер, `POST /api/mail/test` (admin, Bearer). Таблицы **`email_templates`**, **`order_email_rules`**: при смене статуса заказа (website) в очередь ставится письмо, если для **нового** `order_statuses.id` есть **активное** правило и у заказа заполнен **customerEmail**. Idempotency: `order-notify:orderId:old:new`. Список/включение правил: `GET/ PATCH /api/mail/order-email-rules` (по `id` правила, `is_active`). По умолчанию правило в миграции **выключено** (`is_active=0`); включайте вручную после настройки SMTP.
 
 ---
 
