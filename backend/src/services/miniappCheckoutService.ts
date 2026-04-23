@@ -241,8 +241,22 @@ export function mapMiniappCheckoutErrorToHttp(
   e: unknown
 ): { status: number; body: { error: string; message?: string } } | null {
   if (!(e instanceof Error)) return null;
-  const code = (e as { code?: string }).code || e.message;
-  switch (code) {
+  const c = (e as { code?: string }).code;
+  if (c === 'ORDER_AUTO_DEDUCTION_FAILED') {
+    return { status: 400, body: { error: e.message, message: e.message } };
+  }
+  const msg = e.message || '';
+  if (
+    msg.startsWith('Ошибка автоматического списания') ||
+    msg.includes('Недостаточно материала') ||
+    msg.includes('Материал с ID') && msg.includes('не найден')
+  ) {
+    return { status: 400, body: { error: e.message, message: e.message } };
+  }
+  if (msg.includes('Колонка notes')) {
+    return { status: 400, body: { error: e.message, message: e.message } };
+  }
+  switch (c) {
     case 'MINIAPP_PHONE_REQUIRED':
     case 'MINIAPP_NAME_REQUIRED':
     case 'MINIAPP_COMPANY_REQUIRED':

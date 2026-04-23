@@ -512,7 +512,11 @@ export class OrderService {
       );
       
       if (!deductionResult.success) {
-        throw new Error(`Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`);
+        const err = new Error(
+          `Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`
+        );
+        (err as { code?: string }).code = 'ORDER_AUTO_DEDUCTION_FAILED';
+        throw err;
       }
       
       await db.run('COMMIT');

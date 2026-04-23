@@ -5,6 +5,7 @@ import {
   submitMiniappCheckout,
   type MiniappCheckoutBody,
 } from '../services/miniappCheckoutService';
+import { logger } from '../utils/logger';
 
 export class MiniappCheckoutController {
   static async checkout(req: Request, res: Response) {
@@ -38,6 +39,10 @@ export class MiniappCheckoutController {
           return;
         }
       }
+      logger.error('miniapp checkout failed', {
+        message: e instanceof Error ? e.message : String(e),
+        stack: e instanceof Error ? e.stack : undefined,
+      });
       throw e;
     }
   }
