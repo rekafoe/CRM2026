@@ -212,7 +212,7 @@ export class OrderService {
     return orders
   }
 
-  static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm', customerId?: number, paymentChannel?: 'cash' | 'invoice' | 'not_cashed' | 'internal') {
+  static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm' | 'mini_app', customerId?: number, paymentChannel?: 'cash' | 'invoice' | 'not_cashed' | 'internal') {
     const dateOnly = date ? String(date).trim().slice(0, 10) : null
     const isToday = dateOnly && dateOnly === getTodayString()
     const createdAt = dateOnly && !isToday ? `${dateOnly}T12:00:00.000Z` : getCurrentTimestamp()
@@ -397,7 +397,9 @@ export class OrderService {
       prepaymentAmount?: number;
       userId?: number;
       customer_id?: number;
-      source?: 'website' | 'telegram' | 'crm';
+      source?: 'website' | 'telegram' | 'crm' | 'mini_app';
+      /** Для фильтра заказов Mini App (Telegram user id = chat_id в личке) */
+      telegramChatId?: string;
       items: Array<{
         type: string;
         params: string | Record<string, unknown>;
@@ -427,10 +429,24 @@ export class OrderService {
         source,
         orderData.customer_id
       );
+
+      if (orderData.telegramChatId) {
+        try {
+          const hasTg = await hasColumn('orders', 'telegram_chat_id');
+          if (hasTg) {
+            await db.run('UPDATE orders SET telegram_chat_id = ? WHERE id = ?', [
+              orderData.telegramChatId,
+              order.id,
+            ]);
+          }
+        } catch {
+          // ignore
+        }
+      }
       
       // 2. Добавляем товары в заказ
       const orderCreatedAt = (order as any).created_at || (order as any).createdAt
-      const isWebsite = source === 'website'
+      const isWebsiteLike = source === 'website' || source === 'mini_app'
       for (const item of orderData.items) {
         let paramsObj: Record<string, any> = {}
         try {
@@ -446,7 +462,7 @@ export class OrderService {
         }
         let finalPrice = Number(item.price) || 0
         const priceType = (item as any).priceType ?? (item as any).price_type ?? paramsObj.priceType ?? paramsObj.price_type
-        if (isWebsite && priceType && typeof priceType === 'string') {
+        if (isWebsiteLike && priceType && typeof priceType === 'string') {
           const key = priceType.toLowerCase().trim()
           const mult = await PriceTypeService.getMultiplier(key)
           if (mult !== 1) {
@@ -1022,7 +1038,8 @@ export class OrderService {
 
       // Если онлайн/телеграм и заказ ещё не в пуле — мягко отменяем.
       // Если уже в пуле (status=0, userId=NULL), удаляем полностью, чтобы он исчезал из отчётов.
-      const isWebsiteLike = ord && (ord.source === 'website' || ord.source === 'telegram')
+      const isWebsiteLike =
+        ord && (ord.source === 'website' || ord.source === 'telegram' || ord.source === 'mini_app')
       const isAlreadyInPool = Number(ord?.status ?? -1) === 0 && (ord?.userId == null)
       if (isWebsiteLike && !isAlreadyInPool) {
         await this.recordCancellationEvent(db, {

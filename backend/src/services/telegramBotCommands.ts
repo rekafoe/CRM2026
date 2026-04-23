@@ -5,6 +5,11 @@ import { PDFReportService } from './pdfReportService';
 import { PhotoOrderService } from './photoOrderService';
 import { ImageProcessingService } from './imageProcessingService';
 import { getDb } from '../db';
+import {
+  buildPrintcorePoligraphyUrlKeyboard,
+  getPrintcorePoligraphyIntroText
+} from '../utils/printcorePoligraphyBotLinks';
+import { getMiniappWebAppUrl } from '../utils/miniappWebAppUrl';
 
 export interface BotCommand {
   command: string;
@@ -19,6 +24,10 @@ const TELEGRAM_COMMAND_ALIASES: Readonly<Record<string, string>> = {
   '/myorders': '/my_orders',
   '/stockpdf': '/stock_pdf',
   '/stockreport': '/stock_report',
+  '/print': '/poligrafy',
+  '/printcore': '/poligrafy',
+  '/polygraphy': '/poligrafy',
+  '/shop': '/miniapp',
 };
 
 function resolveTelegramCommandName(firstToken: string): string {
@@ -76,6 +85,18 @@ export class TelegramBotCommands {
       description: 'Показать мои заказы фото',
       roles: ['client', 'manager', 'admin'],
       handler: TelegramBotCommands.handleMyOrders
+    },
+    {
+      command: '/poligrafy',
+      description: 'Ссылки на полиграфию на сайте printcore.by',
+      roles: ['client', 'manager', 'admin'],
+      handler: TelegramBotCommands.handlePoligrafySiteLinks
+    },
+    {
+      command: '/miniapp',
+      description: 'Открыть витрину Mini App (кнопка web_app)',
+      roles: ['client', 'manager', 'admin'],
+      handler: TelegramBotCommands.handleMiniappWebView
     }
   ];
 
@@ -90,7 +111,9 @@ export class TelegramBotCommands {
         return `👋 Добро пожаловать! Вы были автоматически добавлены в систему.\n\n` +
                `📋 Доступные команды:\n` +
                `/help - показать все команды\n` +
-               `/profile - информация о профиле\n\n` +
+               `/profile - информация о профиле\n` +
+               `/poligrafy - полиграфия на сайте (кнопки-ссылки)\n` +
+               `/miniapp - витрина Mini App (кнопка в Telegram)\n\n` +
                `💡 Для получения дополнительных возможностей обратитесь к администратору.`;
       }
 
@@ -101,7 +124,9 @@ export class TelegramBotCommands {
              `${roleEmoji} Ваша роль: ${r}\n` +
              `📋 Доступные команды:\n` +
              `/help - показать все команды\n` +
-             `/profile - информация о профиле\n\n` +
+             `/profile - информация о профиле\n` +
+             `/poligrafy - полиграфия на сайте (кнопки-ссылки)\n` +
+             `/miniapp - витрина Mini App (кнопка в Telegram)\n\n` +
              `💡 Для получения дополнительных возможностей используйте /help`;
     } catch (error) {
       console.error('❌ Error in handleStart:', error);
@@ -427,6 +452,58 @@ export class TelegramBotCommands {
   }
 
   /**
+   * Ссылки на разделы полиграфии на сайте (тестовый обход без Mini App).
+   */
+  static async handlePoligrafySiteLinks(chatId: string, userId: string): Promise<string> {
+    try {
+      const user = await TelegramUserService.getUserByChatId(chatId);
+      if (!user) {
+        return '❌ Пользователь не найден.';
+      }
+      await TelegramService.sendMessageWithKeyboard(
+        chatId,
+        getPrintcorePoligraphyIntroText(),
+        buildPrintcorePoligraphyUrlKeyboard()
+      );
+      return '🖨️ Сообщение со ссылками отправлено.';
+    } catch (error) {
+      console.error('❌ Error in handlePoligrafySiteLinks:', error);
+      return '❌ Произошла ошибка. Попробуйте позже.';
+    }
+  }
+
+  /**
+   * Кнопка Web App: открывает MINIAPP_WEBAPP_URL (HTTPS, тот же хост что у API, если не задано иное)
+   */
+  static async handleMiniappWebView(chatId: string, userId: string): Promise<string> {
+    try {
+      const user = await TelegramUserService.getUserByChatId(chatId);
+      if (!user) {
+        return '❌ Пользователь не найден.';
+      }
+      const url = getMiniappWebAppUrl();
+      if (!url) {
+        return (
+          '⚠️ *Mini App не настроен.*\n\n' +
+          'На сервере задайте `MINIAPP_WEBAPP_URL` — полный HTTPS-URL до страницы, ' +
+          'например: `https://ваш-api.railway.app/miniapp`'
+        );
+      }
+      const text =
+        `*Витрина PrintCore (Mini App)*\n\n` + `Нажмите кнопку ниже. После открытия проверяется *initData* и сессия API.`;
+      await TelegramService.sendMessageWithKeyboard(chatId, text, {
+        inline_keyboard: [
+          [{ text: '📱 Открыть витрину', web_app: { url } }],
+        ],
+      });
+      return '📱 Сообщение с кнопкой Mini App отправлено.';
+    } catch (error) {
+      console.error('❌ Error in handleMiniappWebView:', error);
+      return '❌ Произошла ошибка. Попробуйте позже.';
+    }
+  }
+
+  /**
    * Обработка команды /order_photo
    */
   static async handleOrderPhoto(chatId: string, userId: string): Promise<string> {
@@ -437,10 +514,11 @@ export class TelegramBotCommands {
         return '❌ Пользователь не найден.';
       }
 
-      const message = `📸 *ЗАКАЗ ПЕЧАТИ ФОТОГРАФИЙ*\n\n` +
-                     `👤 Клиент: ${user.first_name || 'Не указано'}\n\n` +
-                     `💡 *Выберите размер фотографии:*\n` +
-                     `Нажмите на кнопку с нужным размером ниже ⬇️`;
+      const message = `📸 *Заказ печати фото*\n\n` +
+                     `1) Выберите размер — дальше пришлите фото в чат.\n` +
+                     `По умолчанию: вписать с полями, 1 копия.\n\n` +
+                     `👤 ${user.first_name || 'Клиент'}\n\n` +
+                     `*Размер:*`;
 
       // Отправляем сообщение с inline клавиатурой
       await TelegramService.sendMessageWithKeyboard(chatId, message, TelegramBotCommands.getSizeSelectionKeyboard());
@@ -471,90 +549,6 @@ export class TelegramBotCommands {
     };
 
     return keyboard;
-  }
-
-  /**
-   * Создание клавиатуры для выбора режима обработки
-   */
-  static getProcessingModeKeyboard(sizeName: string) {
-    return {
-      inline_keyboard: [
-        [{
-          text: '✂️ Кроп (обрезать под размер)',
-          callback_data: `mode_crop_${sizeName}`
-        }],
-        [{
-          text: '📐 Вписать (с белыми полями)',
-          callback_data: `mode_fit_${sizeName}`
-        }],
-        [{
-          text: '🤖 Умный кроп (ИИ)',
-          callback_data: `mode_smart_${sizeName}`
-        }],
-        [{
-          text: '⬅️ Назад к размерам',
-          callback_data: 'back_to_sizes'
-        }]
-      ]
-    };
-  }
-
-  /**
-   * Создание клавиатуры для выбора количества копий
-   */
-  static getQuantityKeyboard(sizeName: string, mode: string) {
-    return {
-      inline_keyboard: [
-        [{
-          text: '1 копия',
-          callback_data: `qty_1_${mode}_${sizeName}`
-        }, {
-          text: '2 копии',
-          callback_data: `qty_2_${mode}_${sizeName}`
-        }, {
-          text: '3 копии',
-          callback_data: `qty_3_${mode}_${sizeName}`
-        }],
-        [{
-          text: '5 копий',
-          callback_data: `qty_5_${mode}_${sizeName}`
-        }, {
-          text: '10 копий',
-          callback_data: `qty_10_${mode}_${sizeName}`
-        }, {
-          text: '20 копий',
-          callback_data: `qty_20_${mode}_${sizeName}`
-        }],
-        [{
-          text: '⬅️ Назад к режиму',
-          callback_data: `back_to_mode_${sizeName}`
-        }]
-      ]
-    };
-  }
-
-  /**
-   * Создание клавиатуры для подтверждения заказа
-   */
-  static getConfirmationKeyboard(orderData: any) {
-    const totalPriceRub = (orderData.totalPrice / 100).toFixed(0);
-    
-    return {
-      inline_keyboard: [
-        [{
-          text: '✅ Подтвердить заказ',
-          callback_data: `confirm_${orderData.id}`
-        }],
-        [{
-          text: '❌ Отменить заказ',
-          callback_data: `cancel_${orderData.id}`
-        }],
-        [{
-          text: '✏️ Изменить параметры',
-          callback_data: `edit_${orderData.id}`
-        }]
-      ]
-    };
   }
 
   /**

@@ -25,6 +25,7 @@ import { startMailOutboxWorker } from './services/mailOutboxWorker'
 import { startSmsDebounceWorker } from './services/smsDebounceWorker'
 import { AuthController } from './controllers'
 import { swaggerSpec } from './config/swagger'
+import { registerMiniappPublicPage } from './routes/miniappPublicPage'
 
 // Проверяем, что swaggerSpec загружен
 if (!swaggerSpec) {
@@ -181,6 +182,9 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({ status: 'OK', service: 'crm-backend', timestamp: new Date().toISOString() })
 })
+
+// Telegram Mini App: публичная HTML-страница (до authMiddleware)
+registerMiniappPublicPage(app)
 
 // Backward compatibility: некоторые клиенты шлют POST /login вместо /api/auth/login
 app.post('/login', authRateLimit, asyncHandler(AuthController.login))

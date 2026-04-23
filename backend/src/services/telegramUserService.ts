@@ -1,4 +1,5 @@
 import { getDb } from '../db';
+import { hasColumn } from '../utils/tableSchemaCache';
 
 export interface TelegramUser {
   id: number;
@@ -357,5 +358,25 @@ export class TelegramUserService {
         return acc;
       }, {} as Record<string, number>)
     };
+  }
+
+  /** Карточка клиента в CRM, привязанная к Telegram (колонка после миграции). */
+  static async getCrmCustomerIdByChatId(chatId: string): Promise<number | null> {
+    const db = await getDb();
+    if (!(await hasColumn('telegram_users', 'crm_customer_id'))) return null;
+    const row = (await db.get('SELECT crm_customer_id FROM telegram_users WHERE chat_id = ?', [chatId])) as
+      | { crm_customer_id?: number | null }
+      | undefined;
+    const id = row?.crm_customer_id;
+    return id != null && id > 0 ? id : null;
+  }
+
+  static async setCrmCustomerIdByChatId(chatId: string, customerId: number | null): Promise<void> {
+    const db = await getDb();
+    if (!(await hasColumn('telegram_users', 'crm_customer_id'))) return;
+    await db.run('UPDATE telegram_users SET crm_customer_id = ?, updated_at = datetime("now") WHERE chat_id = ?', [
+      customerId,
+      chatId,
+    ]);
   }
 }

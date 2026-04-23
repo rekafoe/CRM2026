@@ -1,12 +1,17 @@
 import { Request, Response, NextFunction } from 'express'
 import { getDb } from '../config/database'
 import { isWebsiteOrderApiKeyValid } from './websiteOrderApiKey'
+import { isMiniAppBearerToken, verifyMiniAppSession } from '../utils/miniAppSession'
 
 export interface AuthenticatedRequest extends Request {
   user?: {
     id: number;
     role: string;
-  }
+  };
+  /** Сессия Telegram Mini App (токен mapp1.*) */
+  miniApp?: {
+    telegramUserId: string;
+  };
 }
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
@@ -65,6 +70,8 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/prepay$/ },
   // Telegram шлёт POST без Bearer — только сюда (опционально X-Telegram-Bot-Api-Secret-Token)
   { method: 'POST', path: /^\/api\/notifications\/telegram\/webhook\/?$/ },
+  // Mini App: обмен initData → сессия (без CRM api_token)
+  { method: 'POST', path: /^\/api\/miniapp\/auth\/?$/ },
 ]
 
 /**
@@ -115,13 +122,20 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
     if (token) {
       try {
-        const db = await getDb()
-        const user = await db.get<{ id: number; role: string }>(
-          'SELECT id, role FROM users WHERE api_token = ?',
-          token
-        )
-        if (user) {
-          ;(req as AuthenticatedRequest).user = user
+        if (isMiniAppBearerToken(token)) {
+          const p = verifyMiniAppSession(token)
+          if (p) {
+            ;(req as AuthenticatedRequest).miniApp = { telegramUserId: p.sub }
+          }
+        } else {
+          const db = await getDb()
+          const user = await db.get<{ id: number; role: string }>(
+            'SELECT id, role FROM users WHERE api_token = ?',
+            token
+          )
+          if (user) {
+            ;(req as AuthenticatedRequest).user = user
+          }
         }
       } catch {
         // игнорируем: для open-path не обязаны валидировать токен
@@ -136,6 +150,17 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   if (!token) { 
     res.status(401).json({ message: 'Unauthorized' })
     return 
+  }
+
+  if (isMiniAppBearerToken(token)) {
+    const p = verifyMiniAppSession(token)
+    if (p) {
+      ;(req as AuthenticatedRequest).miniApp = { telegramUserId: p.sub }
+      next()
+      return
+    }
+    res.status(401).json({ message: 'Unauthorized' })
+    return
   }
   
   const db = await getDb()

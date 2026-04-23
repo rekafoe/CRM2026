@@ -7,6 +7,7 @@ import { PhotoOrderService } from '../services/photoOrderService';
 import { ImageProcessingService } from '../services/imageProcessingService';
 import { PhotoOrderSessionService } from '../services/photoOrderSessionService';
 import { callTelegramMethod, previewTelegramText, type TelegramWebhookInfoResult } from '../utils/telegramBotApi';
+import { savePhotoOrderSessionSimplified } from '../utils/photoOrderFlowMessages';
 
 export interface TelegramUpdate {
   update_id: number;
@@ -678,19 +679,11 @@ export class TelegramWebhookController {
 
       // Обрабатываем разные типы callback data
       if (data.startsWith('size_')) {
-        await this.handleSizeSelection(chatId, data, message.message_id);
-      } else if (data.startsWith('mode_')) {
-        await this.handleModeSelection(chatId, data, message.message_id);
-      } else if (data.startsWith('qty_')) {
-        await this.handleQuantitySelection(chatId, data, message.message_id);
+        await this.handleSizeSelectionSimplified(chatId, data, message.message_id);
       } else if (data.startsWith('confirm_')) {
         await this.handleOrderConfirmation(chatId, data);
       } else if (data.startsWith('cancel_')) {
         await this.handleOrderCancellation(chatId, data);
-      } else if (data === 'back_to_sizes') {
-        await this.handleBackToSizes(chatId, message.message_id);
-      } else if (data.startsWith('back_to_mode_')) {
-        await this.handleBackToMode(chatId, data, message.message_id);
       }
 
     } catch (error) {
@@ -699,87 +692,21 @@ export class TelegramWebhookController {
   }
 
   /**
-   * Обработка выбора размера
+   * Выбор размера → сессия с дефолтами (вписать, 1 копия) → ждём фото
    */
-  private static async handleSizeSelection(chatId: string, data: string, messageId: number) {
+  private static async handleSizeSelectionSimplified(chatId: string, data: string, messageId: number) {
     const sizeName = data.replace('size_', '');
-    const size = ImageProcessingService.getSizeByName(sizeName);
-    
-    if (!size) {
+    const result = savePhotoOrderSessionSimplified(chatId, sizeName);
+    if (!result.ok) {
       await TelegramService.sendMessageToUser(chatId, '❌ Неверный размер фотографии');
       return;
     }
-
-    const prices = PhotoOrderService.getAllPrices();
-    const price = prices[sizeName] || 0;
-    const priceRub = (price / 100).toFixed(0);
-
-    const message = `📏 *Выбран размер: ${sizeName}*\n\n` +
-                   `📐 Размеры: ${size.width}x${size.height} пикселей\n` +
-                   `💰 Цена: ${priceRub} руб. за копию\n\n` +
-                   `💡 *Выберите режим обработки:*`;
-
-    const keyboard = TelegramBotCommands.getProcessingModeKeyboard(sizeName);
-    await TelegramService.editMessageWithKeyboard(chatId, messageId, message, keyboard);
-  }
-
-  /**
-   * Обработка выбора режима обработки
-   */
-  private static async handleModeSelection(chatId: string, data: string, messageId: number) {
-    const parts = data.split('_');
-    const mode = parts[1]; // crop, fit, smart
-    const sizeName = parts[2];
-
-    const modeText = {
-      'crop': '✂️ Кроп (обрезать под размер)',
-      'fit': '📐 Вписать (с белыми полями)',
-      'smart': '🤖 Умный кроп (ИИ)'
-    }[mode] || mode;
-
-    const message = `🎨 *Режим обработки: ${modeText}*\n\n` +
-                   `📏 Размер: ${sizeName}\n\n` +
-                   `💡 *Выберите количество копий:*`;
-
-    const keyboard = TelegramBotCommands.getQuantityKeyboard(sizeName, mode);
-    await TelegramService.editMessageWithKeyboard(chatId, messageId, message, keyboard);
-  }
-
-  /**
-   * Обработка выбора количества копий
-   */
-  private static async handleQuantitySelection(chatId: string, data: string, messageId: number) {
-    const parts = data.split('_');
-    const quantity = parseInt(parts[1]);
-    const mode = parts[2];
-    const sizeName = parts[3];
-
-    const size = ImageProcessingService.getSizeByName(sizeName);
-    const prices = PhotoOrderService.getAllPrices();
-    const pricePerCopy = prices[sizeName] || 0;
-    const totalPrice = pricePerCopy * quantity;
-    const totalPriceRub = (totalPrice / 100).toFixed(0);
-
-    const modeText = {
-      'crop': '✂️ Кроп',
-      'fit': '📐 Вписать с полями',
-      'smart': '🤖 Умный кроп'
-    }[mode] || mode;
-
-    const message = `📋 *Параметры заказа:*\n\n` +
-                   `📏 Размер: ${sizeName}\n` +
-                   `🎨 Режим: ${modeText}\n` +
-                   `📦 Копий: ${quantity}\n` +
-                   `💰 Цена за копию: ${(pricePerCopy / 100).toFixed(0)} руб.\n` +
-                   `💰 Общая стоимость: ${totalPriceRub} руб.\n\n` +
-                   `📸 *Теперь отправьте фотографии для обработки!*\n` +
-                   `(до 10 фотографий)`;
-
-    // Убираем клавиатуру и показываем финальное сообщение
-    await TelegramService.editMessageWithKeyboard(chatId, messageId, message, { inline_keyboard: [] });
-
-    // Сохраняем параметры заказа в сессии
-    PhotoOrderSessionService.saveSession(chatId, sizeName, mode, quantity);
+    await TelegramService.editMessageWithKeyboard(
+      chatId,
+      messageId,
+      result.text,
+      { inline_keyboard: [] }
+    );
   }
 
   /**
@@ -808,28 +735,4 @@ export class TelegramWebhookController {
     );
   }
 
-  /**
-   * Возврат к выбору размеров
-   */
-  private static async handleBackToSizes(chatId: string, messageId: number) {
-    const message = `📸 *ЗАКАЗ ПЕЧАТИ ФОТОГРАФИЙ*\n\n` +
-                   `💡 *Выберите размер фотографии:*\n` +
-                   `Нажмите на кнопку с нужным размером ниже ⬇️`;
-
-    const keyboard = TelegramBotCommands.getSizeSelectionKeyboard();
-    await TelegramService.editMessageWithKeyboard(chatId, messageId, message, keyboard);
-  }
-
-  /**
-   * Возврат к выбору режима обработки
-   */
-  private static async handleBackToMode(chatId: string, data: string, messageId: number) {
-    const sizeName = data.replace('back_to_mode_', '');
-    
-    const message = `📏 *Размер: ${sizeName}*\n\n` +
-                   `💡 *Выберите режим обработки:*`;
-
-    const keyboard = TelegramBotCommands.getProcessingModeKeyboard(sizeName);
-    await TelegramService.editMessageWithKeyboard(chatId, messageId, message, keyboard);
-  }
 }
