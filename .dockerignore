@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+.git
+.gitignore
+**/.env
+**/.env.*
+**/dist
+**/build
+*.log
+npm-debug.log*
+.DS_Store
+frontend/node_modules
+backend/node_modules
