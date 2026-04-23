@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppIcon } from '../ui/AppIcon';
-import { fetchMailJobsByOrder, type MailJobListRow } from '../../api/mailApi';
+import { fetchMailJobsByOrder, postMailJobBounce, type MailJobListRow } from '../../api/mailApi';
 import './OrderMailLogPanel.css';
 
 function statusLabel(s: string): string {
@@ -15,10 +15,13 @@ export const OrderMailLogPanel: React.FC<{ orderId: number }> = ({ orderId }) =>
   const [jobs, setJobs] = useState<MailJobListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [bounceBusy, setBounceBusy] = useState<number | null>(null);
+  const [bounceErr, setBounceErr] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
     setErr(null);
+    setBounceErr(null);
     void fetchMailJobsByOrder(orderId, 20)
       .then((d) => setJobs(d.jobs || []))
       .catch((e) => setErr(e instanceof Error ? e.message : 'Ошибка загрузки'))
@@ -28,6 +31,15 @@ export const OrderMailLogPanel: React.FC<{ orderId: number }> = ({ orderId }) =>
   useEffect(() => {
     load();
   }, [load]);
+
+  const onBounce = (jobId: number) => {
+    setBounceBusy(jobId);
+    setBounceErr(null);
+    void postMailJobBounce(jobId)
+      .then(() => load())
+      .catch((e) => setBounceErr(e instanceof Error ? e.message : 'Ошибка'))
+      .finally(() => setBounceBusy(null));
+  };
 
   if (loading) {
     return (
@@ -64,6 +76,7 @@ export const OrderMailLogPanel: React.FC<{ orderId: number }> = ({ orderId }) =>
           <AppIcon name="refresh" size="xs" />
         </button>
       </div>
+      {bounceErr ? <div className="order-mail-log__action-err">{bounceErr}</div> : null}
       <ul className="order-mail-log__list">
         {jobs.map((j) => (
           <li key={j.id} className={`order-mail-log__item order-mail-log__item--${j.status}`}>
@@ -75,6 +88,25 @@ export const OrderMailLogPanel: React.FC<{ orderId: number }> = ({ orderId }) =>
               {j.status === 'failed' && j.last_error ? ` — ${j.last_error.slice(0, 80)}` : ''}
             </span>
             <span className="order-mail-log__date">{j.created_at?.replace('T', ' ').slice(0, 19)}</span>
+            {(j.first_opened_at || j.bounce_noted_at) && (
+              <span className="order-mail-log__flags">
+                {j.first_opened_at ? `Открытие: ${j.first_opened_at.replace('T', ' ').slice(0, 19)}` : null}
+                {j.first_opened_at && j.bounce_noted_at ? ' · ' : null}
+                {j.bounce_noted_at ? `Bounce: ${j.bounce_noted_at.replace('T', ' ').slice(0, 19)}` : null}
+              </span>
+            )}
+            <span className="order-mail-log__actions">
+              {!j.bounce_noted_at && (
+                <button
+                  type="button"
+                  className="order-mail-log__bounce"
+                  disabled={bounceBusy === j.id}
+                  onClick={() => onBounce(j.id)}
+                >
+                  {bounceBusy === j.id ? '…' : 'Отметить bounce'}
+                </button>
+              )}
+            </span>
           </li>
         ))}
       </ul>

@@ -42,6 +42,8 @@ export interface MailJobListRow {
   job_type: string;
   created_at: string;
   updated_at: string;
+  first_opened_at: string | null;
+  bounce_noted_at: string | null;
 }
 
 export async function fetchMailConfig(): Promise<MailConfigResponse> {
@@ -78,6 +80,11 @@ export async function fetchMailJobsByOrder(
   const { data } = await apiClient.get<{ jobs: MailJobListRow[] }>('/mail/jobs', {
     params: { orderId, limit },
   });
+  return data;
+}
+
+export async function postMailJobBounce(jobId: number): Promise<{ ok: boolean; id: number }> {
+  const { data } = await apiClient.post<{ ok: boolean; id: number }>(`/mail/jobs/${jobId}/bounce`);
   return data;
 }
 

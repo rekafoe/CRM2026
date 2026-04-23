@@ -1,6 +1,13 @@
+import { randomBytes } from 'crypto';
 import { getDb } from '../config/database';
 import { getMailTransporter } from './mailTransportService';
-import { getMarketingSendDelayMs, getSmtpConfig } from '../config/mail';
+import {
+  getMailFromByJobType,
+  getMarketingSendDelayMs,
+  getSmtpConfig,
+  isMailOpenTrackingEnabled,
+} from '../config/mail';
+import { getPublicApiBaseUrl } from './customerEmailMarketingService';
 import { logger } from '../utils/logger';
 
 export type MailJobType = 'transactional' | 'marketing';
@@ -47,22 +54,35 @@ export async function enqueueMail(input: EnqueueMailInput): Promise<{ id: number
       ? Number(input.contextOrderId)
       : null;
 
+  let bodyHtml = input.html ?? null;
+  let openToken: string | null = null;
+  if (jobType === 'marketing' && isMailOpenTrackingEnabled() && bodyHtml) {
+    const base = getPublicApiBaseUrl();
+    if (base) {
+      openToken = randomBytes(20).toString('hex');
+      const safeBase = base.replace(/\/$/, '');
+      const pixelUrl = `${safeBase}/api/mail/track/open/${openToken}`;
+      bodyHtml = `${bodyHtml}\n<!-- open --><img src="${pixelUrl}" width="1" height="1" alt="" style="display:none;overflow:hidden" />`;
+    }
+  }
+
   try {
     const r = await db.run(
       `INSERT INTO mail_jobs (
         job_type, to_email, subject, body_html, body_text, status,
-        idempotency_key, max_attempts, payload_json, next_attempt_at, context_order_id
-      ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+        idempotency_key, max_attempts, payload_json, next_attempt_at, context_order_id, open_token
+      ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
       jobType,
       input.to,
       input.subject,
-      input.html ?? null,
+      bodyHtml,
       input.text ?? null,
       input.idempotencyKey ?? null,
       maxAttempts,
       payloadJson,
       null,
-      ctx
+      ctx,
+      openToken
     );
     return { id: r.lastID ?? 0 };
   } catch (e: unknown) {
@@ -176,8 +196,9 @@ export async function processOneMailJob(): Promise<boolean> {
     if (!transport) {
       throw new Error('Transporter not available');
     }
+    const from = getMailFromByJobType(cfg, job.job_type);
     await transport.sendMail({
-      from: cfg.from,
+      from,
       to: job.to_email,
       subject: job.subject,
       html: job.body_html ?? undefined,
@@ -247,6 +268,28 @@ export interface MailJobListRow {
   job_type: string;
   created_at: string;
   updated_at: string;
+  first_opened_at: string | null;
+  bounce_noted_at: string | null;
+}
+
+/**
+ * Ручная отметка bounce по id задания (webhook/почта админа позже).
+ */
+export async function noteMailJobBounce(jobId: number): Promise<{ ok: true } | { ok: false; error: 'not_found' }> {
+  const id = Number(jobId);
+  if (!Number.isFinite(id) || id < 1) {
+    return { ok: false, error: 'not_found' };
+  }
+  const db = await getDb();
+  const r = await db.run(
+    `UPDATE mail_jobs
+     SET bounce_noted_at = datetime('now'), updated_at = datetime('now')
+     WHERE id = ?`,
+    [id]
+  );
+  const changes = (r as { changes?: number })?.changes ?? 0;
+  if (changes < 1) return { ok: false, error: 'not_found' };
+  return { ok: true };
 }
 
 /**
@@ -259,7 +302,8 @@ export async function listMailJobsForOrder(
   const db = await getDb();
   const lim = Math.min(100, Math.max(1, limit));
   const rows = (await db.all(
-    `SELECT id, to_email, subject, status, attempts, last_error, job_type, created_at, updated_at
+    `SELECT id, to_email, subject, status, attempts, last_error, job_type, created_at, updated_at,
+            first_opened_at, bounce_noted_at
      FROM mail_jobs
      WHERE context_order_id = ?
      ORDER BY id DESC

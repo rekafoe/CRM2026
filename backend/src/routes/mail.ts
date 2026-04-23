@@ -8,6 +8,7 @@ import {
   enqueueMail,
   getMailOutboxStats,
   listMailJobsForOrder,
+  noteMailJobBounce,
   processMailOutboxBatch,
 } from '../services/mailOutboxService';
 import {
@@ -16,6 +17,7 @@ import {
   unsubscribeByToken,
 } from '../services/customerEmailMarketingService';
 import { enqueueMarketingTemplateBroadcast } from '../services/mailMarketingBroadcastService';
+import { getTrackingPixelResponse, recordMailOpenByToken } from '../services/mailOpenTrackingService';
 
 const router = Router();
 
@@ -63,6 +65,21 @@ router.get(
 );
 
 /**
+ * GET /api/mail/track/open/:token — пиксель первого открытия (marketing, opt-in MAIL_OPEN_TRACKING).
+ */
+router.get(
+  '/track/open/:token',
+  asyncHandler(async (req, res) => {
+    const token = String((req.params as { token?: string }).token || '').trim();
+    await recordMailOpenByToken(token);
+    const { body, contentType } = getTrackingPixelResponse();
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0');
+    res.status(200).send(body);
+  })
+);
+
+/**
  * GET /api/mail/config — проверка, настроен ли SMTP (без секретов).
  */
 router.get(
@@ -105,6 +122,23 @@ router.get(
     const limit = Number((req.query as { limit?: string }).limit) || 30;
     const jobs = await listMailJobsForOrder(orderId, limit);
     res.json({ jobs });
+  })
+);
+
+/**
+ * POST /api/mail/jobs/:id/bounce — зафиксировать bounce по заданию очереди (admin).
+ */
+router.post(
+  '/jobs/:id/bounce',
+  asyncHandler(async (req, res) => {
+    if (!requireAdmin(req as AuthenticatedRequest, res)) return;
+    const id = Number(req.params.id);
+    const r = await noteMailJobBounce(id);
+    if (!r.ok) {
+      res.status(404).json({ error: 'Job not found' });
+      return;
+    }
+    res.json({ ok: true, id });
   })
 );
 

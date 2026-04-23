@@ -3,6 +3,11 @@ import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { OrderRepository } from '../repositories/orderRepository'
+import {
+  ORDER_ITEM_PRODUCT_JOIN,
+  orderItemProductGroupKeyExpr,
+  orderItemProductLabelExpr,
+} from '../utils/orderItemProductAnalyticsSql'
 
 const router = Router()
 
@@ -373,12 +378,18 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
     ? '(o.status != 0 AND COALESCE(o.is_cancelled, 0) = 0)'
     : 'o.status != 0'
 
+  const itemG = orderItemProductGroupKeyExpr()
+  const itemL = orderItemProductLabelExpr()
+
   const productPopularity = await db.all<any>(
-    `SELECT i.type as product_type, COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity,
+    `SELECT MAX(${itemL}) as product_type, COUNT(DISTINCT o.id) as order_count, SUM(i.quantity) as total_quantity,
       SUM(i.price * i.quantity) as total_revenue, AVG(i.price) as avg_price, MAX(COALESCE(o.createdAt, o.created_at)) as last_order_date
-     FROM items i JOIN orders o ON o.id = i.orderId
+     FROM items i
+     JOIN orders o ON o.id = i.orderId
+     ${ORDER_ITEM_PRODUCT_JOIN}
      WHERE ${dateFilter('o')} AND ${notCancelledCond}
-     GROUP BY i.type ORDER BY total_revenue DESC LIMIT ?`,
+     GROUP BY (${itemG})
+     ORDER BY total_revenue DESC LIMIT ?`,
     [...dateParams, limitNum]
   )
 
@@ -395,17 +406,26 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
   )
 
   const productTrends = await db.all<any>(
-    `SELECT DATE(COALESCE(o.createdAt, o.created_at)) as date, i.type as product_type, COUNT(DISTINCT o.id) as daily_orders,
+    `SELECT DATE(COALESCE(o.createdAt, o.created_at)) as date, MAX(${itemL}) as product_type, COUNT(DISTINCT o.id) as daily_orders,
       SUM(i.price * i.quantity) as daily_revenue
-     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')} AND ${notCancelledCond}
-     GROUP BY DATE(COALESCE(o.createdAt, o.created_at)), i.type ORDER BY date DESC, daily_revenue DESC`,
+     FROM items i
+     JOIN orders o ON o.id = i.orderId
+     ${ORDER_ITEM_PRODUCT_JOIN}
+     WHERE ${dateFilter('o')} AND ${notCancelledCond}
+     GROUP BY DATE(COALESCE(o.createdAt, o.created_at)), (${itemG})
+     ORDER BY date DESC, daily_revenue DESC`,
     dateParams
   )
 
   const averageOrderValue = await db.all<any>(
-    `SELECT i.type as product_type, AVG(i.price * i.quantity) as avg_order_value, COUNT(DISTINCT o.id) as orders_with_product
-     FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')} AND ${notCancelledCond}
-     GROUP BY i.type HAVING orders_with_product >= 3 ORDER BY avg_order_value DESC`,
+    `SELECT MAX(${itemL}) as product_type, AVG(i.price * i.quantity) as avg_order_value, COUNT(DISTINCT o.id) as orders_with_product
+     FROM items i
+     JOIN orders o ON o.id = i.orderId
+     ${ORDER_ITEM_PRODUCT_JOIN}
+     WHERE ${dateFilter('o')} AND ${notCancelledCond}
+     GROUP BY (${itemG})
+     HAVING COUNT(DISTINCT o.id) >= 3
+     ORDER BY avg_order_value DESC`,
     dateParams
   )
 
@@ -449,11 +469,18 @@ router.get('/analytics/financial/profitability', asyncHandler(async (req, res) =
     ? '(status != 0 AND COALESCE(is_cancelled, 0) = 0)'
     : 'status != 0'
 
+  const gkF = orderItemProductGroupKeyExpr()
+  const labF = orderItemProductLabelExpr()
+
   const productProfitability = await db.all<any>(`
-    SELECT i.type as product_type, SUM(i.price * i.quantity) as total_revenue, COUNT(DISTINCT o.id) as order_count,
+    SELECT MAX(${labF}) as product_type, SUM(i.price * i.quantity) as total_revenue, COUNT(DISTINCT o.id) as order_count,
       AVG(i.price * i.quantity) as avg_order_value, SUM(i.quantity) as total_items
-    FROM items i JOIN orders o ON o.id = i.orderId WHERE ${dateFilter('o')} AND ${notCancelled}
-    GROUP BY i.type ORDER BY total_revenue DESC
+    FROM items i
+    JOIN orders o ON o.id = i.orderId
+    ${ORDER_ITEM_PRODUCT_JOIN}
+    WHERE ${dateFilter('o')} AND ${notCancelled}
+    GROUP BY (${gkF})
+    ORDER BY total_revenue DESC
   `, dateParams)
 
   const paymentAnalysis = await db.get<any>(`
