@@ -206,7 +206,8 @@ router.get('/', async (req, res) => {
 router.get('/category/:categoryId', async (req, res) => {
   try {
     const { categoryId } = req.params;
-    const { activeOnly, forSite } = req.query;
+    const { activeOnly, forSite, withMinPrice } = req.query;
+    const wantMinPrice = withMinPrice === '1';
     const db = await getDb();
     const publicAnon = isAnonymousCatalogRequest(req);
     const parts: string[] = ['p.category_id = ?'];
@@ -230,6 +231,26 @@ router.get('/category/:categoryId', async (req, res) => {
       ${whereClause}
       ORDER BY p.name
     `, queryParams);
+
+    if (wantMinPrice) {
+      const productIds = products.map((p: any) => p.id);
+      if (productIds.length > 0) {
+        const placeholders = productIds.map(() => '?').join(',');
+        const configs = await db.all(
+          `SELECT product_id, config_data FROM product_template_configs
+           WHERE product_id IN (${placeholders}) AND name = 'template' AND is_active = 1`,
+          productIds
+        ) as any[];
+        const priceMap = new Map<number, number>();
+        for (const c of configs) {
+          const price = extractMinUnitPrice(c.config_data);
+          if (price != null) priceMap.set(c.product_id, price);
+        }
+        for (const p of products) {
+          (p as any).min_price = priceMap.get((p as any).id) ?? null;
+        }
+      }
+    }
 
     res.json(products);
   } catch (error) {
