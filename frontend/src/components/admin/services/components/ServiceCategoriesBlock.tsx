@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useId } from 'react';
 import { Button, Modal } from '../../../common';
 import { ServiceCategory } from '../../../../types/pricing';
 import {
@@ -16,6 +16,8 @@ const normSortOrder = (c: ServiceCategory) =>
   typeof (c as any).sort_order === 'number' ? (c as any).sort_order : (c.sortOrder ?? 0);
 
 export const ServiceCategoriesBlock: React.FC<ServiceCategoriesBlockProps> = ({ categories, onReload }) => {
+  const panelId = useId();
+  const [panelExpanded, setPanelExpanded] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
   const [newSortOrder, setNewSortOrder] = useState(0);
@@ -24,6 +26,10 @@ export const ServiceCategoriesBlock: React.FC<ServiceCategoriesBlockProps> = ({ 
   const [editSortOrder, setEditSortOrder] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (error) setPanelExpanded(true);
+  }, [error]);
 
   const handleCreate = useCallback(async () => {
     const name = newName.trim();
@@ -97,71 +103,106 @@ export const ServiceCategoriesBlock: React.FC<ServiceCategoriesBlockProps> = ({ 
 
   return (
     <div className="service-categories-block">
-      <div className="service-categories-block__header">
-        <h3 className="service-categories-block__title">Категории услуг</h3>
-        <p className="service-categories-block__desc">
-          Категории задают группировку в списке услуг и в калькуляторе (например: Ламинация, Резка).
-        </p>
-        <Button variant="primary" size="sm" onClick={() => setShowAdd(true)} disabled={busy}>
+      <div className="service-categories-block__bar">
+        <button
+          type="button"
+          className="service-categories-block__toggle"
+          aria-expanded={panelExpanded}
+          aria-controls={panelId}
+          id={`${panelId}-toggle`}
+          onClick={() => setPanelExpanded((v) => !v)}
+        >
+          <span className="service-categories-block__chevron" aria-hidden>
+            {panelExpanded ? '▼' : '▶'}
+          </span>
+          <span className="service-categories-block__title">Категории услуг</span>
+          <span className="service-categories-block__count" title="Число категорий">
+            {categories.length}
+          </span>
+        </button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => {
+            setPanelExpanded(true);
+            setShowAdd(true);
+          }}
+          disabled={busy}
+        >
           + Добавить категорию
         </Button>
       </div>
-      {error && (
-        <div className="service-categories-block__error" role="alert">
-          {error}
+      {panelExpanded && (
+        <div className="service-categories-block__body" id={panelId} role="region" aria-labelledby={`${panelId}-toggle`}>
+          <p className="service-categories-block__desc">
+            Категории задают группировку в списке услуг и в калькуляторе (например: ламинация, резка).
+          </p>
+          {error && (
+            <div className="service-categories-block__error" role="alert">
+              {error}
+            </div>
+          )}
+          <ul className="service-categories-block__list">
+            {sortedCategories.length === 0 && !showAdd && (
+              <li className="service-categories-block__empty">Пока нет категорий</li>
+            )}
+            {sortedCategories.map((c) => (
+              <li key={c.id} className="service-categories-block__item">
+                {editingId === c.id ? (
+                  <div className="service-categories-block__edit">
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Название"
+                      className="service-categories-block__input"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={editSortOrder}
+                      onChange={(e) => setEditSortOrder(Number(e.target.value) || 0)}
+                      className="service-categories-block__input-num"
+                    />
+                    <Button variant="primary" size="sm" onClick={handleUpdate} disabled={busy}>
+                      Сохранить
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => setEditingId(null)}>
+                      Отмена
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="service-categories-block__item-name">{c.name}</span>
+                    <span className="service-categories-block__item-order">Порядок: {normSortOrder(c)}</span>
+                    <div className="service-categories-block__item-actions">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setPanelExpanded(true);
+            startEdit(c);
+          }}
+        >
+          Изменить
+        </Button>
+                      <Button variant="error" size="sm" onClick={() => handleDelete(c.id, c.name)}>
+                        Удалить
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
-      <ul className="service-categories-block__list">
-        {sortedCategories.length === 0 && !showAdd && (
-          <li className="service-categories-block__empty">Пока нет категорий</li>
-        )}
-        {sortedCategories.map((c) => (
-          <li key={c.id} className="service-categories-block__item">
-            {editingId === c.id ? (
-              <div className="service-categories-block__edit">
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="Название"
-                  className="service-categories-block__input"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  value={editSortOrder}
-                  onChange={(e) => setEditSortOrder(Number(e.target.value) || 0)}
-                  className="service-categories-block__input-num"
-                />
-                <Button variant="primary" size="sm" onClick={handleUpdate} disabled={busy}>
-                  Сохранить
-                </Button>
-                <Button variant="secondary" size="sm" onClick={() => setEditingId(null)}>
-                  Отмена
-                </Button>
-              </div>
-            ) : (
-              <>
-                <span className="service-categories-block__item-name">{c.name}</span>
-                <span className="service-categories-block__item-order">Порядок: {normSortOrder(c)}</span>
-                <div className="service-categories-block__item-actions">
-                  <Button variant="info" size="sm" onClick={() => startEdit(c)}>
-                    Изменить
-                  </Button>
-                  <Button variant="error" size="sm" onClick={() => handleDelete(c.id, c.name)}>
-                    Удалить
-                  </Button>
-                </div>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
 
       {showAdd && (
         <Modal
           isOpen={true}
           title="Новая категория"
+          className="sm-ui-modal"
           onClose={() => {
             if (!busy) setShowAdd(false);
           }}

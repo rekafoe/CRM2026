@@ -262,6 +262,13 @@
   align-items: flex-start;
 }
 
+/* Упрощённый шаблон: сайдбар в выезжающей панели, основной контент на всю ширину */
+.product-template__body--simplified-with-sidebar.product-template__body--simplified-one-col {
+  grid-template-columns: 1fr;
+  gap: 0;
+  align-items: stretch;
+}
+
 .product-template__sidebar {
   display: grid;
   gap: 16px;

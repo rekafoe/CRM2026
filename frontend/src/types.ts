@@ -5,7 +5,12 @@ export type OrderStatus = 'new' | 'in_production' | 'ready_to_ship' | 'shipped' 
 
 // Реэкспорт типов калькулятора из shared, чтобы импорты вида "../../types" работали консистентно
 import type { Customer } from '../../shared/types/entities';
-export type { Customer, ProductSpecs, CalculationResult } from '../../shared/types/entities';
+export type {
+  Customer,
+  CustomerLegalDocument,
+  ProductSpecs,
+  CalculationResult,
+} from '../../shared/types/entities';
 
 export interface ItemParams {
   description: string;

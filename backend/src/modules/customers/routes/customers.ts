@@ -13,6 +13,14 @@ const router = Router()
 router.get('/', CustomerController.getAll)
 
 /**
+ * Документы юридического лица (даты выдачи / возврата) — до /:id, иначе сегмент перехватится как id
+ */
+router.get('/:customerId/legal-documents', CustomerController.listLegalDocuments)
+router.post('/:customerId/legal-documents', CustomerController.createLegalDocument)
+router.put('/:customerId/legal-documents/:documentId', CustomerController.updateLegalDocument)
+router.delete('/:customerId/legal-documents/:documentId', CustomerController.deleteLegalDocument)
+
+/**
  * @route   GET /api/customers/:id
  * @desc    Получить клиента по ID
  * @access  Private

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Request, Router } from 'express';
 import { getDb } from '../../../db';
 import { asyncHandler, AuthenticatedRequest } from '../../../middleware';
 import { ParameterPresetService } from '../services/parameterPresetService';
@@ -6,6 +6,11 @@ import { logger } from '../../../utils/logger';
 import { extractMinUnitPrice } from './helpers';
 
 const router = Router();
+
+/** Без API-токена: список — только витрина (is_active и active_for_site), иначе сливали бы каталог. */
+function isAnonymousCatalogRequest(req: Request): boolean {
+  return !(req as AuthenticatedRequest).user;
+}
 
 router.get('/debug', async (req, res) => {
   if (process.env.NODE_ENV === 'production') {
@@ -92,7 +97,7 @@ router.get('/parameter-presets', asyncHandler(async (req, res) => {
  *       - in: query
  *         name: forSite
  *         schema: { type: string, enum: ['1', 'true'] }
- *         description: Только продукты, активные для сайта (is_active=1 и active_for_site=1)
+ *         description: Только продукты, активные для сайта (is_active=1 и active_for_site=1). Без токена API этот набор применяется всегда.
  *     responses:
  *       200:
  *         description: Массив продуктов
@@ -109,16 +114,22 @@ router.get('/', async (req, res) => {
     const wantMinPrice = withMinPrice === '1';
     const forSiteCatalog = forSite === '1' || forSite === 'true';
     const searchValue = typeof search === 'string' ? search.trim() : '';
+    const publicAnon = isAnonymousCatalogRequest(req);
 
     const conditions: string[] = [];
     const params: any[] = [];
-    if (activeOnly === 'true') {
-      conditions.push('p.is_active = 1');
-      if (!searchValue) conditions.push('pc.is_active = 1');
-    }
-    if (forSiteCatalog) {
+    if (publicAnon) {
       conditions.push('p.is_active = 1');
       conditions.push('COALESCE(p.active_for_site, 0) = 1');
+    } else {
+      if (activeOnly === 'true') {
+        conditions.push('p.is_active = 1');
+        if (!searchValue) conditions.push('pc.is_active = 1');
+      }
+      if (forSiteCatalog) {
+        conditions.push('p.is_active = 1');
+        conditions.push('COALESCE(p.active_for_site, 0) = 1');
+      }
     }
     if (searchValue) {
       const lowerSearch = searchValue.toLowerCase();
@@ -197,13 +208,18 @@ router.get('/category/:categoryId', async (req, res) => {
     const { categoryId } = req.params;
     const { activeOnly, forSite } = req.query;
     const db = await getDb();
+    const publicAnon = isAnonymousCatalogRequest(req);
     const parts: string[] = ['p.category_id = ?'];
     const queryParams: any[] = [categoryId];
-    if (activeOnly === 'true') {
-      parts.push('p.is_active = 1', 'pc.is_active = 1');
-    }
-    if (forSite === '1' || forSite === 'true') {
+    if (publicAnon) {
       parts.push('p.is_active = 1', 'COALESCE(p.active_for_site, 0) = 1');
+    } else {
+      if (activeOnly === 'true') {
+        parts.push('p.is_active = 1', 'pc.is_active = 1');
+      }
+      if (forSite === '1' || forSite === 'true') {
+        parts.push('p.is_active = 1', 'COALESCE(p.active_for_site, 0) = 1');
+      }
     }
     const whereClause = parts.length > 0 ? `WHERE ${parts.join(' AND ')}` : '';
 

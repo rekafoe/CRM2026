@@ -7,7 +7,7 @@ import type { UseSimplifiedTypesResult } from '../hooks/useSimplifiedTypes';
 import type { ServiceRow } from './SimplifiedTemplateSection';
 import type { ProductWithDetails } from '../../../services/products';
 
-interface SimplifiedTemplateSidebarProps {
+export interface SimplifiedTemplateSidebarProps {
   product: ProductWithDetails | null;
   icon: string;
   name: string;

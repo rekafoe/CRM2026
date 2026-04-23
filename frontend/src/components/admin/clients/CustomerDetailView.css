@@ -1,0 +1,147 @@
+/* Карточка клиента — тот же визуальный язык, что ProductManagement (чипы, product-controls) */
+
+.customer-detail-view {
+  max-width: 100%;
+}
+
+.customer-detail-view__chips {
+  padding-top: 0 !important;
+  border-top: none !important;
+}
+
+.management-content.customer-detail-view__content {
+  padding: 20px 24px 24px;
+}
+
+@media (max-width: 640px) {
+  .management-content.customer-detail-view__content {
+    padding: 16px;
+  }
+}
+
+.customer-detail-view__section-head {
+  margin-bottom: 20px;
+}
+
+.customer-detail-view__title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.customer-detail-view__subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary, #64748b);
+}
+
+.customer-detail-view__summary {
+  margin-top: 0;
+}
+
+/* Те же селекторы, что у списка клиентов (.customers-page), срабатывают от layout;
+   внутри карточки дублируем акцент для метрик без обёртки .customers-page */
+.customer-detail-view .customers-summary-title {
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+  margin-bottom: 6px;
+}
+
+.customer-detail-view .customers-summary-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.customer-detail-view .customers-summary-card {
+  min-width: 160px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-secondary, #f8fafc);
+}
+
+/* Второй ряд внутри .product-controls: период */
+.customer-detail-view .product-controls > .customer-detail-view__period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  width: 100%;
+  margin: 0;
+  padding: 16px 0 0;
+  border-top: 1px solid #f1f5f9;
+}
+
+.customer-detail-view__period-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+}
+
+.customer-detail-view__period .customers-date-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.customer-detail-view__period-hint {
+  flex: 1 1 200px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted, #94a3b8);
+}
+
+.customer-detail-view__content {
+  min-height: 120px;
+}
+
+.customer-detail-view__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.customer-detail-view__doc-intro {
+  margin: 0 0 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary, #64748b);
+}
+
+.customer-detail-view__doc-actions {
+  margin-bottom: 0;
+}
+
+.customer-detail-view__orders {
+  margin-top: 0;
+}
+
+.customer-detail-view__orders-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.customer-detail-view__legal-exports {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.customer-detail-view__orders-heading {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+@media (max-width: 640px) {
+  .customer-detail-view__period {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

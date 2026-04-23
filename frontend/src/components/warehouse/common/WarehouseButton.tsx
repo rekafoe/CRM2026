@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from '../../common/Button';
+import { AppIcon } from '../../ui/AppIcon';
 
 interface WarehouseButtonProps {
   variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning';
@@ -10,6 +11,7 @@ interface WarehouseButtonProps {
   disabled?: boolean;
   loading?: boolean;
   className?: string;
+  title?: string;
 }
 
 export const WarehouseButton: React.FC<WarehouseButtonProps> = ({
@@ -21,6 +23,7 @@ export const WarehouseButton: React.FC<WarehouseButtonProps> = ({
   disabled = false,
   loading = false,
   className = '',
+  title,
 }) => {
   const buttonVariant = variant === 'success' ? 'primary' : 
                        variant === 'warning' ? 'secondary' : 
@@ -31,9 +34,18 @@ export const WarehouseButton: React.FC<WarehouseButtonProps> = ({
     <Button
       variant={buttonVariant}
       size={size}
-      icon={loading ? '⏳' : icon}
+      icon={
+        loading ? (
+          <span className="inline-flex animate-spin" aria-hidden>
+            <AppIcon name="refresh" size="sm" />
+          </span>
+        ) : (
+          icon
+        )
+      }
       onClick={onClick}
       disabled={disabled || loading}
+      title={title}
       className={`warehouse-button warehouse-button--${variant} ${className}`.trim()}
     >
       {loading ? (hasText ? 'Загрузка...' : null) : children}

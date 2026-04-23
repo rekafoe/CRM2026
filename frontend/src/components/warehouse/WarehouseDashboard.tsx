@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useMaterials, useCreateMaterial, useUpdateMaterial, useDeleteMaterial } from '../../api/hooks/useMaterials';
-import { Material, Category, Supplier, MaterialAlert, InventoryTransaction } from '../../types/shared';
+import { useMaterials } from '../../api/hooks/useMaterials';
+import { Material } from '../../types/shared';
 import { useUIStore } from '../../stores/uiStore';
 import { useMaterialStore } from '../../stores/materialStore';
+import { AppIcon, type IconName } from '../ui/AppIcon';
+import { LoadingState } from '../common';
+import '../../components/admin/ProductManagement.css';
+import '../../styles/warehouse-embedded.css';
 
 // Импорт стилей для материалов - должен быть после основных стилей
 import './materials/MaterialsManagement.css';
@@ -22,11 +26,10 @@ interface WarehouseDashboardProps {
   onClose?: () => void;
 }
 
-export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = ({ onClose }) => {
+export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
   const [activeTab, setActiveTab] = useState<WarehouseTab>('materials');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMaterials, setSelectedMaterials] = useState<number[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
   
   const { data: materials, isLoading, error, refetch } = useMaterials({});
   const { showToast } = useUIStore();
@@ -140,73 +143,29 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = ({ onClose 
     }
   }, [selectedMaterials, showToast]);
 
-  // Вкладки складского сервиса
   const tabs: Array<{
     id: WarehouseTab;
     title: string;
-    icon: string;
-    description: string;
-    color: string;
+    icon: IconName;
     count?: number;
-  }> = [
-    {
-      id: 'materials' as WarehouseTab,
-      title: 'Материалы',
-      icon: '📦',
-      description: 'Управление материалами и остатками',
-      color: '#4CAF50'
-    },
-    {
-      id: 'paper-types' as WarehouseTab,
-      title: 'Типы бумаги',
-      icon: '📄',
-      description: 'Управление типами бумаги и ценами',
-      color: '#E91E63'
-    },
-    {
-      id: 'inventory' as WarehouseTab,
-      title: 'Инвентарь',
-      icon: '📋',
-      description: 'Учет и контроль инвентаря',
-      color: '#2196F3'
-    },
-    {
-      id: 'suppliers' as WarehouseTab,
-      title: 'Поставщики',
-      icon: '🏭',
-      description: 'Управление поставщиками',
-      color: '#FF9800'
-    },
-    {
-      id: 'categories' as WarehouseTab,
-      title: 'Категории',
-      icon: '🏷️',
-      description: 'Категории материалов',
-      color: '#9C27B0'
-    },
-    {
-      id: 'reports' as WarehouseTab,
-      title: 'Отчеты',
-      icon: '📊',
-      description: 'Аналитика и отчетность',
-      color: '#607D8B'
-    },
-    {
-      id: 'settings' as WarehouseTab,
-      title: 'Настройки',
-      icon: '⚙️',
-      description: 'Конфигурация склада',
-      color: '#795548'
-    }
-  ];
+  }> = useMemo(
+    () => [
+      { id: 'materials', title: 'Материалы', icon: 'package' as const, count: materials?.length },
+      { id: 'paper-types', title: 'Типы бумаги', icon: 'document' as const },
+      { id: 'inventory', title: 'Инвентарь', icon: 'clipboard' as const },
+      { id: 'suppliers', title: 'Поставщики', icon: 'building' as const },
+      { id: 'categories', title: 'Категории', icon: 'tag' as const },
+      { id: 'reports', title: 'Отчёты', icon: 'chart-bar' as const },
+      { id: 'settings', title: 'Настройки', icon: 'settings' as const },
+    ],
+    [materials?.length],
+  );
 
   if (isLoading) {
     return (
-      <div className="warehouse-dashboard-loading">
-        <div className="loading-content">
-          <div className="loading-spinner"></div>
-          <h3>Загрузка складского сервиса...</h3>
-          <p>Получаем данные о материалах и настройках</p>
+      <div className="warehouse-dashboard warehouse-dashboard--embedded">
+        <div className="warehouse-pm-loading pm-loading">
+          <LoadingState message="Загружаем данные склада…" />
         </div>
       </div>
     );
@@ -214,12 +173,13 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = ({ onClose 
 
   if (error) {
     return (
-      <div className="warehouse-dashboard-error">
-        <div className="error-content">
-          <h3>❌ Ошибка загрузки</h3>
-          <p>{error.message}</p>
-          <button onClick={() => refetch()} className="retry-btn">
-            🔄 Попробовать снова
+      <div className="warehouse-dashboard warehouse-dashboard--embedded">
+        <div className="warehouse-pm-error">
+          <p>
+            <strong>Не удалось загрузить данные.</strong> {error.message}
+          </p>
+          <button type="button" className="lg-btn" onClick={() => refetch()}>
+            Повторить
           </button>
         </div>
       </div>
@@ -227,150 +187,93 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = ({ onClose 
   }
 
   return (
-    <div className="warehouse-dashboard">
-      {onClose && (
-        <button 
-          className="close-btn"
-          onClick={onClose}
-          title="Закрыть складской сервис"
-        >
-          ✕
-        </button>
-      )}
-      <div className="warehouse-content-wrapper">
-        {/* Заголовок с компактной статистикой */}
-        <div className="warehouse-header">
-          <div className="header-content">
-            <h1>🏪 Складской сервис</h1>
-            <p>Комплексное управление складом и материалами</p>
-          </div>
-          
-          {/* Компактные индикаторы статистики */}
-          <div className="compact-stats">
-            <div className="compact-stat success" title="Материалы в наличии">
-              <span className="compact-icon">✅</span>
+    <div className="warehouse-dashboard warehouse-dashboard--embedded">
+      <div className="product-controls">
+        <div className="product-controls__main-row">
+          <div className="compact-stats" aria-label="Краткая сводка по складу">
+            <div className="compact-stat success" title="В наличии (запас больше 10)">
+              <AppIcon name="check" size="xs" />
               <span className="compact-value">{warehouseStats.inStock}</span>
             </div>
-            <div className="compact-stat warning" title="Низкий запас">
-              <span className="compact-icon">⚠️</span>
+            <div className="compact-stat warning" title="Низкий запас (1…10)">
+              <AppIcon name="info" size="xs" />
               <span className="compact-value">{warehouseStats.lowStock}</span>
             </div>
             <div className="compact-stat danger" title="Нет в наличии">
-              <span className="compact-icon">❌</span>
+              <AppIcon name="x" size="xs" />
               <span className="compact-value">{warehouseStats.outOfStock}</span>
             </div>
-            <div className="compact-stat info" title="Общая стоимость">
-              <span className="compact-icon">💰</span>
+            <div className="compact-stat info" title="Оценка остатка по цене">
+              <AppIcon name="wallet" size="xs" />
               <span className="compact-value">{warehouseStats.totalValue.toFixed(0)} BYN</span>
             </div>
           </div>
-          
-          <div className="header-actions">
-            <button 
-              className="action-btn secondary"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              🔧 Фильтры
-            </button>
-          </div>
         </div>
 
-      {/* Панель управления */}
-      <div className="warehouse-controls">
-
-        <div className="bulk-actions-section">
-          {selectedMaterials.length > 0 && (
-            <div className="bulk-actions">
-              <span className="selected-count">
-                Выбрано: {selectedMaterials.length}
-              </span>
-              <button 
-                className="bulk-btn delete"
-                onClick={() => handleBulkAction('delete')}
-              >
-                🗑️ Удалить
+        {selectedMaterials.length > 0 && (
+          <div className="bulk-actions-bar warehouse-pm-bulk">
+            <span className="bulk-count">Выбрано: {selectedMaterials.length}</span>
+            <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+              <button type="button" className="lg-btn" onClick={() => handleBulkAction('delete')}>
+                Удалить
               </button>
-              <button 
-                className="bulk-btn export"
-                onClick={() => handleBulkAction('export')}
-              >
-                📊 Экспорт
+              <button type="button" className="lg-btn" onClick={() => handleBulkAction('export')}>
+                Экспорт
               </button>
-              <button 
-                className="bulk-btn update"
-                onClick={() => handleBulkAction('update')}
-              >
-                ✏️ Обновить
+              <button type="button" className="lg-btn" onClick={() => handleBulkAction('update')}>
+                Обновить
               </button>
             </div>
-          )}
+          </div>
+        )}
+
+        <div
+          className="product-quick-filters"
+          style={{ borderTop: selectedMaterials.length > 0 ? undefined : 'none', paddingTop: 12 }}
+          role="tablist"
+          aria-label="Разделы склада"
+        >
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              className={`product-filter-chip ${activeTab === tab.id ? 'product-filter-chip--active' : ''}`}
+              onClick={() => handleTabChange(tab.id)}
+            >
+              <AppIcon name={tab.icon} size="xs" />
+              <span>{tab.title}</span>
+              {tab.count != null && tab.count > 0 && (
+                <span className="product-filter-chip__count">{tab.count}</span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
-        {/* Вкладки */}
-        <div className="warehouse-tabs">
-          <div className="tabs-header">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => handleTabChange(tab.id)}
-                style={{ '--tab-color': tab.color } as React.CSSProperties}
-              >
-                <span className="tab-icon">{tab.icon}</span>
-                <span className="tab-title">{tab.title}</span>
-                {(tab.count ?? 0) > 0 && (
-                  <span className="tab-count">{tab.count}</span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          <div className="tabs-content">
-            {activeTab === 'materials' && (
-              <MaterialsManagement
-                materials={filteredMaterials}
-                selectedMaterials={selectedMaterials}
-                onMaterialSelect={handleMaterialSelect}
-                onSelectAll={handleSelectAll}
-                onRefresh={refetch}
-              />
-            )}
-            {activeTab === 'paper-types' && (
-              <PaperTypesManagement
-                onRefresh={refetch}
-              />
-            )}
-            {activeTab === 'inventory' && (
-              <InventoryControl
-                materials={filteredMaterials}
-                onRefresh={refetch}
-              />
-            )}
-            {activeTab === 'suppliers' && (
-              <SuppliersManagement
-                onRefresh={refetch}
-              />
-            )}
-            {activeTab === 'categories' && (
-              <CategoriesManagement
-                onRefresh={refetch}
-              />
-            )}
-            {activeTab === 'reports' && (
-              <WarehouseReports
-                materials={materials || []}
-                stats={warehouseStats}
-              />
-            )}
-            {activeTab === 'settings' && (
-              <WarehouseSettings
-                onRefresh={refetch}
-              />
-            )}
-          </div>
-        </div>
+      <div className="management-content tabs-content-embedded">
+        {activeTab === 'materials' && (
+          <MaterialsManagement
+            materials={filteredMaterials}
+            selectedMaterials={selectedMaterials}
+            onMaterialSelect={handleMaterialSelect}
+            onSelectAll={handleSelectAll}
+            onRefresh={refetch}
+          />
+        )}
+        {activeTab === 'paper-types' && <PaperTypesManagement onRefresh={refetch} />}
+        {activeTab === 'inventory' && (
+          <InventoryControl materials={filteredMaterials} onRefresh={refetch} />
+        )}
+        {activeTab === 'suppliers' && <SuppliersManagement onRefresh={refetch} />}
+        {activeTab === 'categories' && <CategoriesManagement onRefresh={refetch} />}
+        {activeTab === 'reports' && (
+          <WarehouseReports materials={materials || []} stats={warehouseStats} />
+        )}
+        {activeTab === 'settings' && <WarehouseSettings onRefresh={refetch} />}
       </div>
     </div>
   );
 };
+

@@ -1,28 +1,37 @@
-/* Страница клиентов — общий контейнер */
-.admin-page-layout.customers-page .admin-page-content {
-  padding: 24px 32px 32px;
-  max-width: 1200px;
-  margin: 0 auto;
+/* Список клиентов: разметка product-management, отступы у алертов */
+.clients-crm-page > .alert,
+.product-management > .alert {
+  max-width: 1680px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 16px;
 }
 
-/* Вкладки Физлица / Юрлица */
+/* Вкладки: физические лица / юридические лица (полные подписи) */
 .customers-tabs {
   margin-top: 0;
   margin-bottom: 24px;
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 4px;
   background: var(--bg-secondary, #f1f5f9);
   border-radius: 10px;
-  width: fit-content;
+  width: 100%;
+  max-width: min(100%, 640px);
+  box-sizing: border-box;
   border: 1px solid var(--border-color, #e2e8f0);
 }
 
 .customers-tabs .tab {
-  padding: 10px 20px;
+  flex: 1 1 200px;
+  min-height: 44px;
+  padding: 10px 16px;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
+  line-height: 1.3;
+  text-align: center;
   transition: background 0.2s, color 0.2s;
 }
 
@@ -452,4 +461,38 @@
 
 .customers-slider .customers-table-wrapper {
   overflow-x: auto;
+}
+
+/* Список в духе /adminpanel/products: шапка таблицы slate */
+.product-management .clients-crm__table {
+  min-width: 720px;
+  table-layout: auto;
+}
+
+.product-management .clients-crm__table thead {
+  background: #475569;
+}
+
+.product-management .clients-crm__table thead th {
+  background: transparent;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px 12px;
+}
+
+.product-management .clients-crm__table thead th:last-child {
+  border-right: none;
+}
+
+.product-management .clients-crm__table tbody td {
+  border-right: 1px solid #e2e8f0;
+}
+
+.product-management .clients-crm__table tbody td:last-child {
+  border-right: none;
 }

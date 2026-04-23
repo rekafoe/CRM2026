@@ -3,6 +3,7 @@ import { Material } from '../../../types/shared';
 import { materialPriceSecondaryLabel } from '../../../utils/materialPriceLabels';
 import { WarehouseButton } from '../common/WarehouseButton';
 import { StatusBadge } from '../../common/StatusBadge';
+import { AppIcon } from '../../ui/AppIcon';
 
 interface MaterialRowCardProps {
   material: Material;
@@ -87,29 +88,32 @@ export const MaterialRowCard: React.FC<MaterialRowCardProps> = ({
       <div className="row-column actions-column">
         <div className="material-actions flex gap-1">
           <WarehouseButton
-            variant="secondary"
+            variant="primary"
             size="sm"
-            icon="✏️"
+            icon={<AppIcon name="pencil" size="xs" />}
             onClick={() => onEdit(material)}
             className="action-btn"
+            title="Редактировать"
           >
             Изменить
           </WarehouseButton>
           <WarehouseButton
             variant="warning"
             size="sm"
-            icon="📦"
+            icon={<AppIcon name="box" size="xs" />}
             onClick={() => onReserve(material)}
             className="action-btn"
+            title="Резерв / списание"
           >
             Резерв
           </WarehouseButton>
           <WarehouseButton
             variant="danger"
             size="sm"
-            icon="🗑️"
+            icon={<AppIcon name="trash" size="xs" />}
             onClick={() => onDelete(material)}
             className="action-btn"
+            title="Удалить"
           >
             Удалить
           </WarehouseButton>

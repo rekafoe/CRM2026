@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppIcon } from '../../ui/AppIcon';
 import { WarehouseFormField } from '../common/WarehouseForm';
 
 interface MaterialsFiltersProps {
@@ -63,10 +64,12 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
             Сбросить
           </button>
           <button
+            type="button"
             onClick={onClose}
-            className="px-3 py-1 text-sm bg-tertiary text-text-primary rounded hover:bg-border-color"
+            className="inline-flex items-center justify-center gap-1 rounded px-3 py-1 text-sm bg-tertiary text-text-primary hover:bg-border-color"
+            aria-label="Закрыть фильтры"
           >
-            ✕
+            <AppIcon name="x" size="sm" />
           </button>
         </div>
       </div>

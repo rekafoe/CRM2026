@@ -3,7 +3,10 @@ import '../../styles/admin-page-layout.css';
 
 interface AdminPageLayoutProps {
   title: string;
-  icon: string | React.ReactNode;
+  /** Иконка слева от заголовка (например, <AppIcon />). Без эмодзи — предпочтительно. */
+  icon?: string | React.ReactNode | null;
+  /** Вторая часть заголовка (например, имя клиента) — визуально мягче основного title */
+  titleSuffix?: string | null;
   onBack: () => void;
   children: React.ReactNode;
   className?: string;
@@ -14,6 +17,7 @@ interface AdminPageLayoutProps {
 export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
   title,
   icon,
+  titleSuffix,
   onBack,
   children,
   className = '',
@@ -26,7 +30,16 @@ export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
           ← Назад
         </button>
         <h1>
-          {icon} {title}
+          {icon != null && <span className="admin-page-header__title-icon">{icon}</span>}
+          <span className="admin-page-header__title-main">{title}</span>
+          {titleSuffix && (
+            <>
+              <span className="admin-page-header__title-sep" aria-hidden="true" />
+              <span className="admin-page-header__title-suffix" title={titleSuffix}>
+                {titleSuffix}
+              </span>
+            </>
+          )}
         </h1>
         {headerExtra != null && (
           <div className="admin-page-header__extra">

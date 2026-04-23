@@ -3,7 +3,7 @@
  * Использует модульную структуру с хуками и компонентами
  */
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useId } from 'react';
 import { Button, Alert, Modal } from '../../common';
 import { AppIcon } from '../../ui/AppIcon';
 import { PricingService } from '../../../types/pricing';
@@ -19,14 +19,18 @@ import { useTierOperations } from './hooks/useTierOperations';
 import { filterAndSortServices } from './utils/serviceFilters';
 import { getServiceIcon, getServiceTypeLabel, getUnitLabel } from './utils/serviceFormatters';
 import ServiceForm from './components/ServiceForm';
-import ServicesTable from './components/ServicesTable';
 import ServiceVolumeTiersPanel from './components/ServiceVolumeTiersPanel';
-import { AutoCuttingPriceSection } from './components/AutoCuttingPriceSection';
+import { AutoCuttingPriceSidebar } from './components/AutoCuttingPriceSidebar';
 import { ServiceVariantsTable } from './components/ServiceVariantsTable';
 import { ServicesFilters } from './components/ServicesFilters';
-import { ServicesStats } from './components/ServicesStats';
+import { ServiceCategoryTableSection } from './components/ServiceCategoryTableSection';
 import { getServiceVariants } from '../../../services/pricing';
 import './ServicesManagement.css';
+
+/** Ключи секций списка услуг (аккордеон по категориям) */
+const SVC_SECTION_BINDINGS = 'svc-bindings';
+const svcSectionKey = (categoryId: number | null) =>
+  categoryId != null ? `svc-cat-${categoryId}` : 'svc-cat-none';
 
 const emptyServiceForm: ServiceFormState = {
   name: '',
@@ -106,6 +110,25 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
   const [servicesWithVariants, setServicesWithVariants] = useState<Set<number>>(new Set());
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [materials, setMaterials] = useState<Array<{ id: number; name: string }>>([]);
+
+  const serviceCategoryAccordionId = useId();
+  const [openServiceCategorySections, setOpenServiceCategorySections] = useState<Set<string>>(
+    () => new Set()
+  );
+
+  const panelIdForServiceSection = useCallback(
+    (key: string) => `panel-${serviceCategoryAccordionId}-${key}`.replace(/[:]/g, ''),
+    [serviceCategoryAccordionId]
+  );
+
+  const toggleServiceCategorySection = useCallback((key: string) => {
+    setOpenServiceCategorySections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   const loadCategories = useCallback(() => {
     getServiceCategories().then(setCategories).catch(() => setCategories([]));
@@ -336,20 +359,27 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
   // Рендеринг действий для строки услуги
   const renderActions = useCallback((service: PricingService) => (
     <div className="services-table__actions">
-      <Button variant="info" size="sm" onClick={() => openEditService(service)}>
+      <Button variant="secondary" size="sm" onClick={() => openEditService(service)} title="Редактировать услугу">
         <AppIcon name="edit" size="xs" /> Редактировать
       </Button>
       <Button
-        variant="warning"
+        variant="secondary"
         size="sm"
+        title={service.isActive ? 'Сделать услугу неактивной' : 'Сделать услугу активной'}
         onClick={() => serviceOperationsRef.current.updateService(service.id, { isActive: !service.isActive })}
       >
         {service.isActive ? <><AppIcon name="ban" size="xs" /> Деактивировать</> : <><AppIcon name="check" size="xs" /> Активировать</>}
       </Button>
-      <Button variant="secondary" size="sm" onClick={() => handleToggleVolumeTiers(service.id)}>
+      <Button variant="secondary" size="sm" onClick={() => handleToggleVolumeTiers(service.id)} title="Объёмы и цены по диапазонам">
         <AppIcon name="chart" size="xs" /> Диапазоны
       </Button>
-      <Button variant="error" size="sm" onClick={() => handleServiceDelete(service.id, service.name)}>
+      <Button
+        variant="error"
+        size="sm"
+        onClick={() => handleServiceDelete(service.id, service.name)}
+        title="Удалить услугу"
+        aria-label="Удалить услугу"
+      >
         <AppIcon name="trash" size="xs" />
       </Button>
     </div>
@@ -381,7 +411,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
   }, [servicesWithVariants, state.volumeTiers, state.tiersLoading]); // tierOperations через ref
 
   return (
-    <div className="services-management">
+    <div className="services-management sm-workspace">
       {showHeader && (
         <div className="services-header">
           <div className="services-header__title-row">
@@ -392,37 +422,36 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
         </div>
       )}
 
-      {/* Статистика */}
-      <ServicesStats services={services} />
+      <AutoCuttingPriceSidebar />
 
-      {/* Цена автоматической резки */}
-      <AutoCuttingPriceSection />
-
-      {/* Ошибки и успех */}
       {combinedError && (
-        <div className="svc-error-banner">
+        <div className="svc-error-banner" role="alert">
           {combinedError}
         </div>
       )}
 
       {state.success && (
-        <Alert type="success" className="mb-4">{state.success}</Alert>
+        <Alert type="success" className="sm-flash sm-flash--success">{state.success}</Alert>
       )}
 
-      {/* Контент */}
       {servicesLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-3"></div>
-            <p className="text-gray-500">Загрузка услуг...</p>
+        <div className="sm-loading">
+          <div className="sm-loading__inner">
+            <div className="sm-loading__spinner" aria-hidden />
+            <p className="sm-loading__text">Загрузка услуг…</p>
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          {/* Категории услуг */}
+        <section className="sm-list-panel" aria-label="Справочник услуг">
+          <header className="sm-list-panel__head">
+            <h2 className="sm-list-panel__title">Услуги</h2>
+            <p className="sm-list-panel__lead">
+              Категории, поиск, таблица. Цены вариантов — в строке услуги («Диапазоны» / варианты).
+            </p>
+          </header>
+
           <ServiceCategoriesBlock categories={categories} onReload={loadCategories} />
 
-          {/* Фильтры */}
           <ServicesFilters
             services={services}
             searchValue={state.serviceSearch}
@@ -447,45 +476,53 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
             }}
           />
 
-          <div className="svc-info-banner">
-            <strong>Как это работает:</strong> Создайте услугу с единицей измерения и базовой ценой. Услуги привязываются к продуктам при их создании.
-          </div>
+          <p className="sm-hint-line">
+            Базовая цена и единица — здесь. Привязка к продуктам — в карточке продукта при настройке.
+          </p>
 
-          {/* Таблица услуг по категориям */}
           {filteredServices.length > 0 ? (
             <>
-              <div className="services-table-container">
+              <div className="services-table-container sm-table-wrap">
                 {bindingServices.length > 0 && (
-                  <div className="services-category-group">
-                    <h3 className="services-category-group__title">Переплёты</h3>
-                    <ServicesTable
-                      services={bindingServices}
-                      renderActions={renderActions}
-                      expandedServiceId={state.expandedServiceId}
-                      renderExpandedRow={renderExpandedRow}
-                      getServiceIcon={getServiceIcon}
-                      getServiceTypeLabel={getServiceTypeLabel}
-                      getUnitLabel={getUnitLabel}
-                    />
-                  </div>
+                  <ServiceCategoryTableSection
+                    sectionKey={SVC_SECTION_BINDINGS}
+                    label="Переплёты"
+                    count={bindingServices.length}
+                    isOpen={openServiceCategorySections.has(SVC_SECTION_BINDINGS)}
+                    onToggle={toggleServiceCategorySection}
+                    panelIdFor={panelIdForServiceSection}
+                    services={bindingServices}
+                    expandedServiceId={state.expandedServiceId}
+                    renderExpandedRow={renderExpandedRow}
+                    getServiceIcon={getServiceIcon}
+                    getServiceTypeLabel={getServiceTypeLabel}
+                    getUnitLabel={getUnitLabel}
+                    renderActions={renderActions}
+                  />
                 )}
-                {servicesByCategory.map((group) => (
-                  <div key={group.categoryId ?? 'none'} className="services-category-group">
-                    <h3 className="services-category-group__title">{group.categoryName}</h3>
-                    <ServicesTable
+                {servicesByCategory.map((group) => {
+                  const sKey = svcSectionKey(group.categoryId);
+                  return (
+                    <ServiceCategoryTableSection
+                      key={sKey}
+                      sectionKey={sKey}
+                      label={group.categoryName}
+                      count={group.services.length}
+                      isOpen={openServiceCategorySections.has(sKey)}
+                      onToggle={toggleServiceCategorySection}
+                      panelIdFor={panelIdForServiceSection}
                       services={group.services}
-                      renderActions={renderActions}
                       expandedServiceId={state.expandedServiceId}
                       renderExpandedRow={renderExpandedRow}
                       getServiceIcon={getServiceIcon}
                       getServiceTypeLabel={getServiceTypeLabel}
                       getUnitLabel={getUnitLabel}
+                      renderActions={renderActions}
                     />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              {/* Футер таблицы */}
-              <div className="services-table-footer">
+              <div className="services-table-footer sm-table-footer">
                 <span>
                   Показано: <strong>{filteredServices.length}</strong> из <strong>{services.length}</strong> услуг
                 </span>
@@ -493,15 +530,15 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               </div>
             </>
           ) : (
-            <div className="services-empty">
+            <div className="services-empty sm-empty-embedded">
               <div className="services-empty__icon"><AppIcon name="clipboard" size="lg" /></div>
               <h3 className="services-empty__title">
                 {state.serviceSearch || state.typeFilter !== 'all' ? 'Ничего не найдено' : 'Нет услуг'}
               </h3>
               <p className="services-empty__message">
                 {state.serviceSearch || state.typeFilter !== 'all'
-                  ? 'Попробуйте изменить параметры поиска или фильтры'
-                  : 'Начните с добавления первой услуги для настройки ценообразования'}
+                  ? 'Попробуйте изменить поиск или фильтры'
+                  : 'Начните с добавления первой услуги'}
               </p>
               {!state.serviceSearch && state.typeFilter === 'all' && (
                 <Button
@@ -517,7 +554,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
               )}
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {/* Модальное окно создания услуги / переплёта */}
@@ -526,7 +563,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
           isOpen={true}
           title="Создание записи"
           size="md"
-          className="services-create-modal"
+          className="services-create-modal sm-ui-modal"
           onClose={() => {
             setShowCreateService(false);
             setCreateMode('service');
@@ -617,7 +654,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
           isOpen={true}
           title="Редактирование услуги"
           size="md"
-          className="services-edit-modal"
+          className="services-edit-modal sm-ui-modal"
           onClose={resetEditingService}
         >
           <ServiceForm value={state.editingServiceForm} onChange={setEditingServiceForm} categories={categories} materials={materials} />

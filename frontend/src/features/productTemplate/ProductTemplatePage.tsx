@@ -29,7 +29,7 @@ import { AppIcon } from '../../components/ui/AppIcon';
 import { ProductDuplicateModal } from '../../components/admin/ProductDuplicateModal';
 import { TemplateHeaderExtra } from './components/TemplateHeaderExtra';
 import { UnsavedChangesBanner } from './components/UnsavedChangesBanner';
-import { SimplifiedTemplateSidebar } from './components/SimplifiedTemplateSidebar';
+import { SimplifiedTemplateSidebarDrawer } from './components/SimplifiedTemplateSidebarDrawer';
 import { useUIStore } from '../../stores/uiStore';
 
 
@@ -214,8 +214,8 @@ const ProductTemplatePage: React.FC = () => {
       />
 
       {isSimplifiedTemplateProduct ? (
-        <div className="product-template__body product-template__body--simplified-with-sidebar">
-          <SimplifiedTemplateSidebar
+        <div className="product-template__body product-template__body--simplified-with-sidebar product-template__body--simplified-one-col">
+          <SimplifiedTemplateSidebarDrawer
             product={product}
             icon={state.meta.icon}
             name={state.meta.name}

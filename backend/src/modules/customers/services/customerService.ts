@@ -18,6 +18,10 @@ export interface Customer {
   notes?: string;
   created_at: string;
   updated_at: string;
+  /** Дата последнего заказа (по данным БД) */
+  last_order_at?: string | null;
+  /** Сумма последнего заказа с учётом скидки (как в CRM) */
+  last_order_amount?: number | null;
 }
 
 export class CustomerService {
@@ -86,6 +90,53 @@ export class CustomerService {
   }
 
   /**
+   * К последним заказам: дата и сумма (по позициям и скидке заказа).
+   */
+  private static async attachLastOrderStats(customers: Customer[]): Promise<Customer[]> {
+    if (customers.length === 0) return customers;
+    const db = await getDb();
+    const ids = customers.map((c) => c.id);
+    const ph = ids.map(() => '?').join(',');
+    const sql = `
+      SELECT customer_id, last_order_at, last_order_amount
+      FROM (
+        SELECT
+          o.customer_id,
+          COALESCE(o.created_at, o.createdAt) AS last_order_at,
+          ROUND(
+            COALESCE((SELECT SUM(i.price * i.quantity) FROM items i WHERE i.orderId = o.id), 0) *
+            (1.0 - COALESCE(o.discount_percent, 0) / 100.0),
+            2
+          ) AS last_order_amount,
+          ROW_NUMBER() OVER (
+            PARTITION BY o.customer_id
+            ORDER BY datetime(COALESCE(o.created_at, o.createdAt)) DESC, o.id DESC
+          ) AS rn
+        FROM orders o
+        WHERE o.customer_id IN (${ph})
+      ) t
+      WHERE t.rn = 1
+    `;
+    const rows = (await db.all(sql, ids)) as Array<{
+      customer_id: number;
+      last_order_at: string;
+      last_order_amount: number;
+    }>;
+    const map = new Map(rows.map((r) => [r.customer_id, r]));
+    return customers.map((c) => {
+      const s = map.get(c.id);
+      if (!s) {
+        return { ...c, last_order_at: null, last_order_amount: null };
+      }
+      return {
+        ...c,
+        last_order_at: s.last_order_at,
+        last_order_amount: s.last_order_amount,
+      };
+    });
+  }
+
+  /**
    * Получить всех клиентов с возможностью фильтрации
    */
   static async getAllCustomers(filters?: {
@@ -98,7 +149,7 @@ export class CustomerService {
       : allCustomers;
 
     if (!filters?.search) {
-      return typeFiltered;
+      return this.attachLastOrderStats(typeFiltered);
     }
 
     const queryText = String(filters.search || '');
@@ -111,7 +162,7 @@ export class CustomerService {
     });
 
     if (directMatches.length > 0) {
-      return directMatches;
+      return this.attachLastOrderStats(directMatches);
     }
 
     // Fallback: триграммный поиск по всем клиентам для защиты от опечаток
@@ -128,7 +179,7 @@ export class CustomerService {
       .slice(0, 20)
       .map((item) => item.customer);
 
-    return scored;
+    return this.attachLastOrderStats(scored);
   }
 
   /**
@@ -137,7 +188,10 @@ export class CustomerService {
   static async getCustomerById(id: number): Promise<Customer | null> {
     const db = await getDb()
     const row = await db.get('SELECT * FROM customers WHERE id = ?', [id])
-    return row ? this.mapRowToCustomer(row) : null
+    if (!row) return null
+    const c = this.mapRowToCustomer(row)
+    const withStats = await this.attachLastOrderStats([c])
+    return withStats[0]
   }
 
   /**

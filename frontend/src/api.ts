@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { calculatePrice as unifiedCalculatePrice } from './services/pricing';
-import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer, DocumentTemplate, TemplateData, OrderActivityResponse } from './types';
+import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer, CustomerLegalDocument, DocumentTemplate, TemplateData, OrderActivityResponse } from './types';
 import { API_BASE_URL } from './config/constants';
 
 const api = axios.create({ baseURL: API_BASE_URL });
@@ -888,6 +888,34 @@ export const updateCustomer = (id: number, customer: Partial<Omit<Customer, 'id'
   api.put<Customer>(`/customers/${id}`, customer);
 export const deleteCustomer = (id: number) => 
   api.delete(`/customers/${id}`);
+
+export const getCustomerLegalDocuments = (customerId: number) =>
+  api.get<CustomerLegalDocument[]>(`/customers/${customerId}/legal-documents`);
+export const createCustomerLegalDocument = (
+  customerId: number,
+  body: {
+    title: string;
+    document_kind?: string | null;
+    issued_at: string;
+    returned_at?: string | null;
+    notes?: string | null;
+    order_id?: number | null;
+  },
+) => api.post<CustomerLegalDocument>(`/customers/${customerId}/legal-documents`, body);
+export const updateCustomerLegalDocument = (
+  customerId: number,
+  documentId: number,
+  body: Partial<{
+    title: string;
+    document_kind: string | null;
+    issued_at: string;
+    returned_at: string | null;
+    notes: string | null;
+    order_id: number | null;
+  }>,
+) => api.put<CustomerLegalDocument>(`/customers/${customerId}/legal-documents/${documentId}`, body);
+export const deleteCustomerLegalDocument = (customerId: number, documentId: number) =>
+  api.delete(`/customers/${customerId}/legal-documents/${documentId}`);
 
 // Document Templates API
 export const getDocumentTemplates = () => 

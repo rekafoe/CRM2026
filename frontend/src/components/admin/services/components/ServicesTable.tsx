@@ -81,12 +81,17 @@ const ServicesTable: React.FC<ServicesTableProps> = ({
     return (
       <div className="services-table__actions">
         {onEdit && (
-          <Button variant="info" size="sm" onClick={() => onEdit(service)}>
+          <Button variant="secondary" size="sm" onClick={() => onEdit(service)} title="Редактировать услугу">
             ✏️ Редактировать
           </Button>
         )}
         {onToggleActive && (
-          <Button variant="warning" size="sm" onClick={() => onToggleActive(service)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onToggleActive(service)}
+            title={service.isActive ? 'Деактивировать' : 'Активировать'}
+          >
             {service.isActive ? '⏸️ Деактивировать' : '▶️ Активировать'}
           </Button>
         )}

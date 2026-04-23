@@ -224,20 +224,6 @@ const ProductManagement: React.FC = () => {
     });
   }, [categories, state.productForm.category_id, setProductForm]);
 
-  // Вычисляем статистику
-  const stats = useMemo(() => {
-    const activeCount = products.filter(p => p.is_active).length;
-    const inactiveCount = products.length - activeCount;
-    const categoriesWithProducts = new Set(products.map(p => p.category_id)).size;
-    
-    return {
-      total: products.length,
-      active: activeCount,
-      inactive: inactiveCount,
-      categories: categoriesWithProducts,
-    };
-  }, [products]);
-
   return (
     <div className="product-management">
       {/* Заголовок */}
@@ -261,53 +247,6 @@ const ProductManagement: React.FC = () => {
           <button type="button" className="lg-btn lg-btn--primary" onClick={() => openCreateWizard()}>
             <AppIcon name="plus" size="xs" /> Создать продукт
           </button>
-        </div>
-      </div>
-
-      {/* Статистика */}
-      <div className="product-stats">
-        <div className="product-stat-card">
-          <div className="product-stat-card__header">
-            <span className="product-stat-card__label">Всего продуктов</span>
-            <span className="product-stat-card__icon"><AppIcon name="package" size="sm" /></span>
-          </div>
-          <div className="product-stat-card__value">{stats.total}</div>
-          <div className="product-stat-card__trend product-stat-card__trend--neutral">
-            В {stats.categories} категориях
-          </div>
-        </div>
-
-        <div className="product-stat-card">
-          <div className="product-stat-card__header">
-            <span className="product-stat-card__label">Активных</span>
-            <span className="product-stat-card__icon"><AppIcon name="check" size="sm" /></span>
-          </div>
-          <div className="product-stat-card__value">{stats.active}</div>
-          <div className="product-stat-card__trend">
-            {stats.total > 0 ? ((stats.active / stats.total) * 100).toFixed(0) : 0}% от всех
-          </div>
-        </div>
-
-        <div className="product-stat-card">
-          <div className="product-stat-card__header">
-            <span className="product-stat-card__label">Неактивных</span>
-            <span className="product-stat-card__icon"><AppIcon name="ban" size="sm" /></span>
-          </div>
-          <div className="product-stat-card__value">{stats.inactive}</div>
-          <div className="product-stat-card__trend product-stat-card__trend--negative">
-            {stats.inactive > 0 ? 'Требуют проверки' : 'Отлично!'}
-          </div>
-        </div>
-
-        <div className="product-stat-card">
-          <div className="product-stat-card__header">
-            <span className="product-stat-card__label">Категорий</span>
-            <span className="product-stat-card__icon"><AppIcon name="folder" size="sm" /></span>
-          </div>
-          <div className="product-stat-card__value">{categories.length}</div>
-          <div className="product-stat-card__trend product-stat-card__trend--neutral">
-            {stats.categories} используются
-          </div>
         </div>
       </div>
 

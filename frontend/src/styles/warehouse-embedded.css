@@ -1,0 +1,66 @@
+/* Склад внутри admin panel + product-management: без fullscreen fixed */
+
+.product-management .warehouse-dashboard--embedded,
+.warehouse-page .warehouse-dashboard--embedded {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  z-index: auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
+  background: transparent;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.product-management .warehouse-dashboard--embedded .warehouse-pm-bulk,
+.warehouse-page .warehouse-dashboard--embedded .warehouse-pm-bulk {
+  margin-bottom: 0;
+  border-radius: 12px 12px 0 0;
+}
+
+.product-management .warehouse-dashboard--embedded .tabs-content-embedded,
+.warehouse-page .warehouse-dashboard--embedded .tabs-content-embedded {
+  padding: 0;
+  min-height: 200px;
+}
+
+.product-management .warehouse-dashboard--embedded .warehouse-pm-loading,
+.warehouse-page .warehouse-dashboard--embedded .warehouse-pm-loading {
+  padding: 48px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product-management .warehouse-dashboard--embedded .warehouse-pm-error,
+.warehouse-page .warehouse-dashboard--embedded .warehouse-pm-error {
+  padding: 32px 24px;
+  text-align: center;
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+.product-management .warehouse-dashboard--embedded .compact-stats,
+.warehouse-page .warehouse-dashboard--embedded .compact-stats {
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+.product-management .warehouse-dashboard--embedded .compact-stat .app-icon,
+.warehouse-page .warehouse-dashboard--embedded .compact-stat .app-icon {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+/* Иконки на активном чипе — как в ProductManagement */
+.warehouse-dashboard--embedded .product-filter-chip--active .app-icon,
+.warehouse-dashboard--embedded .product-filter-chip--active .app-icon svg {
+  color: #fff;
+}

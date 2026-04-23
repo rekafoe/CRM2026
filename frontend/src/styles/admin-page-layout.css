@@ -48,6 +48,37 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.admin-page-header__title-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.admin-page-header__title-main {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.admin-page-header__title-sep {
+  width: 1px;
+  height: 1.1em;
+  background: #cbd5e1;
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+
+.admin-page-header__title-suffix {
+  font-size: 18px;
+  font-weight: 500;
+  color: #64748b;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-page-header h1 .app-icon,

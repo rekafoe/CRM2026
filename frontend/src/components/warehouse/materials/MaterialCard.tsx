@@ -3,6 +3,7 @@ import { Material } from '../../../types/shared';
 import { materialPriceSecondaryLabel } from '../../../utils/materialPriceLabels';
 import { WarehouseButton } from '../common/WarehouseButton';
 import { StatusBadge } from '../../common/StatusBadge';
+import { AppIcon } from '../../ui/AppIcon';
 
 interface MaterialCardProps {
   material: Material;
@@ -34,35 +35,25 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
 
 
   return (
-    <div className={`material-card card ${isSelected ? 'selected' : ''}`}>
-      <div className="material-card-header flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
+    <div className={`material-card ${isSelected ? 'selected' : ''}`}>
+      <div className="material-card-header flex min-w-0 items-start justify-between gap-2 mb-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
           <input
             type="checkbox"
             checked={isSelected}
             onChange={() => onSelect(material.id)}
-            className="material-checkbox"
+            className="material-checkbox shrink-0"
+            aria-label={`Выбрать ${material.name}`}
           />
-          <div className="material-info">
-            <h3 className="material-name text-lg font-bold text-primary">
-              {material.name}
-            </h3>
-            <p className="material-description text-sm text-text-secondary">
-              {material.description || 'Без описания'}
-            </p>
+          <div className="material-info min-w-0">
+            <h3 className="material-name">{material.name}</h3>
+            <p className="material-description">{material.description || 'Без описания'}</p>
           </div>
         </div>
-        <StatusBadge status={stockInfo.status} />
+        <StatusBadge status={stockInfo.status} className="material-card-status shrink-0" />
       </div>
 
       <div className="material-card-body mb-3">
-        {/* Описание материала */}
-        {material.description && (
-          <div className="material-description mb-3 p-2 bg-tertiary rounded text-sm text-text-secondary">
-            {material.description}
-          </div>
-        )}
-        
         <div className="material-details flex flex-col gap-2">
           <div className="detail-item flex justify-between items-center">
             <span className="detail-label text-xs text-text-secondary">Категория:</span>
@@ -94,23 +85,26 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
         <WarehouseButton
           variant="primary"
           size="sm"
-          icon="✏️"
+          icon={<AppIcon name="pencil" size="xs" />}
           onClick={() => onEdit(material)}
           className="icon-only"
+          title="Редактировать"
         />
         <WarehouseButton
           variant="warning"
           size="sm"
-          icon="📦"
+          icon={<AppIcon name="box" size="xs" />}
           onClick={() => onReserve(material)}
           className="icon-only"
+          title="Резерв / списание"
         />
         <WarehouseButton
           variant="danger"
           size="sm"
-          icon="🗑️"
+          icon={<AppIcon name="trash" size="xs" />}
           onClick={() => onDelete(material)}
           className="icon-only"
+          title="Удалить"
         />
       </div>
     </div>

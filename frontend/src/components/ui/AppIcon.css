@@ -62,7 +62,6 @@
 /* ---- Stat card icon boxes — contrasting standalone ---- */
 .reports-stat-card__icon-box .app-icon,
 .earn-stat-card__icon .app-icon,
-.cnt-stat-card__icon-box .app-icon,
-.product-stat-card__icon .app-icon {
+.cnt-stat-card__icon-box .app-icon {
   color: #334155;
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import { Material } from '../../types/shared';
 import { MaterialsManagementRefactored } from './materials/MaterialsManagementRefactored';
 import './materials/MaterialsManagement.css';
+import './materials/MaterialCardProductStyle.css';
 
 interface MaterialsManagementProps {
   materials: Material[];

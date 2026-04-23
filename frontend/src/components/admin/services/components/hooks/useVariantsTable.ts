@@ -9,7 +9,12 @@ import {
 } from '../ServiceVariantsTable.utils';
 import { VariantsByType } from '../ServiceVariantsTable.types';
 
-const AUTO_SAVE_MS = 1100;
+/** Меньше всплесков запросов к API (429 на проде при массовом сохранении) */
+const AUTO_SAVE_MS = 2400;
+
+const staggerMs = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** Пауза между последовательными запросами в одном батче сохранения */
+const BATCH_STAGGER_MS = 70;
 
 export interface UseVariantsTableResult {
   loading: boolean;
@@ -78,6 +83,9 @@ export function useVariantsTable(serviceId: number): UseVariantsTableResult {
                   await operations.updateVariantName(change.variantId, change.variantName);
                 }
                 if (change.parameters) {
+                  if (change.variantName != null) {
+                    await staggerMs(BATCH_STAGGER_MS);
+                  }
                   await operations.updateVariantParams(change.variantId, change.parameters);
                 }
               }
@@ -88,23 +96,32 @@ export function useVariantsTable(serviceId: number): UseVariantsTableResult {
               }
               break;
           }
+          await staggerMs(BATCH_STAGGER_MS);
         }
 
         const removeChanges = rangeChanges.filter((c) => c.type === 'remove' && c.rangeIndex !== undefined);
         for (const change of removeChanges) {
           await operations.removeRange(change.rangeIndex!);
+          await staggerMs(BATCH_STAGGER_MS);
         }
         const addChanges = rangeChanges.filter((c) => c.type === 'add' && c.boundary);
-        await Promise.all(addChanges.map((c) => operations.addRangeBoundary(c.boundary!)));
+        for (const c of addChanges) {
+          await operations.addRangeBoundary(c.boundary!);
+          await staggerMs(BATCH_STAGGER_MS);
+        }
         const editChanges = rangeChanges.filter(
           (c) => c.type === 'edit' && c.rangeIndex !== undefined && c.newBoundary !== undefined
         );
         for (const change of editChanges) {
           await operations.editRangeBoundary(change.rangeIndex!, change.newBoundary!);
+          await staggerMs(BATCH_STAGGER_MS);
         }
 
         if (priceChanges.length > 0) {
-          await Promise.all(priceChanges.map((c) => operations.savePriceImmediate(c.variantId, c.minQty, c.newPrice)));
+          for (const c of priceChanges) {
+            await operations.savePriceImmediate(c.variantId, c.minQty, c.newPrice);
+            await staggerMs(BATCH_STAGGER_MS);
+          }
         }
 
         invalidateCache();

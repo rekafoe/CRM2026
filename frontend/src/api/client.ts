@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { API_BASE_URL } from '../config/constants';
 
 /**
@@ -91,25 +91,40 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Интерцептор для обработки ошибок
+// Интерцептор: 429 Too Many Requests — пауза и повтор (сервер / прокси часто режут всплески)
+const MAX_429_RETRIES = 5;
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Токен истек, перенаправляем на страницу входа
+  async (error) => {
+    const status = error.response?.status;
+    const cfg = error.config as (InternalAxiosRequestConfig & { __retry429?: number }) | undefined;
+
+    if (status === 429 && cfg) {
+      const n = (cfg.__retry429 ?? 0) + 1;
+      if (n <= MAX_429_RETRIES) {
+        cfg.__retry429 = n;
+        const h = (error.response?.headers || {}) as Record<string, string>;
+        const ra = h['retry-after'] ?? h['Retry-After'];
+        const waitMs = ra
+          ? Math.min(30000, Math.max(300, parseInt(String(ra), 10) * 1000))
+          : Math.min(12000, 500 * 2 ** (n - 1));
+        await new Promise<void>((r) => setTimeout(r, waitMs));
+        return apiClient.request(cfg);
+      }
+    }
+
+    if (status === 401) {
       localStorage.removeItem('crmToken');
       localStorage.removeItem('crmRole');
       localStorage.removeItem('crmSessionDate');
       localStorage.removeItem('crmUserId');
       window.location.href = '/login';
     }
-    
-    // Подавляем логирование 404 для новых оптимизированных endpoints (они обрабатываются через fallback)
-    if (error.response?.status === 404 && error.config?.url?.includes('/ranges/')) {
-      // Это ожидаемо - новый API еще не развернут, используется fallback
-      // Не логируем как критическую ошибку
+
+    if (status === 404 && error.config?.url?.includes('/ranges/')) {
+      // ожидаемо для fallback
     }
-    
+
     return Promise.reject(error);
   }
 );

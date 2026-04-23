@@ -11,6 +11,21 @@ export interface User {
   is_active: boolean;
 }
 
+/** Учёт документов, выданных юридическому лицу (даты формирования и возврата к нам). */
+export interface CustomerLegalDocument {
+  id: number;
+  customer_id: number;
+  /** С каким заказом связана выдача/учёт (если null — старые записи или сводно по периоду) */
+  order_id?: number | null;
+  title: string;
+  document_kind: string | null;
+  issued_at: string;
+  returned_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Customer {
   id: number;
   type: 'individual' | 'legal';
@@ -31,6 +46,9 @@ export interface Customer {
   notes?: string;
   created_at: string;
   updated_at: string;
+  /** Список клиентов: последний заказ */
+  last_order_at?: string | null;
+  last_order_amount?: number | null;
 }
 
 export interface Order {

@@ -41,6 +41,7 @@ const CountersServicePage = lazy(() => import('./admin/CountersServicePage'));
 const CustomersAdminPage = lazy(() =>
   import('./admin/CustomersAdminPage').then((m) => ({ default: m.default }))
 );
+const CustomerDetailPage = lazy(() => import('./admin/CustomerDetailPage'));
 const DocumentTemplatesPage = lazy(() => import('./admin/DocumentTemplatesPage'));
 const OrganizationsPage = lazy(() => import('./admin/OrganizationsPage'));
 const SettingsPage = lazy(() =>
@@ -335,6 +336,7 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/preflight" element={<PreflightPage />} />
           <Route path="/design-templates" element={<DesignTemplatesPage />} />
           <Route path="/design-editor/:templateId" element={<DesignEditorPage />} />
+          <Route path="/clients/:id" element={<CustomerDetailPage />} />
           <Route path="/clients" element={<CustomersAdminPage />} />
           <Route path="/document-templates" element={<DocumentTemplatesPage />} />
           <Route path="/organizations" element={<OrganizationsPage />} />
