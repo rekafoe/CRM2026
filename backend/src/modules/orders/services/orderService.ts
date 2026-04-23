@@ -277,40 +277,79 @@ export class OrderService {
       hasResponsibleUserId = false
     }
     const creatorId = userId ?? null
-    const contactResponsible = (hasContactUserId || hasResponsibleUserId)
-      ? `${hasContactUserId ? ', contact_user_id' : ''}${hasResponsibleUserId ? ', responsible_user_id' : ''}`
-      : ''
-    const contactResponsibleVals = (hasContactUserId || hasResponsibleUserId)
-      ? `${hasContactUserId ? ', ?' : ''}${hasResponsibleUserId ? ', ?' : ''}`
-      : ''
     const channelRaw = paymentChannel && OrderService.ALLOWED_PAYMENT_CHANNELS.has(paymentChannel) ? paymentChannel : 'cash'
     const isInternal = channelRaw === 'internal'
     const channel = isInternal ? 'not_cashed' : channelRaw
-    const isInternalCol = hasIsInternal ? ', is_internal' : ''
-    const isInternalVal = hasIsInternal ? ', ?' : ''
-    const insertRes = hasPrepaymentUpdatedAt
-      ? await db.run(
-          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, prepaymentUpdatedAt, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}${isInternalCol}${contactResponsible}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''}${isInternalVal}${contactResponsibleVals})`,
-          [
-            defaultStatusId, createdAt, customerName || null, customerPhone || null, customerEmail || null,
-            initialPrepay, initialPrepay > 0 ? createdAt : null, creatorId, source || 'crm', customerId || null,
-            ...(hasPaymentChannel ? [channel] : []),
-            ...(hasIsInternal ? [isInternal ? 1 : 0] : []),
-            ...(hasContactUserId ? [creatorId] : []),
-            ...(hasResponsibleUserId ? [creatorId] : [])
-          ]
-        )
-      : await db.run(
-          `INSERT INTO orders (status, created_at, customerName, customerPhone, customerEmail, prepaymentAmount, userId, source, customer_id${hasPaymentChannel ? ', payment_channel' : ''}${isInternalCol}${contactResponsible}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?${hasPaymentChannel ? ', ?' : ''}${isInternalVal}${contactResponsibleVals})`,
-          [
-            defaultStatusId, createdAt, customerName || null, customerPhone || null, customerEmail || null,
-            initialPrepay, creatorId, source || 'crm', customerId || null,
-            ...(hasPaymentChannel ? [channel] : []),
-            ...(hasIsInternal ? [isInternal ? 1 : 0] : []),
-            ...(hasContactUserId ? [creatorId] : []),
-            ...(hasResponsibleUserId ? [creatorId] : [])
-          ]
-        )
+
+    const orderCols: string[] = hasPrepaymentUpdatedAt
+      ? [
+          'status',
+          'created_at',
+          'customerName',
+          'customerPhone',
+          'customerEmail',
+          'prepaymentAmount',
+          'prepaymentUpdatedAt',
+          'userId',
+          'source',
+          'customer_id',
+        ]
+      : [
+          'status',
+          'created_at',
+          'customerName',
+          'customerPhone',
+          'customerEmail',
+          'prepaymentAmount',
+          'userId',
+          'source',
+          'customer_id',
+        ]
+    const orderValues: unknown[] = hasPrepaymentUpdatedAt
+      ? [
+          defaultStatusId,
+          createdAt,
+          customerName || null,
+          customerPhone || null,
+          customerEmail || null,
+          initialPrepay,
+          initialPrepay > 0 ? createdAt : null,
+          creatorId,
+          source || 'crm',
+          customerId || null,
+        ]
+      : [
+          defaultStatusId,
+          createdAt,
+          customerName || null,
+          customerPhone || null,
+          customerEmail || null,
+          initialPrepay,
+          creatorId,
+          source || 'crm',
+          customerId || null,
+        ]
+    if (hasPaymentChannel) {
+      orderCols.push('payment_channel')
+      orderValues.push(channel)
+    }
+    if (hasIsInternal) {
+      orderCols.push('is_internal')
+      orderValues.push(isInternal ? 1 : 0)
+    }
+    if (hasContactUserId) {
+      orderCols.push('contact_user_id')
+      orderValues.push(creatorId)
+    }
+    if (hasResponsibleUserId) {
+      orderCols.push('responsible_user_id')
+      orderValues.push(creatorId)
+    }
+    const placeholders = orderCols.map(() => '?').join(', ')
+    const insertRes = await db.run(
+      `INSERT INTO orders (${orderCols.join(', ')}) VALUES (${placeholders})`,
+      orderValues
+    )
     const id = (insertRes as any).lastID!
     const number = buildOrderNumberFromSourceAndId(source || 'crm', id)
     await db.run('UPDATE orders SET number = ? WHERE id = ?', [number, id])
