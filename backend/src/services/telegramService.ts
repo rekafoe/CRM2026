@@ -1,10 +1,13 @@
 // Используем встроенный fetch (Node.js 18+)
 import { TelegramUserService } from './telegramUserService';
+import { previewTelegramText } from '../utils/telegramBotApi';
 
 export interface TelegramConfig {
   botToken: string;
   chatId?: string; // Сделаем опциональным
   enabled: boolean;
+  /** true — доставка апдейтов через setWebhook, long polling в этом процессе не запускается */
+  useWebhook?: boolean;
 }
 
 export interface LowStockNotification {
@@ -48,12 +51,16 @@ export class TelegramService {
     this.config = config;
     console.log('🤖 Telegram service initialized:', {
       enabled: config.enabled,
+      use_webhook: Boolean(config.useWebhook),
       chatId: config.chatId ? `${config.chatId.substring(0, 4)}...` : 'not set'
     });
     
-    // Запускаем polling для получения обновлений
     if (config.enabled && config.botToken) {
-      this.startPolling();
+      if (config.useWebhook) {
+        console.log('🌐 Telegram: webhook mode — getUpdates/polling in this process is not started (use POST .../api/notifications/telegram/webhook).');
+      } else {
+        this.startPolling();
+      }
     }
   }
 
@@ -64,7 +71,8 @@ export class TelegramService {
     return this.config || {
       botToken: '',
       chatId: undefined,
-      enabled: false
+      enabled: false,
+      useWebhook: false
     };
   }
 
@@ -480,12 +488,12 @@ export class TelegramService {
     const { from, chat, text, photo, document } = update.message;
     
     // Проверяем, что сообщение от пользователя, а не от бота
-    if (from.is_bot) return;
+    if (from?.is_bot) return;
 
     console.log('📨 Received message via polling:', {
       chat_id: chat.id,
-      user_id: from.id,
-      text: text?.substring(0, 50) + '...',
+      user_id: from?.id,
+      text_preview: previewTelegramText(text),
       has_photo: !!photo,
       has_document: !!document
     });

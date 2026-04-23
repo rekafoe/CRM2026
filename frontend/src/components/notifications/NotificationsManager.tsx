@@ -1,28 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { LowStockAlerts } from '../warehouse/LowStockAlerts';
 import { TelegramBotManager } from './TelegramBotManager';
 import { AutoOrdersManager } from './AutoOrdersManager';
+import { OrderClientNotifyTab } from './OrderClientNotifyTab';
 import { useUIStore } from '../../stores/uiStore';
 import './NotificationsManager.css';
+
+type NotifyTab = 'alerts' | 'telegram' | 'orders' | 'settings' | 'client';
 
 interface NotificationsManagerProps {
   onClose: () => void;
 }
 
+function tabFromSearchParam(t: string | null): NotifyTab {
+  if (t === 'client' || t === 'mail' || t === 'email' || t === 'sms') {
+    return 'client';
+  }
+  if (t === 'telegram') {
+    return 'telegram';
+  }
+  if (t === 'orders' || t === 'auto') {
+    return 'orders';
+  }
+  if (t === 'settings' || t === 'config') {
+    return 'settings';
+  }
+  if (t === 'alerts' || t === 'stock') {
+    return 'alerts';
+  }
+  return 'alerts';
+}
+
+function paramForTab(tab: NotifyTab): string | undefined {
+  if (tab === 'alerts') {
+    return undefined;
+  }
+  if (tab === 'client') {
+    return 'client';
+  }
+  if (tab === 'telegram') {
+    return 'telegram';
+  }
+  if (tab === 'orders') {
+    return 'orders';
+  }
+  if (tab === 'settings') {
+    return 'settings';
+  }
+  return undefined;
+}
+
 export const NotificationsManager: React.FC<NotificationsManagerProps> = ({ onClose }) => {
-  const [activeTab, setActiveTab] = useState<'alerts' | 'telegram' | 'orders' | 'settings'>('alerts');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<NotifyTab>(() => tabFromSearchParam(searchParams.get('tab')));
   const { showToast } = useUIStore();
+
+  useEffect(() => {
+    setActiveTab(tabFromSearchParam(searchParams.get('tab')));
+  }, [searchParams]);
+
+  const goTab = useCallback(
+    (tab: NotifyTab) => {
+      setActiveTab(tab);
+      const p = paramForTab(tab);
+      if (p) {
+        setSearchParams({ tab: p });
+      } else {
+        setSearchParams({});
+      }
+    },
+    [setSearchParams]
+  );
 
   const renderContent = () => {
     switch (activeTab) {
       case 'alerts':
         return <LowStockAlerts />;
       case 'telegram':
-        return <TelegramBotManager onClose={() => setActiveTab('alerts')} />;
+        return <TelegramBotManager onClose={() => goTab('alerts')} />;
       case 'orders':
-        return <AutoOrdersManager onClose={() => setActiveTab('alerts')} />;
+        return <AutoOrdersManager onClose={() => goTab('alerts')} />;
       case 'settings':
         return <NotificationsSettings />;
+      case 'client':
+        return <OrderClientNotifyTab />;
       default:
         return <LowStockAlerts />;
     }
@@ -31,34 +93,47 @@ export const NotificationsManager: React.FC<NotificationsManagerProps> = ({ onCl
   return (
     <div className="notifications-manager">
       <div className="notifications-header">
-        <h2>🔔 Управление уведомлениями</h2>
-        <button onClick={onClose} className="close-btn">✕</button>
+        <h2>Управление уведомлениями</h2>
+        <button type="button" onClick={onClose} className="close-btn" aria-label="Закрыть">
+          ✕
+        </button>
       </div>
 
       <div className="notifications-tabs">
         <button
+          type="button"
           className={activeTab === 'alerts' ? 'active' : ''}
-          onClick={() => setActiveTab('alerts')}
+          onClick={() => goTab('alerts')}
         >
-          📦 Остатки
+          Остатки
         </button>
         <button
+          type="button"
+          className={activeTab === 'client' ? 'active' : ''}
+          onClick={() => goTab('client')}
+        >
+          Почта / SMS
+        </button>
+        <button
+          type="button"
           className={activeTab === 'telegram' ? 'active' : ''}
-          onClick={() => setActiveTab('telegram')}
+          onClick={() => goTab('telegram')}
         >
-          🤖 Telegram
+          Telegram
         </button>
         <button
+          type="button"
           className={activeTab === 'orders' ? 'active' : ''}
-          onClick={() => setActiveTab('orders')}
+          onClick={() => goTab('orders')}
         >
-          🛒 Автозаказы
+          Автозаказы
         </button>
         <button
+          type="button"
           className={activeTab === 'settings' ? 'active' : ''}
-          onClick={() => setActiveTab('settings')}
+          onClick={() => goTab('settings')}
         >
-          ⚙️ Настройки
+          Настройки
         </button>
       </div>
 

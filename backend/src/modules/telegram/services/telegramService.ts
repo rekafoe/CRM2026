@@ -6,6 +6,7 @@ export interface TelegramConfig {
   botToken: string;
   chatId?: string; // Сделаем опциональным
   enabled: boolean;
+  useWebhook?: boolean;
 }
 
 export interface LowStockNotification {
@@ -44,12 +45,16 @@ export class TelegramService {
     this.config = config;
     logger.info('Telegram service initialized', {
       enabled: config.enabled,
+      use_webhook: Boolean(config.useWebhook),
       chatId: config.chatId ? `${config.chatId.substring(0, 4)}...` : 'not set'
     });
     
-    // Запускаем polling для получения обновлений
     if (config.enabled && config.botToken) {
-      this.startPolling();
+      if (config.useWebhook) {
+        logger.info('Telegram: webhook mode — polling in this process is not started');
+      } else {
+        this.startPolling();
+      }
     }
   }
 
@@ -60,7 +65,8 @@ export class TelegramService {
     return this.config || {
       botToken: '',
       chatId: undefined,
-      enabled: false
+      enabled: false,
+      useWebhook: false
     };
   }
 

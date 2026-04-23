@@ -11,6 +11,7 @@ import { parseNumberFlexible } from '../../../utils/numberInput';
 import { CustomerSelector } from '../../customers/CustomerSelector';
 import { AppIcon } from '../../ui/AppIcon';
 import { OrderMailLogPanel } from '../../orders/OrderMailLogPanel';
+import { OrderSmsPanel } from '../../orders/OrderSmsPanel';
 
 interface OrderDetailSectionProps {
   selectedOrder: Order;
@@ -645,7 +646,10 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       />
 
       {currentUser?.role === 'admin' && (
-        <OrderMailLogPanel key={selectedOrder.id} orderId={selectedOrder.id} />
+        <>
+          <OrderMailLogPanel key={selectedOrder.id} orderId={selectedOrder.id} />
+          <OrderSmsPanel orderId={selectedOrder.id} customerPhone={selectedOrder.customerPhone} />
+        </>
       )}
     </>
   );

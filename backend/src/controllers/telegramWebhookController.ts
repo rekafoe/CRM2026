@@ -6,6 +6,7 @@ import { TelegramService } from '../services/telegramService';
 import { PhotoOrderService } from '../services/photoOrderService';
 import { ImageProcessingService } from '../services/imageProcessingService';
 import { PhotoOrderSessionService } from '../services/photoOrderSessionService';
+import { callTelegramMethod, previewTelegramText, type TelegramWebhookInfoResult } from '../utils/telegramBotApi';
 
 export interface TelegramUpdate {
   update_id: number;
@@ -73,14 +74,23 @@ export class TelegramWebhookController {
    */
   static async handleWebhook(req: Request, res: Response) {
     try {
+      const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+      if (secret) {
+        const h = req.headers['x-telegram-bot-api-secret-token'];
+        const got = Array.isArray(h) ? h[0] : h;
+        if (got !== secret) {
+          return res.status(403).json({ success: false, message: 'Invalid webhook secret' });
+        }
+      }
+
       const update: TelegramUpdate = req.body;
       
       console.log('📨 Received Telegram webhook:', {
         update_id: update.update_id,
         has_message: !!update.message,
         chat_id: update.message?.chat.id,
-        user_id: update.message?.from.id,
-        text: update.message?.text?.substring(0, 50) + '...',
+        user_id: update.message?.from?.id,
+        text_preview: previewTelegramText(update.message?.text),
         full_body: JSON.stringify(req.body, null, 2)
       });
 
@@ -95,6 +105,10 @@ export class TelegramWebhookController {
       }
 
       const { from, chat, text, photo, document } = update.message;
+
+      if (!from) {
+        return res.json({ success: true, message: 'No from in message, skipping' });
+      }
       
       // Проверяем, что сообщение от пользователя, а не от бота
       if (from.is_bot) {
@@ -379,14 +393,25 @@ export class TelegramWebhookController {
    * Получение информации о webhook
    */
   static async getWebhookInfo(req: Request, res: Response) {
+    const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+    if (!token) {
+      return res.status(503).json({ success: false, message: 'TELEGRAM_BOT_TOKEN is not set' });
+    }
     try {
-      // Здесь можно добавить логику для получения информации о webhook
+      const data = await callTelegramMethod<TelegramWebhookInfoResult>(token, 'getWebhookInfo');
+      if (!data.ok) {
+        return res.status(502).json({
+          success: false,
+          message: data.description || 'Telegram getWebhookInfo failed',
+          error_code: data.error_code
+        });
+      }
       res.json({
         success: true,
         data: {
-          webhook_url: process.env.TELEGRAM_WEBHOOK_URL || 'Not configured',
-          bot_username: process.env.TELEGRAM_BOT_USERNAME || 'Not configured',
-          last_update: new Date().toISOString()
+          telegram: data.result,
+          env_webhook_url: process.env.TELEGRAM_WEBHOOK_URL || null,
+          bot_username: process.env.TELEGRAM_BOT_USERNAME || null
         }
       });
     } catch (error: any) {
@@ -403,23 +428,67 @@ export class TelegramWebhookController {
    * Установка webhook
    */
   static async setWebhook(req: Request, res: Response) {
+    const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+    if (!token) {
+      return res.status(503).json({ success: false, message: 'TELEGRAM_BOT_TOKEN is not set' });
+    }
     try {
-      const { webhookUrl } = req.body;
-      
-      if (!webhookUrl) {
-        return res.status(400).json({
-          success: false,
-          message: 'Webhook URL is required'
+      const { webhookUrl, dropPendingUpdates, removeWebhook } = req.body as {
+        webhookUrl?: string
+        dropPendingUpdates?: boolean
+        removeWebhook?: boolean
+      }
+
+      if (removeWebhook) {
+        const del = await callTelegramMethod<true>(token, 'deleteWebhook', {
+          drop_pending_updates: Boolean(dropPendingUpdates)
+        });
+        if (!del.ok) {
+          return res.status(502).json({
+            success: false,
+            message: del.description || 'Telegram deleteWebhook failed',
+            error_code: del.error_code
+          });
+        }
+        return res.json({
+          success: true,
+          message: 'Webhook removed in Telegram',
+          data: { removed: true }
         });
       }
 
-      // Здесь можно добавить логику для установки webhook через Telegram API
-      console.log(`🔗 Setting webhook URL: ${webhookUrl}`);
-      
+      const urlRaw = typeof webhookUrl === 'string' ? webhookUrl.trim() : '';
+      if (urlRaw === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'Укажите webhookUrl или removeWebhook: true для снятия вебхука'
+        });
+      }
+
+      const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+      const params: Record<string, string | number | boolean | undefined> = {
+        url: urlRaw,
+        drop_pending_updates: Boolean(dropPendingUpdates)
+      };
+      if (secret) {
+        params.secret_token = secret;
+      }
+
+      const data = await callTelegramMethod<true>(token, 'setWebhook', params);
+      if (!data.ok) {
+        return res.status(502).json({
+          success: false,
+          message: data.description || 'Telegram setWebhook failed',
+          error_code: data.error_code
+        });
+      }
+
+      console.log(`🔗 setWebhook ok: ${urlRaw}`);
+
       res.json({
         success: true,
-        message: 'Webhook URL set successfully',
-        data: { webhook_url: webhookUrl }
+        message: 'Webhook URL set in Telegram',
+        data: { webhook_url: urlRaw, has_secret: Boolean(secret) }
       });
     } catch (error: any) {
       console.error('❌ Error setting webhook:', error);

@@ -2,7 +2,7 @@
 
 Документ описывает, как настроить отправку уведомлений клиентам о готовности заказа (email и при необходимости SMS).
 
-**Сейчас в бэкенде:** очередь **`mail_jobs`**, **nodemailer** (`SMTP_*`), воркер, `POST /api/mail/test` (admin, Bearer). Таблицы **`email_templates`**, **`order_email_rules`**: при смене статуса заказа (website) в очередь ставится письмо, если для **нового** `order_statuses.id` есть **активное** правило и у заказа заполнен **customerEmail**. Idempotency: `order-notify:orderId:old:new`. Список/включение правил: `GET/ PATCH /api/mail/order-email-rules` (по `id` правила, `is_active`). Логи по заказу: `GET /api/mail/jobs?orderId=` (только `mail_jobs` с `context_order_id`). Во фронте: **Админ** → **Почта (заказы)** (`/adminpanel/mail-notifications`); в карточке заказа (только **admin**) — блок «Почта по заказу». По умолчанию правило в миграции **выключено** (`is_active=0`); включайте вручную после настройки SMTP.
+**Сейчас в бэкенде:** очередь **`mail_jobs`**, **nodemailer** (`SMTP_*`), воркер, `POST /api/mail/test` (admin, Bearer). Таблицы **`email_templates`**, **`order_email_rules`**: при смене статуса заказа (website) в очередь ставится письмо, если для **нового** `order_statuses.id` есть **активное** правило и у заказа заполнен **customerEmail**. Idempotency: `order-notify:orderId:old:new`. Список/включение правил: `GET/ PATCH /api/mail/order-email-rules` (по `id` правила, `is_active`). Логи по заказу: `GET /api/mail/jobs?orderId=` (только `mail_jobs` с `context_order_id`). Во фронте: **Админ** → **Уведомления** (`/adminpanel/notifications`, вкладка **Почта / SMS**, `?tab=client`); в карточке заказа (только **admin**) — «Почта по заказу» и «SMS». Редирект: `/adminpanel/mail-notifications` → туда же. По умолчанию правило в миграции **выключено** (`is_active=0`); включайте вручную после настройки SMTP.
 
 ---
 
@@ -100,6 +100,8 @@ SMS_API_KEY=your-api-key
 
 В реализации достаточно одного интерфейса «sendSms(phone, text)», внутри — чтение `process.env.SMS_*` и вызов нужного API.
 
+**Реализовано в CRM:** таблицы `sms_templates`, `order_sms_rules`, `sms_debounce`, `sms_log`. Автоматически: только `orders.source = 'website'`, `customerPhone`, дебаунс (перезапись последнего целевого статуса), тихие часы **8:30–20:00 Europe/Minsk**, провайдер `log` (лог) или `http` (тестовый `POST` с подстановкой `{{phone}}` / `{{text}}` в теле). API: `GET /api/sms/config`, `GET /api/sms/templates`, `GET /api/sms/order-rules`, `PATCH /api/sms/order-rules/:id` (admin), ручная отправка: `POST /api/orders/:id/sms` (admin) с `templateId` или `body` — вне окна **409** с `nextSendAt`. Подробнее: `env.example` (`SMS_ENABLED`, `SMS_DEBOUNCE_SECONDS`, `SMS_QUIET_HOURS_*`).
+
 ---
 
 ## 4. Итог
@@ -107,6 +109,6 @@ SMS_API_KEY=your-api-key
 | Канал | Что настроить | Где хранить |
 |-------|----------------|-------------|
 | Email | SMTP: хост, порт, пользователь, пароль, от кого | `SMTP_*` в `.env` |
-| SMS   | Провайдер, ключи/токены, номер отправителя или URL шлюза | `SMS_*` в `.env` |
+| SMS   | `SMS_ENABLED`, дебаунс, тихие часы, провайдер `log` или HTTP | `SMS_*` в `.env` |
 
-После подключения **триггеров по заказу** к очереди `mail_jobs` достаточно будет задать `SMTP_*` — письма пойдут через тот же транспорт. SMS — по-прежнему отдельная доработка (`SMS_*`).
+После настройки `SMTP_*` письма идут через `mail_jobs`. Для **SMS** задайте `SMS_ENABLED=true` и при необходимости `SMS_PROVIDER=http` с `SMS_HTTP_URL` и т.д. (см. `env.example`).

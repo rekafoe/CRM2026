@@ -22,6 +22,7 @@ import { startOrderFilesCleanup } from './services/orderFilesCleanupService'
 import { startStorageMonitor } from './services/storageMonitorService'
 import { logger } from './utils/logger'
 import { startMailOutboxWorker } from './services/mailOutboxWorker'
+import { startSmsDebounceWorker } from './services/smsDebounceWorker'
 import { AuthController } from './controllers'
 import { swaggerSpec } from './config/swagger'
 
@@ -205,7 +206,8 @@ async function startServer() {
     const telegramConfig = {
       botToken: process.env.TELEGRAM_BOT_TOKEN || '',
       chatId: process.env.TELEGRAM_CHAT_ID || '',
-      enabled: process.env.TELEGRAM_ENABLED === 'true'
+      enabled: process.env.TELEGRAM_ENABLED === 'true',
+      useWebhook: process.env.TELEGRAM_USE_WEBHOOK === 'true',
     }
     
     TelegramService.initialize(telegramConfig)
@@ -267,9 +269,15 @@ async function startServer() {
     }
     app.listen(port, () => {
       startMailOutboxWorker()
+      startSmsDebounceWorker()
       logger.info(`Server running on port ${port}`)
       logger.info(`Uploads directory: ${uploadsDir}`)
-      logger.info(`Telegram notifications: ${telegramConfig.enabled ? 'enabled' : 'disabled'}`)
+      const tgMode = !telegramConfig.enabled
+        ? 'disabled'
+        : telegramConfig.useWebhook
+          ? 'enabled (webhook, no local polling)'
+          : 'enabled (long polling)'
+      logger.info(`Telegram: ${tgMode}`)
       logger.info(`Stock monitoring: ${process.env.STOCK_MONITORING_ENABLED !== 'false' ? 'enabled' : 'disabled'}`)
       logger.info(`Auto ordering: ${process.env.AUTO_ORDER_ENABLED === 'true' ? 'enabled' : 'disabled'}`)
       logger.info(`Earnings recalculation: ${earningsConfig.enabled ? 'enabled' : 'disabled'} (${earningsConfig.intervalMinutes}m)`)

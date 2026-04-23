@@ -11,6 +11,7 @@ import { getLastWebsiteOrderAt } from '../utils/poolSync'
 import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 import { runPreflight, parseTargetFormatFromParams } from '../services/preflightService'
 import { OrderService } from '../modules/orders/services/orderService'
+import { sendOrderSmsManual } from '../services/orderStatusSmsService'
 
 const router = Router()
 
@@ -768,6 +769,23 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
 
   const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', id)
   res.json(orderForApi(updated))
+}))
+
+/** Admin: ручная отправка SMS клиенту (8:30–20:00 Minsk, SMS_ENABLED) */
+router.post('/:id/sms', asyncHandler(async (req, res) => {
+  const user = (req as any).user as { role: string } | undefined
+  if (!user || user.role !== 'admin') {
+    res.status(403).json({ message: 'Forbidden' })
+    return
+  }
+  const id = Number(req.params.id)
+  const { templateId, body } = (req.body || {}) as { templateId?: number; body?: string }
+  const r = await sendOrderSmsManual({ orderId: id, templateId, body })
+  if (!r.ok) {
+    res.status('nextSendAt' in r && r.nextSendAt ? 409 : 400).json(r)
+    return
+  }
+  res.json(r)
 }))
 
 // Admin utility: normalize item prices

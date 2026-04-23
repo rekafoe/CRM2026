@@ -12,6 +12,7 @@ import { EarningsService } from '../../../services/earningsService'
 import { mapPhotoOrderToOrder, mapPhotoOrderToVirtualItem } from '../../../models/mappers/telegramPhotoOrderMapper'
 import { PriceTypeService } from '../../pricing/services/priceTypeService'
 import { tryEnqueueOrderStatusEmail } from '../../../services/orderStatusEmailService'
+import { tryScheduleOrderStatusSms } from '../../../services/orderStatusSmsService'
 
 export class OrderService {
   private static normalizeReasonCode(reason: string): string {
@@ -893,7 +894,8 @@ export class OrderService {
           newStatusId,
           source: 'website',
         });
-        
+        void tryScheduleOrderStatusSms({ orderId: id, newStatusId });
+
         const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
         const updated: Order = { ...(raw as Order), items: [] }
         return OrderService.orderForApi(updated) as Order
@@ -1284,6 +1286,7 @@ export class OrderService {
           newStatusId: n,
           source: 'website',
         });
+        void tryScheduleOrderStatusSms({ orderId: row.id, newStatusId: n });
       }
     }
     

@@ -44,20 +44,23 @@
 
 .notifications-tabs {
   display: flex;
+  flex-wrap: wrap;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
+  gap: 0;
 }
 
 .notifications-tabs button {
-  flex: 1;
-  padding: 15px 20px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 12px 14px;
   background: none;
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
   border-bottom: 3px solid transparent;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
 }
 

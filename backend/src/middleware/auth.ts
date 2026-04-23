@@ -63,6 +63,8 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'POST', path: /^\/api\/orders\/from-website\/[0-9]+\/files$/ },
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/items$/ },
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/prepay$/ },
+  // Telegram шлёт POST без Bearer — только сюда (опционально X-Telegram-Bot-Api-Secret-Token)
+  { method: 'POST', path: /^\/api\/notifications\/telegram\/webhook\/?$/ },
 ]
 
 /**

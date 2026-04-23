@@ -26,8 +26,11 @@ export interface NotificationMessage {
 }
 
 export class UserNotificationService {
-  private static botToken = '7954389446:AAHmFQmGJOp-fZLhaZD9ZGxvrJ_WEyKMtnE';
   private static isInitialized = false;
+
+  private static getBotTokenFromEnv(): string {
+    return (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  }
 
   /**
    * Инициализация сервиса
@@ -36,12 +39,13 @@ export class UserNotificationService {
     if (this.isInitialized) return;
 
     logger.info('Initializing User Notification Service');
-    
-    // Инициализируем Telegram сервис с токеном бота
+    const token = this.getBotTokenFromEnv();
+    const enabled = process.env.TELEGRAM_ENABLED === 'true' && token.length > 0;
+
     TelegramService.initialize({
-      botToken: this.botToken,
+      botToken: token,
       chatId: '', // Будет устанавливаться для каждого пользователя
-      enabled: true
+      enabled
     });
 
     this.isInitialized = true;
@@ -225,13 +229,18 @@ export class UserNotificationService {
    * Отправка сообщения в Telegram
    */
   private static async sendTelegramMessage(chatId: string, notification: NotificationMessage): Promise<boolean> {
+    const token = this.getBotTokenFromEnv();
+    if (!token) {
+      logger.error('TELEGRAM_BOT_TOKEN is not set, skip sendTelegramMessage');
+      return false;
+    }
     try {
       const emoji = notification.priority === 'high' ? '🚨' : 
                    notification.priority === 'medium' ? '⚠️' : 'ℹ️';
       
       const message = `${emoji} *${notification.title}*\n\n${notification.message}`;
       
-      const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+      const url = `https://api.telegram.org/bot${token}/sendMessage`;
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -314,8 +323,13 @@ export class UserNotificationService {
    * Получение информации о пользователях, которые писали боту
    */
   static async getBotUsers(): Promise<any[]> {
+    const token = this.getBotTokenFromEnv();
+    if (!token) {
+      logger.error('TELEGRAM_BOT_TOKEN is not set, getBotUsers returns []');
+      return [];
+    }
     try {
-      const url = `https://api.telegram.org/bot${this.botToken}/getUpdates`;
+      const url = `https://api.telegram.org/bot${token}/getUpdates`;
       const response = await fetch(url);
       const data = await response.json();
       
@@ -359,8 +373,12 @@ export class UserNotificationService {
     for (const user of botUsers) {
       try {
         const message = `🧪 *Тестовое сообщение*\n\nПривет, ${user.first_name}! Система уведомлений работает корректно.`;
-        
-        const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+        const t = this.getBotTokenFromEnv();
+        if (!t) {
+          logger.error('TELEGRAM_BOT_TOKEN is not set');
+          return 0;
+        }
+        const url = `https://api.telegram.org/bot${t}/sendMessage`;
         const response = await fetch(url, {
           method: 'POST',
           headers: {

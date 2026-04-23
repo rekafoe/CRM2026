@@ -324,6 +324,14 @@ export class UserNotificationController {
 
       logger.info(`Sending low stock notification to ${botUsers.length} bot users`);
 
+      const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+      if (!token) {
+        return res.status(503).json({
+          success: false,
+          message: 'TELEGRAM_BOT_TOKEN не задан, рассылка в Telegram невозможна'
+        });
+      }
+
       for (const user of botUsers) {
         try {
           const message = `🚨 *Низкий остаток материала*\n\n` +
@@ -333,7 +341,7 @@ export class UserNotificationController {
                          (supplierName ? `🏢 *Поставщик:* ${supplierName}\n` : '') +
                          `\n💡 *Рекомендация:* Необходимо пополнить запас`;
           
-          const url = `https://api.telegram.org/bot7954389446:AAHmFQmGJOp-fZLhaZD9ZGxvrJ_WEyKMtnE/sendMessage`;
+          const url = `https://api.telegram.org/bot${token}/sendMessage`;
           const response = await fetch(url, {
             method: 'POST',
             headers: {
