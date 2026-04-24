@@ -69,6 +69,7 @@ export const MINIAPP_CLIENT_PART2 = `
         for (var vi = 0; vi < out.cart.length; vi++) {
           if (!out.checkoutFileByK[out.cart[vi].k]) {
             out.checkoutMsg = 'Добавьте макет в калькуляторе (до «В корзину») или отметьте «Нет макета — требуется помощь с его разработкой».';
+            _miniappScrollTop();
             render();
             return;
           }
@@ -206,8 +207,18 @@ export const MINIAPP_CLIENT_PART2 = `
       })
       .catch(function (err) { out.ordersErr = (err && err.message) || String(err); out.orders = { orders: [], meta: { telegram_orders: true } }; render(); });
   }
+  function _miniappScrollTop() {
+    try {
+      if (window.scrollTo) window.scrollTo(0, 0);
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    } catch (e) {}
+  }
+  var _miniappPrevView = '';
   function render() {
     setNav();
+    var viewChanged = _miniappPrevView !== out.view;
+    _miniappPrevView = out.view;
     main.innerHTML = '';
     if (out.view === 'profile') main.appendChild(renderProfile());
     else if (out.view === 'catalog') main.appendChild(renderCatalog());
@@ -216,6 +227,7 @@ export const MINIAPP_CLIENT_PART2 = `
     else if (out.view === 'order_detail') main.appendChild(renderOrderDetail());
     else if (out.view === 'checkout') main.appendChild(renderCheckout());
     else if (out.view === 'calculator') main.appendChild(renderCalculator());
+    if (viewChanged) _miniappScrollTop();
   }
   function boot() {
     nav = $('miniapp-nav');

@@ -215,7 +215,10 @@ export const MINIAPP_CLIENT_PART1 = `
         row.appendChild(media);
         var blurb = shortProductDescription(p);
         if (blurb) row.appendChild(h('div', esc(blurb), 'ipc-catalog-card__desc'));
-        var price = p.min_price != null && p.min_price !== '' ? 'от ' + esc(p.min_price) + bynSpanHtml() : 'цена по запросу';
+        var price =
+          p.min_price != null && p.min_price !== ''
+            ? 'от <span class="ipc-catalog-card__price-amount">' + esc(p.min_price) + bynSpanHtml() + '</span>'
+            : 'цена по запросу';
         row.appendChild(h('div', price, 'card-price ipc-catalog-card__price'));
         var btn = h('button', isSimplifiedProduct(p) ? 'Заказать' : 'В корзину', 'primary ipc-catalog-card__btn');
         btn.type = 'button';

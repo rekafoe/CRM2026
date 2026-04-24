@@ -12,7 +12,8 @@ export const MINIAPP_CLIENT_PART_CALC_SUMMARY = `
     var line1 = h('div', '', 'ipc-calc-card__line');
     line1.appendChild(h('span', 'Стоимость:', 'ipc-calc-card__label'));
     var valLg = h('div', '', 'ipc-calc-card__value--lg');
-    valLg.innerHTML = '<span class="ipc-calc-card__sum">' + esc(bynFormatNum(r.finalPrice)) + '</span>' + bynSpanHtml();
+    valLg.innerHTML =
+      '<span class="ipc-calc-card__sum">' + esc(bynFormatNum(r.finalPrice)) + bynSpanHtml() + '</span>';
     line1.appendChild(valLg);
     card.appendChild(line1);
     card.appendChild(h('div', '', 'ipc-calc-card__sep'));
@@ -23,7 +24,11 @@ export const MINIAPP_CLIENT_PART_CALC_SUMMARY = `
     if (!isFinite(ppu0) && r.finalPrice != null && r.quantity > 0) {
       ppu0 = Number(r.finalPrice) / Number(r.quantity);
     }
-    valSub.innerHTML = esc(bynFormatNum(isFinite(ppu0) ? ppu0 : NaN)) + bynSpanHtml();
+    valSub.innerHTML =
+      '<span class="ipc-calc-card__ppu-amount">' +
+      esc(bynFormatNum(isFinite(ppu0) ? ppu0 : NaN)) +
+      bynSpanHtml() +
+      '</span>';
     line2.appendChild(valSub);
     card.appendChild(line2);
     container.appendChild(card);

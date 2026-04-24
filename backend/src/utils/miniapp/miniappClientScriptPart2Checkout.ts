@@ -38,11 +38,12 @@ export const MINIAPP_CLIENT_PART2_CHECKOUT = `
     loadOrders();
   }
   function doCheckout(formNode) {
-    if (!out.token) { out.checkoutMsg = 'Нет сессии'; render(); return; }
-    if (out.cart.length === 0) { out.checkoutMsg = 'Корзина пуста'; render(); return; }
+    if (!out.token) { out.checkoutMsg = 'Нет сессии'; _miniappScrollTop(); render(); return; }
+    if (out.cart.length === 0) { out.checkoutMsg = 'Корзина пуста'; _miniappScrollTop(); render(); return; }
     var f = formNode;
     if (!f || !f.querySelector || String(f.tagName || '').toLowerCase() !== 'form') {
       out.checkoutMsg = 'Ошибка формы. Обновите страницу и попробуйте снова.';
+      _miniappScrollTop();
       render();
       return;
     }
@@ -53,17 +54,18 @@ export const MINIAPP_CLIENT_PART2_CHECKOUT = `
     var customer;
     if (isLeg) {
       customer = { type: 'legal', company_name: String(fd.get('co') || '').trim(), phone: phone, email: String(fd.get('email') || '').trim() || undefined, notes: String(fd.get('notes') || '').trim() || undefined };
-      if (!customer.company_name) { out.checkoutMsg = 'Укажите компанию'; render(); return; }
+      if (!customer.company_name) { out.checkoutMsg = 'Укажите компанию'; _miniappScrollTop(); render(); return; }
     } else {
       customer = { type: 'individual', phone: phone, notes: String(fd.get('notes') || '').trim() || undefined };
     }
-    if (!phone) { out.checkoutMsg = 'Укажите телефон'; render(); return; }
+    if (!phone) { out.checkoutMsg = 'Укажите телефон'; _miniappScrollTop(); render(); return; }
     out.checkoutDesignHelp = String(fd.get('design_help') || '') === '1';
     if (!out.checkoutDesignHelp) {
       out.checkoutFileByK = out.checkoutFileByK || {};
       for (var vi = 0; vi < out.cart.length; vi++) {
         if (!out.checkoutFileByK[out.cart[vi].k]) {
           out.checkoutMsg = 'Добавьте макет на этапе расчёта в калькуляторе (до «В корзину») или отметьте «Нет макета — требуется помощь с его разработкой».';
+          _miniappScrollTop();
           render();
           return;
         }
@@ -74,6 +76,7 @@ export const MINIAPP_CLIENT_PART2_CHECKOUT = `
     out.checkoutLoading = true;
     out.checkoutFileProgress = null;
     out.checkoutMsg = null;
+    render();
     var orderNotes = String(fd.get('notes') || '').trim();
     var body = { customer: customer, order: { items: cartToItems(), order_notes: orderNotes, design_help_requested: !!out.checkoutDesignHelp } };
     fetch(API_BASE + '/api/miniapp/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + out.token, Accept: 'application/json' }, body: JSON.stringify(body) })
@@ -82,6 +85,7 @@ export const MINIAPP_CLIENT_PART2_CHECKOUT = `
         if (!x.ok) {
           out.checkoutLoading = false;
           out.checkoutMsg = (x.j && (x.j.error || x.j.message)) ? String(x.j.error || x.j.message) : 'Оформление не удалось';
+          _miniappScrollTop();
           render();
           return;
         }
@@ -121,6 +125,7 @@ export const MINIAPP_CLIENT_PART2_CHECKOUT = `
         out.checkoutLoading = false;
         out.checkoutFileProgress = null;
         out.checkoutMsg = (err && err.message) || String(err);
+        _miniappScrollTop();
         render();
       });
   }

@@ -76,6 +76,7 @@ export function getMiniappMapAndBynShellCss() {
       overflow: hidden;
     }
     .ipc-catalog-card .card-price { flex-shrink: 0; margin-top: auto; font-size: 14px; }
+    .ipc-catalog-card__price-amount { font-size: inherit; white-space: nowrap; }
     .ipc-catalog-card__btn { width: 100%; box-sizing: border-box; flex-shrink: 0; margin-top: 6px; }
     .ipc-subhead {
       font-size: 0.95rem;
@@ -90,19 +91,24 @@ export function getMiniappMapAndBynShellCss() {
     .ipc-detail-block .ipc-result { margin-top: 0; }
     .ipc-list__row--cart .row { margin-top: 0; }
     h2.section-head, h3.section-head { margin-top: 0; }
+    /* Знак BYN: em привязываем к наследуемому кеглю строки; min-* — страховка в Telegram WebView. */
     .ipc-byn {
       display: inline-flex;
-      align-items: flex-end;
-      margin-left: 0.15ch;
+      align-items: center;
+      flex-shrink: 0;
+      margin-left: 0.12ch;
       line-height: 1;
-      vertical-align: -0.02em;
+      vertical-align: -0.06em;
+      font-size: inherit;
     }
     .ipc-byn svg {
       display: block;
       flex-shrink: 0;
-      height: 0.92em;
-      width: 0.77em;
-      transform: translateY(0.02em);
+      height: 1.1em;
+      width: 0.92em;
+      min-height: 14px;
+      min-width: 12px;
+      transform: translateY(0.04em);
     }
     .ipc-design-help-row { margin: 10px 0; }
     .ipc-design-help {

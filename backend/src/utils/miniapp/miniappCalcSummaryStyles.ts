@@ -33,11 +33,21 @@ export const MINIAPP_SHELL_CALC_SUMMARY_CSS = `
       color: #0d9488;
       line-height: 1.2;
     }
-    .ipc-calc-card__value--lg .ipc-byn svg { color: inherit; }
+    .ipc-calc-card__value--lg .ipc-byn { font-size: 1em; }
+    .ipc-calc-card__value--lg .ipc-byn svg {
+      color: inherit;
+      min-height: 20px;
+      min-width: 17px;
+    }
     .ipc-calc-card__value--sub {
       text-align: right;
       font-size: 15px;
       color: #64748b;
+    }
+    .ipc-calc-card__ppu-amount { white-space: nowrap; }
+    .ipc-calc-card__value--sub .ipc-byn svg {
+      min-height: 16px;
+      min-width: 13px;
     }
     .ipc-calc-card__sep {
       height: 1px;
