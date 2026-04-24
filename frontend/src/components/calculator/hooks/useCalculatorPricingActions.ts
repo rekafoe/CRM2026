@@ -219,6 +219,11 @@ export function useCalculatorPricingActions({
           variant_id?: number;
         };
         let finishingConfig: FinishingCalcEntry[] | undefined;
+        const hasSubtypeConfigs = Boolean(
+          specs.typeId != null &&
+          backendProductSchema?.template?.simplified?.typeConfigs &&
+          typeof backendProductSchema.template.simplified.typeConfigs === 'object'
+        );
 
         if (Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0) {
           const backendOps: any[] = Array.isArray(backendProductSchema?.operations)
@@ -347,8 +352,13 @@ export function useCalculatorPricingActions({
           ...(specs.selectedOperations && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0
             ? { selectedOperations: specs.selectedOperations }
             : {}),
-          // 🆕 Передаем нормализованный список finishing для SimplifiedPricingService
-          ...(finishingConfig && finishingConfig.length > 0 ? { finishing: finishingConfig } : {}),
+          // Для продуктов с подтипами пустой finishing тоже значим:
+          // это явный выбор "для текущего подтипа операции не включены".
+          ...(
+            hasSubtypeConfigs
+              ? { finishing: finishingConfig ?? [] }
+              : (finishingConfig && finishingConfig.length > 0 ? { finishing: finishingConfig } : {})
+          ),
         };
 
         // ✅ Логируем trim_size для отладки
