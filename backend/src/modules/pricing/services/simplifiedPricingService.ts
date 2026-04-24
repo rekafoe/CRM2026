@@ -853,19 +853,6 @@ export class SimplifiedPricingService {
               variantId != null
                 ? await PricingServiceRepository.listServiceTiers(serviceId, variantId)
                 : await PricingServiceRepository.listServiceTiers(serviceId);
-
-            // Частый кейс: цены заведены только на услуге (variant_id IS NULL), а в калькуляторе выбран вариант (мат/глянец).
-            // Иначе карта тарифов пустая → ламинация даёт 0 в итоге.
-            if ((!tiers || tiers.length === 0) && variantId != null) {
-              const serviceOnlyTiers = await PricingServiceRepository.listServiceTiers(serviceId);
-              if (serviceOnlyTiers && serviceOnlyTiers.length > 0) {
-                tiers = serviceOnlyTiers;
-                logger.info(
-                  '🔧 [SimplifiedPricingService] Тарифы для variant_id пусты — используем тарифы услуги без варианта',
-                  { productId, serviceId, variantId }
-                );
-              }
-            }
             
             if (tiers && tiers.length > 0) {
               // Конвертируем ServiceVolumeTierDTO -> SimplifiedQtyTier с расчётом max_qty по следующему minQuantity

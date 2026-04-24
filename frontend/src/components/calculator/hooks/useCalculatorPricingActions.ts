@@ -958,7 +958,10 @@ export function useCalculatorPricingActions({
 
         // ✅ Используем ТОЛЬКО цену от бэкенда - скидки должны применяться на бэкенде
         const finalTotalCost = backendResult.finalPrice as number;
-        const finalPricePerItem = backendResult.pricePerUnit as number;
+        const finalPricePerItem =
+          specSnapshot.quantity > 0
+            ? finalTotalCost / specSnapshot.quantity
+            : (backendResult.pricePerUnit as number);
 
 
         const calculationResult: CalculationResult = {

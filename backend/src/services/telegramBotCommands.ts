@@ -55,15 +55,10 @@ export class TelegramBotCommands {
   }
 
   private static buildMainKeyboard() {
-    const url = getMiniappWebAppUrl();
     return {
       keyboard: [
         [{ text: TelegramBotCommands.STATUS_BUTTON_TEXT }],
-        [
-          url
-            ? { text: TelegramBotCommands.PRINTCORE_APP_BUTTON_TEXT, web_app: { url } }
-            : { text: '/miniapp' },
-        ],
+        [{ text: TelegramBotCommands.PRINTCORE_APP_BUTTON_TEXT }],
         [{ text: '/help' }],
       ],
       resize_keyboard: true,

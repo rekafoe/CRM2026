@@ -44,6 +44,20 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
       </>
     );
   };
+  const withBynPerUnit = (value?: number) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return <>—</>;
+    }
+    const formatted = value.toLocaleString('ru-RU', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    });
+    return (
+      <>
+        {formatted} <BynSymbol />
+      </>
+    );
+  };
 
   // Всегда показываем секцию, даже если result null (показываем заглушку)
   if (!result) {
@@ -96,12 +110,7 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
       <div className="result-details">
         <div className="result-item">
           <span>За штуку:</span>
-          <span>
-            {withByn(
-              Math.round(result.totalCost * 100) / 100 / Math.max(1, result.specifications?.quantity ?? 1),
-              true
-            )}
-          </span>
+          <span>{withBynPerUnit(result.pricePerItem)}</span>
         </div>
         <div className="result-item">
           <span>Количество:</span>
