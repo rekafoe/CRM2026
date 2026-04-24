@@ -19,6 +19,7 @@ export class MiniappCheckoutController {
       res.status(201).json({
         order: result.order,
         deductionResult: result.deductionResult,
+        itemIds: result.itemIds ?? [],
         message: 'Заказ создан',
       });
     } catch (e) {

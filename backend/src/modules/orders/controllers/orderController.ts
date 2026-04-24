@@ -155,6 +155,7 @@ export class OrderController {
         res.status(201).json({
           order: result.order,
           deductionResult: result.deductionResult,
+          itemIds: result.itemIds ?? [],
           message: 'Заказ с сайта создан'
         })
         return
@@ -339,6 +340,7 @@ export class OrderController {
       res.status(201).json({
         order: result.order,
         deductionResult: result.deductionResult,
+        itemIds: result.itemIds ?? [],
         message: 'Заказ создан с автоматическим списанием материалов'
       })
     } catch (error: any) {

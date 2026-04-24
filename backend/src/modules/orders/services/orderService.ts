@@ -533,10 +533,17 @@ export class OrderService {
       }
       
       await db.run('COMMIT');
-      
+
+      const itemIdRows = await db.all<{ id: number }>(
+        'SELECT id FROM items WHERE orderId = ? ORDER BY id ASC',
+        [order.id]
+      );
+      const itemIds = (Array.isArray(itemIdRows) ? itemIdRows : []).map((r) => Number(r.id));
+
       return {
         order,
-        deductionResult
+        deductionResult,
+        itemIds,
       };
     } catch (error) {
       await db.run('ROLLBACK');

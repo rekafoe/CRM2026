@@ -18,6 +18,7 @@ import {
 } from '../services/customerEmailMarketingService';
 import { enqueueMarketingTemplateBroadcast } from '../services/mailMarketingBroadcastService';
 import { getTrackingPixelResponse, recordMailOpenByToken } from '../services/mailOpenTrackingService';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -286,14 +287,21 @@ router.post(
       idempotencyKey: `mail-test:${to}:${Date.now()}`,
     });
 
-    // Форс одну попытку обработки сразу (не дожидаясь воркера)
-    const processed = await processMailOutboxBatch(3);
+    // Не ждать SMTP (таймаут 20 с + «медленный запрос»): обработка сразу после ответа + воркер
+    setImmediate(() => {
+      void processMailOutboxBatch(3).catch((e: unknown) => {
+        logger.warn('processMailOutboxBatch after /mail/test', {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      });
+    });
 
     res.json({
       ok: true,
       jobId: id,
       duplicate: duplicate ?? false,
-      immediateProcessed: processed,
+      processingAsync: true,
+      immediateProcessed: null,
     });
   })
 );

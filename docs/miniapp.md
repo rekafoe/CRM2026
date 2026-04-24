@@ -7,7 +7,8 @@
 - `POST /api/miniapp/auth` — `initData` от Telegram, ответ: JWT.
 - `GET /api/miniapp/me` — профиль.
 - `POST /api/miniapp/checkout` — тело JSON: `{ customer, order: { items, order_notes? } }`.  
-  `order.items[]`: `type` (как на сайте, часто id продукта), `params` (объект), `price`, `quantity`, `priceType` (например `standard`).
+  `order.items[]`: `type` (как на сайте, часто id продукта), `params` (объект), `price`, `quantity`, `priceType` (например `standard`).  
+  Ответ `201`: в теле `itemIds: number[]` — id строк `items` **в том же порядке**, что и `order.items` (для привязки макетов).
 
 ## Параметры позиции для CRM
 
@@ -21,10 +22,10 @@
 
 См. также [website-orders-integration.md](./website-orders-integration.md) (аналогия с заказом с сайта).
 
-## Многофайловая загрузка при оформлении
+## Загрузка макетов при оформлении (к позициям)
 
-После **успешного** `POST /api/miniapp/checkout` клиент последовательно вызывает существующий эндпоинт:
+После **успешного** `POST /api/miniapp/checkout` клиент сопоставляет файлы с позициями по **индексу** (`itemIds[i]` ↔ `i`-я строка корзины) и последовательно вызывает:
 
-- `POST /api/miniapp/orders/:orderId/files` — `multipart/form-data`, поле `file` (один файл на запрос).
+- `POST /api/miniapp/orders/:orderId/files` — `multipart/form-data`: поле `file`, при необходимости **`orderItemId`** (id из `itemIds` для этой позиции; не передавать = файл «на весь заказ»).
 
-Ограничения как у общего upload (по умолчанию: до 20 файлов, до 25 МБ на файл — см. `UPLOAD_MAX_*` / `UPLOAD_MAX_FILE_SIZE_BYTES` в окружении). Заказ создаётся **до** загрузок; при ошибке части файлов заказ остаётся, пользователю показывается предупреждение с номером заказа; дозагрузка возможна в карточке заказа в MAP (`GET /api/miniapp/orders/:id` + `POST` файлов).
+Ограничения: до 25 МБ на файл (и общие `UPLOAD_*` в окружении). В форме оформления в MAP — **отдельный файл на каждую позицию**; в калькуляторе можно выбрать макет до «В корзину». Дозагрузка в карточке заказа — по-прежнему `POST` с привязкой к позиции.

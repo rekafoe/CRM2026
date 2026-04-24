@@ -8,7 +8,7 @@ export const MINIAPP_CLIENT_PART2 = `
     if (out.checkoutMsg) box.appendChild(h('p', esc(out.checkoutMsg), 'okmsg'));
     if (out.checkoutFileProgress) box.appendChild(h('p', esc(out.checkoutFileProgress), 'hint'));
     var form = document.createElement('form');
-    form.className = 'form ipc-card';
+    form.className = 'form';
     form.onsubmit = function (e) { e.preventDefault(); doCheckout(e); return false; };
     var isLeg = out.checkoutType === 'legal';
     var sel = document.createElement('select');
@@ -57,44 +57,56 @@ export const MINIAPP_CLIENT_PART2 = `
     no.name = 'notes';
     no.rows = 2;
     addField(form, 'Комментарий', no);
-    var fileInp = document.createElement('input');
-    fileInp.type = 'file';
-    fileInp.name = 'orderFiles';
-    fileInp.multiple = true;
-    fileInp.setAttribute('accept', 'application/pdf,image/*,.doc,.docx,.xls,.xlsx');
-    fileInp.onchange = function () {
-      out.checkoutStagedFiles = (this.files && this.files.length) ? Array.prototype.slice.call(this.files) : [];
-    };
-    addField(form, 'Макеты к заказу (необяз.)', fileInp);
-    form.appendChild(h('p', 'До 20 файлов, до 25 МБ каждый. Загрузка сразу после создания заказа.', 'hint'));
+    out.checkoutFileByK = out.checkoutFileByK || {};
+    for (var cix = 0; cix < out.cart.length; cix++) {
+      (function (line) {
+        var fin = document.createElement('input');
+        fin.type = 'file';
+        fin.setAttribute('accept', 'application/pdf,image/*,.doc,.docx,.xls,.xlsx');
+        fin.onchange = function () {
+          out.checkoutFileByK = out.checkoutFileByK || {};
+          out.checkoutFileByK[line.k] = (this.files && this.files[0]) ? this.files[0] : null;
+        };
+        var cap = (line.params && line.params.description) ? String(line.params.description) : String(line.name || 'позиция');
+        if (cap.length > 56) cap = cap.substring(0, 53) + '…';
+        addField(form, 'Макет к позиции: ' + cap, fin);
+      })(out.cart[cix]);
+    }
+    form.appendChild(h('p', 'Файл привязывается к соответствующей позиции заказа. До 25 МБ на файл; загрузка после создания заказа.', 'hint'));
     var sub = h('button', out.checkoutLoading ? (out.checkoutFileProgress || 'Отправка…') : 'Отправить заказ', 'primary');
     sub.type = 'submit';
     if (out.checkoutLoading) sub.disabled = true;
     form.appendChild(sub);
-    box.appendChild(form);
+    var coPanel = h('div', '', 'ipc-panel');
+    var coInner = h('div', '', 'ipc-detail-block');
+    coInner.appendChild(form);
+    coPanel.appendChild(coInner);
+    box.appendChild(coPanel);
     return box;
   }
-  function uploadCheckoutFilesSequential(orderId, files, index, errors, done) {
-    if (!files || index >= files.length) { done(errors); return; }
-    out.checkoutFileProgress = 'Прикрепляем файлы: ' + (index + 1) + ' / ' + files.length;
+  function uploadCheckoutFilesSequential(orderId, tasks, index, errors, done) {
+    if (!tasks || index >= tasks.length) { done(errors); return; }
+    out.checkoutFileProgress = 'Прикрепляем файлы: ' + (index + 1) + ' / ' + tasks.length;
     render();
+    var t = tasks[index];
     var fd = new FormData();
-    fd.append('file', files[index]);
+    fd.append('file', t.file);
+    if (t.orderItemId != null && t.orderItemId !== '') fd.append('orderItemId', String(t.orderItemId));
     fetch(API_BASE + '/api/miniapp/orders/' + orderId + '/files', { method: 'POST', headers: { Authorization: 'Bearer ' + out.token }, body: fd })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (x) {
         if (!x.ok) errors.push((x.j && (x.j.message || x.j.error)) ? String(x.j.message || x.j.error) : ('Файл ' + (index + 1)));
-        uploadCheckoutFilesSequential(orderId, files, index + 1, errors, done);
+        uploadCheckoutFilesSequential(orderId, tasks, index + 1, errors, done);
       })
       .catch(function (err) {
         errors.push((err && err.message) ? String(err.message) : ('Файл ' + (index + 1)));
-        uploadCheckoutFilesSequential(orderId, files, index + 1, errors, done);
+        uploadCheckoutFilesSequential(orderId, tasks, index + 1, errors, done);
       });
   }
   function finishCheckoutSuccess(orderNumber, fileErrors) {
     out.checkoutLoading = false;
     out.checkoutFileProgress = null;
-    out.checkoutStagedFiles = null;
+    out.checkoutFileByK = null;
     out.cart = [];
     out.orders = null;
     if (fileErrors && fileErrors.length) {
@@ -123,8 +135,6 @@ export const MINIAPP_CLIENT_PART2 = `
       customer = { type: 'individual', phone: phone, notes: String(fd.get('notes') || '').trim() || undefined };
     }
     if (!phone) { out.checkoutMsg = 'Укажите телефон'; render(); return; }
-    var staged = out.checkoutStagedFiles;
-    var files = (staged && staged.length) ? staged : [];
     var subBtn = f.querySelector('button[type=submit]');
     if (subBtn) subBtn.disabled = true;
     out.checkoutLoading = true;
@@ -148,17 +158,27 @@ export const MINIAPP_CLIENT_PART2 = `
           out.checkoutLoading = false;
           out.checkoutMsg = (x.j && x.j.message) ? String(x.j.message) : 'Заказ создан';
           out.cart = [];
+          out.checkoutFileByK = null;
           out.orders = null;
           out.view = 'orders';
           loadOrders();
           return;
         }
-        if (!files.length) {
+        var itemIds = (x.j && Array.isArray(x.j.itemIds)) ? x.j.itemIds : [];
+        var byK = out.checkoutFileByK || {};
+        var tasks = [];
+        for (var ti = 0; ti < out.cart.length; ti++) {
+          var ck = out.cart[ti].k;
+          var fid = itemIds[ti];
+          var one = byK[ck];
+          if (one && fid != null && fid !== '') tasks.push({ file: one, orderItemId: fid });
+        }
+        if (!tasks.length) {
           finishCheckoutSuccess(num, []);
           return;
         }
         var errs = [];
-        uploadCheckoutFilesSequential(oid, files, 0, errs, function (fileErrors) {
+        uploadCheckoutFilesSequential(oid, tasks, 0, errs, function (fileErrors) {
           finishCheckoutSuccess(num, fileErrors);
         });
       })

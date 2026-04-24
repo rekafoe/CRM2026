@@ -80,7 +80,7 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
       render();
     };
     box.appendChild(back);
-    box.appendChild(h('h2', 'Заказ'));
+    box.appendChild(h('h2', 'Заказ', 'section-head'));
     if (out.orderDetailLoading && !out.orderDetailData) {
       box.appendChild(rowHint('Загрузка…'));
       return box;
@@ -95,46 +95,65 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
       return box;
     }
     var ord = d.order;
-    var line1 = esc(ord.number || '—') + (ord.status_name ? ' — ' + esc(ord.status_name) : ' (статус ' + ord.status + ')');
-    box.appendChild(h('p', line1, 'line'));
-    if (ord.created_at) box.appendChild(h('p', esc(ord.created_at), 'muted'));
-    if (ord.notes) box.appendChild(h('p', 'Комментарий: ' + esc(ord.notes), 'line'));
-    box.appendChild(h('h3', 'Позиции'));
+    var sumPanel = h('div', '', 'ipc-panel');
+    var sumInner = h('div', '', 'ipc-detail-block');
+    var headRow = h('div', '', 'ipc-list__row-top');
+    headRow.appendChild(h('div', esc(ord.number || '—'), 'ipc-list__title'));
+    var stChip = document.createElement('span');
+    stChip.className = 'ipc-chip ipc-chip--slate';
+    stChip.textContent = ord.status_name ? String(ord.status_name) : ('Статус ' + ord.status);
+    headRow.appendChild(stChip);
+    sumInner.appendChild(headRow);
+    if (ord.created_at) sumInner.appendChild(h('div', esc(ord.created_at), 'ipc-list__meta'));
+    if (ord.notes) sumInner.appendChild(h('p', 'Комментарий: ' + esc(ord.notes), 'line'));
+    sumPanel.appendChild(sumInner);
+    box.appendChild(sumPanel);
+    box.appendChild(h('h3', 'Позиции', 'ipc-subhead'));
     var items = d.items && d.items.length ? d.items : [];
     if (items.length === 0) {
-      box.appendChild(rowHint('Нет позиций.'));
+      box.appendChild(h('p', 'Нет позиций.', 'hint ipc-empty'));
     } else {
+      var itPanel = h('div', '', 'ipc-panel');
+      var itList = h('div', '', 'ipc-list');
       for (var i = 0; i < items.length; i++) {
         (function (it) {
           var t = '#' + it.id + ' ' + esc(it.type) + ' × ' + it.quantity + ' — ' + it.price + ' Br';
-          box.appendChild(h('p', t, 'line'));
+          var ir = h('div', '', 'ipc-list__row');
+          ir.appendChild(h('div', t, 'ipc-list__row-summary'));
+          itList.appendChild(ir);
         })(items[i]);
       }
+      itPanel.appendChild(itList);
+      box.appendChild(itPanel);
     }
-    box.appendChild(h('h3', 'Файлы'));
+    box.appendChild(h('h3', 'Файлы', 'ipc-subhead'));
     var files = d.files && d.files.length ? d.files : [];
     if (files.length === 0) {
-      box.appendChild(rowHint('Пока нет вложений.'));
+      box.appendChild(h('p', 'Пока нет вложений.', 'hint ipc-empty'));
     } else {
+      var flPanel = h('div', '', 'ipc-panel');
+      var flList = h('div', '', 'ipc-list');
       for (var f = 0; f < files.length; f++) {
         (function (fl) {
           var fn = fl.originalName || fl.filename || 'файл';
           var sub = (fl.orderItemId != null ? 'к позиции #' + fl.orderItemId : 'к заказу') + ' · ' + fmtFileSize(fl.size);
-          var rowF = h('div', '', 'row');
-          var p1 = h('p', esc(fn) + ' — ' + sub, 'line');
-          p1.style.cssText = 'margin:0;flex:1;min-width:0;';
-          rowF.appendChild(p1);
+          var ir = h('div', '', 'ipc-list__row');
+          ir.appendChild(h('div', esc(fn) + ' — ' + sub, 'ipc-list__row-summary'));
+          var act = h('div', '', 'ipc-list__actions');
           var db = h('button', 'Скачать', 'small');
           db.type = 'button';
           db.onclick = function () { downloadOrderFile(fl.id, fn); };
-          rowF.appendChild(db);
-          box.appendChild(rowF);
+          act.appendChild(db);
+          ir.appendChild(act);
+          flList.appendChild(ir);
         })(files[f]);
       }
+      flPanel.appendChild(flList);
+      box.appendChild(flPanel);
     }
     if (out.orderFileMsg) box.appendChild(h('p', esc(out.orderFileMsg), out.orderFileMsg.indexOf('прикреп') >= 0 || out.orderFileMsg.indexOf('успе') >= 0 ? 'okmsg' : 'hint'));
     var form = document.createElement('form');
-    form.className = 'form';
+    form.className = 'form ipc-card';
     form.onsubmit = function (e) {
       e.preventDefault();
       if (!out.token || !out.orderDetailId) return false;
@@ -191,6 +210,7 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
     upBtn.type = 'submit';
     if (out.orderUploadLoading) upBtn.disabled = true;
     form.appendChild(upBtn);
+    box.appendChild(h('h3', 'Прикрепить файл', 'ipc-subhead'));
     box.appendChild(form);
     return box;
   }

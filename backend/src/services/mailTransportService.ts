@@ -1,5 +1,5 @@
 import nodemailer, { Transporter } from 'nodemailer';
-import { getSmtpConfig, getSmtpTimeoutMs } from '../config/mail';
+import { getSmtpConfig, getSmtpSocketFamily, getSmtpTimeoutMs } from '../config/mail';
 import { logger } from '../utils/logger';
 
 let transporter: Transporter | null = null;
@@ -11,6 +11,7 @@ export function getMailTransporter(): Transporter | null {
   }
   if (!transporter) {
     const t = getSmtpTimeoutMs();
+    const fam = getSmtpSocketFamily();
     transporter = nodemailer.createTransport({
       host: cfg.host,
       port: cfg.port,
@@ -18,6 +19,7 @@ export function getMailTransporter(): Transporter | null {
       connectionTimeout: t,
       greetingTimeout: t,
       socketTimeout: t,
+      ...(fam != null ? { family: fam } : {}),
       auth:
         cfg.user && cfg.pass
           ? {
@@ -26,7 +28,7 @@ export function getMailTransporter(): Transporter | null {
             }
           : undefined,
     });
-    logger.info('Mail transporter initialized', { host: cfg.host, port: cfg.port, timeoutMs: t });
+    logger.info('Mail transporter initialized', { host: cfg.host, port: cfg.port, timeoutMs: t, family: fam });
   }
   return transporter;
 }

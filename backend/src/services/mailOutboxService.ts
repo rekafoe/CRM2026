@@ -214,7 +214,16 @@ export async function processOneMailJob(): Promise<boolean> {
     }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    logger.warn('Mail job send failed', { id, error: msg });
+    const ne = e && typeof e === 'object' ? (e as NodeJS.ErrnoException & { address?: string; port?: number }) : null;
+    logger.warn('Mail job send failed', {
+      id,
+      to: job.to_email,
+      error: msg,
+      code: ne?.code,
+      syscall: ne?.syscall,
+      address: ne?.address,
+      port: ne?.port,
+    });
     await markFailedOrRetry(id, job.attempts, job.max_attempts, msg);
   }
 

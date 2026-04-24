@@ -3,6 +3,7 @@ import { OrderService } from '../modules/orders/services/orderService';
 import { normalizeWebsiteItems } from '../modules/orders/utils/websiteOrderNormalize';
 import { TelegramUserService } from './telegramUserService';
 import { setLastWebsiteOrderAt } from '../utils/poolSync';
+import { getDb } from '../config/database';
 
 export type MiniappCustomerBody =
   | {
@@ -36,6 +37,55 @@ export type MiniappCheckoutBody = {
     order_notes?: string;
   };
 };
+
+type NormalizedWebsiteItem = ReturnType<typeof normalizeWebsiteItems>[number];
+
+async function ensureMiniappItemsProductIds(items: NormalizedWebsiteItem[]): Promise<NormalizedWebsiteItem[]> {
+  if (!items.length) return items;
+  const normalized: NormalizedWebsiteItem[] = [];
+  const productIds = new Set<number>();
+
+  items.forEach((it, idx) => {
+    const params = (it.params && typeof it.params === 'object' && !Array.isArray(it.params))
+      ? { ...it.params }
+      : {};
+    const fromParams = Number((params as { productId?: unknown }).productId);
+    const fromType = Number(String(it.type || '').trim());
+    const productId = Number.isFinite(fromParams) && fromParams > 0
+      ? Math.floor(fromParams)
+      : (Number.isFinite(fromType) && fromType > 0 ? Math.floor(fromType) : NaN);
+
+    if (!Number.isFinite(productId)) {
+      const err = new Error(`MINIAPP_PRODUCT_ID_REQUIRED:item=${idx + 1}`);
+      (err as { code?: string }).code = 'MINIAPP_PRODUCT_ID_REQUIRED';
+      throw err;
+    }
+
+    productIds.add(productId);
+    normalized.push({
+      ...it,
+      type: String(productId),
+      params: { ...params, productId },
+    });
+  });
+
+  const db = await getDb();
+  const ids = Array.from(productIds);
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = await db.all<Array<{ id: number }>>(
+    `SELECT id FROM products WHERE id IN (${placeholders})`,
+    ids
+  );
+  const existing = new Set((Array.isArray(rows) ? rows : []).map((r) => Number(r.id)));
+  const missing = ids.filter((id) => !existing.has(id));
+  if (missing.length > 0) {
+    const err = new Error(`MINIAPP_PRODUCT_NOT_FOUND:${missing.join(',')}`);
+    (err as { code?: string }).code = 'MINIAPP_PRODUCT_NOT_FOUND';
+    throw err;
+  }
+
+  return normalized;
+}
 
 /** ФИО физ. лица из Telegram, если в запросе не переданы (миниапп: только телефон + комментарий). */
 async function enrichIndividualFromTelegram(
@@ -198,14 +248,8 @@ export async function submitMiniappCheckout(telegramChatId: string, body: Miniap
     throw err;
   }
 
-  const normalized = normalizeWebsiteItems(body.order.items);
-  for (const it of normalized) {
-    if (!String(it.type || '').trim()) {
-      const err = new Error('MINIAPP_ITEM_TYPE_REQUIRED');
-      (err as any).code = 'MINIAPP_ITEM_TYPE_REQUIRED';
-      throw err;
-    }
-  }
+  const normalizedRaw = normalizeWebsiteItems(body.order.items);
+  const normalized = await ensureMiniappItemsProductIds(normalizedRaw);
 
   const customerPayload = await enrichCustomerForMiniapp(telegramChatId, body.customer);
   const customer = await ensureCustomerForChat(telegramChatId, customerPayload);
@@ -263,6 +307,8 @@ export function mapMiniappCheckoutErrorToHttp(
     case 'MINIAPP_ITEMS_REQUIRED':
     case 'MINIAPP_ITEM_TYPE_REQUIRED':
     case 'MINIAPP_CUSTOMER_REQUIRED':
+    case 'MINIAPP_PRODUCT_ID_REQUIRED':
+    case 'MINIAPP_PRODUCT_NOT_FOUND':
       return { status: 400, body: { error: e.message, message: e.message } };
     default:
       return null;

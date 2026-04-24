@@ -16,6 +16,8 @@ type EarningsRow = {
   price: number;
   quantity: number;
   params: string;
+  /** `items.type` — часто id продукта (сайт / Mini App), пока `params.productId` пуст */
+  itemType: string | null;
 };
 
 export class EarningsService {
@@ -106,11 +108,13 @@ export class EarningsService {
     let hasResponsibleUserId = false;
     let hasIsInternal = false;
     let hasPaymentChannel = false;
+    let hasIsCancelled = false;
     try {
       hasExecutorUserId = await hasColumn('items', 'executor_user_id');
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id');
       hasIsInternal = await hasColumn('orders', 'is_internal');
       hasPaymentChannel = await hasColumn('orders', 'payment_channel');
+      hasIsCancelled = await hasColumn('orders', 'is_cancelled');
     } catch { /* ignore */ }
 
     const executorSel = hasExecutorUserId ? 'i.executor_user_id as executorUserId' : 'NULL as executorUserId';
@@ -120,6 +124,8 @@ export class EarningsService {
       : hasPaymentChannel
         ? "AND COALESCE(o.payment_channel, 'cash') != 'internal'"
         : '';
+    /** Раньше: status != 1 — в актуальном справочнике id=1 часто «Оформлен», заказы с TG/оплатой попадали сюда и выпадали из ЗП целиком. */
+    const excludeCancelled = hasIsCancelled ? 'AND COALESCE(o.is_cancelled, 0) = 0' : '';
 
     const rows = await db.all<EarningsRow[]>(
       `
@@ -131,11 +137,12 @@ export class EarningsService {
         ${responsibleSel},
         i.price as price,
         i.quantity as quantity,
-        i.params as params
+        i.params as params,
+        i.type as itemType
       FROM items i
       JOIN orders o ON o.id = i.orderId
       WHERE date(COALESCE(o.createdAt, o.created_at)) = date(?)
-        AND (o.status IS NULL OR o.status != 1)
+        ${excludeCancelled}
         ${excludeInternal}
       `,
       [date]
@@ -155,8 +162,12 @@ export class EarningsService {
         const productId = Number(parsed?.productId);
         if (Number.isFinite(productId)) {
           productIds.add(productId);
+        } else if (row.itemType != null && String(row.itemType).trim() !== '') {
+          const fromType = Number(String(row.itemType).trim());
+          if (Number.isFinite(fromType) && fromType > 0) {
+            productIds.add(fromType);
+          }
         }
-        
         // Проверяем операции в params
         if (parsed?.services && Array.isArray(parsed.services)) {
           parsed.services.forEach((service: any) => {
@@ -203,7 +214,6 @@ export class EarningsService {
         });
       }
     }
-
     // Получаем проценты из операций (всегда подтягиваем operator_percent из БД)
     const operationPercentMap = new Map<number, number>();
     if (operationIds.size > 0) {
@@ -270,9 +280,13 @@ export class EarningsService {
             percent = operationPercentMap.get(opId) ?? 0;
           }
         }
-        // 4. Продукт
+        // 4. Продукт (params.productId или type позиции = id продукта с витрины / MAP)
         if (percent === 0) {
-          const productId = Number(params?.productId);
+          let productId = Number(params?.productId);
+          if (!Number.isFinite(productId) && row.itemType != null) {
+            const fromType = Number(String(row.itemType).trim());
+            if (Number.isFinite(fromType) && fromType > 0) productId = fromType;
+          }
           if (Number.isFinite(productId)) {
             percent = productPercentMap.get(productId) ?? 0;
           }

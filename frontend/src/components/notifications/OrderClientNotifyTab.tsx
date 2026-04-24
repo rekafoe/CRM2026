@@ -124,9 +124,16 @@ export const OrderClientNotifyTab: React.FC = () => {
     setTestSending(true);
     setTestResult(null);
     try {
-      const r = (await postMailTest(to)) as { ok?: boolean; jobId?: number; immediateProcessed?: number };
+      const r = (await postMailTest(to)) as {
+        ok?: boolean;
+        jobId?: number;
+        processingAsync?: boolean;
+        immediateProcessed?: number | null;
+      };
       const message = r?.jobId
-        ? `Задание #${r.jobId} создано, сразу обработано: ${r.immediateProcessed ?? 0}.`
+        ? r.processingAsync || r.immediateProcessed == null
+          ? `Задание #${r.jobId} в очереди; отправка в фоне. При сбое SMTP смотрите логи и статистику очереди.`
+          : `Задание #${r.jobId} создано, сразу обработано: ${r.immediateProcessed ?? 0}.`
         : 'Запрос отправлен.';
       setTestResult({ type: 'success', message });
       addToast({

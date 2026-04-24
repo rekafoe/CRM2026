@@ -43,6 +43,14 @@ export function getSmtpTimeoutMs(): number {
   return 20_000;
 }
 
+/** Принудительно IPv4/IPv6 при подключении к SMTP (снимает таймауты на «битом» IPv6). */
+export function getSmtpSocketFamily(): 4 | 6 | undefined {
+  const v = String(process.env.SMTP_IP_FAMILY || process.env.SMTP_FORCE_IPV4 || '').trim().toLowerCase();
+  if (v === '1' || v === '4' || v === 'ipv4') return 4;
+  if (v === '6' || v === 'ipv6') return 6;
+  return undefined;
+}
+
 /** Интервал опроса очереди (мс). По умолчанию 15 с. */
 export function getMailOutboxIntervalMs(): number {
   const raw = Number(process.env.MAIL_OUTBOX_INTERVAL_MS);
