@@ -508,7 +508,10 @@ export const MINIAPP_CLIENT_PART_CALC = `
     if (out.calcForm.priceType) pl.priceType = out.calcForm.priceType;
     if (out.calcForm.cutting) pl.cutting = true;
     var fin = buildFinishingFromTypeInitial();
-    if (fin.length > 0) pl.finishing = fin;
+    // Явно передаём выбор операций текущего подтипа.
+    // Пустой массив означает «для этого подтипа finishing не выбран»,
+    // чтобы бэкенд не падал обратно на все операции размера.
+    pl.finishing = fin;
     return pl;
   }
   function runCalc(opts) {

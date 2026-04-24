@@ -689,7 +689,8 @@ export class SimplifiedPricingService {
     // Источник finishing: приоритет у configuration.finishing (выбор пользователя), иначе — selectedSize.finishing (из шаблона размера)
     // При fallback на selectedSize.finishing фильтруем по is_default/is_required: только операции с галочкой «вкл по умолчанию» участвуют в расчёте
     let finishingToUse: Array<{ service_id: number; variant_id?: number; price_unit?: string; units_per_item?: number }>;
-    if (normalizedConfig.finishing && normalizedConfig.finishing.length > 0) {
+    const hasExplicitFinishing = Array.isArray(normalizedConfig.finishing);
+    if (hasExplicitFinishing) {
       finishingToUse = normalizedConfig.finishing;
     } else if (Array.isArray(selectedSize.finishing) && selectedSize.finishing.length > 0) {
       const sizeFinishing = selectedSize.finishing;
