@@ -33,6 +33,16 @@ export function getSmtpConfig(): SmtpConfig {
   };
 }
 
+/**
+ * Таймауты TCP/SMTP для nodemailer (мс). Без лимита соединение может «висеть»
+ * до таймаута HTTP (часто 30 с). По умолчанию 20 с.
+ */
+export function getSmtpTimeoutMs(): number {
+  const raw = Number(process.env.SMTP_TIMEOUT_MS);
+  if (Number.isFinite(raw) && raw >= 5_000 && raw <= 120_000) return raw;
+  return 20_000;
+}
+
 /** Интервал опроса очереди (мс). По умолчанию 15 с. */
 export function getMailOutboxIntervalMs(): number {
   const raw = Number(process.env.MAIL_OUTBOX_INTERVAL_MS);

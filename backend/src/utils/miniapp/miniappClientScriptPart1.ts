@@ -45,7 +45,7 @@ export const MINIAPP_CLIENT_PART1 = `
           out.checkoutMsg = null;
           out.postCheckoutNotice = null;
           if (key === 'catalog' && !out.products) loadProducts();
-          if (key === 'orders' && out.orders == null) loadOrders();
+          if (key === 'orders' && typeof loadOrders === 'function') loadOrders();
           render();
         };
         nav.appendChild(b);

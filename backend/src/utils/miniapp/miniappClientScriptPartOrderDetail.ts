@@ -32,28 +32,36 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
     if (b < 1048576) return (Math.round(b / 102.4) / 10) + ' KB';
     return (Math.round(b / 10485.76) / 10) + ' MB';
   }
-  function loadOrderDetail() {
+  function loadOrderDetail(silent) {
     if (!out.token || !out.orderDetailId) return;
-    out.orderDetailLoading = true;
-    out.orderDetailErr = null;
-    render();
+    var isSilent = !!silent;
+    if (!isSilent) {
+      out.orderDetailLoading = true;
+      out.orderDetailErr = null;
+      render();
+    }
     fetch(API_BASE + '/api/miniapp/orders/' + out.orderDetailId, { headers: { Authorization: 'Bearer ' + out.token, Accept: 'application/json' } })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (x) {
-        out.orderDetailLoading = false;
+        if (!isSilent) out.orderDetailLoading = false;
         if (!x.ok) {
-          out.orderDetailErr = (x.j && (x.j.error || x.j.message)) ? String(x.j.error || x.j.message) : 'Ошибка загрузки';
-          out.orderDetailData = null;
-        } else {
-          out.orderDetailData = x.j;
-          out.orderDetailErr = null;
+          if (!isSilent) {
+            out.orderDetailErr = (x.j && (x.j.error || x.j.message)) ? String(x.j.error || x.j.message) : 'Ошибка загрузки';
+            out.orderDetailData = null;
+          }
+          render();
+          return;
         }
+        out.orderDetailData = x.j;
+        out.orderDetailErr = null;
         render();
       })
       .catch(function (err) {
-        out.orderDetailLoading = false;
-        out.orderDetailErr = (err && err.message) || String(err);
-        out.orderDetailData = null;
+        if (!isSilent) {
+          out.orderDetailLoading = false;
+          out.orderDetailErr = (err && err.message) || String(err);
+          out.orderDetailData = null;
+        }
         render();
       });
   }
@@ -68,6 +76,7 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
       out.orderDetailErr = null;
       out.orderFileMsg = null;
       out.orderUploadLoading = false;
+      if (typeof loadOrders === 'function') loadOrders();
       render();
     };
     box.appendChild(back);

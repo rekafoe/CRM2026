@@ -242,6 +242,18 @@ export const MINIAPP_CLIENT_PART2 = `
           out.err = null;
         }
         render();
+        if (out.token && !out._miniappOrdersPollInit) {
+          out._miniappOrdersPollInit = true;
+          function refreshOrdersViewIfOpen() {
+            if (!out.token) return;
+            if (out.view === 'orders' && typeof loadOrders === 'function') loadOrders();
+            else if (out.view === 'order_detail' && out.orderDetailId && typeof loadOrderDetail === 'function') loadOrderDetail(true);
+          }
+          setInterval(refreshOrdersViewIfOpen, 20000);
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') refreshOrdersViewIfOpen();
+          });
+        }
       })
       .catch(function (err) { out.load = false; out.err = (err && err.message) || String(err); render(); });
   }

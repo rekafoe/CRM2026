@@ -71,6 +71,14 @@ export const MINIAPP_CLIENT_PART_CALC = `
     } else { out.calcForm.printKey = ''; }
     if (!out.calcForm.qty || out.calcForm.qty < 1) out.calcForm.qty = 100;
   }
+  var _calcDebounceT = null;
+  function scheduleCalcRun() {
+    if (_calcDebounceT) clearTimeout(_calcDebounceT);
+    _calcDebounceT = setTimeout(function () {
+      _calcDebounceT = null;
+      runCalc({ soft: true });
+    }, 420);
+  }
   function loadCalcSchema() {
     if (!out.calcPid) return;
     out.calcLoading = true;
@@ -91,6 +99,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
         }
         initCalcFormFromSchema();
         render();
+        scheduleCalcRun();
       })
       .catch(function (e) { out.calcLoading = false; out.calcErr = (e && e.message) || String(e); render(); });
   }
@@ -106,10 +115,15 @@ export const MINIAPP_CLIENT_PART_CALC = `
     if (out.calcForm.typeId != null) pl.type_id = out.calcForm.typeId;
     return pl;
   }
-  function runCalc() {
+  function runCalc(opts) {
     if (!out.calcPid) { return; }
-    out.calcResult = null;
-    out.calcErr = null;
+    var soft = opts && opts.soft;
+    if (!soft) {
+      out.calcResult = null;
+      out.calcErr = null;
+    } else {
+      out.calcErr = null;
+    }
     out.calcLoading = true;
     render();
     var body = buildCalcPayload();
@@ -202,11 +216,11 @@ export const MINIAPP_CLIENT_PART_CALC = `
     var simp = calcSimp();
     if (!simp) { if (!out.calcErr) box.appendChild(rowHint('Нет данных.')); return box; }
     var form = h('form', '', 'form ipc-card');
-    form.onsubmit = function (e) { e.preventDefault(); runCalc(); return false; };
+    form.onsubmit = function (e) { e.preventDefault(); return false; };
     var types = calcTypes();
     if (types.length > 0) {
       var ts = document.createElement('select');
-      ts.onchange = function () { out.calcForm.typeId = ts.value ? (isNaN(+ts.value) ? ts.value : +ts.value) : null; initCalcFormFromSchema(); render(); };
+      ts.onchange = function () { out.calcForm.typeId = ts.value ? (isNaN(+ts.value) ? ts.value : +ts.value) : null; initCalcFormFromSchema(); render(); scheduleCalcRun(); };
       for (var ti = 0; ti < types.length; ti++) {
         var op = document.createElement('option');
         op.value = String(types[ti].id);
@@ -221,7 +235,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     var sizes = calcSizes(calcPickTypeId());
     if (sizes.length > 0) {
       var ss = document.createElement('select');
-      ss.onchange = function () { out.calcForm.sizeId = ss.value ? (isNaN(+ss.value) ? ss.value : +ss.value) : null; var m = calcMaterials(); if (m[0]) out.calcForm.matId = m[0].id; var pp = calcPrintOptions(); if (pp[0]) out.calcForm.printKey = String(pp[0].technology_code || '') + '||' + String(pp[0].color_mode || '') + '||' + String(pp[0].sides_mode || 'single'); render(); };
+      ss.onchange = function () { out.calcForm.sizeId = ss.value ? (isNaN(+ss.value) ? ss.value : +ss.value) : null; var m = calcMaterials(); if (m[0]) out.calcForm.matId = m[0].id; var pp = calcPrintOptions(); if (pp[0]) out.calcForm.printKey = String(pp[0].technology_code || '') + '||' + String(pp[0].color_mode || '') + '||' + String(pp[0].sides_mode || 'single'); render(); scheduleCalcRun(); };
       for (var si = 0; si < sizes.length; si++) {
         var o1 = document.createElement('option');
         o1.value = String(sizes[si].id);
@@ -235,7 +249,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     var matList = calcMaterials();
     if (matList.length > 0) {
       var ms = document.createElement('select');
-      ms.onchange = function () { out.calcForm.matId = ms.value ? +ms.value : null; };
+      ms.onchange = function () { out.calcForm.matId = ms.value ? +ms.value : null; render(); scheduleCalcRun(); };
       for (var mi = 0; mi < matList.length; mi++) {
         var o2 = document.createElement('option');
         o2.value = String(matList[mi].id);
@@ -250,7 +264,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     var pps = calcPrintOptions();
     if (pps.length > 0) {
       var ps = document.createElement('select');
-      ps.onchange = function () { out.calcForm.printKey = ps.value; };
+      ps.onchange = function () { out.calcForm.printKey = ps.value; render(); scheduleCalcRun(); };
       for (var pi = 0; pi < pps.length; pi++) {
         var o3 = document.createElement('option');
         var pr = pps[pi];
@@ -268,12 +282,9 @@ export const MINIAPP_CLIENT_PART_CALC = `
     qi.type = 'number';
     qi.min = '1';
     qi.value = String(out.calcForm.qty);
-    qi.onchange = function () { out.calcForm.qty = Math.max(1, parseInt(qi.value, 10) || 1); };
+    qi.oninput = qi.onchange = function () { out.calcForm.qty = Math.max(1, parseInt(qi.value, 10) || 1); scheduleCalcRun(); };
     addField(form, 'Тираж (шт.)', qi);
-    var sub = h('button', out.calcLoading ? 'Счёт…' : 'Рассчитать цену', 'primary');
-    sub.type = 'submit';
-    if (out.calcLoading) sub.disabled = true;
-    form.appendChild(sub);
+    form.appendChild(h('p', 'Цена обновляется автоматически при смене параметров.', 'hint'));
     box.appendChild(form);
     if (out.calcResult) {
       var r = out.calcResult;
