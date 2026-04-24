@@ -1,4 +1,4 @@
-import { bynSymbolHtmlForPrint } from '../../../shared/byCurrencyBYN';
+import { bynSymbolHtmlForPrint } from '../utils/byCurrencyBYN';
 import { MaterialService } from './materialService';
 import { getDb } from '../config/database';
 import { buildOrderNumberFromSourceAndId } from '../utils/orderNumberGenerator';

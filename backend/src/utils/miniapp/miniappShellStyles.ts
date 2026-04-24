@@ -2,7 +2,7 @@
  * Стили оболочки Telegram Mini App (inline в HTML).
  * Визуально согласованы с ProductManagement.css (/adminpanel/products).
  */
-import { bynSymbolDataUrlForCss } from '../../../../shared/byCurrencyBYN';
+import { bynSymbolDataUrlForCss } from '../byCurrencyBYN';
 
 const _bynU = JSON.stringify(bynSymbolDataUrlForCss());
 

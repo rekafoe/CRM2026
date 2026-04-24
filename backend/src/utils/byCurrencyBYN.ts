@@ -27,5 +27,9 @@ export function bynSymbolDataUrlForCss(): string {
 export function bynSymbolHtmlForPrint(inline: boolean = true): string {
   const svg = SVG_INNER('#0f172a');
   if (!inline) return svg;
-  return '<span class="byn-print" style="display:inline-block;vertical-align:-0.12em;width:0.9em;height:1.1em;position:relative;top:0.05em">' + svg + '</span>';
+  return (
+    '<span class="byn-print" style="display:inline-block;vertical-align:-0.12em;width:0.9em;height:1.1em;position:relative;top:0.05em">' +
+    svg +
+    '</span>'
+  );
 }
