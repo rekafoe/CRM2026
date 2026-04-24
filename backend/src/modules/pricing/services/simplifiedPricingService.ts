@@ -441,12 +441,24 @@ export class SimplifiedPricingService {
       : undefined;
     const isRollPrint = centralPriceForRoll?.counter_unit === 'meters';
 
-    // Офисный принтер или рулонная печать: не ограничиваем мин. тираж по раскладке листов.
+    // Офисный принтер, рулон или ручная норма вместимости (items_per_sheet_override): не привязываем
+    // мин. тираж к «шт/лист» — иначе override 128 заставляет minQty=128 и отсекает 100 шт.
     const isOfficePrint = (normalizedConfig.print_technology ?? '').toLowerCase().includes('office');
-    const minQtyLimit = selectedSize.min_qty ?? (isOfficePrint || isRollPrint ? 1 : itemsPerSheet);
+    const hasManualItemsPerSheet =
+      itemsPerSheetOverride != null && itemsPerSheetOverride > 0;
+    const minQtyLimit = selectedSize.min_qty ?? (
+      isOfficePrint || isRollPrint || hasManualItemsPerSheet ? 1 : itemsPerSheet
+    );
     const maxQtyLimit = selectedSize.max_qty;
     if (quantity < minQtyLimit || (maxQtyLimit !== undefined && quantity > maxQtyLimit)) {
-      const layoutHint = useLayout && !isOfficePrint && minQtyLimit === itemsPerSheet ? ` (по раскладке: ${itemsPerSheet} шт/лист)` : '';
+      const layoutHint =
+        useLayout &&
+        !isOfficePrint &&
+        !isRollPrint &&
+        !hasManualItemsPerSheet &&
+        minQtyLimit === itemsPerSheet
+          ? ` (по раскладке: ${itemsPerSheet} шт/лист)`
+          : '';
       const err: any = new Error(
         maxQtyLimit !== undefined
           ? `Тираж для размера "${selectedSize.label}" должен быть от ${minQtyLimit} до ${maxQtyLimit}`

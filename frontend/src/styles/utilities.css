@@ -393,6 +393,13 @@
   z-index: 9999;
 }
 
+/* Портал `Modal`: выше боковых панелей (simplified-tpl-drawer 9000). Позже
+   подключаемый `warehouse-dashboard.css` задаёт голый `.modal-overlay { z-index: 2000 }`
+   и перетирает 9999 — селектор с двумя классами сохраняет приоритет. */
+.modal-overlay.app-modal-portal {
+  z-index: 10050;
+}
+
 .modal-content {
   background-color: var(--bg-primary);
   border-radius: 0.75rem;

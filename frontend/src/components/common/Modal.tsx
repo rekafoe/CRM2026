@@ -61,7 +61,9 @@ export const Modal: React.FC<ModalProps> = ({
 
   const sizeClasses = getSizeClasses(size);
 
-  const overlayClasses = overlayClassName ? `modal-overlay ${overlayClassName}` : 'modal-overlay';
+  const overlayClasses = overlayClassName
+    ? `modal-overlay app-modal-portal ${overlayClassName}`
+    : 'modal-overlay app-modal-portal';
   const modalContent = (
     <div className={overlayClasses} onClick={onClose}>
       <div 
