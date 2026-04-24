@@ -4,10 +4,11 @@
 export const MINIAPP_CLIENT_PART2 = `
   function renderCheckout() {
     var box = h('div', '', 'section');
-    box.appendChild(h('h2', 'Оформление'));
+    box.appendChild(h('div', 'Оформление', 'section-head'));
     if (out.checkoutMsg) box.appendChild(h('p', esc(out.checkoutMsg), 'okmsg'));
+    if (out.checkoutFileProgress) box.appendChild(h('p', esc(out.checkoutFileProgress), 'hint'));
     var form = document.createElement('form');
-    form.className = 'form';
+    form.className = 'form ipc-card';
     form.onsubmit = function (e) { e.preventDefault(); doCheckout(e); return false; };
     var isLeg = out.checkoutType === 'legal';
     var sel = document.createElement('select');
@@ -56,12 +57,54 @@ export const MINIAPP_CLIENT_PART2 = `
     no.name = 'notes';
     no.rows = 2;
     addField(form, 'Комментарий', no);
-    var sub = h('button', out.checkoutLoading ? 'Отправка…' : 'Отправить заказ', 'primary');
+    var fileInp = document.createElement('input');
+    fileInp.type = 'file';
+    fileInp.name = 'orderFiles';
+    fileInp.multiple = true;
+    fileInp.setAttribute('accept', 'application/pdf,image/*,.doc,.docx,.xls,.xlsx');
+    fileInp.onchange = function () {
+      out.checkoutStagedFiles = (this.files && this.files.length) ? Array.prototype.slice.call(this.files) : [];
+    };
+    addField(form, 'Макеты к заказу (необяз.)', fileInp);
+    form.appendChild(h('p', 'До 20 файлов, до 25 МБ каждый. Загрузка сразу после создания заказа.', 'hint'));
+    var sub = h('button', out.checkoutLoading ? (out.checkoutFileProgress || 'Отправка…') : 'Отправить заказ', 'primary');
     sub.type = 'submit';
     if (out.checkoutLoading) sub.disabled = true;
     form.appendChild(sub);
     box.appendChild(form);
     return box;
+  }
+  function uploadCheckoutFilesSequential(orderId, files, index, errors, done) {
+    if (!files || index >= files.length) { done(errors); return; }
+    out.checkoutFileProgress = 'Прикрепляем файлы: ' + (index + 1) + ' / ' + files.length;
+    render();
+    var fd = new FormData();
+    fd.append('file', files[index]);
+    fetch(API_BASE + '/api/miniapp/orders/' + orderId + '/files', { method: 'POST', headers: { Authorization: 'Bearer ' + out.token }, body: fd })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (x) {
+        if (!x.ok) errors.push((x.j && (x.j.message || x.j.error)) ? String(x.j.message || x.j.error) : ('Файл ' + (index + 1)));
+        uploadCheckoutFilesSequential(orderId, files, index + 1, errors, done);
+      })
+      .catch(function (err) {
+        errors.push((err && err.message) ? String(err.message) : ('Файл ' + (index + 1)));
+        uploadCheckoutFilesSequential(orderId, files, index + 1, errors, done);
+      });
+  }
+  function finishCheckoutSuccess(orderNumber, fileErrors) {
+    out.checkoutLoading = false;
+    out.checkoutFileProgress = null;
+    out.checkoutStagedFiles = null;
+    out.cart = [];
+    out.orders = null;
+    if (fileErrors && fileErrors.length) {
+      out.postCheckoutNotice = 'Заказ ' + (orderNumber || '') + ' создан. Не все файлы загрузились: ' + fileErrors.join('; ') + '. Прикрепите их в карточке заказа.';
+    } else {
+      out.postCheckoutNotice = null;
+    }
+    out.checkoutMsg = null;
+    out.view = 'orders';
+    loadOrders();
   }
   function doCheckout(e) {
     if (!out.token) { out.checkoutMsg = 'Нет сессии'; render(); return; }
@@ -80,24 +123,48 @@ export const MINIAPP_CLIENT_PART2 = `
       customer = { type: 'individual', phone: phone, notes: String(fd.get('notes') || '').trim() || undefined };
     }
     if (!phone) { out.checkoutMsg = 'Укажите телефон'; render(); return; }
+    var staged = out.checkoutStagedFiles;
+    var files = (staged && staged.length) ? staged : [];
     var subBtn = f.querySelector('button[type=submit]');
     if (subBtn) subBtn.disabled = true;
     out.checkoutLoading = true;
+    out.checkoutFileProgress = null;
+    out.checkoutMsg = null;
     var orderNotes = String(fd.get('notes') || '').trim();
     var body = { customer: customer, order: { items: cartToItems(), order_notes: orderNotes } };
     fetch(API_BASE + '/api/miniapp/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + out.token, Accept: 'application/json' }, body: JSON.stringify(body) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (x) {
-        out.checkoutLoading = false;
-        if (!x.ok) { out.checkoutMsg = (x.j && (x.j.error || x.j.message)) ? String(x.j.error || x.j.message) : 'Оформление не удалось'; render(); return; }
-        out.cart = [];
-        out.orders = null;
-        out.checkoutMsg = (x.j && x.j.message) ? String(x.j.message) : 'Заказ создан';
-        out.view = 'orders';
-        loadOrders();
+        if (!x.ok) {
+          out.checkoutLoading = false;
+          out.checkoutMsg = (x.j && (x.j.error || x.j.message)) ? String(x.j.error || x.j.message) : 'Оформление не удалось';
+          render();
+          return;
+        }
+        var ord = x.j && x.j.order;
+        var oid = ord && ord.id != null ? ord.id : null;
+        var num = (ord && ord.number) ? String(ord.number) : '';
+        if (!oid) {
+          out.checkoutLoading = false;
+          out.checkoutMsg = (x.j && x.j.message) ? String(x.j.message) : 'Заказ создан';
+          out.cart = [];
+          out.orders = null;
+          out.view = 'orders';
+          loadOrders();
+          return;
+        }
+        if (!files.length) {
+          finishCheckoutSuccess(num, []);
+          return;
+        }
+        var errs = [];
+        uploadCheckoutFilesSequential(oid, files, 0, errs, function (fileErrors) {
+          finishCheckoutSuccess(num, fileErrors);
+        });
       })
       .catch(function (err) {
         out.checkoutLoading = false;
+        out.checkoutFileProgress = null;
         out.checkoutMsg = (err && err.message) || String(err);
         render();
       });

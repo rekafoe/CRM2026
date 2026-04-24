@@ -9,7 +9,10 @@ export const MINIAPP_CLIENT_PART1 = `
     calcPid: null, calcName: '', calcListItem: null, calcSchema: null, calcErr: null, calcLoading: false, calcResult: null,
     calcForm: { typeId: null, sizeId: null, matId: null, qty: 100, printKey: '' },
     orderDetailId: null, orderDetailData: null, orderDetailErr: null, orderDetailLoading: false,
-    orderFileMsg: null, orderUploadLoading: false
+    orderFileMsg: null, orderUploadLoading: false,
+    postCheckoutNotice: null,
+    checkoutStagedFiles: null,
+    checkoutFileProgress: null
   };
   var nav, main;
   function $(id) { return document.getElementById(id); }
@@ -40,6 +43,7 @@ export const MINIAPP_CLIENT_PART1 = `
           }
           out.view = key;
           out.checkoutMsg = null;
+          out.postCheckoutNotice = null;
           if (key === 'catalog' && !out.products) loadProducts();
           if (key === 'orders' && out.orders == null) loadOrders();
           render();
@@ -72,8 +76,22 @@ export const MINIAPP_CLIENT_PART1 = `
     var k = cartLineKey(id);
     var idx = -1;
     for (var i = 0; i < out.cart.length; i++) { if (out.cart[i].k === k) { idx = i; break; } }
-    if (idx >= 0) out.cart[idx].qty += 1; else
-      out.cart.push({ k: k, pid: id, name: p.name, price: price, qty: 1, type: String(id), params: { productName: p.name, source: 'miniapp' } });
+    if (idx >= 0) out.cart[idx].qty += 1; else {
+      var pn = p.name || 'Товар';
+      out.cart.push({
+        k: k, pid: id, name: p.name, price: price, qty: 1, type: String(id),
+        params: {
+          productName: pn,
+          source: 'miniapp',
+          priceType: 'standard',
+          description: pn + ' — из каталога Mini App',
+          parameterSummary: [
+            { label: 'Продукт', value: pn },
+            { label: 'Источник', value: 'Mini App, каталог' }
+          ]
+        }
+      });
+    }
     out.view = 'cart';
     render();
   }
@@ -95,7 +113,9 @@ export const MINIAPP_CLIENT_PART1 = `
     var items = [];
     for (var i = 0; i < out.cart.length; i++) {
       var c = out.cart[i];
-      items.push({ type: c.type, params: c.params, price: c.price, quantity: c.qty, priceType: 'website' });
+      var p = c.params || {};
+      var pt = p.priceType || p.price_type || 'standard';
+      items.push({ type: c.type, params: c.params, price: c.price, quantity: c.qty, priceType: pt });
     }
     return items;
   }
@@ -110,7 +130,7 @@ export const MINIAPP_CLIENT_PART1 = `
     if (out.err) { box.appendChild(rowHint('Ошибка: ' + out.err)); return box; }
     if (!out.me || !out.me.telegram) { box.appendChild(rowHint('Нет данных профиля.')); return box; }
     var t = out.me.telegram || {};
-    box.appendChild(h('h2', 'Профиль'));
+    box.appendChild(h('div', 'Профиль', 'section-head'));
     box.appendChild(h('p', 'Имя: ' + esc(t.first_name || '—') + (t.last_name ? ' ' + esc(t.last_name) : ''), 'line'));
     box.appendChild(h('p', 'Username: ' + (t.username ? '@' + esc(t.username) : '—'), 'line'));
     box.appendChild(h('p', 'Статус: ' + esc(t.role || 'клиент'), 'line'));
@@ -124,10 +144,11 @@ export const MINIAPP_CLIENT_PART1 = `
     if (out.productErr) box.appendChild(rowHint(out.productErr));
     if (!out.products) { box.appendChild(rowHint('Загрузка каталога…')); return box; }
     if (out.products.length === 0) { box.appendChild(rowHint('Нет товаров для сайта (forSite).')); return box; }
-    box.appendChild(h('h2', 'Каталог'));
+    box.appendChild(h('div', 'Каталог', 'section-head'));
+    var grid = h('div', '', 'catalog-grid');
     for (var i = 0; i < out.products.length; i++) {
       (function (p) {
-        var row = h('div', '', 'card');
+        var row = h('div', '', 'card ipc-card');
         var title = esc(p.name || 'Товар') + (p.category_name ? ' — ' + esc(p.category_name) : '');
         var price = p.min_price != null && p.min_price !== '' ? 'от ' + esc(p.min_price) + ' Br' : 'цена по запросу';
         row.appendChild(h('div', title, 'card-title'));
@@ -136,22 +157,24 @@ export const MINIAPP_CLIENT_PART1 = `
         btn.type = 'button';
         btn.onclick = function () { addToCart(p); };
         row.appendChild(btn);
-        box.appendChild(row);
+        grid.appendChild(row);
       })(out.products[i]);
     }
+    box.appendChild(grid);
     return box;
   }
   function renderCart() {
     var box = h('div', '', 'section');
-    box.appendChild(h('h2', 'Корзина'));
+    box.appendChild(h('div', 'Корзина', 'section-head'));
     if (out.cart.length === 0) {
       box.appendChild(rowHint('Пока пусто. Добавьте позиции из каталога.'));
       return box;
     }
     for (var i = 0; i < out.cart.length; i++) {
       (function (c) {
-        var row = h('div', '', 'card');
-        var line = esc(c.name) + ' × ' + c.qty + ' — ' + (Math.round(c.price * c.qty * 100) / 100) + ' Br';
+        var row = h('div', '', 'card ipc-card');
+        var sub = (c.params && c.params.description) ? esc(c.params.description) : esc(c.name);
+        var line = sub + ' × ' + c.qty + ' — ' + (Math.round(c.price * c.qty * 100) / 100) + ' Br';
         row.appendChild(h('div', line, 'card-title'));
         var tools = h('div', '', 'row');
         var m = h('button', '−', 'small'); m.type = 'button'; m.onclick = function () { setQty(c.k, -1); };
@@ -162,10 +185,10 @@ export const MINIAPP_CLIENT_PART1 = `
         box.appendChild(row);
       })(out.cart[i]);
     }
-    box.appendChild(h('p', 'Итого: ' + subtotal() + ' Br', 'total'));
+    box.appendChild(h('div', 'Итого: ' + subtotal() + ' Br', 'total ipc-total'));
     var go = h('button', 'Оформить заказ', 'primary');
     go.type = 'button';
-    go.onclick = function () { out.view = 'checkout'; out.checkoutMsg = null; render(); };
+    go.onclick = function () { out.view = 'checkout'; out.checkoutMsg = null; out.postCheckoutNotice = null; render(); };
     box.appendChild(go);
     return box;
   }
@@ -174,7 +197,10 @@ export const MINIAPP_CLIENT_PART1 = `
   }
   function renderOrders() {
     var box = h('div', '', 'section');
-    box.appendChild(h('h2', 'Мои заказы'));
+    box.appendChild(h('div', 'Мои заказы', 'section-head'));
+    if (out.postCheckoutNotice) {
+      box.appendChild(h('p', esc(out.postCheckoutNotice), 'okmsg'));
+    }
     if (out.ordersErr) box.appendChild(rowHint(out.ordersErr));
     if (!out.orders) { box.appendChild(rowHint('Загрузка…')); return box; }
     if (orderMetaUnavail()) { box.appendChild(rowHint('Список заказов пока недоступен (нужна миграция telegram_chat_id).')); return box; }
@@ -182,7 +208,7 @@ export const MINIAPP_CLIENT_PART1 = `
     if (list.length === 0) { box.appendChild(rowHint('Заказов пока нет.')); return box; }
     for (var j = 0; j < list.length; j++) {
       (function (o) {
-        var row = h('div', '', 'card');
+        var row = h('div', '', 'card ipc-card');
         var t = esc(o.number) + (o.status_name ? ' — ' + esc(o.status_name) : ' — статус ' + o.status);
         row.appendChild(h('div', t, 'card-title'));
         if (o.created_at) row.appendChild(h('div', esc(o.created_at), 'muted'));
