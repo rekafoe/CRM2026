@@ -479,6 +479,7 @@ export class OrderService {
         params: string | Record<string, unknown>;
         price: number;
         quantity: number;
+        totalCost?: number;
         components?: Array<{ materialId: number; qtyPerItem: number }>;
       }>;
     }
@@ -503,23 +504,35 @@ export class OrderService {
           qtyPerItem: Number(component.qtyPerItem),
         }));
       }
-      let finalPrice = Number(item.price) || 0;
+      const qty = Math.max(1, Number(item.quantity) || 1);
+      const effectiveTotal =
+        item.totalCost != null && Number.isFinite(Number(item.totalCost))
+          ? Math.round(Number(item.totalCost) * 100) / 100
+          : (typeof paramsObj.storedTotalCost === 'number' && Number.isFinite(paramsObj.storedTotalCost)
+              ? Math.round(Number(paramsObj.storedTotalCost) * 100) / 100
+              : null);
+      let finalPrice = effectiveTotal != null ? effectiveTotal / qty : (Number(item.price) || 0);
       const priceType =
         (item as { priceType?: unknown; price_type?: unknown }).priceType ??
         (item as { priceType?: unknown; price_type?: unknown }).price_type ??
         paramsObj.priceType ??
         paramsObj.price_type;
-      if (isWebsiteLike && priceType && typeof priceType === 'string') {
+      if (effectiveTotal != null) {
+        paramsObj.storedTotalCost = effectiveTotal;
+      }
+      if (isWebsiteLike && effectiveTotal == null && priceType && typeof priceType === 'string') {
         const key = priceType.toLowerCase().trim();
         const mult = await PriceTypeService.getMultiplier(key);
         if (mult !== 1) {
           finalPrice = Math.round(finalPrice * mult * 100) / 100;
         }
         paramsObj.priceType = key;
+      } else if (priceType && typeof priceType === 'string') {
+        paramsObj.priceType = priceType.toLowerCase().trim();
       }
       await db.run(
         'INSERT INTO items (orderId, type, params, price, quantity) VALUES (?, ?, ?, ?, ?)',
-        [payload.orderId, item.type, JSON.stringify(paramsObj), finalPrice, item.quantity]
+        [payload.orderId, item.type, JSON.stringify(paramsObj), finalPrice, qty]
       );
     }
   }

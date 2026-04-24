@@ -25,6 +25,7 @@ export function normalizeWebsiteItems(
   params: Record<string, unknown>;
   price: number;
   quantity: number;
+  totalCost?: number;
   components?: Array<{ materialId: number; qtyPerItem: number }>;
   priceType?: string;
   price_type?: string;
@@ -44,6 +45,9 @@ export function normalizeWebsiteItems(
     params: normalizeItemParams(it?.params),
     price: Number(it?.price) || 0,
     quantity: Math.max(1, parseInt(String(it?.quantity), 10) || 1),
+    ...(it?.totalCost != null && Number.isFinite(Number(it.totalCost))
+      ? { totalCost: Math.round(Number(it.totalCost) * 100) / 100 }
+      : {}),
     ...(it?.priceType != null && { priceType: it.priceType }),
     ...(it?.price_type != null && { price_type: it.price_type }),
   }));
