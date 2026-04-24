@@ -446,6 +446,59 @@ export const MINIAPP_CLIENT_PART_CALC = `
     render();
     scheduleCalcRun();
   }
+  /** Как в CRM: initial.operations подтипа → finishing для POST /calculate. */
+  function buildFinishingFromTypeInitial() {
+    var cfg = getTypeConfigForCurrentSubtype();
+    var init = cfg && cfg.initial;
+    var ops = init && Array.isArray(init.operations) ? init.operations : [];
+    if (ops.length === 0) return [];
+    var sz = calcSelectedSize();
+    var sizeFin = sz && Array.isArray(sz.finishing) ? sz.finishing : [];
+    var res = [];
+    for (var i = 0; i < ops.length; i++) {
+      var op = ops[i] || {};
+      var sid = Number(op.operation_id != null ? op.operation_id : op.operationId);
+      if (!isFinite(sid) || sid <= 0) continue;
+      var vidRaw = op.variant_id != null ? op.variant_id : op.variantId;
+      var vid =
+        vidRaw != null && String(vidRaw).trim() !== '' && isFinite(Number(vidRaw)) ? Number(vidRaw) : undefined;
+      var row = null;
+      var j;
+      if (vid != null) {
+        for (j = 0; j < sizeFin.length; j++) {
+          var f = sizeFin[j];
+          if (Number(f.service_id) !== sid) continue;
+          if (f.variant_id != null && Number(f.variant_id) === vid) {
+            row = f;
+            break;
+          }
+        }
+      }
+      if (!row) {
+        for (j = 0; j < sizeFin.length; j++) {
+          if (Number(sizeFin[j].service_id) === sid) {
+            row = sizeFin[j];
+            break;
+          }
+        }
+      }
+      var entry = { service_id: sid };
+      if (vid != null) entry.variant_id = vid;
+      if (row && row.price_unit) entry.price_unit = row.price_unit;
+      if (row && row.units_per_item != null) entry.units_per_item = Number(row.units_per_item);
+      res.push(entry);
+    }
+    return res;
+  }
+  function finishingPayloadSignature(fin) {
+    if (!fin || !fin.length) return '';
+    var parts = [];
+    for (var i = 0; i < fin.length; i++) {
+      var e = fin[i];
+      parts.push(String(e.service_id) + (e.variant_id != null ? 'v' + String(e.variant_id) : ''));
+    }
+    return parts.join('_');
+  }
   function buildCalcPayload() {
     var p = parsePrintKey();
     var qn = Math.max(1, parseInt(String(out.calcForm.qty), 10) || 1);
@@ -454,6 +507,8 @@ export const MINIAPP_CLIENT_PART_CALC = `
     if (out.calcForm.typeId != null) pl.type_id = out.calcForm.typeId;
     if (out.calcForm.priceType) pl.priceType = out.calcForm.priceType;
     if (out.calcForm.cutting) pl.cutting = true;
+    var fin = buildFinishingFromTypeInitial();
+    if (fin.length > 0) pl.finishing = fin;
     return pl;
   }
   function runCalc(opts) {
@@ -588,7 +643,23 @@ export const MINIAPP_CLIENT_PART_CALC = `
         try { delete out.checkoutFileByK[re]; } catch (e) {}
       }
     }
-    var k = 'cx' + out.calcPid + '-' + String(out.calcForm.typeId) + '-' + String(out.calcForm.sizeId) + '-' + String(out.calcForm.matId) + '-' + String(out.calcForm.printKey) + '-c' + (out.calcForm.cutting ? '1' : '0');
+    var finKey = buildFinishingFromTypeInitial();
+    var finSig = finishingPayloadSignature(finKey);
+    var k =
+      'cx' +
+      out.calcPid +
+      '-' +
+      String(out.calcForm.typeId) +
+      '-' +
+      String(out.calcForm.sizeId) +
+      '-' +
+      String(out.calcForm.matId) +
+      '-' +
+      String(out.calcForm.printKey) +
+      '-c' +
+      (out.calcForm.cutting ? '1' : '0') +
+      '-f' +
+      (finSig || '0');
     var name = (out.calcName || 'Товар') + ' (кальк.)';
     var found = -1;
     for (var i = 0; i < out.cart.length; i++) { if (out.cart[i].k === k) { found = i; break; } }

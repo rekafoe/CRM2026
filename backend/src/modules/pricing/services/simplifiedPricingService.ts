@@ -706,6 +706,18 @@ export class SimplifiedPricingService {
           )) as Array<{ operation_id: number }>;
           const allowedIds = new Set(allowed.map((r) => Number(r.operation_id)));
           finishingToUse = sizeFinishing.filter((f: any) => allowedIds.has(Number(f?.service_id)));
+          // Все услуги в sizes[].finishing уже «разрешены» шаблоном; если в product_operations_link
+          // нет ни одной is_default/is_required, строгий фильтр даёт пусто и ламинация/скругление не ценятся
+          // (типичный кейс визиток). Тогда берём любую привязку операции к продукту.
+          if (finishingToUse.length === 0) {
+            const linked = (await db.all(
+              `SELECT operation_id FROM product_operations_link 
+               WHERE product_id = ? AND operation_id IN (${serviceIds.map(() => '?').join(',')})`,
+              [productId, ...serviceIds]
+            )) as Array<{ operation_id: number }>;
+            const linkedIds = new Set(linked.map((r) => Number(r.operation_id)));
+            finishingToUse = sizeFinishing.filter((f: any) => linkedIds.has(Number(f?.service_id)));
+          }
         } else {
           finishingToUse = [];
         }
