@@ -395,8 +395,8 @@ export function compactSimplifiedForSite(simplified: any) {
             {
               sizes: Array.isArray(cfg?.sizes) ? cfg.sizes.map(compactSize) : [],
               ...(Array.isArray(cfg?.common_allowed_material_ids) ? { common_allowed_material_ids: cfg.common_allowed_material_ids } : {}),
-              ...(Array.isArray(cfg?.allowed_price_types) && cfg.allowed_price_types.length > 0
-                ? { allowed_price_types: cfg.allowed_price_types }
+              ...(Array.isArray(cfg?.allowed_price_types)
+                ? { allowed_price_types: cfg.allowed_price_types.slice() }
                 : {}),
               pages: cfg?.pages || simplifiedOrdered.pages || null,
               initial: cfg?.initial || undefined,

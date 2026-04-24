@@ -92,17 +92,17 @@ export function getMiniappMapAndBynShellCss() {
     h2.section-head, h3.section-head { margin-top: 0; }
     .ipc-byn {
       display: inline-flex;
-      align-items: baseline;
+      align-items: flex-end;
       margin-left: 0.15ch;
       line-height: 1;
-      vertical-align: 0.05em;
+      vertical-align: -0.02em;
     }
     .ipc-byn svg {
       display: block;
       flex-shrink: 0;
-      height: 0.9em;
-      width: 0.76em;
-      transform: translateY(0.06em);
+      height: 0.92em;
+      width: 0.77em;
+      transform: translateY(0.02em);
     }
     .ipc-design-help-row { margin: 10px 0; }
     .ipc-design-help {

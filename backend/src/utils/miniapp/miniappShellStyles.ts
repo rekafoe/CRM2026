@@ -48,10 +48,15 @@ const MINIAPP_SHELL_CSS_BASE = `
       display: flex; align-items: center; justify-content: center;
       min-height: 48px;
       max-width: min(44vw, 180px);
+      padding: 8px 12px;
+      background: #fff;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: 12px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
     }
     .ipc-pm-header__logo-img {
       max-width: 100%;
-      max-height: 48px;
+      max-height: 34px;
       width: auto; height: auto;
       object-fit: contain;
       display: block;

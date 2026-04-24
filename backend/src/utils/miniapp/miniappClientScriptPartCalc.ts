@@ -65,14 +65,35 @@ export const MINIAPP_CLIENT_PART_CALC = `
     d = d != null ? String(d).trim() : '';
     return d;
   }
+  function getSimplifiedTypeConfigMap() {
+    var s = calcSimp();
+    if (!s || !s.typeConfigs || typeof s.typeConfigs !== 'object') return null;
+    return s.typeConfigs;
+  }
+  /** typeConfigs ключи в JSON — строки; typeId в форме — число или строка. */
+  function getTypeConfigForCurrentSubtype() {
+    var m = getSimplifiedTypeConfigMap();
+    if (!m) return null;
+    var tid = calcPickTypeId();
+    if (tid == null) return null;
+    if (m[String(tid)] != null) return m[String(tid)];
+    for (var k in m) {
+      if (Object.prototype.hasOwnProperty.call(m, k) && k == tid) return m[k];
+    }
+    return null;
+  }
   function calcAllowedPriceTypesRaw() {
     var s = calcSimp();
-    if (!s || !s.typeConfigs) return [];
-    var tid = calcPickTypeId();
-    if (tid == null) return [];
-    var cfg = s.typeConfigs[String(tid)];
-    if (!cfg || !Array.isArray(cfg.allowed_price_types) || cfg.allowed_price_types.length === 0) return [];
-    return cfg.allowed_price_types;
+    if (!s) return [];
+    var d = out.calcSchema && out.calcSchema.data;
+    var cfg = getTypeConfigForCurrentSubtype();
+    if (cfg && Array.isArray(cfg.allowed_price_types) && cfg.allowed_price_types.length > 0) {
+      return cfg.allowed_price_types;
+    }
+    if (d && d.constraints && Array.isArray(d.constraints.allowed_price_types) && d.constraints.allowed_price_types.length > 0) {
+      return d.constraints.allowed_price_types;
+    }
+    return [];
   }
   function calcAllowedPriceTypes() {
     var raw = calcAllowedPriceTypesRaw();

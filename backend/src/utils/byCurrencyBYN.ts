@@ -2,9 +2,12 @@
  * Официальный графический знак белорусского рубля (заглавная «Б» + горизонтальная линия).
  * Единая разметка для веб, PDF, Telegram Mini App.
  */
-/** Глиф ≈высоты цифр в line-height; линия — над верхом «Б» (как бук. знак) */
+/**
+ * Рисуем знак вручную, а не через `<text>`:
+ * WebView Telegram по-разному рендерит кириллическую "Б", из-за чего глиф "плывёт".
+ */
 const SVG_INNER = (fillHex: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 26" fill="none" aria-hidden="true" focusable="false"><text x="0" y="18" fill="${fillHex}" font-size="19" font-weight="700" font-family="system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif" dominant-baseline="alphabetic">Б</text><line x1="0" y1="10" x2="9" y2="10" stroke="${fillHex}" stroke-width="1.5" stroke-linecap="square"/></svg>`.replace(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 24" fill="none" aria-hidden="true" focusable="false"><path d="M2 2.75H17V5.35H4.7V10.55H10.35C15.2 10.55 18 12.95 18 17.1C18 21.25 15.05 23.25 10.05 23.25H2V2.75ZM4.7 13.05V20.65H9.95C13.3 20.65 15.3 19.55 15.3 16.85C15.3 14.15 13.3 13.05 9.95 13.05H4.7Z" fill="${fillHex}"/><rect x="0.65" y="8.05" width="8.55" height="1.7" rx="0.25" fill="${fillHex}"/></svg>`.replace(
     /\s+/g,
     ' '
   );
@@ -18,19 +21,19 @@ function encodeDataSvg(svg: string): string {
 
 /**
  * Data-URL для `background` в легаси-CSS, где внешняя `url(data:...)` — единственный вариант.
- * В Mini App рядом с суммой используется `bynIconInlineSpanHtmlForMiniapp` (инлайн-SVG, currentColor).
+ * В Mini App рядом с суммой используется `bynIconInlineSpanHtmlForMiniapp`.
  */
 export function bynSymbolDataUrlForCss(): string {
   return encodeDataSvg(SVG_INNER('#0f172a'));
 }
 
 const SVG_INNER_CURRENT = () =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 26" fill="none" aria-hidden="true" focusable="false"><text x="0" y="18" fill="currentColor" font-size="19" font-weight="700" font-family="system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif" dominant-baseline="alphabetic">Б</text><line x1="0" y1="10" x2="9" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>`.replace(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 24" fill="none" aria-hidden="true" focusable="false"><path d="M2 2.75H17V5.35H4.7V10.55H10.35C15.2 10.55 18 12.95 18 17.1C18 21.25 15.05 23.25 10.05 23.25H2V2.75ZM4.7 13.05V20.65H9.95C13.3 20.65 15.3 19.55 15.3 16.85C15.3 14.15 13.3 13.05 9.95 13.05H4.7Z" fill="currentColor"/><rect x="0.65" y="8.05" width="8.55" height="1.7" rx="0.25" fill="currentColor"/></svg>`.replace(
     /\s+/g,
     ' '
   );
 
-/** Инлайн в Mini App: не data-URL в CSS (ломается в WebView), цвет = currentColor. */
+/** Mini App: инлайн-SVG с currentColor. */
 export function bynIconInlineSpanHtmlForMiniapp(): string {
   return ' <span class="ipc-byn" role="img" aria-label="бел. руб.">' + SVG_INNER_CURRENT() + '</span>';
 }
