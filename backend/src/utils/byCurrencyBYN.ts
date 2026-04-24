@@ -1,14 +1,15 @@
 /**
  * Официальный графический знак белорусского рубля (заглавная «Б» + горизонтальная линия).
  * Единая разметка для веб, PDF, Telegram Mini App.
+ * Вектор: экспорт CorelDRAW → один path, без text (WebView не «плывёт»).
  */
-/**
- * Рисуем знак вручную, а не через `<text>`:
- * WebView Telegram по-разному рендерит кириллическую "Б", из-за чего глиф "плывёт".
- */
-/** Гориз. штрих как в `BynSymbol.tsx` (линия y=10.1), прямо под «окном»; длина ~4,5/6 ширины, 1u слева от стояка. */
+/** d и viewBox — как в исходном SVG (px условной сетки). */
+const BYN_SVG_VIEWBOX = '0 0 3780 5315.63';
+const BYN_PATH_D =
+  'M1667.66 2690.24c104.12,-0.5 365.38,-11.13 446.39,13.35 279.36,84.42 271.48,429.66 3.79,511.73 -79.56,24.4 -348.11,15.54 -450.15,13.76l0.08 -187.68 369.98 -0.3 0.16 -161.4 -370.58 -1.29 0.33 -188.17zm0.07 -604.24l653.99 -0.69 0.16 -161.09 -816.93 -0.07 -0.13 954.21 -208.72 0.15 0.43 162.65 208.15 0.76 0.21 349.18c111.37,-0.52 222.85,-0.05 334.23,-0.05 106.15,0 220.5,8.88 316.14,-17.04 379.05,-102.75 447.95,-590.61 110.72,-780.65 -82.93,-46.74 -155.85,-65.71 -268.51,-65.55 -109.25,0.16 -219.85,1.61 -329.7,-0.15l-0.04 -441.66z';
+
 const SVG_INNER = (fillHex: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 24" fill="none" aria-hidden="true" focusable="false"><path d="M2 2.75H17V5.35H4.7V10.55H10.35C15.2 10.55 18 12.95 18 17.1C18 21.25 15.05 23.25 10.05 23.25H2V2.75ZM4.7 13.05V20.65H9.95C13.3 20.65 15.3 19.55 15.3 16.85C15.3 14.15 13.3 13.05 9.95 13.05H4.7Z" fill="${fillHex}"/><rect x="1.1" y="9.45" width="15.1" height="1.3" rx="0.15" fill="${fillHex}"/></svg>`.replace(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${BYN_SVG_VIEWBOX}" fill="none" aria-hidden="true" focusable="false"><path d="${BYN_PATH_D}" fill="${fillHex}"/></svg>`.replace(
     /\s+/g,
     ' '
   );
@@ -29,7 +30,7 @@ export function bynSymbolDataUrlForCss(): string {
 }
 
 const SVG_INNER_CURRENT = () =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 24" fill="none" aria-hidden="true" focusable="false"><path d="M2 2.75H17V5.35H4.7V10.55H10.35C15.2 10.55 18 12.95 18 17.1C18 21.25 15.05 23.25 10.05 23.25H2V2.75ZM4.7 13.05V20.65H9.95C13.3 20.65 15.3 19.55 15.3 16.85C15.3 14.15 13.3 13.05 9.95 13.05H4.7Z" fill="currentColor"/><rect x="1.1" y="9.45" width="15.1" height="1.3" rx="0.15" fill="currentColor"/></svg>`.replace(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${BYN_SVG_VIEWBOX}" fill="none" aria-hidden="true" focusable="false"><path d="${BYN_PATH_D}" fill="currentColor"/></svg>`.replace(
     /\s+/g,
     ' '
   );

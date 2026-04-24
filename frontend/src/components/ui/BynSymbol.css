@@ -11,13 +11,6 @@
   height: 1.1em;
   overflow: visible;
 }
-.byn-sign__b {
+.byn-sign__path {
   fill: currentColor;
-  font-size: 16px;
-  font-weight: 700;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
-}
-.byn-sign__line {
-  stroke: currentColor;
-  stroke-width: 1.45;
 }
