@@ -3,8 +3,10 @@
  */
 import { MINIAPP_CLIENT_PART1 } from './miniappClientScriptPart1';
 import { MINIAPP_CLIENT_PART_CALC } from './miniappClientScriptPartCalc';
+import { MINIAPP_CLIENT_PART_CALC_SUMMARY } from './miniappClientScriptPartCalcSummary';
 import { MINIAPP_CLIENT_PART_ORDER_DETAIL } from './miniappClientScriptPartOrderDetail';
 import { MINIAPP_CLIENT_PART2 } from './miniappClientScriptPart2';
+import { MINIAPP_CLIENT_PART2_CHECKOUT } from './miniappClientScriptPart2Checkout';
 
 /** Опционально: только товары категории (GET /api/products/category/:id), см. MINIAPP_CATALOG_CATEGORY_ID. */
 export function getMiniappClientInlineScript(
@@ -27,7 +29,9 @@ export function getMiniappClientInlineScript(
     ';\n' +
     MINIAPP_CLIENT_PART1 +
     MINIAPP_CLIENT_PART_CALC +
+    MINIAPP_CLIENT_PART_CALC_SUMMARY +
     MINIAPP_CLIENT_PART_ORDER_DETAIL +
-    MINIAPP_CLIENT_PART2
+    MINIAPP_CLIENT_PART2 +
+    MINIAPP_CLIENT_PART2_CHECKOUT
   );
 }

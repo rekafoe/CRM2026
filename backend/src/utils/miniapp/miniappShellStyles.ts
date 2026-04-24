@@ -2,6 +2,10 @@
  * Стили оболочки Telegram Mini App (inline в HTML).
  * Визуально согласованы с ProductManagement.css (/adminpanel/products).
  */
+import { bynSymbolDataUrlForCss } from '../../../../shared/byCurrencyBYN';
+
+const _bynU = JSON.stringify(bynSymbolDataUrlForCss());
+
 export const MINIAPP_SHELL_CSS = `
     :root {
       --ipc-radius: 16px;
@@ -267,6 +271,19 @@ export const MINIAPP_SHELL_CSS = `
       box-shadow: 0 4px 16px rgba(71, 85, 105, 0.1);
       transform: translateY(-1px);
     }
+    .ipc-catalog-card__title { margin-bottom: 8px; }
+    .ipc-catalog-card__media {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100px; max-height: 140px; margin: 0 0 8px; border-radius: 10px;
+      background: #f1f5f9; overflow: hidden;
+    }
+    .ipc-catalog-card__media--empty { min-height: 80px; }
+    .ipc-catalog-card__img { max-width: 100%; max-height: 130px; object-fit: contain; display: block; }
+    .ipc-catalog-card__desc {
+      font-size: 12px; line-height: 1.4; color: var(--ipc-slate-500); margin: 0 0 8px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .ipc-catalog-card__btn { width: 100%; box-sizing: border-box; }
     .ipc-subhead {
       font-size: 0.95rem;
       font-weight: 700;
@@ -280,4 +297,13 @@ export const MINIAPP_SHELL_CSS = `
     .ipc-detail-block .ipc-result { margin-top: 0; }
     .ipc-list__row--cart .row { margin-top: 0; }
     h2.section-head, h3.section-head { margin-top: 0; }
+    .ipc-byn {
+      display: inline-block; width: 0.9em; height: 1.05em; margin-left: 0.12em; vertical-align: -0.1em;
+      background: no-repeat center center / contain; background-image: url(${_bynU});
+    }
+    .ipc-design-help-row { margin: 10px 0; }
+    .ipc-design-help { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.4; color: #334155; cursor: pointer; }
+    .ipc-design-help input { margin-top: 2px; flex-shrink: 0; }
+    .ipc-checkout-design-note, .ipc-checkout-design-hint { line-height: 1.45; }
+    .ipc-checkout-validate { color: #b91c1c; font-weight: 500; }
 `;

@@ -14,10 +14,11 @@
     "checkJs": false,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@shared/*": ["../shared/*"]
     },
     "allowImportingTsExtensions": true
   },
-  "include": ["src"],
+  "include": ["src", "../shared/byCurrencyBYN.ts"],
   "exclude": ["node_modules", "dist"]
 }

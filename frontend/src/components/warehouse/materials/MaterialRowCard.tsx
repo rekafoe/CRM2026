@@ -4,6 +4,7 @@ import { materialPriceSecondaryLabel } from '../../../utils/materialPriceLabels'
 import { WarehouseButton } from '../common/WarehouseButton';
 import { StatusBadge } from '../../common/StatusBadge';
 import { AppIcon } from '../../ui/AppIcon';
+import { BynSymbol } from '../../ui/BynSymbol';
 
 interface MaterialRowCardProps {
   material: Material;
@@ -79,7 +80,9 @@ export const MaterialRowCard: React.FC<MaterialRowCardProps> = ({
       {/* Price Column */}
       <div className="row-column price-column">
         <div className="price-info">
-          <div className="font-bold">{material.sheet_price_single || material.price || 0} BYN</div>
+          <div className="font-bold">
+          {material.sheet_price_single || material.price || 0} <BynSymbol />
+        </div>
           <div className="text-xs text-text-secondary">{materialPriceSecondaryLabel(material.unit)}</div>
         </div>
       </div>

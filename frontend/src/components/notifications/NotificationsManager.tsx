@@ -6,6 +6,7 @@ import { AutoOrdersManager } from './AutoOrdersManager';
 import { OrderClientNotifyTab } from './OrderClientNotifyTab';
 import { CampaignManagerPage } from './campaigns/CampaignManagerPage';
 import { useUIStore } from '../../stores/uiStore';
+import { BynSymbol } from '../ui/BynSymbol';
 import './NotificationsManager.css';
 
 type NotifyTab = 'alerts' | 'telegram' | 'orders' | 'settings' | 'client' | 'campaigns';
@@ -276,7 +277,7 @@ const NotificationsSettings: React.FC = () => {
           </div>
           <div className="setting-item">
             <label>
-              Минимальная сумма заказа (BYN):
+              Минимальная сумма заказа (<BynSymbol />):
               <input
                 type="number"
                 value={settings.autoOrders.minOrderValue}
@@ -290,7 +291,7 @@ const NotificationsSettings: React.FC = () => {
           </div>
           <div className="setting-item">
             <label>
-              Максимальная сумма заказа (BYN):
+              Максимальная сумма заказа (<BynSymbol />):
               <input
                 type="number"
                 value={settings.autoOrders.maxOrderValue}

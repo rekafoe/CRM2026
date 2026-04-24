@@ -2,11 +2,116 @@
  * Продолжение inline-скрипта Mini App (часть 2 / 2) — оформление, boot, конец IIFE.
  */
 export const MINIAPP_CLIENT_PART2 = `
+  function renderCart() {
+    var box = h('div', '', 'section');
+    box.appendChild(h('div', 'Корзина', 'section-head'));
+    if (out.checkoutMsg) box.appendChild(h('p', esc(out.checkoutMsg), 'hint ipc-checkout-validate'));
+    if (out.cart.length === 0) {
+      box.appendChild(h('p', 'Пока пусто. Добавьте позиции из каталога.', 'hint ipc-empty'));
+      return box;
+    }
+    out.checkoutFileByK = out.checkoutFileByK || {};
+    var panel = h('div', '', 'ipc-panel');
+    var listEl = h('div', '', 'ipc-list');
+    for (var i = 0; i < out.cart.length; i++) {
+      (function (c) {
+        var row = h('div', '', 'ipc-list__row ipc-list__row--cart');
+        row.appendChild(h('div', cartLineSummaryEsc(c), 'ipc-list__row-summary'));
+        var fin = document.createElement('input');
+        fin.type = 'file';
+        fin.setAttribute('accept', 'application/pdf,image/*,.doc,.docx,.xls,.xlsx');
+        fin.onchange = function () {
+          out.checkoutFileByK = out.checkoutFileByK || {};
+          out.checkoutFileByK[c.k] = (this.files && this.files[0]) ? this.files[0] : null;
+          render();
+        };
+        var cap = 'Макет (до 25 МБ)' + (out.checkoutFileByK[c.k] ? ' — файл выбран' : '');
+        addField(row, cap, fin);
+        var tools = h('div', '', 'row');
+        var m = h('button', '−', 'small'); m.type = 'button'; m.onclick = function () { setQty(c.k, -1); };
+        var p = h('button', '+', 'small'); p.type = 'button'; p.onclick = function () { setQty(c.k, 1); };
+        var r = h('button', 'Убрать', 'small danger'); r.type = 'button'; r.onclick = function () { removeLine(c.k); };
+        tools.appendChild(m); tools.appendChild(p); tools.appendChild(r);
+        row.appendChild(tools);
+        listEl.appendChild(row);
+      })(out.cart[i]);
+    }
+    panel.appendChild(listEl);
+    box.appendChild(panel);
+    var dhRow = h('div', '', 'field ipc-design-help-row');
+    var dhWrap = h('label', '', 'ipc-design-help');
+    var dh = document.createElement('input');
+    dh.type = 'checkbox';
+    dh.checked = !!out.checkoutDesignHelp;
+    dh.onchange = function () {
+      out.checkoutDesignHelp = !!dh.checked;
+      out.checkoutMsg = null;
+      render();
+    };
+    dhWrap.appendChild(dh);
+    dhWrap.appendChild(document.createTextNode(' Нет макета — требуется помощь с его разработкой'));
+    dhRow.appendChild(dhWrap);
+    box.appendChild(dhRow);
+    if (out.checkoutDesignHelp) {
+      box.appendChild(
+        h(
+          'p',
+          'Без макета файлы не обязательны. Указанная ниже сумма — только печать. Разработка дизайна оценивается отдельно по телефону; итоговая стоимость заказа может измениться.',
+          'hint ipc-checkout-design-hint'
+        )
+      );
+    } else {
+      box.appendChild(
+        h('p', 'Прикрепите макет к каждой позиции (обязательно) или отметьте, что макета нет и нужна помощь с дизайном.', 'hint')
+      );
+    }
+    box.appendChild(h('div', 'Итого: ' + subtotal() + bynSpanHtml(), 'total ipc-total'));
+    var go = h('button', 'Оформить заказ', 'primary');
+    go.type = 'button';
+    go.onclick = function () {
+      if (!out.checkoutDesignHelp) {
+        out.checkoutFileByK = out.checkoutFileByK || {};
+        for (var vi = 0; vi < out.cart.length; vi++) {
+          if (!out.checkoutFileByK[out.cart[vi].k]) {
+            out.checkoutMsg = 'Прикрепите макет к каждой позиции или отметьте «Нет макета — требуется помощь с его разработкой».';
+            render();
+            return;
+          }
+        }
+      }
+      out.view = 'checkout';
+      out.checkoutMsg = null;
+      out.postCheckoutNotice = null;
+      render();
+    };
+    box.appendChild(go);
+    return box;
+  }
   function renderCheckout() {
     var box = h('div', '', 'section');
     box.appendChild(h('div', 'Оформление', 'section-head'));
     if (out.checkoutMsg) box.appendChild(h('p', esc(out.checkoutMsg), 'okmsg'));
     if (out.checkoutFileProgress) box.appendChild(h('p', esc(out.checkoutFileProgress), 'hint'));
+    var sumPanel = h('div', '', 'ipc-panel');
+    var sumInner = h('div', '', 'ipc-detail-block');
+    sumInner.appendChild(h('div', 'Позиции', 'ipc-subhead'));
+    for (var si = 0; si < out.cart.length; si++) {
+      sumInner.appendChild(h('p', cartLineSummaryEsc(out.cart[si]), 'line'));
+    }
+    if (out.checkoutDesignHelp) {
+      sumInner.appendChild(h('p', 'Цена печати: ' + subtotal() + bynSpanHtml(), 'total'));
+      sumInner.appendChild(
+        h(
+          'p',
+          'Цена разработки дизайна будет просчитана в индивидуальном порядке по телефону. Окончательная стоимость заказа изменится.',
+          'hint ipc-checkout-design-note'
+        )
+      );
+    } else {
+      sumInner.appendChild(h('p', 'Итого: ' + subtotal() + bynSpanHtml(), 'total'));
+    }
+    sumPanel.appendChild(sumInner);
+    box.appendChild(sumPanel);
     var form = document.createElement('form');
     form.className = 'form';
     form.onsubmit = function (e) { e.preventDefault(); doCheckout(e); return false; };
@@ -57,22 +162,20 @@ export const MINIAPP_CLIENT_PART2 = `
     no.name = 'notes';
     no.rows = 2;
     addField(form, 'Комментарий', no);
-    out.checkoutFileByK = out.checkoutFileByK || {};
-    for (var cix = 0; cix < out.cart.length; cix++) {
-      (function (line) {
-        var fin = document.createElement('input');
-        fin.type = 'file';
-        fin.setAttribute('accept', 'application/pdf,image/*,.doc,.docx,.xls,.xlsx');
-        fin.onchange = function () {
-          out.checkoutFileByK = out.checkoutFileByK || {};
-          out.checkoutFileByK[line.k] = (this.files && this.files[0]) ? this.files[0] : null;
-        };
-        var cap = (line.params && line.params.description) ? String(line.params.description) : String(line.name || 'позиция');
-        if (cap.length > 56) cap = cap.substring(0, 53) + '…';
-        addField(form, 'Макет к позиции: ' + cap, fin);
-      })(out.cart[cix]);
-    }
-    form.appendChild(h('p', 'Файл привязывается к соответствующей позиции заказа. До 25 МБ на файл; загрузка после создания заказа.', 'hint'));
+    var dhh = document.createElement('input');
+    dhh.type = 'hidden';
+    dhh.name = 'design_help';
+    dhh.value = out.checkoutDesignHelp ? '1' : '0';
+    form.appendChild(dhh);
+    form.appendChild(
+      h(
+        'p',
+        out.checkoutDesignHelp
+          ? 'Макеты в корзине не требуются. Сумма заказа — печать; дизайн согласуем отдельно.'
+          : 'Макеты к позициям выбраны в корзине; после «Отправить» они прикрепляются к строкам заказа (до 25 МБ).',
+        'hint'
+      )
+    );
     var sub = h('button', out.checkoutLoading ? (out.checkoutFileProgress || 'Отправка…') : 'Отправить заказ', 'primary');
     sub.type = 'submit';
     if (out.checkoutLoading) sub.disabled = true;
@@ -83,111 +186,6 @@ export const MINIAPP_CLIENT_PART2 = `
     coPanel.appendChild(coInner);
     box.appendChild(coPanel);
     return box;
-  }
-  function uploadCheckoutFilesSequential(orderId, tasks, index, errors, done) {
-    if (!tasks || index >= tasks.length) { done(errors); return; }
-    out.checkoutFileProgress = 'Прикрепляем файлы: ' + (index + 1) + ' / ' + tasks.length;
-    render();
-    var t = tasks[index];
-    var fd = new FormData();
-    fd.append('file', t.file);
-    if (t.orderItemId != null && t.orderItemId !== '') fd.append('orderItemId', String(t.orderItemId));
-    fetch(API_BASE + '/api/miniapp/orders/' + orderId + '/files', { method: 'POST', headers: { Authorization: 'Bearer ' + out.token }, body: fd })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-      .then(function (x) {
-        if (!x.ok) errors.push((x.j && (x.j.message || x.j.error)) ? String(x.j.message || x.j.error) : ('Файл ' + (index + 1)));
-        uploadCheckoutFilesSequential(orderId, tasks, index + 1, errors, done);
-      })
-      .catch(function (err) {
-        errors.push((err && err.message) ? String(err.message) : ('Файл ' + (index + 1)));
-        uploadCheckoutFilesSequential(orderId, tasks, index + 1, errors, done);
-      });
-  }
-  function finishCheckoutSuccess(orderNumber, fileErrors) {
-    out.checkoutLoading = false;
-    out.checkoutFileProgress = null;
-    out.checkoutFileByK = null;
-    out.cart = [];
-    out.orders = null;
-    if (fileErrors && fileErrors.length) {
-      out.postCheckoutNotice = 'Заказ ' + (orderNumber || '') + ' создан. Не все файлы загрузились: ' + fileErrors.join('; ') + '. Прикрепите их в карточке заказа.';
-    } else {
-      out.postCheckoutNotice = null;
-    }
-    out.checkoutMsg = null;
-    out.view = 'orders';
-    loadOrders();
-  }
-  function doCheckout(e) {
-    if (!out.token) { out.checkoutMsg = 'Нет сессии'; render(); return; }
-    if (out.cart.length === 0) { out.checkoutMsg = 'Корзина пуста'; render(); return; }
-    var f = e.currentTarget;
-    if (!f) return;
-    var fd = new FormData(f);
-    var isLeg = String(fd.get('cust-type') || '') === 'legal';
-    var phone = String(fd.get('phone') || '').trim();
-    if (!phone && out.me && out.me.crm && out.me.crm.phone) phone = String(out.me.crm.phone).trim();
-    var customer;
-    if (isLeg) {
-      customer = { type: 'legal', company_name: String(fd.get('co') || '').trim(), phone: phone, email: String(fd.get('email') || '').trim() || undefined, notes: String(fd.get('notes') || '').trim() || undefined };
-      if (!customer.company_name) { out.checkoutMsg = 'Укажите компанию'; render(); return; }
-    } else {
-      customer = { type: 'individual', phone: phone, notes: String(fd.get('notes') || '').trim() || undefined };
-    }
-    if (!phone) { out.checkoutMsg = 'Укажите телефон'; render(); return; }
-    var subBtn = f.querySelector('button[type=submit]');
-    if (subBtn) subBtn.disabled = true;
-    out.checkoutLoading = true;
-    out.checkoutFileProgress = null;
-    out.checkoutMsg = null;
-    var orderNotes = String(fd.get('notes') || '').trim();
-    var body = { customer: customer, order: { items: cartToItems(), order_notes: orderNotes } };
-    fetch(API_BASE + '/api/miniapp/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + out.token, Accept: 'application/json' }, body: JSON.stringify(body) })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-      .then(function (x) {
-        if (!x.ok) {
-          out.checkoutLoading = false;
-          out.checkoutMsg = (x.j && (x.j.error || x.j.message)) ? String(x.j.error || x.j.message) : 'Оформление не удалось';
-          render();
-          return;
-        }
-        var ord = x.j && x.j.order;
-        var oid = ord && ord.id != null ? ord.id : null;
-        var num = (ord && ord.number) ? String(ord.number) : '';
-        if (!oid) {
-          out.checkoutLoading = false;
-          out.checkoutMsg = (x.j && x.j.message) ? String(x.j.message) : 'Заказ создан';
-          out.cart = [];
-          out.checkoutFileByK = null;
-          out.orders = null;
-          out.view = 'orders';
-          loadOrders();
-          return;
-        }
-        var itemIds = (x.j && Array.isArray(x.j.itemIds)) ? x.j.itemIds : [];
-        var byK = out.checkoutFileByK || {};
-        var tasks = [];
-        for (var ti = 0; ti < out.cart.length; ti++) {
-          var ck = out.cart[ti].k;
-          var fid = itemIds[ti];
-          var one = byK[ck];
-          if (one && fid != null && fid !== '') tasks.push({ file: one, orderItemId: fid });
-        }
-        if (!tasks.length) {
-          finishCheckoutSuccess(num, []);
-          return;
-        }
-        var errs = [];
-        uploadCheckoutFilesSequential(oid, tasks, 0, errs, function (fileErrors) {
-          finishCheckoutSuccess(num, fileErrors);
-        });
-      })
-      .catch(function (err) {
-        out.checkoutLoading = false;
-        out.checkoutFileProgress = null;
-        out.checkoutMsg = (err && err.message) || String(err);
-        render();
-      });
   }
   function loadProducts() {
     out.productErr = null;
@@ -261,6 +259,7 @@ export const MINIAPP_CLIENT_PART2 = `
           else if (me.me && me.me.telegram) out.me = { telegram: me.me.telegram, crm: me.crm != null ? me.crm : null };
           out.err = null;
         }
+        if (out.view === 'catalog' && !out.products) loadProducts();
         render();
         if (out.token && !out._miniappOrdersPollInit) {
           out._miniappOrdersPollInit = true;

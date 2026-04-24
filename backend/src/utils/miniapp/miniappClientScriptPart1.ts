@@ -4,7 +4,7 @@
 export const MINIAPP_CLIENT_PART1 = `
   var out = {
     token: null, me: null, products: null, productErr: null, orders: null, ordersErr: null,
-    cart: [], view: 'profile', err: null, load: false, checkoutMsg: null, checkoutType: 'individual',
+    cart: [], view: 'catalog', err: null, load: false, checkoutMsg: null, checkoutType: 'individual',
     checkoutLoading: false,
     calcPid: null, calcName: '', calcListItem: null, calcSchema: null, calcErr: null, calcLoading: false, calcResult: null,
     calcForm: { typeId: null, sizeId: null, matId: null, qty: 100, printKey: '', priceType: '' },
@@ -12,6 +12,8 @@ export const MINIAPP_CLIENT_PART1 = `
     orderFileMsg: null, orderUploadLoading: false,
     postCheckoutNotice: null,
     checkoutFileByK: null,
+    /** Нет макета — нужна помощь с дизайном (не требовать файлы; сводка как «только печать»). */
+    checkoutDesignHelp: false,
     calcStagedLayout: null,
     checkoutFileProgress: null
   };
@@ -21,6 +23,9 @@ export const MINIAPP_CLIENT_PART1 = `
     if (s == null) return '';
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
+  function bynSpanHtml() {
+    return ' <span class="ipc-byn" role="img" aria-label="бел. руб."></span>';
+  }
   function h(tag, inner, cl) {
     var e = document.createElement(tag);
     if (cl) e.className = cl;
@@ -28,7 +33,7 @@ export const MINIAPP_CLIENT_PART1 = `
     return e;
   }
   function setNav() {
-    var tabs = [ ['profile', 'Профиль'], ['catalog', 'Каталог'], ['cart', 'Корзина'], ['orders', 'Заказы'] ];
+    var tabs = [ ['catalog', 'Каталог'], ['profile', 'Профиль'], ['cart', 'Корзина'], ['orders', 'Заказы'] ];
     nav.innerHTML = '';
     for (var i = 0; i < tabs.length; i++) {
       (function (key, label) {
@@ -57,6 +62,28 @@ export const MINIAPP_CLIENT_PART1 = `
   function cartLineKey(pid) { return 'p' + pid; }
   function isSimplifiedProduct(p) {
     return p && String(p.calculator_type || '').toLowerCase() === 'simplified';
+  }
+  function stripHtmlTags(s) {
+    if (s == null || s === '') return '';
+    return String(s).replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim();
+  }
+  function shortProductDescription(p) {
+    var d = stripHtmlTags(p && p.description != null ? p.description : '');
+    if (d.length > 160) d = d.slice(0, 157) + '…';
+    return d;
+  }
+  /** URL картинки товара для карточки (image_url или icon со ссылкой). */
+  function productCardImageSrc(p) {
+    if (!p) return '';
+    var raw = (p.image_url != null && String(p.image_url).trim() !== '') ? String(p.image_url).trim() : '';
+    if (!raw && p.icon != null) {
+      var ic = String(p.icon).trim();
+      if (ic.indexOf('http') === 0 || ic.indexOf('//') === 0 || ic.charAt(0) === '/') raw = ic;
+    }
+    if (!raw) return '';
+    if (raw.indexOf('http') === 0 || raw.indexOf('//') === 0) return raw;
+    if (raw.charAt(0) === '/') return API_BASE + raw;
+    return '';
   }
   function addToCart(p) {
     if (isSimplifiedProduct(p)) {
@@ -132,6 +159,12 @@ export const MINIAPP_CLIENT_PART1 = `
     for (var i = 0; i < out.cart.length; i++) t += out.cart[i].price * out.cart[i].qty;
     return Math.round(t * 100) / 100;
   }
+  function cartLineSummaryEsc(line) {
+    var name = (line.params && line.params.productName) ? String(line.params.productName) : String(line.name || 'Позиция');
+    var lineTot = Math.round(line.price * line.qty * 100) / 100;
+    var unit = Math.round(line.price * 100) / 100;
+    return esc(name) + ' — ' + line.qty + ' шт — ' + lineTot + bynSpanHtml() + ' — ' + unit + bynSpanHtml() + ' за 1 ед.';
+  }
   function renderProfile() {
     var box = h('div', '', 'section');
     if (out.load) { box.appendChild(rowHint('Вход…')); return box; }
@@ -161,11 +194,23 @@ export const MINIAPP_CLIENT_PART1 = `
     for (var i = 0; i < out.products.length; i++) {
       (function (p) {
         var row = h('div', '', 'card ipc-card ipc-catalog-card');
-        var title = esc(p.name || 'Товар') + (p.category_name ? ' — ' + esc(p.category_name) : '');
-        var price = p.min_price != null && p.min_price !== '' ? 'от ' + esc(p.min_price) + ' Br' : 'цена по запросу';
-        row.appendChild(h('div', title, 'card-title'));
-        row.appendChild(h('div', price, 'card-price'));
-        var btn = h('button', isSimplifiedProduct(p) ? 'Калькулятор' : 'В корзину', 'primary');
+        row.appendChild(h('div', esc(p.name || 'Товар'), 'card-title ipc-catalog-card__title'));
+        var imgSrc = productCardImageSrc(p);
+        var media = h('div', '', 'ipc-catalog-card__media' + (imgSrc ? '' : ' ipc-catalog-card__media--empty'));
+        if (imgSrc) {
+          var im = document.createElement('img');
+          im.className = 'ipc-catalog-card__img';
+          im.alt = '';
+          im.loading = 'lazy';
+          im.src = imgSrc;
+          media.appendChild(im);
+        }
+        row.appendChild(media);
+        var blurb = shortProductDescription(p);
+        if (blurb) row.appendChild(h('div', esc(blurb), 'ipc-catalog-card__desc'));
+        var price = p.min_price != null && p.min_price !== '' ? 'от ' + esc(p.min_price) + bynSpanHtml() : 'цена по запросу';
+        row.appendChild(h('div', price, 'card-price ipc-catalog-card__price'));
+        var btn = h('button', isSimplifiedProduct(p) ? 'Заказать' : 'В корзину', 'primary ipc-catalog-card__btn');
         btn.type = 'button';
         btn.onclick = function () { addToCart(p); };
         row.appendChild(btn);
@@ -173,39 +218,6 @@ export const MINIAPP_CLIENT_PART1 = `
       })(out.products[i]);
     }
     box.appendChild(grid);
-    return box;
-  }
-  function renderCart() {
-    var box = h('div', '', 'section');
-    box.appendChild(h('div', 'Корзина', 'section-head'));
-    if (out.cart.length === 0) {
-      box.appendChild(h('p', 'Пока пусто. Добавьте позиции из каталога.', 'hint ipc-empty'));
-      return box;
-    }
-    var panel = h('div', '', 'ipc-panel');
-    var listEl = h('div', '', 'ipc-list');
-    for (var i = 0; i < out.cart.length; i++) {
-      (function (c) {
-        var row = h('div', '', 'ipc-list__row ipc-list__row--cart');
-        var sub = (c.params && c.params.description) ? esc(c.params.description) : esc(c.name);
-        var line = sub + ' × ' + c.qty + ' — ' + (Math.round(c.price * c.qty * 100) / 100) + ' Br';
-        row.appendChild(h('div', line, 'ipc-list__row-summary'));
-        var tools = h('div', '', 'row');
-        var m = h('button', '−', 'small'); m.type = 'button'; m.onclick = function () { setQty(c.k, -1); };
-        var p = h('button', '+', 'small'); p.type = 'button'; p.onclick = function () { setQty(c.k, 1); };
-        var r = h('button', 'Убрать', 'small danger'); r.type = 'button'; r.onclick = function () { removeLine(c.k); };
-        tools.appendChild(m); tools.appendChild(p); tools.appendChild(r);
-        row.appendChild(tools);
-        listEl.appendChild(row);
-      })(out.cart[i]);
-    }
-    panel.appendChild(listEl);
-    box.appendChild(panel);
-    box.appendChild(h('div', 'Итого: ' + subtotal() + ' Br', 'total ipc-total'));
-    var go = h('button', 'Оформить заказ', 'primary');
-    go.type = 'button';
-    go.onclick = function () { out.view = 'checkout'; out.checkoutMsg = null; out.postCheckoutNotice = null; render(); };
-    box.appendChild(go);
     return box;
   }
   function orderMetaUnavail() {

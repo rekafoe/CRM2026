@@ -3,6 +3,7 @@
  * Стили: `miniapp/miniappShellStyles.ts` (как /adminpanel/products).
  */
 import { getMiniappClientInlineScript } from './miniapp/miniappClientScript';
+import { MINIAPP_SHELL_CALC_SUMMARY_CSS } from './miniapp/miniappCalcSummaryStyles';
 import { MINIAPP_SHELL_CSS } from './miniapp/miniappShellStyles';
 
 export function renderMiniappIndexHtml(
@@ -18,7 +19,7 @@ export function renderMiniappIndexHtml(
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>PrintCore — Mini App</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>${MINIAPP_SHELL_CSS}</style>
+  <style>${MINIAPP_SHELL_CSS}${MINIAPP_SHELL_CALC_SUMMARY_CSS}</style>
 </head>
 <body>
   <div class="miniapp-wrap">

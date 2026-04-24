@@ -1,5 +1,6 @@
 import React from 'react';
 import { AppIcon } from '../../ui/AppIcon';
+import { BynSymbol } from '../../ui/BynSymbol';
 
 interface ResultSectionProps {
   result: {
@@ -30,6 +31,18 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
     const v = roundTo2 ? Math.round(value * 100) / 100 : value;
     const formatted = v.toLocaleString('ru-RU', roundTo2 ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : undefined);
     return suffix ? `${formatted} ${suffix}` : formatted;
+  };
+  const withByn = (value?: number, roundTo2 = false) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return <>—</>;
+    }
+    const v = roundTo2 ? Math.round(value * 100) / 100 : value;
+    const formatted = v.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (
+      <>
+        {formatted} <BynSymbol />
+      </>
+    );
   };
 
   // Всегда показываем секцию, даже если result null (показываем заглушку)
@@ -77,11 +90,18 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
         </div>
       )}
       {/* Округляем до 2 знаков — так же, как при добавлении в заказ (storedTotalCost), чтобы сумма в заказе совпадала с калькулятором */}
-      <h3><AppIcon name="money" size="xs" /> Стоимость: {formatNumber(result.totalCost, 'BYN', true)}</h3>
+      <h3>
+        <AppIcon name="money" size="xs" /> Стоимость: {withByn(result.totalCost, true)}
+      </h3>
       <div className="result-details">
         <div className="result-item">
           <span>За штуку:</span>
-          <span>{formatNumber(Math.round(result.totalCost * 100) / 100 / Math.max(1, result.specifications?.quantity ?? 1), 'BYN', true)}</span>
+          <span>
+            {withByn(
+              Math.round(result.totalCost * 100) / 100 / Math.max(1, result.specifications?.quantity ?? 1),
+              true
+            )}
+          </span>
         </div>
         <div className="result-item">
           <span>Количество:</span>
@@ -147,8 +167,24 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
                 return (
                   <tr key={i} className={isCurrent ? 'tier-prices-row--current' : ''}>
                     <td>{t.max_qty != null ? `${t.min_qty}–${t.max_qty}` : t.min_qty}</td>
-                    <td>{typeof t.unit_price === 'number' ? t.unit_price.toFixed(4).replace(/0+$/, '').replace(/\.$/, '') : '—'} BYN</td>
-                    <td>{t.total_price != null ? `${Number(t.total_price).toFixed(2)} BYN` : '—'}</td>
+                    <td>
+                      {typeof t.unit_price === 'number' ? (
+                        <>
+                          {t.unit_price.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')} <BynSymbol />
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td>
+                      {t.total_price != null ? (
+                        <>
+                          {Number(t.total_price).toFixed(2)} <BynSymbol />
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                   </tr>
                 );
               })}

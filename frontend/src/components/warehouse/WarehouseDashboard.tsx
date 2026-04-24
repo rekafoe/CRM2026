@@ -4,6 +4,7 @@ import { Material } from '../../types/shared';
 import { useUIStore } from '../../stores/uiStore';
 import { useMaterialStore } from '../../stores/materialStore';
 import { AppIcon, type IconName } from '../ui/AppIcon';
+import { BynSymbol } from '../ui/BynSymbol';
 import { LoadingState } from '../common';
 import '../../components/admin/ProductManagement.css';
 import '../../styles/warehouse-embedded.css';
@@ -205,7 +206,9 @@ export const WarehouseDashboard: React.FC<WarehouseDashboardProps> = () => {
             </div>
             <div className="compact-stat info" title="Оценка остатка по цене">
               <AppIcon name="wallet" size="xs" />
-              <span className="compact-value">{warehouseStats.totalValue.toFixed(0)} BYN</span>
+              <span className="compact-value">
+                {warehouseStats.totalValue.toFixed(0)} <BynSymbol />
+              </span>
             </div>
           </div>
         </div>

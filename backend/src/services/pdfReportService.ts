@@ -1,3 +1,4 @@
+import { bynSymbolHtmlForPrint } from '../../../shared/byCurrencyBYN';
 import { MaterialService } from './materialService';
 import { getDb } from '../config/database';
 import { buildOrderNumberFromSourceAndId } from '../utils/orderNumberGenerator';
@@ -1047,15 +1048,15 @@ export class PDFReportService {
                 </div>
                 <div class="tear-off-summary-item">
                     <span class="tear-off-summary-label">Стоимость:</span>
-                    <span class="tear-off-summary-value">${cost.toFixed(2)} руб.</span>
+                    <span class="tear-off-summary-value">${cost.toFixed(2)} ${bynSymbolHtmlForPrint()}</span>
                 </div>
                 <div class="tear-off-summary-item">
                     <span class="tear-off-summary-label">Предоплата:</span>
-                    <span class="tear-off-summary-value">${prepaymentAmount.toFixed(2)} руб.</span>
+                    <span class="tear-off-summary-value">${prepaymentAmount.toFixed(2)} ${bynSymbolHtmlForPrint()}</span>
                 </div>
                 <div class="tear-off-summary-item">
                     <span class="tear-off-summary-label">Долг:</span>
-                    <span class="tear-off-summary-value">${debt.toFixed(2)} руб.</span>
+                    <span class="tear-off-summary-value">${debt.toFixed(2)} ${bynSymbolHtmlForPrint()}</span>
                 </div>
                 ${executedBy ? `
                 <div class="tear-off-summary-item">
@@ -1134,15 +1135,15 @@ export class PDFReportService {
                 </div>
                 <div class="order-summary-item">
                     <span class="order-summary-label">Стоимость:</span>
-                    <span class="order-summary-value">${cost.toFixed(2)} руб.</span>
+                    <span class="order-summary-value">${cost.toFixed(2)} ${bynSymbolHtmlForPrint()}</span>
                 </div>
                 <div class="order-summary-item">
                     <span class="order-summary-label">Предоплата:</span>
-                    <span class="order-summary-value">${prepaymentAmount.toFixed(2)} руб.</span>
+                    <span class="order-summary-value">${prepaymentAmount.toFixed(2)} ${bynSymbolHtmlForPrint()}</span>
                 </div>
                 <div class="order-summary-item">
                     <span class="order-summary-label">Долг:</span>
-                    <span class="order-summary-value">${debt.toFixed(2)} руб.</span>
+                    <span class="order-summary-value">${debt.toFixed(2)} ${bynSymbolHtmlForPrint()}</span>
                 </div>
                 ${executedBy ? `
                 <div class="order-summary-item">
@@ -1208,7 +1209,7 @@ export class PDFReportService {
             <div class="summary-section">
                 <div class="summary-item">
                     <div class="summary-label">ИТОГО:</div>
-                    <div class="summary-value">${totalAmount.toFixed(2)} BYN</div>
+                    <div class="summary-value">${totalAmount.toFixed(2)} ${bynSymbolHtmlForPrint()}</div>
                 </div>
             </div>
 

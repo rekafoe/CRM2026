@@ -12,6 +12,7 @@ import { cleanupOldOrderFiles } from '../services/orderFilesCleanupService'
 import { runPreflight, parseTargetFormatFromParams } from '../services/preflightService'
 import { OrderService } from '../modules/orders/services/orderService'
 import { sendOrderSmsManual } from '../services/orderStatusSmsService'
+import { EarningsService } from '../services/earningsService'
 
 const router = Router()
 
@@ -476,6 +477,11 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
     return;
   }
   const db = await getDb();
+  const preRow = await db.get<{ d: string }>(
+    `SELECT date(COALESCE(createdAt, created_at)) as d FROM orders WHERE id = ?`,
+    [result.id]
+  );
+  const preDay = preRow?.d ? String(preRow.d).slice(0, 10) : null;
   const currentDate = new Date().toISOString();
   const hasCreatedAt = await hasColumn('orders', 'createdAt').catch(() => false);
   const hasCreatedAtSnake = await hasColumn('orders', 'created_at').catch(() => false);
@@ -520,6 +526,14 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
     } else {
       await db.run('UPDATE orders SET responsible_user_id = ? WHERE id = ?', targetUserId, result.id);
     }
+  }
+  try {
+    await EarningsService.recalculateEarningsForOrderDays({
+      orderId: result.id,
+      orderCreatedDateBeforeUpdate: preDay,
+    });
+  } catch (e) {
+    console.error('Earnings recalc after reassign failed', e);
   }
   res.json({ success: true, message: 'Order reassigned successfully' });
 }));

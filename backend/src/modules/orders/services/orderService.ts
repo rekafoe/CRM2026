@@ -684,7 +684,11 @@ export class OrderService {
         userId: actorUserId ?? null,
       });
     }
-    return OrderService.orderForApi(await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
+    const outAssignees = OrderService.orderForApi(await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
+    void EarningsService.recalculateEarningsForOrderDays({ orderId: id }).catch((e) => {
+      logger.error('Earnings recalc after assignees failed', { orderId: id, message: (e as Error)?.message });
+    });
+    return outAssignees;
   }
 
   /** Обновить примечания заказа */

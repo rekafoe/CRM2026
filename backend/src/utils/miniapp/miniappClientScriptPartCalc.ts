@@ -410,8 +410,8 @@ export const MINIAPP_CLIENT_PART_CALC = `
     box.appendChild(calcPanel);
     if (out.calcResult) {
       var r = out.calcResult;
-      var resBox = h('div', '', 'ipc-result');
-      resBox.appendChild(h('p', 'Итого: ' + (Math.round(Number(r.finalPrice) * 100) / 100) + ' Br, за ед.: ' + (Math.round(Number(r.pricePerUnit) * 100) / 100) + ' Br', 'total'));
+      var resBox = h('div', '', 'ipc-calc-summary ipc-result');
+      appendCalcResultSummaryUI(resBox, r);
       if (r.warnings && r.warnings.length) resBox.appendChild(h('p', esc(r.warnings.join('; ')), 'hint'));
       var addB = h('button', 'В корзину', 'primary');
       addB.type = 'button';

@@ -1,6 +1,7 @@
 import React from 'react';
 import { parseNumberFlexible } from '../../utils/numberInput';
 import { AppIcon } from '../ui/AppIcon';
+import { BynSymbol } from '../ui/BynSymbol';
 
 export interface OrderItem {
   id: number;
@@ -20,13 +21,12 @@ interface OrderTotalProps {
   paymentMethod?: 'online' | 'offline' | 'telegram';
 }
 
-// Форматер для BYN (до сотых)
-const bynFormatter = new Intl.NumberFormat('ru-RU', {
-  style: 'currency',
-  currency: 'BYN',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const bynAmount = (n: number) => new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+const BynValue: React.FC<{ children: number }> = ({ children }) => (
+  <>
+    {bynAmount(children)} <BynSymbol />
+  </>
+);
 
 export const OrderTotal: React.FC<OrderTotalProps> = ({
   items,
@@ -69,24 +69,32 @@ export const OrderTotal: React.FC<OrderTotalProps> = ({
     <div className="order-total">
       <div className="order-total__line">
         <span>Подытог:</span>
-        <span>{bynFormatter.format(subtotal)}</span>
+        <span>
+          <BynValue>{subtotal}</BynValue>
+        </span>
       </div>
       {disc > 0 && (
         <div className="order-total__line">
           <span>Скидка:</span>
-          <span>-{bynFormatter.format(disc)}</span>
+          <span>
+            -<BynValue>{disc}</BynValue>
+          </span>
         </div>
       )}
       {tax > 0 && (
         <div className="order-total__line">
           <span>НДС:</span>
-          <span>{bynFormatter.format(tax)}</span>
+          <span>
+            <BynValue>{tax}</BynValue>
+          </span>
         </div>
       )}
       <hr />
       <div className="order-total__sum">
         <span>Итого:</span>
-        <span>{bynFormatter.format(total)}</span>
+        <span>
+          <BynValue>{total}</BynValue>
+        </span>
       </div>
       
       {/* Предоплата */}
@@ -106,13 +114,19 @@ export const OrderTotal: React.FC<OrderTotalProps> = ({
             </span>
             <span className={`order-total__prepayment-value ${isPaid ? 'paid' : 'pending'}`}>
               {isPaid ? <AppIcon name="check" size="xs" /> : <AppIcon name="clock" size="xs" />}
-              {bynFormatter.format(prepayment)}
+              <BynValue>{prepayment}</BynValue>
             </span>
           </div>
           <div className="order-total__line debt">
             <span>Долг клиента:</span>
             <span className={debt > 0 ? 'debt-amount' : 'paid-amount'}>
-              {debt > 0 ? bynFormatter.format(debt) : <><AppIcon name="check" size="xs" /> Оплачено полностью</>}
+              {debt > 0 ? (
+                <BynValue>{debt}</BynValue>
+              ) : (
+                <>
+                  <AppIcon name="check" size="xs" /> Оплачено полностью
+                </>
+              )}
             </span>
           </div>
         </>

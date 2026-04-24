@@ -35,6 +35,8 @@ export type MiniappCheckoutBody = {
     items: unknown[];
     prepaymentAmount?: number;
     order_notes?: string;
+    /** Клиент отметил: макетов нет, нужна разработка дизайна (оценка отдельно). */
+    design_help_requested?: boolean;
   };
 };
 
@@ -272,7 +274,12 @@ export async function submitMiniappCheckout(telegramChatId: string, body: Miniap
     items: normalized,
   });
 
-  const orderNotes = String(body.order.order_notes || '').trim();
+  let orderNotes = String(body.order.order_notes || '').trim();
+  if (body.order.design_help_requested) {
+    const mark =
+      '[Mini App] Клиент: нет макета, требуется помощь с разработкой дизайна. Указанная сумма — печать; стоимость дизайна согласуется отдельно.';
+    orderNotes = orderNotes ? orderNotes + '\n\n' + mark : mark;
+  }
   if (orderNotes) {
     await OrderService.updateOrderNotes(result.order.id, orderNotes, undefined);
   }

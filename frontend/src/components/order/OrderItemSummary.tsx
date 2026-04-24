@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Item } from '../../types';
 import { usePriceTypeLabels } from '../../hooks/pricing/usePriceTypeLabels';
+import { BynSymbol } from '../ui/BynSymbol';
 import { itemParamsHasNoLayout } from './orderItemUtils';
 
 interface ParameterSummaryItem {
@@ -64,13 +65,17 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
       <span className="separator">|</span>
 
       {/* Цена за штуку */}
-      <span className="item-price">{price.toFixed(2)} BYN</span>
+      <span className="item-price">
+        {price.toFixed(2)} <BynSymbol />
+      </span>
 
       {/* Разделитель */}
       <span className="separator">|</span>
 
       {/* Общая стоимость */}
-      <span className="item-total">= {total.toFixed(2)} BYN</span>
+      <span className="item-total">
+        = {total.toFixed(2)} <BynSymbol />
+      </span>
 
       {/* Стороны */}
       {typeof sides !== 'undefined' && sides !== null && (

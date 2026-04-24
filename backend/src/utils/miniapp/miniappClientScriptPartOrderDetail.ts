@@ -117,7 +117,7 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
       var itList = h('div', '', 'ipc-list');
       for (var i = 0; i < items.length; i++) {
         (function (it) {
-          var t = '#' + it.id + ' ' + esc(it.type) + ' × ' + it.quantity + ' — ' + it.price + ' Br';
+          var t = '#' + it.id + ' ' + esc(it.type) + ' × ' + it.quantity + ' — ' + esc(String(it.price)) + bynSpanHtml();
           var ir = h('div', '', 'ipc-list__row');
           ir.appendChild(h('div', t, 'ipc-list__row-summary'));
           itList.appendChild(ir);

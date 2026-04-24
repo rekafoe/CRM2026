@@ -1,18 +1,16 @@
 import { getDb } from '../config/database';
 import { logger } from '../utils/logger';
 import { hasColumn } from '../utils/tableSchemaCache';
+import { effectiveEarningsUserId, type EarningsOrderItemRow } from './earningsEffectiveUserId';
 
 export interface EarningsSchedulerConfig {
   enabled: boolean;
   intervalMinutes: number;
 }
 
-type EarningsRow = {
+type EarningsRow = EarningsOrderItemRow & {
   itemId: number;
   orderId: number;
-  userId: number | null;
-  executorUserId: number | null;
-  responsibleUserId: number | null;
   price: number;
   quantity: number;
   params: string;
@@ -74,6 +72,30 @@ export class EarningsService {
     this.isRunning = false;
   }
 
+  /** Пересчитать order_item_earnings за дни, затронутые заказом (смена created_at, ответственного и т.д.). */
+  static async recalculateEarningsForOrderDays(options: { orderId: number; orderCreatedDateBeforeUpdate?: string | null }): Promise<void> {
+    const db = await getDb();
+    const [earningsExists, ordersExists] = await Promise.all([
+      db.get(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='order_item_earnings'`),
+      db.get(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='orders'`),
+    ]);
+    if (!earningsExists || !ordersExists) return;
+    const after = await db.get<{ d: string }>(
+      `SELECT date(COALESCE(createdAt, created_at)) as d FROM orders WHERE id = ?`,
+      [options.orderId]
+    );
+    const afterDay = after?.d ? String(after.d).slice(0, 10) : null;
+    const set = new Set<string>();
+    const before = options.orderCreatedDateBeforeUpdate != null
+      ? String(options.orderCreatedDateBeforeUpdate).slice(0, 10)
+      : null;
+    if (before) set.add(before);
+    if (afterDay) set.add(afterDay);
+    for (const d of set) {
+      if (d) await this.recalculateForDate(d);
+    }
+  }
+
   static async recalculateForDate(date: string) {
     const db = await getDb();
 
@@ -109,16 +131,19 @@ export class EarningsService {
     let hasIsInternal = false;
     let hasPaymentChannel = false;
     let hasIsCancelled = false;
+    let hasOrderSource = false;
     try {
       hasExecutorUserId = await hasColumn('items', 'executor_user_id');
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id');
       hasIsInternal = await hasColumn('orders', 'is_internal');
       hasPaymentChannel = await hasColumn('orders', 'payment_channel');
       hasIsCancelled = await hasColumn('orders', 'is_cancelled');
+      hasOrderSource = await hasColumn('orders', 'source');
     } catch { /* ignore */ }
 
     const executorSel = hasExecutorUserId ? 'i.executor_user_id as executorUserId' : 'NULL as executorUserId';
     const responsibleSel = hasResponsibleUserId ? 'o.responsible_user_id as responsibleUserId' : 'NULL as responsibleUserId';
+    const sourceSel = hasOrderSource ? "COALESCE(o.source, '') as orderSource" : "'' as orderSource";
     const excludeInternal = hasIsInternal
       ? 'AND COALESCE(o.is_internal, 0) = 0'
       : hasPaymentChannel
@@ -135,6 +160,7 @@ export class EarningsService {
         o.userId as userId,
         ${executorSel},
         ${responsibleSel},
+        ${sourceSel},
         i.price as price,
         i.quantity as quantity,
         i.params as params,
@@ -241,10 +267,7 @@ export class EarningsService {
       await db.run('DELETE FROM order_item_earnings WHERE earned_date = ?', [date]);
 
       for (const row of rows) {
-        // Исполнитель позиции: executor_user_id > responsible_user_id > userId заказа
-        const effectiveUserId: number | null = (row.executorUserId != null && Number.isFinite(Number(row.executorUserId)) ? Number(row.executorUserId)
-          : (row.responsibleUserId != null && Number.isFinite(Number(row.responsibleUserId)) ? Number(row.responsibleUserId)
-          : row.userId));
+        const effectiveUserId = effectiveEarningsUserId(row);
         if (effectiveUserId == null || !Number.isFinite(effectiveUserId)) continue;
 
         let params: any = {};
