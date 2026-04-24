@@ -240,7 +240,7 @@ export class CustomerService {
         phone, email, address, notes,
         marketing_opt_in, unsubscribe_token,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.type,
         data.first_name || null,
