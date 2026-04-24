@@ -3,11 +3,7 @@ import { TelegramUserService, type UpdateTelegramUserRequest } from '../services
 import { TelegramSettingsService } from '../services/telegramSettingsService';
 import { TelegramBotCommands } from '../services/telegramBotCommands';
 import { TelegramService } from '../services/telegramService';
-import { PhotoOrderService } from '../services/photoOrderService';
-import { ImageProcessingService } from '../services/imageProcessingService';
-import { PhotoOrderSessionService } from '../services/photoOrderSessionService';
 import { callTelegramMethod, previewTelegramText, type TelegramWebhookInfoResult } from '../utils/telegramBotApi';
-import { savePhotoOrderSessionSimplified } from '../utils/photoOrderFlowMessages';
 
 export interface TelegramUpdate {
   update_id: number;
@@ -144,28 +140,18 @@ export class TelegramWebhookController {
       console.log(`👤 Existing user check for ${chatId}:`, existingUser ? 'EXISTS' : 'NOT FOUND');
       
       if (existingUser) {
-        // Обновляем информацию о пользователе
         console.log(`🔄 Updating existing user: ${from.first_name} (${chatId})`);
         await this.updateUserInfo(existingUser, from, chat);
         console.log(`✅ Updated existing user: ${from.first_name} (${chatId})`);
-        
-        // Обрабатываем команды, если это команда
-        if (text && text.startsWith('/')) {
-          console.log(`🤖 Processing command: ${text}`);
+
+        if (text && String(text).trim() !== '') {
+          console.log(`🤖 Processing text input: ${text}`);
           const response = await TelegramBotCommands.handleMessage(chatId, from.id.toString(), text);
           if (response) {
             await this.sendMessageToUser(chatId, response);
           }
-        }
-        // Обрабатываем фотографии для заказов
-        else if (photo && photo.length > 0) {
-          console.log(`📸 Processing photo upload from ${from.first_name}`);
-          await this.handlePhotoUpload(chatId, from, photo, text);
-        }
-        // Обрабатываем документы (фото как файлы)
-        else if (document && this.isImageDocument(document)) {
-          console.log(`📄 Processing image document from ${from.first_name}`);
-          await this.handleDocumentUpload(chatId, from, document, text);
+        } else if ((photo && photo.length > 0) || document) {
+          await this.sendMiniappFlowHint(chatId);
         }
       } else {
         // Создаем нового пользователя
@@ -350,30 +336,17 @@ export class TelegramWebhookController {
    */
   private static async sendWelcomeMessage(chatId: string, firstName: string) {
     try {
-      // Импортируем TelegramService динамически, чтобы избежать циклических зависимостей
-      const { TelegramService } = await import('../services/telegramService');
-      
       const welcomeMessage = `👋 Привет, ${firstName}!
 
-Добро пожаловать в систему уведомлений нашей типографии!
+Добро пожаловать в Telegram-бот типографии.
 
 🤖 *Что я умею:*
-• 🛒 Уведомления о статусе ваших заказов
-• 📋 Информация о готовности продукции
-• 💬 Связь с менеджерами
+• показать активные заказы
+• открыть PrintCore App для нового заказа
 
-👤 *Ваш статус:* Клиент
-Вы будете получать уведомления о ваших заказах.
+Используйте /start, /help или /miniapp.`;
 
-⚙️ *Настройки:*
-Администратор может настроить ваши уведомления в системе.
-
-📞 *Поддержка:*
-Если у вас есть вопросы, обратитесь к менеджеру.
-
-Спасибо за выбор нашей типографии! 🎉`;
-
-      await TelegramService.sendMessageToUser(chatId, welcomeMessage);
+      await this.sendMessageToUser(chatId, welcomeMessage);
     } catch (error) {
       console.error('❌ Error sending welcome message:', error);
     }
@@ -384,7 +357,10 @@ export class TelegramWebhookController {
    */
   private static async sendMessageToUser(chatId: string, message: string): Promise<void> {
     try {
-      await TelegramService.sendMessageToUser(chatId, message);
+      const sentWithKeyboard = await TelegramBotCommands.sendMessageWithMainKeyboard(chatId, message);
+      if (!sentWithKeyboard) {
+        await TelegramService.sendMessageToUser(chatId, message);
+      }
     } catch (error) {
       console.error(`❌ Error sending message to ${chatId}:`, error);
     }
@@ -502,236 +478,32 @@ export class TelegramWebhookController {
   }
 
   /**
-   * Обработка загрузки фотографий
-   */
-  private static async handlePhotoUpload(chatId: string, from: any, photos: any[], caption?: string) {
-    try {
-      console.log(`📸 Handling photo upload from ${from.first_name}, photos: ${photos.length}`);
-      
-      // Получаем самую большую фотографию
-      const largestPhoto = photos.reduce((prev, current) => 
-        (current.file_size || 0) > (prev.file_size || 0) ? current : prev
-      );
-      
-      console.log(`📏 Largest photo: ${largestPhoto.width}x${largestPhoto.height}, size: ${largestPhoto.file_size} bytes`);
-      
-      // Проверяем, есть ли активная сессия заказа
-      const session = PhotoOrderSessionService.getSession(chatId);
-      
-      if (session) {
-        console.log(`📋 Found active session for ${chatId}: ${session.sizeName}, ${session.mode}, ${session.quantity}`);
-        
-        // Создаем заказ с параметрами из сессии
-        const size = ImageProcessingService.getSizeByName(session.sizeName);
-        if (!size) {
-          await this.sendMessageToUser(chatId, '❌ Ошибка: неверный размер фотографии');
-          PhotoOrderSessionService.clearSession(chatId);
-          return;
-        }
-
-        const processingOptions = {
-          cropMode: session.mode as 'crop' | 'fit',
-          quality: 90,
-          format: 'jpeg' as const
-        };
-
-        // Создаем заказ
-        const order = await PhotoOrderService.createOrder({
-          chatId,
-          username: from.username,
-          firstName: from.first_name,
-          originalPhotos: [`telegram_photo_${largestPhoto.file_id}`], // Временный путь
-          selectedSize: size,
-          processingOptions,
-          quantity: session.quantity,
-          notes: 'Заказ через Telegram бота'
-        });
-
-        // Очищаем сессию
-        PhotoOrderSessionService.clearSession(chatId);
-
-        await this.sendMessageToUser(chatId, 
-          `✅ *Заказ создан!*\n\n` +
-          `🆔 Заказ #${order.id}\n` +
-          `📏 Размер: ${size.name}\n` +
-          `🎨 Режим: ${session.mode === 'crop' ? 'Кроп' : session.mode === 'fit' ? 'Вписать с полями' : 'Умный кроп'}\n` +
-          `📦 Копий: ${session.quantity}\n` +
-          `💰 Стоимость: ${(order.totalPrice / 100).toFixed(0)} руб.\n\n` +
-          `📸 Фотография будет обработана в течение 1-2 минут.\n` +
-          `📱 Вы получите обработанное фото для проверки.\n\n` +
-          `💡 Используйте /my_orders для отслеживания статуса заказа.`
-        );
-        
-        return;
-      }
-      
-      // Проверяем, есть ли активный заказ в процессе
-      const pendingOrders = await PhotoOrderService.getOrdersByChatId(chatId);
-      const activeOrder = pendingOrders.find(order => 
-        ['pending', 'processing'].includes(order.status)
-      );
-      
-      if (activeOrder) {
-        await this.sendMessageToUser(chatId, 
-          `📸 Фотография получена! Добавлена к заказу #${activeOrder.id}\n\n` +
-          `📋 Текущий заказ:\n` +
-          `• Размер: ${activeOrder.selectedSize.name}\n` +
-          `• Фотографий: ${activeOrder.originalPhotos.length + 1}\n` +
-          `• Копий: ${activeOrder.quantity}\n\n` +
-          `💡 Отправьте еще фотографии или напишите "Готово" для завершения заказа.`
-        );
-        return;
-      }
-      
-      // Если нет активного заказа, отправляем инструкции
-      await this.sendMessageToUser(chatId, 
-        `📸 Фотография получена!\n\n` +
-        `💡 Для создания заказа используйте команду /order_photo\n` +
-        `📋 Или отправьте сообщение в формате:\n` +
-        `"Заказ: 10x15, 2 копии, кроп"\n` +
-        `+ прикрепите фотографии`
-      );
-      
-    } catch (error) {
-      console.error('❌ Error handling photo upload:', error);
-      await this.sendMessageToUser(chatId, 
-        '❌ Произошла ошибка при обработке фотографии. Попробуйте позже.'
-      );
-    }
-  }
-
-  /**
-   * Обработка загрузки документов (изображений)
-   */
-  private static async handleDocumentUpload(chatId: string, from: any, document: any, caption?: string) {
-    try {
-      console.log(`📄 Handling document upload from ${from.first_name}, file: ${document.file_name}`);
-      
-      // Проверяем, есть ли активный заказ в процессе
-      const pendingOrders = await PhotoOrderService.getOrdersByChatId(chatId);
-      const activeOrder = pendingOrders.find(order => 
-        ['pending', 'processing'].includes(order.status)
-      );
-      
-      if (activeOrder) {
-        await this.sendMessageToUser(chatId, 
-          `📄 Файл получен! Добавлен к заказу #${activeOrder.id}\n\n` +
-          `📋 Текущий заказ:\n` +
-          `• Размер: ${activeOrder.selectedSize.name}\n` +
-          `• Фотографий: ${activeOrder.originalPhotos.length + 1}\n` +
-          `• Копий: ${activeOrder.quantity}\n\n` +
-          `💡 Отправьте еще файлы или напишите "Готово" для завершения заказа.`
-        );
-        return;
-      }
-      
-      // Если нет активного заказа, отправляем инструкции
-      await this.sendMessageToUser(chatId, 
-        `📄 Файл получен!\n\n` +
-        `💡 Для создания заказа используйте команду /order_photo\n` +
-        `📋 Или отправьте сообщение в формате:\n` +
-        `"Заказ: 10x15, 2 копии, кроп"\n` +
-        `+ прикрепите файлы`
-      );
-      
-    } catch (error) {
-      console.error('❌ Error handling document upload:', error);
-      await this.sendMessageToUser(chatId, 
-        '❌ Произошла ошибка при обработке файла. Попробуйте позже.'
-      );
-    }
-  }
-
-  /**
-   * Проверка, является ли документ изображением
-   */
-  private static isImageDocument(document: any): boolean {
-    if (!document.mime_type) return false;
-    
-    const imageMimeTypes = [
-      'image/jpeg',
-      'image/jpg', 
-      'image/png',
-      'image/gif',
-      'image/webp'
-    ];
-    
-    return imageMimeTypes.includes(document.mime_type.toLowerCase());
-  }
-
-  /**
-   * Обработка callback query (нажатие на кнопки)
+   * Старые inline-кнопки и media-flow отключены: даём понятную подсказку и
+   * не оставляем callback без ответа.
    */
   private static async handleCallbackQuery(callbackQuery: any) {
     try {
-      const { id, from, message, data } = callbackQuery;
+      const { id, from, message } = callbackQuery;
       const chatId = message?.chat?.id?.toString();
       
-      console.log(`🔘 Callback query from ${from.first_name}: ${data}`);
+      console.log(`🔘 Legacy callback query from ${from.first_name}`);
 
       if (!chatId) {
         console.error('❌ No chat ID in callback query');
         return;
       }
 
-      // Отвечаем на callback query
-      await TelegramService.answerCallbackQuery(id, 'Обрабатываю...');
-
-      // Обрабатываем разные типы callback data
-      if (data.startsWith('size_')) {
-        await this.handleSizeSelectionSimplified(chatId, data, message.message_id);
-      } else if (data.startsWith('confirm_')) {
-        await this.handleOrderConfirmation(chatId, data);
-      } else if (data.startsWith('cancel_')) {
-        await this.handleOrderCancellation(chatId, data);
-      }
-
+      await TelegramService.answerCallbackQuery(id, 'Сценарий перенесён в PrintCore App');
+      await this.sendMiniappFlowHint(chatId);
     } catch (error) {
       console.error('❌ Error handling callback query:', error);
     }
   }
 
-  /**
-   * Выбор размера → сессия с дефолтами (вписать, 1 копия) → ждём фото
-   */
-  private static async handleSizeSelectionSimplified(chatId: string, data: string, messageId: number) {
-    const sizeName = data.replace('size_', '');
-    const result = await savePhotoOrderSessionSimplified(chatId, sizeName);
-    if (!result.ok) {
-      await TelegramService.sendMessageToUser(chatId, '❌ Неверный размер фотографии');
-      return;
-    }
-    await TelegramService.editMessageWithKeyboard(
+  private static async sendMiniappFlowHint(chatId: string) {
+    await this.sendMessageToUser(
       chatId,
-      messageId,
-      result.text,
-      { inline_keyboard: [] }
-    );
-  }
-
-  /**
-   * Обработка подтверждения заказа
-   */
-  private static async handleOrderConfirmation(chatId: string, data: string) {
-    const orderId = data.replace('confirm_', '');
-    
-    await TelegramService.sendMessageToUser(chatId, 
-      `✅ *Заказ #${orderId} подтвержден!*\n\n` +
-      `📸 Ваши фотографии будут обработаны в течение 1-2 минут.\n` +
-      `📱 Вы получите обработанные фото для проверки.\n\n` +
-      `💡 Используйте /my_orders для отслеживания статуса заказа.`
-    );
-  }
-
-  /**
-   * Обработка отмены заказа
-   */
-  private static async handleOrderCancellation(chatId: string, data: string) {
-    const orderId = data.replace('cancel_', '');
-    
-    await TelegramService.sendMessageToUser(chatId, 
-      `❌ *Заказ #${orderId} отменен.*\n\n` +
-      `💡 Вы можете создать новый заказ с помощью /order_photo`
+      'Основной клиентский сценарий перенесён в PrintCore App. Для новых действий используйте /miniapp.'
     );
   }
 

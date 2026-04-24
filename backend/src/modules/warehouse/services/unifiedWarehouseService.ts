@@ -1,6 +1,7 @@
 import { getDb } from '../../../config/database';
 import { logger } from '../../../utils/logger';
 import { MaterialTransactionService } from './materialTransactionService';
+import { hasColumn } from '../../../utils/tableSchemaCache';
 
 export interface UnifiedMaterial {
   id: number;
@@ -29,7 +30,7 @@ export interface MaterialReservation {
   material_id: number;
   order_id?: number;
   quantity: number;
-  status: 'reserved' | 'confirmed' | 'cancelled';
+  status: 'reserved' | 'confirmed' | 'cancelled' | 'expired';
   created_at: string;
   expires_at: string;
   reason?: string;
@@ -350,18 +351,64 @@ export class UnifiedWarehouseService {
       );
       if (!tableExists) return [];
 
+      const hasQuantityReserved = await hasColumn('material_reservations', 'quantity_reserved');
+      const hasQuantity = await hasColumn('material_reservations', 'quantity');
+      const hasCreatedAt = await hasColumn('material_reservations', 'created_at');
+      const hasReservedAt = await hasColumn('material_reservations', 'reserved_at');
+      const hasNotes = await hasColumn('material_reservations', 'notes');
+
+      const quantityExpr = hasQuantityReserved
+        ? 'mr.quantity_reserved'
+        : hasQuantity
+          ? 'mr.quantity'
+          : '0';
+      const createdAtExpr = hasCreatedAt
+        ? 'mr.created_at'
+        : hasReservedAt
+          ? 'mr.reserved_at'
+          : `datetime('now')`;
+      const reasonExpr = hasNotes ? 'mr.notes' : 'NULL';
+
       const reservations = await db.all(`
         SELECT 
-          mr.*,
+          mr.id,
+          mr.material_id,
+          mr.order_id,
+          ${quantityExpr} as quantity,
+          mr.status,
+          ${createdAtExpr} as created_at,
+          mr.expires_at,
+          ${reasonExpr} as reason,
           m.name as material_name,
           m.unit
         FROM material_reservations mr
         JOIN materials m ON m.id = mr.material_id
         WHERE mr.order_id = ?
-        ORDER BY mr.created_at DESC
+        ORDER BY ${createdAtExpr} DESC
       `, orderId);
       
-      return reservations;
+      return (reservations as Array<Record<string, unknown>>).map((row) => {
+        const rawStatus = String(row.status || '');
+        const normalizedStatus =
+          rawStatus === 'active'
+            ? 'reserved'
+            : rawStatus === 'fulfilled'
+              ? 'confirmed'
+              : rawStatus === 'expired'
+                ? 'expired'
+                : 'cancelled';
+
+        return {
+          id: Number(row.id),
+          material_id: Number(row.material_id),
+          order_id: row.order_id == null ? undefined : Number(row.order_id),
+          quantity: Number(row.quantity || 0),
+          status: normalizedStatus,
+          created_at: String(row.created_at || ''),
+          expires_at: String(row.expires_at || ''),
+          reason: row.reason == null ? undefined : String(row.reason),
+        } as MaterialReservation;
+      });
     } catch (error) {
       logger.error('Ошибка получения резервов по заказу', error);
       return [];

@@ -41,7 +41,7 @@ export async function savePhotoOrderSessionSimplified(
     `🎨 Режим: ${MODE_LABEL[PHOTO_ORDER_DEFAULT_MODE] ?? PHOTO_ORDER_DEFAULT_MODE}\n` +
     `📦 Копий: ${PHOTO_ORDER_DEFAULT_QTY} · ~${totalRub} руб. (${priceRub} руб. за копию)\n\n` +
     `📸 Пришлите фото в этот чат — одним или несколькими сообщениями.\n` +
-    `Чтобы выбрать другой размер, снова: /order_photo\n\n` +
+    `Чтобы вернуться к основному клиентскому сценарию, используйте /miniapp\n\n` +
     `Нужен другой режим или число копий — напишите менеджеру или в CRM.`
 
   return { ok: true, text }
