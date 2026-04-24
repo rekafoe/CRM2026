@@ -8,6 +8,20 @@ export const getCustomerDisplayName = (customer: Customer) => {
   return parts.join(' ') || `Клиент #${customer.id}`;
 };
 
+const CUSTOMER_SOURCE_LABELS: Record<string, string> = {
+  crm: 'CRM',
+  website: 'Сайт',
+  telegram: 'Telegram',
+  mini_app: 'Mini App',
+};
+
+/** Подпись канала по значению `customer.source` (для списка и отчётов). */
+export const getCustomerSourceLabel = (source?: string | null) => {
+  if (source == null || String(source).trim() === '') return CUSTOMER_SOURCE_LABELS.crm;
+  const key = String(source).trim();
+  return CUSTOMER_SOURCE_LABELS[key] ?? 'CRM';
+};
+
 /** Итог заказа с учётом скидки (для отображения и документов). */
 export const getOrderTotal = (order: Order) => {
   const anyOrder = order as any;

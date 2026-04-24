@@ -1,6 +1,13 @@
 import { randomBytes } from 'crypto'
 import { getDb } from '../../../config/database'
 
+const CUSTOMER_SOURCE_VALUES = new Set(['crm', 'website', 'telegram', 'mini_app'])
+
+function normalizeCustomerSource(input?: string | null): 'crm' | 'website' | 'telegram' | 'mini_app' {
+  const s = input != null && String(input).trim() ? String(input).trim() : 'crm'
+  return (CUSTOMER_SOURCE_VALUES.has(s) ? s : 'crm') as 'crm' | 'website' | 'telegram' | 'mini_app'
+}
+
 // Интерфейс Customer определен локально, так как shared/types может быть недоступен в backend
 export interface Customer {
   id: number;
@@ -27,6 +34,8 @@ export interface Customer {
   last_order_at?: string | null;
   /** Сумма последнего заказа с учётом скидки (как в CRM) */
   last_order_amount?: number | null;
+  /** Источник: crm — вручную в CRM; website, telegram, mini_app — каналы */
+  source?: 'crm' | 'website' | 'telegram' | 'mini_app';
 }
 
 export class CustomerService {
@@ -216,6 +225,8 @@ export class CustomerService {
     email?: string
     address?: string
     notes?: string
+    /** По умолчанию crm (ручное создание в CRM) */
+    source?: string
   }): Promise<Customer> {
     const db = await getDb()
     const now = new Date().toISOString()
@@ -231,6 +242,7 @@ export class CustomerService {
       }
     }
 
+    const src = normalizeCustomerSource(data.source)
     const unsubToken = randomBytes(24).toString('hex')
     const result = await db.run(
       `INSERT INTO customers (
@@ -238,9 +250,10 @@ export class CustomerService {
         company_name, legal_name, tax_id,
         bank_details, authorized_person,
         phone, email, address, notes,
+        source,
         marketing_opt_in, unsubscribe_token,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.type,
         data.first_name || null,
@@ -255,6 +268,7 @@ export class CustomerService {
         data.email || null,
         data.address || null,
         data.notes || null,
+        src,
         0,
         unsubToken,
         now,
@@ -424,6 +438,7 @@ export class CustomerService {
       email: row.email || undefined,
       address: row.address || undefined,
       notes: row.notes || undefined,
+      source: normalizeCustomerSource(row.source),
       marketing_opt_in: row.marketing_opt_in == null ? 0 : Number(row.marketing_opt_in),
       email_unsubscribed_at: row.email_unsubscribed_at ?? null,
       unsubscribe_token: row.unsubscribe_token || undefined,

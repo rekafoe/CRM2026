@@ -44,6 +44,8 @@ export interface Customer {
   email?: string;
   address?: string;
   notes?: string;
+  /** Откуда пришёл клиент (для статистики). crm — создание вручную в CRM. */
+  source?: 'crm' | 'website' | 'telegram' | 'mini_app';
   created_at: string;
   updated_at: string;
   /** Список клиентов: последний заказ */

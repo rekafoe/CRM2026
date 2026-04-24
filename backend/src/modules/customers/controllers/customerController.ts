@@ -178,7 +178,8 @@ export class CustomerController {
       phone,
       email,
       address,
-      notes
+      notes,
+      source
     } = req.body
 
     if (!type || !['individual', 'legal'].includes(type)) {
@@ -200,7 +201,8 @@ export class CustomerController {
         phone,
         email,
         address,
-        notes
+        notes,
+        source: source != null && source !== '' ? String(source) : 'crm',
       })
 
       res.status(201).json(customer)

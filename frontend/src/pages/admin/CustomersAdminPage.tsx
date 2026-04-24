@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 import '../../components/admin/ProductManagement.css';
 import {
   getCustomerDisplayName,
+  getCustomerSourceLabel,
   formatDateValue,
   formatLastOrderAmount,
 } from './clients/customerDocumentHelpers';
@@ -350,13 +351,14 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
                     <th>Email</th>
                     <th>Последний заказ</th>
                     <th>Сумма</th>
+                    <th>Источник</th>
                     <th>Дата создания</th>
                   </tr>
                 </thead>
                 <tbody>
                   {customers.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="customers-muted">
+                      <td colSpan={7} className="customers-muted">
                         Нет клиентов этого типа
                       </td>
                     </tr>
@@ -382,6 +384,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
                         <td>{c.email || '—'}</td>
                         <td>{c.last_order_at ? formatDateValue(c.last_order_at) : '—'}</td>
                         <td>{formatLastOrderAmount(c.last_order_amount)}</td>
+                        <td>{getCustomerSourceLabel(c.source)}</td>
                         <td>{new Date(c.created_at).toLocaleDateString('ru-RU')}</td>
                       </tr>
                     );

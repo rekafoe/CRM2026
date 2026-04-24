@@ -214,6 +214,7 @@ async function ensureCustomerForChat(
       email: cWithPhone.email,
       address: cWithPhone.address,
       notes: cWithPhone.notes,
+      source: 'mini_app',
     });
     await TelegramUserService.setCrmCustomerIdByChatId(chatId, created.id);
     return created;
@@ -230,6 +231,7 @@ async function ensureCustomerForChat(
     email: cWithPhone.email,
     address: cWithPhone.address,
     notes: cWithPhone.notes,
+    source: 'mini_app',
   });
   await TelegramUserService.setCrmCustomerIdByChatId(chatId, created.id);
   return created;
