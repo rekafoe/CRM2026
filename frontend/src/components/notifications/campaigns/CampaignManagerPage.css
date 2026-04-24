@@ -1,0 +1,222 @@
+.campaign-manager {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.campaign-manager__hero {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.campaign-manager__hero h3 {
+  margin: 0 0 8px;
+  color: var(--text-primary);
+}
+
+.campaign-manager__hero p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.campaign-manager__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.campaign-manager__tabs button {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.campaign-manager__tabs button.active {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.campaign-manager__content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.campaign-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.campaign-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.campaign-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.campaign-card__header h4,
+.campaign-test-box h5 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.campaign-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.campaign-list__item {
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.campaign-list__item.active {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.campaign-list__item span,
+.campaign-list__item small,
+.campaign-muted {
+  color: var(--text-secondary);
+}
+
+.campaign-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.campaign-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.campaign-form-grid label,
+.campaign-checkbox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.campaign-form-grid input,
+.campaign-form-grid select,
+.campaign-textarea,
+.campaign-test-box textarea,
+.campaign-filters select {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 10px 12px;
+  box-sizing: border-box;
+}
+
+.campaign-textarea,
+.campaign-test-box textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.campaign-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.campaign-test-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.campaign-checkbox {
+  flex-direction: row;
+  align-items: center;
+}
+
+.campaign-checkbox input {
+  width: auto;
+}
+
+.campaign-table-wrap {
+  overflow: auto;
+}
+
+.campaign-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.campaign-table th,
+.campaign-table td {
+  border-bottom: 1px solid var(--border-color);
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: top;
+  color: var(--text-primary);
+}
+
+.campaign-table th {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+@media (max-width: 1000px) {
+  .campaign-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .campaign-manager,
+  .campaign-card {
+    padding: 14px;
+  }
+
+  .campaign-form-grid,
+  .campaign-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .campaign-card__header,
+  .campaign-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

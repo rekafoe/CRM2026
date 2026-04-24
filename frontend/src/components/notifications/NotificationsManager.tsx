@@ -4,10 +4,11 @@ import { LowStockAlerts } from '../warehouse/LowStockAlerts';
 import { TelegramBotManager } from './TelegramBotManager';
 import { AutoOrdersManager } from './AutoOrdersManager';
 import { OrderClientNotifyTab } from './OrderClientNotifyTab';
+import { CampaignManagerPage } from './campaigns/CampaignManagerPage';
 import { useUIStore } from '../../stores/uiStore';
 import './NotificationsManager.css';
 
-type NotifyTab = 'alerts' | 'telegram' | 'orders' | 'settings' | 'client';
+type NotifyTab = 'alerts' | 'telegram' | 'orders' | 'settings' | 'client' | 'campaigns';
 
 interface NotificationsManagerProps {
   onClose: () => void;
@@ -16,6 +17,9 @@ interface NotificationsManagerProps {
 function tabFromSearchParam(t: string | null): NotifyTab {
   if (t === 'client' || t === 'mail' || t === 'email' || t === 'sms') {
     return 'client';
+  }
+  if (t === 'campaigns' || t === 'broadcast' || t === 'marketing') {
+    return 'campaigns';
   }
   if (t === 'telegram') {
     return 'telegram';
@@ -38,6 +42,9 @@ function paramForTab(tab: NotifyTab): string | undefined {
   }
   if (tab === 'client') {
     return 'client';
+  }
+  if (tab === 'campaigns') {
+    return 'campaigns';
   }
   if (tab === 'telegram') {
     return 'telegram';
@@ -85,6 +92,8 @@ export const NotificationsManager: React.FC<NotificationsManagerProps> = ({ onCl
         return <NotificationsSettings />;
       case 'client':
         return <OrderClientNotifyTab />;
+      case 'campaigns':
+        return <CampaignManagerPage />;
       default:
         return <LowStockAlerts />;
     }
@@ -113,6 +122,13 @@ export const NotificationsManager: React.FC<NotificationsManagerProps> = ({ onCl
           onClick={() => goTab('client')}
         >
           Почта / SMS
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'campaigns' ? 'active' : ''}
+          onClick={() => goTab('campaigns')}
+        >
+          Кампании
         </button>
         <button
           type="button"

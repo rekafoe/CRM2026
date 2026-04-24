@@ -33,6 +33,7 @@ import imageUrlFetchRoutes from './imageUrlFetch'
 import mailRoutes from './mail'
 import smsRoutes from './sms'
 import miniappRoutes from './miniapp'
+import campaignsRoutes from './campaigns'
 
 const router = Router()
 
@@ -68,6 +69,7 @@ router.use('/images', imageUrlFetchRoutes)
 router.use('/mail', mailRoutes)
 router.use('/sms', smsRoutes)
 router.use('/miniapp', miniappRoutes)
+router.use('/campaigns', campaignsRoutes)
 router.use('/products/:productId/subtype-designs', subtypeDesignsRoutes)
 
 console.log('Routes setup complete')

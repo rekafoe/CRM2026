@@ -23,6 +23,7 @@ import { startStorageMonitor } from './services/storageMonitorService'
 import { logger } from './utils/logger'
 import { startMailOutboxWorker } from './services/mailOutboxWorker'
 import { startSmsDebounceWorker } from './services/smsDebounceWorker'
+import { startCampaignWorker } from './modules/campaigns/services/campaignWorker'
 import { AuthController } from './controllers'
 import { swaggerSpec } from './config/swagger'
 import { registerMiniappPublicPage } from './routes/miniappPublicPage'
@@ -274,6 +275,7 @@ async function startServer() {
     app.listen(port, () => {
       startMailOutboxWorker()
       startSmsDebounceWorker()
+      startCampaignWorker()
       logger.info(`Server running on port ${port}`)
       logger.info(`Uploads directory: ${uploadsDir}`)
       const tgMode = !telegramConfig.enabled

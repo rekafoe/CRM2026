@@ -261,6 +261,14 @@ const AdminPanelHome: React.FC = () => {
             </button>
             <button
               className="admin-link-card"
+              onClick={() => navigate('/adminpanel/notifications?tab=campaigns')}
+            >
+              <span className="link-icon"><AppIcon name="bell" size="md" circle /></span>
+              <span className="link-title">Менеджер рассылки</span>
+              <span className="link-desc">Кампании, шаблоны, сегменты и журнал отправки</span>
+            </button>
+            <button
+              className="admin-link-card"
               onClick={() => navigate('/adminpanel/counters')}
             >
               <span className="link-icon"><AppIcon name="receipt" size="md" circle /></span>
