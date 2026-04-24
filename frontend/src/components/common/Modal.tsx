@@ -61,9 +61,9 @@ export const Modal: React.FC<ModalProps> = ({
 
   const sizeClasses = getSizeClasses(size);
 
-  const overlayClasses = overlayClassName
-    ? `modal-overlay app-modal-portal ${overlayClassName}`
-    : 'modal-overlay app-modal-portal';
+  /** Не `modal-overlay`: этот класс размазан по warehouse/админке с разным z-index и в конце каскала ломает слой. */
+  const overlayClasses = ['common-modal__backdrop', overlayClassName].filter(Boolean).join(' ');
+
   const modalContent = (
     <div className={overlayClasses} onClick={onClose}>
       <div 

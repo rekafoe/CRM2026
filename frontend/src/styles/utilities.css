@@ -378,7 +378,7 @@
   cursor: not-allowed;
 }
 
-/* Модальные окна */
+/* Устаревший глобальный класс — в проекте десятки копий с разным z-index; новые экраны не опирайтесь на него. */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -393,11 +393,16 @@
   z-index: 9999;
 }
 
-/* Портал `Modal`: выше боковых панелей (simplified-tpl-drawer 9000). Позже
-   подключаемый `warehouse-dashboard.css` задаёт голый `.modal-overlay { z-index: 2000 }`
-   и перетирает 9999 — селектор с двумя классами сохраняет приоритет. */
-.modal-overlay.app-modal-portal {
-  z-index: 10050;
+/* Только `components/common/Modal`: отдельное имя, чтобы стили скида/склада не затирали z-index. */
+.common-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000; /* выше .simplified-tpl-drawer-root (9000) */
 }
 
 .modal-content {
