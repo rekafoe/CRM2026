@@ -91,16 +91,18 @@ export function getMiniappMapAndBynShellCss() {
     .ipc-list__row--cart .row { margin-top: 0; }
     h2.section-head, h3.section-head { margin-top: 0; }
     .ipc-byn {
-      display: inline-block;
-      margin-left: 0.1em;
-      line-height: 0;
-      vertical-align: -0.07em;
+      display: inline-flex;
+      align-items: baseline;
+      margin-left: 0.15ch;
+      line-height: 1;
+      vertical-align: 0.05em;
     }
     .ipc-byn svg {
       display: block;
-      /* Визуально уровнять с цифрами кегля цены */
-      height: 1.15em;
-      width: 0.958em; /* 1.15 × 20/24 */
+      flex-shrink: 0;
+      height: 0.9em;
+      width: 0.76em;
+      transform: translateY(0.06em);
     }
     .ipc-design-help-row { margin: 10px 0; }
     .ipc-design-help {

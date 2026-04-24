@@ -59,23 +59,35 @@ export const MINIAPP_CLIENT_PART_CALC = `
     if (!sz || !Array.isArray(sz.print_prices)) return [];
     return sz.print_prices;
   }
+  function priceTypeEntryDescription(x) {
+    if (!x || typeof x !== 'object') return '';
+    var d = x.description != null ? x.description : (x.hint != null ? x.hint : (x.help != null ? x.help : (x.note != null ? x.note : '')));
+    d = d != null ? String(d).trim() : '';
+    return d;
+  }
+  function calcAllowedPriceTypesRaw() {
+    var s = calcSimp();
+    if (!s || !s.typeConfigs) return [];
+    var tid = calcPickTypeId();
+    if (tid == null) return [];
+    var cfg = s.typeConfigs[String(tid)];
+    if (!cfg || !Array.isArray(cfg.allowed_price_types) || cfg.allowed_price_types.length === 0) return [];
+    return cfg.allowed_price_types;
+  }
   function calcAllowedPriceTypes() {
-    var d = out.calcSchema && out.calcSchema.data;
-    var raw = d && d.constraints && Array.isArray(d.constraints.allowed_price_types)
-      ? d.constraints.allowed_price_types
-      : [];
+    var raw = calcAllowedPriceTypesRaw();
     var opts = [];
     for (var i = 0; i < raw.length; i++) {
       var x = raw[i];
       if (typeof x === 'string' || typeof x === 'number') {
         var k = String(x).trim();
-        if (k) opts.push({ key: k, label: k });
+        if (k) opts.push({ key: k, label: k, description: '' });
         continue;
       }
       if (x && typeof x === 'object') {
         var key = String(x.key || x.id || x.value || '').trim();
         if (!key) continue;
-        opts.push({ key: key, label: String(x.name || x.label || key) });
+        opts.push({ key: key, label: String(x.name || x.label || key), description: priceTypeEntryDescription(x) });
       }
     }
     return opts;
@@ -88,7 +100,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     if (mats[0]) out.calcForm.matId = mats[0].id; else out.calcForm.matId = null;
     var pp = calcPrintOptions();
     if (pp[0]) {
-      out.calcForm.printKey = String(pp[0].technology_code || '') + '||' + String(pp[0].color_mode || '') + '||' + String(pp[0].sides_mode || 'single');
+      out.calcForm.printKey = makePrintKeyFromRow(pp[0]);
     } else { out.calcForm.printKey = ''; }
     var allowedPts = calcAllowedPriceTypes();
     if (allowedPts.length > 0) {
@@ -138,6 +150,89 @@ export const MINIAPP_CLIENT_PART_CALC = `
   function parsePrintKey() {
     var a = (out.calcForm.printKey || '').split('||');
     return { tech: (a[0] || '').trim(), color: (a[1] || 'color').trim(), sides: (a[2] || 'single').trim() };
+  }
+  function makePrintKeyFromRow(r) {
+    if (!r) return '';
+    return String(r.technology_code || '') + '||' + String(r.color_mode != null ? r.color_mode : 'color') + '||' + String(r.sides_mode != null ? r.sides_mode : 'single');
+  }
+  function printColorModeLabel(v) {
+    var x = String(v != null ? v : 'color').toLowerCase();
+    if (x === 'bw' || x === 'grayscale' || x === 'grey' || x === 'gray' || x === 'mono') return 'Ч/б';
+    if (x === 'color') return 'Цветная';
+    return v != null && String(v).trim() ? String(v) : '—';
+  }
+  function printSidesModeLabel(v) {
+    var x = String(v != null ? v : 'single').toLowerCase();
+    if (x === 'single' || x === 'one' || x === 'one_sided' || x === 'onesided') return 'Односторонняя';
+    if (x === 'duplex' || x === 'double' || x === 'twosided') return 'Двусторонняя';
+    if (x === 'duplex_bw_back' || x === 'duplex_bw' || x === 'duplex_bwb') return 'Сзади ч/б';
+    return v != null && String(v).trim() ? String(v) : '—';
+  }
+  function uniquePrintColorModes(pps) {
+    var seen = {};
+    var out = [];
+    for (var i = 0; i < pps.length; i++) {
+      var c = String((pps[i] && pps[i].color_mode) != null ? pps[i].color_mode : 'color');
+      if (!seen[c]) { seen[c] = true; out.push(c); }
+    }
+    return out;
+  }
+  function uniquePrintSidesModes(pps) {
+    var seen = {};
+    var out = [];
+    for (var i = 0; i < pps.length; i++) {
+      var s = String((pps[i] && pps[i].sides_mode) != null ? pps[i].sides_mode : 'single');
+      if (!seen[s]) { seen[s] = true; out.push(s); }
+    }
+    return out;
+  }
+  function findPrintRowByColorSides(pps, color, sides, preferTech) {
+    var c = String(color);
+    var s = String(sides);
+    var tech = preferTech != null && String(preferTech).length ? String(preferTech) : '';
+    var list = [];
+    for (var i = 0; i < pps.length; i++) {
+      var r = pps[i];
+      if (!r) continue;
+      var rc = String((r.color_mode != null ? r.color_mode : 'color'));
+      var rs = String((r.sides_mode != null ? r.sides_mode : 'single'));
+      if (rc === c && rs === s) list.push(r);
+    }
+    if (list.length === 0) return null;
+    if (tech) {
+      for (var j = 0; j < list.length; j++) {
+        if (String(list[j].technology_code || '') === tech) return list[j];
+      }
+    }
+    return list[0];
+  }
+  function ensurePrintKeyMatchesOptions() {
+    var pps = calcPrintOptions();
+    if (pps.length === 0) { out.calcForm.printKey = ''; return; }
+    var k = String(out.calcForm.printKey);
+    for (var i = 0; i < pps.length; i++) { if (makePrintKeyFromRow(pps[i]) === k) return; }
+    var p = parsePrintKey();
+    var row = findPrintRowByColorSides(pps, p.color, p.sides, p.tech);
+    if (row) { out.calcForm.printKey = makePrintKeyFromRow(row); return; }
+    out.calcForm.printKey = '';
+  }
+  function onPickPrintColor(colorVal) {
+    var pps = calcPrintOptions();
+    if (pps.length === 0) return;
+    var p = parsePrintKey();
+    var row = findPrintRowByColorSides(pps, String(colorVal), p.sides, p.tech);
+    if (row) out.calcForm.printKey = makePrintKeyFromRow(row);
+    render();
+    scheduleCalcRun();
+  }
+  function onPickPrintSides(sidesVal) {
+    var pps = calcPrintOptions();
+    if (pps.length === 0) return;
+    var p = parsePrintKey();
+    var row = findPrintRowByColorSides(pps, p.color, String(sidesVal), p.tech);
+    if (row) out.calcForm.printKey = makePrintKeyFromRow(row);
+    render();
+    scheduleCalcRun();
   }
   function buildCalcPayload() {
     var p = parsePrintKey();
@@ -189,16 +284,6 @@ export const MINIAPP_CLIENT_PART_CALC = `
     for (var mi = 0; mi < matList.length; mi++) {
       if (String(matList[mi].id) === String(out.calcForm.matId)) { matName = String(matList[mi].name || out.calcForm.matId); break; }
     }
-    var printLabel = '—';
-    var pps = calcPrintOptions();
-    for (var pi = 0; pi < pps.length; pi++) {
-      var pr = pps[pi];
-      var pkey = String(pr.technology_code || '') + '||' + String(pr.color_mode || '') + '||' + String(pr.sides_mode || 'single');
-      if (pkey === String(out.calcForm.printKey)) {
-        printLabel = (pr.technology_code || '') + ' / ' + (pr.color_mode || '') + ' / ' + (pr.sides_mode || '');
-        break;
-      }
-    }
     var productTitle = out.calcName || r.productName || 'Товар';
     var summary = Array.isArray(r.parameterSummary) && r.parameterSummary.length
       ? r.parameterSummary.map(function (p) { return { label: String((p && p.label) || ''), value: String((p && p.value) || '') }; })
@@ -207,7 +292,11 @@ export const MINIAPP_CLIENT_PART_CALC = `
       if (typeName) summary.push({ label: 'Тип', value: typeName });
       summary.push({ label: 'Размер', value: sizeLabel });
       summary.push({ label: 'Материал', value: matName });
-      summary.push({ label: 'Печать', value: printLabel });
+      (function () {
+        var ppn = parsePrintKey();
+        summary.push({ label: 'Тип печати', value: printColorModeLabel(ppn.color) });
+        summary.push({ label: 'Стороны печати', value: printSidesModeLabel(ppn.sides) });
+      })();
       summary.push({ label: 'Тираж', value: String(q) + ' шт.' });
     }
     var summaryText = summary.length ? summary.map(function (p) { return p.label + ': ' + p.value; }).join(' • ') : (q + ' шт.');
@@ -317,23 +406,30 @@ export const MINIAPP_CLIENT_PART_CALC = `
     form.onsubmit = function (e) { e.preventDefault(); return false; };
     var types = calcTypes();
     if (types.length > 0) {
-      var ts = document.createElement('select');
-      ts.onchange = function () { out.calcForm.typeId = ts.value ? (isNaN(+ts.value) ? ts.value : +ts.value) : null; initCalcFormFromSchema(); render(); scheduleCalcRun(); };
-      for (var ti = 0; ti < types.length; ti++) {
-        var op = document.createElement('option');
-        op.value = String(types[ti].id);
-        op.textContent = types[ti].name || op.value;
-        if (String(types[ti].id) === String(calcPickTypeId()) || String(types[ti].id) === String(out.calcForm.typeId)) op.selected = true;
-        ts.appendChild(op);
-      }
       if (out.calcForm.typeId == null) out.calcForm.typeId = types[0].id;
-      ts.value = String(out.calcForm.typeId);
-      addField(form, 'Тип / вариант', ts);
+      var tidOk = false;
+      for (var tix = 0; tix < types.length; tix++) {
+        if (String(types[tix].id) === String(out.calcForm.typeId)) { tidOk = true; break; }
+      }
+      if (!tidOk) out.calcForm.typeId = types[0].id;
+      if (types.length > 1) {
+        var ts = document.createElement('select');
+        ts.onchange = function () { out.calcForm.typeId = ts.value ? (isNaN(+ts.value) ? ts.value : +ts.value) : null; initCalcFormFromSchema(); render(); scheduleCalcRun(); };
+        for (var ti = 0; ti < types.length; ti++) {
+          var op = document.createElement('option');
+          op.value = String(types[ti].id);
+          op.textContent = types[ti].name || op.value;
+          if (String(types[ti].id) === String(calcPickTypeId()) || String(types[ti].id) === String(out.calcForm.typeId)) op.selected = true;
+          ts.appendChild(op);
+        }
+        ts.value = String(out.calcForm.typeId);
+        addField(form, 'Тип / вариант', ts);
+      }
     } else { out.calcForm.typeId = null; }
     var sizes = calcSizes(calcPickTypeId());
     if (sizes.length > 0) {
       var ss = document.createElement('select');
-      ss.onchange = function () { out.calcForm.sizeId = ss.value ? (isNaN(+ss.value) ? ss.value : +ss.value) : null; var m = calcMaterials(); if (m[0]) out.calcForm.matId = m[0].id; var pp = calcPrintOptions(); if (pp[0]) out.calcForm.printKey = String(pp[0].technology_code || '') + '||' + String(pp[0].color_mode || '') + '||' + String(pp[0].sides_mode || 'single'); render(); scheduleCalcRun(); };
+      ss.onchange = function () { out.calcForm.sizeId = ss.value ? (isNaN(+ss.value) ? ss.value : +ss.value) : null; var m = calcMaterials(); if (m[0]) out.calcForm.matId = m[0].id; var pp = calcPrintOptions(); if (pp[0]) out.calcForm.printKey = makePrintKeyFromRow(pp[0]); render(); scheduleCalcRun(); };
       for (var si = 0; si < sizes.length; si++) {
         var o1 = document.createElement('option');
         o1.value = String(sizes[si].id);
@@ -361,34 +457,92 @@ export const MINIAPP_CLIENT_PART_CALC = `
     }
     var pps = calcPrintOptions();
     if (pps.length > 0) {
-      var ps = document.createElement('select');
-      ps.onchange = function () { out.calcForm.printKey = ps.value; render(); scheduleCalcRun(); };
-      for (var pi = 0; pi < pps.length; pi++) {
-        var o3 = document.createElement('option');
-        var pr = pps[pi];
-        o3.value = String(pr.technology_code || '') + '||' + String(pr.color_mode || '') + '||' + String(pr.sides_mode || 'single');
-        o3.textContent = (pr.technology_code || '') + ' / ' + (pr.color_mode || '') + ' / ' + (pr.sides_mode || '');
-        ps.appendChild(o3);
+      ensurePrintKeyMatchesOptions();
+      pps = calcPrintOptions();
+      var uPColors = uniquePrintColorModes(pps);
+      var uPSides = uniquePrintSidesModes(pps);
+      var pCur = parsePrintKey();
+      if (uPColors.length > 1) {
+        var fCol = h('div', '', 'field ipc-field--price-type');
+        fCol.appendChild(h('div', 'Тип печати', 'ipc-price-type__fieldtitle'));
+        var rCol = h('div', '', 'ipc-price-type__btns');
+        for (var pci = 0; pci < uPColors.length; pci++) {
+          (function (cv) {
+            var onC = String(pCur.color) === String(cv);
+            var bc = document.createElement('button');
+            bc.type = 'button';
+            bc.className = 'ipc-price-type__btn' + (onC ? ' ipc-price-type__btn--on' : '');
+            bc.setAttribute('aria-pressed', onC ? 'true' : 'false');
+            bc.textContent = printColorModeLabel(cv);
+            bc.onclick = function () { onPickPrintColor(cv); };
+            rCol.appendChild(bc);
+          })(uPColors[pci]);
+        }
+        fCol.appendChild(rCol);
+        form.appendChild(fCol);
       }
-      if (out.calcForm.printKey) { var ok = false; for (var q = 0; q < ps.options.length; q++) { if (ps.options[q].value === out.calcForm.printKey) { ok = true; break; } } if (!ok) out.calcForm.printKey = ps.options[0].value; }
-      if (!out.calcForm.printKey && ps.options[0]) out.calcForm.printKey = ps.options[0].value;
-      if (out.calcForm.printKey) ps.value = out.calcForm.printKey;
-      addField(form, 'Печать (техн./цвет/стороны)', ps);
+      if (uPSides.length > 1) {
+        var fSide = h('div', '', 'field ipc-field--price-type');
+        fSide.appendChild(h('div', 'Стороны печати', 'ipc-price-type__fieldtitle'));
+        var rSide = h('div', '', 'ipc-price-type__btns');
+        for (var psi = 0; psi < uPSides.length; psi++) {
+          (function (sv) {
+            var onS = String(pCur.sides) === String(sv);
+            var bs = document.createElement('button');
+            bs.type = 'button';
+            bs.className = 'ipc-price-type__btn' + (onS ? ' ipc-price-type__btn--on' : '');
+            bs.setAttribute('aria-pressed', onS ? 'true' : 'false');
+            bs.textContent = printSidesModeLabel(sv);
+            bs.onclick = function () { onPickPrintSides(sv); };
+            rSide.appendChild(bs);
+          })(uPSides[psi]);
+        }
+        fSide.appendChild(rSide);
+        form.appendChild(fSide);
+      }
     } else { box.appendChild(rowHint('В шаблоне нет print_prices для размера — расчёт может быть недоступен.')); }
     var pts = calcAllowedPriceTypes();
     if (pts.length > 0) {
-      var ptsel = document.createElement('select');
-      ptsel.onchange = function () { out.calcForm.priceType = ptsel.value || ''; scheduleCalcRun(); };
-      for (var pti = 0; pti < pts.length; pti++) {
-        var pto = document.createElement('option');
-        pto.value = pts[pti].key;
-        pto.textContent = pts[pti].label;
-        if (String(pts[pti].key) === String(out.calcForm.priceType || '')) pto.selected = true;
-        ptsel.appendChild(pto);
-      }
       if (!out.calcForm.priceType && pts[0]) out.calcForm.priceType = pts[0].key;
-      if (out.calcForm.priceType) ptsel.value = out.calcForm.priceType;
-      addField(form, 'Тип цены', ptsel);
+      var ptpOk = false;
+      for (var pvi = 0; pvi < pts.length; pvi++) {
+        if (String(pts[pvi].key) === String(out.calcForm.priceType || '')) { ptpOk = true; break; }
+      }
+      if (!ptpOk && pts[0]) out.calcForm.priceType = pts[0].key;
+      var ptField = h('div', '', 'field ipc-field--price-type');
+      ptField.appendChild(h('div', 'Тип цены', 'ipc-price-type__fieldtitle'));
+      var ptRow = h('div', '', 'ipc-price-type__btns');
+      for (var pti = 0; pti < pts.length; pti++) {
+        (function (pt) {
+          var on = String(pt.key) === String(out.calcForm.priceType || '');
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'ipc-price-type__btn' + (on ? ' ipc-price-type__btn--on' : '');
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+          b.textContent = pt.label;
+          b.onclick = function () {
+            out.calcForm.priceType = pt.key;
+            render();
+            scheduleCalcRun();
+          };
+          ptRow.appendChild(b);
+        })(pts[pti]);
+      }
+      ptField.appendChild(ptRow);
+      var curPh = '';
+      for (var hci = 0; hci < pts.length; hci++) {
+        if (String(pts[hci].key) === String(out.calcForm.priceType || '')) {
+          curPh = pts[hci].description || '';
+          break;
+        }
+      }
+      if (curPh) ptField.appendChild(h('p', esc(curPh), 'hint ipc-price-type__hint'));
+      form.appendChild(ptField);
+      if (pts.length > 1) {
+        var accF = h('div', '', 'field ipc-field--price-type-help');
+        accF.appendChild(buildPriceTypeHelpAccordion());
+        form.appendChild(accF);
+      }
     }
     var qi = document.createElement('input');
     qi.name = 'q';

@@ -43,6 +43,19 @@ const MINIAPP_SHELL_CSS_BASE = `
       box-shadow: var(--ipc-shadow);
     }
     .ipc-pm-header__left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .ipc-pm-header__logo-wrap {
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 48px;
+      max-width: min(44vw, 180px);
+    }
+    .ipc-pm-header__logo-img {
+      max-width: 100%;
+      max-height: 48px;
+      width: auto; height: auto;
+      object-fit: contain;
+      display: block;
+    }
     .ipc-pm-header__icon {
       width: 48px; height: 48px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;

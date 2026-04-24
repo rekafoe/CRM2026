@@ -7,6 +7,8 @@ import { MINIAPP_CLIENT_PART_CALC_SUMMARY } from './miniappClientScriptPartCalcS
 import { MINIAPP_CLIENT_PART_ORDER_DETAIL } from './miniappClientScriptPartOrderDetail';
 import { MINIAPP_CLIENT_PART2 } from './miniappClientScriptPart2';
 import { MINIAPP_CLIENT_PART2_CHECKOUT } from './miniappClientScriptPart2Checkout';
+import { MINIAPP_CLIENT_PART_PRICE_TYPE_HELP } from './miniappClientScriptPartPriceTypeHelp';
+import { MINIAPP_PRICE_TYPE_HELP_INNER_HTML } from './miniappPriceTypeHelpInnerHtml';
 
 /** Опционально: только товары категории (GET /api/products/category/:id), см. MINIAPP_CATALOG_CATEGORY_ID. */
 export function getMiniappClientInlineScript(
@@ -21,14 +23,18 @@ export function getMiniappClientInlineScript(
       ? Math.floor(Number(catalogCategoryId))
       : null;
   const catJs = cat == null ? 'null' : String(cat);
+  const helpInnerJson = JSON.stringify(MINIAPP_PRICE_TYPE_HELP_INNER_HTML);
   return (
     '(function () {\n  var API_BASE = ' +
     API +
     ';\n  var CATALOG_CATEGORY_ID = ' +
     catJs +
+    ';\n  var MINIAPP_PRICE_TYPE_HELP_INNER = ' +
+    helpInnerJson +
     ';\n' +
     MINIAPP_CLIENT_PART1 +
     MINIAPP_CLIENT_PART_CALC +
+    MINIAPP_CLIENT_PART_PRICE_TYPE_HELP +
     MINIAPP_CLIENT_PART_CALC_SUMMARY +
     MINIAPP_CLIENT_PART_ORDER_DETAIL +
     MINIAPP_CLIENT_PART2 +

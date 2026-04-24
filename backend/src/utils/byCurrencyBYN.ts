@@ -2,8 +2,9 @@
  * Официальный графический знак белорусского рубля (заглавная «Б» + горизонтальная линия).
  * Единая разметка для веб, PDF, Telegram Mini App.
  */
+/** Глиф ≈высоты цифр в line-height; линия — над верхом «Б» (как бук. знак) */
 const SVG_INNER = (fillHex: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 24" fill="none" aria-hidden="true" focusable="false"><text x="0" y="16.4" fill="${fillHex}" font-size="16" font-weight="700" font-family="system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif">Б</text><line x1="0" y1="10.1" x2="8" y2="10.1" stroke="${fillHex}" stroke-width="1.45" stroke-linecap="square"/></svg>`.replace(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 26" fill="none" aria-hidden="true" focusable="false"><text x="0" y="18" fill="${fillHex}" font-size="19" font-weight="700" font-family="system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif" dominant-baseline="alphabetic">Б</text><line x1="0" y1="10" x2="9" y2="10" stroke="${fillHex}" stroke-width="1.5" stroke-linecap="square"/></svg>`.replace(
     /\s+/g,
     ' '
   );
@@ -24,7 +25,7 @@ export function bynSymbolDataUrlForCss(): string {
 }
 
 const SVG_INNER_CURRENT = () =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 24" fill="none" aria-hidden="true" focusable="false"><text x="0" y="16.4" fill="currentColor" font-size="16" font-weight="700" font-family="system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif">Б</text><line x1="0" y1="10.1" x2="8" y2="10.1" stroke="currentColor" stroke-width="1.45" stroke-linecap="square"/></svg>`.replace(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 26" fill="none" aria-hidden="true" focusable="false"><text x="0" y="18" fill="currentColor" font-size="19" font-weight="700" font-family="system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans',sans-serif" dominant-baseline="alphabetic">Б</text><line x1="0" y1="10" x2="9" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>`.replace(
     /\s+/g,
     ' '
   );

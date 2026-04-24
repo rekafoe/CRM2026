@@ -7,20 +7,6 @@ export const MINIAPP_CLIENT_PART_CALC_SUMMARY = `
     if (!isFinite(v)) return '—';
     return v.toFixed(2).replace('.', ',');
   }
-  function printSidesRuCalc() {
-    var p = parsePrintKey();
-    if (p.sides === 'duplex' || p.sides === 'duplex_bw_back') return 'двусторонняя';
-    if (p.sides === 'single') return 'односторонняя';
-    return String(p.sides || '—');
-  }
-  function priceTypeLabelCalc() {
-    var pts = calcAllowedPriceTypes();
-    var k = String(out.calcForm.priceType || '');
-    for (var i = 0; i < pts.length; i++) {
-      if (String(pts[i].key) === k) return String(pts[i].label || k);
-    }
-    return k || '';
-  }
   function appendCalcResultSummaryUI(container, r) {
     var card = h('div', '', 'ipc-calc-card');
     var line1 = h('div', '', 'ipc-calc-card__line');
@@ -41,37 +27,6 @@ export const MINIAPP_CLIENT_PART_CALC_SUMMARY = `
     line2.appendChild(valSub);
     card.appendChild(line2);
     container.appendChild(card);
-    var detP = document.createElement('details');
-    detP.className = 'ipc-calc-details';
-    var smP = document.createElement('summary');
-    smP.textContent = 'Параметры';
-    detP.appendChild(smP);
-    var bodyP = h('div', '', 'ipc-calc-details__body');
-    var q0 = r.quantity != null ? r.quantity : '—';
-    bodyP.appendChild(h('p', 'Количество: ' + q0 + ' шт.', 'hint ipc-calc-line'));
-    bodyP.appendChild(h('p', 'Стороны: ' + printSidesRuCalc(), 'hint ipc-calc-line'));
-    var ptl0 = priceTypeLabelCalc();
-    if (ptl0) bodyP.appendChild(h('p', 'Тип цены: ' + ptl0, 'hint ipc-calc-line'));
-    var params = buildCalcCartParams();
-    var sum = params && Array.isArray(params.parameterSummary) ? params.parameterSummary : [];
-    for (var si = 0; si < sum.length; si++) {
-      var it = sum[si];
-      if (!it || it.label == null || it.label === '') continue;
-      bodyP.appendChild(
-        h('p', esc(String(it.label)) + ': ' + esc(String(it.value != null ? it.value : '')), 'hint ipc-calc-line')
-      );
-    }
-    var lay = r.layout || {};
-    var ips = lay.itemsPerSheet != null ? lay.itemsPerSheet : (r.itemsPerSheet != null ? r.itemsPerSheet : null);
-    var sh = lay.sheetsNeeded != null ? lay.sheetsNeeded : (r.sheetsNeeded != null ? r.sheetsNeeded : null);
-    if (ips != null || sh != null) {
-      var parts = [];
-      if (sh != null) parts.push('листов: ' + sh);
-      if (ips != null) parts.push('на листе: ' + ips + ' шт.');
-      bodyP.appendChild(h('p', 'Раскладка: ' + parts.join(', '), 'hint ipc-calc-line'));
-    }
-    detP.appendChild(bodyP);
-    container.appendChild(detP);
     if (r.tier_prices && r.tier_prices.length) {
       var det = document.createElement('details');
       det.className = 'ipc-calc-tiers';
