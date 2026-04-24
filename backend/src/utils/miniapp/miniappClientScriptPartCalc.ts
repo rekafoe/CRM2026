@@ -178,6 +178,23 @@ export const MINIAPP_CLIENT_PART_CALC = `
     }
     return null;
   }
+  /** В compact-схеме: simplified.cutting === true — в продукте доступна резка (как в CRM). */
+  function calcCuttingFeatureEnabled() {
+    var s = calcSimp();
+    return !!(s && s.cutting === true);
+  }
+  /** В PrintCore резка не отключается: если в шаблоне включена (simplified.cutting), всегда как в CRM с включённой «Резка». */
+  function syncCalcFormCuttingFromTypeDefaults() {
+    if (!calcCuttingFeatureEnabled()) {
+      out.calcForm.cutting = false;
+      out.calcForm.cuttingRequired = false;
+      return;
+    }
+    out.calcForm.cutting = true;
+    var cfg = getTypeConfigForCurrentSubtype();
+    var init = cfg && cfg.initial;
+    out.calcForm.cuttingRequired = !!(init && init.cutting_required);
+  }
   function calcAllowedPriceTypesRaw() {
     var s = calcSimp();
     if (!s) return [];
@@ -248,6 +265,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
       out.calcForm.priceType = '';
     }
     if (!out.calcForm.qty || out.calcForm.qty < 1) out.calcForm.qty = 100;
+    syncCalcFormCuttingFromTypeDefaults();
   }
   var _calcDebounceT = null;
   function scheduleCalcRun() {
@@ -275,6 +293,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     if (p.priceType) out.calcForm.priceType = String(p.priceType);
     syncCalcFormMatPaperKey(calcMaterials());
     ensurePrintKeyMatchesOptions();
+    syncCalcFormCuttingFromTypeDefaults();
     var allowedPts = calcAllowedPriceTypes();
     if (allowedPts.length > 0) {
       var selectedPt = String(out.calcForm.priceType || '').trim();
@@ -306,7 +325,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     out.calcErr = null;
     out.calcResult = null;
     out.calcStagedLayout = out.checkoutFileByK && out.checkoutFileByK[c.k] ? out.checkoutFileByK[c.k] : null;
-    out.calcForm = { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '' };
+    out.calcForm = { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '', cutting: false, cuttingRequired: false };
     out.view = 'calculator';
     loadCalcSchema();
   }
@@ -434,6 +453,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     if (out.calcForm.matId != null) pl.material_id = out.calcForm.matId;
     if (out.calcForm.typeId != null) pl.type_id = out.calcForm.typeId;
     if (out.calcForm.priceType) pl.priceType = out.calcForm.priceType;
+    if (out.calcForm.cutting) pl.cutting = true;
     return pl;
   }
   function runCalc(opts) {
@@ -568,7 +588,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
         try { delete out.checkoutFileByK[re]; } catch (e) {}
       }
     }
-    var k = 'cx' + out.calcPid + '-' + String(out.calcForm.typeId) + '-' + String(out.calcForm.sizeId) + '-' + String(out.calcForm.matId) + '-' + String(out.calcForm.printKey);
+    var k = 'cx' + out.calcPid + '-' + String(out.calcForm.typeId) + '-' + String(out.calcForm.sizeId) + '-' + String(out.calcForm.matId) + '-' + String(out.calcForm.printKey) + '-c' + (out.calcForm.cutting ? '1' : '0');
     var name = (out.calcName || 'Товар') + ' (кальк.)';
     var found = -1;
     for (var i = 0; i < out.cart.length; i++) { if (out.cart[i].k === k) { found = i; break; } }
@@ -835,6 +855,27 @@ export const MINIAPP_CLIENT_PART_CALC = `
         accF.appendChild(buildPriceTypeHelpAccordion());
         form.appendChild(accF);
       }
+    }
+    if (calcCuttingFeatureEnabled()) {
+      var cutField = h('div', '', 'field ipc-field--price-type');
+      cutField.appendChild(h('div', 'Дополнительно', 'ipc-price-type__fieldtitle'));
+      var cutLab = document.createElement('label');
+      cutLab.className = 'ipc-design-help';
+      var cutCb = document.createElement('input');
+      cutCb.type = 'checkbox';
+      cutCb.checked = true;
+      cutCb.disabled = true;
+      cutCb.setAttribute('aria-label', 'Резка учитывается в цене');
+      cutLab.appendChild(cutCb);
+      cutLab.appendChild(
+        document.createTextNode(
+          out.calcForm.cuttingRequired
+            ? ' Резка обязательна для этого варианта — учтена в расчёте'
+            : ' Резка по раскладке — учтена в расчёте (отключить нельзя)'
+        )
+      );
+      cutField.appendChild(cutLab);
+      form.appendChild(cutField);
     }
     var qi = document.createElement('input');
     qi.name = 'q';
