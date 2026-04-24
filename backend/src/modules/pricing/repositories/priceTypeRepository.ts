@@ -49,6 +49,32 @@ export class PriceTypeRepository {
     return row ? mapRow(row) : null;
   }
 
+  /**
+   * Подписи и описания для compact-схемы калькулятора (ключи из шаблона → человеко-читаемое имя из БД).
+   */
+  static async mapByKeys(keys: string[]): Promise<Record<string, { name: string; description: string | null }>> {
+    const uniq = [...new Set(keys.map((k) => String(k).trim()).filter(Boolean))];
+    if (uniq.length === 0) return {};
+    const db = await getDb();
+    const ph = uniq.map(() => '?').join(',');
+    const rows = await db.all<{
+      key: string;
+      name: string;
+      description: string | null;
+    }>(
+      `SELECT key, name, description FROM price_types WHERE key IN (${ph})`,
+      ...uniq
+    );
+    const out: Record<string, { name: string; description: string | null }> = {};
+    const list = Array.isArray(rows) ? rows : [];
+    for (const r of list) {
+      if (r?.key) {
+        out[r.key] = { name: String(r.name || r.key), description: r.description != null && String(r.description).trim() ? r.description : null };
+      }
+    }
+    return out;
+  }
+
   static async create(payload: CreatePriceTypeDTO): Promise<PriceTypeDTO> {
     const db = await getDb();
     const key = String(payload.key ?? '').trim().toLowerCase();

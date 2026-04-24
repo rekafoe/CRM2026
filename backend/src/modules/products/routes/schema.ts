@@ -10,6 +10,7 @@ import {
   collectMaterialIdsFromSimplified,
   collectServiceIdsFromSimplified,
   collectTierBoundariesFromSimplified,
+  collectPriceTypeKeysFromSimplified,
   extractTierPricesFromSimplified,
   parseParameterOptions,
   loadPrintTechnologies,
@@ -17,6 +18,7 @@ import {
 } from './helpers';
 import { syncSimplifiedOperations } from './configs';
 import { PricingServiceRepository } from '../../pricing/repositories/serviceRepository';
+import { PriceTypeRepository } from '../../pricing/repositories/priceTypeRepository';
 
 const router = Router();
 
@@ -466,11 +468,18 @@ router.get('/:productId/schema', async (req, res) => {
     if (isCompact) {
       const compactSimplified = compactSimplifiedForSite(schema.template.simplified);
       const materialIds = collectMaterialIdsFromSimplified(schema.template.simplified);
-      let compactMaterials: Array<{ id: number; name: string; density?: number; paper_type_name?: string; unit?: string }> = [];
+      let compactMaterials: Array<{
+        id: number;
+        name: string;
+        density?: number;
+        paper_type_id?: number;
+        paper_type_name?: string;
+        unit?: string;
+      }> = [];
       if (materialIds.length > 0) {
         const placeholders = materialIds.map(() => '?').join(',');
         const rows = await db.all<any>(
-          `SELECT m.id, m.name, m.density, m.unit, pt.display_name as paper_type_name
+          `SELECT m.id, m.name, m.density, m.unit, m.paper_type_id, pt.display_name as paper_type_name
            FROM materials m
            LEFT JOIN paper_types pt ON pt.id = m.paper_type_id
            WHERE m.id IN (${placeholders}) AND m.is_active = 1`,
@@ -480,6 +489,9 @@ router.get('/:productId/schema', async (req, res) => {
           id: r.id,
           name: r.name,
           ...(r.density != null ? { density: r.density } : {}),
+          ...(r.paper_type_id != null && Number.isFinite(Number(r.paper_type_id))
+            ? { paper_type_id: Number(r.paper_type_id) }
+            : {}),
           ...(r.paper_type_name ? { paper_type_name: r.paper_type_name } : {}),
           ...(r.unit ? { unit: r.unit } : {}),
         }));
@@ -511,6 +523,26 @@ router.get('/:productId/schema', async (req, res) => {
         }
       }
       const tierBoundaries = collectTierBoundariesFromSimplified(schema.template.simplified);
+      const priceTypeKeyList = collectPriceTypeKeysFromSimplified(
+        schema.template.simplified,
+        schema.constraints.allowed_price_types
+      );
+      let priceTypeInfo: Record<string, { name: string; description?: string }> = {};
+      if (priceTypeKeyList.length > 0) {
+        try {
+          const fromDb = await PriceTypeRepository.mapByKeys(priceTypeKeyList);
+          for (const k of Object.keys(fromDb)) {
+            const v = fromDb[k];
+            if (!v) continue;
+            priceTypeInfo[k] = {
+              name: v.name,
+              ...(v.description ? { description: v.description } : {}),
+            };
+          }
+        } catch (err) {
+          logger.warn('[schema] price_types for compact', { error: (err as Error).message });
+        }
+      }
       // Для simplified продуктов в compact — только allowed_price_types (остальное не используется)
       const hasSimplified = !!(schema.template.simplified?.sizes?.length || schema.template.simplified?.typeConfigs);
       const compactConstraints = hasSimplified
@@ -529,6 +561,7 @@ router.get('/:productId/schema', async (req, res) => {
         ...(compactMaterials.length > 0 ? { materials: compactMaterials } : {}),
         ...(Object.keys(serviceVariants).length > 0 ? { service_variants: serviceVariants } : {}),
         ...(tierBoundaries.length > 0 ? { tier_boundaries: tierBoundaries } : {}),
+        ...(Object.keys(priceTypeInfo).length > 0 ? { price_type_info: priceTypeInfo } : {}),
       };
       return res.json({ data: compactSchema, meta: { compact: true } });
     }

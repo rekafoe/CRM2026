@@ -54,6 +54,96 @@ export const MINIAPP_CLIENT_PART_CALC = `
     }
     return o.length > 0 ? o : list;
   }
+  function matHasPaperTypeInfo(m) {
+    if (!m || typeof m !== 'object') return false;
+    if (m.paper_type_id != null && String(m.paper_type_id).trim() !== '') return true;
+    if (m.paper_type_name != null && String(m.paper_type_name).trim() !== '') return true;
+    return false;
+  }
+  function shouldSplitMaterialSelects(list) {
+    if (!list || list.length <= 1) return false;
+    for (var i = 0; i < list.length; i++) {
+      if (matHasPaperTypeInfo(list[i])) return true;
+    }
+    return false;
+  }
+  function materialPaperGroupKey(m) {
+    if (m.paper_type_id != null && String(m.paper_type_id).trim() !== '') return 'pid:' + String(m.paper_type_id);
+    if (m.paper_type_name != null && String(m.paper_type_name).trim() !== '') return 'pnm:' + String(m.paper_type_name).trim();
+    return 'nopt';
+  }
+  function materialPaperGroupLabel(row) {
+    if (row.paper_type_name != null && String(row.paper_type_name).trim() !== '') return String(row.paper_type_name).trim();
+    return 'Прочее';
+  }
+  function materialDensityNum(m) {
+    if (m == null || m.density == null || m.density === '') return NaN;
+    var n = Number(m.density);
+    return isFinite(n) ? n : NaN;
+  }
+  function materialDensityOptionLabel(m) {
+    var n = materialDensityNum(m);
+    if (isFinite(n)) return String(Math.round(n)) + ' г/м²';
+    if (m.name != null && String(m.name).trim() !== '') return String(m.name).trim();
+    return '—';
+  }
+  function buildMaterialPaperGroups(list) {
+    var map = {};
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i];
+      var gk = materialPaperGroupKey(m);
+      if (!map[gk]) map[gk] = [];
+      map[gk].push(m);
+    }
+    var groups = [];
+    for (var k in map) {
+      if (!Object.prototype.hasOwnProperty.call(map, k)) continue;
+      var items = map[k].slice();
+      items.sort(function (a, b) {
+        var da = materialDensityNum(a);
+        var db = materialDensityNum(b);
+        if (isFinite(da) && isFinite(db) && da !== db) return da - db;
+        if (isFinite(da) && !isFinite(db)) return -1;
+        if (!isFinite(da) && isFinite(db)) return 1;
+        return String(a.id) < String(b.id) ? -1 : 1;
+      });
+      groups.push({ key: k, label: materialPaperGroupLabel(items[0]), items: items });
+    }
+    groups.sort(function (a, b) {
+      if (a.key === 'nopt' && b.key !== 'nopt') return 1;
+      if (a.key !== 'nopt' && b.key === 'nopt') return -1;
+      if (a.label < b.label) return -1;
+      if (a.label > b.label) return 1;
+      return 0;
+    });
+    return groups;
+  }
+  function findMaterialGroupByMatId(groups, matId) {
+    if (matId == null) return null;
+    for (var i = 0; i < groups.length; i++) {
+      var it = groups[i].items;
+      for (var j = 0; j < it.length; j++) {
+        if (String(it[j].id) === String(matId)) return groups[i];
+      }
+    }
+    return null;
+  }
+  function syncCalcFormMatPaperKey(mats) {
+    if (!shouldSplitMaterialSelects(mats)) {
+      out.calcForm.matPaperKey = null;
+      return;
+    }
+    var groups = buildMaterialPaperGroups(mats);
+    var g = findMaterialGroupByMatId(groups, out.calcForm.matId);
+    if (g) {
+      out.calcForm.matPaperKey = g.key;
+      return;
+    }
+    if (groups[0] && groups[0].items[0]) {
+      out.calcForm.matPaperKey = groups[0].key;
+      out.calcForm.matId = groups[0].items[0].id;
+    }
+  }
   function calcPrintOptions() {
     var sz = calcSelectedSize();
     if (!sz || !Array.isArray(sz.print_prices)) return [];
@@ -64,6 +154,12 @@ export const MINIAPP_CLIENT_PART_CALC = `
     var d = x.description != null ? x.description : (x.hint != null ? x.hint : (x.help != null ? x.help : (x.note != null ? x.note : '')));
     d = d != null ? String(d).trim() : '';
     return d;
+  }
+  /** Словарь из compact-схемы: key → { name, description? } из таблицы price_types. */
+  function calcPriceTypeInfo() {
+    var d = out.calcSchema && out.calcSchema.data;
+    if (!d || !d.price_type_info || typeof d.price_type_info !== 'object') return null;
+    return d.price_type_info;
   }
   function getSimplifiedTypeConfigMap() {
     var s = calcSimp();
@@ -97,18 +193,29 @@ export const MINIAPP_CLIENT_PART_CALC = `
   }
   function calcAllowedPriceTypes() {
     var raw = calcAllowedPriceTypesRaw();
+    var pti = calcPriceTypeInfo();
     var opts = [];
     for (var i = 0; i < raw.length; i++) {
       var x = raw[i];
       if (typeof x === 'string' || typeof x === 'number') {
         var k = String(x).trim();
-        if (k) opts.push({ key: k, label: k, description: '' });
+        if (!k) continue;
+        var sk = pti && pti[k] ? pti[k] : null;
+        var lab = (sk && sk.name) ? String(sk.name) : k;
+        var dsk = (sk && sk.description) ? String(sk.description) : '';
+        opts.push({ key: k, label: lab, description: dsk });
         continue;
       }
       if (x && typeof x === 'object') {
         var key = String(x.key || x.id || x.value || '').trim();
         if (!key) continue;
-        opts.push({ key: key, label: String(x.name || x.label || key), description: priceTypeEntryDescription(x) });
+        var ptk = pti && pti[key] ? pti[key] : null;
+        var tplDesc = priceTypeEntryDescription(x);
+        var fromDbName = ptk && ptk.name ? String(ptk.name) : '';
+        var fromDbDesc = ptk && ptk.description ? String(ptk.description) : '';
+        var labObj = fromDbName || String(x.name || x.label || x.title || key);
+        var descObj = tplDesc || fromDbDesc;
+        opts.push({ key: key, label: labObj, description: descObj });
       }
     }
     return opts;
@@ -118,7 +225,13 @@ export const MINIAPP_CLIENT_PART_CALC = `
     var sizes = calcSizes(out.calcForm.typeId);
     if (sizes[0]) out.calcForm.sizeId = sizes[0].id; else out.calcForm.sizeId = null;
     var mats = calcMaterials();
-    if (mats[0]) out.calcForm.matId = mats[0].id; else out.calcForm.matId = null;
+    if (mats[0]) {
+      out.calcForm.matId = mats[0].id;
+      syncCalcFormMatPaperKey(mats);
+    } else {
+      out.calcForm.matId = null;
+      out.calcForm.matPaperKey = null;
+    }
     var pp = calcPrintOptions();
     if (pp[0]) {
       out.calcForm.printKey = makePrintKeyFromRow(pp[0]);
@@ -450,7 +563,18 @@ export const MINIAPP_CLIENT_PART_CALC = `
     var sizes = calcSizes(calcPickTypeId());
     if (sizes.length > 0) {
       var ss = document.createElement('select');
-      ss.onchange = function () { out.calcForm.sizeId = ss.value ? (isNaN(+ss.value) ? ss.value : +ss.value) : null; var m = calcMaterials(); if (m[0]) out.calcForm.matId = m[0].id; var pp = calcPrintOptions(); if (pp[0]) out.calcForm.printKey = makePrintKeyFromRow(pp[0]); render(); scheduleCalcRun(); };
+      ss.onchange = function () {
+        out.calcForm.sizeId = ss.value ? (isNaN(+ss.value) ? ss.value : +ss.value) : null;
+        var m = calcMaterials();
+        if (m[0]) {
+          out.calcForm.matId = m[0].id;
+          syncCalcFormMatPaperKey(m);
+        } else { out.calcForm.matId = null; out.calcForm.matPaperKey = null; }
+        var pp = calcPrintOptions();
+        if (pp[0]) out.calcForm.printKey = makePrintKeyFromRow(pp[0]);
+        render();
+        scheduleCalcRun();
+      };
       for (var si = 0; si < sizes.length; si++) {
         var o1 = document.createElement('option');
         o1.value = String(sizes[si].id);
@@ -463,18 +587,79 @@ export const MINIAPP_CLIENT_PART_CALC = `
     }
     var matList = calcMaterials();
     if (matList.length > 0) {
-      var ms = document.createElement('select');
-      ms.onchange = function () { out.calcForm.matId = ms.value ? +ms.value : null; render(); scheduleCalcRun(); };
-      for (var mi = 0; mi < matList.length; mi++) {
-        var o2 = document.createElement('option');
-        o2.value = String(matList[mi].id);
-        o2.textContent = matList[mi].name || o2.value;
-        ms.appendChild(o2);
+      if (shouldSplitMaterialSelects(matList)) {
+        var grps = buildMaterialPaperGroups(matList);
+        if (!out.calcForm.matPaperKey) syncCalcFormMatPaperKey(matList);
+        var gcur = null;
+        for (var gix = 0; gix < grps.length; gix++) {
+          if (grps[gix].key === out.calcForm.matPaperKey) { gcur = grps[gix]; break; }
+        }
+        if (!gcur) { gcur = grps[0]; out.calcForm.matPaperKey = gcur.key; }
+        var inGrp = gcur.items;
+        var mOk = false;
+        for (var mx = 0; mx < inGrp.length; mx++) {
+          if (String(inGrp[mx].id) === String(out.calcForm.matId)) { mOk = true; break; }
+        }
+        if (!mOk && inGrp[0]) out.calcForm.matId = inGrp[0].id;
+        var pty = document.createElement('select');
+        pty.onchange = function () {
+          out.calcForm.matPaperKey = pty.value || null;
+          var gr2 = buildMaterialPaperGroups(matList);
+          var g2 = null;
+          for (var a = 0; a < gr2.length; a++) {
+            if (gr2[a].key === out.calcForm.matPaperKey) { g2 = gr2[a]; break; }
+          }
+          if (g2 && g2.items[0]) {
+            var prevD = null;
+            for (var b = 0; b < matList.length; b++) {
+              if (String(matList[b].id) === String(out.calcForm.matId)) { prevD = materialDensityNum(matList[b]); break; }
+            }
+            var pick = null;
+            if (isFinite(prevD)) {
+              for (var c = 0; c < g2.items.length; c++) {
+                if (materialDensityNum(g2.items[c]) === prevD) { pick = g2.items[c]; break; }
+              }
+            }
+            out.calcForm.matId = pick ? pick.id : g2.items[0].id;
+          }
+          render();
+          scheduleCalcRun();
+        };
+        for (var pi = 0; pi < grps.length; pi++) {
+          var po = document.createElement('option');
+          po.value = grps[pi].key;
+          po.textContent = grps[pi].label;
+          pty.appendChild(po);
+        }
+        pty.value = gcur.key;
+        addField(form, 'Тип материала', pty);
+        var dns = document.createElement('select');
+        dns.onchange = function () { out.calcForm.matId = dns.value ? +dns.value : null; render(); scheduleCalcRun(); };
+        for (var di = 0; di < inGrp.length; di++) {
+          var dopt = document.createElement('option');
+          dopt.value = String(inGrp[di].id);
+          dopt.textContent = materialDensityOptionLabel(inGrp[di]);
+          dns.appendChild(dopt);
+        }
+        if (out.calcForm.matId != null) dns.value = String(out.calcForm.matId);
+        if (out.calcForm.matId == null && inGrp[0]) out.calcForm.matId = inGrp[0].id;
+        if (out.calcForm.matId != null) dns.value = String(out.calcForm.matId);
+        addField(form, 'Плотность', dns);
+      } else {
+        out.calcForm.matPaperKey = null;
+        var ms = document.createElement('select');
+        ms.onchange = function () { out.calcForm.matId = ms.value ? +ms.value : null; render(); scheduleCalcRun(); };
+        for (var mi = 0; mi < matList.length; mi++) {
+          var o2 = document.createElement('option');
+          o2.value = String(matList[mi].id);
+          o2.textContent = matList[mi].name || o2.value;
+          ms.appendChild(o2);
+        }
+        if (out.calcForm.matId != null) ms.value = String(out.calcForm.matId);
+        if (out.calcForm.matId == null && matList[0]) out.calcForm.matId = matList[0].id;
+        if (out.calcForm.matId != null) ms.value = String(out.calcForm.matId);
+        addField(form, 'Материал', ms);
       }
-      if (out.calcForm.matId != null) ms.value = String(out.calcForm.matId);
-      if (out.calcForm.matId == null && matList[0]) out.calcForm.matId = matList[0].id;
-      if (out.calcForm.matId != null) ms.value = String(out.calcForm.matId);
-      addField(form, 'Материал', ms);
     }
     var pps = calcPrintOptions();
     if (pps.length > 0) {
@@ -530,36 +715,36 @@ export const MINIAPP_CLIENT_PART_CALC = `
         if (String(pts[pvi].key) === String(out.calcForm.priceType || '')) { ptpOk = true; break; }
       }
       if (!ptpOk && pts[0]) out.calcForm.priceType = pts[0].key;
-      var ptField = h('div', '', 'field ipc-field--price-type');
-      ptField.appendChild(h('div', 'Тип цены', 'ipc-price-type__fieldtitle'));
-      var ptRow = h('div', '', 'ipc-price-type__btns');
-      for (var pti = 0; pti < pts.length; pti++) {
-        (function (pt) {
-          var on = String(pt.key) === String(out.calcForm.priceType || '');
-          var b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'ipc-price-type__btn' + (on ? ' ipc-price-type__btn--on' : '');
-          b.setAttribute('aria-pressed', on ? 'true' : 'false');
-          b.textContent = pt.label;
-          b.onclick = function () {
-            out.calcForm.priceType = pt.key;
-            render();
-            scheduleCalcRun();
-          };
-          ptRow.appendChild(b);
-        })(pts[pti]);
-      }
-      ptField.appendChild(ptRow);
-      var curPh = '';
-      for (var hci = 0; hci < pts.length; hci++) {
-        if (String(pts[hci].key) === String(out.calcForm.priceType || '')) {
-          curPh = pts[hci].description || '';
-          break;
-        }
-      }
-      if (curPh) ptField.appendChild(h('p', esc(curPh), 'hint ipc-price-type__hint'));
-      form.appendChild(ptField);
       if (pts.length > 1) {
+        var ptField = h('div', '', 'field ipc-field--price-type');
+        ptField.appendChild(h('div', 'Тип цены', 'ipc-price-type__fieldtitle'));
+        var ptRow = h('div', '', 'ipc-price-type__btns');
+        for (var pti = 0; pti < pts.length; pti++) {
+          (function (pt) {
+            var on = String(pt.key) === String(out.calcForm.priceType || '');
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'ipc-price-type__btn' + (on ? ' ipc-price-type__btn--on' : '');
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            b.textContent = pt.label;
+            b.onclick = function () {
+              out.calcForm.priceType = pt.key;
+              render();
+              scheduleCalcRun();
+            };
+            ptRow.appendChild(b);
+          })(pts[pti]);
+        }
+        ptField.appendChild(ptRow);
+        var curPh = '';
+        for (var hci = 0; hci < pts.length; hci++) {
+          if (String(pts[hci].key) === String(out.calcForm.priceType || '')) {
+            curPh = pts[hci].description || '';
+            break;
+          }
+        }
+        if (curPh) ptField.appendChild(h('p', esc(curPh), 'hint ipc-price-type__hint'));
+        form.appendChild(ptField);
         var accF = h('div', '', 'field ipc-field--price-type-help');
         accF.appendChild(buildPriceTypeHelpAccordion());
         form.appendChild(accF);

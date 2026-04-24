@@ -6,9 +6,9 @@
  * Рисуем знак вручную, а не через `<text>`:
  * WebView Telegram по-разному рендерит кириллическую "Б", из-за чего глиф "плывёт".
  */
-/** Сетка 6w×9h (1x = 1/9 высоты): гориз. штрих 4,5w внизу «Р»/Б, 1w толщ., у стебла слева. */
+/** Гориз. штрих как в `BynSymbol.tsx` (линия y=10.1), прямо под «окном»; длина ~4,5/6 ширины, 1u слева от стояка. */
 const SVG_INNER = (fillHex: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 24" fill="none" aria-hidden="true" focusable="false"><path d="M2 2.75H17V5.35H4.7V10.55H10.35C15.2 10.55 18 12.95 18 17.1C18 21.25 15.05 23.25 10.05 23.25H2V2.75ZM4.7 13.05V20.65H9.95C13.3 20.65 15.3 19.55 15.3 16.85C15.3 14.15 13.3 13.05 9.95 13.05H4.7Z" fill="${fillHex}"/><rect x="1.1" y="15.35" width="15.1" height="2.1" rx="0.2" fill="${fillHex}"/></svg>`.replace(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 24" fill="none" aria-hidden="true" focusable="false"><path d="M2 2.75H17V5.35H4.7V10.55H10.35C15.2 10.55 18 12.95 18 17.1C18 21.25 15.05 23.25 10.05 23.25H2V2.75ZM4.7 13.05V20.65H9.95C13.3 20.65 15.3 19.55 15.3 16.85C15.3 14.15 13.3 13.05 9.95 13.05H4.7Z" fill="${fillHex}"/><rect x="1.1" y="9.45" width="15.1" height="1.3" rx="0.15" fill="${fillHex}"/></svg>`.replace(
     /\s+/g,
     ' '
   );
@@ -29,7 +29,7 @@ export function bynSymbolDataUrlForCss(): string {
 }
 
 const SVG_INNER_CURRENT = () =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 24" fill="none" aria-hidden="true" focusable="false"><path d="M2 2.75H17V5.35H4.7V10.55H10.35C15.2 10.55 18 12.95 18 17.1C18 21.25 15.05 23.25 10.05 23.25H2V2.75ZM4.7 13.05V20.65H9.95C13.3 20.65 15.3 19.55 15.3 16.85C15.3 14.15 13.3 13.05 9.95 13.05H4.7Z" fill="currentColor"/><rect x="1.1" y="15.35" width="15.1" height="2.1" rx="0.2" fill="currentColor"/></svg>`.replace(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 24" fill="none" aria-hidden="true" focusable="false"><path d="M2 2.75H17V5.35H4.7V10.55H10.35C15.2 10.55 18 12.95 18 17.1C18 21.25 15.05 23.25 10.05 23.25H2V2.75ZM4.7 13.05V20.65H9.95C13.3 20.65 15.3 19.55 15.3 16.85C15.3 14.15 13.3 13.05 9.95 13.05H4.7Z" fill="currentColor"/><rect x="1.1" y="9.45" width="15.1" height="1.3" rx="0.15" fill="currentColor"/></svg>`.replace(
     /\s+/g,
     ' '
   );

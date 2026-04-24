@@ -459,6 +459,43 @@ export function collectMaterialIdsFromSimplified(simplified: any): number[] {
   return Array.from(ids);
 }
 
+/**
+ * Все уникальные ключи `price_types` из продукта и подтипов (строка или объект в allowed_price_types).
+ * Нужен для подстановки `name` из справочника в compact-схеме.
+ */
+export function collectPriceTypeKeysFromSimplified(
+  simplified: unknown,
+  productLevelKeys: string[] | null | undefined
+): string[] {
+  const s = new Set<string>();
+  const add = (k: string) => {
+    const t = String(k || '').trim();
+    if (t) s.add(t);
+  };
+  if (Array.isArray(productLevelKeys)) {
+    for (const k of productLevelKeys) add(String(k));
+  }
+  const sim = simplified as { typeConfigs?: Record<string, { allowed_price_types?: unknown }> } | null | undefined;
+  if (!sim?.typeConfigs || typeof sim.typeConfigs !== 'object') return Array.from(s);
+  for (const cfg of Object.values(sim.typeConfigs)) {
+    const arr = cfg?.allowed_price_types;
+    if (!Array.isArray(arr)) continue;
+    for (const x of arr) {
+      if (typeof x === 'string' || typeof x === 'number') add(String(x));
+      else if (x && typeof x === 'object') {
+        const key = String(
+          (x as { key?: string; id?: string; value?: string }).key ||
+            (x as { id?: string }).id ||
+            (x as { value?: string }).value ||
+            ''
+        ).trim();
+        if (key) add(key);
+      }
+    }
+  }
+  return Array.from(s);
+}
+
 /** Извлекает цены по тиражам из simplified: print_prices, material_prices (с tiers). Finishing — только service_id/variant_id, tiers подгружаются отдельно. */
 export function extractTierPricesFromSimplified(simplified: any): {
   tier_boundaries: number[];

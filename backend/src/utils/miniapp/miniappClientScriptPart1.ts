@@ -9,7 +9,7 @@ export const MINIAPP_CLIENT_PART1 = `
     cart: [], view: 'catalog', err: null, load: false, checkoutMsg: null, checkoutType: 'individual',
     checkoutLoading: false,
     calcPid: null, calcName: '', calcListItem: null, calcSchema: null, calcErr: null, calcLoading: false, calcResult: null,
-    calcForm: { typeId: null, sizeId: null, matId: null, qty: 100, printKey: '', priceType: '' },
+    calcForm: { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '' },
     orderDetailId: null, orderDetailData: null, orderDetailErr: null, orderDetailLoading: false,
     orderFileMsg: null, orderUploadLoading: false,
     postCheckoutNotice: null,
@@ -96,7 +96,7 @@ export const MINIAPP_CLIENT_PART1 = `
       out.calcErr = null;
       out.calcResult = null;
       out.calcStagedLayout = null;
-      out.calcForm = { typeId: null, sizeId: null, matId: null, qty: 100, printKey: '', priceType: '' };
+      out.calcForm = { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '' };
       out.view = 'calculator';
       if (typeof loadCalcSchema === 'function') loadCalcSchema();
       else { out.calcErr = 'Калькулятор не загружен'; render(); }
