@@ -171,10 +171,13 @@ app.use(
 app.use(
   '/miniapp-assets',
   express.static(miniappAssetsDir, {
-    fallthrough: true,
+    fallthrough: false,
     maxAge: '1h',
   })
 )
+app.get('/favicon.ico', (_req, res) => {
+  res.sendFile(path.join(miniappAssetsDir, 'favicon.ico'))
+})
 
 app.use(compressionMiddleware) // Сжатие ответов (не затрагивает маршруты выше)
 app.use(performanceMiddleware) // Мониторинг производительности
