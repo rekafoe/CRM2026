@@ -22,71 +22,61 @@ export const MINIAPP_CLIENT_PART_CALC_SUMMARY = `
     return k || '';
   }
   function appendCalcResultSummaryUI(container, r) {
-    var hero = h('div', '', 'ipc-calc-hero');
-    hero.appendChild(document.createTextNode('Стоимость: '));
-    var valWrap = h('span', '', 'ipc-calc-hero__amount');
-    valWrap.innerHTML = '<strong>' + esc(bynFormatNum(r.finalPrice)) + '</strong>' + bynSpanHtml();
-    hero.appendChild(valWrap);
-    container.appendChild(hero);
-    var row1 = h('div', '', 'ipc-calc-chips');
-    function addChipWithMoney(lab, n) {
-      var d = document.createElement('div');
-      d.className = 'ipc-calc-chip';
-      d.innerHTML = esc(lab) + bynFormatNum(n) + bynSpanHtml();
-      row1.appendChild(d);
+    var card = h('div', '', 'ipc-calc-card');
+    var line1 = h('div', '', 'ipc-calc-card__line');
+    line1.appendChild(h('span', 'Стоимость:', 'ipc-calc-card__label'));
+    var valLg = h('div', '', 'ipc-calc-card__value--lg');
+    valLg.innerHTML = '<span class="ipc-calc-card__sum">' + esc(bynFormatNum(r.finalPrice)) + '</span>' + bynSpanHtml();
+    line1.appendChild(valLg);
+    card.appendChild(line1);
+    card.appendChild(h('div', '', 'ipc-calc-card__sep'));
+    var line2 = h('div', '', 'ipc-calc-card__line ipc-calc-card__line--sub');
+    line2.appendChild(h('span', 'За 1 шт.', 'ipc-calc-card__label ipc-calc-card__label--sub'));
+    var valSub = h('div', '', 'ipc-calc-card__value--sub');
+    var ppu0 = r.pricePerUnit != null && isFinite(Number(r.pricePerUnit)) ? Number(r.pricePerUnit) : NaN;
+    if (!isFinite(ppu0) && r.finalPrice != null && r.quantity > 0) {
+      ppu0 = Number(r.finalPrice) / Number(r.quantity);
     }
-    addChipWithMoney('За штуку: ', r.pricePerUnit);
-    var dQty = document.createElement('div');
-    dQty.className = 'ipc-calc-chip';
-    dQty.textContent = 'Количество: ' + (r.quantity != null ? r.quantity : '—') + ' шт.';
-    row1.appendChild(dQty);
-    var dSides = document.createElement('div');
-    dSides.className = 'ipc-calc-chip';
-    dSides.textContent = 'Стороны: ' + printSidesRuCalc();
-    row1.appendChild(dSides);
-    var ptl = priceTypeLabelCalc();
-    if (ptl) {
-      var dPt = document.createElement('div');
-      dPt.className = 'ipc-calc-chip';
-      dPt.textContent = 'Тип цены: ' + ptl;
-      row1.appendChild(dPt);
-    }
-    container.appendChild(row1);
+    valSub.innerHTML = esc(bynFormatNum(isFinite(ppu0) ? ppu0 : NaN)) + bynSpanHtml();
+    line2.appendChild(valSub);
+    card.appendChild(line2);
+    container.appendChild(card);
+    var detP = document.createElement('details');
+    detP.className = 'ipc-calc-details';
+    var smP = document.createElement('summary');
+    smP.textContent = 'Параметры';
+    detP.appendChild(smP);
+    var bodyP = h('div', '', 'ipc-calc-details__body');
+    var q0 = r.quantity != null ? r.quantity : '—';
+    bodyP.appendChild(h('p', 'Количество: ' + q0 + ' шт.', 'hint ipc-calc-line'));
+    bodyP.appendChild(h('p', 'Стороны: ' + printSidesRuCalc(), 'hint ipc-calc-line'));
+    var ptl0 = priceTypeLabelCalc();
+    if (ptl0) bodyP.appendChild(h('p', 'Тип цены: ' + ptl0, 'hint ipc-calc-line'));
     var params = buildCalcCartParams();
     var sum = params && Array.isArray(params.parameterSummary) ? params.parameterSummary : [];
-    if (sum.length > 0) {
-      var row2 = h('div', '', 'ipc-calc-chips ipc-calc-chips--detail');
-      for (var si = 0; si < sum.length; si++) {
-        var it = sum[si];
-        if (!it || it.label == null || it.label === '') continue;
-        var chip = document.createElement('div');
-        chip.className = 'ipc-calc-chip ipc-calc-chip--kv';
-        var sl = document.createElement('span');
-        sl.className = 'ipc-calc-chip__lab';
-        sl.textContent = String(it.label) + ' ';
-        var sv = document.createElement('span');
-        sv.className = 'ipc-calc-chip__val';
-        sv.textContent = String(it.value != null ? it.value : '');
-        chip.appendChild(sl);
-        chip.appendChild(sv);
-        row2.appendChild(chip);
-      }
-      container.appendChild(row2);
+    for (var si = 0; si < sum.length; si++) {
+      var it = sum[si];
+      if (!it || it.label == null || it.label === '') continue;
+      bodyP.appendChild(
+        h('p', esc(String(it.label)) + ': ' + esc(String(it.value != null ? it.value : '')), 'hint ipc-calc-line')
+      );
     }
     var lay = r.layout || {};
     var ips = lay.itemsPerSheet != null ? lay.itemsPerSheet : (r.itemsPerSheet != null ? r.itemsPerSheet : null);
     var sh = lay.sheetsNeeded != null ? lay.sheetsNeeded : (r.sheetsNeeded != null ? r.sheetsNeeded : null);
     if (ips != null || sh != null) {
       var parts = [];
-      if (sh != null) parts.push('Листов: ' + sh);
-      if (ips != null) parts.push('На листе: ' + ips + ' шт.');
-      container.appendChild(h('div', '📄 ' + parts.join(' • '), 'ipc-calc-layout'));
+      if (sh != null) parts.push('листов: ' + sh);
+      if (ips != null) parts.push('на листе: ' + ips + ' шт.');
+      bodyP.appendChild(h('p', 'Раскладка: ' + parts.join(', '), 'hint ipc-calc-line'));
     }
+    detP.appendChild(bodyP);
+    container.appendChild(detP);
     if (r.tier_prices && r.tier_prices.length) {
       var det = document.createElement('details');
       det.className = 'ipc-calc-tiers';
       var sm = document.createElement('summary');
-      sm.textContent = 'Тиражные скидки';
+      sm.textContent = 'Тиражные скидки (за ед.)';
       det.appendChild(sm);
       var tb = h('div', '', 'ipc-calc-tiers__body');
       for (var ti = 0; ti < r.tier_prices.length; ti++) {

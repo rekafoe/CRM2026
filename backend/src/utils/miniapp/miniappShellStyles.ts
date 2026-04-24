@@ -2,15 +2,14 @@
  * Стили оболочки Telegram Mini App (inline в HTML).
  * Визуально согласованы с ProductManagement.css (/adminpanel/products).
  */
-import { bynSymbolDataUrlForCss } from '../byCurrencyBYN';
+import { getMiniappMapAndBynShellCss } from './miniappShellStylesMap';
 
-const _bynU = JSON.stringify(bynSymbolDataUrlForCss());
-
-export const MINIAPP_SHELL_CSS = `
+const MINIAPP_SHELL_CSS_BASE = `
     :root {
       --ipc-radius: 16px;
       --ipc-border: #e2e8f0;
-      --ipc-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      --ipc-sep: var(--tg-theme-section-separator-color, rgba(120, 120, 120, 0.28));
+      --ipc-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
       --ipc-slate-900: #0f172a;
       --ipc-slate-500: #64748b;
       --ipc-slate-600: #475569;
@@ -19,10 +18,12 @@ export const MINIAPP_SHELL_CSS = `
     body {
       font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       margin: 0;
-      padding: 16px 16px 96px;
+      /* Запас под плавающую навигацию + safe area + iPhone home indicator */
+      padding: 16px 16px calc(128px + env(safe-area-inset-bottom, 0px) + 12px);
       min-height: 100vh;
       background: var(--tg-theme-bg-color, #f8fafc);
       color: var(--tg-theme-text-color, var(--ipc-slate-900));
+      -webkit-tap-highlight-color: transparent;
       animation: ipcFadeIn 0.35s ease-out;
     }
     @keyframes ipcFadeIn {
@@ -37,7 +38,7 @@ export const MINIAPP_SHELL_CSS = `
       margin-bottom: 20px;
       padding: 16px 20px;
       background: var(--tg-theme-secondary-bg-color, #fff);
-      border: 1px solid var(--ipc-border);
+      border: 1px solid var(--ipc-sep, var(--ipc-border));
       border-radius: var(--ipc-radius);
       box-shadow: var(--ipc-shadow);
     }
@@ -46,8 +47,8 @@ export const MINIAPP_SHELL_CSS = `
       width: 48px; height: 48px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       font-size: 22px;
-      background: #f1f5f9;
-      border: 2px solid var(--ipc-border);
+      background: var(--tg-theme-bg-color, #f1f5f9);
+      border: 2px solid var(--ipc-sep, var(--ipc-border));
       border-radius: 12px;
     }
     .ipc-pm-header__title {
@@ -61,18 +62,19 @@ export const MINIAPP_SHELL_CSS = `
     .ipc-pm-header__sub {
       margin: 4px 0 0;
       font-size: 13px;
-      color: var(--ipc-slate-500);
+      color: var(--tg-theme-hint-color, var(--ipc-slate-500));
       line-height: 1.35;
     }
     #miniapp-main { min-height: 40vh; }
     .miniapp-nav {
       position: fixed; left: 0; right: 0; bottom: 0;
+      z-index: 5;
       display: flex; gap: 8px;
-      padding: 10px 12px;
-      padding-bottom: max(10px, env(safe-area-inset-bottom));
-      background: rgba(255, 255, 255, 0.96);
-      border-top: 1px solid var(--ipc-border);
-      box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.06);
+      /* Поднять панель над home indicator: safe area + запас 14px */
+      padding: 10px 12px calc(16px + env(safe-area-inset-bottom, 0px) + 14px);
+      background: var(--tg-theme-secondary-bg-color, rgba(255, 255, 255, 0.98));
+      border-top: 1px solid var(--ipc-sep, var(--ipc-border));
+      box-shadow: 0 -4px 28px rgba(0, 0, 0, 0.15);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
     }
@@ -84,21 +86,18 @@ export const MINIAPP_SHELL_CSS = `
       letter-spacing: 0.02em;
       border-radius: 999px;
       cursor: pointer;
-      border: 1px solid rgba(209, 213, 219, 0.6);
-      background: rgba(229, 231, 235, 0.88);
-      color: #1f2937;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--ipc-sep, rgba(120, 120, 120, 0.3));
+      background: var(--tg-theme-bg-color, rgba(128, 128, 128, 0.1));
+      color: var(--tg-theme-text-color, #1f2937);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
       transition: all 0.2s ease;
     }
-    .tab:hover { background: rgba(229, 231, 235, 0.95); border-color: rgba(255, 255, 255, 0.5); }
+    .tab:hover { filter: brightness(1.05); }
     .tab-on {
-      background: rgba(59, 130, 246, 0.28);
-      border-color: rgba(59, 130, 246, 0.45);
-      color: #1d4ed8;
+      background: rgba(59, 130, 246, 0.3);
+      border-color: rgba(59, 130, 246, 0.55);
+      color: var(--tg-theme-link-color, #60a5fa);
       font-weight: 600;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(37, 99, 235, 0.12);
     }
     .section { margin-bottom: 8px; }
     .section-head {
@@ -108,20 +107,20 @@ export const MINIAPP_SHELL_CSS = `
       color: var(--tg-theme-text-color, var(--ipc-slate-900));
       letter-spacing: -0.02em;
     }
-    .hint { color: var(--ipc-slate-500); font-size: 13px; line-height: 1.45; }
-    .line { font-size: 15px; margin: 6px 0; color: #334155; }
+    .hint { color: var(--tg-theme-hint-color, var(--ipc-slate-500)); font-size: 13px; line-height: 1.45; }
+    .line { font-size: 15px; margin: 6px 0; color: var(--tg-theme-text-color, #334155); }
     .card, .ipc-card {
       background: var(--tg-theme-secondary-bg-color, #fff);
       border-radius: var(--ipc-radius);
-      border: 1px solid var(--ipc-border);
+      border: 1px solid var(--ipc-sep, var(--ipc-border));
       box-shadow: var(--ipc-shadow);
     }
     .card { padding: 14px 16px; margin-bottom: 12px; }
     .ipc-card { padding: 14px 16px; }
-    .card-title { font-weight: 600; margin-bottom: 6px; line-height: 1.35; color: #1e293b; }
-    .card-price, .muted { font-size: 14px; color: var(--ipc-slate-500); }
+    .card-title { font-weight: 600; margin-bottom: 6px; line-height: 1.35; color: var(--tg-theme-text-color, #1e293b); }
+    .card-price, .muted { font-size: 14px; font-weight: 600; color: var(--tg-theme-text-color, var(--ipc-slate-500)); }
     .catalog-grid { display: flex; flex-direction: column; gap: 12px; }
-    .ipc-total { font-weight: 700; font-size: 1.05rem; padding: 14px 0 6px; color: var(--ipc-slate-900); }
+    .ipc-total { font-weight: 700; font-size: 1.05rem; padding: 14px 0 6px; color: var(--tg-theme-text-color, var(--ipc-slate-900)); }
     .ipc-result { margin-top: 14px; padding: 14px 16px; border-radius: var(--ipc-radius); }
     .row { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .primary {
@@ -131,16 +130,15 @@ export const MINIAPP_SHELL_CSS = `
       letter-spacing: 0.02em;
       border-radius: 999px;
       cursor: pointer;
-      border: 1px solid rgba(59, 130, 246, 0.45);
-      background: rgba(59, 130, 246, 0.22);
-      color: #1d4ed8;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.06);
-      backdrop-filter: blur(10px);
+      border: 1px solid rgba(59, 130, 246, 0.5);
+      background: rgba(59, 130, 246, 0.28);
+      color: var(--tg-theme-button-text-color, var(--tg-theme-link-color, #1d4ed8));
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       transition: all 0.2s ease;
     }
     .primary:hover:not(:disabled) {
-      background: rgba(59, 130, 246, 0.32);
-      border-color: rgba(59, 130, 246, 0.55);
+      background: rgba(59, 130, 246, 0.4);
+      border-color: rgba(59, 130, 246, 0.65);
     }
     .primary:disabled { opacity: 0.65; cursor: not-allowed; }
     .small {
@@ -150,14 +148,12 @@ export const MINIAPP_SHELL_CSS = `
       letter-spacing: 0.02em;
       border-radius: 999px;
       cursor: pointer;
-      border: 1px solid rgba(209, 213, 219, 0.6);
-      background: rgba(229, 231, 235, 0.88);
-      color: #1f2937;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
-      backdrop-filter: blur(10px);
+      border: 1px solid var(--ipc-sep, rgba(120, 120, 120, 0.3));
+      background: var(--tg-theme-bg-color, rgba(128, 128, 128, 0.12));
+      color: var(--tg-theme-text-color, #1f2937);
       transition: all 0.2s ease;
     }
-    .small:hover:not(:disabled) { background: rgba(229, 231, 235, 0.95); }
+    .small:hover:not(:disabled) { filter: brightness(1.05); }
     .danger {
       border-color: rgba(239, 68, 68, 0.45) !important;
       background: rgba(239, 68, 68, 0.18) !important;
@@ -167,36 +163,36 @@ export const MINIAPP_SHELL_CSS = `
       background: rgba(239, 68, 68, 0.28) !important;
       border-color: rgba(239, 68, 68, 0.55) !important;
     }
-    .total { font-weight: 600; margin: 10px 0; color: var(--ipc-slate-900); }
+    .total { font-weight: 600; margin: 10px 0; color: var(--tg-theme-text-color, var(--ipc-slate-900)); }
     .okmsg { color: #15803d; font-size: 14px; }
     .form .field { margin-bottom: 12px; }
-    .form label { display: block; font-size: 13px; font-weight: 500; color: var(--ipc-slate-600); }
+    .form label { display: block; font-size: 13px; font-weight: 500; color: var(--tg-theme-hint-color, var(--ipc-slate-600)); }
     .form input, .form textarea, .form select {
       width: 100%;
       margin-top: 6px;
       padding: 10px 14px;
       border-radius: 10px;
-      border: 1px solid var(--ipc-border);
+      border: 1px solid var(--ipc-sep, var(--ipc-border));
       font: inherit;
-      background: #f8fafc;
-      color: var(--ipc-slate-900);
+      background: var(--tg-theme-bg-color, #f8fafc);
+      color: var(--tg-theme-text-color, var(--ipc-slate-900));
       transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
     }
     .form input:focus, .form textarea:focus, .form select:focus {
       outline: none;
       border-color: #64748b;
-      box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.1);
-      background: #fff;
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+      background: var(--tg-theme-secondary-bg-color, #fff);
     }
     .form input[type="file"] {
-      border: 1px dashed #cbd5e1;
+      border: 1px dashed var(--ipc-sep, #cbd5e1);
       padding: 10px;
       font-size: 13px;
-      background: #fff;
+      background: var(--tg-theme-bg-color, #fff);
     }
     .ipc-panel {
-      background: #fff;
-      border: 1px solid var(--ipc-border);
+      background: var(--tg-theme-secondary-bg-color, #fff);
+      border: 1px solid var(--ipc-sep, var(--ipc-border));
       border-radius: var(--ipc-radius);
       box-shadow: var(--ipc-shadow);
       overflow: hidden;
@@ -205,11 +201,11 @@ export const MINIAPP_SHELL_CSS = `
     .ipc-list { display: flex; flex-direction: column; }
     .ipc-list__row {
       padding: 14px 16px;
-      border-bottom: 1px solid #f1f5f9;
+      border-bottom: 1px solid var(--ipc-sep, #f1f5f9);
       transition: background 0.15s ease;
     }
     .ipc-list__row:last-child { border-bottom: none; }
-    .ipc-list__row:hover { background: #f8fafc; }
+    .ipc-list__row:hover { background: var(--tg-theme-bg-color, #f8fafc); }
     .ipc-list__row-top {
       display: flex;
       justify-content: space-between;
@@ -219,13 +215,13 @@ export const MINIAPP_SHELL_CSS = `
     .ipc-list__title {
       font-size: 15px;
       font-weight: 600;
-      color: var(--ipc-slate-900);
+      color: var(--tg-theme-text-color, var(--ipc-slate-900));
       line-height: 1.3;
     }
-    .ipc-list__meta { font-size: 13px; color: var(--ipc-slate-500); margin-top: 4px; }
+    .ipc-list__meta { font-size: 13px; color: var(--tg-theme-hint-color, var(--ipc-slate-500)); margin-top: 4px; }
     .ipc-list__actions { margin-top: 12px; display: flex; justify-content: flex-end; }
     .ipc-list__actions--wide .primary { width: 100%; justify-content: center; }
-    .ipc-list__row-summary { font-size: 14px; color: #334155; line-height: 1.4; flex: 1; min-width: 0; }
+    .ipc-list__row-summary { font-size: 14px; color: var(--tg-theme-text-color, #334155); line-height: 1.4; flex: 1; min-width: 0; }
     .ipc-chip {
       display: inline-flex;
       align-items: center;
@@ -234,9 +230,9 @@ export const MINIAPP_SHELL_CSS = `
       border-radius: 20px;
       font-size: 12px;
       font-weight: 600;
-      border: 1px solid #e2e8f0;
-      background: #f8fafc;
-      color: #334155;
+      border: 1px solid var(--ipc-sep, #e2e8f0);
+      background: var(--tg-theme-bg-color, #f8fafc);
+      color: var(--tg-theme-text-color, #334155);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -250,60 +246,10 @@ export const MINIAPP_SHELL_CSS = `
     .ipc-empty {
       text-align: center;
       padding: 36px 20px;
-      color: #94a3b8;
+      color: var(--tg-theme-hint-color, #94a3b8);
       font-size: 14px;
       line-height: 1.5;
     }
-    .catalog-grid.ipc-catalog-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-    }
-    @media (min-width: 420px) {
-      .catalog-grid.ipc-catalog-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-    }
-    .ipc-catalog-card {
-      margin-bottom: 0;
-      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-    }
-    .ipc-catalog-card:hover {
-      border-color: #94a3b8;
-      box-shadow: 0 4px 16px rgba(71, 85, 105, 0.1);
-      transform: translateY(-1px);
-    }
-    .ipc-catalog-card__title { margin-bottom: 8px; }
-    .ipc-catalog-card__media {
-      display: flex; align-items: center; justify-content: center;
-      min-height: 100px; max-height: 140px; margin: 0 0 8px; border-radius: 10px;
-      background: #f1f5f9; overflow: hidden;
-    }
-    .ipc-catalog-card__media--empty { min-height: 80px; }
-    .ipc-catalog-card__img { max-width: 100%; max-height: 130px; object-fit: contain; display: block; }
-    .ipc-catalog-card__desc {
-      font-size: 12px; line-height: 1.4; color: var(--ipc-slate-500); margin: 0 0 8px;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-    }
-    .ipc-catalog-card__btn { width: 100%; box-sizing: border-box; }
-    .ipc-subhead {
-      font-size: 0.95rem;
-      font-weight: 700;
-      margin: 20px 0 10px;
-      color: var(--ipc-slate-900);
-      letter-spacing: -0.02em;
-    }
-    .ipc-detail-block {
-      padding: 14px 16px;
-    }
-    .ipc-detail-block .ipc-result { margin-top: 0; }
-    .ipc-list__row--cart .row { margin-top: 0; }
-    h2.section-head, h3.section-head { margin-top: 0; }
-    .ipc-byn {
-      display: inline-block; width: 0.9em; height: 1.05em; margin-left: 0.12em; vertical-align: -0.1em;
-      background: no-repeat center center / contain; background-image: url(${_bynU});
-    }
-    .ipc-design-help-row { margin: 10px 0; }
-    .ipc-design-help { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.4; color: #334155; cursor: pointer; }
-    .ipc-design-help input { margin-top: 2px; flex-shrink: 0; }
-    .ipc-checkout-design-note, .ipc-checkout-design-hint { line-height: 1.45; }
-    .ipc-checkout-validate { color: #b91c1c; font-weight: 500; }
 `;
+
+export const MINIAPP_SHELL_CSS = MINIAPP_SHELL_CSS_BASE + getMiniappMapAndBynShellCss();

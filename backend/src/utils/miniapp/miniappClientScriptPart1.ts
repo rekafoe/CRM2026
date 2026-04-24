@@ -1,6 +1,8 @@
 /**
  * Продолжение inline-скрипта Mini App (часть 1 / 2) — с начала IIFE до renderOrders.
  */
+import { bynIconInlineSpanHtmlForMiniapp } from '../byCurrencyBYN';
+
 export const MINIAPP_CLIENT_PART1 = `
   var out = {
     token: null, me: null, products: null, productErr: null, orders: null, ordersErr: null,
@@ -24,7 +26,7 @@ export const MINIAPP_CLIENT_PART1 = `
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
   function bynSpanHtml() {
-    return ' <span class="ipc-byn" role="img" aria-label="бел. руб."></span>';
+    return ${JSON.stringify(bynIconInlineSpanHtmlForMiniapp())};
   }
   function h(tag, inner, cl) {
     var e = document.createElement(tag);

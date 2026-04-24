@@ -397,6 +397,19 @@ export const MINIAPP_CLIENT_PART_CALC = `
     qi.value = String(out.calcForm.qty);
     qi.oninput = qi.onchange = function () { out.calcForm.qty = Math.max(1, parseInt(qi.value, 10) || 1); scheduleCalcRun(); };
     addField(form, 'Тираж (шт.)', qi);
+    var dhRow = h('div', '', 'field ipc-design-help-row');
+    var dhLabel = h('label', '', 'ipc-design-help');
+    var dhIn = document.createElement('input');
+    dhIn.type = 'checkbox';
+    dhIn.checked = !!out.checkoutDesignHelp;
+    dhIn.setAttribute('aria-label', 'Нет макета, нужна помощь с дизайном');
+    dhIn.onchange = function () { out.checkoutDesignHelp = !!dhIn.checked; out.checkoutMsg = null; };
+    dhLabel.appendChild(dhIn);
+    dhLabel.appendChild(
+      document.createTextNode(' Нет макета — требуется помощь с его разработкой')
+    );
+    dhRow.appendChild(dhLabel);
+    form.appendChild(dhRow);
     var layIn = document.createElement('input');
     layIn.type = 'file';
     layIn.setAttribute('accept', 'application/pdf,image/*,.doc,.docx,.xls,.xlsx');
