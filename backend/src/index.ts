@@ -1,4 +1,5 @@
 import express from 'express'
+import path from 'path'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import helmet from 'helmet'
@@ -37,6 +38,7 @@ if (!swaggerSpec) {
 dotenv.config()
 
 const app = express()
+const miniappAssetsDir = path.resolve(__dirname, '..', 'public', 'miniapp')
 
 function assertProductionSecurityEnv(): void {
   if (config.nodeEnv !== 'production') return
@@ -165,6 +167,13 @@ app.use(
   blockSensitiveStaticPath,
   asyncHandler(uploadsApiKeyMiddleware),
   express.static(uploadsDir)
+)
+app.use(
+  '/miniapp-assets',
+  express.static(miniappAssetsDir, {
+    fallthrough: true,
+    maxAge: '1h',
+  })
 )
 
 app.use(compressionMiddleware) // Сжатие ответов (не затрагивает маршруты выше)

@@ -4,6 +4,14 @@ import { normalizeWebsiteItems } from '../modules/orders/utils/websiteOrderNorma
 import { TelegramUserService } from './telegramUserService';
 import { setLastWebsiteOrderAt } from '../utils/poolSync';
 import { getDb } from '../config/database';
+import {
+  appendMiniappLayoutsPendingNote,
+  clearMiniappLayoutsPendingNote,
+} from '../utils/miniappOrderNotes';
+import {
+  MINIAPP_CHECKOUT_STATE_DRAFT,
+  MINIAPP_CHECKOUT_STATE_FINALIZED,
+} from '../utils/miniappCheckoutState';
 
 export type MiniappCustomerBody =
   | {
@@ -37,6 +45,8 @@ export type MiniappCheckoutBody = {
     order_notes?: string;
     /** Клиент отметил: макетов нет, нужна разработка дизайна (оценка отдельно). */
     design_help_requested?: boolean;
+    /** Число позиций, для которых клиент подготовил макеты до checkout. */
+    layout_item_count?: number;
   };
 };
 
@@ -237,57 +247,170 @@ async function ensureCustomerForChat(
   return created;
 }
 
-/**
- * Создание заказа из Mini App: клиент (ФЛ/ЮЛ) + позиции, source=mini_app.
- */
-export async function submitMiniappCheckout(telegramChatId: string, body: MiniappCheckoutBody) {
+function ensureMiniappCheckoutBody(body: MiniappCheckoutBody): void {
   if (!body?.order?.items || !Array.isArray(body.order.items) || body.order.items.length === 0) {
     const err = new Error('MINIAPP_ITEMS_REQUIRED');
-    (err as any).code = 'MINIAPP_ITEMS_REQUIRED';
+    (err as { code?: string }).code = 'MINIAPP_ITEMS_REQUIRED';
     throw err;
   }
   if (!body.customer || typeof body.customer !== 'object') {
     const err = new Error('MINIAPP_CUSTOMER_REQUIRED');
-    (err as any).code = 'MINIAPP_CUSTOMER_REQUIRED';
+    (err as { code?: string }).code = 'MINIAPP_CUSTOMER_REQUIRED';
     throw err;
   }
+}
 
+function buildMiniappOrderNotes(
+  orderNotesRaw: string | undefined,
+  designHelpRequested: boolean,
+  itemCount: number
+): string {
+  let orderNotes = String(orderNotesRaw || '').trim();
+  if (designHelpRequested) {
+    const mark =
+      '[Mini App] Клиент: нет макета, требуется помощь с разработкой дизайна. Указанная сумма — печать; стоимость дизайна согласуется отдельно.';
+    return orderNotes ? orderNotes + '\n\n' + mark : mark;
+  }
+  return appendMiniappLayoutsPendingNote(orderNotes, itemCount);
+}
+
+async function prepareMiniappCheckoutContext(telegramChatId: string, body: MiniappCheckoutBody) {
+  ensureMiniappCheckoutBody(body);
   const normalizedRaw = normalizeWebsiteItems(body.order.items);
   const normalized = await ensureMiniappItemsProductIds(normalizedRaw);
-
   const customerPayload = await enrichCustomerForMiniapp(telegramChatId, body.customer);
   const customer = await ensureCustomerForChat(telegramChatId, customerPayload);
   const { customerName, customerPhone, customerEmail } = orderContactFromCustomer(customer);
-
   const prepayment =
     body.order.prepaymentAmount != null && Number.isFinite(Number(body.order.prepaymentAmount))
       ? Number(body.order.prepaymentAmount)
       : undefined;
-
-  const result = await OrderService.createOrderWithAutoDeduction({
+  const designHelpRequested = !!body.order.design_help_requested;
+  return {
+    normalized,
+    customer,
     customerName,
     customerPhone,
     customerEmail,
-    prepaymentAmount: prepayment,
+    prepayment,
+    designHelpRequested,
+    orderNotes: buildMiniappOrderNotes(body.order.order_notes, designHelpRequested, normalized.length),
+  };
+}
+
+async function getOwnedMiniappOrderRow(telegramChatId: string, orderId: number) {
+  const db = await getDb();
+  return db.get<{
+    id: number;
+    number: string;
+    notes?: string | null;
+    miniapp_checkout_state?: string | null;
+    miniapp_design_help_requested?: number | null;
+  }>(
+    `SELECT id, number, notes, miniapp_checkout_state, miniapp_design_help_requested
+     FROM orders
+     WHERE id = ? AND telegram_chat_id = ?`,
+    [orderId, telegramChatId]
+  );
+}
+
+export async function createMiniappDraft(telegramChatId: string, body: MiniappCheckoutBody) {
+  const prepared = await prepareMiniappCheckoutContext(telegramChatId, body);
+  const result = await OrderService.createOrderWithItems({
+    customerName: prepared.customerName,
+    customerPhone: prepared.customerPhone,
+    customerEmail: prepared.customerEmail,
+    prepaymentAmount: prepared.prepayment,
     userId: undefined,
-    customer_id: customer.id,
+    customer_id: prepared.customer.id,
     source: 'mini_app',
-    telegramChatId: telegramChatId,
-    items: normalized,
+    telegramChatId,
+    miniappCheckoutState: MINIAPP_CHECKOUT_STATE_DRAFT,
+    miniappDesignHelpRequested: prepared.designHelpRequested,
+    items: prepared.normalized,
   });
 
-  let orderNotes = String(body.order.order_notes || '').trim();
-  if (body.order.design_help_requested) {
-    const mark =
-      '[Mini App] Клиент: нет макета, требуется помощь с разработкой дизайна. Указанная сумма — печать; стоимость дизайна согласуется отдельно.';
-    orderNotes = orderNotes ? orderNotes + '\n\n' + mark : mark;
-  }
-  if (orderNotes) {
-    await OrderService.updateOrderNotes(result.order.id, orderNotes, undefined);
+  if (prepared.orderNotes) {
+    await OrderService.updateOrderNotes(result.order.id, prepared.orderNotes, undefined);
   }
 
   setLastWebsiteOrderAt(Date.now());
   return result;
+}
+
+export async function finalizeMiniappDraft(telegramChatId: string, orderId: number) {
+  if (!Number.isFinite(orderId) || orderId < 1) {
+    const err = new Error('Заказ не найден');
+    (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_FOUND';
+    throw err;
+  }
+  const draftOrder = await getOwnedMiniappOrderRow(telegramChatId, orderId);
+  if (!draftOrder) {
+    const err = new Error('Заказ не найден');
+    (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_FOUND';
+    throw err;
+  }
+  if (
+    draftOrder.miniapp_checkout_state &&
+    String(draftOrder.miniapp_checkout_state) !== MINIAPP_CHECKOUT_STATE_DRAFT
+  ) {
+    const err = new Error('Этот заказ уже оформлен');
+    (err as { code?: string }).code = 'MINIAPP_ORDER_NOT_DRAFT';
+    throw err;
+  }
+
+  const db = await getDb();
+  const itemCountRow = await db.get<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM items WHERE orderId = ?',
+    [orderId]
+  );
+  const itemCount = Number(itemCountRow?.count) || 0;
+  const designHelpRequested = Number(draftOrder.miniapp_design_help_requested) === 1;
+  if (!designHelpRequested) {
+    const fileCountRow = await db.get<{ count: number }>(
+      `SELECT COUNT(DISTINCT orderItemId) AS count
+       FROM order_files
+       WHERE orderId = ? AND orderItemId IS NOT NULL`,
+      [orderId]
+    );
+    const uploadedForItems = Number(fileCountRow?.count) || 0;
+    if (uploadedForItems < itemCount) {
+      const err = new Error('Для каждой позиции нужен макет или включите помощь с разработкой дизайна');
+      (err as { code?: string }).code = 'MINIAPP_LAYOUT_FILES_REQUIRED';
+      throw err;
+    }
+  }
+
+  try {
+    await db.run('BEGIN');
+    const deductionResult = await OrderService.deductMaterialsForExistingOrder(orderId, undefined);
+    if (!deductionResult.success) {
+      const err = new Error(`Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`);
+      (err as { code?: string }).code = 'ORDER_AUTO_DEDUCTION_FAILED';
+      throw err;
+    }
+    await db.run(
+      'UPDATE orders SET miniapp_checkout_state = ? WHERE id = ?',
+      [MINIAPP_CHECKOUT_STATE_FINALIZED, orderId]
+    );
+    const nextNotes = designHelpRequested
+      ? String(draftOrder.notes || '').trim() || null
+      : clearMiniappLayoutsPendingNote(draftOrder.notes ?? null) || null;
+    await OrderService.updateOrderNotes(orderId, nextNotes, undefined);
+    await db.run('COMMIT');
+
+    const order = await db.get<{ id: number; number: string }>(
+      'SELECT id, number FROM orders WHERE id = ?',
+      [orderId]
+    );
+    return {
+      order,
+      deductionResult,
+    };
+  } catch (error) {
+    await db.run('ROLLBACK');
+    throw error;
+  }
 }
 
 export function mapMiniappCheckoutErrorToHttp(
@@ -310,6 +433,8 @@ export function mapMiniappCheckoutErrorToHttp(
     return { status: 400, body: { error: e.message, message: e.message } };
   }
   switch (c) {
+    case 'MINIAPP_ORDER_NOT_FOUND':
+      return { status: 404, body: { error: e.message, message: e.message } };
     case 'MINIAPP_PHONE_REQUIRED':
     case 'MINIAPP_NAME_REQUIRED':
     case 'MINIAPP_COMPANY_REQUIRED':
@@ -318,6 +443,8 @@ export function mapMiniappCheckoutErrorToHttp(
     case 'MINIAPP_CUSTOMER_REQUIRED':
     case 'MINIAPP_PRODUCT_ID_REQUIRED':
     case 'MINIAPP_PRODUCT_NOT_FOUND':
+    case 'MINIAPP_LAYOUT_FILES_REQUIRED':
+    case 'MINIAPP_ORDER_NOT_DRAFT':
       return { status: 400, body: { error: e.message, message: e.message } };
     default:
       return null;

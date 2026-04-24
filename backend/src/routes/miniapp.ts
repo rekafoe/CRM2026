@@ -10,8 +10,9 @@ const router = Router();
 
 router.post('/auth', authRateLimit, asyncHandler(MiniappAuthController.auth));
 router.get('/me', asyncHandler(MiniappAuthController.me));
-router.post('/checkout', asyncHandler(MiniappCheckoutController.checkout));
+router.post('/orders/draft', asyncHandler(MiniappCheckoutController.createDraft));
 router.get('/orders', asyncHandler(MiniappOrderController.list));
+router.post('/orders/:orderId/finalize', asyncHandler(MiniappCheckoutController.finalize));
 router.get(
   '/orders/:orderId/files/:fileId',
   asyncHandler(MiniappOrderController.downloadFile)

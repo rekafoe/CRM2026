@@ -1,16 +1,14 @@
-/**
- * Одностраничный Mini App: сессия, каталог, корзина, заказы, оформление.
- * Стили: `miniapp/miniappShellStyles.ts` (как /adminpanel/products).
- */
-import { getMiniappClientInlineScript } from './miniapp/miniappClientScript';
-import { MINIAPP_SHELL_CALC_SUMMARY_CSS } from './miniapp/miniappCalcSummaryStyles';
-import { MINIAPP_SHELL_CSS } from './miniapp/miniappShellStyles';
+import { MINIAPP_PRICE_TYPE_HELP_INNER_HTML } from './miniapp/miniappPriceTypeHelpInnerHtml';
 
 function escapeAttr(s: string): string {
   return s
     .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;')
     .replace(/</g, '&lt;');
+}
+
+function escapeInlineJson(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
 function isSafeOrgLogoUrlForMiniappHeader(url: string): boolean {
@@ -51,16 +49,20 @@ export function renderMiniappIndexHtml(
   options?: { catalogCategoryId?: number | null; organizationLogoUrl?: string | null }
 ): string {
   const base = apiBase.replace(/\/+$/, '');
-  const script = getMiniappClientInlineScript(base, options?.catalogCategoryId);
   const logo = miniappHeaderLogoBlock(options?.organizationLogoUrl, base);
+  const runtimeConfig = escapeInlineJson({
+    apiBase: base,
+    catalogCategoryId: options?.catalogCategoryId ?? null,
+    priceTypeHelpHtml: MINIAPP_PRICE_TYPE_HELP_INNER_HTML,
+  });
   return `<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Ваша онлайн-типография</title>
+  <link rel="stylesheet" href="/miniapp-assets/miniapp.css" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>${MINIAPP_SHELL_CSS}${MINIAPP_SHELL_CALC_SUMMARY_CSS}</style>
 </head>
 <body>
   <div class="miniapp-wrap">
@@ -75,7 +77,8 @@ export function renderMiniappIndexHtml(
     <div id="miniapp-main"></div>
   </div>
   <div id="miniapp-nav" class="miniapp-nav" aria-label="Навигация"></div>
-  <script>${script}</script>
+  <script>window.__MINIAPP_CONFIG__ = ${runtimeConfig};</script>
+  <script src="/miniapp-assets/miniapp.js"></script>
 </body>
 </html>`;
 }

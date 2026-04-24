@@ -1,6 +1,3 @@
-/**
- * Клиент Mini App: аккордеон «Срочно / Промо» (innerHTML из getMiniappClientInlineScript).
- */
 export const MINIAPP_CLIENT_PART_PRICE_TYPE_HELP = `
   function buildPriceTypeHelpAccordion() {
     var det = document.createElement('details');

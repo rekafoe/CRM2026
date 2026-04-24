@@ -3,6 +3,9 @@ import { hasColumn } from '../utils/tableSchemaCache';
 import { OrderRepository } from '../repositories/orderRepository';
 import type { Item } from '../models/Item';
 import { saveBufferToOrderFiles } from '../config/upload';
+import { OrderService } from '../modules/orders/services/orderService';
+import { clearMiniappLayoutsPendingNote } from '../utils/miniappOrderNotes';
+import { MINIAPP_CHECKOUT_STATE_DRAFT } from '../utils/miniappCheckoutState';
 
 export type MiniappOrderListRow = {
   id: number;
@@ -31,6 +34,10 @@ export async function listMiniappOrders(
   }
   const limit = Math.min(Math.max(1, options?.limit ?? 50), 200);
   const db = await getDb();
+  const hasCheckoutState = await hasColumn('orders', 'miniapp_checkout_state');
+  const finalizedWhere = hasCheckoutState
+    ? ` AND COALESCE(o.miniapp_checkout_state, '') != '${MINIAPP_CHECKOUT_STATE_DRAFT}'`
+    : '';
 
   const rows = (await db.all(
     `SELECT
@@ -47,6 +54,7 @@ export async function listMiniappOrders(
        (SELECT COUNT(*) FROM items i WHERE i.orderId = o.id) AS items_count
      FROM orders o
      WHERE o.telegram_chat_id = ?
+     ${finalizedWhere}
      ORDER BY datetime(COALESCE(o.createdAt, o.created_at)) DESC, o.id DESC
      LIMIT ?`,
     [telegramChatId, limit]
@@ -116,6 +124,10 @@ export async function getMiniappOrderDetail(
     return null;
   }
   const db = await getDb();
+  const hasCheckoutState = await hasColumn('orders', 'miniapp_checkout_state');
+  const finalizedWhere = hasCheckoutState
+    ? ` AND COALESCE(o.miniapp_checkout_state, '') != '${MINIAPP_CHECKOUT_STATE_DRAFT}'`
+    : '';
 
   const o = (await db.get(
     `SELECT
@@ -131,7 +143,7 @@ export async function getMiniappOrderDetail(
        o.notes,
        (SELECT COUNT(*) FROM items i WHERE i.orderId = o.id) AS items_count
      FROM orders o
-     WHERE o.id = ? AND o.telegram_chat_id = ?`,
+     WHERE o.id = ? AND o.telegram_chat_id = ?${finalizedWhere}`,
     [orderId, telegramChatId]
   )) as any;
 
@@ -217,14 +229,20 @@ export async function attachFileToMiniappOrder(
   }
 
   let itemFk: number | null = null;
-  if (orderItemId != null && String(orderItemId).trim() !== '' && Number.isFinite(Number(orderItemId))) {
-    const id = Number(orderItemId);
-    const item = (await db.get<{ orderId: number }>('SELECT orderId FROM items WHERE id = ?', [id])) as
-      | { orderId: number }
-      | undefined;
-    if (item && item.orderId === orderId) {
-      itemFk = id;
+  if (orderItemId != null && String(orderItemId).trim() !== '') {
+    const idNum = Number(orderItemId);
+    const id = Math.floor(idNum);
+    if (!Number.isFinite(idNum) || idNum < 1 || id !== idNum) {
+      return { ok: false, status: 400, message: 'Некорректный orderItemId' };
     }
+    const item = (await db.get<{ id: number }>(
+      'SELECT id FROM items WHERE id = ? AND orderId = ?',
+      [id, orderId]
+    )) as { id: number } | undefined;
+    if (!item) {
+      return { ok: false, status: 400, message: 'Указанная позиция не относится к этому заказу' };
+    }
+    itemFk = id;
   }
 
   const saved = saveBufferToOrderFiles(buf, file.originalName);
@@ -253,6 +271,27 @@ export async function attachFileToMiniappOrder(
     size: row.size != null ? Number(row.size) : null,
     uploadedAt: row.uploadedAt != null ? String(row.uploadedAt) : null,
   };
+
+  if (itemFk != null) {
+    try {
+      const [orderRow, itemCountRow, fileCountRow] = await Promise.all([
+        db.get<{ notes?: string | null }>('SELECT notes FROM orders WHERE id = ?', [orderId]),
+        db.get<{ count: number }>('SELECT COUNT(*) AS count FROM items WHERE orderId = ?', [orderId]),
+        db.get<{ count: number }>(
+          'SELECT COUNT(DISTINCT orderItemId) AS count FROM order_files WHERE orderId = ? AND orderItemId IS NOT NULL',
+          [orderId]
+        ),
+      ]);
+      const expectedCount = Number(itemCountRow?.count) || 0;
+      const uploadedForItems = Number(fileCountRow?.count) || 0;
+      if (expectedCount > 0 && uploadedForItems >= expectedCount) {
+        const nextNotes = clearMiniappLayoutsPendingNote(orderRow?.notes ?? null);
+        await OrderService.updateOrderNotes(orderId, nextNotes || null, undefined);
+      }
+    } catch {
+      // Не ломаем загрузку файла, если не удалось синхронизировать служебную пометку в notes.
+    }
+  }
 
   return { ok: true, row: out };
 }

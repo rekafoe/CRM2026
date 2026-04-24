@@ -318,8 +318,11 @@ export const MINIAPP_CLIENT_PART_CALC = `
     out.calcErr = null;
     out.calcResult = null;
     render();
-    fetch(API_BASE + '/api/products/' + out.calcPid + '/schema?compact=1', { headers: { Accept: 'application/json' } })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    miniappRequestJson('/api/products/' + out.calcPid + '/schema?compact=1', {
+      headers: { Accept: 'application/json' },
+      auth: false,
+      retry401: false
+    })
       .then(function (x) {
         out.calcLoading = false;
         if (!x.ok || !x.j || !x.j.data) { out.calcErr = (x.j && (x.j.error || x.j.message)) ? String(x.j.error || x.j.message) : 'Схема не загрузилась'; render(); return; }
@@ -445,10 +448,11 @@ export const MINIAPP_CLIENT_PART_CALC = `
     out.calcLoading = true;
     render();
     var body = buildCalcPayload();
-    var hdrs = { 'Content-Type': 'application/json', Accept: 'application/json' };
-    if (out.token) hdrs.Authorization = 'Bearer ' + out.token;
-    fetch(API_BASE + '/api/products/' + out.calcPid + '/calculate', { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    miniappRequestJson('/api/products/' + out.calcPid + '/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body)
+    })
       .then(function (x) {
         out.calcLoading = false;
         if (!x.ok || !x.j) { out.calcErr = 'Ошибка цены'; render(); return; }
@@ -547,6 +551,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
   }
   function calcAddToCart() {
     if (!out.calcResult || out.calcResult.finalPrice == null) { return; }
+    if (typeof clearDraftCheckoutState === 'function') clearDraftCheckoutState();
     var r = out.calcResult || {};
     var q = Math.max(1, parseInt(String(out.calcForm.qty), 10) || 1);
     var totalCost = Number(r.totalCost);

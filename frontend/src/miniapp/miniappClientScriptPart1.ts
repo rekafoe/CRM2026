@@ -1,13 +1,15 @@
-/**
- * Продолжение inline-скрипта Mini App (часть 1 / 2) — с начала IIFE до renderOrders.
- */
-import { bynIconInlineSpanHtmlForMiniapp } from '../byCurrencyBYN';
+import { bynIconInlineSpanHtmlForMiniapp } from './byn';
 
 export const MINIAPP_CLIENT_PART1 = `
   var out = {
     token: null, me: null, products: null, productErr: null, orders: null, ordersErr: null,
     cart: [], view: 'catalog', err: null, load: false, checkoutMsg: null, checkoutType: 'individual',
     checkoutLoading: false,
+    finalizeLoading: false,
+    draftOrderId: null,
+    draftItemIds: null,
+    draftOrderNumber: null,
+    draftUploadedItemIds: null,
     calcPid: null, calcName: '', calcListItem: null, calcSchema: null, calcErr: null, calcLoading: false, calcResult: null,
     calcForm: { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '' },
     orderDetailId: null, orderDetailData: null, orderDetailErr: null, orderDetailLoading: false,
@@ -36,6 +38,13 @@ export const MINIAPP_CLIENT_PART1 = `
     if (cl) e.className = cl;
     if (inner != null) e.innerHTML = inner;
     return e;
+  }
+  function clearDraftCheckoutState() {
+    out.draftOrderId = null;
+    out.draftItemIds = null;
+    out.draftOrderNumber = null;
+    out.draftUploadedItemIds = null;
+    out.finalizeLoading = false;
   }
   function setNav() {
     var tabs = [ ['catalog', 'Каталог'], ['profile', 'Профиль'], ['cart', 'Корзина'], ['orders', 'Заказы'] ];
@@ -77,7 +86,6 @@ export const MINIAPP_CLIENT_PART1 = `
     if (d.length > 160) d = d.slice(0, 157) + '…';
     return d;
   }
-  /** URL картинки товара для карточки (image_url или icon со ссылкой). */
   function productCardImageSrc(p) {
     if (!p) return '';
     var raw = (p.image_url != null && String(p.image_url).trim() !== '') ? String(p.image_url).trim() : '';
@@ -112,6 +120,7 @@ export const MINIAPP_CLIENT_PART1 = `
     var k = cartLineKey(id);
     var idx = -1;
     for (var i = 0; i < out.cart.length; i++) { if (out.cart[i].k === k) { idx = i; break; } }
+    clearDraftCheckoutState();
     if (idx >= 0) out.cart[idx].qty += 1; else {
       var pn = p.name || 'Товар';
       var priceTypeKey = String(p && (p.priceType || p.price_type || '') || '').trim();
@@ -136,6 +145,7 @@ export const MINIAPP_CLIENT_PART1 = `
   function setQty(k, d) {
     for (var i = 0; i < out.cart.length; i++) {
       if (out.cart[i].k !== k) continue;
+      clearDraftCheckoutState();
       out.cart[i].qty = Math.max(1, out.cart[i].qty + d);
       render();
       return;
@@ -144,6 +154,7 @@ export const MINIAPP_CLIENT_PART1 = `
   function removeLine(k) {
     var a = [];
     for (var i = 0; i < out.cart.length; i++) { if (out.cart[i].k !== k) a.push(out.cart[i]); }
+    clearDraftCheckoutState();
     out.cart = a;
     if (out.checkoutFileByK && out.checkoutFileByK[k]) { try { delete out.checkoutFileByK[k]; } catch (e) {} }
     render();

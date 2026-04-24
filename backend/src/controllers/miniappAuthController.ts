@@ -5,8 +5,8 @@ import { verifyTelegramInitData } from '../utils/telegramInitData';
 import { signMiniAppSession } from '../utils/miniAppSession';
 import type { AuthenticatedRequest } from '../middleware/auth';
 
-const DEFAULT_INIT_MAX_AGE = 86400;
-const DEFAULT_SESSION_TTL = 7 * 24 * 3600;
+const DEFAULT_INIT_MAX_AGE = 24 * 3600;
+const DEFAULT_SESSION_TTL = 24 * 3600;
 
 function intEnv(name: string, def: number): number {
   const n = parseInt(String(process.env[name] || ''), 10);

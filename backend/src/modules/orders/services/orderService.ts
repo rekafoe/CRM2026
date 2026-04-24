@@ -20,6 +20,7 @@ import { tryEnqueueOrderStatusEmail } from '../../../services/orderStatusEmailSe
 import { tryScheduleOrderStatusSms } from '../../../services/orderStatusSmsService'
 import { tryNotifyTelegramOrderStatusForMiniappOrder } from '../../../services/miniappOrderStatusTelegramService'
 import { logger } from '../../../utils/logger'
+import { MINIAPP_CHECKOUT_STATE_FINALIZED, type MiniappCheckoutState } from '../../../utils/miniappCheckoutState'
 
 export class OrderService {
   private static normalizeReasonCode(reason: string): string {
@@ -421,6 +422,234 @@ export class OrderService {
     }
   }
 
+  private static async applyMiniappOrderMetadata(
+    db: any,
+    payload: {
+      orderId: number;
+      telegramChatId?: string;
+      miniappCheckoutState?: MiniappCheckoutState;
+      miniappDesignHelpRequested?: boolean;
+    }
+  ) {
+    if (payload.telegramChatId) {
+      try {
+        const hasTg = await hasColumn('orders', 'telegram_chat_id');
+        if (hasTg) {
+          await db.run('UPDATE orders SET telegram_chat_id = ? WHERE id = ?', [
+            payload.telegramChatId,
+            payload.orderId,
+          ]);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    try {
+      const hasCheckoutState = await hasColumn('orders', 'miniapp_checkout_state');
+      if (hasCheckoutState) {
+        await db.run('UPDATE orders SET miniapp_checkout_state = ? WHERE id = ?', [
+          payload.miniappCheckoutState || MINIAPP_CHECKOUT_STATE_FINALIZED,
+          payload.orderId,
+        ]);
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      const hasDesignHelp = await hasColumn('orders', 'miniapp_design_help_requested');
+      if (hasDesignHelp) {
+        await db.run('UPDATE orders SET miniapp_design_help_requested = ? WHERE id = ?', [
+          payload.miniappDesignHelpRequested ? 1 : 0,
+          payload.orderId,
+        ]);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  private static async insertItemsForOrder(
+    db: any,
+    payload: {
+      orderId: number;
+      source: 'website' | 'telegram' | 'crm' | 'mini_app';
+      orderCreatedAt?: string | null;
+      items: Array<{
+        type: string;
+        params: string | Record<string, unknown>;
+        price: number;
+        quantity: number;
+        components?: Array<{ materialId: number; qtyPerItem: number }>;
+      }>;
+    }
+  ) {
+    const isWebsiteLike = payload.source === 'website' || payload.source === 'mini_app';
+    for (const item of payload.items) {
+      let paramsObj: Record<string, any> = {};
+      try {
+        paramsObj = typeof item.params === 'string' ? JSON.parse(item.params) : (item.params || {});
+      } catch {
+        paramsObj = {};
+      }
+      if (!paramsObj.readyDate) {
+        const defaultReadyDate = this.buildDefaultReadyDate(payload.orderCreatedAt || undefined);
+        if (defaultReadyDate) {
+          paramsObj.readyDate = defaultReadyDate;
+        }
+      }
+      if (Array.isArray(item.components) && item.components.length > 0) {
+        paramsObj._miniappComponents = item.components.map((component) => ({
+          materialId: Number(component.materialId),
+          qtyPerItem: Number(component.qtyPerItem),
+        }));
+      }
+      let finalPrice = Number(item.price) || 0;
+      const priceType =
+        (item as { priceType?: unknown; price_type?: unknown }).priceType ??
+        (item as { priceType?: unknown; price_type?: unknown }).price_type ??
+        paramsObj.priceType ??
+        paramsObj.price_type;
+      if (isWebsiteLike && priceType && typeof priceType === 'string') {
+        const key = priceType.toLowerCase().trim();
+        const mult = await PriceTypeService.getMultiplier(key);
+        if (mult !== 1) {
+          finalPrice = Math.round(finalPrice * mult * 100) / 100;
+        }
+        paramsObj.priceType = key;
+      }
+      await db.run(
+        'INSERT INTO items (orderId, type, params, price, quantity) VALUES (?, ?, ?, ?, ?)',
+        [payload.orderId, item.type, JSON.stringify(paramsObj), finalPrice, item.quantity]
+      );
+    }
+  }
+
+  private static async createOrderWithItemsTx(
+    db: any,
+    orderData: {
+      customerName?: string;
+      customerPhone?: string;
+      customerEmail?: string;
+      prepaymentAmount?: number;
+      userId?: number;
+      customer_id?: number;
+      source?: 'website' | 'telegram' | 'crm' | 'mini_app';
+      telegramChatId?: string;
+      miniappCheckoutState?: MiniappCheckoutState;
+      miniappDesignHelpRequested?: boolean;
+      items: Array<{
+        type: string;
+        params: string | Record<string, unknown>;
+        price: number;
+        quantity: number;
+        components?: Array<{ materialId: number; qtyPerItem: number }>;
+      }>;
+    }
+  ) {
+    const source = orderData.source || 'crm';
+    const createdOrder = await this.createOrder(
+      orderData.customerName,
+      orderData.customerPhone,
+      orderData.customerEmail,
+      orderData.prepaymentAmount,
+      orderData.userId,
+      undefined,
+      source,
+      orderData.customer_id
+    );
+    await this.applyMiniappOrderMetadata(db, {
+      orderId: createdOrder.id,
+      telegramChatId: orderData.telegramChatId,
+      miniappCheckoutState: orderData.miniappCheckoutState,
+      miniappDesignHelpRequested: orderData.miniappDesignHelpRequested,
+    });
+    const orderCreatedAt = (createdOrder as any).created_at || (createdOrder as any).createdAt;
+    await this.insertItemsForOrder(db, {
+      orderId: createdOrder.id,
+      source,
+      orderCreatedAt,
+      items: orderData.items,
+    });
+    const itemIdRows = (await db.all(
+      'SELECT id FROM items WHERE orderId = ? ORDER BY id ASC',
+      [createdOrder.id]
+    )) as Array<{ id: number }>;
+    const itemIds = (Array.isArray(itemIdRows) ? itemIdRows : []).map((r) => Number(r.id));
+    const rawOrder = await db.get('SELECT * FROM orders WHERE id = ?', [createdOrder.id]);
+    return {
+      order: OrderService.orderForApi({ ...(rawOrder as any), items: [] }) as Order,
+      itemIds,
+    };
+  }
+
+  static async createOrderWithItems(
+    orderData: {
+      customerName?: string;
+      customerPhone?: string;
+      customerEmail?: string;
+      prepaymentAmount?: number;
+      userId?: number;
+      customer_id?: number;
+      source?: 'website' | 'telegram' | 'crm' | 'mini_app';
+      telegramChatId?: string;
+      miniappCheckoutState?: MiniappCheckoutState;
+      miniappDesignHelpRequested?: boolean;
+      items: Array<{
+        type: string;
+        params: string | Record<string, unknown>;
+        price: number;
+        quantity: number;
+        components?: Array<{ materialId: number; qtyPerItem: number }>;
+      }>;
+    }
+  ) {
+    const db = await getDb();
+    try {
+      await db.run('BEGIN');
+      const result = await this.createOrderWithItemsTx(db, orderData);
+      await db.run('COMMIT');
+      return result;
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+  }
+
+  static async deductMaterialsForExistingOrder(orderId: number, userId?: number) {
+    const db = await getDb();
+    const rows = (await db.all(
+      'SELECT type, params, quantity FROM items WHERE orderId = ? ORDER BY id ASC',
+      [orderId]
+    )) as Array<{ type: string; params: string | null; quantity: number }>;
+    const deductionItems = (Array.isArray(rows) ? rows : []).map((row) => {
+      let paramsObj: Record<string, any> = {};
+      try {
+        paramsObj = row.params ? JSON.parse(String(row.params)) : {};
+      } catch {
+        paramsObj = {};
+      }
+      const storedComponents = Array.isArray(paramsObj._miniappComponents)
+        ? paramsObj._miniappComponents
+        : [];
+      return {
+        type: row.type,
+        params: paramsObj,
+        quantity: Number(row.quantity) || 0,
+        components: storedComponents
+          .map((component: Record<string, unknown>) => ({
+            materialId: Number(component.materialId),
+            qtyPerItem: Number(component.qtyPerItem),
+          }))
+          .filter((component: { materialId: number; qtyPerItem: number }) =>
+            Number.isFinite(component.materialId) &&
+            component.materialId > 0 &&
+            Number.isFinite(component.qtyPerItem)
+          ),
+      };
+    });
+    return AutoMaterialDeductionService.deductMaterialsForOrder(orderId, deductionItems, userId);
+  }
+
   // Создание заказа с автоматическим списанием материалов
   static async createOrderWithAutoDeduction(
     orderData: {
@@ -446,84 +675,11 @@ export class OrderService {
     }
   ) {
     const db = await getDb();
-    const source = orderData.source || 'crm';
 
     try {
       await db.run('BEGIN');
-      
-      // 1. Создаем заказ
-      const order = await this.createOrder(
-        orderData.customerName,
-        orderData.customerPhone,
-        orderData.customerEmail,
-        orderData.prepaymentAmount,
-        orderData.userId,
-        undefined,
-        source,
-        orderData.customer_id
-      );
-
-      if (orderData.telegramChatId) {
-        try {
-          const hasTg = await hasColumn('orders', 'telegram_chat_id');
-          if (hasTg) {
-            await db.run('UPDATE orders SET telegram_chat_id = ? WHERE id = ?', [
-              orderData.telegramChatId,
-              order.id,
-            ]);
-          }
-        } catch {
-          // ignore
-        }
-      }
-      
-      // 2. Добавляем товары в заказ
-      const orderCreatedAt = (order as any).created_at || (order as any).createdAt
-      const isWebsiteLike = source === 'website' || source === 'mini_app'
-      for (const item of orderData.items) {
-        let paramsObj: Record<string, any> = {}
-        try {
-          paramsObj = typeof item.params === 'string' ? JSON.parse(item.params) : (item.params || {})
-        } catch {
-          paramsObj = {}
-        }
-        if (!paramsObj.readyDate) {
-          const defaultReadyDate = this.buildDefaultReadyDate(orderCreatedAt)
-          if (defaultReadyDate) {
-            paramsObj.readyDate = defaultReadyDate
-          }
-        }
-        let finalPrice = Number(item.price) || 0
-        const priceType = (item as any).priceType ?? (item as any).price_type ?? paramsObj.priceType ?? paramsObj.price_type
-        if (isWebsiteLike && priceType && typeof priceType === 'string') {
-          const key = priceType.toLowerCase().trim()
-          const mult = await PriceTypeService.getMultiplier(key)
-          if (mult !== 1) {
-            finalPrice = Math.round(finalPrice * mult * 100) / 100
-          }
-          paramsObj.priceType = key
-        }
-        await db.run(
-          'INSERT INTO items (orderId, type, params, price, quantity) VALUES (?, ?, ?, ?, ?)',
-          [order.id, item.type, JSON.stringify(paramsObj), finalPrice, item.quantity]
-        );
-      }
-      
-      // 3. Автоматическое списание материалов (params уже объект при заказе с сайта, иначе строка JSON)
-      const deductionResult = await AutoMaterialDeductionService.deductMaterialsForOrder(
-        order.id,
-        orderData.items.map(item => {
-          const paramsObj = typeof item.params === 'string' ? (() => { try { return JSON.parse(item.params || '{}'); } catch { return {}; } })() : (item.params || {});
-          return {
-            type: item.type,
-            params: paramsObj,
-            quantity: item.quantity,
-            components: item.components
-          };
-        }),
-        orderData.userId
-      );
-      
+      const { order, itemIds } = await this.createOrderWithItemsTx(db, orderData);
+      const deductionResult = await this.deductMaterialsForExistingOrder(order.id, orderData.userId);
       if (!deductionResult.success) {
         const err = new Error(
           `Ошибка автоматического списания: ${deductionResult.errors.join(', ')}`
@@ -531,15 +687,7 @@ export class OrderService {
         (err as { code?: string }).code = 'ORDER_AUTO_DEDUCTION_FAILED';
         throw err;
       }
-      
       await db.run('COMMIT');
-
-      const itemIdRows = await db.all<{ id: number }>(
-        'SELECT id FROM items WHERE orderId = ? ORDER BY id ASC',
-        [order.id]
-      );
-      const itemIds = (Array.isArray(itemIdRows) ? itemIdRows : []).map((r) => Number(r.id));
-
       return {
         order,
         deductionResult,

@@ -1,14 +1,11 @@
-/**
- * Mini App: детали заказа, список файлов, загрузка вложения (multipart, поле file).
- */
 export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
   function downloadOrderFile(fileId, suggestedName) {
     if (!out.token || !out.orderDetailId) return;
     out.orderFileMsg = null;
-    fetch(API_BASE + '/api/miniapp/orders/' + out.orderDetailId + '/files/' + fileId, { headers: { Authorization: 'Bearer ' + out.token } })
+    miniappRequest('/api/miniapp/orders/' + out.orderDetailId + '/files/' + fileId, { headers: {} })
       .then(function (r) {
         if (r.ok) return r.blob();
-        return r.json().then(function (j) { throw new Error((j && (j.error || j.message)) ? String(j.error || j.message) : ('HTTP ' + r.status)); });
+        return miniappJsonResponse(r).then(function (x) { throw new Error((x.j && (x.j.error || x.j.message)) ? String(x.j.error || x.j.message) : ('HTTP ' + x.status)); });
       })
       .then(function (blob) {
         var a = document.createElement('a');
@@ -40,8 +37,7 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
       out.orderDetailErr = null;
       render();
     }
-    fetch(API_BASE + '/api/miniapp/orders/' + out.orderDetailId, { headers: { Authorization: 'Bearer ' + out.token, Accept: 'application/json' } })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    miniappRequestJson('/api/miniapp/orders/' + out.orderDetailId, { headers: { Accept: 'application/json' } })
       .then(function (x) {
         if (!isSilent) out.orderDetailLoading = false;
         if (!x.ok) {
@@ -170,8 +166,7 @@ export const MINIAPP_CLIENT_PART_ORDER_DETAIL = `
       out.orderUploadLoading = true;
       out.orderFileMsg = null;
       render();
-      fetch(API_BASE + '/api/miniapp/orders/' + out.orderDetailId + '/files', { method: 'POST', headers: { Authorization: 'Bearer ' + out.token }, body: fd })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      miniappRequestJson('/api/miniapp/orders/' + out.orderDetailId + '/files', { method: 'POST', headers: {}, body: fd })
         .then(function (x) {
           out.orderUploadLoading = false;
           if (!x.ok) {

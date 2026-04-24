@@ -1,6 +1,3 @@
-/**
- * Продолжение inline-скрипта Mini App (часть 2 / 2) — оформление, boot, конец IIFE.
- */
 export const MINIAPP_CLIENT_PART2 = `
   function renderCart() {
     var box = h('div', '', 'section');
@@ -39,6 +36,7 @@ export const MINIAPP_CLIENT_PART2 = `
     dh.type = 'checkbox';
     dh.checked = !!out.checkoutDesignHelp;
     dh.onchange = function () {
+      if (typeof clearDraftCheckoutState === 'function') clearDraftCheckoutState();
       out.checkoutDesignHelp = !!dh.checked;
       out.checkoutMsg = null;
       render();
@@ -88,6 +86,15 @@ export const MINIAPP_CLIENT_PART2 = `
     box.appendChild(h('div', 'Оформление', 'section-head'));
     if (out.checkoutMsg) box.appendChild(h('p', esc(out.checkoutMsg), 'okmsg'));
     if (out.checkoutFileProgress) box.appendChild(h('p', esc(out.checkoutFileProgress), 'hint'));
+    if (out.draftOrderId) {
+      box.appendChild(
+        h(
+          'p',
+          'Черновик ' + esc(out.draftOrderNumber || ('#' + out.draftOrderId)) + ' уже создан. Повторная отправка продолжит загрузку файлов и финализацию, а не создаст новый заказ.',
+          'hint'
+        )
+      );
+    }
     var sumPanel = h('div', '', 'ipc-panel');
     var sumInner = h('div', '', 'ipc-detail-block');
     sumInner.appendChild(h('div', 'Позиции', 'ipc-subhead'));
@@ -168,12 +175,15 @@ export const MINIAPP_CLIENT_PART2 = `
       h(
         'p',
         out.checkoutDesignHelp
-          ? 'Макеты в корзине не требуются. Сумма заказа — печать; дизайн согласуем отдельно.'
-          : 'Файлы макетов, выбранные в калькуляторе, после отправки заказа прикрепляются к позициям (до 25 МБ).',
+          ? 'Сначала будет создан черновик, затем заказ сразу финализируется без файлов. Сумма заказа — печать; дизайн согласуем отдельно.'
+          : 'Сначала будет создан черновик заказа, затем макеты прикрепятся к позициям и только после этого произойдёт финализация.',
         'hint'
       )
     );
-    var sub = h('button', out.checkoutLoading ? (out.checkoutFileProgress || 'Отправка…') : 'Отправить заказ', 'primary');
+    var subText = 'Создать черновик и завершить';
+    if (out.draftOrderId && !out.checkoutLoading) subText = 'Продолжить финализацию';
+    else if (out.checkoutLoading) subText = out.checkoutFileProgress || (out.finalizeLoading ? 'Финализация…' : 'Отправка…');
+    var sub = h('button', subText, 'primary');
     sub.type = 'submit';
     if (out.checkoutLoading) sub.disabled = true;
     form.appendChild(sub);
@@ -190,7 +200,7 @@ export const MINIAPP_CLIENT_PART2 = `
     if (typeof CATALOG_CATEGORY_ID === 'number' && CATALOG_CATEGORY_ID > 0) {
       listPath = '/api/products/category/' + CATALOG_CATEGORY_ID + '?forSite=1&withMinPrice=1';
     }
-    fetch(API_BASE + listPath, { headers: { Accept: 'application/json' } })
+    miniappRequest(listPath, { headers: { Accept: 'application/json' }, auth: false, retry401: false })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (data) { out.products = Array.isArray(data) ? data : []; render(); })
       .catch(function (err) { out.productErr = (err && err.message) || String(err); out.products = []; render(); });
@@ -198,8 +208,7 @@ export const MINIAPP_CLIENT_PART2 = `
   function loadOrders() {
     if (!out.token) return;
     out.ordersErr = null;
-    fetch(API_BASE + '/api/miniapp/orders', { headers: { Authorization: 'Bearer ' + out.token, Accept: 'application/json' } })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    miniappRequestJson('/api/miniapp/orders', { headers: { Accept: 'application/json' } })
       .then(function (x) {
         if (!x.ok) { out.ordersErr = (x.j && x.j.error) ? String(x.j.error) : 'Ошибка'; out.orders = { orders: [], meta: { telegram_orders: true } }; }
         else out.orders = x.j;
@@ -241,31 +250,25 @@ export const MINIAPP_CLIENT_PART2 = `
     }
     out.load = true;
     render();
-    fetch(API_BASE + '/api/miniapp/auth', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ initData: initData }) })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    miniappEnsureSession(true)
       .then(function (x) {
         out.load = false;
-        if (!x.ok) {
-          out.err = (x.j && (x.j.error || x.j.message)) ? JSON.stringify(x.j) : 'auth failed';
+        if (!x || !x.token) {
+          out.err = 'auth failed';
           render();
           return null;
         }
-        if (!x.j || !x.j.token) { out.err = 'Нет токена'; render(); return null; }
-        out.token = x.j.token;
-        return fetch(API_BASE + '/api/miniapp/me', { headers: { Authorization: 'Bearer ' + out.token, Accept: 'application/json' } });
+        return miniappRequestJson('/api/miniapp/me', { headers: { Accept: 'application/json' } });
       })
-      .then(function (r) {
-        if (r == null) return null;
-        if (!r.ok) {
-          return r.json().then(function (j) { out.me = null; out.err = (j && (j.error || j.message)) ? String(j.error || j.message) : ('HTTP ' + r.status); });
-        }
-        return r.json();
-      })
-      .then(function (me) {
-        if (me) {
+      .then(function (meResp) {
+        if (meResp && meResp.ok && meResp.j) {
+          var me = meResp.j;
           if (me.telegram) out.me = { telegram: me.telegram, crm: me.crm != null ? me.crm : null };
           else if (me.me && me.me.telegram) out.me = { telegram: me.me.telegram, crm: me.crm != null ? me.crm : null };
           out.err = null;
+        } else if (meResp && !meResp.ok) {
+          out.me = null;
+          out.err = (meResp.j && (meResp.j.error || meResp.j.message)) ? String(meResp.j.error || meResp.j.message) : ('HTTP ' + meResp.status);
         }
         if (out.view === 'catalog' && !out.products) loadProducts();
         render();
