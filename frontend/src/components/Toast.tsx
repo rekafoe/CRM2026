@@ -156,7 +156,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {children}
       
       {/* Контейнер для уведомлений */}
-      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm w-full">
+      <div className="fixed top-4 right-4 space-y-2 max-w-sm w-full" style={{ zIndex: 2000 }}>
         {toasts.map(toast => (
           <ToastItem
             key={toast.id}

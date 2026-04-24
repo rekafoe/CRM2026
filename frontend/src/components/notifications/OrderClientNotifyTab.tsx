@@ -24,6 +24,8 @@ export const OrderClientNotifyTab: React.FC = () => {
   const [rules, setRules] = useState<OrderEmailRuleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [testTo, setTestTo] = useState('');
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [smsEnabled, setSmsEnabled] = useState<boolean | null>(null);
   const [smsDebounce, setSmsDebounce] = useState<number | null>(null);
@@ -115,25 +117,34 @@ export const OrderClientNotifyTab: React.FC = () => {
   const handleTest = async () => {
     const to = testTo.trim();
     if (!to.includes('@')) {
+      setTestResult({ type: 'error', message: 'Укажите корректный email.' });
       addToast({ type: 'error', title: 'Адрес', message: 'Укажите корректный email' });
       return;
     }
+    setTestSending(true);
+    setTestResult(null);
     try {
       const r = (await postMailTest(to)) as { ok?: boolean; jobId?: number; immediateProcessed?: number };
+      const message = r?.jobId
+        ? `Задание #${r.jobId} создано, сразу обработано: ${r.immediateProcessed ?? 0}.`
+        : 'Запрос отправлен.';
+      setTestResult({ type: 'success', message });
       addToast({
         type: 'success',
         title: 'Очередь',
-        message: r?.jobId
-          ? `Задание #${r.jobId}, сразу: ${r.immediateProcessed ?? 0}`
-          : 'Запрос отправлен',
+        message,
       });
       void load();
     } catch (e) {
+      const message = e instanceof Error ? e.message : 'Не удалось поставить тест в очередь';
+      setTestResult({ type: 'error', message });
       addToast({
         type: 'error',
         title: 'Ошибка',
-        message: e instanceof Error ? e.message : 'Не удалось поставить тест в очередь',
+        message,
       });
+    } finally {
+      setTestSending(false);
     }
   };
 
@@ -181,10 +192,20 @@ export const OrderClientNotifyTab: React.FC = () => {
               placeholder="email@example.com"
               className="client-notify-input"
             />
-            <button type="button" className="btn btn-primary" onClick={() => void handleTest()}>
-              Отправить тест
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => void handleTest()}
+              disabled={testSending}
+            >
+              {testSending ? 'Отправка...' : 'Отправить тест'}
             </button>
           </div>
+          {testResult && (
+            <p className={testResult.type === 'success' ? 'client-notify-okmsg' : 'client-notify-errmsg'}>
+              {testResult.message}
+            </p>
+          )}
         </div>
 
         <div className="settings-section">

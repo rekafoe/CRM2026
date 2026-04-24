@@ -77,6 +77,21 @@
   font-size: 14px;
 }
 
+.client-notify-okmsg,
+.client-notify-errmsg {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.client-notify-okmsg {
+  color: #15803d;
+}
+
+.client-notify-errmsg {
+  color: #b91c1c;
+}
+
 .client-notify-table-wrap {
   overflow-x: auto;
 }

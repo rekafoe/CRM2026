@@ -1,7 +1,7 @@
 import { buildOrderNumberFromSourceAndId } from '../../../utils/orderNumberGenerator'
 import { getDb } from '../../../config/database'
 import { getCurrentTimestamp, getTodayString } from '../../../utils/date'
-import { hasColumn } from '../../../utils/tableSchemaCache'
+import { hasColumn, invalidateTableSchemaCache } from '../../../utils/tableSchemaCache'
 import { getCachedData } from '../../../utils/dataCache'
 import { Order } from '../../../models/Order'
 import { UnifiedWarehouseService } from '../../warehouse/services/unifiedWarehouseService'
@@ -263,6 +263,7 @@ export class OrderService {
     let hasIsInternal = false
     let hasContactUserId = false
     let hasResponsibleUserId = false
+    invalidateTableSchemaCache('orders')
     try {
       hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
@@ -281,70 +282,30 @@ export class OrderService {
     const isInternal = channelRaw === 'internal'
     const channel = isInternal ? 'not_cashed' : channelRaw
 
-    const orderCols: string[] = hasPrepaymentUpdatedAt
-      ? [
-          'status',
-          'created_at',
-          'customerName',
-          'customerPhone',
-          'customerEmail',
-          'prepaymentAmount',
-          'prepaymentUpdatedAt',
-          'userId',
-          'source',
-          'customer_id',
-        ]
-      : [
-          'status',
-          'created_at',
-          'customerName',
-          'customerPhone',
-          'customerEmail',
-          'prepaymentAmount',
-          'userId',
-          'source',
-          'customer_id',
-        ]
-    const orderValues: unknown[] = hasPrepaymentUpdatedAt
-      ? [
-          defaultStatusId,
-          createdAt,
-          customerName || null,
-          customerPhone || null,
-          customerEmail || null,
-          initialPrepay,
-          initialPrepay > 0 ? createdAt : null,
-          creatorId,
-          source || 'crm',
-          customerId || null,
-        ]
-      : [
-          defaultStatusId,
-          createdAt,
-          customerName || null,
-          customerPhone || null,
-          customerEmail || null,
-          initialPrepay,
-          creatorId,
-          source || 'crm',
-          customerId || null,
-        ]
-    if (hasPaymentChannel) {
-      orderCols.push('payment_channel')
-      orderValues.push(channel)
+    /** Пары (колонка, значение) — один источник правды, без рассинхрона N колонок / N-1 значений. */
+    const insertFields: Array<[string, unknown]> = [
+      ['status', defaultStatusId],
+      ['created_at', createdAt],
+      ['customerName', customerName || null],
+      ['customerPhone', customerPhone || null],
+      ['customerEmail', customerEmail || null],
+      ['prepaymentAmount', initialPrepay],
+    ]
+    if (hasPrepaymentUpdatedAt) {
+      insertFields.push(['prepaymentUpdatedAt', initialPrepay > 0 ? createdAt : null])
     }
-    if (hasIsInternal) {
-      orderCols.push('is_internal')
-      orderValues.push(isInternal ? 1 : 0)
-    }
-    if (hasContactUserId) {
-      orderCols.push('contact_user_id')
-      orderValues.push(creatorId)
-    }
-    if (hasResponsibleUserId) {
-      orderCols.push('responsible_user_id')
-      orderValues.push(creatorId)
-    }
+    insertFields.push(
+      ['userId', creatorId],
+      ['source', source || 'crm'],
+      ['customer_id', customerId || null]
+    )
+    if (hasPaymentChannel) insertFields.push(['payment_channel', channel])
+    if (hasIsInternal) insertFields.push(['is_internal', isInternal ? 1 : 0])
+    if (hasContactUserId) insertFields.push(['contact_user_id', creatorId])
+    if (hasResponsibleUserId) insertFields.push(['responsible_user_id', creatorId])
+
+    const orderCols = insertFields.map(([col]) => col)
+    const orderValues = insertFields.map(([, v]) => v)
     const placeholders = orderCols.map(() => '?').join(', ')
     const insertRes = await db.run(
       `INSERT INTO orders (${orderCols.join(', ')}) VALUES (${placeholders})`,
