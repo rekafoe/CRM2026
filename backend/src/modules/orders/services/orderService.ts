@@ -19,6 +19,7 @@ import { PriceTypeService } from '../../pricing/services/priceTypeService'
 import { tryEnqueueOrderStatusEmail } from '../../../services/orderStatusEmailService'
 import { tryScheduleOrderStatusSms } from '../../../services/orderStatusSmsService'
 import { tryNotifyTelegramOrderStatusForMiniappOrder } from '../../../services/miniappOrderStatusTelegramService'
+import { logger } from '../../../utils/logger'
 
 export class OrderService {
   private static normalizeReasonCode(reason: string): string {
@@ -307,10 +308,22 @@ export class OrderService {
     const orderCols = insertFields.map(([col]) => col)
     const orderValues = insertFields.map(([, v]) => v)
     const placeholders = orderCols.map(() => '?').join(', ')
-    const insertRes = await db.run(
-      `INSERT INTO orders (${orderCols.join(', ')}) VALUES (${placeholders})`,
-      orderValues
-    )
+    let insertRes
+    try {
+      insertRes = await db.run(
+        `INSERT INTO orders (${orderCols.join(', ')}) VALUES (${placeholders})`,
+        orderValues
+      )
+    } catch (error) {
+      logger.error('orders insert failed', {
+        message: error instanceof Error ? error.message : String(error),
+        orderCols,
+        orderColsCount: orderCols.length,
+        orderValuesCount: orderValues.length,
+        source: source || 'crm',
+      })
+      throw error
+    }
     const id = (insertRes as any).lastID!
     const number = buildOrderNumberFromSourceAndId(source || 'crm', id)
     await db.run('UPDATE orders SET number = ? WHERE id = ?', [number, id])
