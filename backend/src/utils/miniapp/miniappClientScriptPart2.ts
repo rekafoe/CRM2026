@@ -16,18 +16,13 @@ export const MINIAPP_CLIENT_PART2 = `
     for (var i = 0; i < out.cart.length; i++) {
       (function (c) {
         var row = h('div', '', 'ipc-list__row ipc-list__row--cart');
-        row.appendChild(h('div', cartLineSummaryEsc(c), 'ipc-list__row-summary'));
-        var fin = document.createElement('input');
-        fin.type = 'file';
-        fin.setAttribute('accept', 'application/pdf,image/*,.doc,.docx,.xls,.xlsx');
-        fin.onchange = function () {
-          out.checkoutFileByK = out.checkoutFileByK || {};
-          out.checkoutFileByK[c.k] = (this.files && this.files[0]) ? this.files[0] : null;
-          render();
-        };
-        var cap = 'Макет (до 25 МБ)' + (out.checkoutFileByK[c.k] ? ' — файл выбран' : '');
-        addField(row, cap, fin);
+        var sumLine = cartLineSummaryEsc(c) + (out.checkoutFileByK[c.k] ? ' — макет к позиции выбран' : '');
+        row.appendChild(h('div', sumLine, 'ipc-list__row-summary'));
         var tools = h('div', '', 'row');
+        if (c.params && c.params.calculator) {
+          var edc = h('button', 'Изменить', 'small'); edc.type = 'button'; edc.onclick = function () { if (typeof openCartLineForEdit === 'function') openCartLineForEdit(c); };
+          tools.appendChild(edc);
+        }
         var m = h('button', '−', 'small'); m.type = 'button'; m.onclick = function () { setQty(c.k, -1); };
         var p = h('button', '+', 'small'); p.type = 'button'; p.onclick = function () { setQty(c.k, 1); };
         var r = h('button', 'Убрать', 'small danger'); r.type = 'button'; r.onclick = function () { removeLine(c.k); };
@@ -62,7 +57,7 @@ export const MINIAPP_CLIENT_PART2 = `
       );
     } else {
       box.appendChild(
-        h('p', 'Прикрепите макет к каждой позиции (обязательно) или отметьте, что макета нет и нужна помощь с дизайном.', 'hint')
+        h('p', 'Макет к позиции из калькулятора добавьте в калькуляторе до кнопки «В корзину». Или отметьте, что макета нет и нужна помощь с дизайном.', 'hint')
       );
     }
     box.appendChild(h('div', 'Итого: ' + subtotal() + bynSpanHtml(), 'total ipc-total'));
@@ -73,7 +68,7 @@ export const MINIAPP_CLIENT_PART2 = `
         out.checkoutFileByK = out.checkoutFileByK || {};
         for (var vi = 0; vi < out.cart.length; vi++) {
           if (!out.checkoutFileByK[out.cart[vi].k]) {
-            out.checkoutMsg = 'Прикрепите макет к каждой позиции или отметьте «Нет макета — требуется помощь с его разработкой».';
+            out.checkoutMsg = 'Добавьте макет в калькуляторе (до «В корзину») или отметьте «Нет макета — требуется помощь с его разработкой».';
             render();
             return;
           }
@@ -114,7 +109,8 @@ export const MINIAPP_CLIENT_PART2 = `
     box.appendChild(sumPanel);
     var form = document.createElement('form');
     form.className = 'form';
-    form.onsubmit = function (e) { e.preventDefault(); doCheckout(e); return false; };
+    form.setAttribute('novalidate', 'novalidate');
+    form.onsubmit = function (e) { e.preventDefault(); doCheckout(this); return false; };
     var isLeg = out.checkoutType === 'legal';
     var sel = document.createElement('select');
     sel.name = 'cust-type';
@@ -172,7 +168,7 @@ export const MINIAPP_CLIENT_PART2 = `
         'p',
         out.checkoutDesignHelp
           ? 'Макеты в корзине не требуются. Сумма заказа — печать; дизайн согласуем отдельно.'
-          : 'Макеты к позициям выбраны в корзине; после «Отправить» они прикрепляются к строкам заказа (до 25 МБ).',
+          : 'Файлы макетов, выбранные в калькуляторе, после отправки заказа прикрепляются к позициям (до 25 МБ).',
         'hint'
       )
     );

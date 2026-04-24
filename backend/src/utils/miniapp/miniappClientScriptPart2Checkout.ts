@@ -37,11 +37,15 @@ export const MINIAPP_CLIENT_PART2_CHECKOUT = `
     out.view = 'orders';
     loadOrders();
   }
-  function doCheckout(e) {
+  function doCheckout(formNode) {
     if (!out.token) { out.checkoutMsg = 'Нет сессии'; render(); return; }
     if (out.cart.length === 0) { out.checkoutMsg = 'Корзина пуста'; render(); return; }
-    var f = e.currentTarget;
-    if (!f) return;
+    var f = formNode;
+    if (!f || !f.querySelector || String(f.tagName || '').toLowerCase() !== 'form') {
+      out.checkoutMsg = 'Ошибка формы. Обновите страницу и попробуйте снова.';
+      render();
+      return;
+    }
     var fd = new FormData(f);
     var isLeg = String(fd.get('cust-type') || '') === 'legal';
     var phone = String(fd.get('phone') || '').trim();
@@ -59,7 +63,7 @@ export const MINIAPP_CLIENT_PART2_CHECKOUT = `
       out.checkoutFileByK = out.checkoutFileByK || {};
       for (var vi = 0; vi < out.cart.length; vi++) {
         if (!out.checkoutFileByK[out.cart[vi].k]) {
-          out.checkoutMsg = 'Прикрепите макет к каждой позиции в корзине или отметьте «Нет макета — требуется помощь с его разработкой».';
+          out.checkoutMsg = 'Добавьте макет на этапе расчёта в калькуляторе (до «В корзину») или отметьте «Нет макета — требуется помощь с его разработкой».';
           render();
           return;
         }

@@ -257,8 +257,63 @@ export const MINIAPP_CLIENT_PART_CALC = `
       runCalc({ soft: true });
     }, 420);
   }
+  /** Восстанавливает calcForm из сохранённого configuration позиции корзины. */
+  function applyConfigFromCartLine(c) {
+    var p = c && c.params && c.params.configuration;
+    if (!p || typeof p !== 'object') return;
+    if (p.type_id != null) out.calcForm.typeId = p.type_id;
+    if (p.size_id != null) out.calcForm.sizeId = p.size_id;
+    if (p.material_id != null) out.calcForm.matId = p.material_id;
+    out.calcForm.printKey =
+      String(p.print_technology || '') +
+      '||' +
+      String(p.print_color_mode != null ? p.print_color_mode : 'color') +
+      '||' +
+      String(p.print_sides_mode != null ? p.print_sides_mode : 'single');
+    if (c.qty != null) out.calcForm.qty = Math.max(1, parseInt(String(c.qty), 10) || 1);
+    else if (p.quantity != null) out.calcForm.qty = Math.max(1, parseInt(String(p.quantity), 10) || 1);
+    if (p.priceType) out.calcForm.priceType = String(p.priceType);
+    syncCalcFormMatPaperKey(calcMaterials());
+    ensurePrintKeyMatchesOptions();
+    var allowedPts = calcAllowedPriceTypes();
+    if (allowedPts.length > 0) {
+      var selectedPt = String(out.calcForm.priceType || '').trim();
+      var validP = false;
+      for (var pti = 0; pti < allowedPts.length; pti++) {
+        if (allowedPts[pti].key === selectedPt) { validP = true; break; }
+      }
+      out.calcForm.priceType = validP ? selectedPt : allowedPts[0].key;
+    } else {
+      out.calcForm.priceType = '';
+    }
+  }
+  function openCartLineForEdit(c) {
+    if (!c || !c.params || !c.params.configuration || !c.params.calculator) return;
+    out._pendingCalcRestore = c;
+    out.calcPid = c.pid;
+    out.calcName = c.params && c.params.productName ? String(c.params.productName) : (c.name || 'Товар');
+    out.calcListItem = null;
+    if (out.products) {
+      for (var pi = 0; pi < out.products.length; pi++) {
+        if (String(out.products[pi].id) === String(c.pid)) {
+          out.calcListItem = out.products[pi];
+          break;
+        }
+      }
+    }
+    out.calcEditCartKey = c.k;
+    out.calcSchema = null;
+    out.calcErr = null;
+    out.calcResult = null;
+    out.calcStagedLayout = out.checkoutFileByK && out.checkoutFileByK[c.k] ? out.checkoutFileByK[c.k] : null;
+    out.calcForm = { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '' };
+    out.view = 'calculator';
+    loadCalcSchema();
+  }
   function loadCalcSchema() {
     if (!out.calcPid) return;
+    var restoreLine = out._pendingCalcRestore;
+    out._pendingCalcRestore = null;
     out.calcLoading = true;
     out.calcErr = null;
     out.calcResult = null;
@@ -276,6 +331,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
           return;
         }
         initCalcFormFromSchema();
+        if (restoreLine) applyConfigFromCartLine(restoreLine);
         render();
         scheduleCalcRun();
       })
@@ -496,6 +552,17 @@ export const MINIAPP_CLIENT_PART_CALC = `
     var totalCost = Number(r.totalCost);
     var ppu = q > 0 && isFinite(totalCost) ? totalCost / q : Number(r.pricePerUnit);
     if (!isFinite(ppu) || ppu < 0) ppu = q > 0 ? Number(r.finalPrice) / q : 0;
+    if (out.calcEditCartKey) {
+      var re = out.calcEditCartKey;
+      var ncart = [];
+      for (var ri = 0; ri < out.cart.length; ri++) {
+        if (out.cart[ri].k !== re) ncart.push(out.cart[ri]);
+      }
+      out.cart = ncart;
+      if (out.checkoutFileByK && out.checkoutFileByK[re]) {
+        try { delete out.checkoutFileByK[re]; } catch (e) {}
+      }
+    }
     var k = 'cx' + out.calcPid + '-' + String(out.calcForm.typeId) + '-' + String(out.calcForm.sizeId) + '-' + String(out.calcForm.matId) + '-' + String(out.calcForm.printKey);
     var name = (out.calcName || 'Товар') + ' (кальк.)';
     var found = -1;
@@ -515,6 +582,7 @@ export const MINIAPP_CLIENT_PART_CALC = `
     out.checkoutFileByK = out.checkoutFileByK || {};
     if (out.calcStagedLayout) { out.checkoutFileByK[k] = out.calcStagedLayout; }
     out.calcStagedLayout = null;
+    out.calcEditCartKey = null;
     out.view = 'cart';
     render();
   }
@@ -522,14 +590,27 @@ export const MINIAPP_CLIENT_PART_CALC = `
     out.view = 'catalog';
     out.calcPid = null;
     out.calcStagedLayout = null;
+    out.calcEditCartKey = null;
+    out._pendingCalcRestore = null;
     render();
   }
   function renderCalculator() {
     var box = h('div', '', 'section');
     box.appendChild(h('div', esc(out.calcName || 'Калькулятор'), 'section-head'));
-    var back = h('button', '← Каталог', 'small');
+    var back = h('button', out.calcEditCartKey ? '← Корзина' : '← Каталог', 'small');
     back.type = 'button';
-    back.onclick = function () { calcBack(); };
+    back.onclick = function () {
+      if (out.calcEditCartKey) {
+        out._pendingCalcRestore = null;
+        out.calcPid = null;
+        out.calcStagedLayout = null;
+        out.calcEditCartKey = null;
+        out.view = 'cart';
+        render();
+        return;
+      }
+      calcBack();
+    };
     box.appendChild(back);
     if (out.calcLoading && !out.calcSchema) { box.appendChild(rowHint('Загрузка схемы…')); return box; }
     if (out.calcErr) box.appendChild(rowHint(out.calcErr));

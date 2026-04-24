@@ -17,7 +17,10 @@ export const MINIAPP_CLIENT_PART1 = `
     /** Нет макета — нужна помощь с дизайном (не требовать файлы; сводка как «только печать»). */
     checkoutDesignHelp: false,
     calcStagedLayout: null,
-    checkoutFileProgress: null
+    checkoutFileProgress: null,
+    /** Правка строки из корзины: при «В корзину» старая позиция с этим k удаляется. */
+    calcEditCartKey: null,
+    _pendingCalcRestore: null
   };
   var nav, main;
   function $(id) { return document.getElementById(id); }
@@ -96,6 +99,8 @@ export const MINIAPP_CLIENT_PART1 = `
       out.calcErr = null;
       out.calcResult = null;
       out.calcStagedLayout = null;
+      out.calcEditCartKey = null;
+      out._pendingCalcRestore = null;
       out.calcForm = { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '' };
       out.view = 'calculator';
       if (typeof loadCalcSchema === 'function') loadCalcSchema();
