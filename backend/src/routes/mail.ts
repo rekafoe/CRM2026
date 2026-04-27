@@ -1,8 +1,17 @@
+import dns from 'dns/promises';
+import net from 'net';
+import nodemailer from 'nodemailer';
 import { Router } from 'express';
 import { asyncHandler } from '../middleware';
 import type { AuthenticatedRequest } from '../middleware/auth';
 import { mailBroadcastRateLimit } from '../middleware/rateLimiter';
-import { getMailOutboxIntervalMs, getSmtpConfig, isMailOutboxWorkerEnabled } from '../config/mail';
+import {
+  getMailOutboxIntervalMs,
+  getSmtpConfig,
+  getSmtpSocketFamily,
+  getSmtpTimeoutMs,
+  isMailOutboxWorkerEnabled,
+} from '../config/mail';
 import { getDb } from '../config/database';
 import {
   enqueueMail,
@@ -21,6 +30,114 @@ import { getTrackingPixelResponse, recordMailOpenByToken } from '../services/mai
 import { logger } from '../utils/logger';
 
 const router = Router();
+
+type DiagnosticStep = {
+  ok: boolean;
+  ms: number;
+  error?: string;
+  code?: string;
+  address?: string;
+  family?: number;
+};
+
+function getErrorInfo(error: unknown): { error: string; code?: string } {
+  const err = error as { message?: string; code?: string };
+  return {
+    error: err?.message || String(error),
+    code: err?.code,
+  };
+}
+
+async function checkTcpConnection(host: string, port: number, family: 4 | 6 | undefined, timeoutMs: number): Promise<DiagnosticStep> {
+  const started = Date.now();
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host, port, family });
+    let settled = false;
+    const finish = (result: Omit<DiagnosticStep, 'ms'>) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve({ ...result, ms: Date.now() - started });
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => finish({ ok: true }));
+    socket.once('timeout', () => finish({ ok: false, error: 'TCP connection timeout', code: 'ETIMEDOUT' }));
+    socket.once('error', (error) => finish({ ok: false, ...getErrorInfo(error) }));
+  });
+}
+
+async function runSmtpDiagnostics(): Promise<{
+  configured: boolean;
+  host: string;
+  port: number;
+  secure: boolean;
+  family?: 4 | 6;
+  timeoutMs: number;
+  dns: DiagnosticStep;
+  tcp: DiagnosticStep | null;
+  smtp: DiagnosticStep | null;
+}> {
+  const cfg = getSmtpConfig();
+  const family = getSmtpSocketFamily();
+  const timeoutMs = Math.min(getSmtpTimeoutMs(), 15_000);
+  const dnsStarted = Date.now();
+  let dnsResult: DiagnosticStep;
+  try {
+    const resolved = await dns.lookup(cfg.host, family ? { family } : undefined);
+    dnsResult = {
+      ok: true,
+      ms: Date.now() - dnsStarted,
+      address: resolved.address,
+      family: resolved.family,
+    };
+  } catch (error) {
+    dnsResult = { ok: false, ms: Date.now() - dnsStarted, ...getErrorInfo(error) };
+  }
+
+  const tcpResult = cfg.host && cfg.port
+    ? await checkTcpConnection(cfg.host, cfg.port, family, timeoutMs)
+    : null;
+
+  let smtpResult: DiagnosticStep | null = null;
+  if (cfg.configured && tcpResult?.ok) {
+    const smtpStarted = Date.now();
+    try {
+      const transporter = nodemailer.createTransport({
+        host: cfg.host,
+        port: cfg.port,
+        secure: cfg.secure,
+        connectionTimeout: timeoutMs,
+        greetingTimeout: timeoutMs,
+        socketTimeout: timeoutMs,
+        ...(family != null ? { family } : {}),
+        auth:
+          cfg.user && cfg.pass
+            ? {
+                user: cfg.user,
+                pass: cfg.pass,
+              }
+            : undefined,
+      });
+      await transporter.verify();
+      transporter.close();
+      smtpResult = { ok: true, ms: Date.now() - smtpStarted };
+    } catch (error) {
+      smtpResult = { ok: false, ms: Date.now() - smtpStarted, ...getErrorInfo(error) };
+    }
+  }
+
+  return {
+    configured: cfg.configured,
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
+    family,
+    timeoutMs,
+    dns: dnsResult,
+    tcp: tcpResult,
+    smtp: smtpResult,
+  };
+}
 
 function unsubscribeHtmlPage(ok: boolean, message: string): string {
   const title = ok ? 'Отписка' : 'Ошибка';
@@ -96,6 +213,18 @@ router.get(
       workerEnabled: isMailOutboxWorkerEnabled(),
       outboxIntervalMs: getMailOutboxIntervalMs(),
     });
+  })
+);
+
+/**
+ * GET /api/mail/diagnostics — DNS/TCP/SMTP verify без отправки письма.
+ */
+router.get(
+  '/diagnostics',
+  asyncHandler(async (req, res) => {
+    if (!requireAdmin(req as AuthenticatedRequest, res)) return;
+    const diagnostics = await runSmtpDiagnostics();
+    res.json(diagnostics);
   })
 );
 

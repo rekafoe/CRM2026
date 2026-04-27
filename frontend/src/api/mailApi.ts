@@ -15,6 +15,27 @@ export interface MailStatsResponse {
   sent24h: number;
 }
 
+export interface MailDiagnosticStep {
+  ok: boolean;
+  ms: number;
+  error?: string;
+  code?: string;
+  address?: string;
+  family?: number;
+}
+
+export interface MailDiagnosticsResponse {
+  configured: boolean;
+  host: string;
+  port: number;
+  secure: boolean;
+  family?: 4 | 6;
+  timeoutMs: number;
+  dns: MailDiagnosticStep;
+  tcp: MailDiagnosticStep | null;
+  smtp: MailDiagnosticStep | null;
+}
+
 export interface OrderEmailRuleRow {
   id: number;
   to_status_id: number;
@@ -56,6 +77,11 @@ export async function fetchMailConfig(): Promise<MailConfigResponse> {
 
 export async function fetchMailStats(): Promise<MailStatsResponse> {
   const { data } = await apiClient.get<MailStatsResponse>('/mail/stats');
+  return data;
+}
+
+export async function fetchMailDiagnostics(): Promise<MailDiagnosticsResponse> {
+  const { data } = await apiClient.get<MailDiagnosticsResponse>('/mail/diagnostics');
   return data;
 }
 

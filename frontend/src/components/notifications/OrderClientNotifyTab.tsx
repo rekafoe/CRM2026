@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../Toast';
 import {
   fetchMailConfig,
+  fetchMailDiagnostics,
   fetchMailStats,
   fetchOrderEmailRules,
   postMailTest,
   patchOrderEmailRule,
 } from '../../api/mailApi';
 import type { OrderEmailRuleRow } from '../../api/mailApi';
+import type { MailDiagnosticsResponse, MailDiagnosticStep } from '../../api/mailApi';
 import { fetchSmsConfig, fetchOrderSmsRules, patchOrderSmsRule } from '../../api/smsApi';
 import type { OrderSmsRuleRow } from '../../api/smsApi';
 import './OrderClientNotifyTab.css';
@@ -33,6 +35,8 @@ export const OrderClientNotifyTab: React.FC = () => {
   const [testTo, setTestTo] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [testResult, setTestResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [diagnostics, setDiagnostics] = useState<MailDiagnosticsResponse | null>(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [smsEnabled, setSmsEnabled] = useState<boolean | null>(null);
   const [smsDebounce, setSmsDebounce] = useState<number | null>(null);
@@ -162,6 +166,45 @@ export const OrderClientNotifyTab: React.FC = () => {
     }
   };
 
+  const handleDiagnostics = async () => {
+    setDiagnosticsLoading(true);
+    try {
+      const result = await fetchMailDiagnostics();
+      setDiagnostics(result);
+      const tcpOk = result.tcp?.ok;
+      const smtpOk = result.smtp?.ok;
+      addToast({
+        type: tcpOk && (smtpOk || !result.configured) ? 'success' : 'warning',
+        title: 'SMTP диагностика',
+        message: tcpOk ? 'TCP-соединение проверено' : 'TCP-соединение не прошло',
+      });
+    } catch (e) {
+      addToast({
+        type: 'error',
+        title: 'Диагностика',
+        message: e instanceof Error ? e.message : 'Не удалось проверить SMTP',
+      });
+    } finally {
+      setDiagnosticsLoading(false);
+    }
+  };
+
+  const renderDiagnosticStep = (label: string, step: MailDiagnosticStep | null) => (
+    <div className="client-notify-diagnostic-row">
+      <strong>{label}</strong>
+      {step ? (
+        <span className={step.ok ? 'client-notify-ok' : 'client-notify-bad'}>
+          {step.ok ? 'OK' : 'Ошибка'} · {step.ms} мс
+          {step.address ? ` · ${step.address}` : ''}
+          {step.code ? ` · ${step.code}` : ''}
+          {step.error ? ` · ${step.error}` : ''}
+        </span>
+      ) : (
+        <span className="client-notify-muted-inline">не запускалось</span>
+      )}
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="notifications-settings client-notify-tab">
@@ -208,6 +251,27 @@ export const OrderClientNotifyTab: React.FC = () => {
               Очередь: {stats.pending} ожидает · {stats.failed} с ошибкой · {stats.sent24h} за 24ч
             </p>
           )}
+          <div className="client-notify-diagnostics">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void handleDiagnostics()}
+              disabled={diagnosticsLoading}
+            >
+              {diagnosticsLoading ? 'Проверяем...' : 'Проверить SMTP-соединение'}
+            </button>
+            {diagnostics && (
+              <div className="client-notify-diagnostic-result">
+                <p className="client-notify-meta">
+                  Проверяется: {diagnostics.host}:{diagnostics.port} · secure={String(diagnostics.secure)}
+                  {diagnostics.family ? ` · IPv${diagnostics.family}` : ''}
+                </p>
+                {renderDiagnosticStep('DNS', diagnostics.dns)}
+                {renderDiagnosticStep('TCP', diagnostics.tcp)}
+                {renderDiagnosticStep('SMTP verify', diagnostics.smtp)}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="settings-section">
