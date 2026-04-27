@@ -10,6 +10,7 @@ import { MINIAPP_CLIENT_PART2_CHECKOUT } from './miniappClientScriptPart2Checkou
 import { MINIAPP_CLIENT_PART_PRICE_TYPE_HELP } from './miniappClientScriptPartPriceTypeHelp';
 import { MINIAPP_PRICE_TYPE_HELP_INNER_HTML } from './priceTypeHelpInnerHtml';
 import { MINIAPP_CLIENT_PART_CALC } from '../../../backend/src/utils/miniapp/miniappClientScriptPartCalc';
+import { MINIAPP_CLIENT_PART_CALC_OPERATIONS } from '../../../backend/src/utils/miniapp/miniappClientScriptPartCalcOperations';
 
 declare global {
   interface Window {
@@ -43,6 +44,7 @@ function buildMiniappScript(): string {
     MINIAPP_CLIENT_PART1 +
     MINIAPP_CLIENT_PART_API +
     MINIAPP_CLIENT_PART_CALC +
+    MINIAPP_CLIENT_PART_CALC_OPERATIONS +
     MINIAPP_CLIENT_PART_PRICE_TYPE_HELP +
     MINIAPP_CLIENT_PART_CALC_SUMMARY +
     MINIAPP_CLIENT_PART_ORDER_DETAIL +

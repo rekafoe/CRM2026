@@ -1,4 +1,4 @@
-(function(){"use strict";const y="",b="",C="",t=`
+(function(){"use strict";const b="",C="",_="",t=`
   var _miniappAuthPromise = null;
   function getMiniappInitData() {
     var tg = window.Telegram && window.Telegram.WebApp;
@@ -80,7 +80,7 @@
   function miniappRequestJson(path, opts) {
     return miniappRequest(path, opts).then(function (r) { return miniappJsonResponse(r); });
   }
-`,r="0 0 3780 5315.63",i="M1667.66 2690.24c104.12,-0.5 365.38,-11.13 446.39,13.35 279.36,84.42 271.48,429.66 3.79,511.73 -79.56,24.4 -348.11,15.54 -450.15,13.76l0.08 -187.68 369.98 -0.3 0.16 -161.4 -370.58 -1.29 0.33 -188.17zm0.07 -604.24l653.99 -0.69 0.16 -161.09 -816.93 -0.07 -0.13 954.21 -208.72 0.15 0.43 162.65 208.15 0.76 0.21 349.18c111.37,-0.52 222.85,-0.05 334.23,-0.05 106.15,0 220.5,8.88 316.14,-17.04 379.05,-102.75 447.95,-590.61 110.72,-780.65 -82.93,-46.74 -155.85,-65.71 -268.51,-65.55 -109.25,0.16 -219.85,1.61 -329.7,-0.15l-0.04 -441.66z",a=()=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r}" fill="none" aria-hidden="true" focusable="false"><path d="${i}" fill="currentColor"/></svg>`.replace(/\s+/g," ");function n(){return' <span class="ipc-byn" role="img" aria-label="бел. руб.">'+a()+"</span>"}const o=`
+`,r="0 0 3780 5315.63",i="M1667.66 2690.24c104.12,-0.5 365.38,-11.13 446.39,13.35 279.36,84.42 271.48,429.66 3.79,511.73 -79.56,24.4 -348.11,15.54 -450.15,13.76l0.08 -187.68 369.98 -0.3 0.16 -161.4 -370.58 -1.29 0.33 -188.17zm0.07 -604.24l653.99 -0.69 0.16 -161.09 -816.93 -0.07 -0.13 954.21 -208.72 0.15 0.43 162.65 208.15 0.76 0.21 349.18c111.37,-0.52 222.85,-0.05 334.23,-0.05 106.15,0 220.5,8.88 316.14,-17.04 379.05,-102.75 447.95,-590.61 110.72,-780.65 -82.93,-46.74 -155.85,-65.71 -268.51,-65.55 -109.25,0.16 -219.85,1.61 -329.7,-0.15l-0.04 -441.66z",n=()=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r}" fill="none" aria-hidden="true" focusable="false"><path d="${i}" fill="currentColor"/></svg>`.replace(/\s+/g," ");function a(){return' <span class="ipc-byn" role="img" aria-label="бел. руб.">'+n()+"</span>"}const o=`
   var out = {
     token: null, me: null, products: null, productErr: null, orders: null, ordersErr: null,
     cart: [], view: 'catalog', err: null, load: false, checkoutMsg: null, checkoutType: 'individual',
@@ -91,7 +91,7 @@
     draftOrderNumber: null,
     draftUploadedItemIds: null,
     calcPid: null, calcName: '', calcListItem: null, calcSchema: null, calcErr: null, calcLoading: false, calcResult: null,
-    calcForm: { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '' },
+    calcForm: { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '', cutting: false, cuttingRequired: false },
     orderDetailId: null, orderDetailData: null, orderDetailErr: null, orderDetailLoading: false,
     orderFileMsg: null, orderUploadLoading: false,
     postCheckoutNotice: null,
@@ -111,7 +111,7 @@
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
   function bynSpanHtml() {
-    return ${JSON.stringify(n())};
+    return ${JSON.stringify(a())};
   }
   function h(tag, inner, cl) {
     var e = document.createElement(tag);
@@ -189,7 +189,7 @@
       out.calcStagedLayout = null;
       out.calcEditCartKey = null;
       out._pendingCalcRestore = null;
-      out.calcForm = { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '' };
+      out.calcForm = { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '', cutting: false, cuttingRequired: false };
       out.view = 'calculator';
       if (typeof loadCalcSchema === 'function') loadCalcSchema();
       else { out.calcErr = 'Калькулятор не загружен'; render(); }
@@ -381,6 +381,107 @@
     form.appendChild(w);
   }
 `,l=`
+  function ipcCalcMoneyHtml(value) {
+    var n = Number(value);
+    if (!isFinite(n)) return '—';
+    return esc(String(Math.round(n * 100) / 100)) + bynSpanHtml();
+  }
+  function ipcCalcNumberLabel(value, suffix) {
+    var n = Number(value);
+    if (!isFinite(n) || n <= 0) return '';
+    var rounded = Math.round(n * 1000) / 1000;
+    return String(rounded) + (suffix || '');
+  }
+  function ipcCalcLineTotal(row) {
+    if (!row) return 0;
+    var direct = row.totalCost != null ? row.totalCost : (row.total != null ? row.total : row.priceForQuantity);
+    var n = Number(direct);
+    if (isFinite(n)) return n;
+    var unit = Number(row.unitPrice != null ? row.unitPrice : (row.unit_price != null ? row.unit_price : row.price));
+    var qty = Number(row.quantity != null ? row.quantity : row.units_needed);
+    return isFinite(unit) && isFinite(qty) ? unit * qty : 0;
+  }
+  function ipcCalcOperationName(row) {
+    if (!row) return 'Операция';
+    return String(
+      row.operationName ||
+      row.operation_name ||
+      row.service_name ||
+      row.service ||
+      row.name ||
+      'Операция'
+    );
+  }
+  function ipcCalcOperationKind(row) {
+    var name = ipcCalcOperationName(row).toLowerCase();
+    var type = String(row && (row.operationType || row.operation_type || row.type || '') || '').toLowerCase();
+    var key = String(row && (row.pricingKey || row.pricing_key || '') || '').toLowerCase();
+    if (key === 'print' || type === 'print' || row.technologyCode || row.technology_code || name.indexOf('печать') >= 0) return 'print';
+    if (type === 'cut' || name.indexOf('резк') >= 0 || name.indexOf('cut') >= 0) return 'cutting';
+    return 'operation';
+  }
+  function ipcCalcBreakdownRows(r) {
+    var rows = [];
+    var materials = Array.isArray(r.materials) ? r.materials : [];
+    for (var i = 0; i < materials.length; i++) {
+      var m = materials[i] || {};
+      rows.push({
+        group: 'material',
+        label: m.materialName || m.material_name || m.name || 'Материал',
+        meta: ipcCalcNumberLabel(m.quantity, m.unit ? ' ' + m.unit : ''),
+        total: ipcCalcLineTotal(m)
+      });
+    }
+    var ops = Array.isArray(r.operations) ? r.operations : (Array.isArray(r.services) ? r.services : []);
+    for (var j = 0; j < ops.length; j++) {
+      var op = ops[j] || {};
+      var kind = ipcCalcOperationKind(op);
+      rows.push({
+        group: kind,
+        label: ipcCalcOperationName(op),
+        meta: ipcCalcNumberLabel(op.quantity != null ? op.quantity : op.units_needed, ''),
+        total: ipcCalcLineTotal(op)
+      });
+    }
+    return rows.filter(function (row) {
+      return row && row.label && isFinite(Number(row.total));
+    });
+  }
+  function ipcCalcGroupTitle(group) {
+    if (group === 'material') return 'Материалы';
+    if (group === 'print') return 'Печать';
+    if (group === 'cutting') return 'Резка';
+    return 'Операции';
+  }
+  function appendCalcBreakdownUI(card, r) {
+    var rows = ipcCalcBreakdownRows(r);
+    if (!rows.length) return;
+    card.appendChild(h('hr', '', 'ipc-calc-card__sep'));
+    var wrap = h('div', '', 'ipc-calc-breakdown');
+    wrap.appendChild(h('div', 'Разбивка цены', 'ipc-calc-breakdown__title'));
+    var order = ['material', 'print', 'cutting', 'operation'];
+    for (var gi = 0; gi < order.length; gi++) {
+      var group = order[gi];
+      var groupRows = rows.filter(function (row) { return row.group === group; });
+      if (!groupRows.length) continue;
+      var groupBox = h('div', '', 'ipc-calc-breakdown__group');
+      groupBox.appendChild(h('div', ipcCalcGroupTitle(group), 'ipc-calc-breakdown__group-title'));
+      for (var ri = 0; ri < groupRows.length; ri++) {
+        var row = groupRows[ri];
+        var line = h('div', '', 'ipc-calc-breakdown__row');
+        var left = h('div', '', 'ipc-calc-breakdown__left');
+        left.appendChild(h('span', esc(row.label), 'ipc-calc-breakdown__label'));
+        if (row.meta) left.appendChild(h('span', esc(row.meta), 'ipc-calc-breakdown__meta'));
+        var right = h('div', '', 'ipc-calc-breakdown__value');
+        right.innerHTML = ipcCalcMoneyHtml(row.total);
+        line.appendChild(left);
+        line.appendChild(right);
+        groupBox.appendChild(line);
+      }
+      wrap.appendChild(groupBox);
+    }
+    card.appendChild(wrap);
+  }
   function appendCalcResultSummaryUI(container, r) {
     if (!container || !r) return;
     var card = h('div', '', 'ipc-calc-card');
@@ -405,6 +506,8 @@
         : '—';
     lineSub.appendChild(valSub);
     card.appendChild(lineSub);
+
+    appendCalcBreakdownUI(card, r);
 
     if (Array.isArray(r.priceTiers) && r.priceTiers.length > 0) {
       card.appendChild(h('hr', '', 'ipc-calc-card__sep'));
@@ -1351,6 +1454,23 @@
     }
     return null;
   }
+  /** В compact-схеме: simplified.cutting === true — в продукте доступна резка (как в CRM). */
+  function calcCuttingFeatureEnabled() {
+    var s = calcSimp();
+    return !!(s && s.cutting === true);
+  }
+  /** В PrintCore резка не отключается: если в шаблоне включена (simplified.cutting), всегда как в CRM с включённой «Резка». */
+  function syncCalcFormCuttingFromTypeDefaults() {
+    if (!calcCuttingFeatureEnabled()) {
+      out.calcForm.cutting = false;
+      out.calcForm.cuttingRequired = false;
+      return;
+    }
+    out.calcForm.cutting = true;
+    var cfg = getTypeConfigForCurrentSubtype();
+    var init = cfg && cfg.initial;
+    out.calcForm.cuttingRequired = !!(init && init.cutting_required);
+  }
   function calcAllowedPriceTypesRaw() {
     var s = calcSimp();
     if (!s) return [];
@@ -1421,14 +1541,42 @@
       out.calcForm.priceType = '';
     }
     if (!out.calcForm.qty || out.calcForm.qty < 1) out.calcForm.qty = 100;
+    syncCalcFormCuttingFromTypeDefaults();
+    if (typeof syncMiniappFinishingSelectionFromDefaults === 'function') {
+      syncMiniappFinishingSelectionFromDefaults(true);
+    }
   }
   var _calcDebounceT = null;
+  var _calcRequestSeq = 0;
   function scheduleCalcRun() {
     if (_calcDebounceT) clearTimeout(_calcDebounceT);
     _calcDebounceT = setTimeout(function () {
       _calcDebounceT = null;
       runCalc({ soft: true });
     }, 420);
+  }
+  function stableCalcPayloadSignature(value) {
+    function normalize(v) {
+      if (Array.isArray(v)) {
+        return v.map(normalize);
+      }
+      if (v && typeof v === 'object') {
+        var outObj = {};
+        var keys = Object.keys(v).sort();
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          if (v[k] === undefined) continue;
+          outObj[k] = normalize(v[k]);
+        }
+        return outObj;
+      }
+      return v;
+    }
+    try {
+      return JSON.stringify(normalize(value || {}));
+    } catch (e) {
+      return '';
+    }
   }
   /** Восстанавливает calcForm из сохранённого configuration позиции корзины. */
   function applyConfigFromCartLine(c) {
@@ -1448,6 +1596,10 @@
     if (p.priceType) out.calcForm.priceType = String(p.priceType);
     syncCalcFormMatPaperKey(calcMaterials());
     ensurePrintKeyMatchesOptions();
+    syncCalcFormCuttingFromTypeDefaults();
+    if (typeof restoreMiniappFinishingSelection === 'function') {
+      restoreMiniappFinishingSelection(p.finishing);
+    }
     var allowedPts = calcAllowedPriceTypes();
     if (allowedPts.length > 0) {
       var selectedPt = String(out.calcForm.priceType || '').trim();
@@ -1479,7 +1631,7 @@
     out.calcErr = null;
     out.calcResult = null;
     out.calcStagedLayout = out.checkoutFileByK && out.checkoutFileByK[c.k] ? out.checkoutFileByK[c.k] : null;
-    out.calcForm = { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '' };
+    out.calcForm = { typeId: null, sizeId: null, matId: null, matPaperKey: null, qty: 100, printKey: '', priceType: '', cutting: false, cuttingRequired: false };
     out.view = 'calculator';
     loadCalcSchema();
   }
@@ -1600,6 +1752,59 @@
     render();
     scheduleCalcRun();
   }
+  /** Как в CRM: initial.operations подтипа → finishing для POST /calculate. */
+  function buildFinishingFromTypeInitial() {
+    var cfg = getTypeConfigForCurrentSubtype();
+    var init = cfg && cfg.initial;
+    var ops = init && Array.isArray(init.operations) ? init.operations : [];
+    if (ops.length === 0) return [];
+    var sz = calcSelectedSize();
+    var sizeFin = sz && Array.isArray(sz.finishing) ? sz.finishing : [];
+    var res = [];
+    for (var i = 0; i < ops.length; i++) {
+      var op = ops[i] || {};
+      var sid = Number(op.operation_id != null ? op.operation_id : op.operationId);
+      if (!isFinite(sid) || sid <= 0) continue;
+      var vidRaw = op.variant_id != null ? op.variant_id : op.variantId;
+      var vid =
+        vidRaw != null && String(vidRaw).trim() !== '' && isFinite(Number(vidRaw)) ? Number(vidRaw) : undefined;
+      var row = null;
+      var j;
+      if (vid != null) {
+        for (j = 0; j < sizeFin.length; j++) {
+          var f = sizeFin[j];
+          if (Number(f.service_id) !== sid) continue;
+          if (f.variant_id != null && Number(f.variant_id) === vid) {
+            row = f;
+            break;
+          }
+        }
+      }
+      if (!row) {
+        for (j = 0; j < sizeFin.length; j++) {
+          if (Number(sizeFin[j].service_id) === sid) {
+            row = sizeFin[j];
+            break;
+          }
+        }
+      }
+      var entry = { service_id: sid };
+      if (vid != null) entry.variant_id = vid;
+      if (row && row.price_unit) entry.price_unit = row.price_unit;
+      if (row && row.units_per_item != null) entry.units_per_item = Number(row.units_per_item);
+      res.push(entry);
+    }
+    return res;
+  }
+  function finishingPayloadSignature(fin) {
+    if (!fin || !fin.length) return '';
+    var parts = [];
+    for (var i = 0; i < fin.length; i++) {
+      var e = fin[i];
+      parts.push(String(e.service_id) + (e.variant_id != null ? 'v' + String(e.variant_id) : ''));
+    }
+    return parts.join('_');
+  }
   function buildCalcPayload() {
     var p = parsePrintKey();
     var qn = Math.max(1, parseInt(String(out.calcForm.qty), 10) || 1);
@@ -1607,6 +1812,14 @@
     if (out.calcForm.matId != null) pl.material_id = out.calcForm.matId;
     if (out.calcForm.typeId != null) pl.type_id = out.calcForm.typeId;
     if (out.calcForm.priceType) pl.priceType = out.calcForm.priceType;
+    if (out.calcForm.cutting) pl.cutting = true;
+    var fin = typeof buildMiniappFinishingPayload === 'function'
+      ? buildMiniappFinishingPayload()
+      : buildFinishingFromTypeInitial();
+    // Явно передаём выбор операций текущего подтипа.
+    // Пустой массив означает «для этого подтипа finishing не выбран»,
+    // чтобы бэкенд не падал обратно на все операции размера.
+    pl.finishing = fin;
     return pl;
   }
   function runCalc(opts) {
@@ -1621,19 +1834,32 @@
     out.calcLoading = true;
     render();
     var body = buildCalcPayload();
+    var bodySig = stableCalcPayloadSignature(body);
+    var requestSeq = ++_calcRequestSeq;
+    out.calcRequestSignature = bodySig;
     miniappRequestJson('/api/products/' + out.calcPid + '/calculate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body)
     })
       .then(function (x) {
+        if (requestSeq !== _calcRequestSeq) return;
         out.calcLoading = false;
         if (!x.ok || !x.j) { out.calcErr = 'Ошибка цены'; render(); return; }
-        if (x.j.success && x.j.data) { out.calcResult = x.j.data; out.calcErr = null; } else
+        if (x.j.success && x.j.data) {
+          out.calcResult = x.j.data;
+          out.calcResultSignature = bodySig;
+          out.calcErr = null;
+        } else
           { out.calcErr = (x.j.message || x.j.error) ? String(x.j.message || x.j.error) : 'Расчёт неудачен'; }
         render();
       })
-      .catch(function (e) { out.calcLoading = false; out.calcErr = (e && e.message) || String(e); render(); });
+      .catch(function (e) {
+        if (requestSeq !== _calcRequestSeq) return;
+        out.calcLoading = false;
+        out.calcErr = (e && e.message) || String(e);
+        render();
+      });
   }
   function buildCalcCartParams() {
     var cfg = buildCalcPayload();
@@ -1724,6 +1950,14 @@
   }
   function calcAddToCart() {
     if (!out.calcResult || out.calcResult.finalPrice == null) { return; }
+    var currentPayload = buildCalcPayload();
+    var currentSig = stableCalcPayloadSignature(currentPayload);
+    if (!out.calcResultSignature || out.calcResultSignature !== currentSig) {
+      out.calcErr = 'Параметры изменились — дождитесь обновления цены.';
+      scheduleCalcRun();
+      render();
+      return;
+    }
     if (typeof clearDraftCheckoutState === 'function') clearDraftCheckoutState();
     var r = out.calcResult || {};
     var q = Math.max(1, parseInt(String(out.calcForm.qty), 10) || 1);
@@ -1741,7 +1975,25 @@
         try { delete out.checkoutFileByK[re]; } catch (e) {}
       }
     }
-    var k = 'cx' + out.calcPid + '-' + String(out.calcForm.typeId) + '-' + String(out.calcForm.sizeId) + '-' + String(out.calcForm.matId) + '-' + String(out.calcForm.printKey);
+    var finKey = typeof buildMiniappFinishingPayload === 'function'
+      ? buildMiniappFinishingPayload()
+      : buildFinishingFromTypeInitial();
+    var finSig = finishingPayloadSignature(finKey);
+    var k =
+      'cx' +
+      out.calcPid +
+      '-' +
+      String(out.calcForm.typeId) +
+      '-' +
+      String(out.calcForm.sizeId) +
+      '-' +
+      String(out.calcForm.matId) +
+      '-' +
+      String(out.calcForm.printKey) +
+      '-c' +
+      (out.calcForm.cutting ? '1' : '0') +
+      '-f' +
+      (finSig || '0');
     var name = (out.calcName || 'Товар') + ' (кальк.)';
     var found = -1;
     for (var i = 0; i < out.cart.length; i++) { if (out.cart[i].k === k) { found = i; break; } }
@@ -2009,6 +2261,30 @@
         form.appendChild(accF);
       }
     }
+    if (calcCuttingFeatureEnabled()) {
+      var cutField = h('div', '', 'field ipc-field--price-type');
+      cutField.appendChild(h('div', 'Дополнительно', 'ipc-price-type__fieldtitle'));
+      var cutLab = document.createElement('label');
+      cutLab.className = 'ipc-design-help';
+      var cutCb = document.createElement('input');
+      cutCb.type = 'checkbox';
+      cutCb.checked = true;
+      cutCb.disabled = true;
+      cutCb.setAttribute('aria-label', 'Резка учитывается в цене');
+      cutLab.appendChild(cutCb);
+      cutLab.appendChild(
+        document.createTextNode(
+          out.calcForm.cuttingRequired
+            ? ' Резка обязательна для этого варианта — учтена в расчёте'
+            : ' Резка по раскладке — учтена в расчёте (отключить нельзя)'
+        )
+      );
+      cutField.appendChild(cutLab);
+      form.appendChild(cutField);
+    }
+    if (typeof renderMiniappFinishingControls === 'function') {
+      renderMiniappFinishingControls(form);
+    }
     var qi = document.createElement('input');
     qi.name = 'q';
     qi.type = 'number';
@@ -2047,6 +2323,10 @@
       if (r.warnings && r.warnings.length) resBox.appendChild(h('p', esc(r.warnings.join('; ')), 'hint'));
       var addB = h('button', 'В корзину', 'primary');
       addB.type = 'button';
+      var currentSigForButton = stableCalcPayloadSignature(buildCalcPayload());
+      var isFreshPrice = !!out.calcResultSignature && out.calcResultSignature === currentSigForButton;
+      addB.disabled = out.calcLoading || !isFreshPrice;
+      if (!isFreshPrice) addB.textContent = out.calcLoading ? 'Обновляем цену…' : 'Цена устарела';
       addB.onclick = function () { calcAddToCart(); };
       resBox.appendChild(addB);
       var resPanel = h('div', '', 'ipc-panel');
@@ -2057,8 +2337,223 @@
     }
     return box;
   }
-`;function f(){const e=window.__MINIAPP_CONFIG__||{},h=JSON.stringify(String(e.apiBase||"").replace(/\/+$/,"")),g=e.catalogCategoryId!=null&&Number.isFinite(Number(e.catalogCategoryId))&&Number(e.catalogCategoryId)>=1?String(Math.floor(Number(e.catalogCategoryId))):"null",v=JSON.stringify(e.priceTypeHelpHtml||s);return`(function () {
-  var API_BASE = `+h+`;
+`,f=`
+  function miniappFinishingKey(x) {
+    if (!x) return '';
+    var sid = Number(x.service_id != null ? x.service_id : (x.operation_id != null ? x.operation_id : x.operationId));
+    if (!isFinite(sid) || sid <= 0) return '';
+    var vidRaw = x.variant_id != null ? x.variant_id : x.variantId;
+    var vid = vidRaw != null && String(vidRaw).trim() !== '' && isFinite(Number(vidRaw)) ? Number(vidRaw) : null;
+    return String(sid) + ':' + (vid != null ? String(vid) : '');
+  }
+  function miniappServiceInfo(serviceId) {
+    var d = out.calcSchema && out.calcSchema.data;
+    var ops = d && Array.isArray(d.operations) ? d.operations : [];
+    for (var i = 0; i < ops.length; i++) {
+      var op = ops[i] || {};
+      var oid = Number(op.operation_id != null ? op.operation_id : (op.id != null ? op.id : op.service_id));
+      if (oid === Number(serviceId)) return op;
+    }
+    return null;
+  }
+  function miniappVariantLabel(serviceId, variantId) {
+    if (variantId == null) return '';
+    var d = out.calcSchema && out.calcSchema.data;
+    var byService = d && d.service_variants ? d.service_variants[String(serviceId)] : null;
+    if (!Array.isArray(byService)) return '';
+    for (var i = 0; i < byService.length; i++) {
+      var v = byService[i] || {};
+      if (Number(v.id) !== Number(variantId)) continue;
+      var p = v.parameters || {};
+      var parts = [];
+      if (p.type) parts.push(String(p.type).trim());
+      if (p.subType) parts.push(String(p.subType).trim());
+      else if (p.density) parts.push(String(p.density).trim());
+      var joined = parts.filter(Boolean).join(' ');
+      return joined || v.variantName || ('Вариант #' + variantId);
+    }
+    return 'Вариант #' + variantId;
+  }
+  function miniappFinishingOptions() {
+    var sz = calcSelectedSize();
+    var rows = sz && Array.isArray(sz.finishing) ? sz.finishing : [];
+    var cfg = getTypeConfigForCurrentSubtype();
+    var init = cfg && cfg.initial;
+    var initOps = init && Array.isArray(init.operations) ? init.operations : [];
+    var byKey = {};
+    function add(raw) {
+      var sid = Number(raw && (raw.service_id != null ? raw.service_id : (raw.operation_id != null ? raw.operation_id : raw.operationId)));
+      if (!isFinite(sid) || sid <= 0) return;
+      var vidRaw = raw.variant_id != null ? raw.variant_id : raw.variantId;
+      var vid = vidRaw != null && String(vidRaw).trim() !== '' && isFinite(Number(vidRaw)) ? Number(vidRaw) : undefined;
+      var key = miniappFinishingKey({ service_id: sid, variant_id: vid });
+      if (!key || byKey[key]) return;
+      var svc = miniappServiceInfo(sid);
+      var variantLabel = miniappVariantLabel(sid, vid);
+      byKey[key] = {
+        key: key,
+        service_id: sid,
+        variant_id: vid,
+        price_unit: raw.price_unit || (svc && svc.price_unit) || undefined,
+        units_per_item: raw.units_per_item != null ? Number(raw.units_per_item) : 1,
+        name: (svc && (svc.operation_name || svc.name)) || ('Операция #' + sid),
+        variantLabel: variantLabel
+      };
+    }
+    for (var i = 0; i < rows.length; i++) add(rows[i]);
+    for (var j = 0; j < initOps.length; j++) add(initOps[j]);
+    var outRows = [];
+    for (var k in byKey) {
+      if (Object.prototype.hasOwnProperty.call(byKey, k)) outRows.push(byKey[k]);
+    }
+    outRows.sort(function (a, b) {
+      if (a.name < b.name) return -1;
+      if (a.name > b.name) return 1;
+      return String(a.variantLabel || '').localeCompare(String(b.variantLabel || ''), 'ru');
+    });
+    return outRows;
+  }
+  function miniappDefaultFinishingSelection() {
+    var cfg = getTypeConfigForCurrentSubtype();
+    var init = cfg && cfg.initial;
+    var initOps = init && Array.isArray(init.operations) ? init.operations : [];
+    var selected = {};
+    for (var i = 0; i < initOps.length; i++) {
+      var key = miniappFinishingKey(initOps[i]);
+      if (key) selected[key] = true;
+    }
+    return selected;
+  }
+  function miniappFinishingContextKey() {
+    return String(calcPickTypeId()) + '|' + String(out.calcForm.sizeId || '');
+  }
+  function syncMiniappFinishingSelectionFromDefaults(force) {
+    var ctx = miniappFinishingContextKey();
+    if (!out.calcForm.finishingSelection || force || out.calcForm.finishingSelectionContext !== ctx) {
+      out.calcForm.finishingSelection = miniappDefaultFinishingSelection();
+      out.calcForm.finishingSelectionContext = ctx;
+    }
+  }
+  function restoreMiniappFinishingSelection(finishing) {
+    var selected = {};
+    if (Array.isArray(finishing)) {
+      for (var i = 0; i < finishing.length; i++) {
+        var key = miniappFinishingKey(finishing[i]);
+        if (key) selected[key] = true;
+      }
+    }
+    out.calcForm.finishingSelection = selected;
+    out.calcForm.finishingSelectionContext = miniappFinishingContextKey();
+  }
+  function buildMiniappFinishingPayload() {
+    syncMiniappFinishingSelectionFromDefaults(false);
+    var selected = out.calcForm.finishingSelection || {};
+    var options = miniappFinishingOptions();
+    var payload = [];
+    var usedServices = {};
+    for (var i = 0; i < options.length; i++) {
+      var opt = options[i];
+      if (!selected[opt.key]) continue;
+      if (usedServices[String(opt.service_id)]) continue;
+      usedServices[String(opt.service_id)] = true;
+      var entry = { service_id: opt.service_id };
+      if (opt.variant_id != null) entry.variant_id = opt.variant_id;
+      if (opt.price_unit) entry.price_unit = opt.price_unit;
+      if (opt.units_per_item != null && isFinite(Number(opt.units_per_item))) entry.units_per_item = Number(opt.units_per_item);
+      payload.push(entry);
+    }
+    return payload;
+  }
+  function miniappFinishingGroups(options) {
+    var byService = {};
+    for (var i = 0; i < options.length; i++) {
+      var opt = options[i];
+      var key = String(opt.service_id);
+      if (!byService[key]) byService[key] = { service_id: opt.service_id, name: opt.name, options: [] };
+      byService[key].options.push(opt);
+    }
+    var groups = [];
+    for (var k in byService) {
+      if (Object.prototype.hasOwnProperty.call(byService, k)) groups.push(byService[k]);
+    }
+    groups.sort(function (a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
+    });
+    return groups;
+  }
+  function setMiniappFinishingServiceSelection(serviceId, optionKey) {
+    out.calcForm.finishingSelection = out.calcForm.finishingSelection || {};
+    var options = miniappFinishingOptions();
+    for (var i = 0; i < options.length; i++) {
+      if (Number(options[i].service_id) === Number(serviceId)) {
+        out.calcForm.finishingSelection[options[i].key] = false;
+      }
+    }
+    if (optionKey) out.calcForm.finishingSelection[optionKey] = true;
+    render();
+    scheduleCalcRun();
+  }
+  function renderMiniappFinishingControls(form) {
+    var options = miniappFinishingOptions();
+    if (!options.length) return;
+    syncMiniappFinishingSelectionFromDefaults(false);
+    var selected = out.calcForm.finishingSelection || {};
+    var field = h('div', '', 'field ipc-field--price-type ipc-ops-field');
+    field.appendChild(h('div', 'Операции', 'ipc-price-type__fieldtitle'));
+    var wrap = h('div', '', 'ipc-ops-list');
+    var groups = miniappFinishingGroups(options);
+    for (var gi = 0; gi < groups.length; gi++) {
+      (function (group) {
+        if (group.options.length <= 1) {
+          var opt = group.options[0];
+          if (!opt) return;
+          var lab = document.createElement('label');
+          lab.className = 'ipc-design-help ipc-op-option';
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = !!selected[opt.key];
+          cb.setAttribute('aria-label', opt.name);
+          cb.onchange = function () {
+            out.calcForm.finishingSelection = out.calcForm.finishingSelection || {};
+            out.calcForm.finishingSelection[opt.key] = !!cb.checked;
+            render();
+            scheduleCalcRun();
+          };
+          var text = opt.name + (opt.variantLabel ? ' — ' + opt.variantLabel : '');
+          lab.appendChild(cb);
+          lab.appendChild(document.createTextNode(' ' + text));
+          wrap.appendChild(lab);
+          return;
+        }
+        var groupBox = h('div', '', 'ipc-op-group');
+        groupBox.appendChild(h('div', esc(group.name), 'ipc-op-group__title'));
+        var btns = h('div', '', 'ipc-op-group__btns');
+        var hasSelected = group.options.some(function (opt) { return !!selected[opt.key]; });
+        var noneBtn = document.createElement('button');
+        noneBtn.type = 'button';
+        noneBtn.className = 'ipc-op-variant' + (!hasSelected ? ' ipc-op-variant--on' : '');
+        noneBtn.textContent = 'Без операции';
+        noneBtn.onclick = function () { setMiniappFinishingServiceSelection(group.service_id, null); };
+        btns.appendChild(noneBtn);
+        for (var oi = 0; oi < group.options.length; oi++) {
+          (function (opt) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'ipc-op-variant' + (selected[opt.key] ? ' ipc-op-variant--on' : '');
+            btn.textContent = opt.variantLabel || opt.name;
+            btn.onclick = function () { setMiniappFinishingServiceSelection(group.service_id, opt.key); };
+            btns.appendChild(btn);
+          })(group.options[oi]);
+        }
+        groupBox.appendChild(btns);
+        wrap.appendChild(groupBox);
+      })(groups[gi]);
+    }
+    field.appendChild(wrap);
+    form.appendChild(field);
+  }
+`;function h(){const e=window.__MINIAPP_CONFIG__||{},v=JSON.stringify(String(e.apiBase||"").replace(/\/+$/,"")),g=e.catalogCategoryId!=null&&Number.isFinite(Number(e.catalogCategoryId))&&Number(e.catalogCategoryId)>=1?String(Math.floor(Number(e.catalogCategoryId))):"null",y=JSON.stringify(e.priceTypeHelpHtml||s);return`(function () {
+  var API_BASE = `+v+`;
   var CATALOG_CATEGORY_ID = `+g+`;
-  var MINIAPP_PRICE_TYPE_HELP_INNER = `+v+`;
-`+o+t+m+d+l+c+u+p}new Function(f())()})();
+  var MINIAPP_PRICE_TYPE_HELP_INNER = `+y+`;
+`+o+t+m+f+d+l+c+u+p}new Function(h())()})();

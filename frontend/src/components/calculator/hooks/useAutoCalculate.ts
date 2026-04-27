@@ -72,7 +72,9 @@ export function useAutoCalculate({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const specsRef = useRef(specs);
   const lastSpecsKeyRef = useRef<string>('');
+  const currentSpecsKeyRef = useRef<string>('');
   const isCalculatingRef = useRef(false);
+  const pendingCalculateRef = useRef(false);
   
   // Обновляем ref при изменении specs
   useEffect(() => {
@@ -85,6 +87,10 @@ export function useAutoCalculate({
       `${getSpecsKey(specs, customFormat, isCustomFormat)}|print:${printTechnology ?? ''}|color:${printColorMode ?? ''}`,
     [specs, customFormat, isCustomFormat, printTechnology, printColorMode],
   );
+
+  useEffect(() => {
+    currentSpecsKeyRef.current = specsKey;
+  }, [specsKey]);
   
   // Ref для стабильной ссылки на onCalculate и других зависимостей
   const onCalculateRef = useRef(onCalculate);
@@ -105,8 +111,9 @@ export function useAutoCalculate({
       return;
     }
     
-    // Не запускаем новый расчет, если уже идет расчет
+    // Если расчет уже идет, не теряем изменение: пересчитаем по последним specs после завершения.
     if (isCalculatingRef.current) {
+      pendingCalculateRef.current = true;
       return;
     }
     
@@ -131,6 +138,11 @@ export function useAutoCalculate({
       } finally {
         isCalculatingRef.current = false;
         timeoutRef.current = null;
+        if (pendingCalculateRef.current) {
+          pendingCalculateRef.current = false;
+          lastSpecsKeyRef.current = currentSpecsKeyRef.current;
+          debouncedCalculate();
+        }
       }
     }, debounceMs);
   }, [debounceMs]);
@@ -141,8 +153,9 @@ export function useAutoCalculate({
       return;
     }
     
-    // Не запускаем новый расчет, если уже идет расчет
+    // Если расчет уже идет, не теряем изменение: пересчитаем по последним specs после завершения.
     if (isCalculatingRef.current) {
+      pendingCalculateRef.current = true;
       return;
     }
     
@@ -159,8 +172,13 @@ export function useAutoCalculate({
       console.error('Instant calculate error:', error);
     } finally {
       isCalculatingRef.current = false;
+      if (pendingCalculateRef.current) {
+        pendingCalculateRef.current = false;
+        lastSpecsKeyRef.current = currentSpecsKeyRef.current;
+        debouncedCalculate();
+      }
     }
-  }, []);
+  }, [debouncedCalculate]);
   
   // Автопересчет при изменении specs
   useEffect(() => {
@@ -176,8 +194,9 @@ export function useAutoCalculate({
       return; // Не пересчитываем, если ключ не изменился
     }
     
-    // Не пересчитываем, если уже идет расчет
+    // Не теряем изменение, если оно произошло во время активного запроса.
     if (isCalculatingRef.current) {
+      pendingCalculateRef.current = true;
       return;
     }
     

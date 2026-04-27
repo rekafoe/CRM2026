@@ -46,10 +46,16 @@ function miniappHeaderLogoBlock(logoUrl: string | null | undefined, apiBase: str
 
 export function renderMiniappIndexHtml(
   apiBase: string,
-  options?: { catalogCategoryId?: number | null; organizationLogoUrl?: string | null }
+  options?: {
+    catalogCategoryId?: number | null;
+    organizationLogoUrl?: string | null;
+    assetVersion?: string | null;
+  }
 ): string {
   const base = apiBase.replace(/\/+$/, '');
   const logo = miniappHeaderLogoBlock(options?.organizationLogoUrl, base);
+  const assetVersion = String(options?.assetVersion || '').trim();
+  const assetQuery = assetVersion ? `?v=${encodeURIComponent(assetVersion)}` : '';
   const runtimeConfig = escapeInlineJson({
     apiBase: base,
     catalogCategoryId: options?.catalogCategoryId ?? null,
@@ -61,7 +67,7 @@ export function renderMiniappIndexHtml(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Ваша онлайн-типография</title>
-  <link rel="stylesheet" href="/miniapp-assets/miniapp.css" />
+  <link rel="stylesheet" href="/miniapp-assets/miniapp.css${assetQuery}" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
@@ -78,7 +84,7 @@ export function renderMiniappIndexHtml(
   </div>
   <div id="miniapp-nav" class="miniapp-nav" aria-label="Навигация"></div>
   <script>window.__MINIAPP_CONFIG__ = ${runtimeConfig};</script>
-  <script src="/miniapp-assets/miniapp.js"></script>
+  <script src="/miniapp-assets/miniapp.js${assetQuery}"></script>
 </body>
 </html>`;
 }

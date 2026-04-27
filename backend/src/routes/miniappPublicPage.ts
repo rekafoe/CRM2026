@@ -1,4 +1,6 @@
 import type { Express, NextFunction, Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { getDb } from '../config/database';
 import { renderMiniappIndexHtml } from '../utils/miniappIndexHtml';
 
@@ -24,6 +26,22 @@ async function getDefaultOrganizationLogoUrl(): Promise<string | null> {
   }
 }
 
+function getMiniappAssetVersion(): string {
+  const fromEnv = String(process.env.MINIAPP_ASSET_VERSION || '').trim();
+  if (fromEnv) return fromEnv;
+  try {
+    const publicDir = path.resolve(__dirname, '..', '..', 'public', 'miniapp');
+    const files = ['miniapp.js', 'miniapp.css'];
+    const newestMtime = files.reduce((max, fileName) => {
+      const stat = fs.statSync(path.join(publicDir, fileName));
+      return Math.max(max, Math.floor(stat.mtimeMs));
+    }, 0);
+    return newestMtime > 0 ? String(newestMtime) : 'dev';
+  } catch {
+    return 'dev';
+  }
+}
+
 /**
  * Публичная витрина Mini App (без JWT CRM). Кладёт на сервер ДО app.use(authMiddleware).
  */
@@ -37,12 +55,14 @@ export function registerMiniappPublicPage(app: Express): void {
       const catalogCategoryId =
         rawCat && Number.isFinite(n) && n > 0 ? n : null;
       const organizationLogoUrl = await getDefaultOrganizationLogoUrl();
+      const assetVersion = getMiniappAssetVersion();
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store');
       res.send(
         renderMiniappIndexHtml(apiBase, {
           catalogCategoryId,
           organizationLogoUrl,
+          assetVersion,
         })
       );
     } catch (e) {

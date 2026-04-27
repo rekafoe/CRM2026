@@ -266,14 +266,41 @@ export const MINIAPP_CLIENT_PART_CALC = `
     }
     if (!out.calcForm.qty || out.calcForm.qty < 1) out.calcForm.qty = 100;
     syncCalcFormCuttingFromTypeDefaults();
+    if (typeof syncMiniappFinishingSelectionFromDefaults === 'function') {
+      syncMiniappFinishingSelectionFromDefaults(true);
+    }
   }
   var _calcDebounceT = null;
+  var _calcRequestSeq = 0;
   function scheduleCalcRun() {
     if (_calcDebounceT) clearTimeout(_calcDebounceT);
     _calcDebounceT = setTimeout(function () {
       _calcDebounceT = null;
       runCalc({ soft: true });
     }, 420);
+  }
+  function stableCalcPayloadSignature(value) {
+    function normalize(v) {
+      if (Array.isArray(v)) {
+        return v.map(normalize);
+      }
+      if (v && typeof v === 'object') {
+        var outObj = {};
+        var keys = Object.keys(v).sort();
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          if (v[k] === undefined) continue;
+          outObj[k] = normalize(v[k]);
+        }
+        return outObj;
+      }
+      return v;
+    }
+    try {
+      return JSON.stringify(normalize(value || {}));
+    } catch (e) {
+      return '';
+    }
   }
   /** Восстанавливает calcForm из сохранённого configuration позиции корзины. */
   function applyConfigFromCartLine(c) {
@@ -294,6 +321,9 @@ export const MINIAPP_CLIENT_PART_CALC = `
     syncCalcFormMatPaperKey(calcMaterials());
     ensurePrintKeyMatchesOptions();
     syncCalcFormCuttingFromTypeDefaults();
+    if (typeof restoreMiniappFinishingSelection === 'function') {
+      restoreMiniappFinishingSelection(p.finishing);
+    }
     var allowedPts = calcAllowedPriceTypes();
     if (allowedPts.length > 0) {
       var selectedPt = String(out.calcForm.priceType || '').trim();
@@ -507,7 +537,9 @@ export const MINIAPP_CLIENT_PART_CALC = `
     if (out.calcForm.typeId != null) pl.type_id = out.calcForm.typeId;
     if (out.calcForm.priceType) pl.priceType = out.calcForm.priceType;
     if (out.calcForm.cutting) pl.cutting = true;
-    var fin = buildFinishingFromTypeInitial();
+    var fin = typeof buildMiniappFinishingPayload === 'function'
+      ? buildMiniappFinishingPayload()
+      : buildFinishingFromTypeInitial();
     // Явно передаём выбор операций текущего подтипа.
     // Пустой массив означает «для этого подтипа finishing не выбран»,
     // чтобы бэкенд не падал обратно на все операции размера.
@@ -526,19 +558,32 @@ export const MINIAPP_CLIENT_PART_CALC = `
     out.calcLoading = true;
     render();
     var body = buildCalcPayload();
+    var bodySig = stableCalcPayloadSignature(body);
+    var requestSeq = ++_calcRequestSeq;
+    out.calcRequestSignature = bodySig;
     miniappRequestJson('/api/products/' + out.calcPid + '/calculate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body)
     })
       .then(function (x) {
+        if (requestSeq !== _calcRequestSeq) return;
         out.calcLoading = false;
         if (!x.ok || !x.j) { out.calcErr = 'Ошибка цены'; render(); return; }
-        if (x.j.success && x.j.data) { out.calcResult = x.j.data; out.calcErr = null; } else
+        if (x.j.success && x.j.data) {
+          out.calcResult = x.j.data;
+          out.calcResultSignature = bodySig;
+          out.calcErr = null;
+        } else
           { out.calcErr = (x.j.message || x.j.error) ? String(x.j.message || x.j.error) : 'Расчёт неудачен'; }
         render();
       })
-      .catch(function (e) { out.calcLoading = false; out.calcErr = (e && e.message) || String(e); render(); });
+      .catch(function (e) {
+        if (requestSeq !== _calcRequestSeq) return;
+        out.calcLoading = false;
+        out.calcErr = (e && e.message) || String(e);
+        render();
+      });
   }
   function buildCalcCartParams() {
     var cfg = buildCalcPayload();
@@ -629,6 +674,14 @@ export const MINIAPP_CLIENT_PART_CALC = `
   }
   function calcAddToCart() {
     if (!out.calcResult || out.calcResult.finalPrice == null) { return; }
+    var currentPayload = buildCalcPayload();
+    var currentSig = stableCalcPayloadSignature(currentPayload);
+    if (!out.calcResultSignature || out.calcResultSignature !== currentSig) {
+      out.calcErr = 'Параметры изменились — дождитесь обновления цены.';
+      scheduleCalcRun();
+      render();
+      return;
+    }
     if (typeof clearDraftCheckoutState === 'function') clearDraftCheckoutState();
     var r = out.calcResult || {};
     var q = Math.max(1, parseInt(String(out.calcForm.qty), 10) || 1);
@@ -646,7 +699,9 @@ export const MINIAPP_CLIENT_PART_CALC = `
         try { delete out.checkoutFileByK[re]; } catch (e) {}
       }
     }
-    var finKey = buildFinishingFromTypeInitial();
+    var finKey = typeof buildMiniappFinishingPayload === 'function'
+      ? buildMiniappFinishingPayload()
+      : buildFinishingFromTypeInitial();
     var finSig = finishingPayloadSignature(finKey);
     var k =
       'cx' +
@@ -951,6 +1006,9 @@ export const MINIAPP_CLIENT_PART_CALC = `
       cutField.appendChild(cutLab);
       form.appendChild(cutField);
     }
+    if (typeof renderMiniappFinishingControls === 'function') {
+      renderMiniappFinishingControls(form);
+    }
     var qi = document.createElement('input');
     qi.name = 'q';
     qi.type = 'number';
@@ -989,6 +1047,10 @@ export const MINIAPP_CLIENT_PART_CALC = `
       if (r.warnings && r.warnings.length) resBox.appendChild(h('p', esc(r.warnings.join('; ')), 'hint'));
       var addB = h('button', 'В корзину', 'primary');
       addB.type = 'button';
+      var currentSigForButton = stableCalcPayloadSignature(buildCalcPayload());
+      var isFreshPrice = !!out.calcResultSignature && out.calcResultSignature === currentSigForButton;
+      addB.disabled = out.calcLoading || !isFreshPrice;
+      if (!isFreshPrice) addB.textContent = out.calcLoading ? 'Обновляем цену…' : 'Цена устарела';
       addB.onclick = function () { calcAddToCart(); };
       resBox.appendChild(addB);
       var resPanel = h('div', '', 'ipc-panel');
