@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback } from 'react';
 import { Button, FormField, StatusBadge, EmptyState } from '../../../common';
+import { MoneyAmount } from '../../../ui';
 import type { ServicePrice, PricingItemType, EditingItem, EditingValues } from '../../hooks/usePricingManagementState';
 
 interface ServicesTabProps {
@@ -103,7 +104,7 @@ const ServicesTabComponent: React.FC<ServicesTabProps> = ({
                         className="form-control"
                       />
                     ) : (
-                      <span className="price-value">{item.price_per_unit.toFixed(2)} BYN</span>
+                      <span className="price-value"><MoneyAmount value={item.price_per_unit} /></span>
                     )}
                   </FormField>
                   

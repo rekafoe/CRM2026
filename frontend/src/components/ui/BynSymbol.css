@@ -2,15 +2,18 @@
 .byn-sign {
   display: inline-block;
   line-height: 0;
-  vertical-align: -0.1em;
+  vertical-align: -0.16em;
   color: inherit;
 }
 .byn-sign__svg {
   display: block;
-  width: 0.9em;
-  height: 1.1em;
+  width: 1.08em;
+  height: 1.08em;
   overflow: visible;
 }
 .byn-sign__path {
   fill: currentColor;
+}
+.money-amount {
+  white-space: nowrap;
 }

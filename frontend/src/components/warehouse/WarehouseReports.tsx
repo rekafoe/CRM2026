@@ -1,6 +1,7 @@
 import React from 'react';
 import { Material } from '../../types/shared';
 import { getWarehouseSummary, getLowStockItems, getSupplierSummary, getMaterialMovements, generatePdfReport, getABCAnalysis, getTurnoverAnalysis, getCostAnalysis, getSupplierAnalytics, getForecastingData } from '../../api';
+import { BynSymbol, MoneyAmount } from '../ui';
 
 interface WarehouseReportsProps {
   materials: Material[];
@@ -269,7 +270,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
           <div className="card"><div className="card-body"><div>В наличии</div><strong>{backendSummary?.inStock || stats.inStock}</strong></div></div>
           <div className="card"><div className="card-body"><div>Низкий остаток</div><strong>{backendSummary?.lowStock || stats.lowStock}</strong></div></div>
           <div className="card"><div className="card-body"><div>Нет в наличии</div><strong>{backendSummary?.outOfStock || stats.outOfStock}</strong></div></div>
-          <div className="card"><div className="card-body"><div>Общая стоимость</div><strong>{Math.round(backendSummary?.totalValue || stats.totalValue)} BYN</strong></div></div>
+          <div className="card"><div className="card-body"><div>Общая стоимость</div><strong><MoneyAmount value={backendSummary?.totalValue || stats.totalValue} decimals={0} /></strong></div></div>
         </div>
       )}
 
@@ -298,7 +299,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
                   <td style={{ textAlign: 'left' }}>{item.supplier_name || '—'}</td>
                   <td>{item.quantity || 0} {item.unit}</td>
                   <td>{item.min_quantity || 10}</td>
-                  <td>{Math.round(item.total_value || 0)} BYN</td>
+                  <td><MoneyAmount value={item.total_value || 0} decimals={0} /></td>
                 </tr>
               ))}
             </tbody>
@@ -371,7 +372,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
                   <td style={{ textAlign: 'left' }}>{row.supplier_name}</td>
                   <td>{row.materials_count}</td>
                   <td>{row.total_quantity}</td>
-                  <td>{Math.round(row.total_value)} BYN</td>
+                  <td><MoneyAmount value={row.total_value} decimals={0} /></td>
                   <td style={{ color: row.low_stock_count > 0 ? '#e74c3c' : '#27ae60' }}>
                     {row.low_stock_count}
                   </td>
@@ -393,7 +394,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
               <tr>
                 <th>Материал</th>
                 <th>Категория</th>
-                <th>Стоимость (BYN)</th>
+                <th>Стоимость (<BynSymbol />)</th>
                 <th>% от общей стоимости</th>
                 <th>Кумулятивный %</th>
                 <th>ABC класс</th>
@@ -408,7 +409,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
                 <tr key={item.material_id}>
                   <td style={{ textAlign: 'left' }}>{item.material_name}</td>
                   <td style={{ textAlign: 'left' }}>{item.category_name}</td>
-                  <td>{Math.round(item.total_value)}</td>
+                  <td><MoneyAmount value={item.total_value} decimals={0} /></td>
                   <td>{item.percentage.toFixed(1)}%</td>
                   <td>{((item.cumulative_value / abcData[abcData.length - 1]?.cumulative_value) * 100).toFixed(1)}%</td>
                   <td>
@@ -491,7 +492,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
               <tr>
                 <th>Категория</th>
                 <th>Количество материалов</th>
-                <th>Общая стоимость (BYN)</th>
+                <th>Общая стоимость (<BynSymbol />)</th>
                 <th>Средняя цена за единицу</th>
                 <th>Тренд цен</th>
                 <th>Волатильность (%)</th>
@@ -506,7 +507,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
                 <tr key={item.category_id}>
                   <td style={{ textAlign: 'left' }}>{item.category_name}</td>
                   <td>{item.total_materials}</td>
-                  <td>{Math.round(item.total_value)}</td>
+                  <td><MoneyAmount value={item.total_value} decimals={0} /></td>
                   <td>{item.avg_cost_per_unit.toFixed(2)}</td>
                   <td>
                     <span style={{
@@ -543,7 +544,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
               <tr>
                 <th>Поставщик</th>
                 <th>Материалов</th>
-                <th>Общая стоимость (BYN)</th>
+                <th>Общая стоимость (<BynSymbol />)</th>
                 <th>Средняя цена</th>
                 <th>Тренд цен</th>
                 <th>Надежность</th>
@@ -560,7 +561,7 @@ export const WarehouseReports: React.FC<WarehouseReportsProps> = ({ materials, s
                 <tr key={item.supplier_id}>
                   <td style={{ textAlign: 'left' }}>{item.supplier_name}</td>
                   <td>{item.total_materials}</td>
-                  <td>{Math.round(item.total_value)}</td>
+                  <td><MoneyAmount value={item.total_value} decimals={0} /></td>
                   <td>{item.avg_price.toFixed(2)}</td>
                   <td>
                     <span style={{

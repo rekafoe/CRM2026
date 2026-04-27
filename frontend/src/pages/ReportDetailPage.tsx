@@ -6,6 +6,7 @@ import { ProgressBar } from '../components/order/ProgressBar';
 import { OrderItem } from '../components/OrderItem';
 import { useReasonPrompt } from '../components/common/useReasonPrompt';
 import { useReasonPresets } from '../components/common/useReasonPresets';
+import { MoneyAmount } from '../components/ui';
 
 interface ReportDetailPageProps {
   reportDate: string;
@@ -166,7 +167,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
           <p style={{ margin: '8px 0 0 0', color: '#666' }}>
             Пользователь: {report.user_name || 'Неизвестный'} | 
             Заказов: {report.orders?.length || 0} | 
-            Выручка: {getTotalRevenue().toLocaleString('ru-RU')} BYN
+            Выручка: <MoneyAmount value={getTotalRevenue()} decimals={0} />
           </p>
         </div>
         <button
@@ -222,7 +223,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
                 {status.name}
               </div>
               <div style={{ fontSize: '12px', color: '#888' }}>
-                {statusRevenue.toLocaleString('ru-RU')} BYN
+                <MoneyAmount value={statusRevenue} decimals={0} />
               </div>
             </div>
           );
@@ -347,9 +348,9 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
                     <div>Телефон: <strong>{order.customerPhone}</strong></div>
                     <div>Email: <strong>{order.customerEmail}</strong></div>
                     <div>Создан: <strong>{new Date(order.created_at).toLocaleString('ru-RU')}</strong></div>
-                    <div>Сумма: <strong>{orderTotal.toLocaleString('ru-RU')} BYN</strong></div>
+                    <div>Сумма: <strong><MoneyAmount value={orderTotal} decimals={0} /></strong></div>
                     {order.prepaymentAmount && order.prepaymentAmount > 0 && (
-                      <div>Предоплата: <strong>{order.prepaymentAmount} BYN</strong></div>
+                      <div>Предоплата: <strong><MoneyAmount value={order.prepaymentAmount} /></strong></div>
                     )}
                   </div>
 

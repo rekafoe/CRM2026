@@ -171,7 +171,7 @@ export const SpecificationsForm: React.FC<SpecificationsFormProps> = ({
         >
           {dynamicDensities.map((density) => (
             <option key={density.value} value={density.value}>
-              {density.label} - {density.price} Br/лист
+              {density.label} - {density.price}/лист
             </option>
           ))}
         </select>

@@ -4,7 +4,7 @@ import { renderEmailTemplate } from './emailTemplateService';
 import { enqueueMail } from './mailOutboxService';
 import { logger } from '../utils/logger';
 
-export type OrderEmailSource = 'website' | 'telegram';
+export type OrderEmailSource = 'crm' | 'website' | 'telegram' | 'mini_app';
 
 /**
  * Поставить в очередь письмо клиенту при смене статуса (если есть правило и email).
@@ -14,7 +14,7 @@ export async function tryEnqueueOrderStatusEmail(params: {
   orderId: number;
   oldStatusId: number;
   newStatusId: number;
-  source: OrderEmailSource;
+  source?: OrderEmailSource;
 }): Promise<void> {
   if (params.source === 'telegram') {
     return;
@@ -48,15 +48,29 @@ export async function tryEnqueueOrderStatusEmail(params: {
       number: string | null;
       customerName: string | null;
       customerEmail: string | null;
+      customerEmailFromCard: string | null;
+      source: OrderEmailSource | null;
     }>(
-      `SELECT id, number, customerName, customerEmail FROM orders WHERE id = ?`,
+      `SELECT
+         o.id,
+         o.number,
+         o.customerName,
+         o.customerEmail,
+         o.source,
+         c.email as customerEmailFromCard
+       FROM orders o
+       LEFT JOIN customers c ON c.id = o.customer_id
+       WHERE o.id = ?`,
       [params.orderId]
     );
     if (!order) {
       return;
     }
+    if ((params.source ?? order.source) === 'telegram') {
+      return;
+    }
 
-    const to = (order.customerEmail || '').trim();
+    const to = (order.customerEmail || order.customerEmailFromCard || '').trim();
     if (!to) {
       logger.debug('Order status email skipped: no customerEmail', { orderId: params.orderId });
       return;

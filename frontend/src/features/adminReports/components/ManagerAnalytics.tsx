@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ManagerAnalyticsData } from '../types';
+import { MoneyAmount } from '../../../components/ui';
 
 interface ManagerAnalyticsProps {
   data: ManagerAnalyticsData;
@@ -51,8 +52,8 @@ export const ManagerAnalytics: React.FC<ManagerAnalyticsProps> = ({ data }) => {
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--accent-primary)' }}>
                     {manager.total_revenue != null && Number(manager.total_revenue) > 0
-                      ? `${Number(manager.total_revenue).toLocaleString('ru-RU')} BYN`
-                      : '0 BYN'}
+                      ? <MoneyAmount value={manager.total_revenue} decimals={0} />
+                      : <MoneyAmount value={0} decimals={0} />}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                     {manager.total_orders} заказов
@@ -80,7 +81,7 @@ export const ManagerAnalytics: React.FC<ManagerAnalyticsProps> = ({ data }) => {
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--accent-primary)' }}>
                     {manager.avg_order_value != null && Number.isFinite(manager.avg_order_value)
-                      ? `${Number(manager.avg_order_value).toFixed(0)} BYN`
+                      ? <MoneyAmount value={manager.avg_order_value} decimals={0} />
                       : '—'}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>

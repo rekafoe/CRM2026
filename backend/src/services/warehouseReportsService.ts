@@ -1,4 +1,5 @@
 import { getDb } from '../config/database'
+import { bynSymbolHtmlForPrint } from '../utils/byCurrencyBYN'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -802,6 +803,8 @@ export class WarehouseReportsService {
   private static generateHTMLReport(reportType: string, data: any, title: string, generatedBy: string): string {
     const currentDate = new Date().toLocaleDateString('ru-RU')
     const currentTime = new Date().toLocaleTimeString('ru-RU')
+    const byn = bynSymbolHtmlForPrint()
+    const money = (value: number) => `${Math.round(value || 0)} ${byn}`
     
     let content = ''
     
@@ -825,7 +828,7 @@ export class WarehouseReportsService {
             <div class="card-label">Нет в наличии</div>
           </div>
           <div class="card">
-            <div class="card-value">${Math.round(data.totalValue)} BYN</div>
+            <div class="card-value">${money(data.totalValue)}</div>
             <div class="card-label">Общая стоимость</div>
           </div>
         </div>
@@ -842,7 +845,7 @@ export class WarehouseReportsService {
               <th>Кол-во</th>
               <th>Ед.</th>
               <th>Мин.</th>
-              <th>Стоимость (BYN)</th>
+              <th>Стоимость ${byn}</th>
             </tr>
           </thead>
           <tbody>
@@ -855,7 +858,7 @@ export class WarehouseReportsService {
                 <td>${item.quantity || 0}</td>
                 <td>${item.unit || ''}</td>
                 <td>${item.min_quantity || 0}</td>
-                <td>${Math.round(item.total_value || 0)}</td>
+                <td>${money(item.total_value || 0)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -869,7 +872,7 @@ export class WarehouseReportsService {
               <th>Поставщик</th>
               <th>Позиций</th>
               <th>Суммарный остаток</th>
-              <th>Общая стоимость (BYN)</th>
+              <th>Общая стоимость ${byn}</th>
               <th>Низкий остаток</th>
               <th>Нет в наличии</th>
             </tr>
@@ -880,7 +883,7 @@ export class WarehouseReportsService {
                 <td>${item.supplier_name}</td>
                 <td>${item.materials_count}</td>
                 <td>${item.total_quantity}</td>
-                <td>${Math.round(item.total_value)}</td>
+                <td>${money(item.total_value)}</td>
                 <td>${item.low_stock_count}</td>
                 <td>${item.out_of_stock_count}</td>
               </tr>
@@ -929,7 +932,7 @@ export class WarehouseReportsService {
               <th>Категория</th>
               <th>Позиций</th>
               <th>Суммарный остаток</th>
-              <th>Общая стоимость (BYN)</th>
+              <th>Общая стоимость ${byn}</th>
               <th>Низкий остаток</th>
               <th>Нет в наличии</th>
             </tr>
@@ -944,7 +947,7 @@ export class WarehouseReportsService {
                 </td>
                 <td>${item.materials_count}</td>
                 <td>${item.total_quantity}</td>
-                <td>${Math.round(item.total_value)}</td>
+                <td>${money(item.total_value)}</td>
                 <td>${item.low_stock_count}</td>
                 <td>${item.out_of_stock_count}</td>
               </tr>
@@ -959,7 +962,7 @@ export class WarehouseReportsService {
             <tr>
               <th>Материал</th>
               <th>Категория</th>
-              <th>Стоимость (BYN)</th>
+              <th>Стоимость ${byn}</th>
               <th>% от общей стоимости</th>
               <th>Кумулятивный %</th>
               <th>ABC класс</th>
@@ -972,7 +975,7 @@ export class WarehouseReportsService {
               <tr>
                 <td>${item.material_name}</td>
                 <td>${item.category_name}</td>
-                <td>${Math.round(item.total_value)}</td>
+                <td>${money(item.total_value)}</td>
                 <td>${item.percentage.toFixed(1)}%</td>
                 <td>${((item.cumulative_value / data[data.length - 1]?.cumulative_value) * 100).toFixed(1)}%</td>
                 <td>
@@ -1029,7 +1032,7 @@ export class WarehouseReportsService {
             <tr>
               <th>Категория</th>
               <th>Количество материалов</th>
-              <th>Общая стоимость (BYN)</th>
+              <th>Общая стоимость ${byn}</th>
               <th>Средняя цена за единицу</th>
               <th>Тренд цен</th>
               <th>Волатильность (%)</th>
@@ -1042,7 +1045,7 @@ export class WarehouseReportsService {
               <tr>
                 <td>${item.category_name}</td>
                 <td>${item.total_materials}</td>
-                <td>${Math.round(item.total_value)}</td>
+                <td>${money(item.total_value)}</td>
                 <td>${item.avg_cost_per_unit.toFixed(2)}</td>
                 <td>
                   <span class="status-badge ${item.cost_trend === 'increasing' ? 'badge-critical' : item.cost_trend === 'decreasing' ? 'badge-success' : 'badge-warning'}">
@@ -1068,7 +1071,7 @@ export class WarehouseReportsService {
             <tr>
               <th>Поставщик</th>
               <th>Материалов</th>
-              <th>Общая стоимость (BYN)</th>
+              <th>Общая стоимость ${byn}</th>
               <th>Средняя цена</th>
               <th>Тренд цен</th>
               <th>Надежность</th>
@@ -1083,8 +1086,8 @@ export class WarehouseReportsService {
               <tr>
                 <td>${item.supplier_name}</td>
                 <td>${item.total_materials}</td>
-                <td>${Math.round(item.total_value)}</td>
-                <td>${item.avg_price.toFixed(2)}</td>
+                <td>${money(item.total_value)}</td>
+                <td>${money(item.avg_price)}</td>
                 <td>
                   <span class="status-badge ${item.price_trend === 'increasing' ? 'badge-critical' : item.price_trend === 'decreasing' ? 'badge-success' : 'badge-warning'}">
                     ${item.price_trend === 'increasing' ? 'Рост' : item.price_trend === 'decreasing' ? 'Снижение' : 'Стабильно'}

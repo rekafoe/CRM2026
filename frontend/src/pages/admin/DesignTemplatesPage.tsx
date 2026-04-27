@@ -9,6 +9,7 @@ import {
   updateDesignTemplate,
   deleteDesignTemplate,
   uploadDesignTemplatePreview,
+  importDesignTemplateFile,
   type DesignTemplate,
   type DesignTemplateInput,
 } from '../../api';
@@ -35,9 +36,11 @@ export const DesignTemplatesPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -50,6 +53,18 @@ export const DesignTemplatesPage: React.FC = () => {
     is_active: true,
     sort_order: 0,
   });
+  const [importForm, setImportForm] = useState({
+    name: '',
+    description: '',
+    category: '',
+    productId: '',
+    typeId: '',
+    sizeId: '',
+    sortOrder: 0,
+    file: null as File | null,
+  });
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
 
   const loadTemplates = useCallback(async () => {
     try {
@@ -82,6 +97,21 @@ export const DesignTemplatesPage: React.FC = () => {
       sort_order: templates.length,
     });
     setModalOpen(true);
+  };
+
+  const openImport = () => {
+    setImportWarnings([]);
+    setImportForm({
+      name: '',
+      description: '',
+      category: '',
+      productId: '',
+      typeId: '',
+      sizeId: '',
+      sortOrder: templates.length,
+      file: null,
+    });
+    setImportModalOpen(true);
   };
 
   const openEdit = (t: DesignTemplate) => {
@@ -150,6 +180,41 @@ export const DesignTemplatesPage: React.FC = () => {
     }
   }, [form, editingId, loadTemplates]);
 
+  const handleImport = useCallback(async () => {
+    if (!importForm.file) {
+      setError('Выберите SVG-файл для импорта');
+      return;
+    }
+    if (!importForm.name.trim()) {
+      setError('Укажите название импортируемого шаблона');
+      return;
+    }
+    try {
+      setImporting(true);
+      setError(null);
+      setImportWarnings([]);
+      const res = await importDesignTemplateFile({
+        file: importForm.file,
+        name: importForm.name.trim(),
+        description: importForm.description.trim() || undefined,
+        category: importForm.category.trim() || undefined,
+        productId: importForm.productId.trim() || undefined,
+        typeId: importForm.typeId.trim() || undefined,
+        sizeId: importForm.sizeId.trim() || undefined,
+        sortOrder: importForm.sortOrder,
+      });
+      setImportWarnings(res.data.warnings ?? []);
+      await loadTemplates();
+      if ((res.data.warnings ?? []).length === 0) setImportModalOpen(false);
+    } catch (err: unknown) {
+      const response = (err as { response?: { data?: { message?: string; warnings?: string[] } } }).response;
+      setImportWarnings(response?.data?.warnings ?? []);
+      setError(response?.data?.message ?? (err instanceof Error ? err.message : 'Ошибка импорта шаблона'));
+    } finally {
+      setImporting(false);
+    }
+  }, [importForm, loadTemplates]);
+
   const handleDelete = useCallback(async (id: number) => {
     if (!confirm('Удалить шаблон?')) return;
     try {
@@ -178,6 +243,9 @@ export const DesignTemplatesPage: React.FC = () => {
         <div className="design-templates-toolbar">
           <Button onClick={openCreate}>
             <AppIcon name="plus" size="xs" /> Добавить шаблон
+          </Button>
+          <Button variant="secondary" onClick={openImport}>
+            <AppIcon name="download" size="xs" /> Импорт SVG
           </Button>
           <div className="design-templates-filter">
             <label>Категория:</label>
@@ -341,6 +409,79 @@ export const DesignTemplatesPage: React.FC = () => {
           <div className="form-actions">
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Отмена</Button>
             <Button onClick={handleSave}>Сохранить</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={importModalOpen} onClose={() => setImportModalOpen(false)} title="Импорт SVG-шаблона">
+        <div className="design-template-form">
+          <div className="form-row">
+            <label>SVG-файл *</label>
+            <div className="preview-upload">
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".svg,image/svg+xml,.pdf,application/pdf"
+                onChange={(e) => setImportForm((p) => ({ ...p, file: e.target.files?.[0] ?? null }))}
+                style={{ display: 'none' }}
+              />
+              <Button variant="secondary" onClick={() => importFileInputRef.current?.click()}>
+                Выбрать файл
+              </Button>
+              <p className="form-hint">
+                {importForm.file ? importForm.file.name : 'Загрузите SVG, экспортированный из AI/CDR по стандарту слоёв.'}
+              </p>
+            </div>
+          </div>
+          <div className="form-row">
+            <label>Название *</label>
+            <input
+              type="text"
+              value={importForm.name}
+              onChange={(e) => setImportForm((p) => ({ ...p, name: e.target.value }))}
+              placeholder="Например: Открытка 10×15 День рождения"
+            />
+          </div>
+          <div className="form-row">
+            <label>Описание</label>
+            <textarea
+              value={importForm.description}
+              onChange={(e) => setImportForm((p) => ({ ...p, description: e.target.value }))}
+              rows={2}
+            />
+          </div>
+          <div className="form-row">
+            <label>Категория</label>
+            <select value={importForm.category} onChange={(e) => setImportForm((p) => ({ ...p, category: e.target.value }))}>
+              <option value="">—</option>
+              {DEFAULT_CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-row form-row-inline">
+            <label>
+              <span>Product ID</span>
+              <input value={importForm.productId} onChange={(e) => setImportForm((p) => ({ ...p, productId: e.target.value }))} />
+            </label>
+            <label>
+              <span>Type ID</span>
+              <input value={importForm.typeId} onChange={(e) => setImportForm((p) => ({ ...p, typeId: e.target.value }))} />
+            </label>
+            <label>
+              <span>Size ID</span>
+              <input value={importForm.sizeId} onChange={(e) => setImportForm((p) => ({ ...p, sizeId: e.target.value }))} />
+            </label>
+          </div>
+          {importWarnings.length > 0 && (
+            <div className="design-template-import-warnings">
+              <strong>Предупреждения импорта:</strong>
+              {importWarnings.map((warning) => <span key={warning}>{warning}</span>)}
+            </div>
+          )}
+          <div className="form-actions">
+            <Button variant="secondary" onClick={() => setImportModalOpen(false)}>Закрыть</Button>
+            <Button onClick={handleImport} disabled={importing}>{importing ? 'Импорт...' : 'Импортировать'}</Button>
           </div>
         </div>
       </Modal>

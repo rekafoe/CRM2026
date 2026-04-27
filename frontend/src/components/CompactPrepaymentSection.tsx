@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Order } from '../types';
 import { createPrepaymentLink } from '../api';
+import { MoneyAmount } from './ui';
 
 interface CompactPrepaymentSectionProps {
   order: Order;
@@ -92,7 +93,7 @@ export const CompactPrepaymentSection: React.FC<CompactPrepaymentSectionProps> =
         <div className="prepayment-details">
           <div className="prepayment-amount">
             <span className="amount-label">Сумма предоплаты:</span>
-            <span className="amount-value">{order.prepaymentAmount} BYN</span>
+            <span className="amount-value"><MoneyAmount value={order.prepaymentAmount} /></span>
           </div>
           
           {order.paymentUrl && (

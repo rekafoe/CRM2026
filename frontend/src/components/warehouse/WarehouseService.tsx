@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../../types';
 import { UserRoles } from './UserRoles';
+import { MoneyAmount } from '../ui';
 
 interface WarehouseServiceProps {
   currentUser: User | null;
@@ -157,7 +158,7 @@ export const WarehouseService: React.FC<WarehouseServiceProps> = ({
               </div>
               <div className="stat-item">
                 <span className="stat-icon">💰</span>
-                <span className="stat-value">{totalRevenue.toFixed(0)}BYN</span>
+                <span className="stat-value"><MoneyAmount value={totalRevenue} decimals={0} /></span>
                 <span className="stat-label">Оборот</span>
               </div>
             </div>

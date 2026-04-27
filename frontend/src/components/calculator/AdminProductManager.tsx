@@ -20,6 +20,7 @@ import {
   type Service,
   type OperationNorm
 } from '../../api/pricing';
+import { MoneyAmount } from '../ui';
 
 export const AdminProductManager: React.FC = () => {
   const [loading, setLoading] = React.useState(false);
@@ -210,7 +211,7 @@ export const AdminProductManager: React.FC = () => {
               {!calcResult && <div style={{ color: '#666' }}>Нет данных</div>}
               {calcResult && (
                 <div style={{ border: '1px solid #ddd', borderRadius: 4, padding: 8 }}>
-                  <div>Итог: <strong>{calcResult.final?.toFixed ? calcResult.final.toFixed(2) : (calcResult.data?.finalPrice ?? '')} BYN</strong></div>
+                  <div>Итог: <strong><MoneyAmount value={calcResult.final ?? calcResult.data?.finalPrice ?? 0} /></strong></div>
                   <div style={{ marginTop: 8 }}>
                     <strong>Материалы</strong>
                     <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6 }}>

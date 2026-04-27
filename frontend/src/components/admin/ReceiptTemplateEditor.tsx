@@ -182,9 +182,9 @@ const DEFAULT_ORDER_BLANK_TEMPLATE = `<!DOCTYPE html>
       </div>
       <div class="summary-right">
         <div class="summary-item"><span class="summary-label">Заказ №:</span><span class="summary-value">{{orderNumber}}</span></div>
-        <div class="summary-item"><span class="summary-label">Стоимость:</span><span class="summary-value">{{cost}} руб.</span></div>
-        <div class="summary-item"><span class="summary-label">Предоплата:</span><span class="summary-value">{{prepaymentAmount}} руб.</span></div>
-        <div class="summary-item"><span class="summary-label">Долг:</span><span class="summary-value">{{debt}} руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Стоимость:</span><span class="summary-value">{{cost}} бел. руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Предоплата:</span><span class="summary-value">{{prepaymentAmount}} бел. руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Долг:</span><span class="summary-value">{{debt}} бел. руб.</span></div>
         <div class="summary-item"><span class="summary-label">Выполнил:</span><span class="summary-value">{{executedBy}}</span></div>
       </div>
     </div>
@@ -220,9 +220,9 @@ const DEFAULT_ORDER_BLANK_TEMPLATE = `<!DOCTYPE html>
       </div>
       <div class="summary-right">
         <div class="summary-item"><span class="summary-label">Заказ №:</span><span class="summary-value">{{orderNumber}}</span></div>
-        <div class="summary-item"><span class="summary-label">Стоимость:</span><span class="summary-value">{{cost}} руб.</span></div>
-        <div class="summary-item"><span class="summary-label">Предоплата:</span><span class="summary-value">{{prepaymentAmount}} руб.</span></div>
-        <div class="summary-item"><span class="summary-label">Долг:</span><span class="summary-value">{{debt}} руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Стоимость:</span><span class="summary-value">{{cost}} бел. руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Предоплата:</span><span class="summary-value">{{prepaymentAmount}} бел. руб.</span></div>
+        <div class="summary-item"><span class="summary-label">Долг:</span><span class="summary-value">{{debt}} бел. руб.</span></div>
         <div class="summary-item"><span class="summary-label">Выполнил:</span><span class="summary-value">{{executedBy}}</span></div>
       </div>
     </div>
@@ -235,7 +235,7 @@ const DEFAULT_ORDER_BLANK_TEMPLATE = `<!DOCTYPE html>
       <thead><tr><th style="width:5%">№</th><th style="width:35%">Наименование</th><th style="width:40%">Параметры</th><th style="width:8%;text-align:center">Кол-во</th><th style="width:12%;text-align:right">Сумма</th></tr></thead>
       <tbody>{{itemsTable}}</tbody>
     </table>
-    <div class="total-row">ИТОГО: {{totalAmount}} BYN</div>
+    <div class="total-row">ИТОГО: {{totalAmount}} бел. руб.</div>
     <div class="executed-row">Выполнил: {{executedBy}}</div>
   </div>
 </body>

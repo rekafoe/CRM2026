@@ -56,6 +56,25 @@ export interface ItemParams {
   };
   /** Состояние редактора макетов (позиции фото и т.д.) */
   designState?: Record<string, unknown>;
+  /** Пакетная фотопечать: группы по размерам и список фото с crop/quantity. */
+  photoBatch?: {
+    groups?: Array<{
+      groupSizeId: string;
+      groupLabel: string;
+      targetSizeMm: { width: number; height: number };
+      quantity: number;
+      items?: Array<{
+        fileId: number;
+        originalName: string;
+        quantity: number;
+        fitMode: 'cover' | 'contain';
+        rotation: number;
+        crop: { x: number; y: number; w: number; h: number };
+      }>;
+    }>;
+    totalFiles?: number;
+    totalQuantity?: number;
+  };
   /** ID шаблона дизайна из design_templates */
   designTemplateId?: number;
 }

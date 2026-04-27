@@ -62,6 +62,19 @@ export type MultiPageStructureConfig = {
     units_per_item?: number;
   };
 }
+export type DesignEditorMode = 'none' | 'single' | 'multipage' | 'photo_batch'
+
+export type ProductPrepressConfig = {
+  /** Дозаливка наружу от trim-формата, мм. */
+  bleedMm?: number;
+  /** Безопасная зона внутрь от trim-формата, мм. */
+  safeZoneMm?: number;
+  showBleed?: boolean;
+  showTrim?: boolean;
+  showSafeZone?: boolean;
+  cutMarks?: boolean;
+}
+
 export type SimplifiedSizeConfig = {
   id: number | string;
   label: string;
@@ -163,6 +176,10 @@ export type SimplifiedConfig = {
   sizes: SimplifiedSizeConfig[];
   pages?: SimplifiedPagesConfig;
   multiPageStructure?: MultiPageStructureConfig;
+  /** Какой сценарий макетов открывать для продукта на сайте/в CRM. */
+  design_editor_mode?: DesignEditorMode;
+  /** Общие настройки допечатной подготовки для редактора, preflight и production export. */
+  prepress?: ProductPrepressConfig;
   /** Типы продукта (варианты): если заданы, у каждого типа свой конфиг в typeConfigs */
   types?: ProductTypeVariant[];
   /** Конфиг по типам: typeId -> размеры и цены */
@@ -370,7 +387,21 @@ export function useProductTemplateInitial(): TemplateState {
     packaging: [],
     print_run: { enabled: false, min: '', max: '' },
     price_rules: [],
-    simplified: { sizes: buildDefaultSizes(), pages: { options: [] }, duplex_as_single_x2: false, include_material_cost: true },
+    simplified: {
+      sizes: buildDefaultSizes(),
+      pages: { options: [] },
+      design_editor_mode: 'none',
+      prepress: {
+        bleedMm: 2,
+        safeZoneMm: 5,
+        showBleed: true,
+        showTrim: true,
+        showSafeZone: true,
+        cutMarks: true,
+      },
+      duplex_as_single_x2: false,
+      include_material_cost: true,
+    },
     test: { qty: 100, params: {}, paramsJson: '{}' }
   }
 }

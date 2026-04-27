@@ -34,6 +34,7 @@ import mailRoutes from './mail'
 import smsRoutes from './sms'
 import miniappRoutes from './miniapp'
 import campaignsRoutes from './campaigns'
+import publicEditorRoutes from './publicEditor'
 
 const router = Router()
 
@@ -70,6 +71,7 @@ router.use('/mail', mailRoutes)
 router.use('/sms', smsRoutes)
 router.use('/miniapp', miniappRoutes)
 router.use('/campaigns', campaignsRoutes)
+router.use('/public-editor', publicEditorRoutes)
 router.use('/products/:productId/subtype-designs', subtypeDesignsRoutes)
 
 console.log('Routes setup complete')

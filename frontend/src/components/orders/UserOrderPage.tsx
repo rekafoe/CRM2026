@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api, getPageChanges } from '../../api';
+import { MoneyAmount } from '../ui';
 
 interface UserOrderPage {
   id: number;
@@ -395,7 +396,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
           </div>
           <div className="bg-purple-50 rounded-lg p-4">
             <div className="text-3xl font-bold text-purple-600">
-              {((page.totalRevenue || 0) / 100).toFixed(0)} Br
+              <MoneyAmount value={(page.totalRevenue || 0) / 100} decimals={0} />
             </div>
             <div className="text-sm text-purple-600">Общая сумма</div>
           </div>
@@ -483,7 +484,7 @@ export const UserOrderPage: React.FC<UserOrderPageProps> = ({
               </div>
               <div>
                 <span className="text-gray-500">Выручка:</span>
-                <span className="ml-2 font-medium">{changes.stats.totalRevenue} BYN</span>
+                <span className="ml-2 font-medium"><MoneyAmount value={changes.stats.totalRevenue} /></span>
               </div>
             </div>
           </div>

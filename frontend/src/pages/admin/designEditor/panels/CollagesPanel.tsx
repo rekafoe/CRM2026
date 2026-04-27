@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AppIcon } from '../../../../components/ui/AppIcon';
+import { Button } from '../../../../components/common';
 import { getCollageTemplates, type CollageTemplate, type CollageLayout } from '../../../../api';
 
 interface CollagesPanelProps {
@@ -12,33 +13,27 @@ interface CollagesPanelProps {
   onPaddingChange: (value: number) => void;
   selectedTemplateId: number | null;
   onSelectTemplate: (id: number | null) => void;
+  onApplyTemplate?: (layout: CollageLayout) => void;
 }
 
 /** Мини-превью раскладки (серые ячейки с отступом) */
-const LayoutPreview: React.FC<{
-  layout: CollageLayout;
-  paddingPercent: number;
-  className?: string;
-}> = ({ layout, paddingPercent, className }) => {
+const LayoutPreview: React.FC<{ layout: CollageLayout; paddingPercent: number }> = ({ layout, paddingPercent }) => {
   const margin = paddingPercent / 100 / 2;
   const scale = 1 - 2 * margin;
   return (
-    <div className={className} style={{ width: '100%', height: '100%', position: 'relative', background: '#e5e7eb' }}>
+    <svg className="design-editor-collage-thumb-inner" viewBox="0 0 100 100" aria-hidden="true">
+      <rect className="design-editor-collage-preview-bg" x="0" y="0" width="100" height="100" />
       {layout.cells.map((cell, i) => (
-        <div
+        <rect
           key={i}
-          style={{
-            position: 'absolute',
-            left: `${(margin + cell.x * scale) * 100}%`,
-            top: `${(margin + cell.y * scale) * 100}%`,
-            width: `${(cell.w * scale) * 100}%`,
-            height: `${(cell.h * scale) * 100}%`,
-            background: '#9ca3af',
-            boxSizing: 'border-box',
-          }}
+          className="design-editor-collage-preview-cell"
+          x={(margin + cell.x * scale) * 100}
+          y={(margin + cell.y * scale) * 100}
+          width={(cell.w * scale) * 100}
+          height={(cell.h * scale) * 100}
         />
       ))}
-    </div>
+    </svg>
   );
 };
 
@@ -54,6 +49,7 @@ export const CollagesPanel: React.FC<CollagesPanelProps> = ({
   onPaddingChange,
   selectedTemplateId,
   onSelectTemplate,
+  onApplyTemplate,
 }) => {
   const [templates, setTemplates] = useState<CollageTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +79,9 @@ export const CollagesPanel: React.FC<CollagesPanelProps> = ({
     t.layoutParsed ?? (typeof t.layout === 'string' ? (() => { try { return JSON.parse(t.layout); } catch { return { cells: [] }; } })() : { cells: [] });
 
   const paddingPercent = Math.min(30, Math.max(0, padding));
+  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
+  const selectedLayout = selectedTemplate ? layoutParsed(selectedTemplate) : null;
+  const canApply = !!selectedLayout?.cells?.length && !!onApplyTemplate;
 
   return (
     <div className="design-editor-panel-collages">
@@ -117,7 +116,7 @@ export const CollagesPanel: React.FC<CollagesPanelProps> = ({
       </label>
 
       <div className="design-editor-panel-field">
-        <label className="design-editor-panel-label">Размер отступа</label>
+        <label className="design-editor-panel-label">Отступ, %</label>
         <div className="design-editor-collage-padding-row">
           <input
             type="range"
@@ -138,6 +137,16 @@ export const CollagesPanel: React.FC<CollagesPanelProps> = ({
         </div>
       </div>
 
+      <Button
+        type="button"
+        variant="primary"
+        className="design-editor-collage-apply"
+        disabled={!canApply}
+        onClick={() => selectedLayout && onApplyTemplate?.(selectedLayout)}
+      >
+        Применить раскладку
+      </Button>
+
       {error && <p className="design-editor-panel-error">{error}</p>}
       {loading && <p className="design-editor-panel-placeholder">Загрузка шаблонов...</p>}
 
@@ -154,7 +163,7 @@ export const CollagesPanel: React.FC<CollagesPanelProps> = ({
                 onClick={() => onSelectTemplate(isSelected ? null : t.id)}
                 title={t.name ?? `Шаблон ${t.id}`}
               >
-                <LayoutPreview layout={layout} paddingPercent={paddingPercent} className="design-editor-collage-thumb-inner" />
+                <LayoutPreview layout={layout} paddingPercent={paddingPercent} />
               </button>
             );
           })}

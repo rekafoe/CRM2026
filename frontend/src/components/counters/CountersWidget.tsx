@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
+import { BynSymbol, MoneyAmount } from '../ui';
 
 interface PrinterCounter {
   id: number;
@@ -164,7 +165,7 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
         >
           <span className="counters-icon">📊</span>
           <span className="counters-summary">
-            🖨️ {getTotalPrinterDifference()} | {getCashStatusIcon()} {cashData.actual !== null ? cashData.actual.toFixed(0) : '?'} BYN
+            🖨️ {getTotalPrinterDifference()} | {getCashStatusIcon()} {cashData.actual !== null ? <MoneyAmount value={cashData.actual} decimals={0} /> : '?'}
           </span>
         </button>
       </div>
@@ -235,17 +236,17 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
                     }}
                     placeholder="Сумма из терминала"
                   />
-                  <span className="currency">BYN</span>
+                  <span className="currency"><BynSymbol /></span>
                 </div>
               </div>
               <div className="cash-row">
                 <span className="cash-label">Расчетная:</span>
-                <span className="cash-value">{cashData.calculated.toFixed(2)} BYN</span>
+                <span className="cash-value"><MoneyAmount value={cashData.calculated} /></span>
               </div>
               <div className="cash-row">
                 <span className="cash-label">Разница:</span>
                 <span className={`cash-difference ${getCashStatus()}`}>
-                  {cashData.difference >= 0 ? '+' : ''}{cashData.difference.toFixed(2)} BYN
+                  <MoneyAmount value={cashData.difference} signed />
                 </span>
               </div>
             </div>

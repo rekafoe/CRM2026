@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button, StatusBadge } from '../../../common';
+import { MoneyAmount } from '../../../ui';
 import { ServiceVolumeTier, ServiceVolumeTierPayload } from '../../../../types/pricing';
 import { TierFormState } from './hooks/useTierForm';
 
@@ -61,7 +62,7 @@ export const TierRow: React.FC<TierRowProps> = ({
             placeholder="Цена"
           />
         ) : (
-          <span className="text-sm font-medium text-gray-900">{tier.rate.toFixed(2)} BYN</span>
+          <span className="text-sm font-medium text-gray-900"><MoneyAmount value={tier.rate} /></span>
         )}
       </td>
       <td className="px-4 py-2">

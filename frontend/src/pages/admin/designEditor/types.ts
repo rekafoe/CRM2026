@@ -3,6 +3,16 @@ export interface DesignPage {
   fabricJSON: Record<string, unknown>;
 }
 
+/** Настройки допечатной подготовки, которые приходят из продукта/шаблона. */
+export interface DesignPrepressConfig {
+  bleedMm: number;
+  safeZoneMm: number;
+  showBleed: boolean;
+  showTrim: boolean;
+  showSafeZone: boolean;
+  cutMarks: boolean;
+}
+
 /** Свойства выбранного объекта на холсте (для тулбара / панелей) */
 export interface SelectedObjProps {
   type: 'IText' | 'image' | 'rect' | 'circle' | 'line' | 'triangle' | 'photoField' | 'other';
@@ -61,6 +71,7 @@ export interface DesignState {
   pageWidth: number;
   pageHeight: number;
   pageCount: number;
+  prepress?: DesignPrepressConfig;
   pages: Array<{ fabricJSON: Record<string, unknown> }>;
   spread_mode?: boolean;
   cover_pages?: number;

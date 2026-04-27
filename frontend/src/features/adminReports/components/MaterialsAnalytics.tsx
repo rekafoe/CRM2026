@@ -3,6 +3,7 @@
 import React from 'react';
 import { MaterialsAnalyticsData } from '../types';
 import type { ABCSummary } from '../types';
+import { MoneyAmount } from '../../../components/ui';
 
 interface MaterialsAnalyticsProps {
   data: MaterialsAnalyticsData;
@@ -54,7 +55,7 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                   {stats?.count ?? 0} материалов<br/>
-                  {Number(stats?.total_cost ?? 0).toLocaleString('ru-RU')} BYN
+                  <MoneyAmount value={Number(stats?.total_cost ?? 0)} decimals={0} />
                 </div>
               </div>
             ))}
@@ -90,7 +91,7 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
                         {material.material_name}
                       </div>
                       <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-                        {Number(material.total_cost ?? 0).toLocaleString('ru-RU')} BYN • {Number(material.total_consumed ?? 0).toFixed(1)} ед.
+                        <MoneyAmount value={Number(material.total_cost ?? 0)} decimals={0} /> • {Number(material.total_consumed ?? 0).toFixed(1)} ед.
                       </div>
                     </div>
                   ))}
@@ -121,7 +122,7 @@ export const MaterialsAnalytics: React.FC<MaterialsAnalyticsProps> = ({ data }) 
                 {category.category_name ?? 'Без категории'}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                {Number(category.total_cost ?? 0).toLocaleString('ru-RU')} BYN<br/>
+                <MoneyAmount value={Number(category.total_cost ?? 0)} decimals={0} /><br/>
                 {Number(category.total_consumed ?? 0).toFixed(0)} ед.
               </div>
             </div>

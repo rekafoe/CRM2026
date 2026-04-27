@@ -90,17 +90,17 @@ h2.section-head, h3.section-head { margin-top: 0; }
   flex-shrink: 0;
   margin-left: 0.12ch;
   line-height: 1;
-  vertical-align: -0.06em;
+  vertical-align: -0.14em;
   font-size: inherit;
 }
 .ipc-byn svg {
   display: block;
   flex-shrink: 0;
-  height: 1.1em;
-  width: 0.92em;
-  min-height: 14px;
-  min-width: 12px;
-  transform: translateY(0.04em);
+  height: 1.18em;
+  width: 1.18em;
+  min-height: 16px;
+  min-width: 16px;
+  transform: translateY(0.02em);
 }
 .ipc-design-help-row { margin: 10px 0; }
 .ipc-design-help {

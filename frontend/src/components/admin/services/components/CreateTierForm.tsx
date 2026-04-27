@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from '../../../common';
+import { BynSymbol } from '../../../ui';
 import { TierFormState } from './hooks/useTierForm';
 
 interface CreateTierFormProps {
@@ -35,7 +36,7 @@ export const CreateTierForm: React.FC<CreateTierFormProps> = ({
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Цена (BYN)</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Цена (<BynSymbol />)</label>
           <input
             type="number"
             min={0}

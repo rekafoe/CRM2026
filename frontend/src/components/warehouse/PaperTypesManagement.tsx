@@ -1,5 +1,6 @@
 import React from 'react';
 import { usePaperTypesManagement } from './hooks/usePaperTypesManagement';
+import { BynSymbol, MoneyAmount } from '../ui';
 import './PaperTypesManagement.css';
 
 interface PaperTypesManagementProps {
@@ -121,7 +122,7 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
                             <span className="material-density">{material.density}г/м²</span>
                           )}
                           <span className="material-price">
-                            {(material.sheet_price_single || material.price || 0).toFixed(2)} BYN
+                            <MoneyAmount value={material.sheet_price_single || material.price || 0} />
                           </span>
                           <span className="material-stock">
                             {material.quantity} {material.unit}
@@ -163,7 +164,7 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
                         </div>
                         <div className="material-details">
                           <span className="material-price">
-                            {(material.sheet_price_single || material.price || 0).toFixed(2)} BYN
+                            <MoneyAmount value={material.sheet_price_single || material.price || 0} />
                           </span>
                           <span className="material-stock">
                             {material.quantity} {material.unit}
@@ -332,7 +333,7 @@ export const PaperTypesManagement: React.FC<PaperTypesManagementProps> = ({ onRe
               </div>
               
               <div className="form-group">
-                <label>Цена (BYN) *</label>
+                <label>Цена (<BynSymbol />) *</label>
                 <input
                   type="number"
                   step="0.01"

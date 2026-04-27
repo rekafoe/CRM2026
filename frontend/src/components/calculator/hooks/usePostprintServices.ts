@@ -329,7 +329,7 @@ export function usePostprintServices({
       productionTime: '—',
       parameterSummary: selectedPostprintOperations.map((op) => ({
         label: op.name,
-        value: `${op.quantity} × ${op.unitPrice.toFixed(2)} BYN`,
+        value: `${op.quantity} × ${op.unitPrice.toFixed(2)} бел. руб.`,
       })),
     };
   }, [isPostprintValid, postprintTotal, selectedPostprintOperations]);

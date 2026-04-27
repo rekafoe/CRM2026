@@ -22,6 +22,7 @@ const allowedUploadMimes = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
+  'image/svg+xml',
   'image/tiff',
   'application/pdf',
   'application/msword',
@@ -48,7 +49,7 @@ export const storage = multer.diskStorage({
 function defaultFileFilter(_req: any, file: any, cb: (error: Error | null, acceptFile: boolean) => void): void {
   const mime = String(file?.mimetype || '').toLowerCase()
   const ext = path.extname(String(file?.originalname || '')).toLowerCase()
-  const extAllowed = ['.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.pdf', '.doc', '.docx', '.xls', '.xlsx']
+  const extAllowed = ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.tif', '.tiff', '.pdf', '.doc', '.docx', '.xls', '.xlsx']
   const accepted = allowedUploadMimes.has(mime) && extAllowed.includes(ext)
   if (!accepted) {
     cb(new Error('Unsupported file type'), false)

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppIcon } from './ui/AppIcon';
+import { AppIcon, BynSymbol } from './ui';
 import './PrepaymentModal.css';
 
 interface PrepaymentModalProps {
@@ -61,7 +61,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
     }
 
     if (totalOrderAmount > 0 && amountNum > totalOrderAmount) {
-      alert(`Предоплата не может быть больше общей суммы заказа (${totalOrderAmount.toLocaleString()} BYN)`);
+      alert(`Предоплата не может быть больше общей суммы заказа (${totalOrderAmount.toLocaleString('ru-RU')} бел. руб.)`);
       return;
     }
 
@@ -91,7 +91,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
 
         <form onSubmit={handleSubmit}>
           <div className="pp-field">
-            <label className="pp-label">Сумма предоплаты (BYN):</label>
+            <label className="pp-label">Сумма предоплаты (<BynSymbol />):</label>
             <input
               type="number"
               step="0.01"
@@ -190,7 +190,7 @@ export const PrepaymentModal: React.FC<PrepaymentModalProps> = ({
             <strong>Информация:</strong>
             <br />
             {amountNum === 0
-              ? 'Установка предоплаты в 0 BYN уберёт предоплату с заказа.'
+              ? <>Установка предоплаты в 0 <BynSymbol /> уберёт предоплату с заказа.</>
               : paymentMethod === 'online'
                 ? 'Онлайн: После создания предоплаты клиенту будет отправлена ссылка для оплаты на указанный email.'
                 : 'Оффлайн: Предоплата будет отмечена как полученная в кассе. Email не требуется.'}

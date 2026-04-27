@@ -1,17 +1,49 @@
 import { Router, Request, Response } from 'express'
-import { upload } from '../config/upload'
+import { upload, uploadMemory } from '../config/upload'
 import { asyncHandler, authenticate } from '../middleware'
 import {
   getAllDesignTemplates,
   getDesignTemplate,
+  getPublicDesignTemplate,
+  getPublicDesignTemplates,
   getDesignTemplatesByCategory,
   createDesignTemplate,
   updateDesignTemplate,
   deleteDesignTemplate,
   type DesignTemplateInput,
 } from '../services/designTemplateService'
+import { importDesignTemplateFromFile } from '../services/designTemplateImporterService'
 
 const router = Router()
+
+/** Public API for external website: templates filtered by product/type/size. */
+router.get('/public', asyncHandler(async (req: Request, res: Response) => {
+  const productId = req.query.productId != null ? Number(req.query.productId) : undefined
+  const typeId = req.query.typeId != null ? Number(req.query.typeId) : undefined
+  const sizeId = req.query.sizeId != null ? String(req.query.sizeId) : undefined
+  const templates = await getPublicDesignTemplates({
+    productId: Number.isFinite(productId) ? productId : undefined,
+    typeId: Number.isFinite(typeId) ? typeId : undefined,
+    sizeId,
+  })
+  res.json(templates)
+}))
+
+/** Public API for external website: single active template with designState. */
+router.get('/public/:id', asyncHandler(async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id)
+  if (isNaN(id)) {
+    res.status(400).json({ message: 'Неверный ID' })
+    return
+  }
+  const template = await getPublicDesignTemplate(id)
+  if (!template) {
+    res.status(404).json({ message: 'Шаблон не найден' })
+    return
+  }
+  res.json(template)
+}))
+
 router.use(authenticate)
 
 /** GET /api/design-templates — все шаблоны */
@@ -72,6 +104,31 @@ router.post('/upload-preview', upload.single('preview'), asyncHandler(async (req
     return
   }
   res.json({ filename: file.filename, url: `/api/uploads/${file.filename}` })
+}))
+
+/** POST /api/design-templates/import — импорт SVG по стандарту слоёв */
+router.post('/import', uploadMemory.single('file'), asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const body = req.body as Record<string, unknown>
+    const result = await importDesignTemplateFromFile({
+      file: (req as any).file,
+      name: String(body.name || '').trim(),
+      description: body.description != null ? String(body.description) : undefined,
+      category: body.category != null ? String(body.category) : undefined,
+      productId: body.productId != null && body.productId !== '' ? Number(body.productId) : undefined,
+      typeId: body.typeId != null && body.typeId !== '' ? Number(body.typeId) : undefined,
+      sizeId: body.sizeId != null && body.sizeId !== '' ? String(body.sizeId) : undefined,
+      sortOrder: body.sortOrder != null ? Number(body.sortOrder) : undefined,
+    })
+    res.status(201).json(result)
+  } catch (err: unknown) {
+    const details = err as Error & { importErrors?: string[]; importWarnings?: string[] }
+    res.status(400).json({
+      message: details.message || 'Ошибка импорта шаблона',
+      errors: details.importErrors ?? [details.message || 'Ошибка импорта шаблона'],
+      warnings: details.importWarnings ?? [],
+    })
+  }
 }))
 
 /** PUT /api/design-templates/:id — обновить шаблон */

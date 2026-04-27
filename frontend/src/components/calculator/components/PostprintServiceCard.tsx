@@ -1,4 +1,5 @@
 import React, { type Dispatch, type SetStateAction } from 'react';
+import { MoneyAmount } from '../../ui';
 import { usePostprintServiceCard } from './hooks/usePostprintServiceCard';
 import type { PostprintServiceOption } from './postprintTypes';
 
@@ -59,7 +60,7 @@ export const PostprintServiceCard: React.FC<PostprintServiceCardProps> = ({
         </div>
         <div className="postprint-service-meta">
           <span className="postprint-service-price">
-            {unitPrice.toFixed(2)} BYN / {service.priceUnit || service.unit || 'шт'}
+            <MoneyAmount value={unitPrice} /> / {service.priceUnit || service.unit || 'шт'}
           </span>
         </div>
       </div>

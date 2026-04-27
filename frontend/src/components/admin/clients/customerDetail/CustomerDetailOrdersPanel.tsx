@@ -2,6 +2,7 @@ import React from 'react';
 import { Order } from '../../../../types';
 import { getOrderTotal } from '../../../../pages/admin/clients/customerDocumentHelpers';
 import { Button } from '../../../common';
+import { MoneyAmount } from '../../../ui';
 import { CustomerLegalDocumentsSection } from '../CustomerLegalDocumentsSection';
 
 export interface CustomerDetailOrdersLegalBlockProps {
@@ -102,7 +103,7 @@ export const CustomerDetailOrdersPanel: React.FC<CustomerDetailOrdersPanelProps>
                       order.created_at || (order as { created_at?: string }).created_at || '',
                     ).toLocaleDateString('ru-RU')}
                   </td>
-                  <td>{getOrderTotal(order).toFixed(2)} BYN</td>
+                  <td><MoneyAmount value={getOrderTotal(order)} /></td>
                   <td>{order.status ?? '—'}</td>
                 </tr>
               ))}

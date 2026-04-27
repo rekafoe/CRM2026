@@ -407,6 +407,42 @@
   color: var(--text-primary, #0f172a);
 }
 
+.template-summary-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-primary, #0f172a);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.template-summary-card__field .form-input {
+  width: 100%;
+}
+
+.template-summary-card__field-hint {
+  color: var(--text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.template-summary-card__field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+}
+
+.template-summary-card__field-title {
+  color: var(--text-primary, #0f172a);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* --- Tabs (product-tab) for template page --- */
 
 .product-template .product-tabs {

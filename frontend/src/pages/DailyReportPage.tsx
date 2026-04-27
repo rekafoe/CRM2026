@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { getDailyReports, getDailyReportByDate, updateDailyReport, getUsers, getPrinters, submitPrinterCounter, getPrinterCountersByDate, getDailySummary, getCurrentUser, getFullDailyReport, saveFullDailyReport } from '../api';
 import { DailyReport } from '../types';
 import EditModal from '../components/EditReportModal';
+import { BynSymbol, MoneyAmount } from '../components/ui';
 
 export const DailyReportPage: React.FC = () => {
   const [history, setHistory] = useState<DailyReport[]>([]);
@@ -154,7 +155,7 @@ export const DailyReportPage: React.FC = () => {
             >
               <div style={{ fontWeight: 'bold' }}>{r.report_date}</div>
               <div style={{ fontSize: '12px', color: '#666' }}>
-                Заказов: {r.orders_count} | Выручка: {r.total_revenue.toLocaleString('ru-RU')} BYN
+                Заказов: {r.orders_count} | Выручка: <MoneyAmount value={r.total_revenue} decimals={0} />
               </div>
               {r.user_name && (
                 <div style={{ fontSize: '11px', color: '#888', fontStyle: 'italic' }}>
@@ -196,20 +197,20 @@ export const DailyReportPage: React.FC = () => {
             <p>Заказов: {report.orders_count}</p>
             <p>
               Выручка:{' '}
-              {report.total_revenue.toLocaleString('ru-RU')} BYN
+              <MoneyAmount value={report.total_revenue} decimals={0} />
             </p>
             {(report.debt_closed_issued_by_me ?? 0) > 0 && (
               <p style={{ color: '#28a745' }}>
                 {selectedUserId === currentUser?.id
                   ? 'Долги закрыты вами в этот день'
                   : 'Долги закрыты пользователем в этот день'}
-                : +{report.debt_closed_issued_by_me!.toLocaleString('ru-RU')} BYN
+                : <MoneyAmount value={report.debt_closed_issued_by_me!} signed decimals={0} />
               </p>
             )}
             <div style={{ margin: '8px 0', padding: 12, border: '1px dashed #ddd', borderRadius: 6 }}>
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div>
-                  <label style={{ fontSize: 12, color: '#666' }}>Фактически в кассе (BYN)</label>
+                  <label style={{ fontSize: 12, color: '#666' }}>Фактически в кассе (<BynSymbol />)</label>
                   <input
                     type="number"
                     value={report.cash_actual ?? ''}
@@ -218,11 +219,11 @@ export const DailyReportPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, color: '#666' }}>Ожидается по CRM (BYN)</label>
+                  <label style={{ fontSize: 12, color: '#666' }}>Ожидается по CRM (<BynSymbol />)</label>
                   <input type="number" value={report.total_revenue} disabled style={{ marginLeft: 8 }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, color: '#666' }}>Δ Расхождение (BYN)</label>
+                  <label style={{ fontSize: 12, color: '#666' }}>Δ Расхождение (<BynSymbol />)</label>
                   <input type="number" value={((report.cash_actual ?? 0) - (report.total_revenue || 0)).toFixed(2)} disabled style={{ marginLeft: 8 }} />
                 </div>
                 <button onClick={async () => {
@@ -245,39 +246,39 @@ export const DailyReportPage: React.FC = () => {
                 <div className="order-total">
                   <div className="order-total__line">
                     <span>Предоплаты (оплачено)</span>
-                    <span>{(summary.prepayment?.paid_amount||0).toLocaleString('ru-RU')} BYN</span>
+                    <span><MoneyAmount value={summary.prepayment?.paid_amount || 0} decimals={0} /></span>
                   </div>
                   <div className="order-total__line">
                     <span>Ожидает</span>
-                    <span>{(summary.prepayment?.pending_amount||0).toLocaleString('ru-RU')} BYN</span>
+                    <span><MoneyAmount value={summary.prepayment?.pending_amount || 0} decimals={0} /></span>
                   </div>
                 </div>
                 <div className="order-total">
                   <div className="order-total__line">
                     <span>🌐 Онлайн</span>
-                    <span>{(summary.prepayment?.online_paid_amount||0).toLocaleString('ru-RU')} BYN</span>
+                    <span><MoneyAmount value={summary.prepayment?.online_paid_amount || 0} decimals={0} /></span>
                   </div>
                   <div className="order-total__line">
                     <span>🏪 Оффлайн</span>
-                    <span>{(summary.prepayment?.offline_paid_amount||0).toLocaleString('ru-RU')} BYN</span>
+                    <span><MoneyAmount value={summary.prepayment?.offline_paid_amount || 0} decimals={0} /></span>
                   </div>
                 </div>
                 <div className="order-total">
                   <div className="order-total__line">
                     <span>Общая сумма заказов</span>
-                    <span>{(summary.debt?.total_orders_amount||0).toLocaleString('ru-RU')} BYN</span>
+                    <span><MoneyAmount value={summary.debt?.total_orders_amount || 0} decimals={0} /></span>
                   </div>
                   <div className="order-total__line">
                     <span>Долг клиентов</span>
                     <span style={{ color: (summary.debt?.total_debt||0) > 0 ? '#dc3545' : '#28a745' }}>
-                      {(summary.debt?.total_debt||0).toLocaleString('ru-RU')} BYN
+                      <MoneyAmount value={summary.debt?.total_debt || 0} decimals={0} />
                     </span>
                   </div>
                   {(summary.debt_closed_today ?? 0) > 0 && (
                     <div className="order-total__line">
                       <span>Долги закрыты в этот день</span>
                       <span style={{ color: '#28a745' }}>
-                        +{(summary.debt_closed_today ?? 0).toLocaleString('ru-RU')} BYN
+                        <MoneyAmount value={summary.debt_closed_today ?? 0} signed decimals={0} />
                       </span>
                     </div>
                   )}

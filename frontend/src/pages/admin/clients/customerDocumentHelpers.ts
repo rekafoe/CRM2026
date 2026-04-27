@@ -43,7 +43,7 @@ export const formatDateValue = (value?: string) => {
 
 export const formatLastOrderAmount = (value: number | null | undefined) => {
   if (value == null || Number.isNaN(Number(value))) return '—';
-  return `${Number(value).toFixed(2)} BYN`;
+  return `${Number(value).toFixed(2)} бел. руб.`;
 };
 
 export const formatDateForFile = (date: Date) => date.toISOString().slice(0, 10).replace(/-/g, '');

@@ -34,8 +34,8 @@
 .ipc-calc-card__value--lg .ipc-byn { font-size: 1em; }
 .ipc-calc-card__value--lg .ipc-byn svg {
   color: inherit;
-  min-height: 20px;
-  min-width: 17px;
+  min-height: 24px;
+  min-width: 24px;
 }
 .ipc-calc-card__value--sub {
   text-align: right;
@@ -44,8 +44,8 @@
 }
 .ipc-calc-card__ppu-amount { white-space: nowrap; }
 .ipc-calc-card__value--sub .ipc-byn svg {
-  min-height: 16px;
-  min-width: 13px;
+  min-height: 18px;
+  min-width: 18px;
 }
 .ipc-calc-breakdown { margin-top: 10px; }
 .ipc-calc-breakdown__title {

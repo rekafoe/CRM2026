@@ -2,10 +2,37 @@ import React from 'react';
 import { AppIcon } from '../../../components/ui/AppIcon';
 import { ProductTypesCard } from './ProductTypesCard';
 import { TemplateProductRouteKey } from './TemplateProductRouteKey';
-import type { SimplifiedConfig } from '../hooks/useProductTemplate';
+import type { DesignEditorMode, SimplifiedConfig } from '../hooks/useProductTemplate';
 import type { UseSimplifiedTypesResult } from '../hooks/useSimplifiedTypes';
 import type { ServiceRow } from './SimplifiedTemplateSection';
 import type { ProductWithDetails } from '../../../services/products';
+
+const DESIGN_EDITOR_MODE_OPTIONS: Array<{
+  value: DesignEditorMode;
+  label: string;
+  hint: string;
+}> = [
+  {
+    value: 'none',
+    label: 'Без редактора',
+    hint: 'Клиент загружает готовый макет или просит разработку.',
+  },
+  {
+    value: 'single',
+    label: 'Одностраничный редактор',
+    hint: 'Один canvas: открытка, постер, визитка, одиночный макет.',
+  },
+  {
+    value: 'multipage',
+    label: 'Многостраничный редактор',
+    hint: 'Страницы/развороты: фотокнига, календарь, каталог.',
+  },
+  {
+    value: 'photo_batch',
+    label: 'Пакетная фотопечать',
+    hint: 'Много отдельных фото одного формата: 10×15, 15×20 и т.д.',
+  },
+];
 
 export interface SimplifiedTemplateSidebarProps {
   product: ProductWithDetails | null;
@@ -43,6 +70,19 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
   productNumericId,
   onProductRouteKeySaved,
 }) => {
+  const selectedEditorMode = value.design_editor_mode ?? 'none';
+  const selectedEditorModeHint = DESIGN_EDITOR_MODE_OPTIONS.find((option) => option.value === selectedEditorMode)?.hint;
+  const prepress = value.prepress ?? {};
+  const updatePrepress = (patch: NonNullable<SimplifiedConfig['prepress']>) => {
+    onChange({
+      ...value,
+      prepress: {
+        ...prepress,
+        ...patch,
+      },
+    });
+  };
+
   return (
     <aside className="product-template__sidebar">
       {productNumericId != null && product && (
@@ -93,6 +133,85 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
         </div>
         {calcOptionsExpanded && (
           <div className="template-summary-card__calc-content">
+            <label className="template-summary-card__field">
+              <span>Режим макета</span>
+              <select
+                className="form-input"
+                value={selectedEditorMode}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    design_editor_mode: e.target.value as DesignEditorMode,
+                  })
+                }
+              >
+                {DESIGN_EDITOR_MODE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {selectedEditorModeHint && (
+                <small className="template-summary-card__field-hint">{selectedEditorModeHint}</small>
+              )}
+            </label>
+            <div className="template-summary-card__field-group">
+              <span className="template-summary-card__field-title">Допечатная подготовка</span>
+              <label className="template-summary-card__field">
+                <span>Дозаливка, мм</span>
+                <input
+                  className="form-input"
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={prepress.bleedMm ?? 2}
+                  onChange={(e) => updatePrepress({ bleedMm: Number(e.target.value) || 0 })}
+                />
+              </label>
+              <label className="template-summary-card__field">
+                <span>Безопасная зона, мм</span>
+                <input
+                  className="form-input"
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={prepress.safeZoneMm ?? 5}
+                  onChange={(e) => updatePrepress({ safeZoneMm: Number(e.target.value) || 0 })}
+                />
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={prepress.showBleed !== false}
+                  onChange={(e) => updatePrepress({ showBleed: e.target.checked })}
+                />
+                Показывать дозаливку
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={prepress.showTrim !== false}
+                  onChange={(e) => updatePrepress({ showTrim: e.target.checked })}
+                />
+                Показывать линию реза
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={prepress.showSafeZone !== false}
+                  onChange={(e) => updatePrepress({ showSafeZone: e.target.checked })}
+                />
+                Показывать safe zone
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={prepress.cutMarks !== false}
+                  onChange={(e) => updatePrepress({ cutMarks: e.target.checked })}
+                />
+                Метки реза в production export
+              </label>
+            </div>
             <label className="checkbox-label">
               <input
                 type="checkbox"

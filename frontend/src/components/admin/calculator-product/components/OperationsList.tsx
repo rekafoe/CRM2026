@@ -88,7 +88,7 @@ export const OperationsList: React.FC<OperationsListProps> = React.memo(({
                       <option value="">Выберите услугу</option>
                       {services.filter(s => s.is_active).map(service => (
                         <option key={service.id} value={service.name}>
-                          {service.name} ({service.rate} BYN/{service.unit})
+                          {service.name} ({service.rate}/{service.unit})
                         </option>
                       ))}
                     </select>

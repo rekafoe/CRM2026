@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { OrderStatusAnalyticsData } from '../types';
+import { BynSymbol, MoneyAmount } from '../../../components/ui';
 
 interface OrderStatusAnalyticsProps {
   data: OrderStatusAnalyticsData;
@@ -56,7 +57,7 @@ export const OrderStatusAnalytics: React.FC<OrderStatusAnalyticsProps> = ({ data
                 </div>
               </div>
               <div style={{ minWidth: '80px', textAlign: 'right', fontSize: '12px', color: 'var(--text-primary)' }}>
-                {status.total_amount?.toLocaleString('ru-RU')} BYN
+                <MoneyAmount value={status.total_amount || 0} decimals={0} />
               </div>
             </div>
           );
@@ -91,10 +92,10 @@ export const OrderStatusAnalytics: React.FC<OrderStatusAnalyticsProps> = ({ data
         </div>
         <div className="reports-metric">
           <div className="reports-metric-value" style={{ color: '#dc3545' }}>
-            {data.cancellationReasons?.cancelled_amount?.toLocaleString('ru-RU') || '0'}
+            <MoneyAmount value={data.cancellationReasons?.cancelled_amount || 0} decimals={0} />
           </div>
           <div className="reports-metric-label">
-            Потери от отмен (BYN)
+            Потери от отмен (<BynSymbol />)
           </div>
         </div>
       </div>

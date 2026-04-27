@@ -1085,8 +1085,8 @@ export class OrderService {
       const orderInOrders = await db.get('SELECT id FROM orders WHERE id = ?', [id])
       
       if (orderInOrders) {
-        const prevRow = await db.get<{ status: number }>(
-          'SELECT status FROM orders WHERE id = ?',
+        const prevRow = await db.get<{ status: number; source?: Order['source'] | null }>(
+          'SELECT status, source FROM orders WHERE id = ?',
           [id]
         );
         const oldStatusId = Number(prevRow?.status ?? 0);
@@ -1117,7 +1117,7 @@ export class OrderService {
           orderId: id,
           oldStatusId,
           newStatusId,
-          source: 'website',
+          source: prevRow?.source ?? 'crm',
         });
         void tryScheduleOrderStatusSms({ orderId: id, newStatusId });
         void tryNotifyTelegramOrderStatusForMiniappOrder({
@@ -1537,9 +1537,9 @@ export class OrderService {
     
     const placeholders = orderIds.map(() => '?').join(',')
     const before = (await db.all(
-      `SELECT id, status FROM orders WHERE id IN (${placeholders})`,
+      `SELECT id, status, source FROM orders WHERE id IN (${placeholders})`,
       orderIds
-    )) as { id: number; status: number }[];
+    )) as { id: number; status: number; source?: Order['source'] | null }[];
     const params = [newStatus, ...orderIds]
     
     await db.run(
@@ -1554,7 +1554,7 @@ export class OrderService {
           orderId: row.id,
           oldStatusId: old,
           newStatusId: n,
-          source: 'website',
+          source: row.source ?? 'crm',
         });
         void tryScheduleOrderStatusSms({ orderId: row.id, newStatusId: n });
         void tryNotifyTelegramOrderStatusForMiniappOrder({

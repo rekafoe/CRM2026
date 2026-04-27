@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../middleware';
 import type { AuthenticatedRequest } from '../middleware/auth';
 import { mailBroadcastRateLimit } from '../middleware/rateLimiter';
-import { getSmtpConfig } from '../config/mail';
+import { getMailOutboxIntervalMs, getSmtpConfig, isMailOutboxWorkerEnabled } from '../config/mail';
 import { getDb } from '../config/database';
 import {
   enqueueMail,
@@ -90,8 +90,11 @@ router.get(
     const c = getSmtpConfig();
     res.json({
       configured: c.configured,
-      host: c.configured ? c.host : undefined,
-      port: c.configured ? c.port : undefined,
+      host: c.host || undefined,
+      port: c.port,
+      from: c.from || undefined,
+      workerEnabled: isMailOutboxWorkerEnabled(),
+      outboxIntervalMs: getMailOutboxIntervalMs(),
     });
   })
 );

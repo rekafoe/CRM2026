@@ -38,6 +38,23 @@ export const MINIAPP_CLIENT_PART_CALC_OPERATIONS = `
     }
     return 'Вариант #' + variantId;
   }
+  function miniappServiceVariantsForOptions(serviceId) {
+    var d = out.calcSchema && out.calcSchema.data;
+    var byService = d && d.service_variants ? d.service_variants[String(serviceId)] : null;
+    if (!Array.isArray(byService) || byService.length === 0) return [];
+    var childRows = byService.filter(function (v) {
+      return v && v.parameters && v.parameters.parentVariantId != null;
+    });
+    var source = childRows.length > 0 ? childRows : byService;
+    return source
+      .filter(function (v) { return v && v.id != null && isFinite(Number(v.id)); })
+      .sort(function (a, b) {
+        var ao = Number(a.sortOrder != null ? a.sortOrder : a.sort_order);
+        var bo = Number(b.sortOrder != null ? b.sortOrder : b.sort_order);
+        if (isFinite(ao) && isFinite(bo) && ao !== bo) return ao - bo;
+        return Number(a.id) - Number(b.id);
+      });
+  }
   function miniappFinishingOptions() {
     var sz = calcSelectedSize();
     var rows = sz && Array.isArray(sz.finishing) ? sz.finishing : [];
@@ -64,7 +81,23 @@ export const MINIAPP_CLIENT_PART_CALC_OPERATIONS = `
         variantLabel: variantLabel
       };
     }
-    for (var i = 0; i < rows.length; i++) add(rows[i]);
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i] || {};
+      var sid = Number(row.service_id != null ? row.service_id : (row.operation_id != null ? row.operation_id : row.operationId));
+      var variants = isFinite(sid) && sid > 0 ? miniappServiceVariantsForOptions(sid) : [];
+      if (variants.length > 0) {
+        for (var vi = 0; vi < variants.length; vi++) {
+          add({
+            service_id: sid,
+            variant_id: Number(variants[vi].id),
+            price_unit: row.price_unit,
+            units_per_item: row.units_per_item
+          });
+        }
+      } else {
+        add(row);
+      }
+    }
     for (var j = 0; j < initOps.length; j++) add(initOps[j]);
     var outRows = [];
     for (var k in byKey) {

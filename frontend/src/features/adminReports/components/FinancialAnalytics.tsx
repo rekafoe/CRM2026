@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { FinancialAnalyticsData } from '../types';
+import { BynSymbol, MoneyAmount } from '../../../components/ui';
 
 interface FinancialAnalyticsProps {
   data: FinancialAnalyticsData;
@@ -24,10 +25,10 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ data }) 
         </div>
         <div className="reports-metric">
           <div className="reports-metric-value">
-            {data.paymentAnalysis.avg_payment_amount?.toFixed(2) || '0.00'}
+            <MoneyAmount value={data.paymentAnalysis.avg_payment_amount || 0} />
           </div>
           <div className="reports-metric-label">
-            Средний платеж (BYN)
+            Средний платеж (<BynSymbol />)
           </div>
         </div>
         <div className="reports-metric">
@@ -62,7 +63,7 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ data }) 
               Онлайн
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-primary)' }}>
-              {data.paymentAnalysis.online_revenue?.toLocaleString('ru-RU')} BYN
+              <MoneyAmount value={data.paymentAnalysis.online_revenue || 0} decimals={0} />
             </div>
           </div>
           <div style={{ textAlign: 'center', flex: '1', minWidth: '120px' }}>
@@ -73,7 +74,7 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ data }) 
               Оффлайн
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-primary)' }}>
-              {data.paymentAnalysis.offline_revenue?.toLocaleString('ru-RU')} BYN
+              <MoneyAmount value={data.paymentAnalysis.offline_revenue || 0} decimals={0} />
             </div>
           </div>
           <div style={{ textAlign: 'center', flex: '1', minWidth: '120px' }}>
@@ -84,7 +85,7 @@ export const FinancialAnalytics: React.FC<FinancialAnalyticsProps> = ({ data }) 
               Telegram
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-primary)' }}>
-              {data.paymentAnalysis.telegram_revenue?.toLocaleString('ru-RU')} BYN
+              <MoneyAmount value={data.paymentAnalysis.telegram_revenue || 0} decimals={0} />
             </div>
           </div>
         </div>

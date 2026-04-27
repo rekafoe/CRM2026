@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common';
-import { AppIcon } from '../../components/ui/AppIcon';
+import { AppIcon, MoneyAmount, BynSymbol } from '../../components/ui';
 import { api, getUsers, getPrinterCountersByMonth, getDailyCashByMonth } from '../../api';
 import { cashIncrementForRegisterDay } from '../../utils/numberInput';
 import './CountersServicePage.css';
@@ -235,7 +235,7 @@ export const CountersServicePage: React.FC = () => {
                   <div className="cnt-day-card__row">
                     <span className="cnt-day-card__label">Касса</span>
                     <span className="cnt-day-card__value cnt-day-card__value--cash">
-                      {card.cash.toFixed(0)} BYN
+                      <MoneyAmount value={card.cash} decimals={0} />
                     </span>
                   </div>
                 </div>
@@ -271,7 +271,7 @@ export const CountersServicePage: React.FC = () => {
             <span className="cnt-stat-card__icon-box"><AppIcon name="card" size="sm" /></span>
           </div>
           <div className="cnt-stat-card__value">{cashTotal.toFixed(0)}</div>
-          <div className="cnt-stat-card__trend">BYN</div>
+          <div className="cnt-stat-card__trend"><BynSymbol /></div>
         </div>
         <div className="cnt-stat-card">
           <div className="cnt-stat-card__header">
@@ -336,7 +336,7 @@ export const CountersServicePage: React.FC = () => {
         <div className="cnt-card">
           <div className="cnt-card__header">
             <h3><AppIcon name="card" size="xs" /> Касса</h3>
-            <span className="cnt-card__badge cnt-card__badge--green">{cashTotal.toFixed(2)} BYN</span>
+            <span className="cnt-card__badge cnt-card__badge--green"><MoneyAmount value={cashTotal} /></span>
           </div>
           {loading ? (
             <div className="cnt-card__loading">Загрузка...</div>
@@ -348,7 +348,7 @@ export const CountersServicePage: React.FC = () => {
                     <span className="cnt-cash-item__avatar"><AppIcon name="user" size="xs" /></span>
                     <span className="cnt-cash-item__name">{entry.user_name}</span>
                   </div>
-                  <span className="cnt-cash-item__amount">{entry.amount.toFixed(2)} BYN</span>
+                  <span className="cnt-cash-item__amount"><MoneyAmount value={entry.amount} /></span>
                 </div>
               ))}
             </div>

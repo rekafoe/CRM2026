@@ -1,4 +1,5 @@
 import React from 'react';
+import type { CollageLayout } from '../../../api';
 import { SIDEBAR_ITEMS } from './constants';
 import type { TextBlockPresetKind } from './constants';
 import type { SidebarSection, SelectedObjProps, SidebarPhotoItem, TextEffectsValues } from './types';
@@ -61,6 +62,7 @@ interface DesignEditorPanelProps {
   onCollagePaddingChange?: (v: number) => void;
   collageSelectedTemplateId?: number | null;
   onCollageSelectTemplate?: (id: number | null) => void;
+  onCollageApplyTemplate?: (layout: CollageLayout) => void;
 }
 
 export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
@@ -107,6 +109,7 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
   onCollagePaddingChange,
   collageSelectedTemplateId = null,
   onCollageSelectTemplate,
+  onCollageApplyTemplate,
 }) => {
   const title = SIDEBAR_ITEMS.find((i) => i.id === section)?.label ?? '';
 
@@ -128,6 +131,7 @@ export const DesignEditorPanel: React.FC<DesignEditorPanelProps> = ({
         onPaddingChange={onCollagePaddingChange}
         selectedTemplateId={collageSelectedTemplateId}
         onSelectTemplate={onCollageSelectTemplate}
+        onApplyTemplate={onCollageApplyTemplate}
       />
     );
   }

@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { numberInputFromString, type NumberInputValue } from '../../utils/numberInput';
 import { sanitizeOrderItemDescription } from './orderItemUtils';
+import { BynSymbol } from '../ui';
 
 interface OrderItemEditFormProps {
   item: any;
@@ -82,7 +83,7 @@ export const OrderItemEditForm: React.FC<OrderItemEditFormProps> = React.memo(({
           onChange={e => onPriceChange(numberInputFromString(e.target.value))} 
           step="0.01" 
           style={{ width: 100 }} 
-        /> BYN ×
+        /> <BynSymbol /> ×
         <input 
           type="number" 
           value={qty} 

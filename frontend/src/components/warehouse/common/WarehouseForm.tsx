@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface WarehouseFormFieldProps {
-  label: string;
+  label: React.ReactNode;
   id: string;
   type?: 'text' | 'number' | 'email' | 'password' | 'tel' | 'url';
   value: string | number;

@@ -362,7 +362,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
                       <option value="">Без операции</option>
                       {Array.isArray(availableOperations) && availableOperations.map((op) => (
                         <option key={op.id} value={op.id}>
-                          {op.operation_name || op.service_name} — {op.price || op.price_per_unit || 0} Br
+                          {op.operation_name || op.service_name} — {op.price || op.price_per_unit || 0}
                         </option>
                       ))}
                     </select>
@@ -534,7 +534,7 @@ const ParametersSection: React.FC<ParametersSectionProps> = ({
                     <option value="">Без операции</option>
                     {availableOperations.map((op) => (
                       <option key={op.id} value={op.id}>
-                        {op.operation_name || op.service_name} — {op.price || op.price_per_unit || 0} Br
+                        {op.operation_name || op.service_name} — {op.price || op.price_per_unit || 0}
                       </option>
                     ))}
                   </select>

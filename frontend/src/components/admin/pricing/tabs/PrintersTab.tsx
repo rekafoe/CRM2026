@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Button, FormField, StatusBadge } from '../../../common';
+import { MoneyAmount } from '../../../ui';
 import { api } from '../../../../api';
 import { numberInputFromString, numberInputToNullable, type NumberInputValue } from '../../../../utils/numberInput';
 import type { PrinterRow, PrintTechnology, PricingMode } from '../types';
@@ -330,8 +331,13 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
                   <FormField label="Себестоимость печати">
                     <span className="field-value">
                       {techOptions.find((t) => t.code === printer.technology_code)?.pricing_mode === 'per_meter'
-                        ? (printer.price_per_meter == null ? '—' : `${Number(printer.price_per_meter).toFixed(2)} BYN/м`)
-                        : `${printer.price_single == null ? '—' : `${Number(printer.price_single).toFixed(2)} BYN/лист`}${printer.price_duplex == null ? '' : `, 2 стор: ${Number(printer.price_duplex).toFixed(2)}`}`}
+                        ? (printer.price_per_meter == null ? '—' : <><MoneyAmount value={printer.price_per_meter} />/м</>)
+                        : (
+                          <>
+                            {printer.price_single == null ? '—' : <><MoneyAmount value={printer.price_single} />/лист</>}
+                            {printer.price_duplex == null ? '' : <>, 2 стор: <MoneyAmount value={printer.price_duplex} /></>}
+                          </>
+                        )}
                     </span>
                   </FormField>
                   <FormField label="Ед. счётчика">

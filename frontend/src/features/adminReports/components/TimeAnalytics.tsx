@@ -3,6 +3,7 @@
 import React from 'react';
 import { TimeAnalyticsData } from '../types';
 import type { TimeOfDayTrends } from '../types';
+import { MoneyAmount } from '../../../components/ui';
 
 interface TimeAnalyticsProps {
   data: TimeAnalyticsData;
@@ -79,12 +80,12 @@ export const TimeAnalytics: React.FC<TimeAnalyticsProps> = ({ data }) => {
                   <td style={{ textAlign: 'right', padding: '8px 12px' }}>{h.orders_count}</td>
                   <td style={{ textAlign: 'right', padding: '8px 12px' }}>
                     {h.total_revenue != null && Number(h.total_revenue) > 0
-                      ? `${Number(h.total_revenue).toFixed(0)} BYN`
+                      ? <MoneyAmount value={h.total_revenue} decimals={0} />
                       : '—'}
                   </td>
                   <td style={{ textAlign: 'right', padding: '8px 12px' }}>
                     {h.avg_order_value != null && Number(h.avg_order_value) > 0
-                      ? `${Number(h.avg_order_value).toFixed(0)} BYN`
+                      ? <MoneyAmount value={h.avg_order_value} decimals={0} />
                       : '—'}
                   </td>
                 </tr>

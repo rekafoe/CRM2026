@@ -108,7 +108,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({
           orderId: order.id,
           action: 'prepayment_created',
           description: 'Создана предоплата',
-          newValue: `${order.prepaymentAmount || 0} BYN`,
+          newValue: `${order.prepaymentAmount || 0} бел. руб.`,
           userId: 1,
           userName: 'Админ',
           timestamp: new Date(Date.now() - 14400000).toISOString(),

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../api';
+import { MoneyAmount } from '../ui';
 import './DailyActivityOverview.css';
 
 interface DailyByUser {
@@ -80,9 +81,9 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
     onDateSelect?.(date);
   };
 
-  const formatAmount = (n: number) =>
+  const formatAmountText = (n: number) =>
     n != null && Number.isFinite(n)
-      ? `${Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BYN`
+      ? `${Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} бел. руб.`
       : '—';
 
   if (loading) {
@@ -164,14 +165,14 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
         </div>
         <div className="daily-activity-overview__card daily-activity-overview__card--accent">
           <div className="daily-activity-overview__card-value">
-            {formatAmount(overallTotal.total_amount)}
+            <MoneyAmount value={overallTotal.total_amount} />
           </div>
           <div className="daily-activity-overview__card-label">Общая сумма</div>
         </div>
         <div className="daily-activity-overview__card">
           <div className="daily-activity-overview__card-value">
             {dailyTotals.length > 0
-              ? formatAmount(overallTotal.total_amount / dailyTotals.length)
+              ? <MoneyAmount value={overallTotal.total_amount / dailyTotals.length} />
               : '—'}
           </div>
           <div className="daily-activity-overview__card-label">Среднее за день</div>
@@ -192,7 +193,7 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
                 <div
                   className="daily-activity-overview__chart-bar"
                   style={{ height: `${Math.max(height, 2)}%` }}
-                  title={`${formatDate(d.date)}: ${chartMode === 'revenue' ? formatAmount(val) : val} зак.`}
+                  title={`${formatDate(d.date)}: ${chartMode === 'revenue' ? formatAmountText(val) : val} зак.`}
                 />
                 <div className="daily-activity-overview__chart-label">
                   {new Date(d.date + 'T12:00:00').toLocaleDateString('ru-RU', {
@@ -234,7 +235,7 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
                       <span>👥 {dayTotal.operators_count} опер.</span>
                       <span>📦 {dayTotal.orders_count} зак.</span>
                       <span className="daily-activity-overview__day-amount">
-                        💰 {formatAmount(dayTotal.total_amount)}
+                        💰 <MoneyAmount value={dayTotal.total_amount} />
                       </span>
                     </div>
                   </div>
@@ -256,7 +257,7 @@ export const DailyActivityOverview: React.FC<DailyActivityOverviewProps> = ({
                               {u.orders_count} зак.
                             </span>
                             <span className="daily-activity-overview__operator-amount">
-                              {formatAmount(u.total_amount)}
+                              <MoneyAmount value={u.total_amount} />
                             </span>
                           </div>
                         ))

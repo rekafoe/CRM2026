@@ -1,5 +1,6 @@
 import React from 'react';
 import { Customer } from '../../../../types';
+import { MoneyAmount } from '../../../ui';
 
 export interface CustomerDetailMetrics {
   ordersCount: number;
@@ -31,7 +32,7 @@ export const CustomerDetailOverviewPanel: React.FC<CustomerDetailOverviewPanelPr
         <div className="customers-summary-card">
           <div className="customers-summary-title">Средний чек</div>
           <div className="customers-summary-value">
-            {customerMetrics.ordersCount > 0 ? `${customerMetrics.averageCheck.toFixed(2)} BYN` : '—'}
+            {customerMetrics.ordersCount > 0 ? <MoneyAmount value={customerMetrics.averageCheck} /> : '—'}
           </div>
         </div>
         <div className="customers-summary-card">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Button, FormField, Alert } from '../../../../components/common';
+import { MoneyAmount } from '../../../../components/ui';
 import { ProductOperation } from '../../types';
 
 interface OperationEditModalProps {
@@ -144,7 +145,7 @@ export const OperationEditModal: React.FC<OperationEditModalProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-secondary">Цена:</span>
             <span className="text-sm text-secondary">
-              {(operation.price ?? operation.price_per_unit ?? 0).toFixed(2)} BYN/{operation.unit || operation.price_unit}
+              <MoneyAmount value={operation.price ?? operation.price_per_unit ?? 0} />/{operation.unit || operation.price_unit}
             </span>
           </div>
         </div>

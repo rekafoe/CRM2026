@@ -1,5 +1,6 @@
 import React from 'react';
 import { FormField } from '../../../common';
+import { BynSymbol } from '../../../ui';
 import { PricingServiceType } from '../../../../types/pricing';
 import './ServiceForm.css';
 
@@ -203,7 +204,7 @@ const ServiceForm: React.FC<ServiceFormProps> = ({
             ))}
           </select>
         </FormField>
-        <FormField label="Цена (BYN) *" required>
+        <FormField label={<>Цена (<BynSymbol />) *</>} required>
           <input
             type="number"
             step="0.01"

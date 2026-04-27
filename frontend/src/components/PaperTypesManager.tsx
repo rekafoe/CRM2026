@@ -7,6 +7,7 @@ import {
   addPrintingPrice,
   deletePrintingPrice 
 } from '../api';
+import { BynSymbol, MoneyAmount } from './ui';
 import '../styles/paper-types-manager.css';
 
 interface PaperType {
@@ -317,7 +318,7 @@ export const PaperTypesManager: React.FC<PaperTypesManagerProps> = ({ isOpen, on
                   />
                 </div>
                 <div className="form-group">
-                  <label>Цена за лист (BYN):</label>
+                  <label>Цена за лист (<BynSymbol />):</label>
                   <input
                     type="number"
                     step="0.01"
@@ -346,7 +347,7 @@ export const PaperTypesManager: React.FC<PaperTypesManagerProps> = ({ isOpen, on
                             return (
                               <div key={density} className="price-item">
                                 <span>{density}г/м²</span>
-                                <span>{typeof price === 'number' ? price.toFixed(2) : 'N/A'} BYN/лист</span>
+                                <span>{typeof price === 'number' ? <><MoneyAmount value={price} />/лист</> : 'N/A'}</span>
                                 <button 
                                   onClick={() => {
                                     // Пока что просто показываем сообщение, так как у нас нет ID цены

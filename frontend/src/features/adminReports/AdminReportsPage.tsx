@@ -10,7 +10,7 @@ import { TimeAnalytics } from './components/TimeAnalytics';
 import { AnalyticsTab } from './types';
 import { api, getAnalyticsOrderReasons, getAnalyticsOrdersList, getYearlyRevenue, getDepartments, updateReasonPresetsSettings, type Department } from '../../api';
 import { Button } from '../../components/common';
-import { AppIcon } from '../../components/ui/AppIcon';
+import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
 import { useReasonPresets } from '../../components/common/useReasonPresets';
 
 import './AdminReportsPage.css';
@@ -730,7 +730,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') void loadDrilldownOrders('revenue', 'Заказы в выручке'); }}
           >
             <div className="reports-stat-value">
-              {totalStats.totalRevenue.toLocaleString('ru-RU')} BYN
+              <MoneyAmount value={totalStats.totalRevenue} decimals={0} />
             </div>
             <div className="reports-stat-label">Общая выручка</div>
           </div>
@@ -757,7 +757,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               {yearlyRevenueLoading
                 ? '…'
                 : yearlyRevenue
-                  ? `${yearlyRevenue.total_revenue.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BYN`
+                  ? <MoneyAmount value={yearlyRevenue.total_revenue} />
                   : '—'}
             </div>
             <div className="reports-stat-label">Выручка за 12 мес.</div>
@@ -783,7 +783,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               {pendingOrdersCount}
             </div>
             <div className="reports-stat-label">
-              Неоплаченные заказы {pendingOrdersAmount > 0 ? `(${pendingOrdersAmount.toLocaleString('ru-RU')} BYN)` : ''}
+              Неоплаченные заказы {pendingOrdersAmount > 0 ? <> (<MoneyAmount value={pendingOrdersAmount} decimals={0} />)</> : ''}
             </div>
           </div>
           <div className="reports-stat-card">
@@ -860,7 +860,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
           </div>
           <div className="reports-stat-card">
             <div className="reports-stat-value">
-              {avgCheckCurrent.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} BYN
+              <MoneyAmount value={avgCheckCurrent} />
             </div>
             <div className="reports-stat-label">
               Средний чек за период
@@ -1091,7 +1091,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
               />
             </label>
             <label className="reports-thresholds__item">
-              План выручки (BYN)
+              План выручки (<BynSymbol />)
               <input
                 type="number"
                 min={0}
@@ -1253,7 +1253,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
                 </select>
               </label>
               <div className="reports-user-info">
-                Всего заказов: <b>{drilldownSummary.total_orders}</b> • Общая сумма: <b>{Number(drilldownSummary.total_revenue || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} BYN</b>
+                Всего заказов: <b>{drilldownSummary.total_orders}</b> • Общая сумма: <b><MoneyAmount value={Number(drilldownSummary.total_revenue || 0)} /></b>
               </div>
             </div>
             {drilldownSummary.total_orders > drilldownPageSize && (
@@ -1305,8 +1305,8 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
                         <td>{order.status_name ?? order.status}</td>
                         <td>{order.prepayment_status_label ?? order.prepayment_status ?? '—'}</td>
                         <td>{order.user_name || '—'}</td>
-                        <td>{Number(order.prepayment_amount || 0).toLocaleString('ru-RU')} BYN</td>
-                        <td>{Number(order.order_total || 0).toLocaleString('ru-RU')} BYN</td>
+                        <td><MoneyAmount value={Number(order.prepayment_amount || 0)} decimals={0} /></td>
+                        <td><MoneyAmount value={Number(order.order_total || 0)} decimals={0} /></td>
                       </tr>
                     ))}
                     {drilldownOrders.length === 0 && (

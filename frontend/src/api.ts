@@ -1021,6 +1021,12 @@ export type DesignTemplateInput = Omit<Partial<DesignTemplate>, 'spec' | 'is_act
   is_active?: boolean | number;
 };
 
+export interface DesignTemplateImportResult {
+  template: DesignTemplate;
+  warnings: string[];
+  errors: string[];
+}
+
 /** Прокси: скачать изображение по HTTPS (Я.Диск, Google Drive, прямая ссылка) — обход CORS в браузере */
 export const fetchImageFromUrl = (url: string) =>
   api.post<Blob>('/images/from-url', { url }, { responseType: 'blob' });
@@ -1039,6 +1045,45 @@ export const uploadDesignTemplatePreview = (file: File) => {
   formData.append('preview', file);
   return api.post<{ filename: string; url: string }>('/design-templates/upload-preview', formData);
 };
+export const importDesignTemplateFile = (payload: {
+  file: File;
+  name: string;
+  description?: string;
+  category?: string;
+  productId?: number | string;
+  typeId?: number | string;
+  sizeId?: string;
+  sortOrder?: number;
+}) => {
+  const formData = new FormData();
+  formData.append('file', payload.file);
+  formData.append('name', payload.name);
+  if (payload.description) formData.append('description', payload.description);
+  if (payload.category) formData.append('category', payload.category);
+  if (payload.productId != null && payload.productId !== '') formData.append('productId', String(payload.productId));
+  if (payload.typeId != null && payload.typeId !== '') formData.append('typeId', String(payload.typeId));
+  if (payload.sizeId) formData.append('sizeId', payload.sizeId);
+  if (payload.sortOrder != null) formData.append('sortOrder', String(payload.sortOrder));
+  return api.post<DesignTemplateImportResult>('/design-templates/import', formData);
+};
+export const getPublicDesignTemplates = (params?: { productId?: number; typeId?: number; sizeId?: string }) =>
+  api.get<DesignTemplate[]>('/design-templates/public', { params });
+export const getPublicDesignTemplate = (id: number) =>
+  api.get<DesignTemplate>(`/design-templates/public/${id}`);
+
+export const createPublicEditorDraft = (payload: Record<string, unknown>) =>
+  api.post('/public-editor/drafts', payload);
+export const getPublicEditorDraft = (token: string) =>
+  api.get(`/public-editor/drafts/${encodeURIComponent(token)}`);
+export const updatePublicEditorDraft = (token: string, patch: Record<string, unknown>) =>
+  api.patch(`/public-editor/drafts/${encodeURIComponent(token)}`, patch);
+export const uploadPublicEditorDraftFile = (token: string, file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api.post(`/public-editor/drafts/${encodeURIComponent(token)}/files`, formData);
+};
+export const finalizePublicEditorDraft = (token: string, payload: Record<string, unknown>) =>
+  api.post(`/public-editor/drafts/${encodeURIComponent(token)}/finalize`, payload);
 
 // ─── Subtype Design Templates API ──────────────────────────────────────────────
 // Привязка дизайн-шаблонов к подтипам продукта

@@ -102,6 +102,19 @@ if (res.ok && data.order) {
 
 Не использовать свой формат (например `"ORD-" + Date.now()`): в CRM заказ будет под номером из `order.number`, и клиент должен видеть тот же номер.
 
+### Public editor API для отдельного сайта
+
+Онлайн-редактор сайта не зависит от CRM UI. Сайт получает шаблоны и работает с draft через отдельные endpoint-ы:
+
+- `GET /api/design-templates/public?productId=22&typeId=1&sizeId=10x15` — публичный список активных шаблонов.
+- `GET /api/design-templates/public/:id` — один активный шаблон с `spec.designState`.
+- `POST /api/public-editor/drafts` — создать draft редактора.
+- `PATCH /api/public-editor/drafts/:token` — сохранить состояние редактора (`designState`, `photoBatch`, выбранные параметры).
+- `POST /api/public-editor/drafts/:token/files` — загрузить файл клиента в draft.
+- `POST /api/public-editor/drafts/:token/finalize` — создать заказ `source=website` и привязать файлы draft к заказу.
+
+Для `/api/public-editor/*` используется `WEBSITE_ORDER_API_KEY`. Ключ должен храниться на backend отдельного сайта; браузеру его отдавать нельзя.
+
 ### Пример запроса на backend
 
 **Создание заказа с позициями (POST /api/orders/from-website):**
@@ -227,6 +240,89 @@ curl -X POST "https://api.printcore.by/api/orders/from-website" \
 | `layout.itemsPerSheet` | Штук на листе |
 | `layout.sheetSize` | Формат листа (SRA3, A4 и т.д.) |
 | `priceType` | Тип цены (срочно, онлайн, промо и т.д.) |
+
+**Photo batch metadata (для пачки фото с индивидуальным размером/кропом):**
+
+Если продукт настроен как `design_editor_mode = photo_batch`, фото лучше передавать **позициями по группам размера**.
+Количество фото в пачке не является частью контракта: режим работает для `n` файлов, а лимиты должны задаваться отдельно на уровне загрузки/обработки.
+Например заказ с 30 фото `10×15`, 30 фото `15×20` и 40 фото `20×30` создаёт три позиции заказа.
+Внутри каждой позиции лежит `params.photoBatch.items` с конкретными файлами, кропом и тиражом фото.
+В CRM первый экран редактирования пачки доступен из модалки файлов позиции заказа: `/photo-batch-editor?orderId=...&orderItemId=...&productId=...&typeId=...`.
+Размеры должны браться из конфигурации продукта, а не из фиксированного списка.
+
+```json
+{
+  "params": {
+    "specifications": {
+      "format": "mixed",
+      "paperType": "glossy",
+      "sides": 1
+    },
+    "photoBatch": {
+      "groupSizeId": "10x15",
+      "groupLabel": "10×15",
+      "targetSizeMm": { "width": 100, "height": 150 },
+      "production": {
+        "exportMode": "group_pdf",
+        "folderName": "01_10x15_30шт",
+        "imposeToSheet": false,
+        "sheetSizeMm": null
+      },
+      "items": [
+        {
+          "fileId": 123,
+          "originalName": "IMG_0012.jpg",
+          "quantity": 1,
+          "fitMode": "cover",
+          "rotation": 0,
+          "crop": { "x": 0.12, "y": 0.04, "w": 0.76, "h": 0.92 }
+        },
+        {
+          "fileId": 124,
+          "originalName": "IMG_0013.jpg",
+          "quantity": 2,
+          "fitMode": "contain",
+          "rotation": 90,
+          "crop": { "x": 0, "y": 0, "w": 1, "h": 1 }
+        }
+      ]
+    }
+  }
+}
+```
+
+`targetSizeMm` — физический размер печати группы, `crop` — относительные координаты области исходного фото (0–1), `quantity` — тираж конкретного фото.
+
+Для цифровой печати на SRA3 позиция может попросить производственный экспорт с раскладкой:
+
+```json
+{
+  "photoBatch": {
+    "groupSizeId": "10x15",
+    "groupLabel": "10×15",
+    "targetSizeMm": { "width": 100, "height": 150 },
+    "production": {
+      "exportMode": "imposed_pdf",
+      "folderName": "01_10x15_30шт",
+      "imposeToSheet": true,
+      "sheetSizeMm": { "width": 320, "height": 450 },
+      "gapMm": 2,
+      "bleedMm": 2,
+      "cutMarks": true,
+      "cutMarksMode": "trim_box"
+    },
+    "items": []
+  }
+}
+```
+
+При `cutMarks=true` метки ставятся по обрезному размеру `targetSizeMm`, а изображение должно выходить наружу на дозаливку `bleedMm`.
+Например для `10×15` (`100×150 мм`) и `bleedMm=2` картинка размещается как `104×154 мм`, но метки реза стоят по `100×150 мм`.
+Это нужно, чтобы оператор вручную резал по правильному финальному размеру, а по краям не появлялись белые полосы.
+Клиентский редактор должен показывать эту же геометрию: bleed-рамку, trim-рамку и safe zone, чтобы клиент видел, какая часть изображения может быть срезана.
+Значения по умолчанию берутся из `config_data.simplified.prepress` продукта: `bleedMm`, `safeZoneMm`, `showBleed`, `showTrim`, `showSafeZone`, `cutMarks`.
+
+Production export должен уметь вернуть ZIP с общей папкой заказа и подпапками по позициям/размерам, либо PDF по каждой группе.
 
 **Вариант: 4 разных фото как 4 отдельные позиции** (если каждое фото — своя строка):
 
@@ -429,6 +525,12 @@ const typeConfigs = data?.template?.simplified?.typeConfigs ?? {};
 
 ---
 
-## Планы: система уведомлений клиенту (TODO)
+## Уведомления клиенту
 
-**Запланировано:** реализовать систему уведомлений для клиента — оповещение о готовности заказа по email и при необходимости по SMS (например, при переходе заказа в статус «Готов» / «Передан в ПВЗ»). Подробнее по настройке почтового агента и SMS см. **[Настройка уведомлений клиентам (email/SMS)](./customer-notifications-setup.md)**.
+Email-уведомления о смене статуса работают через SMTP и очередь `mail_jobs`. Для отправки нужно:
+
+- задать `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` и при необходимости `SMTP_USER` / `SMTP_PASS`;
+- проверить отправку через `POST /api/mail/test` или вкладку **Админ → Уведомления → Почта / SMS**;
+- включить нужные правила `order_email_rules` для статусов.
+
+Письмо уходит, если у заказа или связанной карточки клиента есть email. Повторное письмо на один и тот же переход `oldStatusId -> newStatusId` не создаётся. Подробнее: **[Настройка уведомлений клиентам (email/SMS)](./customer-notifications-setup.md)**.

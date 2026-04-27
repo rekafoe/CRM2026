@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Alert } from '../../components/common';
+import { BynSymbol } from '../../components/ui';
 import { apiClient } from '../../api/client';
 import '../../styles/admin-page-layout.css';
 import './MultiPageProductEditor.css';
@@ -201,7 +202,7 @@ export const MultiPageProductEditor: React.FC = () => {
                     <th>Мин. стр.</th>
                     <th>Макс. стр.</th>
                     <th>Двуст. печать</th>
-                    <th>Цена, BYN</th>
+                    <th>Цена, <BynSymbol /></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -273,8 +274,8 @@ export const MultiPageProductEditor: React.FC = () => {
                   <tr>
                     <th>Вкл</th>
                     <th>Название</th>
-                    <th>Цена за стр., BYN</th>
-                    <th>Приладка, BYN</th>
+                    <th>Цена за стр., <BynSymbol /></th>
+                    <th>Приладка, <BynSymbol /></th>
                   </tr>
                 </thead>
                 <tbody>

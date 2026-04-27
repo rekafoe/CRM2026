@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { AdminPageLayout } from '../components/admin/AdminPageLayout';
 import { Alert, Button, FormField, Modal } from '../components/common';
-import { AppIcon } from '../components/ui/AppIcon';
+import { AppIcon, MoneyAmount } from '../components/ui';
 import { getMyEarnings } from '../api';
 import './EarningsPage.css';
 
@@ -175,11 +175,11 @@ export const EarningsPage: React.FC = () => {
         <div className="earnings-summary-group">
           <div className="earnings-summary-card earnings-summary-card--today">
             <div className="earnings-summary-title"><AppIcon name="wallet" size="xs" /> Сегодня</div>
-            <div className="earnings-summary-value">{todayTotal.toFixed(2)} BYN</div>
+            <div className="earnings-summary-value"><MoneyAmount value={todayTotal} /></div>
           </div>
           <div className="earnings-summary-card">
             <div className="earnings-summary-title">Итого за месяц</div>
-            <div className="earnings-summary-value">{total.toFixed(2)} BYN</div>
+            <div className="earnings-summary-value"><MoneyAmount value={total} /></div>
           </div>
           <button
             type="button"
@@ -187,7 +187,7 @@ export const EarningsPage: React.FC = () => {
             onClick={() => setShowBonusesModal(true)}
           >
             <div className="earnings-summary-title">Премии</div>
-            <div className="earnings-summary-value">+{totalBonuses.toFixed(2)} BYN</div>
+            <div className="earnings-summary-value"><MoneyAmount value={totalBonuses} signed /></div>
           </button>
           <button
             type="button"
@@ -195,11 +195,11 @@ export const EarningsPage: React.FC = () => {
             onClick={() => setShowPenaltiesModal(true)}
           >
             <div className="earnings-summary-title">Штрафы</div>
-            <div className="earnings-summary-value">−{totalPenalties.toFixed(2)} BYN</div>
+            <div className="earnings-summary-value">−<MoneyAmount value={totalPenalties} /></div>
           </button>
           <div className="earnings-summary-card earnings-summary-card--net">
             <div className="earnings-summary-title">К выплате</div>
-            <div className="earnings-summary-value">{totalNet.toFixed(2)} BYN</div>
+            <div className="earnings-summary-value"><MoneyAmount value={totalNet} /></div>
           </div>
           <div className="earnings-summary-card">
             <div className="earnings-summary-title">Количество позиций</div>
@@ -210,13 +210,13 @@ export const EarningsPage: React.FC = () => {
           <div className="earnings-summary-card">
             <div className="earnings-summary-title">Выработка за день</div>
             <div className="earnings-summary-value">
-              {outputStats.todayOrdersCount} заказов · {outputStats.todayOrderValue.toFixed(2)} BYN
+              {outputStats.todayOrdersCount} заказов · <MoneyAmount value={outputStats.todayOrderValue} />
             </div>
           </div>
           <div className="earnings-summary-card">
             <div className="earnings-summary-title">Выработка за месяц</div>
             <div className="earnings-summary-value">
-              {outputStats.monthOrderValue.toFixed(2)} BYN
+              <MoneyAmount value={outputStats.monthOrderValue} />
             </div>
           </div>
         </div>
@@ -232,7 +232,7 @@ export const EarningsPage: React.FC = () => {
             <div key={date} className="earnings-day-group">
               <div className="earnings-day-header">
                 <span className="earnings-day-title">{formatDate(date)}</span>
-                <span className="earnings-day-total">{dayTotal.toFixed(2)} BYN</span>
+                <span className="earnings-day-total"><MoneyAmount value={dayTotal} /></span>
               </div>
               <table className="earnings-table">
                 <colgroup>
@@ -256,9 +256,9 @@ export const EarningsPage: React.FC = () => {
                     <tr key={`${item.itemId}-${item.earnedDate}`}>
                       <td>{item.orderNumber || `#${item.orderId}`}</td>
                       <td>{item.itemName}</td>
-                      <td>{Number(item.itemTotal).toFixed(2)} BYN</td>
+                      <td><MoneyAmount value={item.itemTotal} /></td>
                       <td>{Number(item.percent).toFixed(2)}%</td>
-                      <td className="earnings-amount">{Number(item.amount).toFixed(2)} BYN</td>
+                      <td className="earnings-amount"><MoneyAmount value={item.amount} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -278,7 +278,7 @@ export const EarningsPage: React.FC = () => {
       >
         <div className="earnings-detail-modal">
           <p className="earnings-detail-modal__summary">
-            За {month}: <strong>+{totalBonuses.toFixed(2)} BYN</strong>
+            За {month}: <strong><MoneyAmount value={totalBonuses} signed /></strong>
           </p>
           {bonuses.length === 0 ? (
             <p className="earnings-detail-modal__empty">Нет премий за выбранный месяц</p>
@@ -291,7 +291,7 @@ export const EarningsPage: React.FC = () => {
                 {bonuses.map((b) => (
                   <tr key={b.id}>
                     <td>{b.bonusDate}</td>
-                    <td className="earnings-amount earnings-amount--bonus">+{Number(b.amount).toFixed(2)} BYN</td>
+                    <td className="earnings-amount earnings-amount--bonus"><MoneyAmount value={b.amount} signed /></td>
                     <td>{b.reason || '—'}</td>
                   </tr>
                 ))}
@@ -311,7 +311,7 @@ export const EarningsPage: React.FC = () => {
       >
         <div className="earnings-detail-modal">
           <p className="earnings-detail-modal__summary">
-            За {month}: <strong>−{totalPenalties.toFixed(2)} BYN</strong>
+            За {month}: <strong>−<MoneyAmount value={totalPenalties} /></strong>
           </p>
           {penalties.length === 0 ? (
             <p className="earnings-detail-modal__empty">Нет штрафов за выбранный месяц</p>
@@ -324,7 +324,7 @@ export const EarningsPage: React.FC = () => {
                 {penalties.map((p) => (
                   <tr key={p.id}>
                     <td>{p.penaltyDate}</td>
-                    <td className="earnings-amount earnings-amount--penalty">−{Number(p.amount).toFixed(2)} BYN</td>
+                    <td className="earnings-amount earnings-amount--penalty">−<MoneyAmount value={p.amount} /></td>
                     <td>{p.reason || '—'}</td>
                   </tr>
                 ))}

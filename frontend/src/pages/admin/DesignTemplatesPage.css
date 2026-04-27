@@ -244,6 +244,18 @@
   background: rgba(0, 0, 0, 0.8);
 }
 
+.design-template-import-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
 .design-template-form .form-actions {
   display: flex;
   gap: 12px;

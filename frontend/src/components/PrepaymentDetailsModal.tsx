@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { parseNumberFlexible } from '../utils/numberInput';
 import { Order } from '../types';
 import { createPrepaymentLink } from '../api';
+import { MoneyAmount } from './ui';
 
 interface PrepaymentDetailsModalProps {
   isOpen: boolean;
@@ -95,7 +96,7 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
                   </div>
                   <div className="amount-display">
                     <span className="amount-label">Сумма:</span>
-                    <span className="amount-value">{order.prepaymentAmount} BYN</span>
+                    <span className="amount-value"><MoneyAmount value={order.prepaymentAmount} /></span>
                   </div>
                   <div className="payment-method-display">
                     <span className="method-label">Способ оплаты:</span>
@@ -115,16 +116,16 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
                   <div className="debt-details">
                     <div className="debt-row">
                       <span className="debt-label">Общая сумма заказа:</span>
-                      <span className="debt-value total">{totalOrderAmount.toFixed(2)} BYN</span>
+                      <span className="debt-value total"><MoneyAmount value={totalOrderAmount} /></span>
                     </div>
                     <div className="debt-row">
                       <span className="debt-label">Предоплата:</span>
-                      <span className="debt-value prepayment">-{prepaymentAmount.toFixed(2)} BYN</span>
+                      <span className="debt-value prepayment">-<MoneyAmount value={prepaymentAmount} /></span>
                     </div>
                     <div className="debt-row debt-total">
                       <span className="debt-label">Долг клиента:</span>
                       <span className={`debt-value debt ${debtAmount > 0 ? 'positive' : 'zero'}`}>
-                        {debtAmount > 0 ? `${debtAmount.toFixed(2)} BYN` : 'Оплачено полностью'}
+                        {debtAmount > 0 ? <MoneyAmount value={debtAmount} /> : 'Оплачено полностью'}
                       </span>
                     </div>
                   </div>

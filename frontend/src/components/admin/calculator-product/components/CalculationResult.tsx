@@ -1,5 +1,6 @@
 import React from 'react';
 import { LoadingState, EmptyState } from '../../../common';
+import { MoneyAmount } from '../../../ui';
 
 interface CalculationResultProps {
   calcLoading: boolean;
@@ -21,7 +22,7 @@ export const CalculationResult: React.FC<CalculationResultProps> = React.memo(({
           <div className="result-total">
             <span className="result-total-label">Общая стоимость:</span>
             <span className="result-total-value">
-              {calcResult.totalPrice?.toFixed(2) || calcResult.final?.toFixed(2) || '0.00'} BYN
+              <MoneyAmount value={calcResult.totalPrice ?? calcResult.final ?? 0} />
             </span>
           </div>
           
@@ -33,7 +34,7 @@ export const CalculationResult: React.FC<CalculationResultProps> = React.memo(({
                   {calcResult.breakdown.materials.map((item: any, index: number) => (
                     <div key={index} className="breakdown-item">
                       <span className="breakdown-item-name">{item.name}</span>
-                      <span className="breakdown-item-cost">{item.totalCost?.toFixed(2)} BYN</span>
+                      <span className="breakdown-item-cost"><MoneyAmount value={item.totalCost ?? 0} /></span>
                     </div>
                   ))}
                 </div>
@@ -44,7 +45,7 @@ export const CalculationResult: React.FC<CalculationResultProps> = React.memo(({
                   {calcResult.breakdown.services.map((item: any, index: number) => (
                     <div key={index} className="breakdown-item">
                       <span className="breakdown-item-name">{item.name}</span>
-                      <span className="breakdown-item-cost">{item.totalCost?.toFixed(2)} BYN</span>
+                      <span className="breakdown-item-cost"><MoneyAmount value={item.totalCost ?? 0} /></span>
                     </div>
                   ))}
                 </div>
@@ -60,7 +61,7 @@ export const CalculationResult: React.FC<CalculationResultProps> = React.memo(({
                   {calcResult.materials.map((item: any, index: number) => (
                     <div key={index} className="breakdown-item">
                       <span className="breakdown-item-name">{item.name}</span>
-                      <span className="breakdown-item-cost">{item.total?.toFixed(2)} BYN</span>
+                      <span className="breakdown-item-cost"><MoneyAmount value={item.total ?? 0} /></span>
                     </div>
                   ))}
                 </div>
@@ -71,7 +72,7 @@ export const CalculationResult: React.FC<CalculationResultProps> = React.memo(({
                   {calcResult.services.map((item: any, index: number) => (
                     <div key={index} className="breakdown-item">
                       <span className="breakdown-item-name">{item.name}</span>
-                      <span className="breakdown-item-cost">{item.total?.toFixed(2)} BYN</span>
+                      <span className="breakdown-item-cost"><MoneyAmount value={item.total ?? 0} /></span>
                     </div>
                   ))}
                 </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Supplier } from '../../types/shared';
 import { api } from '../../api/client';
+import { MoneyAmount } from '../ui';
 import './SupplierMaterialsModal.css';
 
 interface Material {
@@ -90,7 +91,7 @@ export const SupplierMaterialsModal: React.FC<SupplierMaterialsModalProps> = ({
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Общая стоимость:</span>
-                  <span className="stat-value">{totalValue.toFixed(2)} BYN</span>
+                  <span className="stat-value"><MoneyAmount value={totalValue} /></span>
                 </div>
               </div>
 
@@ -125,7 +126,7 @@ export const SupplierMaterialsModal: React.FC<SupplierMaterialsModalProps> = ({
                       <div className="material-price">
                         {material.sheet_price_single ? (
                           <span className="price">
-                            {material.sheet_price_single.toFixed(2)} BYN
+                            <MoneyAmount value={material.sheet_price_single} />
                           </span>
                         ) : (
                           <span className="no-price">Цена не указана</span>

@@ -4,6 +4,9 @@ export interface MailConfigResponse {
   configured: boolean;
   host?: string;
   port?: number;
+  from?: string;
+  workerEnabled?: boolean;
+  outboxIntervalMs?: number;
 }
 
 export interface MailStatsResponse {

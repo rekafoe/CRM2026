@@ -4,6 +4,7 @@ import { addOrderItem, getProductMaterials, getPresets, getPrinters, getPrintTec
 import axios from 'axios';
 // import FlyersCalculatorModal from './FlyersCalculatorModal'; // MOVED TO ARCHIVE
 import type { Printer } from '../types';
+import { MoneyAmount } from './ui';
 
 interface Props {
   order: Order;
@@ -198,8 +199,8 @@ export default function AddItemModal({ order, onSave, onClose, initialCategory, 
               </div>
               {calcResult && (calcResult as any).totalPrice != null && (
                 <div style={{ marginTop: 8, fontSize: 14 }}>
-                  <div>Цена за штуку: <strong>{(calcResult as any).pricePerItem} BYN</strong></div>
-                  <div>Итого: <strong>{(calcResult as any).totalPrice} BYN</strong></div>
+                  <div>Цена за штуку: <strong><MoneyAmount value={(calcResult as any).pricePerItem} /></strong></div>
+                  <div>Итого: <strong><MoneyAmount value={(calcResult as any).totalPrice} /></strong></div>
                   <div>SRA3 листов: {(calcResult as any).totalSheets}</div>
                 </div>
               )}

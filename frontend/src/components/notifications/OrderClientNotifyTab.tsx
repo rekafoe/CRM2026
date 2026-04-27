@@ -17,7 +17,14 @@ import './OrderClientNotifyTab.css';
  */
 export const OrderClientNotifyTab: React.FC = () => {
   const { addToast } = useToast();
-  const [config, setConfig] = useState<{ configured: boolean; host?: string } | null>(null);
+  const [config, setConfig] = useState<{
+    configured: boolean;
+    host?: string;
+    port?: number;
+    from?: string;
+    workerEnabled?: boolean;
+    outboxIntervalMs?: number;
+  } | null>(null);
   const [stats, setStats] = useState<{ pending: number; failed: number; sent24h: number } | null>(
     null
   );
@@ -68,7 +75,7 @@ export const OrderClientNotifyTab: React.FC = () => {
       addToast({
         type: 'warning',
         title: 'SMTP',
-        message: 'Сначала задайте SMTP_HOST и SMTP_FROM на сервере.',
+        message: 'Сначала задайте SMTP_HOST и SMTP_FROM на сервере, затем отправьте тестовое письмо.',
       });
       return;
     }
@@ -167,8 +174,8 @@ export const OrderClientNotifyTab: React.FC = () => {
     <div className="notifications-settings client-notify-tab">
       <h3 className="client-notify-title">Почта и SMS по заказам</h3>
       <p className="client-notify-lead">
-        Уведомления клиенту при смене статуса. Email — при наличии <code>customerEmail</code>; авто-SMS — только
-        для заказов с сайта и с <code>customerPhone</code> (ручная отправка в карточке заказа).
+        Уведомления клиенту при смене статуса. Email — при наличии <code>customerEmail</code> в заказе или
+        карточке клиента; авто-SMS — только для заказов с сайта и с <code>customerPhone</code>.
       </p>
 
       <div className="settings-sections">
@@ -177,11 +184,25 @@ export const OrderClientNotifyTab: React.FC = () => {
           <p className="client-notify-p">
             <strong>SMTP:</strong>{' '}
             {config?.configured ? (
-              <span className="client-notify-ok">настроен ({config.host})</span>
+              <span className="client-notify-ok">
+                настроен ({config.host}:{config.port})
+              </span>
             ) : (
-              <span className="client-notify-bad">не настроен — задайте SMTP_HOST и SMTP_FROM</span>
+              <span className="client-notify-bad">
+                не настроен — задайте SMTP_HOST и SMTP_FROM
+              </span>
             )}
           </p>
+          <p className="client-notify-meta">
+            Отправитель: {config?.from || 'не задан'} · воркер:{' '}
+            {config?.workerEnabled === false ? 'выключен' : `включён, интервал ${(config?.outboxIntervalMs ?? 0) / 1000 || 15} с`}
+          </p>
+          {!config?.configured && (
+            <p className="client-notify-hint">
+              Минимум для запуска: <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_FROM</code>.
+              Если сервер требует авторизацию, добавьте <code>SMTP_USER</code> и <code>SMTP_PASS</code>.
+            </p>
+          )}
           {stats && (
             <p className="client-notify-meta">
               Очередь: {stats.pending} ожидает · {stats.failed} с ошибкой · {stats.sent24h} за 24ч
@@ -271,7 +292,10 @@ export const OrderClientNotifyTab: React.FC = () => {
 
         <div className="settings-section">
           <h4>Email при смене статуса</h4>
-          <p className="client-notify-hint">Нужен email клиента и <strong>включённое</strong> правило.</p>
+          <p className="client-notify-hint">
+            Нужен email клиента, настроенный SMTP и <strong>включённое</strong> правило для нового статуса.
+            Дубли на один переход статуса блокируются idempotency-ключом.
+          </p>
           <div className="client-notify-table-wrap">
             <table className="client-notify-table">
               <thead>

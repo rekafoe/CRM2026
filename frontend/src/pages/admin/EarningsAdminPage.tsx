@@ -1,24 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Button, FormField, Modal } from '../../components/common';
-import { AppIcon } from '../../components/ui/AppIcon';
+import { AppIcon, BynSymbol, MoneyAmount } from '../../components/ui';
 import { getAdminEarnings, getShifts, updateShift, createShift, getDepartments, getPenalties, createPenalty, deletePenalty, getBonuses, createBonus, deleteBonus, type Department, type Penalty, type Bonus } from '../../api';
+import { EarningsAnalyticsPanel } from './earnings/EarningsAnalyticsPanel';
+import type { AdminUserRow } from './earnings/earningsTypes';
 import './EarningsAdminPage.css';
-
-type AdminUserRow = {
-  userId: number;
-  name: string;
-  role: string;
-  isActive: boolean;
-  totalCurrentMonth: number;
-  totalPreviousMonth: number;
-  totalPenalties?: number;
-  totalBonuses?: number;
-  totalNet?: number;
-  hours: number;
-  shifts: number;
-  history: Array<{ month: string; total: number }>;
-};
 
 type ShiftRow = {
   id: number;
@@ -37,7 +24,7 @@ export const EarningsAdminPage: React.FC = () => {
   const [historyMonths, setHistoryMonths] = useState(3);
   const [departmentId, setDepartmentId] = useState<number | ''>('');
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [activeTab, setActiveTab] = useState<'summary' | 'analytics'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'analytics' | 'employee'>('summary');
   const [analyticsUserId, setAnalyticsUserId] = useState<number | null>(null);
   const [detailUser, setDetailUser] = useState<AdminUserRow | null>(null);
   const [shiftUser, setShiftUser] = useState<AdminUserRow | null>(null);
@@ -301,16 +288,16 @@ export const EarningsAdminPage: React.FC = () => {
             <span className="earn-stat-card__label">Средняя ЗП</span>
             <span className="earn-stat-card__icon"><AppIcon name="chart" size="sm" /></span>
           </div>
-          <div className="earn-stat-card__value">{averageSalary.toFixed(0)}</div>
-          <div className="earn-stat-card__trend earn-stat-card__trend--neutral">BYN за период</div>
+          <div className="earn-stat-card__value"><MoneyAmount value={averageSalary} decimals={0} /></div>
+          <div className="earn-stat-card__trend earn-stat-card__trend--neutral">за период</div>
         </div>
         <div className="earn-stat-card">
           <div className="earn-stat-card__header">
             <span className="earn-stat-card__label">Всего начислено</span>
             <span className="earn-stat-card__icon"><AppIcon name="money" size="sm" /></span>
           </div>
-          <div className="earn-stat-card__value">{totalSalary.toFixed(0)}</div>
-          <div className="earn-stat-card__trend">BYN за {month}</div>
+          <div className="earn-stat-card__value"><MoneyAmount value={totalSalary} decimals={0} /></div>
+          <div className="earn-stat-card__trend">за {month}</div>
         </div>
         <div className="earn-stat-card">
           <div className="earn-stat-card__header">
@@ -362,6 +349,13 @@ export const EarningsAdminPage: React.FC = () => {
         >
           Аналитика
         </button>
+        <button
+          type="button"
+          className={`earn-tab ${activeTab === 'employee' ? 'earn-tab--active' : ''}`}
+          onClick={() => setActiveTab('employee')}
+        >
+          По сотруднику
+        </button>
       </div>
 
       {/* Summary tab */}
@@ -397,17 +391,17 @@ export const EarningsAdminPage: React.FC = () => {
                 {rows.map((row) => (
                   <tr key={row.userId}>
                     <td className="earn-cell-name">{row.name}</td>
-                    <td className="earn-cell-money">{Number(row.totalCurrentMonth).toFixed(2)} BYN</td>
+                    <td className="earn-cell-money"><MoneyAmount value={row.totalCurrentMonth} /></td>
                     <td className="earn-cell-money earn-cell-money--bonus">
-                      +{Number(row.totalBonuses ?? 0).toFixed(2)} BYN
+                      <MoneyAmount value={row.totalBonuses ?? 0} signed />
                     </td>
                     <td className="earn-cell-money earn-cell-money--penalty">
-                      −{Number(row.totalPenalties ?? 0).toFixed(2)} BYN
+                      −<MoneyAmount value={row.totalPenalties ?? 0} />
                     </td>
                     <td className="earn-cell-money earn-cell-money--net">
-                      {Number(row.totalNet ?? row.totalCurrentMonth).toFixed(2)} BYN
+                      <MoneyAmount value={row.totalNet ?? row.totalCurrentMonth} />
                     </td>
-                    <td>{Number(row.totalPreviousMonth).toFixed(2)} BYN</td>
+                    <td><MoneyAmount value={row.totalPreviousMonth} /></td>
                     <td>{Number(row.hours).toFixed(1)}</td>
                     <td>{row.shifts}</td>
                     <td>
@@ -436,6 +430,11 @@ export const EarningsAdminPage: React.FC = () => {
 
       {/* Analytics tab */}
       {activeTab === 'analytics' && (
+        <EarningsAnalyticsPanel rows={rows} month={month} />
+      )}
+
+      {/* Employee tab */}
+      {activeTab === 'employee' && (
         <div className="earn-admin__card">
           <div className="earn-admin__card-header">
             <h3>Аналитика по сотруднику</h3>
@@ -462,7 +461,7 @@ export const EarningsAdminPage: React.FC = () => {
                     {analyticsTrend.direction === 'neutral' && '— Без изменений'}
                   </div>
                   <div className="earn-trend-value">
-                    {analyticsTrend.delta >= 0 ? '+' : ''}{analyticsTrend.delta.toFixed(2)} BYN
+                    <MoneyAmount value={analyticsTrend.delta} signed />
                     {analyticsTrend.percent !== null && (
                       <span className="earn-trend-pct">
                         ({analyticsTrend.percent >= 0 ? '+' : ''}{analyticsTrend.percent.toFixed(1)}%)
@@ -507,7 +506,7 @@ export const EarningsAdminPage: React.FC = () => {
                       {analyticsHistory.map((entry) => (
                         <tr key={entry.month}>
                           <td>{entry.month}</td>
-                          <td className="earn-cell-money">{Number(entry.total).toFixed(2)} BYN</td>
+                          <td className="earn-cell-money"><MoneyAmount value={entry.total} /></td>
                         </tr>
                       ))}
                     </tbody>
@@ -531,7 +530,7 @@ export const EarningsAdminPage: React.FC = () => {
                 {detailUser.history.map((h) => (
                   <tr key={h.month}>
                     <td>{h.month}</td>
-                    <td className="earn-cell-money">{Number(h.total).toFixed(2)} BYN</td>
+                    <td className="earn-cell-money"><MoneyAmount value={h.total} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -608,7 +607,7 @@ export const EarningsAdminPage: React.FC = () => {
         {penaltyUser && (
           <>
             <div className="earn-shift-form earn-penalty-form">
-              <FormField label="Сумма (BYN)">
+              <FormField label={<>Сумма (<BynSymbol />)</>}>
                 <input type="number" className="earn-filter-input" min={0} step={0.01} value={newPenaltyAmount} onChange={(e) => setNewPenaltyAmount(e.target.value)} />
               </FormField>
               <FormField label="Причина">
@@ -622,9 +621,9 @@ export const EarningsAdminPage: React.FC = () => {
               </Button>
             </div>
             <div className="earn-penalty-summary">
-              Итого штрафов за {month}: <strong>{penaltyTotal.toFixed(2)} BYN</strong>
+              Итого штрафов за {month}: <strong><MoneyAmount value={penaltyTotal} /></strong>
               {' · '}
-              К выплате: <strong>{Math.max(0, (penaltyUser.totalCurrentMonth ?? 0) + (penaltyUser.totalBonuses ?? 0) - penaltyTotal).toFixed(2)} BYN</strong>
+              К выплате: <strong><MoneyAmount value={Math.max(0, (penaltyUser.totalCurrentMonth ?? 0) + (penaltyUser.totalBonuses ?? 0) - penaltyTotal)} /></strong>
             </div>
             {penaltyLoading ? (
               <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>Загрузка...</div>
@@ -645,7 +644,7 @@ export const EarningsAdminPage: React.FC = () => {
                     {penaltyList.map((p) => (
                       <tr key={p.id}>
                         <td>{p.penaltyDate}</td>
-                        <td className="earn-cell-money">{Number(p.amount).toFixed(2)} BYN</td>
+                        <td className="earn-cell-money"><MoneyAmount value={p.amount} /></td>
                         <td>{p.reason || '—'}</td>
                         <td>
                           <Button variant="secondary" size="sm" onClick={() => handlePenaltyDelete(p.id, p.amount)}>
@@ -667,7 +666,7 @@ export const EarningsAdminPage: React.FC = () => {
         {bonusUser && (
           <>
             <div className="earn-shift-form earn-penalty-form">
-              <FormField label="Сумма (BYN)">
+              <FormField label={<>Сумма (<BynSymbol />)</>}>
                 <input type="number" className="earn-filter-input" min={0} step={0.01} value={newBonusAmount} onChange={(e) => setNewBonusAmount(e.target.value)} />
               </FormField>
               <FormField label="Причина">
@@ -681,9 +680,9 @@ export const EarningsAdminPage: React.FC = () => {
               </Button>
             </div>
             <div className="earn-bonus-summary">
-              Итого премий за {month}: <strong>+{bonusTotal.toFixed(2)} BYN</strong>
+              Итого премий за {month}: <strong><MoneyAmount value={bonusTotal} signed /></strong>
               {' · '}
-              К выплате: <strong>{Math.max(0, (bonusUser.totalCurrentMonth ?? 0) + bonusTotal - (bonusUser.totalPenalties ?? 0)).toFixed(2)} BYN</strong>
+              К выплате: <strong><MoneyAmount value={Math.max(0, (bonusUser.totalCurrentMonth ?? 0) + bonusTotal - (bonusUser.totalPenalties ?? 0))} /></strong>
             </div>
             {bonusLoading ? (
               <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>Загрузка...</div>
@@ -704,7 +703,7 @@ export const EarningsAdminPage: React.FC = () => {
                     {bonusList.map((b) => (
                       <tr key={b.id}>
                         <td>{b.bonusDate}</td>
-                        <td className="earn-cell-money">+{Number(b.amount).toFixed(2)} BYN</td>
+                        <td className="earn-cell-money"><MoneyAmount value={b.amount} signed /></td>
                         <td>{b.reason || '—'}</td>
                         <td>
                           <Button variant="secondary" size="sm" onClick={() => handleBonusDelete(b.id, b.amount)}>

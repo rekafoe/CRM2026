@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Supplier } from '../../types/shared';
 import { api } from '../../api/client';
 import { ENDPOINTS } from '../../api/endpoints';
+import { MoneyAmount } from '../ui';
 import './SupplierAnalyticsModal.css';
 
 interface SupplierAnalyticsModalProps {
@@ -100,13 +101,6 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
     } catch (error: any) {
       console.error('Ошибка загрузки истории поставок:', error);
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'BYN'
-    }).format(amount);
   };
 
   const formatDate = (dateString: string | null) => {
@@ -228,7 +222,7 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
                       <div className="stat-card">
                         <div className="stat-icon">💰</div>
                         <div className="stat-content">
-                          <div className="stat-value">{formatCurrency(analytics.delivery_stats.total_value)}</div>
+                          <div className="stat-value"><MoneyAmount value={analytics.delivery_stats.total_value} /></div>
                           <div className="stat-label">Общая стоимость</div>
                         </div>
                       </div>
@@ -262,7 +256,7 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
                         <strong>Общий объем:</strong> {analytics.delivery_stats.total_quantity.toFixed(2)} ед.
                       </div>
                       <div className="stat-item">
-                        <strong>Средняя стоимость поставки:</strong> {formatCurrency(analytics.delivery_stats.average_delivery_value)}
+                        <strong>Средняя стоимость поставки:</strong> <MoneyAmount value={analytics.delivery_stats.average_delivery_value} />
                       </div>
                       <div className="stat-item">
                         <strong>Частота поставок:</strong> каждые {analytics.delivery_stats.delivery_frequency_days} дней
@@ -308,16 +302,16 @@ export const SupplierAnalyticsModal: React.FC<SupplierAnalyticsModalProps> = ({
                   <div className="financial-tab">
                     <div className="financial-stats">
                       <div className="stat-item">
-                        <strong>Общие расходы:</strong> {formatCurrency(analytics.financial_stats.total_spent)}
+                        <strong>Общие расходы:</strong> <MoneyAmount value={analytics.financial_stats.total_spent} />
                       </div>
                       <div className="stat-item">
-                        <strong>Средний размер заказа:</strong> {formatCurrency(analytics.financial_stats.average_order_value)}
+                        <strong>Средний размер заказа:</strong> <MoneyAmount value={analytics.financial_stats.average_order_value} />
                       </div>
                       <div className="stat-item">
-                        <strong>Самая крупная поставка:</strong> {formatCurrency(analytics.financial_stats.largest_delivery_value)}
+                        <strong>Самая крупная поставка:</strong> <MoneyAmount value={analytics.financial_stats.largest_delivery_value} />
                       </div>
                       <div className="stat-item">
-                        <strong>Самая мелкая поставка:</strong> {formatCurrency(analytics.financial_stats.smallest_delivery_value)}
+                        <strong>Самая мелкая поставка:</strong> <MoneyAmount value={analytics.financial_stats.smallest_delivery_value} />
                       </div>
                       <div className="stat-item">
                         <strong>Тренд цен:</strong> 

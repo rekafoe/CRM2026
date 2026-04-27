@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useUIStore } from '../../stores/uiStore';
+import { BynSymbol } from '../ui';
 
 interface AutomationRule {
   id: number;
@@ -287,7 +288,7 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
               value={settings.minOrderValue}
               onChange={(e) => handleUpdateSettings({ minOrderValue: Number(e.target.value) })}
             />
-            BYN
+            <BynSymbol />
           </label>
         </div>
         <div className="setting-item">
@@ -298,7 +299,7 @@ export const WarehouseAutomation: React.FC<WarehouseAutomationProps> = ({ onClos
               value={settings.maxOrderValue}
               onChange={(e) => handleUpdateSettings({ maxOrderValue: Number(e.target.value) })}
             />
-            BYN
+            <BynSymbol />
           </label>
         </div>
       </div>

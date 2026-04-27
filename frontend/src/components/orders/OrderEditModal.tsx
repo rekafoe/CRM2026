@@ -4,6 +4,7 @@ import { useLogger } from '../../utils/logger';
 import { useToastNotifications } from '../Toast';
 import { LoadingSpinner } from '../LoadingSpinner';
 import { useOrderStatuses } from '../../hooks/useOrderStatuses';
+import { BynSymbol, MoneyAmount } from '../ui';
 import './OrderEditModal.css';
 
 interface OrderEditModalProps {
@@ -85,7 +86,7 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
     if (order && prepaymentAmount > 0) {
       const totalOrderAmount = (order.items ?? []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
       if (prepaymentAmount > totalOrderAmount) {
-        newErrors.prepaymentAmount = `Предоплата не может быть больше общей суммы заказа (${totalOrderAmount.toLocaleString()} BYN)`;
+        newErrors.prepaymentAmount = `Предоплата не может быть больше общей суммы заказа (${totalOrderAmount.toLocaleString('ru-RU')} бел. руб.)`;
       }
     }
     
@@ -260,7 +261,7 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="prepaymentAmount">Предоплата (BYN)</label>
+                  <label htmlFor="prepaymentAmount">Предоплата (<BynSymbol />)</label>
                   <input
                     id="prepaymentAmount"
                     type="number"
@@ -316,9 +317,10 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
                   <div className="info-item">
                     <label>Общая сумма:</label>
                     <span className="amount">
-                      {(order.items ?? [])
-                        .reduce((sum, item) => sum + (item.price * item.quantity), 0)
-                        .toLocaleString()} BYN
+                      <MoneyAmount
+                        value={(order.items ?? []).reduce((sum, item) => sum + (item.price * item.quantity), 0)}
+                        decimals={0}
+                      />
                     </span>
                   </div>
                 </div>

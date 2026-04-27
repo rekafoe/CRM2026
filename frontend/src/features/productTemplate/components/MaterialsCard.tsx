@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { FormField, Alert, Button } from '../../../components/common'
+import { MoneyAmount } from '../../../components/ui'
 import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
 import type { PaperTypeForCalculator } from '../../../services/calculatorMaterialService'
 import type { SimplifiedSizeConfig } from '../hooks/useProductTemplate'
@@ -160,7 +161,7 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
                       {m.name}{densityInfo ? ` (${densityInfo.value} г/м²)` : ''}
                       {densityInfo?.price != null && (
                         <span className="text-muted" style={{ marginLeft: 6 }}>
-                          {densityInfo.price.toFixed(2)} ₽/лист
+                          <MoneyAmount value={densityInfo.price} />/лист
                         </span>
                       )}
                     </span>
@@ -185,7 +186,7 @@ export const MaterialsCard: React.FC<MaterialsCardProps> = ({
                         {pt && ` [${pt.display_name || pt.name}]`}
                         {density?.price != null && (
                           <span className="text-muted" style={{ marginLeft: 6 }}>
-                            — {density.price.toFixed(2)} ₽/лист
+                            — <MoneyAmount value={density.price} />/лист
                           </span>
                         )}
                       </li>

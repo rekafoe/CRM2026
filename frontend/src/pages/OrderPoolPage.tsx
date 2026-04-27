@@ -14,6 +14,7 @@ import { OrderTotal } from '../components/order/OrderTotal';
 import { FilesModal } from '../components/FilesModal';
 import { PrepaymentModal } from '../components/PrepaymentModal';
 import { PrepaymentDetailsModal } from '../components/PrepaymentDetailsModal';
+import { MoneyAmount } from '../components/ui';
 import { useToastNotifications } from '../components/Toast';
 import { useLogger } from '../utils/logger';
 import { useReasonPrompt } from '../components/common/useReasonPrompt';
@@ -174,7 +175,7 @@ const OrderRow = React.memo<{
         <div className="order-prepayment">
           {getOrderPrepayment(order) > 0 ? (
             <span className={`prepayment-amount ${order.prepaymentStatus === 'paid' ? 'paid' : 'pending'}`}>
-              {getOrderPrepayment(order).toFixed(2)} BYN
+              <MoneyAmount value={getOrderPrepayment(order)} />
               <br />
               <small className={`prepayment-status ${order.prepaymentStatus === 'paid' ? 'paid' : 'pending'}`}>
                 {order.prepaymentStatus === 'paid' ? 'Оплачено' : 'Ожидает'}
@@ -187,11 +188,11 @@ const OrderRow = React.memo<{
       </td>
       <td className="numeric">
         <div className={`order-debt ${getOrderDebt(order) > 0 ? 'order-debt--due' : 'order-debt--paid'}`}>
-          {getOrderDebt(order).toFixed(2)} BYN
+          <MoneyAmount value={getOrderDebt(order)} />
         </div>
       </td>
       <td className="numeric">
-        <div className="order-total">{getOrderTotal(order).toFixed(2)} BYN</div>
+        <div className="order-total"><MoneyAmount value={getOrderTotal(order)} /></div>
       </td>
     </tr>
   )

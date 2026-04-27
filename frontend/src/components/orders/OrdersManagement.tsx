@@ -6,6 +6,7 @@ import { useToastNotifications } from '../Toast';
 import { LoadingSpinner } from '../LoadingSpinner';
 import { ErrorDisplay } from '../ErrorStates';
 import { useOrderStatuses } from '../../hooks/useOrderStatuses';
+import { MoneyAmount } from '../ui';
 import './OrdersManagement.css';
 
 interface OrdersManagementProps {
@@ -345,7 +346,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
         <div className="orders-title">
           <h2>📋 Управление заказами</h2>
           <div className="orders-count">
-            {orders.length} заказов • {totalAmount.toLocaleString()} BYN
+            {orders.length} заказов • <MoneyAmount value={totalAmount} decimals={0} />
           </div>
         </div>
         
@@ -400,11 +401,11 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
               <div className="stat-label">Завершённых</div>
             </div>
             <div className="stat-item">
-              <div className="stat-value">{stats.totalRevenue.toLocaleString()} BYN</div>
+              <div className="stat-value"><MoneyAmount value={stats.totalRevenue} decimals={0} /></div>
               <div className="stat-label">Общая выручка</div>
             </div>
             <div className="stat-item">
-              <div className="stat-value">{stats.averageOrderValue.toFixed(0)} BYN</div>
+              <div className="stat-value"><MoneyAmount value={stats.averageOrderValue} decimals={0} /></div>
               <div className="stat-label">Средний чек</div>
             </div>
           </div>
@@ -638,10 +639,10 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                   </div>
                   
                   <div className="order-amount">
-                    <div className="amount-value">{orderTotal.toLocaleString()} BYN</div>
+                    <div className="amount-value"><MoneyAmount value={orderTotal} decimals={0} /></div>
                     {order.prepaymentAmount && order.prepaymentAmount > 0 && (
                       <div className="prepayment-info">
-                        💳 {order.prepaymentAmount} BYN
+                        💳 <MoneyAmount value={order.prepaymentAmount} />
                       </div>
                     )}
                   </div>

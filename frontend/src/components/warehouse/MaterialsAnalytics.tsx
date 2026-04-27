@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { MoneyAmount } from '../ui'
 import './MaterialsAnalytics.css'
 
 interface MaterialAnalytics {
@@ -175,7 +176,7 @@ export const MaterialsAnalytics: React.FC = () => {
           </div>
           <div className="summary-card">
             <div className="summary-icon">💰</div>
-            <div className="summary-value">{summary.totalValue.toFixed(0)} BYN</div>
+            <div className="summary-value"><MoneyAmount value={summary.totalValue} decimals={0} /></div>
             <div className="summary-label">Общая стоимость</div>
           </div>
           <div className="summary-card">
@@ -328,7 +329,7 @@ export const MaterialsAnalytics: React.FC = () => {
                       </div>
                       <div className="detail-row">
                         <span className="detail-label">Стоимость:</span>
-                        <span className="detail-value">{material.stockValue.toFixed(2)} BYN</span>
+                        <span className="detail-value"><MoneyAmount value={material.stockValue} /></span>
                       </div>
                       <div className="detail-row">
                         <span className="detail-label">Оборачиваемость:</span>

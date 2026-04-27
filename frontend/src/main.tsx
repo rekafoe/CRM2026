@@ -39,6 +39,9 @@ const LazyDesignTemplatesPage = React.lazy(() =>
 const LazyDesignEditorPage = React.lazy(() =>
   import('./pages/admin/DesignEditorPage').then((m) => ({ default: m.DesignEditorPage }))
 );
+const LazyPhotoBatchEditorPage = React.lazy(() =>
+  import('./pages/admin/PhotoBatchEditorPage').then((m) => ({ default: m.PhotoBatchEditorPage }))
+);
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem(APP_CONFIG.storage.token) : null;
@@ -166,6 +169,16 @@ root.render(
               <RequireAuth>
                 <React.Suspense fallback={<LoadingFallback />}>
                   <LazyDesignEditorPage />
+                </React.Suspense>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/photo-batch-editor"
+            element={
+              <RequireAuth>
+                <React.Suspense fallback={<LoadingFallback />}>
+                  <LazyPhotoBatchEditorPage />
                 </React.Suspense>
               </RequireAuth>
             }

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { MoneyAmount } from '../../../../components/ui'
 
 interface ParamDef { name?: string; label?: string; type?: string; options?: any[]; min_value?: number }
 
@@ -126,8 +127,8 @@ const QuickTestSection: React.FC<QuickTestSectionProps> = ({ parameters, qty, pa
             <div>
               {(() => { const d:any = (result as any)?.data ?? result; return (
                 <>
-                  <div><strong>Итого:</strong> {d.price_total ?? d.finalPrice ?? d.total ?? ''} {d.currency||'Br'}</div>
-                  {d.pricePerUnit !== undefined && (<div><strong>Цена за шт.:</strong> {d.pricePerUnit.toFixed(2)} Br</div>)}
+                  <div><strong>Итого:</strong> <MoneyAmount value={d.price_total ?? d.finalPrice ?? d.total} /></div>
+                  {d.pricePerUnit !== undefined && (<div><strong>Цена за шт.:</strong> <MoneyAmount value={d.pricePerUnit} /></div>)}
                   {(d.sheetsNeeded !== undefined || d.itemsPerSheet !== undefined || d.cutsPerSheet !== undefined || d.numberOfStacks !== undefined) && (
                     <div style={{marginTop:8, padding:8, backgroundColor:'#f0f0f0', borderRadius:4}}>
                       {d.sheetsNeeded !== undefined && (<div><strong>📄 Листов печати:</strong> {d.sheetsNeeded}</div>)}

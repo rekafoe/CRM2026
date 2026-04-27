@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Button, Alert, StatusBadge } from '../../../components/common';
-import { AppIcon, type IconName } from '../../../components/ui/AppIcon';
+import { AppIcon, MoneyAmount, type IconName } from '../../../components/ui';
 import { ProductServiceLink } from '../../../services/products';
 import { PricingService } from '../../../types/pricing';
 
@@ -113,7 +113,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = React.memo(({
                       </div>
                     </td>
                     <td>{getServiceTypeLabel(svc.service_type)}</td>
-                    <td>{svc.price_per_unit.toFixed(2)} BYN</td>
+                    <td><MoneyAmount value={svc.price_per_unit} /></td>
                     <td>{svc.unit || '—'}</td>
                     <td>
                       <StatusBadge

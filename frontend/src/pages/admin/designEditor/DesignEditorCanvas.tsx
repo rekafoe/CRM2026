@@ -21,13 +21,14 @@ import {
   FitContentLayout,
 } from 'fabric';
 import type { FabricObject } from 'fabric';
-import type { DesignTemplate } from '../../../api';
+import type { CollageLayout, DesignTemplate } from '../../../api';
 import type { DesignPage, SelectedObjProps } from './types';
 import { TEXT_BLOCK_PRESETS, TEXT_FONTS } from './constants';
 import type { TextBlockPresetKind } from './constants';
 import { isLikelyImageFile, looksLikeHttpUrl } from '../../../utils/imageFile';
 import { computeSnap } from './CanvasRulers';
 import { splitSpreadCanvasToPagesSync } from './spreadCanvas';
+import { PrepressOverlay } from './PrepressOverlay';
 
 // ─── Custom property names saved in Fabric JSON ───────────────────────────────
 
@@ -54,6 +55,8 @@ export interface DesignEditorCanvasHandle {
   addImageFromFile: (file: File) => Promise<void>;
   addImageFromUrl: (url: string) => Promise<void>;
   addPhotoField: () => void;
+  /** Создаёт набор пустых полей для фото по шаблону коллажа. */
+  applyCollageLayout: (layout: CollageLayout, paddingPercent: number) => void;
   /** Подставляет свободные изображения на макете в пустые поля для фото (по порядку объектов). */
   autofillPhotoFields: () => Promise<void>;
   addShape: (type: 'rect' | 'circle' | 'line' | 'triangle') => void;
@@ -98,6 +101,10 @@ interface DesignEditorCanvasProps {
   canvasWidthPx: number;
   pageHeightPx: number;
   safeZonePx: number;
+  bleedPx: number;
+  showBleed: boolean;
+  showTrim: boolean;
+  showSafeZone: boolean;
   pages: DesignPage[];
   setPages: React.Dispatch<React.SetStateAction<DesignPage[]>>;
   currentPage: number;
@@ -247,6 +254,125 @@ function canvasToJSON(canvas: Canvas): Record<string, unknown> {
   return canvas.toObject(CUSTOM_PROPS) as Record<string, unknown>;
 }
 
+function createPhotoFieldGroup(opts: {
+  id: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}): Group {
+  const { id, left, top, width, height } = opts;
+  const frame = new Rect({
+    left: 0,
+    top: 0,
+    originX: 'left',
+    originY: 'top',
+    width,
+    height,
+    fill: 'rgba(248, 250, 252, 0.96)',
+    stroke: '#94a3b8',
+    strokeWidth: 1,
+    strokeDashArray: [6, 4],
+    rx: 6,
+    ry: 6,
+  });
+  const minSide = Math.min(width, height);
+  const badgeR = Math.max(12, Math.min(22, minSide * 0.22));
+  const badgeCx = width / 2;
+  const badgeCy = height / 2;
+  const badge = new Circle({
+    left: badgeCx,
+    top: badgeCy,
+    originX: 'center',
+    originY: 'center',
+    radius: badgeR,
+    fill: '#ffffff',
+    stroke: '#e2e8f0',
+    strokeWidth: 1,
+    selectable: false,
+    evented: false,
+  });
+  const camBodyW = badgeR * 0.82;
+  const camBodyH = badgeR * 0.55;
+  const camBody = new Rect({
+    left: badgeCx,
+    top: badgeCy + 1,
+    originX: 'center',
+    originY: 'center',
+    width: camBodyW,
+    height: camBodyH,
+    rx: 2,
+    ry: 2,
+    fill: 'transparent',
+    stroke: '#64748b',
+    strokeWidth: 1.5,
+    selectable: false,
+    evented: false,
+  });
+  const camTop = new Rect({
+    left: badgeCx,
+    top: badgeCy - camBodyH / 2 - 2,
+    originX: 'center',
+    originY: 'center',
+    width: badgeR * 0.42,
+    height: badgeR * 0.18,
+    rx: 1,
+    ry: 1,
+    fill: '#64748b',
+    selectable: false,
+    evented: false,
+  });
+  const camLens = new Circle({
+    left: badgeCx,
+    top: badgeCy + 1,
+    originX: 'center',
+    originY: 'center',
+    radius: Math.max(2, badgeR * 0.15),
+    fill: 'transparent',
+    stroke: '#64748b',
+    strokeWidth: 1.5,
+    selectable: false,
+    evented: false,
+  });
+  const group = new Group([frame, badge, camBody, camTop, camLens], {
+    left,
+    top,
+    originX: 'left',
+    originY: 'top',
+    subTargetCheck: true,
+  });
+  asAny(group).isPhotoField = true;
+  asAny(group).id = id;
+  return group;
+}
+
+async function addTemplatePreviewBackground(
+  canvas: Canvas,
+  template: DesignTemplate | null,
+  pageW: number,
+  pageH: number,
+  apiBaseUrl: string,
+): Promise<void> {
+  const previewUrl = resolvePreviewUrl(template, apiBaseUrl);
+  if (!previewUrl) return;
+  try {
+    const img = await FabricImage.fromURL(previewUrl, { crossOrigin: 'anonymous' });
+    img.set({
+      left: 0,
+      top: 0,
+      scaleX: pageW / (img.width || pageW),
+      scaleY: pageH / (img.height || pageH),
+      selectable: false,
+      evented: false,
+    });
+    (img as unknown as AnyObj).isBackground = true;
+    canvas.add(img);
+    canvas.sendObjectToBack(img);
+  } catch {
+    // preview not available
+  }
+}
+
 async function loadPageIntoCanvas(
   canvas: Canvas,
   pageData: DesignPage | undefined,
@@ -265,28 +391,14 @@ async function loadPageIntoCanvas(
           obj.set({ selectable: false, evented: false });
         }
       });
+      const hasBackgroundObject = canvas.getObjects().some((obj) => !!asAny(obj).isBackground);
+      if (!hasBackgroundObject) {
+        await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
+      }
     } else {
       canvas.clear();
       (canvas as unknown as AnyObj).backgroundColor = 'white';
-      const previewUrl = resolvePreviewUrl(template, apiBaseUrl);
-      if (previewUrl) {
-        try {
-          const img = await FabricImage.fromURL(previewUrl, { crossOrigin: 'anonymous' });
-          img.set({
-            left: 0,
-            top: 0,
-            scaleX: pageW / (img.width || pageW),
-            scaleY: pageH / (img.height || pageH),
-            selectable: false,
-            evented: false,
-          });
-          (img as unknown as AnyObj).isBackground = true;
-          canvas.add(img);
-          canvas.sendObjectToBack(img);
-        } catch {
-          // preview not available
-        }
-      }
+      await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
     }
     canvas.requestRenderAll();
   } finally {
@@ -349,6 +461,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       canvasWidthPx,
       pageHeightPx,
       safeZonePx,
+      bleedPx,
+      showBleed,
+      showTrim,
+      showSafeZone,
       pages,
       setPages,
       currentPage,
@@ -956,97 +1072,50 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       addPhotoField: () => {
         const canvas = fabricRef.current;
         if (!canvas || modeRef.current === 'basic') return;
-        const fieldId = `field-${Date.now()}`;
-        const w = 140;
-        const h = 140;
-        // По умолчанию у Rect origin — center: (0,0) — центр рамки, не левый верхний угол.
-        const frame = new Rect({
-          left: 0,
-          top: 0,
-          originX: 'left',
-          originY: 'top',
-          width: w,
-          height: h,
-          fill: 'rgba(248, 250, 252, 0.96)',
-          stroke: '#94a3b8',
-          strokeWidth: 1,
-          strokeDashArray: [6, 4],
-          rx: 6,
-          ry: 6,
+        const field = createPhotoFieldGroup({
+          id: `field-${Date.now()}`,
+          left: canvas.width! / 2 - 70,
+          top: canvas.height! / 2 - 70,
+          width: 140,
+          height: 140,
         });
-        // Пиктограмма по центру вместо текста-плейсхолдера
-        const badgeR = 22;
-        const badgeCx = w / 2;
-        const badgeCy = h / 2;
-        const badge = new Circle({
-          left: badgeCx,
-          top: badgeCy,
-          originX: 'center',
-          originY: 'center',
-          radius: badgeR,
-          fill: '#ffffff',
-          stroke: '#e2e8f0',
-          strokeWidth: 1,
-          selectable: false,
-          evented: false,
-        });
-        const camBodyW = 18;
-        const camBodyH = 12;
-        const camBody = new Rect({
-          left: badgeCx,
-          top: badgeCy + 1,
-          originX: 'center',
-          originY: 'center',
-          width: camBodyW,
-          height: camBodyH,
-          rx: 2,
-          ry: 2,
-          fill: 'transparent',
-          stroke: '#64748b',
-          strokeWidth: 1.5,
-          selectable: false,
-          evented: false,
-        });
-        const camTopW = 9;
-        const camTopH = 4;
-        const camTop = new Rect({
-          left: badgeCx,
-          top: badgeCy - camBodyH / 2 - 2,
-          originX: 'center',
-          originY: 'center',
-          width: camTopW,
-          height: camTopH,
-          rx: 1,
-          ry: 1,
-          fill: '#64748b',
-          selectable: false,
-          evented: false,
-        });
-        const camLens = new Circle({
-          left: badgeCx,
-          top: badgeCy + 1,
-          originX: 'center',
-          originY: 'center',
-          radius: 3.2,
-          fill: 'transparent',
-          stroke: '#64748b',
-          strokeWidth: 1.5,
-          selectable: false,
-          evented: false,
-        });
-        // Стандартный FitContentLayout: инициализация согласует bbox группы и позиции детей.
-        // (Кастомная стратегия с отключённым layout ломала матрицы и рамку выделения.)
-        const group = new Group([frame, badge, camBody, camTop, camLens], {
-          left: canvas.width! / 2 - w / 2,
-          top: canvas.height! / 2 - h / 2,
-          originX: 'left',
-          originY: 'top',
-          subTargetCheck: true,
-        });
-        (group as unknown as AnyObj).isPhotoField = true;
-        (group as unknown as AnyObj).id = fieldId;
-        canvas.add(group);
-        canvas.setActiveObject(group);
+        canvas.add(field);
+        canvas.setActiveObject(field);
+        canvas.requestRenderAll();
+        saveSnapshot();
+      },
+      applyCollageLayout: (layout: CollageLayout, paddingPercent: number) => {
+        const canvas = fabricRef.current;
+        if (!canvas || modeRef.current === 'basic') return;
+        const cells = Array.isArray(layout.cells) ? layout.cells : [];
+        if (cells.length === 0) return;
+
+        const pageSafeLeft = spreadPairPagesRef.current ? (currentPageRef.current % 2 === 1 ? pageWidthRef.current : 0) : 0;
+        const safeLeft = pageSafeLeft + safeZonePx;
+        const safeTop = safeZonePx;
+        const safeWidth = Math.max(1, pageWidthRef.current - safeZonePx * 2);
+        const safeHeight = Math.max(1, canvas.height! - safeZonePx * 2);
+        const margin = Math.min(0.3, Math.max(0, paddingPercent) / 100 / 2);
+        const scale = 1 - 2 * margin;
+        const stamp = Date.now();
+        const fields = cells
+          .map((cell, index) => {
+            const x = Math.max(0, Math.min(1, Number(cell.x) || 0));
+            const y = Math.max(0, Math.min(1, Number(cell.y) || 0));
+            const w = Math.max(0.02, Math.min(1, Number(cell.w) || 0));
+            const h = Math.max(0.02, Math.min(1, Number(cell.h) || 0));
+            return createPhotoFieldGroup({
+              id: `field-${stamp}-${index}`,
+              left: safeLeft + (margin + x * scale) * safeWidth,
+              top: safeTop + (margin + y * scale) * safeHeight,
+              width: Math.max(24, w * scale * safeWidth),
+              height: Math.max(24, h * scale * safeHeight),
+            });
+          });
+
+        canvas.add(...fields);
+        canvas.discardActiveObject();
+        canvas.setActiveObject(fields[0]);
         canvas.requestRenderAll();
         saveSnapshot();
       },
@@ -1341,100 +1410,20 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 
     return (
       <div className="fabric-canvas-outer">
-        <div className="fabric-canvas-inner" style={{ position: 'relative', display: 'inline-block' }}>
+        <div className="fabric-canvas-inner">
           <canvas ref={canvasElRef} />
-          {showGuides && safeZonePx > 0 && (
-            <svg
-              className="fabric-guides-overlay"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: canvasWidthPx,
-                height: pageHeightPx,
-                pointerEvents: 'none',
-                overflow: 'visible',
-              }}
-            >
-              {spreadPairPages != null ? (
-                <>
-                  <path
-                    fillRule="evenodd"
-                    d={[
-                      `M 0 0 L ${canvasWidthPx} 0 L ${canvasWidthPx} ${pageHeightPx} L 0 ${pageHeightPx} Z`,
-                      `M ${safeZonePx} ${safeZonePx} L ${pageWidthPx - safeZonePx} ${safeZonePx} L ${pageWidthPx - safeZonePx} ${pageHeightPx - safeZonePx} L ${safeZonePx} ${pageHeightPx - safeZonePx} Z`,
-                      `M ${pageWidthPx + safeZonePx} ${safeZonePx} L ${canvasWidthPx - safeZonePx} ${safeZonePx} L ${canvasWidthPx - safeZonePx} ${pageHeightPx - safeZonePx} L ${pageWidthPx + safeZonePx} ${pageHeightPx - safeZonePx} Z`,
-                    ].join(' ')}
-                    fill="rgba(233, 180, 160, 0.22)"
-                  />
-                  <rect
-                    x={safeZonePx}
-                    y={safeZonePx}
-                    width={pageWidthPx - 2 * safeZonePx}
-                    height={pageHeightPx - 2 * safeZonePx}
-                    fill="none"
-                    stroke="#e53e3e"
-                    strokeWidth={0.8}
-                  />
-                  <rect
-                    x={pageWidthPx + safeZonePx}
-                    y={safeZonePx}
-                    width={pageWidthPx - 2 * safeZonePx}
-                    height={pageHeightPx - 2 * safeZonePx}
-                    fill="none"
-                    stroke="#e53e3e"
-                    strokeWidth={0.8}
-                  />
-                  <text
-                    x={canvasWidthPx / 2}
-                    y={safeZonePx / 2}
-                    fill="#c0392b"
-                    fontSize={Math.min(safeZonePx * 0.55, 9)}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontFamily="sans-serif"
-                    opacity="0.75"
-                  >
-                    всё за этой линией может срезаться
-                  </text>
-                </>
-              ) : (
-                <>
-                  <path
-                    fillRule="evenodd"
-                    d={[
-                      `M 0 0 L ${pageWidthPx} 0 L ${pageWidthPx} ${pageHeightPx} L 0 ${pageHeightPx} Z`,
-                      `M ${safeZonePx} ${safeZonePx}`,
-                      `L ${pageWidthPx - safeZonePx} ${safeZonePx}`,
-                      `L ${pageWidthPx - safeZonePx} ${pageHeightPx - safeZonePx}`,
-                      `L ${safeZonePx} ${pageHeightPx - safeZonePx} Z`,
-                    ].join(' ')}
-                    fill="rgba(233, 180, 160, 0.22)"
-                  />
-                  <rect
-                    x={safeZonePx}
-                    y={safeZonePx}
-                    width={pageWidthPx - 2 * safeZonePx}
-                    height={pageHeightPx - 2 * safeZonePx}
-                    fill="none"
-                    stroke="#e53e3e"
-                    strokeWidth={0.8}
-                  />
-                  <text
-                    x={pageWidthPx / 2}
-                    y={safeZonePx / 2}
-                    fill="#c0392b"
-                    fontSize={Math.min(safeZonePx * 0.55, 9)}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontFamily="sans-serif"
-                    opacity="0.75"
-                  >
-                    всё за этой линией может срезаться
-                  </text>
-                </>
-              )}
-            </svg>
+          {showGuides && (
+            <PrepressOverlay
+              canvasWidthPx={canvasWidthPx}
+              pageWidthPx={pageWidthPx}
+              pageHeightPx={pageHeightPx}
+              bleedPx={bleedPx}
+              safeZonePx={safeZonePx}
+              isSpreadView={spreadPairPages != null}
+              showBleed={showBleed}
+              showTrim={showTrim}
+              showSafeZone={showSafeZone}
+            />
           )}
 
           {/* Smart-snap alignment lines */}

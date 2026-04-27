@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button, Alert } from '../../../../components/common';
+import { MoneyAmount } from '../../../../components/ui';
 import { ProductOperation, AvailableOperation, OperationError } from '../../types';
 import BulkOperationsModal from './BulkOperationsModal';
 import OperationEditModal from './OperationEditModal';
@@ -174,7 +175,7 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
                   <td style={{ padding: 8, textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
                     {(op.price !== undefined && op.price !== null) || (op.price_per_unit !== undefined && op.price_per_unit !== null) ? (
                       <>
-                        {((op.price ?? op.price_per_unit ?? 0)).toFixed(2)} Br
+                        <MoneyAmount value={op.price ?? op.price_per_unit ?? 0} />
                         <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400, marginLeft: 4 }}>
                           /{op.unit || op.price_unit || 'шт'}
                         </span>

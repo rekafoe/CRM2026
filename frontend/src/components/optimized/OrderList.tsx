@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useMemo } from 'react';
 import { Order } from '../../types';
 import { parseNumberFlexible } from '../../utils/numberInput';
+import { MoneyAmount } from '../ui';
 import { useOrderStatusClasses } from './hooks/useOrderStatusClasses';
 import type { OrdersListTab } from './hooks/useOptimizedAppData';
 import './styles/OrderList.css';
@@ -106,7 +107,7 @@ const OrderItem = memo<{
     >
       <div className="order-item__header">
         <span className="order-item__number">{order.number}</span>
-        <span className="order-item__amount">{totalAmount.toFixed(2)} BYN</span>
+        <span className="order-item__amount"><MoneyAmount value={totalAmount} /></span>
       </div>
       {customerLabel && (
         <div className="order-item__customer">
@@ -115,7 +116,7 @@ const OrderItem = memo<{
       )}
       {showDebt && debt != null && debt > 0 && (
         <div className="order-item__debt" style={{ fontSize: 11, color: '#c62828', marginTop: 2 }}>
-          Долг: {debt.toFixed(2)} BYN
+          Долг: <MoneyAmount value={debt} />
         </div>
       )}
       {showIssuedByMe && (issuedByMe === true || issuedByMe === 1) && (

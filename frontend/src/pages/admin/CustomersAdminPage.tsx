@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AppIcon } from '../../components/ui/AppIcon';
+import { AppIcon, MoneyAmount } from '../../components/ui';
 import { Alert } from '../../components/common';
 import { createCustomer, getCustomers } from '../../api';
 import { Customer } from '../../types';
@@ -10,7 +10,6 @@ import {
   getCustomerDisplayName,
   getCustomerSourceLabel,
   formatDateValue,
-  formatLastOrderAmount,
 } from './clients/customerDocumentHelpers';
 import './CustomersAdminPage.css';
 
@@ -383,7 +382,7 @@ const CustomersAdminPage: React.FC<CustomersAdminPageProps> = ({ backTo = '/admi
                         <td>{c.phone || '—'}</td>
                         <td>{c.email || '—'}</td>
                         <td>{c.last_order_at ? formatDateValue(c.last_order_at) : '—'}</td>
-                        <td>{formatLastOrderAmount(c.last_order_amount)}</td>
+                        <td><MoneyAmount value={c.last_order_amount} /></td>
                         <td>{getCustomerSourceLabel(c.source)}</td>
                         <td>{new Date(c.created_at).toLocaleDateString('ru-RU')}</td>
                       </tr>

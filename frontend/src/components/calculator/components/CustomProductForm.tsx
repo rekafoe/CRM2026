@@ -1,4 +1,5 @@
 import React from 'react';
+import { BynSymbol } from '../../ui';
 import { AppIcon } from '../../ui/AppIcon';
 import { SelectedProductCard } from './SelectedProductCard';
 
@@ -71,7 +72,7 @@ export const CustomProductForm: React.FC<CustomProductFormProps> = ({
             <span className="custom-product-hint">Можно оставить 1 день по умолчанию</span>
           </label>
           <label className="custom-product-field">
-            <span className="custom-product-label">Цена за штуку (BYN)</span>
+            <span className="custom-product-label">Цена за штуку (<BynSymbol />)</span>
             <input
               type="number"
               className="custom-product-input"

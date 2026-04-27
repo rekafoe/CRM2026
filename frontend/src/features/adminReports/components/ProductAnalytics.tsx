@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ProductAnalyticsData } from '../types';
+import { MoneyAmount } from '../../../components/ui';
 
 interface ProductAnalyticsProps {
   data: ProductAnalyticsData;
@@ -53,10 +54,10 @@ export const ProductAnalytics: React.FC<ProductAnalyticsProps> = ({ data }) => {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--accent-primary)' }}>
-                    {product.total_revenue.toLocaleString('ru-RU')} BYN
+                    <MoneyAmount value={product.total_revenue} decimals={0} />
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                    ~{product.avg_price.toFixed(2)} BYN/шт
+                    ~<MoneyAmount value={product.avg_price} />/шт
                   </div>
                 </div>
               </div>
@@ -91,7 +92,7 @@ export const ProductAnalytics: React.FC<ProductAnalyticsProps> = ({ data }) => {
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                   {category.order_count} заказов<br/>
-                  {category.total_revenue.toLocaleString('ru-RU')} BYN
+                  <MoneyAmount value={category.total_revenue} decimals={0} />
                 </div>
               </div>
             );

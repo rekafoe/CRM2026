@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useMultiPageCalculation, BindingType } from '../hooks/useMultiPageCalculation';
+import { MoneyAmount } from '../../ui';
 import './MultiPageProductForm.css';
 
 interface MultiPageProductFormProps {
@@ -233,28 +234,28 @@ export const MultiPageProductForm: React.FC<MultiPageProductFormProps> = ({
         <div className="multipage-form__result">
           <div className="multipage-form__result-main">
             <span className="multipage-form__result-label">Итого:</span>
-            <span className="multipage-form__result-value">{result.totalCost.toFixed(2)} BYN</span>
+            <span className="multipage-form__result-value"><MoneyAmount value={result.totalCost} /></span>
           </div>
           {params.quantity > 1 && (
             <div className="multipage-form__result-per-item">
-              {result.pricePerItem.toFixed(2)} BYN / шт
+              <MoneyAmount value={result.pricePerItem} /> / шт
             </div>
           )}
           
           <details className="multipage-form__breakdown">
             <summary>Детализация расчёта</summary>
             <ul>
-              <li>Печать: {result.breakdown.printCost.toFixed(2)} BYN</li>
-              <li>Переплёт: {result.breakdown.bindingCost.toFixed(2)} BYN</li>
-              <li>Бумага: {result.breakdown.paperCost.toFixed(2)} BYN</li>
+              <li>Печать: <MoneyAmount value={result.breakdown.printCost} /></li>
+              <li>Переплёт: <MoneyAmount value={result.breakdown.bindingCost} /></li>
+              <li>Бумага: <MoneyAmount value={result.breakdown.paperCost} /></li>
               {result.breakdown.laminationCost > 0 && (
-                <li>Ламинация: {result.breakdown.laminationCost.toFixed(2)} BYN</li>
+                <li>Ламинация: <MoneyAmount value={result.breakdown.laminationCost} /></li>
               )}
               {result.breakdown.trimCost > 0 && (
-                <li>Обрезка: {result.breakdown.trimCost.toFixed(2)} BYN</li>
+                <li>Обрезка: <MoneyAmount value={result.breakdown.trimCost} /></li>
               )}
               {result.breakdown.setupCost > 0 && (
-                <li>Приладка: {result.breakdown.setupCost.toFixed(2)} BYN</li>
+                <li>Приладка: <MoneyAmount value={result.breakdown.setupCost} /></li>
               )}
               <li className="multipage-form__breakdown-sheets">
                 Листов: {result.sheets} ({params.duplex ? 'двухсторонняя' : 'односторонняя'})

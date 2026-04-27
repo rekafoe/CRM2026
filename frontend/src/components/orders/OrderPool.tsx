@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
 import { parseNumberFlexible } from '../../utils/numberInput';
+import { MoneyAmount } from '../ui';
 
 interface UnifiedOrder {
   id: number;
@@ -170,10 +171,9 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
     return new Date(dateString).toLocaleString('ru-RU');
   };
 
-  const formatAmount = (amount: number | string, type?: UnifiedOrder['type']) => {
+  const normalizeAmount = (amount: number | string, type?: UnifiedOrder['type']) => {
     const parsed = parseNumberFlexible(amount);
-    const normalized = type === 'telegram' ? parsed / 100 : parsed;
-    return `${parseNumberFlexible(normalized).toFixed(2)} BYN`;
+    return type === 'telegram' ? parsed / 100 : parsed;
   };
 
   const isOrderIssued = (order: UnifiedOrder) => {
@@ -279,23 +279,25 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
                   <strong>Контакты:</strong> {searchResult.customerContact || 'Не указаны'}
                 </div>
                 <div className="text-sm text-gray-600 mb-1">
-                  <strong>Сумма:</strong> {formatAmount(searchResult.totalAmount, searchResult.type)}
+                  <strong>Сумма:</strong> <MoneyAmount value={normalizeAmount(searchResult.totalAmount, searchResult.type)} />
                 </div>
                 {searchResult.type !== 'telegram' && (
                   <>
                     <div className="text-sm text-gray-600 mb-1">
                       <strong>Предоплата:</strong>{' '}
-                      {formatAmount(searchResult.prepaymentAmount || 0, searchResult.type)}
+                      <MoneyAmount value={normalizeAmount(searchResult.prepaymentAmount || 0, searchResult.type)} />
                       {searchResult.prepaymentStatus
                         ? ` (${searchResult.prepaymentStatus === 'paid' ? 'оплачено' : 'ожидает'})`
                         : ''}
                     </div>
                     <div className="text-sm text-gray-600">
                       <strong>Долг:</strong>{' '}
-                      {formatAmount(
-                        Math.max(0, (searchResult.totalAmount || 0) - (searchResult.prepaymentAmount || 0)),
-                        searchResult.type
-                      )}
+                      <MoneyAmount
+                        value={normalizeAmount(
+                          Math.max(0, (searchResult.totalAmount || 0) - (searchResult.prepaymentAmount || 0)),
+                          searchResult.type
+                        )}
+                      />
                     </div>
                   </>
                 )}
@@ -355,7 +357,7 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
                         <strong>Контакты:</strong> {order.customerContact || 'Не указаны'}
                       </div>
                       <div className="text-sm text-gray-600 mb-1">
-                        <strong>Сумма:</strong> {formatAmount(order.totalAmount, order.type)}
+                        <strong>Сумма:</strong> <MoneyAmount value={normalizeAmount(order.totalAmount, order.type)} />
                       </div>
                       <div className="text-sm text-gray-600">
                         <strong>Создан:</strong> {formatDate(order.created_at)}
@@ -412,7 +414,7 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
                         <strong>Ответственный:</strong> {order.assignedToName || 'Не назначен'}
                       </div>
                       <div className="text-sm text-gray-600 mb-1">
-                        <strong>Сумма:</strong> {formatAmount(order.totalAmount, order.type)}
+                        <strong>Сумма:</strong> <MoneyAmount value={normalizeAmount(order.totalAmount, order.type)} />
                       </div>
                       <div className="text-sm text-gray-600">
                         <strong>Создан:</strong> {formatDate(order.created_at)}

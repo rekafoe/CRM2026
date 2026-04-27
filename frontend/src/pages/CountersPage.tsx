@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { getCurrentUser, getUsers } from '../api';
 import { cashIncrementForRegisterDay } from '../utils/numberInput';
-import { AppIcon } from '../components/ui/AppIcon';
+import { AppIcon, MoneyAmount, BynSymbol } from '../components/ui';
 import './CountersPage.css';
 
 interface Printer {
@@ -524,7 +524,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
                   onChange={(e) => handleCashInputChange(e.target.value)}
                   placeholder="Введите сумму"
                 />
-                <span className="currency">BYN</span>
+                <span className="currency"><BynSymbol /></span>
                 <button
                   className="save-btn"
                   onClick={handleCashSave}
@@ -538,18 +538,18 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
             <div className="cash-row">
               <div className="cash-label">Счётчик за вчера (факт):</div>
               <div className="cash-value">
-                {cashData.previousActual != null ? cashData.previousActual.toFixed(2) : '—'} BYN
+                <MoneyAmount value={cashData.previousActual} />
               </div>
             </div>
 
             <div className="cash-row">
               <div className="cash-label">Выручка за день (CRM):</div>
-              <div className="cash-value">{(cashData.dailyRevenue ?? 0).toFixed(2)} BYN</div>
+              <div className="cash-value"><MoneyAmount value={cashData.dailyRevenue ?? 0} /></div>
             </div>
 
             <div className="cash-row">
               <div className="cash-label">Выдано за день (общая сумма):</div>
-              <div className="cash-value">{(cashData.issuedOrdersTotal ?? 0).toFixed(2)} BYN</div>
+              <div className="cash-value"><MoneyAmount value={cashData.issuedOrdersTotal ?? 0} /></div>
             </div>
 
             {(cashData.issuedByOperators?.length ?? 0) > 0 && (
@@ -559,7 +559,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
                   {cashData.issuedByOperators!.map((op, idx) => (
                     <div key={`${op.user_id}-${op.user_name}-${idx}`} className="cash-contribution-row">
                       <span className="cash-contribution-user">{op.user_name}</span>
-                      <span className="cash-contribution-amount">{op.amount.toFixed(2)} BYN</span>
+                      <span className="cash-contribution-amount"><MoneyAmount value={op.amount} /></span>
                     </div>
                   ))}
                 </div>
@@ -568,13 +568,13 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
 
             <div className="cash-row">
               <div className="cash-label">Расчётный счётчик (CRM):</div>
-              <div className="cash-value">{cashData.calculated.toFixed(2)} BYN</div>
+              <div className="cash-value"><MoneyAmount value={cashData.calculated} /></div>
             </div>
             
             <div className="cash-row">
               <div className="cash-label">Разница:</div>
               <div className={`cash-difference ${getCashStatus()}`}>
-                {cashData.difference >= 0 ? '+' : ''}{cashData.difference.toFixed(2)} BYN
+                <MoneyAmount value={cashData.difference} signed />
               </div>
             </div>
 
@@ -591,14 +591,14 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
                           {report.user_name || `Пользователь #${report.user_id}`}
                         </span>
                         <span className="cash-contribution-amount">
-                          {Number(report.cash_actual || 0).toFixed(2)} BYN
+                          <MoneyAmount value={Number(report.cash_actual || 0)} />
                         </span>
                       </div>
                     ))}
                   </div>
                   <div className="cash-contribution-total">
                     <span>Итого за день:</span>
-                    <span>{cashContributionsTotal.toFixed(2)} BYN</span>
+                    <span><MoneyAmount value={cashContributionsTotal} /></span>
                   </div>
                 </>
               )}

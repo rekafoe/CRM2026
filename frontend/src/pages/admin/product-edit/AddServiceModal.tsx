@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Modal, Button } from '../../../components/common';
-import { AppIcon, type IconName } from '../../../components/ui/AppIcon';
+import { AppIcon, MoneyAmount, type IconName } from '../../../components/ui';
 import { PricingService } from '../../../types/pricing';
 
 interface AddServiceModalProps {
@@ -123,7 +123,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = React.memo(({
                         </div>
                       </td>
                       <td>{getServiceTypeLabel(svc.type)}</td>
-                      <td>{svc.rate.toFixed(2)} BYN</td>
+                      <td><MoneyAmount value={svc.rate} /></td>
                       <td>{svc.unit || '—'}</td>
                       <td className="product-services-actions">
                         <Button

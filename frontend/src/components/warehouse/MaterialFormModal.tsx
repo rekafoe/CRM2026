@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Material } from '../../types/shared';
 import { api } from '../../api';
 import { materialPriceFieldLabel } from '../../utils/materialPriceLabels';
+import { BynSymbol } from '../ui';
 
 interface PaperType {
   id: number;
@@ -429,7 +430,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
               />
             </div>
             <div className="form-group">
-              <label>{materialPriceFieldLabel(formData.unit)}</label>
+              <label>{materialPriceFieldLabel(formData.unit)} (<BynSymbol />) *</label>
               <input
                 type="number"
                 value={formData.price ?? ''}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { MoneyAmount } from '../../ui';
 
 interface CalculatorSpecs {
   productType: string;
@@ -54,11 +55,11 @@ export const CalculationResultComponent: React.FC<CalculationResultProps> = ({
         </div>
         <div className="result-item">
           <span>Цена за штуку:</span>
-          <span>{result.pricePerItem.toFixed(2)} BYN</span>
+          <span><MoneyAmount value={result.pricePerItem} /></span>
         </div>
         <div className="result-item total">
           <span>Итого:</span>
-          <span>{result.totalCost.toFixed(2)} BYN</span>
+          <span><MoneyAmount value={result.totalCost} /></span>
         </div>
         <div className="result-item">
           <span>Срок производства:</span>
@@ -74,7 +75,7 @@ export const CalculationResultComponent: React.FC<CalculationResultProps> = ({
             <div key={index} className="material-item">
               <span>{material.material}</span>
               <span>{material.quantity} {material.unit}</span>
-              <span>{material.total.toFixed(2)} BYN</span>
+              <span><MoneyAmount value={material.total} /></span>
             </div>
           ))}
         </div>

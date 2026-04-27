@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AppIcon } from '../../ui/AppIcon';
+import { AppIcon, MoneyAmount } from '../../ui';
 import { checkMaterialAvailability, calculateMaterialCost } from '../../../services/calculatorMaterialService';
 import type { CalculationResult } from '../types/calculator.types';
 import { getMaterials } from '../../../api';
@@ -741,7 +741,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
                 
                 return (
                   <option key={density.value} value={density.value} disabled={!isAvailable}>
-                    {density.label} {price > 0 ? `(${price.toFixed(2)} BYN/лист)` : ''} {!isAvailable ? '(недоступно)' : ''}
+                    {density.label} {price > 0 ? `(${price.toFixed(2)}/лист)` : ''} {!isAvailable ? '(недоступно)' : ''}
                   </option>
                 );
               })}
@@ -990,7 +990,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
               <div className="cost-breakdown">
                 <div className="cost-item">
                   <span className="cost-label">Цена за лист:</span>
-                  <span className="cost-value">{materialCost.price_per_sheet.toFixed(2)} BYN</span>
+                  <span className="cost-value"><MoneyAmount value={materialCost.price_per_sheet} /></span>
                 </div>
                 <div className="cost-item">
                   <span className="cost-label">Требуется листов:</span>
@@ -998,7 +998,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
                 </div>
                 <div className="cost-item total">
                   <span className="cost-label">Стоимость материалов:</span>
-                  <span className="cost-value">{materialCost.material_cost.toFixed(2)} BYN</span>
+                  <span className="cost-value"><MoneyAmount value={materialCost.material_cost} /></span>
                 </div>
               </div>
             </div>

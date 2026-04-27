@@ -160,6 +160,13 @@ export const FilesModal: React.FC<FilesModalProps> = ({
 
   const approvedCount = files.filter(f => f.approved).length;
   const totalCount = files.length;
+  const selectedOrderItem = selectedOrderItemId != null
+    ? items.find((item) => item.id === selectedOrderItemId)
+    : null;
+  const selectedPhotoBatch = selectedOrderItem?.params?.photoBatch;
+  const selectedPhotoBatchSummary = selectedPhotoBatch
+    ? `${selectedPhotoBatch.totalFiles ?? 0} файлов · ${selectedPhotoBatch.totalQuantity ?? 0} отпечатков`
+    : null;
 
   /** Группировка файлов по позиции заказа для отображения */
   const filesByItem = useMemo(() => {
@@ -311,6 +318,31 @@ export const FilesModal: React.FC<FilesModalProps> = ({
           >
             <AppIcon name="image" size="xs" /> Создать макет
           </button>
+          <button
+            type="button"
+            className="btn-create-design btn-photo-batch"
+            disabled={!selectedOrderItem}
+            onClick={() => {
+              if (!selectedOrderItem) return;
+              onClose();
+              const q = new URLSearchParams({
+                orderId: String(orderId),
+                orderItemId: String(selectedOrderItem.id),
+              });
+              if (selectedOrderItem.params?.productId != null) {
+                q.set('productId', String(selectedOrderItem.params.productId));
+              }
+              const typeId = (selectedOrderItem.params as { typeId?: number | string }).typeId;
+              if (typeId != null) q.set('typeId', String(typeId));
+              navigate(`/photo-batch-editor?${q.toString()}`);
+            }}
+            title={selectedOrderItem ? 'Открыть пакетную фотопечать для позиции' : 'Сначала выберите позицию заказа'}
+          >
+            <AppIcon name="camera" size="xs" /> Пакетная фотопечать
+          </button>
+          {selectedPhotoBatchSummary && (
+            <span className="files-photo-batch-summary">{selectedPhotoBatchSummary}</span>
+          )}
         </div>
 
         {/* Список файлов */}

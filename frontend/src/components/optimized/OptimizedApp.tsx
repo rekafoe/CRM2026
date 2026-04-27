@@ -513,9 +513,9 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
               if (amount === 0) {
                 toast.info('Предоплата убрана с заказа');
               } else if (paymentMethod === 'online') {
-                toast.success(`Онлайн предоплата ${actionText}`, `Сумма: ${amount} BYN. Ссылка отправлена на ${email}`);
+                toast.success(`Онлайн предоплата ${actionText}`, `Сумма: ${amount} бел. руб. Ссылка отправлена на ${email}`);
               } else {
-                toast.success(`Оффлайн предоплата ${actionText}`, `Сумма: ${amount} BYN. Оплата отмечена как полученная в кассе`);
+                toast.success(`Оффлайн предоплата ${actionText}`, `Сумма: ${amount} бел. руб. Оплата отмечена как полученная в кассе`);
               }
             } catch (error) {
               logger.error('Failed to create prepayment', error);

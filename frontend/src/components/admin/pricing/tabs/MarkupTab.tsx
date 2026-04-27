@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback } from 'react';
 import { Button, FormField, StatusBadge, EmptyState } from '../../../common';
+import { MoneyAmount } from '../../../ui';
 import type { MarkupSetting, PricingItemType, EditingItem, EditingValues } from '../../hooks/usePricingManagementState';
 
 interface MarkupTabProps {
@@ -116,7 +117,7 @@ const MarkupTabComponent: React.FC<MarkupTabProps> = ({
                     ) : (
                       <span className="field-value">
                         {item.setting_name === 'auto_cutting_price'
-                          ? `${item.setting_value} ₽/рез`
+                          ? <><MoneyAmount value={item.setting_value} />/рез</>
                           : (item.setting_name.includes('multiplier') || item.setting_name.includes('markup'))
                             ? `×${item.setting_value} (${((item.setting_value - 1) * 100).toFixed(0)}%)`
                             : `${item.setting_value}%`}

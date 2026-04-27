@@ -29,6 +29,7 @@ import {
   extractUsedFontFamiliesFromPages,
 } from './designEditor/patchFabricTextObjects';
 import type {
+  DesignPrepressConfig,
   DesignPage,
   DesignState,
   SidebarSection,
@@ -37,7 +38,6 @@ import type {
   TextEffectsValues,
 } from './designEditor/types';
 
-const SIDEBAR_PHOTO_MAX = 500;
 import { buildStripItems } from './designEditor/spreadUtils';
 import { PageStrip } from './designEditor/PageStrip';
 import { DesignEditorSidebar } from './designEditor/DesignEditorSidebar';
@@ -53,6 +53,35 @@ import { ImagePickerModal } from '../../components/ImagePickerModal';
 import { TextFloatingToolbar } from './designEditor/TextFloatingToolbar';
 import '../../styles/admin-page-layout.css';
 import './DesignEditorPage.css';
+
+const SIDEBAR_PHOTO_MAX = 500;
+const DEFAULT_PREPRESS_CONFIG: DesignPrepressConfig = {
+  bleedMm: 2,
+  safeZoneMm: SAFE_ZONE_MM,
+  showBleed: true,
+  showTrim: true,
+  showSafeZone: true,
+  cutMarks: true,
+};
+
+function normalizePrepressConfig(input: unknown): DesignPrepressConfig {
+  const raw = input && typeof input === 'object' ? input as Partial<DesignPrepressConfig> : {};
+  const num = (value: unknown, fallback: number) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  };
+  const bool = (value: unknown, fallback: boolean) =>
+    typeof value === 'boolean' ? value : fallback;
+
+  return {
+    bleedMm: num(raw.bleedMm, DEFAULT_PREPRESS_CONFIG.bleedMm),
+    safeZoneMm: num(raw.safeZoneMm, DEFAULT_PREPRESS_CONFIG.safeZoneMm),
+    showBleed: bool(raw.showBleed, DEFAULT_PREPRESS_CONFIG.showBleed),
+    showTrim: bool(raw.showTrim, DEFAULT_PREPRESS_CONFIG.showTrim),
+    showSafeZone: bool(raw.showSafeZone, DEFAULT_PREPRESS_CONFIG.showSafeZone),
+    cutMarks: bool(raw.cutMarks, DEFAULT_PREPRESS_CONFIG.cutMarks),
+  };
+}
 
 export const DesignEditorPage: React.FC = () => {
   const navigate = useNavigate();
@@ -118,18 +147,20 @@ export const DesignEditorPage: React.FC = () => {
     pageCount: 1,
     scale: 1,
   });
+  const [prepressConfig, setPrepressConfig] = useState<DesignPrepressConfig>(DEFAULT_PREPRESS_CONFIG);
   const { pageWidth, pageHeight, pageCount, scale } = pageSpec;
   const pageW = Math.round(pageWidth * MM_TO_PX * scale);
   const pageH = Math.round(pageHeight * MM_TO_PX * scale);
-  const safeZonePx = SAFE_ZONE_MM * MM_TO_PX * scale;
+  const safeZonePx = prepressConfig.safeZoneMm * MM_TO_PX * scale;
+  const bleedPx = prepressConfig.bleedMm * MM_TO_PX * scale;
 
   /** Guide lines converted from mm (safe-zone-relative) to canvas px */
   const guideLinesPx = useMemo(
     () => guides.map((g) => ({
       axis: g.axis,
-      pos: (g.posMM + SAFE_ZONE_MM) * MM_TO_PX * scale,
+      pos: (g.posMM + prepressConfig.safeZoneMm) * MM_TO_PX * scale,
     })),
-    [guides, scale],
+    [guides, prepressConfig.safeZoneMm, scale],
   );
 
   const projectUsedFonts = useMemo(
@@ -146,10 +177,13 @@ export const DesignEditorPage: React.FC = () => {
   useEffect(() => {
     const el = viewportRef.current ?? scrollAreaRef.current;
     if (!el || !pageW || !pageH) return;
-    const contentW = isSpreadView ? pageW * 2 + 4 : pageW + 40;
-    const contentH = pageH + (isSpreadView ? 50 : 40);
-    const canvasPadX = isSpreadView ? 0 : 20;
-    const canvasPadY = isSpreadView ? 0 : 20;
+    const visibleBleedPx = prepressConfig.showBleed ? bleedPx : 0;
+    const wrapperPadX = isSpreadView ? 64 : 80;
+    const wrapperPadY = isSpreadView ? 98 : 80;
+    const contentW = (isSpreadView ? pageW * 2 : pageW) + wrapperPadX + visibleBleedPx * 2;
+    const contentH = pageH + wrapperPadY + visibleBleedPx * 2;
+    const canvasPadX = isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx;
+    const canvasPadY = isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx;
     const compute = () => {
       const aw = el.clientWidth;
       const ah = el.clientHeight;
@@ -167,7 +201,7 @@ export const DesignEditorPage: React.FC = () => {
     ro.observe(el);
     compute();
     return () => ro.disconnect();
-  }, [pageW, pageH, isSpreadView]);
+  }, [bleedPx, isSpreadView, pageH, pageW, prepressConfig.showBleed]);
 
   useEffect(() => {
     if (editorMode === 'basic') setTextFloatingAnchor(null);
@@ -272,6 +306,7 @@ export const DesignEditorPage: React.FC = () => {
         page_count?: number;
         spread_mode?: boolean;
         cover_pages?: number;
+        prepress?: unknown;
         designState?: DesignState;
       } = {};
       try {
@@ -288,8 +323,10 @@ export const DesignEditorPage: React.FC = () => {
       const sm = !!(ds?.spread_mode ?? spec.spread_mode);
       const sc = 1; // fitZoom обеспечивает визуальное вписывание
       const cp = Math.max(0, Math.min(3, Number(ds?.cover_pages ?? spec.cover_pages ?? 1)));
+      const prepress = normalizePrepressConfig(ds?.prepress ?? spec.prepress);
       setTemplateState((s) => ({ ...s, template: t, loading: false, error: null }));
       setPageSpec({ pageWidth: w, pageHeight: h, pageCount: count, scale: sc });
+      setPrepressConfig(prepress);
       if (ds?.pages && ds.pages.length > 0) {
         setPages(
           ds.pages.map((p) => ({
@@ -660,6 +697,7 @@ export const DesignEditorPage: React.FC = () => {
       pageWidth,
       pageHeight,
       pageCount,
+      prepress: prepressConfig,
       pages: updatedPages,
       spread_mode: spreadMode,
       cover_pages: coverPages,
@@ -721,6 +759,7 @@ export const DesignEditorPage: React.FC = () => {
         page_count: pageCount,
         spread_mode: spreadMode,
         cover_pages: coverPages,
+        prepress: prepressConfig,
         designState,
       };
       const res = await updateDesignTemplate(tid, { spec: mergedSpec });
@@ -740,6 +779,7 @@ export const DesignEditorPage: React.FC = () => {
     pageWidth,
     pageHeight,
     pageCount,
+    prepressConfig,
     spreadMode,
     coverPages,
     hasOrderContext,
@@ -890,6 +930,9 @@ export const DesignEditorPage: React.FC = () => {
               onCollageSelectTemplate={(id) =>
                 setCollageState((c) => ({ ...c, selectedTemplateId: id }))
               }
+              onCollageApplyTemplate={(layout) =>
+                activeCanvas()?.applyCollageLayout(layout, collageState.padding)
+              }
             />
           </aside>
         )}
@@ -1006,6 +1049,10 @@ export const DesignEditorPage: React.FC = () => {
                   canvasWidthPx={isSpreadView ? pageW * 2 : pageW}
                   pageHeightPx={pageH}
                   safeZonePx={safeZonePx}
+                  bleedPx={bleedPx}
+                  showBleed={prepressConfig.showBleed}
+                  showTrim={prepressConfig.showTrim}
+                  showSafeZone={prepressConfig.showSafeZone}
                   pages={pages}
                   setPages={setPages}
                   currentPage={currentPage}
@@ -1062,7 +1109,7 @@ export const DesignEditorPage: React.FC = () => {
             onDeleteLast={handleDeleteLast}
             canDelete={pageCount > (spreadMode ? 1 + coverPages : 1)}
             onSpreadModeToggle={() => setSpreadMode((v) => !v)}
-            infoLine={`${pageWidth}×${pageHeight} мм · ${Math.round(zoom * 100)}% · Ctrl+колесо — зум`}
+            infoLine={`${pageWidth}×${pageHeight} мм · bleed ${prepressConfig.bleedMm} мм · safe ${prepressConfig.safeZoneMm} мм · ${Math.round(zoom * 100)}%`}
             collapsed={stripCollapsed}
             onCollapse={() => setStripCollapsed((v) => !v)}
           />

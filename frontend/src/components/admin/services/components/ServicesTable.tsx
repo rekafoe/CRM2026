@@ -1,6 +1,7 @@
 import React, { Fragment } from 'react';
 import { PricingService } from '../../../../types/pricing';
 import { Button, StatusBadge } from '../../../common';
+import { MoneyAmount } from '../../../ui';
 
 const defaultGetServiceIcon = (type: string) => {
   switch (type) {
@@ -143,7 +144,7 @@ const ServicesTable: React.FC<ServicesTableProps> = ({
                 <span>{getUnitLabel(service.unit)}</span>
               </td>
               <td>
-                <span className="services-table__price">{(service.rate ?? 0).toFixed(2)} BYN</span>
+                <MoneyAmount className="services-table__price" value={service.rate ?? 0} />
               </td>
               <td>
                 <StatusBadge status={service.isActive ? 'Активна' : 'Неактивна'} color={service.isActive ? 'success' : 'error'} size="sm" />

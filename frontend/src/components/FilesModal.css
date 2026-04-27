@@ -163,6 +163,29 @@
   border-color: rgba(255, 255, 255, 0.4);
 }
 
+.btn-create-design:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-photo-batch {
+  background: rgba(14, 116, 144, 0.9);
+}
+
+.btn-photo-batch:hover:not(:disabled) {
+  background: rgba(21, 94, 117, 0.98);
+}
+
+.files-photo-batch-summary {
+  color: #0f766e;
+  background: #ccfbf1;
+  border: 1px solid #99f6e4;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .btn-download-all,
 .btn-upload {
   padding: 10px 18px;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppIcon } from '../../ui/AppIcon';
+import { AppIcon, BynSymbol } from '../../ui';
 import { WarehouseFormField } from '../common/WarehouseForm';
 
 interface MaterialsFiltersProps {
@@ -138,7 +138,7 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
 
         {/* Минимальная цена */}
         <WarehouseFormField
-          label="Мин. цена (BYN)"
+          label={<>Мин. цена (<BynSymbol />)</>}
           id="min-price-filter"
           type="number"
           value={filters.minPrice}
@@ -149,7 +149,7 @@ export const MaterialsFilters: React.FC<MaterialsFiltersProps> = ({
 
         {/* Максимальная цена */}
         <WarehouseFormField
-          label="Макс. цена (BYN)"
+          label={<>Макс. цена (<BynSymbol />)</>}
           id="max-price-filter"
           type="number"
           value={filters.maxPrice}

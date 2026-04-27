@@ -7,6 +7,7 @@ import {
   AutoOrder 
 } from '../../api/hooks/useNotifications';
 import { useUIStore } from '../../stores/uiStore';
+import { MoneyAmount } from '../ui';
 import './AutoOrdersManager.css';
 
 interface AutoOrdersManagerProps {
@@ -109,7 +110,7 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
                 <div className="order-details">
                   <div className="order-amount">
                     <span className="amount-label">Сумма:</span>
-                    <span className="amount-value">{order.totalAmount.toFixed(2)} BYN</span>
+                    <span className="amount-value"><MoneyAmount value={order.totalAmount} /></span>
                   </div>
                   
                   {order.notes && (
@@ -130,7 +131,7 @@ export const AutoOrdersManager: React.FC<AutoOrdersManagerProps> = ({ onClose })
                           <span>Текущий: {material.currentStock}</span>
                           <span>Минимум: {material.minStock}</span>
                           <span>Заказ: {material.orderQuantity} {material.unit}</span>
-                          <span>Цена: {material.price.toFixed(2)} BYN</span>
+                          <span>Цена: <MoneyAmount value={material.price} /></span>
                         </div>
                       </div>
                     ))}

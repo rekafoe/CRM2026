@@ -24,7 +24,7 @@ const LayoutWorkSection: React.FC<LayoutWorkSectionProps> = ({ ranges, saving, o
       id: Date.now().toString(),
       min: '1',
       max: '∞',
-      unit: 'Br'
+      unit: 'BYN'
     };
     onChange([...ranges, newRange]);
   };
@@ -90,7 +90,8 @@ const LayoutWorkSection: React.FC<LayoutWorkSectionProps> = ({ ranges, saving, o
               onChange={(e) => updateRange(range.id, 'unit', e.target.value)}
               style={{ width: '100px' }}
             >
-              <option value="Br">Br</option>
+              <option value="BYN">Валюта</option>
+              <option value="Br">Валюта</option>
               <option value="шт">шт</option>
               <option value="лист">лист</option>
             </select>

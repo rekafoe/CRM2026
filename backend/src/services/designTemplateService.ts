@@ -53,6 +53,48 @@ export async function getDesignTemplate(id: number): Promise<DesignTemplateRow |
   return row ?? null
 }
 
+export async function getPublicDesignTemplate(id: number): Promise<DesignTemplateRow | null> {
+  const db = await getDb()
+  const row = await db.get(
+    'SELECT * FROM design_templates WHERE id = ? AND is_active = 1',
+    [id],
+  ) as DesignTemplateRow | undefined
+  return row ?? null
+}
+
+export async function getPublicDesignTemplates(params: {
+  productId?: number
+  typeId?: number
+  sizeId?: string
+}): Promise<DesignTemplateRow[]> {
+  const db = await getDb()
+  let rows: DesignTemplateRow[]
+  if (params.productId && params.typeId) {
+    rows = await db.all(
+      `SELECT dt.*
+       FROM product_subtype_designs psd
+       JOIN design_templates dt ON dt.id = psd.design_template_id
+       WHERE psd.product_id = ? AND psd.type_id = ? AND dt.is_active = 1
+       ORDER BY psd.sort_order ASC, dt.sort_order ASC, dt.name ASC`,
+      [params.productId, params.typeId],
+    ) as DesignTemplateRow[]
+  } else {
+    rows = await db.all(
+      'SELECT * FROM design_templates WHERE is_active = 1 ORDER BY sort_order ASC, name ASC',
+    ) as DesignTemplateRow[]
+  }
+
+  if (!params.sizeId) return rows
+  return rows.filter((row) => {
+    try {
+      const spec = row.spec ? JSON.parse(row.spec) as Record<string, unknown> : {}
+      return spec.sizeId == null || String(spec.sizeId) === params.sizeId
+    } catch {
+      return true
+    }
+  })
+}
+
 export async function createDesignTemplate(input: DesignTemplateInput): Promise<DesignTemplateRow> {
   const db = await getDb()
   const spec = input.spec ? JSON.stringify(input.spec) : null

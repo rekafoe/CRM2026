@@ -1,4 +1,5 @@
 import React from 'react';
+import { MoneyAmount } from '../../ui';
 
 interface HistoryItem {
   productName: string;
@@ -24,7 +25,7 @@ export const CalculationHistoryList: React.FC<Props> = ({ items, onApply }) => {
             <div className="history-info">
               <div className="history-name">{item.productName}</div>
               <div className="history-meta">
-                {item.specifications?.format} • {item.specifications?.quantity?.toLocaleString?.() || item.specifications?.quantity} шт • {item.pricePerItem.toLocaleString()} BYN/шт
+                {item.specifications?.format} • {item.specifications?.quantity?.toLocaleString?.() || item.specifications?.quantity} шт • <MoneyAmount value={item.pricePerItem} />/шт
               </div>
             </div>
             <div className="history-actions">
