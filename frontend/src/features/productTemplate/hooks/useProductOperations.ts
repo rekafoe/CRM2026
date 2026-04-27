@@ -1,6 +1,45 @@
 import { useState, useEffect, useCallback, useReducer } from 'react';
 import { apiClient } from '../../../api/client';
+import type { PostProcessingOperation } from '../../../services/products/types';
+import { useProductDirectoryStore } from '../../../stores/productDirectoryStore';
 import { ProductOperation, AvailableOperation, OperationError } from '../types';
+
+function mapDirectoryOpToAvailable(o: PostProcessingOperation): AvailableOperation {
+  return {
+    id: o.id,
+    name: o.name,
+    operation_type: o.operation_type,
+    price: o.price,
+    unit: o.unit,
+    is_active: o.is_active === 1,
+  };
+}
+
+/** Собрать строку таблицы без лишнего GET: POST отдаёт только id связи и operation_id. */
+function productOperationFromAdded(
+  linkId: number,
+  operationId: number,
+  av: AvailableOperation,
+  sequence: number
+): ProductOperation {
+  return {
+    id: linkId,
+    operation_id: operationId,
+    operation_name: av.name,
+    operation_type: av.operation_type,
+    price: av.price,
+    price_per_unit: av.price,
+    unit: av.unit,
+    price_unit: av.unit,
+    service_name: av.name,
+    sequence,
+    is_required: true,
+    is_default: false,
+    price_multiplier: 1.0,
+    conditions: null,
+    linked_parameter_name: null,
+  };
+}
 
 // Типы для состояний
 interface OperationsState {
@@ -123,18 +162,20 @@ export function useProductOperations(
       setOperationsState(prev => ({ ...prev, operationError: null }));
       
       try {
-        const [opsResponse, availableResponse] = await Promise.all([
+        const [opsResponse, directoryOps] = await Promise.all([
           apiClient.get(`/products/${productId}/operations`),
-          apiClient.get('/operations')
+          useProductDirectoryStore.getState().fetchOperations(false),
         ]);
-        
+
         const ops = opsResponse.data?.data || opsResponse.data || [];
-        const available = availableResponse.data?.data || availableResponse.data || [];
-        
+        const available = Array.isArray(directoryOps)
+          ? directoryOps.map(mapDirectoryOpToAvailable)
+          : [];
+
         setOperationsState(prev => ({
           ...prev,
           productOperations: Array.isArray(ops) ? ops : [],
-          availableOperations: Array.isArray(available) ? available : []
+          availableOperations: available,
         }));
       } catch (error: any) {
         console.error('Error loading operations:', error);
@@ -155,67 +196,91 @@ export function useProductOperations(
 
   const handleAddOperation = useCallback(async () => {
     if (!operationsState.selectedOperationId || !productId) return;
-    
-    setOperationsState(prev => ({ ...prev, operationError: null }));
-    
+
+    const selectedId = operationsState.selectedOperationId;
+    const availableSnapshot = operationsState.availableOperations;
+    const nextSequence = operationsState.productOperations.length + 1;
+
+    setOperationsState((prev) => ({ ...prev, operationError: null, addingOperation: true }));
+
     try {
-      setOperationsState(prev => ({ ...prev, addingOperation: true }));
-      await apiClient.post(`/products/${productId}/operations`, {
-        operation_id: operationsState.selectedOperationId,
-        sequence: operationsState.productOperations.length + 1,
+      const res = await apiClient.post(`/products/${productId}/operations`, {
+        operation_id: selectedId,
+        sequence: nextSequence,
         is_required: true,
         is_default: false,
-        price_multiplier: 1.0
+        price_multiplier: 1.0,
       });
-      
-      // Перезагружаем список операций
+      const payload = (res.data as { data?: { id: number; operation_id: number } })?.data ?? res.data;
+      const linkId = Number((payload as { id?: number })?.id);
+      const opId = Number((payload as { operation_id?: number })?.operation_id);
+
+      if (!Number.isFinite(linkId) || linkId < 1 || !Number.isFinite(opId) || opId < 1) {
+        const response = await apiClient.get(`/products/${productId}/operations`);
+        const ops = response.data?.data || response.data || [];
+        setOperationsState((prev) => ({
+          ...prev,
+          productOperations: Array.isArray(ops) ? ops : [],
+          selectedOperationId: null,
+          addingOperation: false,
+        }));
+        return;
+      }
+
+      const av = availableSnapshot.find((a) => a.id === selectedId);
+      if (av) {
+        const next = productOperationFromAdded(linkId, opId, av, nextSequence);
+        setOperationsState((prev) => ({
+          ...prev,
+          productOperations: [...prev.productOperations, next],
+          selectedOperationId: null,
+          addingOperation: false,
+        }));
+        return;
+      }
+
       const response = await apiClient.get(`/products/${productId}/operations`);
       const ops = response.data?.data || response.data || [];
-      setOperationsState(prev => ({
+      setOperationsState((prev) => ({
         ...prev,
         productOperations: Array.isArray(ops) ? ops : [],
         selectedOperationId: null,
-        addingOperation: false
+        addingOperation: false,
       }));
     } catch (error: any) {
       console.error('Error adding operation:', error);
-      setOperationsState(prev => ({
+      setOperationsState((prev) => ({
         ...prev,
         operationError: {
           type: 'add',
-          message: error?.response?.data?.message || 'Не удалось добавить операцию. Попробуйте еще раз.'
+          message: error?.response?.data?.message || 'Не удалось добавить операцию. Попробуйте еще раз.',
         },
-        addingOperation: false
+        addingOperation: false,
       }));
     }
-  }, [operationsState.selectedOperationId, operationsState.productOperations.length, productId]);
+  }, [operationsState.selectedOperationId, operationsState.productOperations.length, operationsState.availableOperations, productId]);
 
   const handleRemoveOperation = useCallback(async (linkId: number) => {
     if (!confirm('Удалить эту операцию?') || !productId) return;
-    
-    setOperationsState(prev => ({ ...prev, operationError: null }));
-    
+
+    setOperationsState((prev) => ({ ...prev, operationError: null, deletingOperationId: linkId }));
+
     try {
-      setOperationsState(prev => ({ ...prev, deletingOperationId: linkId }));
       await apiClient.delete(`/products/${productId}/operations/${linkId}`);
-      
-      // Перезагружаем список операций
-      const response = await apiClient.get(`/products/${productId}/operations`);
-      const ops = response.data?.data || response.data || [];
-      setOperationsState(prev => ({
+      setOperationsState((prev) => ({
         ...prev,
-        productOperations: Array.isArray(ops) ? ops : [],
-        deletingOperationId: null
+        productOperations: prev.productOperations.filter((o) => o.id !== linkId),
+        deletingOperationId: null,
       }));
     } catch (error: any) {
       console.error('Error removing operation:', error);
-      setOperationsState(prev => ({
+      setOperationsState((prev) => ({
         ...prev,
         operationError: {
           type: 'remove',
-          message: error?.response?.data?.message || 'Не удалось удалить операцию. Попробуйте еще раз.'
+          message: error?.response?.data?.message || 'Не удалось удалить операцию. Попробуйте еще раз.',
         },
-        deletingOperationId: null
+        deletingOperationId: null,
       }));
     }
   }, [productId]);
@@ -276,29 +341,41 @@ export function useProductOperations(
     bulkModalDispatch({ type: 'SET_REQUIRED', payload: required } as BulkModalAction);
   }, []);
 
-  const handleUpdateOperation = useCallback(async (operationId: number, updates: any) => {
+  const handleUpdateOperation = useCallback(async (linkId: number, updates: Record<string, unknown>) => {
     if (!productId) return;
-    
-    setOperationsState(prev => ({ ...prev, operationError: null }));
-    
+
+    setOperationsState((prev) => ({ ...prev, operationError: null }));
+
     try {
-      await apiClient.put(`/products/${productId}/operations/${operationId}`, updates);
-      
-      // Перезагружаем список операций
-      const response = await apiClient.get(`/products/${productId}/operations`);
-      const ops = response.data?.data || response.data || [];
-      setOperationsState(prev => ({
+      await apiClient.put(`/products/${productId}/operations/${linkId}`, updates);
+      setOperationsState((prev) => ({
         ...prev,
-        productOperations: Array.isArray(ops) ? ops : []
+        productOperations: prev.productOperations.map((po) => {
+          if (po.id !== linkId) return po;
+          const next: ProductOperation = { ...po };
+          if (updates.is_required !== undefined) {
+            next.is_required = Boolean(updates.is_required);
+          }
+          if (updates.is_default !== undefined) {
+            next.is_default = updates.is_default as boolean | number;
+          }
+          if (updates.conditions !== undefined) {
+            next.conditions = updates.conditions as Record<string, unknown> | null;
+          }
+          if (Object.prototype.hasOwnProperty.call(updates, 'linked_parameter_name')) {
+            next.linked_parameter_name = updates.linked_parameter_name as string | null;
+          }
+          return next;
+        }),
       }));
     } catch (error: any) {
       console.error('Error updating operation:', error);
-      setOperationsState(prev => ({
+      setOperationsState((prev) => ({
         ...prev,
         operationError: {
           type: 'update',
-          message: error?.response?.data?.message || 'Не удалось обновить операцию'
-        }
+          message: error?.response?.data?.message || 'Не удалось обновить операцию',
+        },
       }));
       throw error;
     }

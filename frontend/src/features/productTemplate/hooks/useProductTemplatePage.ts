@@ -16,7 +16,8 @@ import {
   updateProduct,
   updateProductConfig
 } from '../../../services/products'
-import { getAllWarehouseMaterials, CalculatorMaterial } from '../../../services/calculatorMaterialService'
+import { CalculatorMaterial } from '../../../services/calculatorMaterialService'
+import { useProductDirectoryStore } from '../../../stores/productDirectoryStore'
 import { calculatePrice } from '../../../services/pricing'
 import useProductTemplate, { buildDefaultSizes } from './useProductTemplate'
 import type { Material } from '../../../types/shared'
@@ -179,7 +180,7 @@ export default function useProductTemplatePage(productId: number | undefined): U
         const [templateConfig, productMaterials, warehouseMaterials] = await Promise.all([
           getProductTemplateConfig(productId),
           getProductMaterials(productId),
-          getAllWarehouseMaterials()
+          useProductDirectoryStore.getState().fetchMaterials(false),
         ])
         if (templateConfig) {
           setTemplateConfigId(templateConfig.id)

@@ -213,8 +213,8 @@ const DEFAULT_RATE_WINDOW_MS = 30 * 1000
 export const generalRateLimit = rateLimiter.middleware({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || DEFAULT_RATE_WINDOW_MS),
   // Лимиты «за окно» (см. RATE_LIMIT_WINDOW_MS). При окне 30 с — запас на параллельные GET тяжёлой страницы
-  max: Number(process.env.RATE_LIMIT_MAX || 150),
-  maxAuthenticated: Number(process.env.RATE_LIMIT_AUTH_MAX || 500),
+  max: Number(process.env.RATE_LIMIT_MAX || 400),
+  maxAuthenticated: Number(process.env.RATE_LIMIT_AUTH_MAX || 2000),
   message: 'Too many requests from this IP, please try again later',
   keyPrefix: 'general',
   skip: skipRateLimitForPublicUploadStatic,

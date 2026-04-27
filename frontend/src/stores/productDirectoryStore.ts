@@ -110,6 +110,34 @@ function shouldUseCache(
   return Date.now() - ts < CACHE_TTL;
 }
 
+/** Пока идёт параллельный fetch (например из initialize), дождаться и вернуть актуальные данные. */
+function waitWhileSliceLoading(
+  get: () => ProductDirectoryState,
+  kind: 'materials' | 'operations',
+  maxMs = 30_000,
+): Promise<Material[] | PostProcessingOperation[]> {
+  const start = Date.now();
+  return new Promise((resolve) => {
+    const tick = () => {
+      const s = get();
+      if (kind === 'materials' && !s.loading.materials) {
+        resolve(s.materials);
+        return;
+      }
+      if (kind === 'operations' && !s.loading.operations) {
+        resolve(s.operations);
+        return;
+      }
+      if (Date.now() - start > maxMs) {
+        resolve(kind === 'materials' ? s.materials : s.operations);
+        return;
+      }
+      setTimeout(tick, 25);
+    };
+    tick();
+  });
+}
+
 export const useProductDirectoryStore = create<ProductDirectoryState>()(
   devtools(
     (set, get) => ({
@@ -213,8 +241,8 @@ export const useProductDirectoryStore = create<ProductDirectoryState>()(
 
       fetchOperations: async (force) => {
         const state = get();
-        if (state.loading.operations) {
-          return state.operations;
+        if (state.loading.operations && !force) {
+          return (await waitWhileSliceLoading(get, 'operations')) as PostProcessingOperation[];
         }
         if (shouldUseCache(state.lastFetched, 'operations', force)) {
           return state.operations;
@@ -250,8 +278,8 @@ export const useProductDirectoryStore = create<ProductDirectoryState>()(
 
       fetchMaterials: async (force) => {
         const state = get();
-        if (state.loading.materials) {
-          return state.materials;
+        if (state.loading.materials && !force) {
+          return (await waitWhileSliceLoading(get, 'materials')) as Material[];
         }
         if (shouldUseCache(state.lastFetched, 'materials', force)) {
           return state.materials;

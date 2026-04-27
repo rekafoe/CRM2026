@@ -2,6 +2,7 @@ import { getDb } from '../config/database';
 import { getSmtpConfig } from '../config/mail';
 import { renderEmailTemplate } from './emailTemplateService';
 import { enqueueMail } from './mailOutboxService';
+import { isValidEmailAddress } from '../utils/isValidEmail';
 import { logger } from '../utils/logger';
 
 export type OrderEmailSource = 'crm' | 'website' | 'telegram' | 'mini_app';
@@ -73,6 +74,10 @@ export async function tryEnqueueOrderStatusEmail(params: {
     const to = (order.customerEmail || order.customerEmailFromCard || '').trim();
     if (!to) {
       logger.debug('Order status email skipped: no customerEmail', { orderId: params.orderId });
+      return;
+    }
+    if (!isValidEmailAddress(to)) {
+      logger.debug('Order status email skipped: invalid customerEmail', { orderId: params.orderId, to });
       return;
     }
 

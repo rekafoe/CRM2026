@@ -27,6 +27,7 @@ import {
 } from '../services/customerEmailMarketingService';
 import { enqueueMarketingTemplateBroadcast } from '../services/mailMarketingBroadcastService';
 import { getTrackingPixelResponse, recordMailOpenByToken } from '../services/mailOpenTrackingService';
+import { isValidEmailAddress } from '../utils/isValidEmail';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -404,7 +405,7 @@ router.post(
       return;
     }
     const to = String((req.body as { to?: string })?.to || '').trim();
-    if (!to || !to.includes('@')) {
+    if (!isValidEmailAddress(to)) {
       res.status(400).json({ error: 'Valid "to" email required' });
       return;
     }
