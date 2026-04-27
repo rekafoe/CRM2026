@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { FormField, Button } from '../../../components/common'
-import { getServiceVolumeTiers, getServiceVariants, getAllVariantTiers } from '../../../services/pricing/api'
+import { getPricingServicesBundle } from '../../../services/pricing/api'
 import type { ServiceVolumeTier, ServiceVariant } from '../../../types/pricing'
 import { useTierRangeFloating, TIER_RANGE_POPOVER_Z_INDEX, tierModalFloatingRef } from '../hooks/useTierRangeFloating'
 
@@ -226,79 +226,72 @@ export const ServicePricingTable: React.FC<ServicePricingTableProps> = ({
   // Варианты услуг (любая услуга с вариантами — не привязываем к типу)
   const [serviceVariants, setServiceVariants] = useState<Map<number, ServiceVariant[]>>(new Map())
   const [variantTiersByService, setVariantTiersByService] = useState<Map<number, Record<number, ServiceVolumeTier[]>>>(new Map())
-  const [loadingVariants, setLoadingVariants] = useState<Set<number>>(new Set())
-  const loadedVariantServiceIdsRef = useRef<Set<number>>(new Set())
 
-  // Загрузка вариантов и их tiers для всех услуг (API вернёт [] для услуг без вариантов)
+  // Один батч-запрос: варианты, базовые tiers и tiers вариантов для всех услуг таблицы
   useEffect(() => {
-    if (services.length === 0) return
-
-    const loadForService = async (serviceId: number) => {
-      if (loadedVariantServiceIdsRef.current.has(serviceId)) return
-      loadedVariantServiceIdsRef.current.add(serviceId)
-
-      setLoadingVariants(prev => new Set(prev).add(serviceId))
-      try {
-        const [variants, tiersMap] = await Promise.all([
-          getServiceVariants(serviceId),
-          getAllVariantTiers(serviceId)
-        ])
-        setServiceVariants(prev => new Map(prev).set(serviceId, variants))
-        setVariantTiersByService(prev => new Map(prev).set(serviceId, tiersMap))
-      } catch (error) {
-        console.error(`Ошибка загрузки вариантов для услуги ${serviceId}:`, error)
-        loadedVariantServiceIdsRef.current.delete(serviceId)
-      } finally {
-        setLoadingVariants(prev => {
-          const next = new Set(prev)
-          next.delete(serviceId)
-          return next
-        })
-      }
-    }
-
-    void Promise.all(services.map(s => loadForService(s.id)))
-  }, [services])
-
-  // Загрузка tiers для услуг
-  useEffect(() => {
-    if (!loadServiceTiers || services.length === 0) {
-      setServicesWithTiers(services.map(s => ({ ...s, tiers: [] })))
+    if (services.length === 0) {
+      setServicesWithTiers([])
+      setServiceVariants(new Map())
+      setVariantTiersByService(new Map())
+      setLoadingTiers(false)
       return
     }
 
-    const loadTiers = async () => {
+    let cancelled = false
+    const run = async () => {
       setLoadingTiers(true)
       try {
-        const servicesWithTiersData = await Promise.all(
-          services.map(async (service) => {
-            try {
-              const serviceTiers = await getServiceVolumeTiers(service.id)
-              const tiers = convertServiceTiersToTiers(serviceTiers, commonRanges)
-              return {
-                ...service,
-                tiers,
-                loading: false
-              }
-            } catch (error) {
-              console.error(`Ошибка загрузки tiers для услуги ${service.id}:`, error)
-              return {
-                ...service,
-                tiers: commonRanges.map(r => ({ ...r, unit_price: 0 })),
-                loading: false
-              }
-            }
-          })
-        )
-        setServicesWithTiers(servicesWithTiersData)
+        const bundle = await getPricingServicesBundle(services.map((s) => s.id))
+        if (cancelled) return
+
+        const vMap = new Map<number, ServiceVariant[]>()
+        const tMap = new Map<number, Record<number, ServiceVolumeTier[]>>()
+        for (const s of services) {
+          const entry = bundle[s.id]
+          vMap.set(s.id, entry?.variants ?? [])
+          tMap.set(s.id, entry?.variantTiers ?? {})
+        }
+        setServiceVariants(vMap)
+        setVariantTiersByService(tMap)
+
+        if (!loadServiceTiers) {
+          setServicesWithTiers(services.map((su) => ({ ...su, tiers: [] })))
+        } else {
+          setServicesWithTiers(
+            services.map((su) => {
+              const entry = bundle[su.id]
+              const baseTiers = entry?.baseTiers ?? []
+              const tiers = convertServiceTiersToTiers(baseTiers, commonRanges)
+              return { ...su, tiers, loading: false }
+            }),
+          )
+        }
       } catch (error) {
-        console.error('Ошибка загрузки tiers услуг:', error)
+        console.error('Ошибка загрузки бандла цен услуг:', error)
+        if (!cancelled) {
+          setServiceVariants(new Map())
+          setVariantTiersByService(new Map())
+          if (loadServiceTiers) {
+            setServicesWithTiers(
+              services.map((s) => ({
+                ...s,
+                tiers: commonRanges.map((r) => ({ ...r, unit_price: 0 })),
+                loading: false,
+              })),
+            )
+          } else {
+            setServicesWithTiers(services.map((s) => ({ ...s, tiers: [] })))
+          }
+        }
       } finally {
-        setLoadingTiers(false)
+        if (!cancelled) setLoadingTiers(false)
       }
     }
 
-    void loadTiers()
+    void run()
+    return () => {
+      cancelled = true
+    }
   }, [services, loadServiceTiers, commonRanges])
 
   // Закрытие модалки при клике вне её

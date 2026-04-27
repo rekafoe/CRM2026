@@ -10,7 +10,7 @@ import {
   UpdateServiceVariantDTO,
   ServiceCategoryDTO,
 } from '../dtos/service.dto';
-import { PricingServiceRepository } from '../repositories/serviceRepository';
+import { PricingServiceRepository, type ServicePricingBundleEntry } from '../repositories/serviceRepository';
 
 export class ServiceManagementService {
   static listServices(): Promise<PricingServiceDTO[]> {
@@ -96,6 +96,10 @@ export class ServiceManagementService {
 
   static listAllVariantTiers(serviceId: number): Promise<Map<number, ServiceVolumeTierDTO[]>> {
     return PricingServiceRepository.listAllVariantTiers(serviceId);
+  }
+
+  static listPricingBundleForServiceIds(serviceIds: number[]): Promise<Record<number, ServicePricingBundleEntry>> {
+    return PricingServiceRepository.listPricingBundleForServiceIds(serviceIds);
   }
 }
 

@@ -110,6 +110,12 @@ type RawTierRow = {
   is_active: number;
 };
 
+export type ServicePricingBundleEntry = {
+  variants: ServiceVariantDTO[];
+  baseTiers: ServiceVolumeTierDTO[];
+  variantTiers: Record<number, ServiceVolumeTierDTO[]>;
+};
+
 export class PricingServiceRepository {
   private static schemaEnsured = false;
 
@@ -818,6 +824,142 @@ export class PricingServiceRepository {
       console.error('ServiceId:', serviceId);
       throw error;
     }
+  }
+
+  /**
+   * Варианты, базовые tiers и tiers вариантов для нескольких услуг — без N+1 HTTP.
+   */
+  static async listPricingBundleForServiceIds(
+    serviceIds: number[],
+  ): Promise<Record<number, ServicePricingBundleEntry>> {
+    const uniq = [...new Set(serviceIds.map(Number).filter((n) => Number.isFinite(n) && n > 0))];
+    const out: Record<number, ServicePricingBundleEntry> = {};
+    if (uniq.length === 0) return out;
+
+    for (const id of uniq) {
+      out[id] = { variants: [], baseTiers: [], variantTiers: {} };
+    }
+
+    const db = await this.getConnection();
+    await this.ensureSchema(db);
+
+    let hasMaterialId = false;
+    let hasQtyPerItem = false;
+    let hasParentVariantId = false;
+    try {
+      hasMaterialId = await hasColumn('service_variants', 'material_id');
+    } catch {
+      /* ignore */
+    }
+    try {
+      hasQtyPerItem = await hasColumn('service_variants', 'qty_per_item');
+    } catch {
+      /* ignore */
+    }
+    try {
+      hasParentVariantId = await hasColumn('service_variants', 'parent_variant_id');
+    } catch {
+      /* ignore */
+    }
+    const materialCols = hasMaterialId && hasQtyPerItem ? ', material_id, qty_per_item' : '';
+    const parentCol = hasParentVariantId ? ', parent_variant_id' : '';
+    const placeholders = uniq.map(() => '?').join(',');
+
+    const vRows = await db.all<any[]>(
+      `SELECT id, service_id, variant_name, parameters, sort_order, is_active, created_at, updated_at${parentCol}${materialCols}
+       FROM service_variants
+       WHERE service_id IN (${placeholders})
+       ORDER BY service_id, sort_order, id`,
+      ...uniq,
+    );
+    for (const row of vRows) {
+      const sid = Number(row.service_id);
+      if (!out[sid]) continue;
+      const paramsRaw = parseServiceVariantParameters(row.parameters);
+      const parentColVal = hasParentVariantId ? normalizeParentVariantId(row.parent_variant_id) : null;
+      const parentFromJson = normalizeParentVariantId(paramsRaw.parentVariantId);
+      const parentResolved = parentColVal !== null ? parentColVal : parentFromJson;
+      const parameters = parametersWithParentSync(paramsRaw, parentResolved);
+      out[sid].variants.push({
+        id: row.id,
+        serviceId: row.service_id,
+        variantName: row.variant_name,
+        parameters,
+        sortOrder: row.sort_order || 0,
+        isActive: row.is_active !== undefined ? !!row.is_active : true,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        ...(hasParentVariantId ? { parentVariantId: parentResolved } : {}),
+        ...(hasMaterialId && row.material_id != null ? { material_id: row.material_id } : {}),
+        ...(hasQtyPerItem && row.qty_per_item != null ? { qty_per_item: Number(row.qty_per_item) } : {}),
+      });
+    }
+
+    const bRows = await db.all<RawTierRow[]>(
+      `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active
+       FROM service_volume_prices
+       WHERE service_id IN (${placeholders}) AND variant_id IS NULL
+       ORDER BY service_id, min_quantity`,
+      ...uniq,
+    );
+    for (const row of bRows) {
+      const sid = Number(row.service_id);
+      if (!out[sid]) continue;
+      out[sid].baseTiers.push(this.mapTier(row));
+    }
+
+    const hasNewStructure = await db.get(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='service_range_boundaries'`,
+    );
+
+    if (hasNewStructure) {
+      const vtRows = await db.all<any[]>(
+        `SELECT
+            svp.id,
+            svp.variant_id,
+            srb.service_id,
+            srb.min_quantity,
+            svp.price_per_unit,
+            svp.is_active
+           FROM service_variant_prices svp
+           JOIN service_range_boundaries srb ON svp.range_id = srb.id
+           WHERE srb.service_id IN (${placeholders}) AND svp.variant_id IS NOT NULL
+           ORDER BY srb.service_id, svp.variant_id, srb.min_quantity`,
+        ...uniq,
+      );
+      for (const row of vtRows) {
+        const sid = Number(row.service_id);
+        const vid = Number(row.variant_id);
+        if (!out[sid] || !Number.isFinite(vid)) continue;
+        const tier: ServiceVolumeTierDTO = {
+          id: row.id,
+          serviceId: sid,
+          variantId: vid,
+          minQuantity: row.min_quantity,
+          rate: row.price_per_unit,
+          isActive: !!row.is_active,
+        };
+        if (!out[sid].variantTiers[vid]) out[sid].variantTiers[vid] = [];
+        out[sid].variantTiers[vid].push(tier);
+      }
+    } else {
+      const vtRows = await db.all<RawTierRow[]>(
+        `SELECT id, service_id, variant_id, min_quantity, price_per_unit, is_active
+         FROM service_volume_prices
+         WHERE service_id IN (${placeholders}) AND variant_id IS NOT NULL
+         ORDER BY service_id, variant_id, min_quantity`,
+        ...uniq,
+      );
+      for (const row of vtRows) {
+        const sid = Number(row.service_id);
+        const vid = row.variant_id != null ? Number(row.variant_id) : NaN;
+        if (!out[sid] || !Number.isFinite(vid)) continue;
+        if (!out[sid].variantTiers[vid]) out[sid].variantTiers[vid] = [];
+        out[sid].variantTiers[vid].push(this.mapTier(row));
+      }
+    }
+
+    return out;
   }
 
   static async createServiceTier(serviceId: number, payload: CreateServiceVolumeTierDTO): Promise<ServiceVolumeTierDTO> {

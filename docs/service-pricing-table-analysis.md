@@ -1,5 +1,12 @@
 # Анализ ServicePricingTable — таблица сложных операций (отделка)
 
+## Обновление (батч цен услуг)
+
+Чтобы не грузить бэкенд **3N** запросами (variants + variant tiers + базовые tiers на каждую услугу), таблица вызывает один эндпоинт:
+
+- **POST** `/api/pricing/services/pricing-bundle` — тело `{ "serviceIds": number[] }` (до 200 id), ответ `{ success, data }`, где `data` — объект с ключами `serviceId`: `{ variants, baseTiers, variantTiers }`.
+- Клиент: `getPricingServicesBundle` в `frontend/src/services/pricing/api.ts`.
+
 ## Где используется
 
 - **FinishingCard** → **ServicePricingTable** — настройка отделки для размера продукта (упрощённый калькулятор)

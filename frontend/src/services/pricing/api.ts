@@ -1,4 +1,4 @@
-import { api } from '../../api/client';
+import { api, apiClient } from '../../api/client';
 import {
   PricingService,
   PriceType,
@@ -473,6 +473,47 @@ export async function getAllVariantTiers(serviceId: number): Promise<Record<numb
   return result;
 }
 
+export type PricingServicesBundleEntry = {
+  variants: ServiceVariant[];
+  baseTiers: ServiceVolumeTier[];
+  variantTiers: Record<number, ServiceVolumeTier[]>;
+};
+
+/** Один HTTP-запрос: варианты, базовые tiers и tiers вариантов для списка услуг */
+export async function getPricingServicesBundle(serviceIds: number[]): Promise<Record<number, PricingServicesBundleEntry>> {
+  const uniq = [...new Set(serviceIds.map(Number).filter((n) => Number.isFinite(n) && n > 0))];
+  if (uniq.length === 0) return {};
+  const response = await apiClient.post('/pricing/services/pricing-bundle', { serviceIds: uniq }, { timeout: 60000 });
+  const payload: Record<string, unknown> =
+    ((response.data as { data?: Record<string, unknown> })?.data as Record<string, unknown>) ??
+    ((response.data as Record<string, unknown> | undefined) ?? {});
+  const out: Record<number, PricingServicesBundleEntry> = {};
+  for (const [key, raw] of Object.entries(payload)) {
+    const sid = Number(key);
+    if (!Number.isFinite(sid)) continue;
+    const entry = raw as {
+      variants?: unknown[];
+      baseTiers?: unknown[];
+      variantTiers?: Record<string, unknown[]>;
+    };
+    const variantsList = Array.isArray(entry?.variants) ? entry.variants : [];
+    const baseList = Array.isArray(entry?.baseTiers) ? entry.baseTiers : [];
+    const vtRaw = entry?.variantTiers && typeof entry.variantTiers === 'object' ? entry.variantTiers : {};
+    const variantTiers: Record<number, ServiceVolumeTier[]> = {};
+    for (const [vidStr, tiers] of Object.entries(vtRaw)) {
+      const vid = Number(vidStr);
+      if (!Number.isFinite(vid)) continue;
+      variantTiers[vid] = Array.isArray(tiers) ? tiers.map(mapTier) : [];
+    }
+    out[sid] = {
+      variants: variantsList.map(mapVariant),
+      baseTiers: baseList.map(mapTier),
+      variantTiers,
+    };
+  }
+  return out;
+}
+
 export async function createServiceVariantTier(serviceId: number, variantId: number | string, payload: ServiceVolumeTierPayload): Promise<ServiceVolumeTier> {
   // 🆕 Нормализуем variantId
   const normalizedVariantId = typeof variantId === 'string' 
@@ -578,6 +619,7 @@ export default {
   deleteServiceVariant,
   getServiceVariantTiers,
   getAllVariantTiers,
+  getPricingServicesBundle,
   createServiceVariantTier,
   // Новые функции для оптимизированной структуры
   addRangeBoundary,

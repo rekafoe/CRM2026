@@ -1163,6 +1163,45 @@ const toVariantResponse = (variant: any) => ({
   parent_variant_id: variant.parentVariantId ?? null,
 })
 
+const PRICING_BUNDLE_MAX_IDS = 200
+
+/** Один запрос: варианты, базовые tiers и tiers вариантов для списка услуг (шаблон продукта и т.п.) */
+router.post('/services/pricing-bundle', asyncHandler(async (req, res) => {
+  const raw = req.body?.serviceIds ?? req.body?.service_ids
+  if (!Array.isArray(raw)) {
+    res.status(400).json({ success: false, error: 'serviceIds must be an array' })
+    return
+  }
+  const serviceIds = raw
+    .map((x: unknown) => Number(x))
+    .filter((n: number) => Number.isFinite(n) && n > 0)
+  const uniq = [...new Set(serviceIds)]
+  if (uniq.length > PRICING_BUNDLE_MAX_IDS) {
+    res.status(400).json({ success: false, error: `Too many service ids (max ${PRICING_BUNDLE_MAX_IDS})` })
+    return
+  }
+  const bundle = await ServiceManagementService.listPricingBundleForServiceIds(uniq)
+  const result: Record<string, {
+    variants: ReturnType<typeof toVariantResponse>[]
+    baseTiers: ReturnType<typeof toTierResponse>[]
+    variantTiers: Record<string, ReturnType<typeof toTierResponse>[]>
+  }> = {}
+  for (const sid of uniq) {
+    const entry = bundle[sid]
+    if (!entry) continue
+    const variantTiers: Record<string, ReturnType<typeof toTierResponse>[]> = {}
+    for (const [vid, tiers] of Object.entries(entry.variantTiers)) {
+      variantTiers[vid] = tiers.map(toTierResponse)
+    }
+    result[String(sid)] = {
+      variants: entry.variants.map(toVariantResponse),
+      baseTiers: entry.baseTiers.map(toTierResponse),
+      variantTiers,
+    }
+  }
+  res.json({ success: true, data: result })
+}))
+
 router.get('/services/:serviceId/variants', asyncHandler(async (req, res) => {
   const { serviceId } = req.params
   const variants = await ServiceManagementService.listServiceVariants(Number(serviceId))
