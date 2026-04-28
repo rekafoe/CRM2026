@@ -138,6 +138,7 @@ export const DesignEditorPage: React.FC = () => {
 
   // ── fit-zoom: CSS-масштаб, чтобы вписать холст в контейнер ─────────────────
   const [fitZoom, setFitZoom] = useState(1);
+  const [fitReady, setFitReady] = useState(false);
   const [rulerOrigin, setRulerOrigin] = useState({ x: 0, y: 0 });
 
   // ── Page spec (scale=1 — натуральный размер; fitZoom вписывает в экран) ─────
@@ -177,6 +178,7 @@ export const DesignEditorPage: React.FC = () => {
   useEffect(() => {
     const el = viewportRef.current ?? scrollAreaRef.current;
     if (!el || !pageW || !pageH) return;
+    setFitReady(false);
     const visibleBleedPx = prepressConfig.showBleed ? bleedPx : 0;
     const wrapperPadX = isSpreadView ? 64 : 80;
     const wrapperPadY = isSpreadView ? 98 : 80;
@@ -190,14 +192,13 @@ export const DesignEditorPage: React.FC = () => {
       if (aw < 100 || ah < 100) return;
       const zW = aw / contentW;
       const zH = ah / contentH;
-      // Fit zoom должен только вписывать крупный макет в viewport.
-      // Автоувеличение маленьких форматов после первого ResizeObserver визуально "уводит" canvas.
-      const z = Math.max(0.1, Math.min(zW, zH, 1));
+      const z = Math.max(0.1, Math.min(zW, zH, 3));
       setFitZoom(z);
       setRulerOrigin({
         x: (aw - contentW * z) / 2 + canvasPadX * z,
         y: (ah - contentH * z) / 2 + canvasPadY * z,
       });
+      setFitReady(true);
     };
     const ro = new ResizeObserver(compute);
     ro.observe(el);
@@ -1027,7 +1028,10 @@ export const DesignEditorPage: React.FC = () => {
 
           <div
             className="design-editor-fit-scaler"
-            style={{ transform: `scale(${fitZoom})` }}
+            style={{
+              transform: `scale(${fitZoom})`,
+              visibility: fitReady ? 'visible' : 'hidden',
+            }}
           >
 
           {/* Один экземпляр холста: при смене isSpreadView нельзя размонтировать второй canvas — правки теряются. */}
