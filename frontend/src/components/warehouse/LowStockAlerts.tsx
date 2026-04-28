@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useLogger } from '../../utils/logger'
 import { useStockAlerts, useCheckStockLevels, useResolveStockAlert } from '../../api/hooks/useNotifications'
+import { useUIStore } from '../../stores/uiStore'
 import './LowStockAlerts.css'
 
 interface LowStockAlert {
@@ -28,7 +29,9 @@ interface AlertStats {
 
 export const LowStockAlerts: React.FC = () => {
   const logger = useLogger('LowStockAlerts')
+  const { showToast } = useUIStore()
   const [filter, setFilter] = useState<'all' | 'active' | 'resolved'>('active')
+  const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null)
   
   // API хуки
   const { data: alerts = [], isLoading, error } = useStockAlerts()
@@ -60,9 +63,14 @@ export const LowStockAlerts: React.FC = () => {
   // Проверка остатков
   const handleCheckStockLevels = async () => {
     try {
-      await checkStockLevels.mutateAsync()
+      const result = await checkStockLevels.mutateAsync()
+      const checkedAlerts = Array.isArray(result?.data) ? result.data.length : 0
+      setLastCheckedAt(new Date())
+      showToast(`Проверка завершена. Найдено предупреждений: ${checkedAlerts}`, 'success')
       logger.info('Проверка остатков завершена')
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Не удалось проверить остатки'
+      showToast(errorMessage, 'error')
       logger.error('Ошибка проверки остатков', err)
     }
   }
@@ -71,8 +79,11 @@ export const LowStockAlerts: React.FC = () => {
   const handleResolveAlert = async (alertId: number) => {
     try {
       await resolveStockAlert.mutateAsync(alertId)
+      showToast('Уведомление отмечено как решенное', 'success')
       logger.info('Уведомление отмечено как решенное', { alertId })
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Не удалось отметить уведомление как решенное'
+      showToast(errorMessage, 'error')
       logger.error('Ошибка отметки уведомления как решенного', err)
     }
   }
@@ -139,6 +150,11 @@ export const LowStockAlerts: React.FC = () => {
       <div className="alerts-header">
         <h2>📦 Уведомления о низких остатках</h2>
         <div className="alerts-actions">
+          {lastCheckedAt && (
+            <span className="alerts-last-checked">
+              Последняя проверка: {lastCheckedAt.toLocaleString('ru-RU')}
+            </span>
+          )}
           <button 
             className="btn btn-primary"
             onClick={handleCheckStockLevels}

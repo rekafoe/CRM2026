@@ -39,7 +39,7 @@ function tabFromSearchParam(t: string | null): NotifyTab {
 
 function paramForTab(tab: NotifyTab): string | undefined {
   if (tab === 'alerts') {
-    return undefined;
+    return 'alerts';
   }
   if (tab === 'client') {
     return 'client';
@@ -72,11 +72,7 @@ export const NotificationsManager: React.FC<NotificationsManagerProps> = ({ onCl
     (tab: NotifyTab) => {
       setActiveTab(tab);
       const p = paramForTab(tab);
-      if (p) {
-        setSearchParams({ tab: p });
-      } else {
-        setSearchParams({});
-      }
+      setSearchParams(p ? { tab: p } : {});
     },
     [setSearchParams]
   );

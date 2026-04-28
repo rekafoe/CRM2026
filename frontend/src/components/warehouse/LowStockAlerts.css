@@ -22,7 +22,14 @@
 
 .alerts-actions {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
+}
+
+.alerts-last-checked {
+  color: #6c757d;
+  font-size: 13px;
 }
 
 .btn {
