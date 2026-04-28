@@ -44,6 +44,10 @@ export interface Customer {
   email?: string;
   address?: string;
   notes?: string;
+  /** 1 = рассылки разрешены, 0 = клиент отказался */
+  marketing_opt_in?: number;
+  email_unsubscribed_at?: string | null;
+  unsubscribe_token?: string;
   /** Откуда пришёл клиент (для статистики). crm — создание вручную в CRM. */
   source?: 'crm' | 'website' | 'telegram' | 'mini_app';
   created_at: string;

@@ -24,7 +24,7 @@ export interface Customer {
   email?: string;
   address?: string;
   notes?: string;
-  /** 1 = согласен на маркетинг; учитывается вместе с email_unsubscribed_at */
+  /** 1 = рассылки разрешены; учитывается вместе с email_unsubscribed_at */
   marketing_opt_in?: number;
   email_unsubscribed_at?: string | null;
   unsubscribe_token?: string;
@@ -227,6 +227,8 @@ export class CustomerService {
     notes?: string
     /** По умолчанию crm (ручное создание в CRM) */
     source?: string
+    /** По умолчанию рассылки разрешены, пока клиент не отказался */
+    marketing_opt_in?: 0 | 1
   }): Promise<Customer> {
     const db = await getDb()
     const now = new Date().toISOString()
@@ -243,6 +245,7 @@ export class CustomerService {
     }
 
     const src = normalizeCustomerSource(data.source)
+    const marketingOptIn = data.marketing_opt_in === 0 ? 0 : 1
     const unsubToken = randomBytes(24).toString('hex')
     const result = await db.run(
       `INSERT INTO customers (
@@ -269,7 +272,7 @@ export class CustomerService {
         data.address || null,
         data.notes || null,
         src,
-        0,
+        marketingOptIn,
         unsubToken,
         now,
         now
@@ -332,7 +335,11 @@ export class CustomerService {
     }
 
     const mOptIn =
-      data.marketing_opt_in !== undefined ? data.marketing_opt_in : (existing as Customer).marketing_opt_in ?? 0
+      data.marketing_opt_in !== undefined ? data.marketing_opt_in : (existing as Customer).marketing_opt_in ?? 1
+    const unsubscribedAt =
+      mOptIn === 1
+        ? null
+        : (existing as Customer).email_unsubscribed_at || now
 
     await db.run(
       `UPDATE customers SET
@@ -350,6 +357,7 @@ export class CustomerService {
         address = ?,
         notes = ?,
         marketing_opt_in = ?,
+        email_unsubscribed_at = ?,
         updated_at = ?
       WHERE id = ?`,
       [
@@ -367,6 +375,7 @@ export class CustomerService {
         data.address !== undefined ? data.address : existing.address,
         data.notes !== undefined ? data.notes : existing.notes,
         mOptIn,
+        unsubscribedAt,
         now,
         id
       ]
@@ -439,7 +448,7 @@ export class CustomerService {
       address: row.address || undefined,
       notes: row.notes || undefined,
       source: normalizeCustomerSource(row.source),
-      marketing_opt_in: row.marketing_opt_in == null ? 0 : Number(row.marketing_opt_in),
+      marketing_opt_in: row.marketing_opt_in == null ? 1 : Number(row.marketing_opt_in),
       email_unsubscribed_at: row.email_unsubscribed_at ?? null,
       unsubscribe_token: row.unsubscribe_token || undefined,
       created_at: row.created_at,

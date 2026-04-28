@@ -190,7 +190,9 @@ export const DesignEditorPage: React.FC = () => {
       if (aw < 100 || ah < 100) return;
       const zW = aw / contentW;
       const zH = ah / contentH;
-      const z = Math.max(0.1, Math.min(zW, zH, 3));
+      // Fit zoom должен только вписывать крупный макет в viewport.
+      // Автоувеличение маленьких форматов после первого ResizeObserver визуально "уводит" canvas.
+      const z = Math.max(0.1, Math.min(zW, zH, 1));
       setFitZoom(z);
       setRulerOrigin({
         x: (aw - contentW * z) / 2 + canvasPadX * z,

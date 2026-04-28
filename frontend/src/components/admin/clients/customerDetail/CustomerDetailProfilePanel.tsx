@@ -13,6 +13,7 @@ export type CustomerEditFormState = {
   email: string;
   address: string;
   notes: string;
+  marketing_opt_in: boolean;
 };
 
 interface CustomerDetailProfilePanelProps {
@@ -138,6 +139,17 @@ export const CustomerDetailProfilePanel: React.FC<CustomerDetailProfilePanelProp
             onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
             placeholder="Заметки"
           />
+        </label>
+        <label className="customers-edit-field customers-edit-field--checkbox">
+          <input
+            type="checkbox"
+            checked={editForm.marketing_opt_in}
+            onChange={(e) => setEditForm((prev) => ({ ...prev, marketing_opt_in: e.target.checked }))}
+          />
+          <span>Разрешены email-рассылки</span>
+          <small>
+            Выключайте только если клиент попросил не присылать маркетинговые письма.
+          </small>
         </label>
       </div>
       <Button variant="primary" size="sm" onClick={onSaveDetails} disabled={savingCustomer}>

@@ -53,9 +53,10 @@ export const CustomerDetailView: React.FC<{
     email: string;
     address: string;
     notes: string;
+    marketing_opt_in: boolean;
   }>({
     first_name: '', last_name: '', middle_name: '', company_name: '', legal_name: '', tax_id: '',
-    phone: '', email: '', address: '', notes: '',
+    phone: '', email: '', address: '', notes: '', marketing_opt_in: true,
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [generatingDocument, setGeneratingDocument] = useState<string | null>(null);
@@ -118,7 +119,7 @@ export const CustomerDetailView: React.FC<{
     if (!customer) {
       setEditForm({
         first_name: '', last_name: '', middle_name: '', company_name: '', legal_name: '', tax_id: '',
-        phone: '', email: '', address: '', notes: '',
+        phone: '', email: '', address: '', notes: '', marketing_opt_in: true,
       });
       return;
     }
@@ -133,6 +134,7 @@ export const CustomerDetailView: React.FC<{
       email: customer.email ?? '',
       address: customer.address ?? '',
       notes: customer.notes ?? '',
+      marketing_opt_in: customer.marketing_opt_in !== 0,
     });
   }, [customer]);
 
@@ -295,6 +297,7 @@ export const CustomerDetailView: React.FC<{
         email: editForm.email.trim() || undefined,
         address: editForm.address.trim() || undefined,
         notes: editForm.notes.trim() || undefined,
+        marketing_opt_in: editForm.marketing_opt_in ? 1 : 0,
       };
       if (customer.type === 'individual') {
         payload.first_name = editForm.first_name.trim();

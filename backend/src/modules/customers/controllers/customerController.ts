@@ -179,7 +179,8 @@ export class CustomerController {
       email,
       address,
       notes,
-      source
+      source,
+      marketing_opt_in
     } = req.body
 
     if (!type || !['individual', 'legal'].includes(type)) {
@@ -203,6 +204,7 @@ export class CustomerController {
         address,
         notes,
         source: source != null && source !== '' ? String(source) : 'crm',
+        ...(marketing_opt_in === 0 || marketing_opt_in === 1 ? { marketing_opt_in } : {}),
       })
 
       res.status(201).json(customer)
