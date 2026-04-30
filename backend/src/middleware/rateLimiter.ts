@@ -207,14 +207,24 @@ function skipRateLimitForPublicUploadStatic(req: Request): boolean {
   return false
 }
 
-/** Окно по умолчанию 30 с: счётчик обнуляется часто — не «зависаешь» на 15 мин после серии запросов */
-const DEFAULT_RATE_WINDOW_MS = 30 * 1000
+/** Окно по умолчанию 60 с — SPA с параллельными GET + опрос пула реже упираются в 429 */
+const DEFAULT_RATE_WINDOW_MS = 60 * 1000
+
+/** Значение из env: пустое / NaN / ≤0 → fallback (защита от RATE_LIMIT_AUTH_MAX=0 → мгновенный 429 для Bearer). */
+function envPositiveInt(envKey: string, fallback: number): number {
+  const raw = process.env[envKey]
+  if (raw === undefined || raw === '') return fallback
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return fallback
+  return Math.min(Math.floor(n), 1_000_000)
+}
 
 export const generalRateLimit = rateLimiter.middleware({
-  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || DEFAULT_RATE_WINDOW_MS),
-  // Лимиты «за окно» (см. RATE_LIMIT_WINDOW_MS). При окне 30 с — запас на параллельные GET тяжёлой страницы
-  max: Number(process.env.RATE_LIMIT_MAX || 400),
-  maxAuthenticated: Number(process.env.RATE_LIMIT_AUTH_MAX || 2000),
+  windowMs: envPositiveInt('RATE_LIMIT_WINDOW_MS', DEFAULT_RATE_WINDOW_MS),
+  // Гость (без Bearer): сайт/боты — консервативный потолок
+  max: envPositiveInt('RATE_LIMIT_MAX', 2000),
+  // CRM с Bearer: параллельные запросы одной страницы (заказы, прайсинг, принтеры, активность)
+  maxAuthenticated: envPositiveInt('RATE_LIMIT_AUTH_MAX', 12000),
   message: 'Too many requests from this IP, please try again later',
   keyPrefix: 'general',
   skip: skipRateLimitForPublicUploadStatic,
