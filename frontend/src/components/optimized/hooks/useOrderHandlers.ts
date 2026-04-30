@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import React from 'react';
 import { Order } from '../../../types';
-import { createOrder, deleteOrder, addOrderItem, deleteOrderItem, updateOrderStatus } from '../../../api';
+import { createOrder, cancelOnlineOrder, addOrderItem, deleteOrderItem, updateOrderStatus } from '../../../api';
 import { useToastNotifications } from '../../Toast';
 import { useLogger } from '../../../utils/logger';
 import { useReasonPresets } from '../../common/useReasonPresets';
@@ -43,20 +43,20 @@ export const useOrderHandlers = ({
   const handleDeleteOrder = useCallback(async (orderId: number) => {
     try {
       const reason = await requestReason({
-        title: 'Причина удаления/отмены заказа',
-        placeholder: 'Опишите причину удаления или отмены заказа',
+        title: 'Отмена заказа',
+        placeholder: 'Опишите причину отмены заказа',
         presets: getPresets('delete'),
-        confirmText: 'Удалить/отменить',
+        confirmText: 'Отменить заказ',
         rememberKey: 'order_delete_reason',
       });
       if (!reason) return;
-      await deleteOrder(orderId, reason);
+      await cancelOnlineOrder(orderId, reason);
       setSelectedId(null);
       loadOrders();
     } catch (e: any) {
       const msg = e?.response?.data?.error ?? e?.message ?? 'Не удалось удалить заказ';
       const is401 = e?.response?.status === 401 || (typeof msg === 'string' && msg.startsWith('401'));
-      toast.error(is401 ? 'Сессия истекла' : 'Ошибка удаления', is401 ? 'Войдите в систему снова' : msg);
+      toast.error(is401 ? 'Сессия истекла' : 'Ошибка отмены', is401 ? 'Войдите в систему снова' : msg);
     }
   }, [setSelectedId, loadOrders, requestReason, getPresets, toast]);
 

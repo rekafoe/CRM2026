@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useReducer, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order, OrderActivityEvent } from '../types';
-import { getOrders, getOrderPoolSync, reassignOrderByNumber, cancelOnlineOrder, getUsers, createPrepaymentLink, issueOrder, getOperatorsToday, updateOrderItem, getOrderActivity, updateOrderNotes } from '../api';
+import { getOrders, getOrderPoolSync, reassignOrderByNumber, cancelOnlineOrder, deleteOrder, getUsers, createPrepaymentLink, issueOrder, getOperatorsToday, updateOrderItem, getOrderActivity, updateOrderNotes } from '../api';
 import { useOrderStatuses } from '../hooks/useOrderStatuses';
 
 const ORDER_POOL_LAST_SEEN_KEY = 'orderPoolLastSeenAt';
@@ -24,10 +24,12 @@ import '../styles/order-pool.css';
 interface OrderPoolPageProps {
   currentUserId: number;
   currentUserName: string;
+  /** Физическое удаление отменённого заказа из БД */
+  isAdmin: boolean;
 }
 
 type FilterState = {
-  source: 'all' | 'crm' | 'website' | 'telegram';
+  source: 'all' | 'crm' | 'website' | 'telegram' | 'mini_app';
   cancelled: 'all' | 'cancelled' | 'not_cancelled';
   assigned: 'all' | 'assigned' | 'not_assigned';
   searchInput: string;
@@ -53,7 +55,7 @@ type FilterAction =
 
 const initialFilters: FilterState = {
   source: 'all',
-  cancelled: 'all',
+  cancelled: 'not_cancelled',
   assigned: 'not_assigned',
   searchInput: '',
   searchTerm: '',
@@ -68,6 +70,7 @@ function getSourceLabel(source?: string): string {
     case 'website': return 'Онлайн';
     case 'telegram': return 'Telegram';
     case 'crm': return 'CRM';
+    case 'mini_app': return 'Mini App';
     default: return 'Неизвестно';
   }
 }
@@ -99,7 +102,15 @@ function filtersReducer(state: FilterState, action: FilterAction): FilterState {
     case 'toggleSortDirection':
       return { ...state, sortDirection: state.sortDirection === 'asc' ? 'desc' : 'asc' };
     case 'resetFilters':
-      return { ...state, source: 'all', cancelled: 'all', assigned: 'all', searchInput: '', searchTerm: '', quickFilter: null };
+      return {
+        ...state,
+        source: 'all',
+        cancelled: 'not_cancelled',
+        assigned: 'not_assigned',
+        searchInput: '',
+        searchTerm: '',
+        quickFilter: null,
+      };
     case 'resetVisible':
       return { ...state, visibleCount: 100 };
     case 'increaseVisible':
@@ -198,7 +209,7 @@ const OrderRow = React.memo<{
   )
 );
 
-export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, currentUserName }) => {
+export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, currentUserName, isAdmin }) => {
   const navigate = useNavigate();
   const toast = useToastNotifications();
   const logger = useLogger('OrderPoolPage');
@@ -610,14 +621,39 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         });
         if (!reason) return;
         await cancelOnlineOrder(orderId, reason);
-        toast.success('Заказ отменен!', `Онлайн-заказ ${orderId} отменен и перемещен в пул.`);
-        updateOrderInList(orderId, { is_cancelled: 1 });
+        toast.success('Заказ отменён', 'Запись помечена как отменённая и скрыта из списка активных.');
+        updateOrderInList(orderId, { is_cancelled: 1, status: 0 as any, userId: null as any });
       } catch (err) {
         logger.error('Failed to cancel online order', err);
         toast.error('Ошибка отмены', (err as Error).message);
       }
     },
     [toast, logger, updateOrderInList, requestReason, getPresets]
+  );
+
+  const handlePermanentDelete = useCallback(
+    async (orderId: number) => {
+      try {
+        const reason = await requestReason({
+          title: 'Удаление отменённого заказа из базы',
+          placeholder: 'Причина окончательного удаления записи (доступно только администратору)',
+          presets: getPresets('delete'),
+          confirmText: 'Удалить из базы',
+          rememberKey: 'order_permanent_delete_reason',
+        });
+        if (!reason) return;
+        await deleteOrder(orderId, reason);
+        toast.success('Удалено', 'Запись заказа удалена из базы');
+        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+        setSelectedOrder((prev) => (prev?.id === orderId ? null : prev));
+      } catch (err: unknown) {
+        const ax = err as { response?: { data?: { error?: string } }; message?: string };
+        const msg = ax?.response?.data?.error ?? ax?.message ?? 'Не удалось удалить заказ';
+        logger.error('Failed to permanently delete order', err);
+        toast.error('Ошибка', msg);
+      }
+    },
+    [toast, logger, requestReason, getPresets]
   );
 
   const handlePrepaymentCreated = useCallback(
@@ -750,6 +786,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               <option value="crm">CRM</option>
               <option value="website">Онлайн</option>
               <option value="telegram">Telegram</option>
+              <option value="mini_app">Mini App</option>
             </select>
             <select value={filters.cancelled} onChange={(e) => dispatchFilters({ type: 'setCancelled', value: e.target.value as any })}>
               <option value="all">Все</option>
@@ -884,8 +921,20 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   {issuingOrderId === selectedOrder.id ? '⏳ Выдача...' : '✅ Выдать заказ'}
                 </button>
               )}
-              {selectedOrder.source && (selectedOrder.source === 'website' || selectedOrder.source === 'telegram') && (
-                <button onClick={() => handleCancelOnline(selectedOrder.id)}>Отменить онлайн</button>
+              {(Number(selectedOrder.status) === 0 || Number(selectedOrder.status) === 1) &&
+                selectedOrder.is_cancelled !== 1 && (
+                <button type="button" onClick={() => handleCancelOnline(selectedOrder.id)}>
+                  Отменить заказ
+                </button>
+              )}
+              {isAdmin && selectedOrder.is_cancelled === 1 && (
+                <button
+                  type="button"
+                  className="btn-order-permanent-delete"
+                  onClick={() => handlePermanentDelete(selectedOrder.id)}
+                >
+                  Удалить из базы
+                </button>
               )}
             </div>
             {(() => {

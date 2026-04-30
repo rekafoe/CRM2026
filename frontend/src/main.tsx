@@ -73,7 +73,11 @@ function OrderPoolPageWrapper() {
 
   return (
     <React.Suspense fallback={<LoadingFallback />}>
-      <LazyOrderPoolPage currentUserId={user.id} currentUserName={user.name} />
+      <LazyOrderPoolPage
+        currentUserId={user.id}
+        currentUserName={user.name}
+        isAdmin={user.role === 'admin'}
+      />
     </React.Suspense>
   );
 }

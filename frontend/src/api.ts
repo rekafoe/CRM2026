@@ -105,6 +105,7 @@ export const getOperatorsToday = (date?: string) =>
 export const reassignOrderByNumber = (number: string, userId: number) =>
   api.post(`/orders/reassign/${encodeURIComponent(number)}`, { userId });
 
+/** Мягкая отмена заказа (источник любой: сайт, Telegram, Mini App, CRM). Запись остаётся в БД с is_cancelled. */
 export const cancelOnlineOrder = (id: number, cancelReason: string) =>
   api.post(`/orders/${id}/cancel-online`, { cancel_reason: cancelReason });
 
@@ -118,6 +119,7 @@ export const issueOrder = (id: number, issuedOn?: string) =>
 export const addOrderItem = (id: number, item: Omit<Item, 'id'>) =>
   api.post<Item>(`/orders/${id}/items`, item);
 
+/** Полное удаление строки заказа из БД: только роль admin и только если заказ уже отменён (is_cancelled). */
 export const deleteOrder = (id: number, deleteReason: string) =>
   api.delete(`/orders/${id}`, {
     data: { delete_reason: deleteReason },

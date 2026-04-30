@@ -1,5 +1,22 @@
 /* Order Pool Page — в одном стиле с модалкой калькулятора и страницей отчётов */
 
+.btn-order-permanent-delete {
+  padding: 8px 14px;
+  border: 2px solid #b91c1c;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.btn-order-permanent-delete:hover {
+  background: #fee2e2;
+  border-color: #991b1b;
+}
+
 .order-pool-page {
   display: flex;
   height: 100vh;

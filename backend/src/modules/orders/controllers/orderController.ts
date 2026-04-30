@@ -69,7 +69,7 @@ export class OrderController {
         res.status(400).json({ error: 'Необходимо указать причину отмены' })
         return
       }
-      await OrderService.deleteOrder(id, authUser?.id, cancelReason)
+      await OrderService.softCancelOrder(id, authUser?.id, cancelReason)
       res.json({ id, softCancelled: true })
     } catch (error: any) {
       res.status(400).json({ error: error.message })
@@ -469,14 +469,18 @@ export class OrderController {
   static async deleteOrder(req: Request, res: Response) {
     const id = Number(req.params.id)
     try {
-      const authUser = (req as any).user as { id: number } | undefined
-      const deleteReason = String((req.body as any)?.delete_reason || (req.query as any)?.delete_reason || '').trim()
-      if (!deleteReason) {
-        res.status(400).json({ error: 'Необходимо указать причину удаления/отмены заказа' })
+      const authUser = (req as any).user as { id: number; role?: string } | undefined
+      if (!authUser?.id || authUser.role !== 'admin') {
+        res.status(403).json({ error: 'Удаление заказа из базы доступно только администратору' })
         return
       }
-      
-      await OrderService.deleteOrder(id, authUser?.id, deleteReason)
+      const deleteReason = String((req.body as any)?.delete_reason || (req.query as any)?.delete_reason || '').trim()
+      if (!deleteReason) {
+        res.status(400).json({ error: 'Необходимо указать причину удаления заказа из базы' })
+        return
+      }
+
+      await OrderService.permanentDeleteOrder(id, authUser.id, deleteReason)
       res.status(204).end()
     } catch (error: any) {
       logger.error('deleteOrder failed', { orderId: id, error: error?.message, stack: error?.stack })
@@ -595,12 +599,17 @@ export class OrderController {
         res.status(400).json({ error: 'orderIds must be a non-empty array' })
         return
       }
-      const reasonText = String(delete_reason || '').trim()
-      if (!reasonText) {
-        res.status(400).json({ error: 'Необходимо указать причину удаления/отмены заказов' })
+      if (authUser.role !== 'admin') {
+        res.status(403).json({ error: 'Массовое удаление заказов доступно только администратору' })
         return
       }
-      
+
+      const reasonText = String(delete_reason || '').trim()
+      if (!reasonText) {
+        res.status(400).json({ error: 'Необходимо указать причину удаления заказов из базы' })
+        return
+      }
+
       const result = await OrderService.bulkDeleteOrders(orderIds, authUser.id, reasonText)
       res.json(result)
     } catch (error: any) {

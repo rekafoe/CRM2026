@@ -1223,13 +1223,118 @@ export class OrderService {
     return { id: row.id, userId: targetUserId }
   }
 
-  static async deleteOrder(id: number, userId?: number, reason?: string) {
-    // Собираем все позиции заказа и их состав
+  /**
+   * Мягкая отмена: запись остаётся в БД (is_cancelled=1), заказ уходит из активного пула.
+   * Для CRM/сайта/TG/mini-app — одна и та же логика. Без физического DELETE.
+   */
+  static async softCancelOrder(id: number, userId?: number, reason?: string): Promise<{ softCancelled: true }> {
+    const reasonText = String(reason || '').trim()
+    if (!reasonText) {
+      throw new Error('Для отмены заказа необходимо указать причину')
+    }
+    const db = await getDb()
+    const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
+    const ord = await db.get<{
+      source?: string
+      status?: number
+      created_date?: string
+      number?: string
+      userId?: number | null
+      is_cancelled?: number
+    }>(
+      hasIsCancelled
+        ? 'SELECT source, status, number, userId, is_cancelled, COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?'
+        : 'SELECT source, status, number, userId, COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
+      [id]
+    )
+    if (!ord) {
+      throw new Error('Заказ не найден')
+    }
+    if (hasIsCancelled && Number(ord.is_cancelled) === 1) {
+      return { softCancelled: true }
+    }
+
+    await db.run('BEGIN')
+    try {
+      await this.recordCancellationEvent(db, {
+        orderId: id,
+        orderNumber: ord?.number ?? null,
+        orderSource: ord?.source ?? null,
+        statusBefore: Number(ord?.status ?? 0),
+        eventType: 'soft_cancel',
+        reason: reasonText,
+        userId
+      })
+      if (hasIsCancelled) {
+        try {
+          await db.run(
+            'UPDATE orders SET status = 0, userId = NULL, is_cancelled = 1, updatedAt = datetime("now") WHERE id = ?',
+            [id]
+          )
+        } catch {
+          try {
+            await db.run(
+              'UPDATE orders SET status = 0, userId = NULL, is_cancelled = 1, updated_at = datetime("now") WHERE id = ?',
+              [id]
+            )
+          } catch {
+            await db.run('UPDATE orders SET status = 0, userId = NULL, is_cancelled = 1 WHERE id = ?', [id])
+          }
+        }
+      } else {
+        try {
+          await db.run('UPDATE orders SET status = 0, userId = NULL, updatedAt = datetime("now") WHERE id = ?', [id])
+        } catch {
+          try {
+            await db.run('UPDATE orders SET status = 0, userId = NULL, updated_at = datetime("now") WHERE id = ?', [id])
+          } catch {
+            await db.run('UPDATE orders SET status = 0, userId = NULL WHERE id = ?', [id])
+          }
+        }
+      }
+      await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
+      await db.run('COMMIT')
+      if (ord?.created_date) {
+        const date = String(ord.created_date).slice(0, 10)
+        await EarningsService.recalculateForDate(date)
+      }
+      return { softCancelled: true }
+    } catch (e) {
+      await db.run('ROLLBACK')
+      throw e
+    }
+  }
+
+  /**
+   * Физическое удаление строки заказа. Только для отменённых (is_cancelled=1), только по решению админа.
+   */
+  static async permanentDeleteOrder(id: number, userId?: number, reason?: string): Promise<void> {
     const db = await getDb()
     const reasonText = String(reason || '').trim()
     if (!reasonText) {
-      throw new Error('Для удаления/отмены заказа необходимо указать причину')
+      throw new Error('Для удаления заказа из базы необходимо указать причину')
     }
+    const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
+    if (!hasIsCancelled) {
+      throw new Error('Удаление из базы недоступно: в схеме нет поля is_cancelled')
+    }
+    const pre = await db.get<{
+      is_cancelled?: number
+      source?: string
+      status?: number
+      number?: string
+      created_date?: string
+    }>(
+      'SELECT is_cancelled, source, status, number, COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
+      [id]
+    )
+    if (!pre) {
+      throw new Error('Заказ не найден')
+    }
+    if (Number(pre.is_cancelled) !== 1) {
+      throw new Error('Удалить из базы можно только отменённый заказ. Сначала отмените заказ.')
+    }
+
     const items = (await db.all<{
       id: number
       type: string
@@ -1240,7 +1345,6 @@ export class OrderService {
       [id]
     )) as unknown as Array<{ id: number; type: string; params: string; quantity: number }>
 
-    // Агрегируем возвраты по materialId
     const returns: Record<number, number> = {}
     const hasRulesTable = !!(await db.get(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='product_material_rules'"
@@ -1269,55 +1373,15 @@ export class OrderService {
         )) as unknown as Array<{ materialId: number; qtyPerItem: number }>
       }
       for (const c of composition) {
-        const add = Math.ceil((c.qtyPerItem || 0) * Math.max(1, Number(item.quantity) || 1)) // Округляем вверх до целого числа
+        const add = Math.ceil((c.qtyPerItem || 0) * Math.max(1, Number(item.quantity) || 1))
         returns[c.materialId] = (returns[c.materialId] || 0) + add
       }
     }
 
+    const ord = pre
+
     await db.run('BEGIN')
     try {
-      // Узнаем источник заказа (для онлайн/телеграм делаем мягкую отмену)
-      const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
-      const ord = await db.get<{ source?: string; status?: number; created_date?: string; number?: string; userId?: number | null; is_cancelled?: number }>(
-        hasIsCancelled
-          ? 'SELECT source, status, number, userId, is_cancelled, COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?'
-          : 'SELECT source, status, number, userId, COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
-        [id]
-      )
-      if (!ord) {
-        await db.run('ROLLBACK')
-        throw new Error('Заказ не найден')
-      }
-
-      // Если онлайн/телеграм и заказ ещё не в пуле — мягко отменяем.
-      // Если уже в пуле (status=0, userId=NULL), удаляем полностью, чтобы он исчезал из отчётов.
-      const isWebsiteLike =
-        ord && (ord.source === 'website' || ord.source === 'telegram' || ord.source === 'mini_app')
-      const isAlreadyInPool = Number(ord?.status ?? -1) === 0 && (ord?.userId == null)
-      if (isWebsiteLike && !isAlreadyInPool) {
-        await this.recordCancellationEvent(db, {
-          orderId: id,
-          orderNumber: ord?.number ?? null,
-          orderSource: ord?.source ?? null,
-          statusBefore: Number(ord?.status ?? 0),
-          eventType: 'soft_cancel',
-          reason: reasonText,
-          userId
-        })
-        if (hasIsCancelled) {
-          await db.run('UPDATE orders SET status = 0, userId = NULL, is_cancelled = 1, updatedAt = datetime("now") WHERE id = ?', [id])
-        } else {
-          await db.run('UPDATE orders SET status = 0, userId = NULL, updatedAt = datetime("now") WHERE id = ?', [id])
-        }
-        await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
-        await db.run('COMMIT')
-        if (ord?.created_date) {
-          const date = String(ord.created_date).slice(0, 10)
-          await EarningsService.recalculateForDate(date)
-        }
-        return { softCancelled: true }
-      }
-
       for (const mid of Object.keys(returns)) {
         const materialId = Number(mid)
         const addQty = Math.ceil(returns[materialId])
@@ -1334,31 +1398,26 @@ export class OrderService {
 
       await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
 
-      // material_moves ссылается на orders без ON DELETE — обнуляем перед удалением
       await db.run('UPDATE material_moves SET order_id = NULL WHERE order_id = ?', [id])
 
-      // debt_closed_events ссылается на orders без ON DELETE — удаляем перед удалением заказа
       try {
         await db.run('DELETE FROM debt_closed_events WHERE order_id = ?', [id])
       } catch {
         // таблица может отсутствовать
       }
 
-      // user_order_page_orders — привязки заказа к страницам операторов
       try {
         await db.run('DELETE FROM user_order_page_orders WHERE order_id = ?', [id])
       } catch {
         // таблица может отсутствовать
       }
 
-      // order_item_earnings — явно удаляем (на случай если CASCADE не сработает)
       try {
         await db.run('DELETE FROM order_item_earnings WHERE order_id = ?', [id])
       } catch {
         // таблица может отсутствовать
       }
 
-      // items и order_files — удаляем до orders (CASCADE может не сработать в некоторых конфигурациях)
       await db.run('DELETE FROM items WHERE orderId = ?', [id])
       await db.run('DELETE FROM order_files WHERE orderId = ?', [id])
 
@@ -1372,7 +1431,6 @@ export class OrderService {
         userId
       })
 
-      // Удаляем заказ (позиции удалятся каскадно)
       await db.run('DELETE FROM orders WHERE id = ?', [id])
       await db.run('COMMIT')
       if (ord?.created_date) {
@@ -1580,7 +1638,7 @@ export class OrderService {
     await db.run('BEGIN')
     try {
       for (const orderId of orderIds) {
-        await OrderService.deleteOrder(orderId, userId, reason)
+        await OrderService.permanentDeleteOrder(orderId, userId, reason)
         deletedCount++
       }
       await db.run('COMMIT')

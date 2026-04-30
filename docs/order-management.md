@@ -61,6 +61,10 @@ CREATE TABLE user_order_page_orders (
 
 ## 🔧 API Endpoints
 
+### Отмена vs удаление (orders)
+- `POST /api/orders/:id/cancel-online` — мягкая отмена (`is_cancelled`), доступна любому авторизованному пользователю CRM с доступом к заказам (единый поток для сайта / Telegram / Mini App / CRM).
+- `DELETE /api/orders/:id` — физическое удаление записи: только **admin**, только если заказ уже отменён (`is_cancelled = 1`).
+
 ### Order Management
 - `GET /api/order-management/pool` - Получить пул заказов
 - `POST /api/order-management/assign` - Назначить заказ пользователю

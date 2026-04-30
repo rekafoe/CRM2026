@@ -113,7 +113,7 @@ export interface Order {
   /** Ответственный — оператор, выполняющий заказ */
   responsible_user_id?: number | null;
   // Источник заказа
-  source?: 'crm' | 'website' | 'telegram';
+  source?: 'crm' | 'website' | 'telegram' | 'mini_app';
   // Customer information
   customerName?: string;
   customerPhone?: string;

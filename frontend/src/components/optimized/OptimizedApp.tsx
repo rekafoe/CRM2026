@@ -3,7 +3,6 @@ import { Order } from "../../types";
 import {
   getOrders,
   createOrder,
-  deleteOrder,
   deleteOrderItem,
   updateOrderStatus,
   updateOrderItem,

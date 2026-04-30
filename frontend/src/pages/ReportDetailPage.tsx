@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getFullDailyReport, updateOrderStatus, deleteOrder, duplicateOrder } from '../api';
+import { getFullDailyReport, updateOrderStatus, cancelOnlineOrder, duplicateOrder } from '../api';
 import { useOrderStatuses } from '../hooks/useOrderStatuses';
 import { Order, DailyReport } from '../types';
 import { ProgressBar } from '../components/order/ProgressBar';
@@ -69,23 +69,23 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
   };
 
   const handleDeleteOrder = async (orderId: number) => {
-    if (!confirm('Вы уверены, что хотите удалить этот заказ?')) return;
+    if (!confirm('Отменить этот заказ?')) return;
     const reason = await requestReason({
-      title: 'Причина удаления/отмены заказа',
-      placeholder: 'Опишите причину удаления или отмены заказа',
+      title: 'Отмена заказа',
+      placeholder: 'Опишите причину отмены заказа',
       presets: getPresets('delete'),
-      confirmText: 'Удалить/отменить',
+      confirmText: 'Отменить заказ',
       rememberKey: 'order_delete_reason',
     });
     if (!reason) return;
 
     try {
-      await deleteOrder(orderId, reason);
+      await cancelOnlineOrder(orderId, reason);
       await loadReportData();
-      alert('Заказ успешно удалён');
+      alert('Заказ отменён');
     } catch (error) {
       console.error('Error deleting order:', error);
-      alert('Ошибка при удалении заказа');
+      alert('Ошибка при отмене заказа');
     }
   };
 
