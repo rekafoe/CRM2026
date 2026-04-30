@@ -23,6 +23,14 @@ import { logger } from '../../../utils/logger'
 import { MINIAPP_CHECKOUT_STATE_FINALIZED, type MiniappCheckoutState } from '../../../utils/miniappCheckoutState'
 
 export class OrderService {
+  /** Старые инстансы без миграции — добавляем колонку при первом обращении. */
+  private static async ensureOrdersIsCancelledColumn(): Promise<void> {
+    if (await hasColumn('orders', 'is_cancelled')) return
+    const db = await getDb()
+    await db.exec(`ALTER TABLE orders ADD COLUMN is_cancelled INTEGER NOT NULL DEFAULT 0`)
+    invalidateTableSchemaCache('orders')
+  }
+
   private static normalizeReasonCode(reason: string): string {
     return String(reason || '')
       .trim()
@@ -1232,6 +1240,7 @@ export class OrderService {
     if (!reasonText) {
       throw new Error('Для отмены заказа необходимо указать причину')
     }
+    await this.ensureOrdersIsCancelledColumn()
     const db = await getDb()
     const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
     const ord = await db.get<{
@@ -1309,15 +1318,12 @@ export class OrderService {
    * Физическое удаление строки заказа. Только для отменённых (is_cancelled=1), только по решению админа.
    */
   static async permanentDeleteOrder(id: number, userId?: number, reason?: string): Promise<void> {
-    const db = await getDb()
     const reasonText = String(reason || '').trim()
     if (!reasonText) {
       throw new Error('Для удаления заказа из базы необходимо указать причину')
     }
-    const hasIsCancelled = await hasColumn('orders', 'is_cancelled')
-    if (!hasIsCancelled) {
-      throw new Error('Удаление из базы недоступно: в схеме нет поля is_cancelled')
-    }
+    await this.ensureOrdersIsCancelledColumn()
+    const db = await getDb()
     const pre = await db.get<{
       is_cancelled?: number
       source?: string
