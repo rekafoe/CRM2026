@@ -35,6 +35,9 @@ npm run dev  # Запуск на порту 5173
 - [📋 Order Management](./order-management.md) - Управление заказами
 - [🤖 Telegram Bot](./telegram-bot.md) - Telegram бот для заказов
 - [🧮 Calculator](./calculator.md) - Калькулятор печати
+- [💰 Ценообразование](./pricing-architecture.md) - Канон: simplified + `/api/pricing/calculate`
+- [📐 Раскладка и дозаливка](./dynamic-layout-bleed.md) - Лист материала, `bleed_mm`, произвольный trim
+- [📄 Многостраничные продукты](./multipage-products-review.md) - Политика `multi_page` vs legacy multipage
 - [📦 Materials](./materials.md) - Управление материалами
 - [📊 Reports](./reports.md) - Отчеты и аналитика
 - [👥 Users](./users.md) - Пользователи и роли

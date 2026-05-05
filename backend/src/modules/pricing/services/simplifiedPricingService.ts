@@ -48,7 +48,12 @@ export interface SimplifiedPricingResult {
     price_unit: string;
     units_per_item: number;
   }>;
-  
+
+  /** Фактический обрез (мм), если отличается от строки тарифов (allow_custom_trim) */
+  actualTrimMm?: { width: number; height: number };
+  /** Дозаливка (мм с каждой стороны), применённая в раскладке */
+  layoutBleedMm?: number;
+
   // Стоимость по компонентам
   printPrice: number;
   materialPrice: number;
@@ -99,6 +104,8 @@ export interface SimplifiedPricingResult {
     recommendedSheetSize?: { width: number; height: number };
     /** Количество резов на лист (для резки стопой) */
     cutsPerSheet?: number;
+    /** Дозаливка (мм с каждой стороны), использованная в расчёте ячейки trim+2×bleed */
+    bleedMm?: number;
   };
   warnings?: string[];
   breakdown?: {
@@ -172,6 +179,15 @@ interface SimplifiedConfig {
   duplex_as_single_x2?: boolean;
   /** Учитывать стоимость материалов: false = materialPrice = 0 */
   include_material_cost?: boolean;
+  /** Произвольный trim: тарифы по якорю (pricing_size_id / custom_trim_pricing_size_id) */
+  allow_custom_trim?: boolean;
+  custom_trim_pricing_size_id?: number | string;
+  default_bleed_mm?: number;
+  /**
+   * Если false и у выбранного материала нет sheet_width/height — ошибка вместо подбора SRA3/A3/A4.
+   */
+  allow_optimal_sheet_fallback?: boolean;
+  prepress?: { bleedMm?: number };
   multiPageStructure?: {
     innerBlock?: {
       pagesSource?: 'parameter' | 'fixed';
@@ -228,6 +244,10 @@ export class SimplifiedPricingService {
         price_unit?: 'per_cut' | 'per_item';
         units_per_item?: number;
       }>;
+      /** Дозаливка мм (с каждой стороны) — переопределяет дефолт из шаблона */
+      bleed_mm?: number;
+      /** Якорь строки размера для тарифов при allow_custom_trim */
+      pricing_size_id?: number | string;
     },
     quantity: number
   ): Promise<SimplifiedPricingResult> {
@@ -353,29 +373,68 @@ export class SimplifiedPricingService {
       }
     }
     
-    // 3. Находим выбранный размер
+    // 3. Находим выбранный размер (тарифная строка) и фактический trim для раскладки
+    const allowCustomTrim = simplifiedConfig.allow_custom_trim === true;
+    const trimInput =
+      normalizedConfig.trim_size &&
+      Number.isFinite(Number(normalizedConfig.trim_size.width)) &&
+      Number.isFinite(Number(normalizedConfig.trim_size.height))
+        ? {
+            width: Number(normalizedConfig.trim_size.width),
+            height: Number(normalizedConfig.trim_size.height),
+          }
+        : null;
+
     let selectedSize: SimplifiedSizeConfig | null = null;
-    
-    if (normalizedConfig.size_id) {
-      selectedSize = sizesToUse.find(s => String(s.id) === String(normalizedConfig.size_id)) || null;
-    } else if (normalizedConfig.trim_size) {
-      // Ищем по размерам (примерное совпадение с допуском ±1мм)
-      selectedSize = sizesToUse.find(s => 
-        Math.abs(s.width_mm - normalizedConfig.trim_size!.width) <= 1 &&
-        Math.abs(s.height_mm - normalizedConfig.trim_size!.height) <= 1
-      ) || null;
+
+    if (allowCustomTrim && trimInput) {
+      const anchorId =
+        (normalizedConfig as any).pricing_size_id ??
+        normalizedConfig.size_id ??
+        simplifiedConfig.custom_trim_pricing_size_id;
+      if (anchorId == null || anchorId === '') {
+        const err: any = new Error(
+          'При allow_custom_trim укажите pricing_size_id или size_id (якорь тарифов) и trim_size.'
+        );
+        err.status = 400;
+        throw err;
+      }
+      selectedSize = sizesToUse.find((s) => String(s.id) === String(anchorId)) || null;
+    } else if (normalizedConfig.size_id) {
+      selectedSize = sizesToUse.find((s) => String(s.id) === String(normalizedConfig.size_id)) || null;
+    } else if (trimInput) {
+      selectedSize =
+        sizesToUse.find(
+          (s) =>
+            Math.abs(s.width_mm - trimInput.width) <= 1 && Math.abs(s.height_mm - trimInput.height) <= 1
+        ) || null;
     }
-    
+
     if (!selectedSize) {
       const err: any = new Error(
         `Selected size not found in simplified config. size_id=${normalizedConfig.size_id ?? 'не указан'}, trim_size=${normalizedConfig.trim_size ? JSON.stringify(normalizedConfig.trim_size) : 'не указан'}. ` +
-        'Проверьте, что size_id соответствует одному из размеров в схеме продукта (typeConfigs[typeId].sizes или simplified.sizes).'
+          'Проверьте, что size_id соответствует одному из размеров в схеме продукта (typeConfigs[typeId].sizes или simplified.sizes).'
       );
       err.status = 400;
       throw err;
     }
 
-    const productSize = { width: selectedSize.width_mm, height: selectedSize.height_mm };
+    const layoutTrim =
+      trimInput && Number.isFinite(trimInput.width) && Number.isFinite(trimInput.height)
+        ? trimInput
+        : { width: selectedSize.width_mm, height: selectedSize.height_mm };
+
+    const prepressBleed = simplifiedConfig.prepress?.bleedMm;
+    let resolvedBleedMm = 0;
+    const bleedFromReq = (normalizedConfig as any).bleed_mm;
+    if (bleedFromReq != null && Number.isFinite(Number(bleedFromReq))) {
+      resolvedBleedMm = Math.max(0, Number(bleedFromReq));
+    } else if (simplifiedConfig.default_bleed_mm != null && Number.isFinite(Number(simplifiedConfig.default_bleed_mm))) {
+      resolvedBleedMm = Math.max(0, Number(simplifiedConfig.default_bleed_mm));
+    } else if (prepressBleed != null && Number.isFinite(Number(prepressBleed))) {
+      resolvedBleedMm = Math.max(0, Number(prepressBleed));
+    }
+
     const customMarginMm: number | undefined = (selectedSize as any).cut_margin_mm != null
       ? Number((selectedSize as any).cut_margin_mm)
       : undefined;
@@ -395,7 +454,7 @@ export class SimplifiedPricingService {
         fitsOnSheet: true,
         itemsPerSheet: itemsPerSheetOverride,
         wastePercentage: 0,
-        recommendedSheetSize: { width: productSize.width, height: productSize.height },
+        recommendedSheetSize: { width: layoutTrim.width, height: layoutTrim.height },
         layout: { rows: 1, cols: itemsPerSheetOverride, actualItemsPerSheet: itemsPerSheetOverride },
         cutsPerSheet: itemsPerSheetOverride + 1,
       };
@@ -405,7 +464,7 @@ export class SimplifiedPricingService {
         fitsOnSheet: true,
         itemsPerSheet: 1,
         wastePercentage: 0,
-        recommendedSheetSize: { width: productSize.width, height: productSize.height },
+        recommendedSheetSize: { width: layoutTrim.width, height: layoutTrim.height },
         layout: { rows: 1, cols: 1, actualItemsPerSheet: 1 },
         cutsPerSheet: 4,
       };
@@ -418,7 +477,13 @@ export class SimplifiedPricingService {
       const mw = materialSheet?.sheet_width != null && materialSheet.sheet_width > 0 ? Number(materialSheet.sheet_width) : 0;
       const mh = materialSheet?.sheet_height != null && materialSheet.sheet_height > 0 ? Number(materialSheet.sheet_height) : 0;
       if (mw > 0 && mh > 0) {
-        layoutCheck = LayoutCalculationService.calculateLayout(productSize, { width: mw, height: mh }, customMarginMm, customGapMm);
+        layoutCheck = LayoutCalculationService.calculateLayout(
+          layoutTrim,
+          { width: mw, height: mh },
+          customMarginMm,
+          customGapMm,
+          resolvedBleedMm
+        );
         logger.info('Раскладка по размеру листа выбранного материала', {
           material_id: normalizedConfig.material_id,
           sheet_width: mw,
@@ -426,12 +491,29 @@ export class SimplifiedPricingService {
           itemsPerSheet: layoutCheck.itemsPerSheet,
           cut_margin_mm: customMarginMm,
           cut_gap_mm: customGapMm,
+          bleed_mm: resolvedBleedMm,
         });
+      } else if (simplifiedConfig.allow_optimal_sheet_fallback === false) {
+        const err: any = new Error(
+          'У материала не заданы sheet_width/sheet_height. Укажите формат листа в карточке материала или включите allow_optimal_sheet_fallback в шаблоне продукта.'
+        );
+        err.status = 400;
+        throw err;
       } else {
-        layoutCheck = LayoutCalculationService.findOptimalSheetSize(productSize, customMarginMm, customGapMm);
+        layoutCheck = LayoutCalculationService.findOptimalSheetSize(
+          layoutTrim,
+          customMarginMm,
+          customGapMm,
+          resolvedBleedMm
+        );
       }
     } else {
-      layoutCheck = LayoutCalculationService.findOptimalSheetSize(productSize, customMarginMm, customGapMm);
+      layoutCheck = LayoutCalculationService.findOptimalSheetSize(
+        layoutTrim,
+        customMarginMm,
+        customGapMm,
+        resolvedBleedMm
+      );
     }
     const itemsPerSheet = Math.max(1, layoutCheck.itemsPerSheet || 1);
 
@@ -487,7 +569,7 @@ export class SimplifiedPricingService {
       ? Math.max(1, quantity * sheetsPerItem)
       : Math.ceil(quantity / itemsPerSheet);
     // Длина в направлении подачи: меньшая сторона (594×420 → 0.42 м, т.к. 420 мм вдоль рулона)
-    const metersPerItem = isRollPrint ? Math.min(productSize.width, productSize.height) / 1000 : 0;
+    const metersPerItem = isRollPrint ? Math.min(layoutTrim.width, layoutTrim.height) / 1000 : 0;
     const metersNeeded = isRollPrint ? metersPerItem * quantity : 0;
     const effectivePrintQuantity = isRollPrint ? metersNeeded : sheetsNeeded;
 
@@ -560,7 +642,7 @@ export class SimplifiedPricingService {
 
       // Fallback: рулон — централизованные ставки за пог. м (если в шаблоне нет применимой цены)
       if (!resolvedFromTemplate && isRollPrint && centralPriceForRoll) {
-        const widthMeters = Math.max(productSize.width, productSize.height) / 1000;
+        const widthMeters = Math.max(layoutTrim.width, layoutTrim.height) / 1000;
         const isColor = normalizedConfig.print_color_mode === 'color';
         const perMeter = isColor ? centralPriceForRoll.price_color_per_meter : centralPriceForRoll.price_bw_per_meter;
         if (perMeter != null && perMeter > 0) {
@@ -1356,11 +1438,12 @@ export class SimplifiedPricingService {
       wastePercentage: layoutCheck.wastePercentage,
       recommendedSheetSize: layoutCheck.recommendedSheetSize,
       cutsPerSheet: layoutCheck.cutsPerSheet ?? 0,
+      bleedMm: resolvedBleedMm,
     };
     const warnings: string[] = [...pricingWarnings];
     if (!isRollPrint && !layoutCheck.fitsOnSheet) {
       warnings.push(
-        `Формат ${selectedSize.width_mm}×${selectedSize.height_mm} мм не помещается на стандартные печатные листы (SRA3, A3, A4). Проверьте размер.`
+        `Формат ${layoutTrim.width}×${layoutTrim.height} мм (обрез) не помещается на печатный лист. Проверьте размер, материал или дозаливку.`
       );
     }
 
@@ -1425,6 +1508,8 @@ export class SimplifiedPricingService {
         width_mm: selectedSize.width_mm,
         height_mm: selectedSize.height_mm,
       },
+      actualTrimMm: { width: layoutTrim.width, height: layoutTrim.height },
+      layoutBleedMm: resolvedBleedMm,
       selectedPrint: normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode ? {
         technology_code: normalizedConfig.print_technology,
         color_mode: normalizedConfig.print_color_mode,

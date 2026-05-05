@@ -192,6 +192,16 @@ export type SimplifiedConfig = {
   use_layout?: boolean;
   /** Учитывать стоимость материалов в итоговой цене: false = materialPrice не добавляется */
   include_material_cost?: boolean;
+  /** Произвольный trim_size с тарифами по якорю (pricing_size_id / size_id) */
+  allow_custom_trim?: boolean;
+  /** Якорь тарифов по умолчанию, если сайт не передаёт pricing_size_id */
+  custom_trim_pricing_size_id?: number | string;
+  /** Дефолт дозаливки (мм) для расчёта раскладки, если не передан bleed_mm */
+  default_bleed_mm?: number;
+  /**
+   * Если false и у материала нет sheet_width/height — ошибка вместо подбора SRA3/A3/A4.
+   */
+  allow_optimal_sheet_fallback?: boolean;
 }
 
 function toTypeConfigKey(id: ProductTypeId): string {

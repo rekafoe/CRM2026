@@ -67,6 +67,11 @@ Content-Type: application/json
 | `configuration.typeId` | number | ID типа продукта (если есть types), опционально |
 | `configuration.pages` | number | Страниц (multi_page), опционально |
 | `configuration.cutting` | boolean | Резка по раскладке, опционально |
+| `configuration.trim_size` | `{ width, height }` | Обрезной формат (мм); при `allow_custom_trim` может не совпадать с пресетом |
+| `configuration.bleed_mm` | number | Дозаливка с каждой стороны (мм); ячейка укладки = trim + 2×bleed. Если не задано — `default_bleed_mm` / `prepress.bleedMm` из шаблона |
+| `configuration.pricing_size_id` | number \| string | Якорь строки размера для тарифов при `simplified.allow_custom_trim` и произвольном `trim_size` |
+
+Подробнее: [dynamic-layout-bleed.md](./dynamic-layout-bleed.md).
 
 ## Пример ответа
 

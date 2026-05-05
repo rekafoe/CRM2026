@@ -9,7 +9,14 @@ interface ResultSectionProps {
     specifications: { quantity: number; sides?: number };
     productionTime: string;
     parameterSummary?: Array<{ label: string; value: string }>;
-    layout?: { sheetsNeeded?: number; itemsPerSheet?: number; sheetSize?: string; fitsOnSheet?: boolean };
+    layout?: {
+      sheetsNeeded?: number;
+      itemsPerSheet?: number;
+      sheetSize?: string;
+      fitsOnSheet?: boolean;
+      bleedMm?: number;
+      cutsPerSheet?: number;
+    };
     warnings?: string[];
     tier_prices?: Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price?: number }>;
   } | null;
@@ -86,6 +93,8 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
   const itemsPerSheet = result.layout?.itemsPerSheet;
   const sheetSize = result.layout?.sheetSize;
   const fitsOnSheet = result.layout?.fitsOnSheet;
+  const bleedMm = result.layout?.bleedMm;
+  const cutsPerSheetUi = result.layout?.cutsPerSheet;
   const warnings = result.warnings || [];
   const parameterSummary = result.parameterSummary || [];
   const addButtonLabel = mode === 'edit' ? <><AppIcon name="save" size="xs" /> Обновить позицию</> : <>Добавить в заказ</>;
@@ -151,11 +160,19 @@ export const ResultSection: React.FC<ResultSectionProps> = ({
             ))}
         </div>
       )}
-      {(sheetsNeeded || itemsPerSheet || sheetSize) && (
+      {(sheetsNeeded ||
+        itemsPerSheet ||
+        sheetSize ||
+        (bleedMm != null && bleedMm > 0) ||
+        (cutsPerSheetUi != null && cutsPerSheetUi > 0)) && (
         <div className="result-sheet-info">
           {sheetsNeeded != null && <span><AppIcon name="document" size="xs" /> Листов: {sheetsNeeded}</span>}
           {itemsPerSheet != null && <span>• На листе: {itemsPerSheet} шт.</span>}
           {sheetSize && <span>• Формат листа: {sheetSize}</span>}
+          {bleedMm != null && bleedMm > 0 && <span>• Дозаливка: {bleedMm} мм</span>}
+          {cutsPerSheetUi != null && cutsPerSheetUi > 0 && (
+            <span>• Резов на лист: {cutsPerSheetUi}</span>
+          )}
         </div>
       )}
       {result.tier_prices && result.tier_prices.length > 0 && (

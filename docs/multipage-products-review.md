@@ -1,6 +1,14 @@
 # Обзор сущности «многостраничные продукты»
 
-> ⚠️ Актуализация: документ содержит исторические ссылки на legacy-калькуляторы. Текущий рабочий путь расчёта в API — только для `calculator_type='simplified'`.
+## Каноническая политика (зафиксировано)
+
+- **Расчёт цен и поведение продуктов в продакшене** опираются на **`calculator_type = 'simplified'`**: вход **`POST /api/pricing/calculate`** → **`UnifiedPricingService`** → **`SimplifiedPricingService`**.
+- **Многостраничные изделия в каталоге** задаются как **`product_type = 'multi_page'`** при том же simplified-шаблоне (страницы, при необходимости **`multiPageStructure`** в `config_data.simplified`).
+- Отдельный сценарий **`/api/pricing/multipage/*`**, **`MultipageProductService`**, **`product_schemas.json` (секция multipage)**, форма **`MultiPageProductForm`**, старые ветки **flexible / прочие калькуляторы** в кодовой базе — **устаревшие проявления**; новый функционал, интеграция сайта и доработки многостранички **не** строятся на этих путях.
+
+> Ниже по документу сохранено описание исторической двойственности и деталей simplified — ориентир для миграции и аудита, а не инструкция к расширению legacy.
+
+Раскладка на лист материала, дозаливка и произвольный trim в simplified: см. **[dynamic-layout-bleed.md](./dynamic-layout-bleed.md)**.
 
 Документ описывает, как в системе представлены многостраничные изделия (буклеты, брошюры, каталоги и т.п.) и где они используются.
 
@@ -12,12 +20,12 @@
 
 | Термин | Где используется | Суть |
 |--------|-------------------|------|
-| **`product_type = 'multi_page'`** | Таблица `products`, API продуктов, калькулятор | Тип **продукта в каталоге**: «это многостраничное изделие». У такого продукта обычно `calculator_type = 'simplified'`, параметр `pages` и т.д. |
-| **`multipage` (схема/API)** | `product_schemas.json`, `/pricing/multipage/*` | Отдельный **конструктор расчёта** из JSON-схемы: страницы, формат, тип печати, переплёт, бумага. Используется формой `MultiPageProductForm` и сервисом `MultipageProductService`. |
+| **`product_type = 'multi_page'`** | Таблица `products`, API продуктов, калькулятор | Тип **продукта в каталоге**: «это многостраничное изделие». **`calculator_type = 'simplified'`**, параметр `pages` и логика листов в **`SimplifiedPricingService`**. |
+| **`multipage` (схема/API)** | `product_schemas.json`, `/pricing/multipage/*` | **Legacy:** отдельный конструктор из JSON-схемы (`MultipageProductService`, `MultiPageProductForm`). Не использовать для новых сценариев. |
 
 То есть:
-- **multi_page** — признак продукта в БД и в логике калькулятора (simplified/flexible pricing).
-- **multipage** — отдельный сценарий расчёта со своей схемой и API (`/pricing/multipage/calculate`, `/multipage/schema`, `/multipage/binding-types`).
+- **multi_page** — признак продукта в БД; расчёт только через **simplified**.
+- **multipage** (отдельный API) — **устаревший** параллельный сценарий; канон — продукт каталога + `/api/pricing/calculate`.
 
 ---
 

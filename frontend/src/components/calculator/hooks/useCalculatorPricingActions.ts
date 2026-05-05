@@ -2,6 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Product } from '../../../services/products';
 import { calculatePrice as unifiedCalculatePrice } from '../../../services/pricing';
 import { parseFormatToTrimSize } from '../../../utils/formatUtils';
+import { resolveBleedMmForCalculateRequest } from '../utils/templateBleed';
 import { CalculationResult, ProductSpecs } from '../types/calculator.types';
 
 interface BuildSummaryOptions {
@@ -352,6 +353,21 @@ export function useCalculatorPricingActions({
           ...(specs.selectedOperations && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0
             ? { selectedOperations: specs.selectedOperations }
             : {}),
+          // Для allow_custom_trim: якорь тарифов при кастомном trim (оба поля читает бэкенд)
+          ...((): Record<string, unknown> => {
+            const simp = backendProductSchema?.template?.simplified as { allow_custom_trim?: boolean } | undefined;
+            if (simp?.allow_custom_trim === true && isCustomFormat && trimSize && specs.size_id != null) {
+              return { pricing_size_id: specs.size_id };
+            }
+            return {};
+          })(),
+          ...((): { bleed_mm?: number } => {
+            const simp = backendProductSchema?.template?.simplified as
+              | { default_bleed_mm?: number; prepress?: { bleedMm?: number } }
+              | undefined;
+            const mm = resolveBleedMmForCalculateRequest(specs as { bleed_mm?: number }, simp ?? null);
+            return mm !== undefined ? { bleed_mm: mm } : {};
+          })(),
           // Для продуктов с подтипами пустой finishing тоже значим:
           // это явный выбор "для текущего подтипа операции не включены".
           ...(
@@ -389,6 +405,7 @@ export function useCalculatorPricingActions({
             print_technology: configuration.print_technology,
             print_color_mode: configuration.print_color_mode,
             sides: configuration.sides,
+            bleed_mm: (configuration as { bleed_mm?: number }).bleed_mm,
             // 🆕 Явно логируем finishing для отладки
             finishing: configuration.finishing,
             hasFinishing: !!(configuration.finishing && Array.isArray(configuration.finishing) && configuration.finishing.length > 0),
@@ -664,8 +681,20 @@ export function useCalculatorPricingActions({
         const wastePercentage = layoutData.wastePercentage ?? layoutData.waste_percentage;
         const fitsOnSheet = layoutData.fitsOnSheet;
         const cutsPerSheet = layoutData.cutsPerSheet ?? layoutData.cuts_per_sheet;
+        const layoutBleedMmRaw =
+          backendResult.layoutBleedMm ?? layoutData.bleedMm ?? layoutData.bleed_mm;
+        const layoutBleedMm =
+          layoutBleedMmRaw != null && Number.isFinite(Number(layoutBleedMmRaw))
+            ? Math.max(0, Number(layoutBleedMmRaw))
+            : undefined;
         const layoutSummary =
-          itemsPerSheet || sheetsNeeded || sheetSizeLabel || wastePercentage || fitsOnSheet === false || (Number(cutsPerSheet) > 0)
+          itemsPerSheet ||
+          sheetsNeeded ||
+          sheetSizeLabel ||
+          wastePercentage ||
+          fitsOnSheet === false ||
+          (Number(cutsPerSheet) > 0) ||
+          (layoutBleedMm != null && layoutBleedMm > 0)
             ? {
                 itemsPerSheet,
                 sheetsNeeded,
@@ -674,6 +703,7 @@ export function useCalculatorPricingActions({
                   wastePercentage != null ? Math.round(Number(wastePercentage) * 100) / 100 : undefined,
                 fitsOnSheet: fitsOnSheet === undefined ? undefined : !!fitsOnSheet,
                 ...(Number(cutsPerSheet) > 0 ? { cutsPerSheet: Number(cutsPerSheet) } : {}),
+                ...(layoutBleedMm != null && layoutBleedMm > 0 ? { bleedMm: layoutBleedMm } : {}),
               }
             : undefined;
 

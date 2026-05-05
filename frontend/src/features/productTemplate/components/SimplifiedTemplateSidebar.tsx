@@ -244,6 +244,55 @@ export const SimplifiedTemplateSidebar: React.FC<SimplifiedTemplateSidebarProps>
               />
               Учитывать стоимость материалов
             </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={value.allow_custom_trim === true}
+                onChange={(e) => onChange({ ...value, allow_custom_trim: e.target.checked })}
+              />
+              Произвольный trim (тарифы по якорю pricing_size_id / size_id)
+            </label>
+            <label className="template-summary-card__field">
+              <span>Якорь тарифов (id размера), если не передан с сайта</span>
+              <input
+                type="text"
+                className="form-input"
+                value={value.custom_trim_pricing_size_id != null ? String(value.custom_trim_pricing_size_id) : ''}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    custom_trim_pricing_size_id: e.target.value.trim() === '' ? undefined : e.target.value,
+                  })
+                }
+                placeholder="напр. a4 или числовой id"
+              />
+            </label>
+            <label className="template-summary-card__field">
+              <span>Дефолт дозаливки для расчёта (мм), если не в запросе</span>
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                className="form-input"
+                value={value.default_bleed_mm ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  onChange({
+                    ...value,
+                    default_bleed_mm: v === '' ? undefined : Math.max(0, Number(v) || 0),
+                  });
+                }}
+                placeholder="иначе prepress.bleedMm"
+              />
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={value.allow_optimal_sheet_fallback !== false}
+                onChange={(e) => onChange({ ...value, allow_optimal_sheet_fallback: e.target.checked })}
+              />
+              Разрешить подбор SRA3/A3/A4, если у материала нет размера листа
+            </label>
           </div>
         )}
       </div>

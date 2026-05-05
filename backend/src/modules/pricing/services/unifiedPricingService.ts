@@ -69,6 +69,8 @@ export interface UnifiedPricingResult {
   // Метаданные
   calculatedAt: string;
   calculationMethod: 'simplified';
+  /** Дозаливка (мм с каждой стороны), применённая в раскладке (дублирует layout.bleedMm) */
+  layoutBleedMm?: number;
   /** Предупреждения (например: формат не помещается на лист) */
   warnings?: string[];
   breakdown?: {
@@ -137,10 +139,11 @@ export class UnifiedPricingService {
       productId: result.productId,
       productName: result.productName,
       quantity: result.quantity,
-      productSize: result.selectedSize ? {
-        width: result.selectedSize.width_mm,
-        height: result.selectedSize.height_mm,
-      } : { width: 0, height: 0 },
+      productSize: result.actualTrimMm
+        ? { width: result.actualTrimMm.width, height: result.actualTrimMm.height }
+        : result.selectedSize
+          ? { width: result.selectedSize.width_mm, height: result.selectedSize.height_mm }
+          : { width: 0, height: 0 },
       layout: result.layout ? {
         fitsOnSheet: result.layout.fitsOnSheet,
         itemsPerSheet: result.layout.itemsPerSheet,
@@ -148,10 +151,14 @@ export class UnifiedPricingService {
         metersNeeded: result.layout.metersNeeded,
         wastePercentage: result.layout.wastePercentage,
         recommendedSheetSize: result.layout.recommendedSheetSize,
-        cutsPerSheet: (result.layout as any).cutsPerSheet,
+        cutsPerSheet: result.layout.cutsPerSheet,
+        bleedMm: result.layoutBleedMm ?? result.layout.bleedMm,
       } : {},
       sheetsNeeded: result.layout?.sheetsNeeded,
       metersNeeded: result.layout?.metersNeeded,
+      itemsPerSheet: result.layout?.itemsPerSheet,
+      cutsPerSheet: result.layout?.cutsPerSheet,
+      layoutBleedMm: result.layoutBleedMm,
       warnings: result.warnings,
       materials: [
         ...(result.selectedMaterial ? [{

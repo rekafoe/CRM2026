@@ -39,19 +39,30 @@ export class LayoutCalculationService {
 
   /**
    * Проверяет, помещается ли продукт на лист
+   * @param trimSize — обрезной формат изделия (мм)
    * @param customMarginMm — отступ с каждой стороны (мм). По умолчанию 5 мм. Для плоттерной резки — 15 мм.
    * @param customGapMm — зазор между стикерами (мм). По умолчанию 2 мм.
+   * @param bleedMm — дозаливка с каждой стороны от обреза (мм); габарит ячейки = trim + 2×bleed по ширине и высоте.
    */
-  static calculateLayout(productSize: ProductSize, sheetSize: SheetSize, customMarginMm?: number, customGapMm?: number): LayoutResult {
+  static calculateLayout(
+    trimSize: ProductSize,
+    sheetSize: SheetSize,
+    customMarginMm?: number,
+    customGapMm?: number,
+    bleedMm?: number
+  ): LayoutResult {
     const margin = (customMarginMm != null && customMarginMm > 0) ? customMarginMm : this.MARGINS.printerMargins;
     const gap = (customGapMm != null && customGapMm >= 0) ? customGapMm : this.MARGINS.layoutGap;
+    const bleed = Math.max(0, Number(bleedMm) || 0);
+    const cellW = trimSize.width + 2 * bleed;
+    const cellH = trimSize.height + 2 * bleed;
     const availableWidth = sheetSize.width - (margin * 2);
     const availableHeight = sheetSize.height - (margin * 2);
 
     // Вариант 1: без поворота
     const variant1 = this.calculateSingleLayout(
-      productSize.width,
-      productSize.height,
+      cellW,
+      cellH,
       availableWidth,
       availableHeight,
       sheetSize,
@@ -60,8 +71,8 @@ export class LayoutCalculationService {
 
     // Вариант 2: с поворотом на 90°
     const variant2 = this.calculateSingleLayout(
-      productSize.height,
-      productSize.width,
+      cellH,
+      cellW,
       availableWidth,
       availableHeight,
       sheetSize,
@@ -71,8 +82,8 @@ export class LayoutCalculationService {
     // Выбираем вариант с меньшими отходами
     const selected = variant1.wastePercentage <= variant2.wastePercentage ? variant1 : variant2;
 
-    // Специальное правило для визиток 55×85: всегда поворот для 21 шт на лист
-    if (productSize.width === 55 && productSize.height === 85) {
+    // Специальное правило для визиток 55×85: всегда поворот для 21 шт на лист (по обрезу)
+    if (trimSize.width === 55 && trimSize.height === 85) {
       return variant2; // 85×55 дает 3×7 = 21 шт
     }
 
@@ -133,12 +144,17 @@ export class LayoutCalculationService {
    * @param customMarginMm — отступ с каждой стороны (мм). По умолчанию 5 мм.
    * @param customGapMm — зазор между стикерами (мм). По умолчанию 2 мм.
    */
-  static findOptimalSheetSize(productSize: ProductSize, customMarginMm?: number, customGapMm?: number): LayoutResult {
+  static findOptimalSheetSize(
+    productSize: ProductSize,
+    customMarginMm?: number,
+    customGapMm?: number,
+    bleedMm?: number
+  ): LayoutResult {
     let bestResult: LayoutResult | null = null;
     let bestEfficiency = 0;
 
     for (const [sheetName, sheetSize] of Object.entries(this.SHEET_SIZES)) {
-      const result = this.calculateLayout(productSize, sheetSize, customMarginMm, customGapMm);
+      const result = this.calculateLayout(productSize, sheetSize, customMarginMm, customGapMm, bleedMm);
       
       if (result.fitsOnSheet) {
         const efficiency = result.itemsPerSheet / (result.wastePercentage + 1);

@@ -46,6 +46,8 @@ export interface ProductSpecs {
   material_id?: number; // 🆕 ID материала (для упрощённых и обычных продуктов)
   /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
   base_material_id?: number;
+  /** Дозаливка мм (с каждой стороны) — переопределяет шаблон; иначе см. resolveBleedMmForCalculateRequest */
+  bleed_mm?: number;
   /** ID типа продукта (вариант внутри продукта: односторонние, с ламинацией и т.д.) */
   typeId?: number;
   /** Название типа продукта для отображения и для POST заказа с сайта */
@@ -99,6 +101,8 @@ export interface CalculationResult {
     wastePercentage?: number;
     fitsOnSheet?: boolean;
     cutsPerSheet?: number;
+    /** Дозаливка с каждой стороны (мм), факт из ответа расчёта */
+    bleedMm?: number;
   };
   /** Предупреждения от бэкенда (например: формат не помещается на печатный лист) */
   warnings?: string[];
