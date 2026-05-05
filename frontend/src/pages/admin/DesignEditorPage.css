@@ -1,4 +1,8 @@
-/* Зафиксировать весь редактор в viewport без внешнего скролла */
+/* Зафиксировать весь редактор в viewport без внешнего скролла.
+ * Явный класс нужен там, где :has недоступен (часть Firefox/Safari) — иначе зона канваса
+ * раздувается по высоте контента холста, ResizeObserver получает огромный ah и fitZoom
+ * упирается в max 3× — визуально «летит масштаб». */
+.admin-page-layout.design-editor-fullbleed,
 .admin-page-layout:has(.design-editor),
 .admin-page:has(.design-editor) {
   height: 100vh;
@@ -7,6 +11,7 @@
   display: flex;
   flex-direction: column;
 }
+.admin-page-layout.design-editor-fullbleed .admin-page-content,
 .admin-page-layout:has(.design-editor) .admin-page-content,
 .admin-page:has(.design-editor) .admin-page-content {
   flex: 1;

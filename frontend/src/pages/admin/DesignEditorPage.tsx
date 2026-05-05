@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
@@ -175,7 +175,7 @@ export const DesignEditorPage: React.FC = () => {
   const isSpreadView = spreadMode && (currentStripItem?.pages.length ?? 1) === 2;
 
   // ── Пересчитываем fitZoom при изменении контейнера / формата / режима ────────
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = viewportRef.current ?? scrollAreaRef.current;
     if (!el || !pageW || !pageH) return;
     setFitReady(false);
@@ -186,24 +186,37 @@ export const DesignEditorPage: React.FC = () => {
     const contentH = pageH + wrapperPadY + visibleBleedPx * 2;
     const canvasPadX = isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx;
     const canvasPadY = isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx;
+    const cw = Math.max(contentW, 1);
+    const ch = Math.max(contentH, 1);
+    let rafId = 0;
+    let alive = true;
     const compute = () => {
-      const aw = el.clientWidth;
-      const ah = el.clientHeight;
-      if (aw < 100 || ah < 100) return;
-      const zW = aw / contentW;
-      const zH = ah / contentH;
-      const z = Math.max(0.1, Math.min(zW, zH, 3));
-      setFitZoom(z);
-      setRulerOrigin({
-        x: (aw - contentW * z) / 2 + canvasPadX * z,
-        y: (ah - contentH * z) / 2 + canvasPadY * z,
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (!alive) return;
+        const aw = Math.round(el.clientWidth);
+        const ah = Math.round(el.clientHeight);
+        if (aw < 100 || ah < 100) return;
+        const zW = aw / cw;
+        const zH = ah / ch;
+        const zRaw = Math.max(0.1, Math.min(zW, zH, 3));
+        const z = Math.round(zRaw * 1000) / 1000;
+        setFitZoom(z);
+        setRulerOrigin({
+          x: (aw - cw * z) / 2 + canvasPadX * z,
+          y: (ah - ch * z) / 2 + canvasPadY * z,
+        });
+        setFitReady(true);
       });
-      setFitReady(true);
     };
     const ro = new ResizeObserver(compute);
     ro.observe(el);
     compute();
-    return () => ro.disconnect();
+    return () => {
+      alive = false;
+      cancelAnimationFrame(rafId);
+      ro.disconnect();
+    };
   }, [bleedPx, isSpreadView, pageH, pageW, prepressConfig.showBleed]);
 
   useEffect(() => {
@@ -847,6 +860,7 @@ export const DesignEditorPage: React.FC = () => {
         title="Редактор макета"
         icon={<AppIcon name="image" size="sm" />}
         onBack={() => navigate(-1)}
+        className="design-editor-fullbleed"
       >
         <div className="design-editor-loading">Загрузка шаблона...</div>
       </AdminPageLayout>
@@ -859,6 +873,7 @@ export const DesignEditorPage: React.FC = () => {
         title="Редактор макета"
         icon={<AppIcon name="image" size="sm" />}
         onBack={() => navigate(-1)}
+        className="design-editor-fullbleed"
       >
         {error && <Alert type="error">{error}</Alert>}
         <Button variant="secondary" onClick={() => navigate(catalogPath)}>
@@ -873,6 +888,7 @@ export const DesignEditorPage: React.FC = () => {
       title={`Редактор: ${template.name}`}
       icon={<AppIcon name="image" size="sm" />}
       onBack={() => navigate(-1)}
+      className="design-editor-fullbleed"
     >
       <div className="design-editor">
         <DesignEditorSidebar
