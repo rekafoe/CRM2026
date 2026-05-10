@@ -5,6 +5,7 @@ import { hasColumn, invalidateTableSchemaCache } from '../utils/tableSchemaCache
 import { ServiceManagementService } from '../modules/pricing/services/serviceManagementService'
 import { PriceTypeService } from '../modules/pricing/services/priceTypeService'
 import { PricingServiceRepository } from '../modules/pricing/repositories/serviceRepository'
+import { PlotterCuttingTariffRepository } from '../modules/pricing/repositories/plotterCuttingTariffRepository'
 
 console.log('Loading pricing routes...')
 
@@ -613,6 +614,22 @@ router.get('/service-prices', asyncHandler(async (req, res) => {
 router.get('/services', asyncHandler(async (_req, res) => {
   const services = await ServiceManagementService.listServices()
   res.json(services.map(toServiceResponse))
+}))
+
+router.get('/plotter-cutting-tariffs', asyncHandler(async (_req, res) => {
+  const bundle = await PlotterCuttingTariffRepository.getBundle()
+  res.json(bundle)
+}))
+
+router.put('/plotter-cutting-tariffs', asyncHandler(async (req, res) => {
+  const body = req.body as { roll?: Record<string, unknown>; sheet?: Record<string, unknown> }
+  const cur = await PlotterCuttingTariffRepository.getBundle()
+  const merged = {
+    roll: { ...cur.roll, ...(body.roll ?? {}), mode: 'roll' as const },
+    sheet: { ...cur.sheet, ...(body.sheet ?? {}), mode: 'sheet' as const },
+  }
+  const next = await PlotterCuttingTariffRepository.replaceBundle(merged)
+  res.json(next)
 }))
 
 router.get('/bindings', asyncHandler(async (_req, res) => {

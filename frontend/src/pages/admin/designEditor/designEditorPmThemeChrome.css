@@ -1,0 +1,131 @@
+/**
+ * Редактор: нижняя полоса страниц, fmt-кнопки, холст — стиль ProductManagement.
+ * Переменные --de-* задаются в designEditorGlassTheme.css
+ */
+.design-editor .ps-root {
+  background: #fff;
+  border-top: 1px solid var(--de-pm-border);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.design-editor .ps-header {
+  border-bottom-color: #f1f5f9;
+}
+
+.design-editor .ps-header-title {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.design-editor .ps-header-icon,
+.design-editor .ps-collapse-btn {
+  color: #64748b;
+}
+
+.design-editor .ps-header-count {
+  color: #64748b;
+  background: #f8fafc;
+  border-color: var(--de-pm-border);
+}
+
+.design-editor .ps-header-info {
+  color: #94a3b8;
+}
+
+.design-editor .ps-collapse-btn:hover {
+  color: #334155;
+}
+
+.design-editor .ps-mode-toggle {
+  background: var(--de-lg-bg);
+  border-color: var(--de-lg-border);
+  box-shadow: var(--de-lg-inset), var(--de-lg-shadow);
+}
+
+.design-editor .ps-mode-btn {
+  color: #64748b;
+}
+
+.design-editor .ps-mode-btn.is-active {
+  background: rgba(59, 130, 246, 0.9);
+  color: #fff;
+}
+
+.design-editor .ps-mode-btn:hover:not(.is-active) {
+  color: #334155;
+}
+
+.design-editor .ps-strip {
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+
+.design-editor .ps-strip::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.design-editor .psitem-label {
+  color: #64748b;
+}
+
+.design-editor .psitem.is-active .psitem-label {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.design-editor .psitem-thumbs {
+  box-shadow: 0 0 0 1px var(--de-pm-border), var(--de-pm-card-shadow);
+}
+
+.design-editor .psitem:hover {
+  background: #f8fafc;
+  border-color: #cbd5e0;
+}
+
+.design-editor .psitem.is-active {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.design-editor .ps-add-btn {
+  border-color: var(--de-pm-border);
+  background: #f8fafc;
+  color: #475569;
+}
+
+.design-editor .ps-add-btn:hover {
+  border-color: #94a3b8;
+  color: #1d4ed8;
+}
+
+.design-editor-fmt-btn {
+  border-radius: 999px;
+  border: 1px solid var(--de-lg-border);
+  background: var(--de-lg-bg);
+  color: #1f2937;
+  box-shadow: var(--de-lg-inset), var(--de-lg-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.design-editor-fmt-btn:hover {
+  background: rgba(229, 231, 235, 0.95);
+}
+
+.design-editor-fmt-btn.is-active {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #1d4ed8;
+}
+
+.design-editor-canvas-wrap,
+.design-editor-spread-wrap {
+  background: #fff;
+  border: 1px solid var(--de-pm-border);
+  border-radius: 16px;
+  box-shadow: var(--de-pm-card-shadow);
+}
+
+.fabric-canvas-outer {
+  background: #f1f5f9;
+  border-radius: 0 0 12px 12px;
+}

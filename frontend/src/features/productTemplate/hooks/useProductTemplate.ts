@@ -158,6 +158,13 @@ export type SimplifiedTypeConfig = {
   sizes: SimplifiedSizeConfig[];
   /** Общие материалы типа: используются всеми размерами, у которых use_own_materials !== true */
   common_allowed_material_ids?: number[];
+  /** Плоттерная резка — один блок подтипа */
+  plotter?: {
+    enabled?: boolean;
+    mode?: 'sheet' | 'roll';
+    roll_allowed_material_ids?: number[];
+    mounting_film_material_id?: number;
+  };
   pages?: SimplifiedPagesConfig;
   initial?: SubtypeInitialDefaults;
   /**
@@ -202,6 +209,8 @@ export type SimplifiedConfig = {
    * Если false и у материала нет sheet_width/height — ошибка вместо подбора SRA3/A3/A4.
    */
   allow_optimal_sheet_fallback?: boolean;
+  /** Печать необязательна — только материал / плоттер без технологии печати */
+  print_optional?: boolean;
 }
 
 function toTypeConfigKey(id: ProductTypeId): string {

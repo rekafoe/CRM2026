@@ -9,6 +9,7 @@ import { DynamicFieldsSection } from './DynamicFieldsSection';
 import { AdvancedSettingsSection } from './AdvancedSettingsSection';
 import { OperationsSection } from './OperationsSection';
 import { SelectedProductCard } from './SelectedProductCard';
+import { getHiddenPlotterRollFinFieldNamesForCalculator } from '../utils/simplifiedConfig';
 
 interface CalculatorSectionsProps {
   specs: ProductSpecs;
@@ -94,6 +95,11 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
 }) => {
   const hasEffectiveSizes = Array.isArray(effectiveSizes) && effectiveSizes.length > 0;
   const showTypeSelector = Array.isArray(productTypes) && productTypes.length > 0 && onSelectType != null;
+  const typeIdForPlotterFields = showTypeSelector ? selectedTypeId ?? specs.typeId ?? null : specs.typeId ?? null;
+  const plotterRollFinHiddenFields = getHiddenPlotterRollFinFieldNamesForCalculator(
+    backendProductSchema?.template?.simplified,
+    typeIdForPlotterFields ?? null
+  );
 
   return (
     <div className="calculator-section-group calculator-section-unified">
@@ -222,6 +228,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           schema={backendProductSchema}
           specs={specs as any}
           updateSpecs={updateSpecs as any}
+          hiddenFieldNames={plotterRollFinHiddenFields}
         />
 
         <OperationsSection

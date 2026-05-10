@@ -105,6 +105,17 @@ export function normalizeSimplifiedTypeIds(simplified: any): any {
   };
 }
 
+/** Хотя бы один подтип с включённым рулонным плоттером — для полей калькулятора выборка/накатка. */
+export function simplifiedHasRollPlotterSubtype(simplified: any): boolean {
+  const tc = simplified?.typeConfigs;
+  if (!tc || typeof tc !== 'object') return false;
+  for (const cfg of Object.values(tc) as Array<{ plotter?: { enabled?: boolean; mode?: string } }>) {
+    const p = cfg?.plotter;
+    if (p?.enabled === true && p?.mode === 'roll') return true;
+  }
+  return false;
+}
+
 export function normalizeConfigDataForPersistence(configData: any): any {
   if (typeof configData === 'string') {
     try {

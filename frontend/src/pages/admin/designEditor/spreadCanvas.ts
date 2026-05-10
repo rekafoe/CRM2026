@@ -1,8 +1,6 @@
 import type { Canvas } from 'fabric';
 import type { FabricObject } from 'fabric';
-
-/** Должны совпадать с DesignEditorCanvas CUSTOM_PROPS */
-const CUSTOM_PROPS = ['id', 'isBackground', 'isPhotoField', 'locked'];
+import { FABRIC_CUSTOM_PROPS as CUSTOM_PROPS } from './constants';
 
 function deepCloneJson<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj)) as T;

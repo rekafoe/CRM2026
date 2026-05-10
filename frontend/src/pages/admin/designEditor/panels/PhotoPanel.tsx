@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AppIcon } from '../../../../components/ui/AppIcon';
 import { Button } from '../../../../components/common';
 import type { SidebarPhotoItem } from '../types';
+import { SIDEBAR_PHOTO_DRAG_MIME } from '../constants';
 
 interface PhotoPanelProps {
   onAddImage: () => void;
@@ -106,8 +107,9 @@ export const PhotoPanel: React.FC<PhotoPanelProps> = ({
                 <AppIcon name="camera" size="xs" /> Поле для фото
               </Button>
               <p className="photo-panel__hint">
-                Рамка на макете: перетащите сюда фото или дважды кликните по рамке. Изображение вписывается без
-                искажения.
+                Поле на макете: перетащите фото или дважды кликните по пустой рамке. По умолчанию снимок целиком
+                вписывается в ячейку без искажений (могут быть поля по краям при другом формате кадра); двойной
+                клик по заполненному полю — сместить кадр.
               </p>
             </>
           )}
@@ -198,15 +200,32 @@ export const PhotoPanel: React.FC<PhotoPanelProps> = ({
         {libraryPhotos.length > 0 && (
           <section className="photo-panel__section photo-panel__section--gallery" aria-label="Неразмещённые фото">
             <h4 className="photo-panel__gallery-title">Загружены в проект</h4>
-            <p className="photo-panel__gallery-hint">Ещё не на макете — кликните, чтобы добавить на страницу.</p>
+            <p className="photo-panel__gallery-hint">
+              Перетащите на поле для фото на макете или кликните, чтобы вставить в центр страницы.
+            </p>
             <ul className="photo-panel__gallery">
               {sortedLibrary.map((p) => (
                 <li key={p.id} className="photo-panel__gallery-item">
                   <button
                     type="button"
                     className="photo-panel__gallery-thumb"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(SIDEBAR_PHOTO_DRAG_MIME, JSON.stringify({ id: p.id }));
+                      e.dataTransfer.effectAllowed = 'copy';
+                      const el = e.currentTarget.querySelector('img');
+                      if (el instanceof HTMLImageElement) {
+                        try {
+                          const ox = Math.min(36, Math.max(16, Math.round(el.offsetWidth / 2)));
+                          const oy = Math.min(36, Math.max(16, Math.round(el.offsetHeight / 2)));
+                          e.dataTransfer.setDragImage(el, ox, oy);
+                        } catch {
+                          /* некоторые браузеры ограничивают setDragImage */
+                        }
+                      }
+                    }}
                     onClick={() => void onLibraryPhotoClick?.(p.id)}
-                    title={p.name}
+                    title={`${p.name} — перетащите в поле фото или кликните`}
                     aria-label={`Поставить на макет: ${p.name}`}
                   >
                     <img src={p.previewUrl} alt="" className="photo-panel__gallery-img" draggable={false} />

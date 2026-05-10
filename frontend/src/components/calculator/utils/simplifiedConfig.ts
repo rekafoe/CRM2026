@@ -107,6 +107,35 @@ function orderedKeys(keys: string[], orderRef: string[]): string[] {
   return orderRef.filter((k) => set.has(k));
 }
 
+/** Поля выборки/накатки считаются только для рулонного плоттера; скрываем в калькуляторе на листовом подтипе. */
+const PLOTTER_ROLL_FIN_CALC_FIELD_NAMES = ['plotter_weeding', 'plotter_mounting'] as const;
+
+/** Набор имён полей для фильтрации в «Доп. параметры» или undefined = не фильтровать. */
+export function getHiddenPlotterRollFinFieldNamesForCalculator(
+  simplified:
+    | {
+        types?: unknown[];
+        typeConfigs?: Record<string, { plotter?: { enabled?: boolean; mode?: string } }>;
+      }
+    | null
+    | undefined,
+  selectedTypeId: number | null | undefined
+): Set<string> | undefined {
+  const types = simplified?.types;
+  const tcs = simplified?.typeConfigs;
+  if (!Array.isArray(types) || types.length === 0 || !tcs || typeof tcs !== 'object') {
+    return undefined;
+  }
+  if (selectedTypeId == null || !Number.isFinite(Number(selectedTypeId))) {
+    return undefined;
+  }
+  const cfg = tcs[String(selectedTypeId)];
+  if (!cfg) return undefined;
+  const p = cfg.plotter;
+  if (p?.enabled === true && p?.mode === 'roll') return undefined;
+  return new Set(PLOTTER_ROLL_FIN_CALC_FIELD_NAMES);
+}
+
 export function getEffectiveSimplifiedConfig(
   simplified: {
     sizes?: EffectiveSimplifiedConfig['sizes'];

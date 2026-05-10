@@ -1,4 +1,5 @@
 import { bynSymbolHtmlForPrint } from '../utils/byCurrencyBYN';
+import { formatReceiptPaperCaptionFromItemParams } from './commodityReceiptLabels';
 import { MaterialService } from './materialService';
 import { getDb } from '../config/database';
 import { buildOrderNumberFromSourceAndId } from '../utils/orderNumberGenerator';
@@ -480,89 +481,108 @@ export class PDFReportService {
             params = {};
           }
           
-          // Формируем строку параметров в том же формате, что и в OrderItemSummary
+          // Формируем строку параметров; печать/материал — как в товарном чеке (commodityReceiptLabels)
           const paramParts: string[] = [];
-          
-          // Стороны
-          const sides = Number(item.sides) || 0;
-          if (sides > 0) {
-            paramParts.push(`${sides} стор.`);
+          const specs = params.specifications || {};
+          const paperCaption = formatReceiptPaperCaptionFromItemParams(params);
+
+          if (!paperCaption) {
+            const sd = specs.sides;
+            const sidesFromSpec =
+              typeof sd === 'number' && Number.isFinite(sd) ? sd : Number(sd);
+            if (sidesFromSpec === 1 || sidesFromSpec === 2) {
+              paramParts.push(`${sidesFromSpec} стор.`);
+            } else {
+              const sidesItem = Number((item as any).sides) || 0;
+              if (sidesItem > 0) paramParts.push(`${sidesItem} стор.`);
+            }
           }
-          
-          // Брак
-          const waste = Number(item.waste) || 0;
+
+          const waste = Number((item as any).waste) || 0;
           if (waste > 0) {
             paramParts.push(`брак: ${waste} шт.`);
           }
-          
-          // Листов
-          const sheetCount = Number(item.sheets) || Number(params.sheetsNeeded) || Number(params.layout?.sheetsNeeded) || null;
+
+          const sheetCount =
+            Number((item as any).sheets) ||
+            Number(params.sheetsNeeded) ||
+            Number(params.layout?.sheetsNeeded) ||
+            null;
           if (sheetCount != null && sheetCount > 0) {
             paramParts.push(`Листов: ${sheetCount}`);
           }
-          
-          // На листе
-          const itemsPerSheet = Number(params.layout?.itemsPerSheet) || Number(params.piecesPerSheet) || null;
+
+          const itemsPerSheet =
+            Number(params.layout?.itemsPerSheet) || Number(params.piecesPerSheet) || null;
           if (itemsPerSheet != null && itemsPerSheet > 0) {
             paramParts.push(`На листе: ${itemsPerSheet}`);
           }
-          
-          // Формат листа
+
           const sheetSize = params.layout?.sheetSize || null;
           if (sheetSize) {
             paramParts.push(`Формат листа: ${sheetSize}`);
           }
-          
-          // Формат печати
-          const specs = params.specifications || {};
+
           const materialFormat = specs.format || params.formatInfo || sheetSize || null;
           if (materialFormat) {
             paramParts.push(`Формат печати: ${materialFormat}`);
           }
-          
-          // Тип материала
-          const materialTypeRaw = specs.paperType || specs.materialType || null;
-          const materialTypeFromSummary = params.parameterSummary && Array.isArray(params.parameterSummary)
-            ? params.parameterSummary.find((p: any) => 
-                (p.label || p.key || '').toLowerCase() === 'материал' || 
-                (p.label || p.key || '').toLowerCase() === 'тип материала'
-              )?.value
-            : null;
-          const materialType = materialTypeFromSummary || materialTypeRaw;
-          if (materialType) {
-            paramParts.push(`Тип: ${materialType}`);
+
+          if (!paperCaption) {
+            const materialTypeRaw = specs.paperType || specs.materialType || null;
+            const materialTypeFromSummary =
+              params.parameterSummary && Array.isArray(params.parameterSummary)
+                ? params.parameterSummary.find(
+                    (p: any) =>
+                      (p.label || p.key || '').toLowerCase() === 'материал' ||
+                      (p.label || p.key || '').toLowerCase() === 'тип материала'
+                  )?.value
+                : null;
+            const materialType = materialTypeFromSummary || materialTypeRaw;
+            if (materialType) {
+              paramParts.push(`Тип: ${materialType}`);
+            }
+
+            const materialDensity = specs.paperDensity || params.paperDensity || null;
+            if (materialDensity) {
+              paramParts.push(`Плотность: ${materialDensity} г/м²`);
+            }
+
+            if (params.paperName) {
+              paramParts.push(`Материал: ${params.paperName}`);
+            }
+          } else {
+            paramParts.push(paperCaption);
           }
-          
-          // Плотность
-          const materialDensity = specs.paperDensity || params.paperDensity || null;
-          if (materialDensity) {
-            paramParts.push(`Плотность: ${materialDensity} г/м²`);
-          }
-          
-          // Материал (paperName)
-          if (params.paperName) {
-            paramParts.push(`Материал: ${params.paperName}`);
-          }
-          
-          // Ламинация
+
           if (params.lamination && params.lamination !== 'none') {
-            const laminationText = params.lamination === 'matte' ? 'мат' : 
-                                  params.lamination === 'glossy' ? 'гл' : 
-                                  params.lamination;
+            const laminationText =
+              params.lamination === 'matte'
+                ? 'мат'
+                : params.lamination === 'glossy'
+                  ? 'гл'
+                  : params.lamination;
             paramParts.push(`Ламинация: ${laminationText}`);
           }
-          
-          // Дополнительные параметры из parameterSummary (исключая уже показанные)
+
           if (params.parameterSummary && Array.isArray(params.parameterSummary)) {
             const excludedLabels = [
-              'материал', 'тип материала', 'плотность бумаги', 'плотность',
-              'тип продукта', 'тираж', 'стороны печати', 'срок изготовления',
-              'формат', 'размер', 'ламинация'
+              'материал',
+              'тип материала',
+              'плотность бумаги',
+              'плотность',
+              'тип продукта',
+              'тираж',
+              'стороны печати',
+              'срок изготовления',
+              'формат',
+              'размер',
+              'ламинация',
             ];
-            
+
             params.parameterSummary.forEach((p: any) => {
               const label = (p.label || p.key || '').toLowerCase();
-              if (!excludedLabels.some(excluded => label.includes(excluded))) {
+              if (!excludedLabels.some((excluded) => label.includes(excluded))) {
                 paramParts.push(`${p.label || p.key || ''}: ${p.value || ''}`);
               }
             });
@@ -1323,42 +1343,14 @@ export class PDFReportService {
   }
 
   /**
-   * Фраза о расходуемой бумаге: "Печать на (тип) бумаге (плотность) (односторонняя/двухсторонняя)".
-   * Тип берём из выбранного материала (materialType/paperType из specs), не первый попавшийся из summary.
+   * Фраза о расходуемой бумаге для чека: как в карточке заказа —
+   * «Печать односторонняя — Мелованная полуматовая, 200 г/м²» (номинатив из каталога / сводки).
    */
   private static getOrderItemPaperPhrase(it: any): string {
     try {
-      const params = typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
-      const specs = params.specifications || {};
-      const ps: Array<{ label?: string; key?: string; value?: string }> = Array.isArray(params.parameterSummary) ? params.parameterSummary : [];
-      // Приоритет: тип из спецификации (привязан к выбранному материалу), потом из summary по метке «Материал»/«Тип материала»
-      let paperType = (specs.materialType ? String(specs.materialType).trim() : '') || (specs.paperType ? String(specs.paperType).trim() : '');
-      let density = specs.paperDensity != null ? String(specs.paperDensity).replace(/\s*г\/м².*/i, '').trim() : '';
-      if (!paperType && ps.length) {
-        const ptEntry = ps.find((x: any) => {
-          const label = String(x.label || x.key || '').toLowerCase();
-          if (/тип\s*печати|print_technology|printtechnology/.test(label)) return false;
-          return /тип\s*бумаги|papertype|бумага|тип\s*материала|^материал$/i.test(label);
-        });
-        if (ptEntry?.value) paperType = String(ptEntry.value).trim();
-      }
-      if (!density && ps.length) {
-        const denEntry = ps.find((x: any) => /плотность|density|г\/м/i.test(String(x.label || x.key || '')));
-        if (denEntry?.value) density = String(denEntry.value).replace(/\s*г\/м².*/i, '').trim();
-      }
-      const sides = specs.sides ?? (typeof specs.sides === 'number' ? specs.sides : undefined);
-      let sidesStr = '';
-      if (sides === 1) sidesStr = 'односторонняя';
-      else if (sides === 2) sidesStr = 'двухсторонняя';
-      if (!sidesStr && ps.length) {
-        const sidesEntry = ps.find((x: any) => /сторон|печать|sides/i.test(String(x.label || x.key || '')));
-        if (sidesEntry?.value) sidesStr = /двух|2/i.test(String(sidesEntry.value)) ? 'двухсторонняя' : 'односторонняя';
-      }
-      if (!paperType && !density && !sidesStr) return '';
-      const typePart = paperType ? ` на ${paperType.toLowerCase()} бумаге` : (density && /\d/.test(density) ? ' на бумаге' : '');
-      const densityPart = density && /\d/.test(density) ? ` ${density}${/г\s*$/i.test(density) ? '' : ' г'}/м²` : '';
-      const sidesPart = sidesStr ? ` ${sidesStr}` : '';
-      return `Печать${typePart}${densityPart}${sidesPart}`.trim();
+      const params =
+        typeof it.params === 'string' ? JSON.parse(it.params || '{}') : (it.params || {});
+      return formatReceiptPaperCaptionFromItemParams(params);
     } catch (_) {
       return '';
     }
@@ -1392,7 +1384,7 @@ export class PDFReportService {
           if (!Number.isFinite(q) || q <= 0) continue;
           const totalCost = typeof s.totalCost === 'number' ? s.totalCost : (typeof s.total === 'number' ? s.total : undefined);
           const isPrintOp = String(s.operationType || s.operation_type || '').toLowerCase() === 'print' || /^печать$/i.test(name);
-          // Печать из operations объединяем с первой строкой «Печать на … бумаге» (не дублируем строку)
+          // Печать из operations объединяем с первой строкой «Печать … — материал» (не дублируем строку)
           if (isPrintOp && rows.length > 0 && typeof totalCost === 'number' && totalCost >= 0) {
             if (/печать|листы/i.test(rows[0].name)) {
               rows[0].totalCost = totalCost;

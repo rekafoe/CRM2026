@@ -1,0 +1,236 @@
+/**
+ * Редактор: кнопки/селекты в стиле ProductManagement. См. designEditorPmButtonsMore.css
+ */
+.design-editor-panel .font-library__select,
+.design-editor-panel .photo-panel__select {
+  padding: 8px 32px 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border: 1px solid rgba(209, 213, 219, 0.6);
+  background: rgba(229, 231, 235, 0.88);
+  color: #1f2937;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  appearance: none;
+}
+
+.design-editor-panel .photo-panel__select {
+  flex: 1;
+  padding: 10px 32px 10px 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23475569' stroke-width='2'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.design-editor-panel .font-library__select:focus,
+.design-editor-panel .photo-panel__select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 0 0 3px rgba(71, 85, 105, 0.12);
+}
+
+.design-editor .btn,
+.design-editor-toolbar .btn,
+.design-editor-panel .btn {
+  gap: 6px !important;
+  letter-spacing: 0.02em !important;
+  border-radius: 999px !important;
+  padding: 8px 14px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border: 1px solid rgba(209, 213, 219, 0.6) !important;
+  background: rgba(229, 231, 235, 0.88) !important;
+  color: #1f2937 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.design-editor .btn:hover:not(:disabled),
+.design-editor-toolbar .btn:hover:not(:disabled),
+.design-editor-panel .btn:hover:not(:disabled) {
+  background: rgba(229, 231, 235, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+.design-editor .btn.btn-secondary,
+.design-editor-toolbar .btn.btn-secondary,
+.design-editor-panel .btn.btn-secondary {
+  background: rgba(229, 231, 235, 0.88) !important;
+  border-color: rgba(209, 213, 219, 0.6) !important;
+  color: #1f2937 !important;
+}
+
+.design-editor .btn.btn-primary:not(.photo-panel__btn-primary),
+.design-editor-toolbar .btn.btn-primary:not(.photo-panel__btn-primary),
+.design-editor-panel .btn.btn-primary:not(.photo-panel__btn-primary) {
+  background: rgba(59, 130, 246, 0.25) !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  color: #1d4ed8 !important;
+}
+
+.design-editor .btn.btn-primary:not(.photo-panel__btn-primary):hover:not(:disabled),
+.design-editor-toolbar .btn.btn-primary:not(.photo-panel__btn-primary):hover:not(:disabled),
+.design-editor-panel .btn.btn-primary:not(.photo-panel__btn-primary):hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.35) !important;
+  border-color: rgba(59, 130, 246, 0.5) !important;
+}
+
+.design-editor .btn.photo-panel__btn-primary,
+.design-editor-panel .btn.photo-panel__btn-primary {
+  background: rgba(239, 68, 68, 0.2) !important;
+  border-color: rgba(239, 68, 68, 0.42) !important;
+  color: #b91c1c !important;
+}
+
+.design-editor .btn.photo-panel__btn-primary:hover:not(:disabled),
+.design-editor-panel .btn.photo-panel__btn-primary:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.32) !important;
+  border-color: rgba(239, 68, 68, 0.55) !important;
+}
+
+.design-editor .btn.photo-panel__btn-outline,
+.design-editor-panel .btn.photo-panel__btn-outline {
+  background: rgba(229, 231, 235, 0.88) !important;
+  border-color: rgba(209, 213, 219, 0.6) !important;
+  color: #1f2937 !important;
+}
+
+.design-editor .btn.photo-panel__btn-outline:hover:not(:disabled),
+.design-editor-panel .btn.photo-panel__btn-outline:hover:not(:disabled) {
+  background: rgba(229, 231, 235, 0.95) !important;
+}
+
+.design-editor .btn.btn-success,
+.design-editor-panel .btn.btn-success {
+  background: rgba(34, 197, 94, 0.22) !important;
+  border-color: rgba(34, 197, 94, 0.42) !important;
+  color: #15803d !important;
+}
+
+.design-editor .btn.btn-error,
+.design-editor-panel .btn.btn-error {
+  background: rgba(239, 68, 68, 0.2) !important;
+  border-color: rgba(239, 68, 68, 0.42) !important;
+  color: #b91c1c !important;
+}
+
+.design-editor .design-editor-panel-close,
+.design-editor .photo-panel__close {
+  border-radius: 999px !important;
+  border: 1px solid rgba(209, 213, 219, 0.55) !important;
+  background: rgba(229, 231, 235, 0.65) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+}
+
+.design-editor .design-editor-panel-close:hover,
+.design-editor .photo-panel__close:hover {
+  background: rgba(229, 231, 235, 0.92) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.design-editor .design-editor-bg-tab {
+  flex: 1;
+  padding: 8px 4px !important;
+  margin: 0 !important;
+  border-radius: 999px !important;
+  border: 1px solid transparent !important;
+  background: #f8fafc !important;
+  color: #475569 !important;
+}
+
+.design-editor .design-editor-bg-tab:hover {
+  border-color: #e2e8f0 !important;
+  background: #f1f5f9 !important;
+}
+
+.design-editor .design-editor-bg-tab.is-active {
+  background: rgba(59, 130, 246, 0.12) !important;
+  border-color: rgba(59, 130, 246, 0.35) !important;
+  color: #1d4ed8 !important;
+}
+
+.design-editor .design-editor-transparent-btn,
+.design-editor .design-editor-custom-bg-btn {
+  border-radius: 999px !important;
+  border: 1px dashed rgba(209, 213, 219, 0.85) !important;
+  background: rgba(229, 231, 235, 0.45) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+  color: #1f2937 !important;
+  font-weight: 500 !important;
+}
+
+.design-editor .design-editor-transparent-btn:hover,
+.design-editor .design-editor-custom-bg-btn:hover {
+  border-color: rgba(59, 130, 246, 0.45) !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+  color: #1d4ed8 !important;
+}
+
+.design-editor .design-editor-pattern-btn {
+  border-color: var(--de-pm-border, #e2e8f0) !important;
+  background: rgba(229, 231, 235, 0.35) !important;
+}
+
+.design-editor .design-editor-pattern-btn:hover {
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  background: rgba(241, 245, 249, 0.95) !important;
+}
+
+.design-editor .design-editor-panel-hint-btn {
+  border-radius: 999px !important;
+  border: 1px solid rgba(209, 213, 219, 0.6) !important;
+  background: rgba(229, 231, 235, 0.75) !important;
+  font-weight: 500 !important;
+  color: #334155 !important;
+}
+
+.design-editor .design-editor-panel-hint-btn:hover {
+  background: rgba(229, 231, 235, 0.95) !important;
+}
+
+.design-editor .design-editor-shape-btn {
+  border-radius: 12px !important;
+  border: 1px solid var(--de-pm-border, #e2e8f0) !important;
+  background: #f8fafc !important;
+}
+
+.design-editor .design-editor-shape-btn:hover {
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  background: rgba(239, 246, 255, 0.85) !important;
+}
+
+.design-editor .photo-panel__icon-btn,
+.design-editor .photo-panel__filter-btn {
+  border-radius: 999px !important;
+  border: 1px solid rgba(209, 213, 219, 0.6) !important;
+  background: rgba(229, 231, 235, 0.82) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+  color: #475569 !important;
+}
+
+.design-editor .photo-panel__icon-btn:hover,
+.design-editor .photo-panel__filter-btn:hover {
+  background: rgba(229, 231, 235, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  color: #1e293b !important;
+}
+
+.design-editor .photo-panel__gallery-remove {
+  border-radius: 999px !important;
+  border: 1px solid rgba(209, 213, 219, 0.6) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+}
+
+.design-editor .photo-panel__gallery-remove:hover {
+  background: rgba(254, 226, 226, 0.95) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}

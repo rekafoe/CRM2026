@@ -1,87 +1,77 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { Item } from '../../types';
+import { AppIcon } from '../ui/AppIcon';
 
 interface OrderItemActionsProps {
   editing: boolean;
-  printerId: number | '';
-  printers: Array<{ id: number; name: string }>;
-  savingPrinter: boolean;
   onEditParameters?: (orderId: number, item: Item) => void;
   orderId: number;
   item: Item;
   onSave: () => void;
   onCancel: () => void;
   onDelete: () => void;
-  onPrinterFocus: () => void;
-  onPrinterChange: (printerId: number | '') => void;
+  /** Компактная шапка: как кнопки шапки заказа — иконки карандаш / корзина */
+  variant?: 'default' | 'compact';
 }
 
-export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(({
-  editing,
-  printerId,
-  printers,
-  savingPrinter,
-  onEditParameters,
-  orderId,
-  item,
-  onSave,
-  onCancel,
-  onDelete,
-  onPrinterFocus,
-  onPrinterChange,
-}) => {
-  const handlePrinterChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    onPrinterChange(e.target.value ? Number(e.target.value) : '');
-  }, [onPrinterChange]);
+/** Кнопки позиции: сохранение при редактировании или Редактировать / Удалить (компактно — как на странице заказа). */
+export const OrderItemActions: React.FC<OrderItemActionsProps> = React.memo(
+  ({ editing, onEditParameters, orderId, item, onSave, onCancel, onDelete, variant = 'default' }) => {
+    const compact = variant === 'compact';
 
-  if (editing) {
+    if (editing) {
+      return (
+        <div className={`order-item-actions${compact ? ' order-item-actions--compact' : ''}`}>
+          <button type="button" className="order-item-btn order-item-btn--primary" onClick={onSave}>
+            Сохранить
+          </button>
+          <button type="button" className="order-item-btn order-item-btn--neutral" onClick={onCancel}>
+            Отмена
+          </button>
+        </div>
+      );
+    }
+
     return (
-      <>
-        <button className="order-item-btn order-item-btn--primary" onClick={onSave}>
-          Сохранить
-        </button>
-        <button className="order-item-btn order-item-btn--neutral" onClick={onCancel}>
-          Отмена
-        </button>
-      </>
+      <div className={`order-item-actions${compact ? ' order-item-actions--compact' : ''}`}>
+        {onEditParameters &&
+          (compact ? (
+            <button
+              type="button"
+              className="order-item-toolbar-btn order-item-toolbar-btn--primary"
+              onClick={() => onEditParameters(orderId, item)}
+              title="Редактировать параметры позиции"
+              aria-label="Редактировать параметры позиции"
+            >
+              <AppIcon name="pencil" size="sm" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="order-item-btn order-item-btn--primary"
+              onClick={() => onEditParameters(orderId, item)}
+            >
+              Редактировать
+            </button>
+          ))}
+        {compact ? (
+          <button
+            type="button"
+            className="order-item-toolbar-btn order-item-toolbar-btn--danger"
+            onClick={onDelete}
+            title="Удалить позицию"
+            aria-label="Удалить позицию"
+          >
+            <AppIcon name="trash" size="sm" />
+          </button>
+        ) : (
+          <button type="button" className="order-item-btn order-item-btn--danger" onClick={onDelete}>
+            Удалить
+          </button>
+        )}
+      </div>
     );
   }
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-      {/* Выбор принтера — отдельный блок для надёжного клика */}
-      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>Принтер:</span>
-        <select
-          value={printerId === '' ? '' : String(printerId)}
-          onFocus={onPrinterFocus}
-          onMouseDown={onPrinterFocus}
-          onChange={handlePrinterChange}
-          disabled={savingPrinter}
-          style={{ minWidth: 140, maxWidth: 220, padding: '4px 8px' }}
-        >
-          <option value="">Не выбран</option>
-          {printerId !== '' && !printers.some((p) => p.id === printerId) && (
-            <option value={String(printerId)}>{`Принтер #${printerId}`}</option>
-          )}
-          {printers.map((p) => (
-            <option key={p.id} value={String(p.id)}>{p.name}</option>
-          ))}
-        </select>
-        {savingPrinter && <span style={{ fontSize: 11, color: '#888' }}>Сохраняем…</span>}
-      </label>
-
-      {onEditParameters && (
-        <button className="order-item-btn order-item-btn--primary" onClick={() => onEditParameters(orderId, item)}>
-          Редактировать
-        </button>
-      )}
-      <button className="order-item-btn order-item-btn--danger" onClick={onDelete}>
-        Удалить
-      </button>
-    </div>
-  );
-});
+);
 
 OrderItemActions.displayName = 'OrderItemActions';
-

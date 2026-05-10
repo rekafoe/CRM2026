@@ -1,3 +1,4 @@
+import './fabricDesignSerialization';
 import React, {
   useRef,
   useEffect,
@@ -17,25 +18,49 @@ import {
   Point,
   Group,
   Shadow,
-  classRegistry,
-  FitContentLayout,
 } from 'fabric';
 import type { FabricObject } from 'fabric';
 import type { CollageLayout, DesignTemplate } from '../../../api';
 import type { DesignPage, SelectedObjProps } from './types';
-import { TEXT_BLOCK_PRESETS, TEXT_FONTS } from './constants';
+import {
+  TEXT_BLOCK_PRESETS,
+  TEXT_FONTS,
+  SIDEBAR_PHOTO_DRAG_MIME,
+  FABRIC_CUSTOM_PROPS,
+} from './constants';
 import type { TextBlockPresetKind } from './constants';
 import { isLikelyImageFile, looksLikeHttpUrl } from '../../../utils/imageFile';
-import { computeSnap } from './CanvasRulers';
+import { computeSnap } from './snapGuide';
 import { splitSpreadCanvasToPagesSync } from './spreadCanvas';
 import { PrepressOverlay } from './PrepressOverlay';
+import {
+  applyPhotoFieldPanToGroup,
+  buildFilledPhotoFieldGroup,
+  getFabricImageIntrinsicSize,
+  getFilledPhotoCropContext,
+  resolvePhotoFieldFitMode,
+  resolvePhotoFieldFrameSize,
+  wrapLegacyFilledPhotoImage,
+} from './photoFieldFit';
+import {
+  pickEmptyPhotoFieldFrameRect,
+  syncFilledPhotoFieldSceneAnchor,
+} from './photoFieldGeometry';
+import { PhotoFieldCropModal } from './PhotoFieldCropModal';
+import { findPhotoFieldAtScene } from './photoFieldHitTest';
 
 // ─── Custom property names saved in Fabric JSON ───────────────────────────────
 
-const CUSTOM_PROPS = ['id', 'isBackground', 'isPhotoField', 'locked'];
+const CUSTOM_PROPS = FABRIC_CUSTOM_PROPS;
 
-// Старые сохранения могли ссылаться на strategy "photo-field-static" — маппим на FitContentLayout.
-classRegistry.setClass(FitContentLayout, 'photo-field-static');
+/** После enlarge гарантированно восстанавливаем доменные поля (fabric не всегда прокидывает их в экземпляр). */
+function fabricDeserializeReviver(serializedObj: Record<string, unknown>, instance: unknown): void {
+  const t = instance as Record<string, unknown>;
+  for (const k of CUSTOM_PROPS) {
+    if (!Object.prototype.hasOwnProperty.call(serializedObj, k)) continue;
+    t[k] = serializedObj[k];
+  }
+}
 
 // ─── Public handle exposed via forwardRef ────────────────────────────────────
 
@@ -86,6 +111,8 @@ export interface DesignEditorCanvasHandle {
   captureThumb: () => string;
   /** Пересчитать позицию плавающей панели текста (скролл, зум, смена выделения) */
   syncTextFloatingAnchor: () => void;
+  /** После CSS fit-zoom / скролла — синхронизировать hit-test и рамку выделения с экраном */
+  syncCanvasOffset: () => void;
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -122,6 +149,10 @@ interface DesignEditorCanvasProps {
   onPageThumbReady?: (pageIndex: number, thumbUrl: string) => void;
   /** Перетаскивание ссылки на изображение (браузер отдаёт URL, не File) */
   onDropRemoteImageUrl?: (url: string) => Promise<void>;
+  /** Файл из галереи сайдбара по id (drag&drop в поле фото / на холст) */
+  getSidebarPhotoFile?: (id: string) => File | undefined;
+  /** Убрать фото из галереи после успешного drop на холст */
+  onSidebarPhotoDropped?: (id: string) => void;
   /** Custom guide lines (positions in canvas px, safe-zone relative) */
   guideLinesPx?: { axis: 'h' | 'v'; pos: number }[];
   /** Callback: вернуть snap-линии для overlay рендера */
@@ -178,6 +209,20 @@ function releaseBasicModeConstraints(canvas: Canvas): void {
       obj.set({ selectable: false, evented: false });
       return;
     }
+    if (o.isPhotoField && o.photoFieldFilled === true && obj.type === 'group') {
+      obj.set({
+        selectable: true,
+        evented: true,
+        lockMovementX: false,
+        lockMovementY: false,
+        lockScalingX: true,
+        lockScalingY: true,
+        lockRotation: true,
+        hasControls: true,
+        hasBorders: true,
+      });
+      return;
+    }
     obj.set({
       selectable: true,
       evented: true,
@@ -195,6 +240,22 @@ function releaseBasicModeConstraints(canvas: Canvas): void {
 
 function asAny(obj: unknown): AnyObj {
   return obj as unknown as AnyObj;
+}
+
+/** Поле для фото может быть внутри группы; `canvas.getObjects().find` его не находит. */
+function findPhotoFieldByIdDeep(canvas: Canvas, fieldId: string): FabricObject | undefined {
+  if (!fieldId) return undefined;
+  const walk = (list: FabricObject[]): FabricObject | undefined => {
+    for (const o of list) {
+      if (asAny(o).isPhotoField && String(asAny(o).id ?? '') === fieldId) return o;
+      if (typeof (o as Group).getObjects === 'function') {
+        const nested = walk((o as Group).getObjects());
+        if (nested) return nested;
+      }
+    }
+    return undefined;
+  };
+  return walk(canvas.getObjects());
 }
 
 function resolvePreviewUrl(template: DesignTemplate | null, apiBaseUrl: string): string | null {
@@ -342,6 +403,9 @@ function createPhotoFieldGroup(opts: {
     subTargetCheck: true,
   });
   asAny(group).isPhotoField = true;
+  asAny(group).photoFieldFilled = false;
+  asAny(group).photoFieldFw = width;
+  asAny(group).photoFieldFh = height;
   asAny(group).id = id;
   return group;
 }
@@ -385,7 +449,7 @@ async function loadPageIntoCanvas(
   isLoadingRef.current = true;
   try {
     if (pageData?.fabricJSON && Object.keys(pageData.fabricJSON).length > 0) {
-      await canvas.loadFromJSON(pageData.fabricJSON);
+      await canvas.loadFromJSON(pageData.fabricJSON, fabricDeserializeReviver);
       canvas.getObjects().forEach((obj) => {
         if (asAny(obj).isBackground) {
           obj.set({ selectable: false, evented: false });
@@ -478,6 +542,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       onZoomChange,
       onPageThumbReady,
       onDropRemoteImageUrl,
+      getSidebarPhotoFile,
+      onSidebarPhotoDropped,
       guideLinesPx,
       onSnapLinesChange,
       onTextFloatingAnchor,
@@ -511,6 +577,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     modeRef.current = mode;
     const remoteUrlHandlerRef = useRef(onDropRemoteImageUrl);
     remoteUrlHandlerRef.current = onDropRemoteImageUrl;
+    const getSidebarPhotoFileRef = useRef(getSidebarPhotoFile);
+    getSidebarPhotoFileRef.current = getSidebarPhotoFile;
+    const onSidebarPhotoDroppedRef = useRef(onSidebarPhotoDropped);
+    onSidebarPhotoDroppedRef.current = onSidebarPhotoDropped;
     const pageThumbReadyRef = useRef(onPageThumbReady);
     pageThumbReadyRef.current = onPageThumbReady;
     const guidesRef = useRef(guideLinesPx);
@@ -522,9 +592,33 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const textAnchorRafRef = useRef(0);
     const scheduleTextAnchorRef = useRef<(() => void) | null>(null);
 
-    const [photoPickerFieldId, setPhotoPickerFieldId] = useState<string | null>(null);
+    const photoPickerTargetIdRef = useRef<string | null>(null);
     const photoFileInputRef = useRef<HTMLInputElement>(null);
+    /** Последняя точка над холстом — для Ctrl+V во фото-поле (иначе попадало в addImage). */
+    const photoPasteSceneRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const [localSnapLines, setLocalSnapLines] = useState<{ axis: 'h' | 'v'; pos: number }[]>([]);
+    const snapOverlayKeyRef = useRef('');
+
+    /** Модалка смещения кадра (cover) в заполненном поле для фото */
+    const [cropModal, setCropModal] = useState<{
+      fieldId: string;
+      previewUrl: string;
+      frameW: number;
+      frameH: number;
+      iw: number;
+      ih: number;
+      panX: number;
+      panY: number;
+      fitMode: 'cover' | 'contain';
+    } | null>(null);
+
+    const snapLinesSignature = useCallback((lines: { axis: 'h' | 'v'; pos: number }[]) => {
+      if (lines.length === 0) return '';
+      return [...lines]
+        .sort((a, b) => (a.axis === b.axis ? a.pos - b.pos : a.axis.localeCompare(b.axis)))
+        .map((l) => `${l.axis}:${l.pos.toFixed(2)}`)
+        .join(';');
+    }, []);
 
     // ── History ──────────────────────────────────────────────────────────────
 
@@ -549,7 +643,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       historyRef.current.index = newIndex;
       isLoadingRef.current = true;
       try {
-        await canvas.loadFromJSON(JSON.parse(stack[newIndex]) as Record<string, unknown>);
+        await canvas.loadFromJSON(JSON.parse(stack[newIndex]) as Record<string, unknown>, fabricDeserializeReviver);
         canvas.requestRenderAll();
       } finally {
         isLoadingRef.current = false;
@@ -566,7 +660,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       historyRef.current.index = newIndex;
       isLoadingRef.current = true;
       try {
-        await canvas.loadFromJSON(JSON.parse(stack[newIndex]) as Record<string, unknown>);
+        await canvas.loadFromJSON(JSON.parse(stack[newIndex]) as Record<string, unknown>, fabricDeserializeReviver);
         canvas.requestRenderAll();
       } finally {
         isLoadingRef.current = false;
@@ -586,6 +680,15 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         preserveObjectStacking: true,
       });
       fabricRef.current = canvas;
+
+      const trackPasteScene = (ev: Event) => {
+        try {
+          photoPasteSceneRef.current = canvas.getScenePoint(ev as never);
+        } catch {
+          /* noop */
+        }
+      };
+      canvas.upperCanvasEl.addEventListener('mousemove', trackPasteScene);
 
       const scheduleTextAnchor = () => {
         if (!onTextFloatingAnchorRef.current) return;
@@ -644,19 +747,24 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         if (!target) return;
         if (target.lockMovementX && target.lockMovementY) return;
         const brT = target.getBoundingRect();
-        const others = canvas.getObjects()
-          .filter((o) => o !== target && !(asAny(o).isBackground))
-          .map((o) => {
-            const r = o.getBoundingRect();
-            return {
-              left: r.left,
-              top: r.top,
-              width: r.width,
-              height: r.height,
-              scaleX: 1,
-              scaleY: 1,
-            };
-          });
+        const excludePeerSnap =
+          !!(asAny(target).isPhotoField || (target.group && asAny(target.group).isPhotoField));
+        const others = excludePeerSnap
+          ? []
+          : canvas
+              .getObjects()
+              .filter((o) => o !== target && !(asAny(o).isBackground))
+              .map((o) => {
+                const r = o.getBoundingRect();
+                return {
+                  left: r.left,
+                  top: r.top,
+                  width: r.width,
+                  height: r.height,
+                  scaleX: 1,
+                  scaleY: 1,
+                };
+              });
         const cW = canvas.getWidth() ?? canvasWidthRef.current;
         const snap = computeSnap(
           {
@@ -677,10 +785,18 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         if (snap.dx !== 0) target.set('left', (target.left ?? 0) + snap.dx);
         if (snap.dy !== 0) target.set('top', (target.top ?? 0) + snap.dy);
         if (snap.dx !== 0 || snap.dy !== 0) target.setCoords();
-        setLocalSnapLines(snap.lines);
-        snapLinesRef.current?.(snap.lines);
+        const sig = snapLinesSignature(snap.lines);
+        if (sig !== snapOverlayKeyRef.current) {
+          snapOverlayKeyRef.current = sig;
+          setLocalSnapLines(snap.lines);
+          snapLinesRef.current?.(snap.lines);
+        }
       });
-      const clearSnaps = () => { setLocalSnapLines([]); snapLinesRef.current?.([]); };
+      const clearSnaps = () => {
+        snapOverlayKeyRef.current = '';
+        setLocalSnapLines([]);
+        snapLinesRef.current?.([]);
+      };
       canvas.on('mouse:up', clearSnaps);
       canvas.on('text:changed', () => {
         const active = canvas.getActiveObject();
@@ -689,16 +805,12 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         scheduleTextAnchor();
       });
 
-      // Zoom on Ctrl + mouse wheel only; plain scroll propagates to page
+      // Ctrl+wheel: без масштаба сцены Fabric; plain scroll страницы не трогаем
       canvas.on('mouse:wheel', (opt) => {
         const e = opt.e as WheelEvent;
         if (!e.ctrlKey) return;
         e.preventDefault();
         e.stopPropagation();
-        let zoom = canvas.getZoom() * (0.999 ** e.deltaY);
-        zoom = Math.min(Math.max(zoom, 0.1), 10);
-        canvas.zoomToPoint(new Point(e.offsetX, e.offsetY), zoom);
-        onZoomChange(zoom);
       });
 
       // Alt+drag pan
@@ -719,77 +831,125 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       });
       canvas.on('mouse:up', () => { isPanning = false; canvas.selection = true; });
 
-      // Double-click to fill photo fields (клик по подписи внутри Group — поднимаем к группе)
+      // Double-click: пустое поле — выбор файла; заполненное — кадрирование
       canvas.on('mouse:dblclick', (opt) => {
         let target = opt.target as FabricObject | undefined;
         if (target?.group && asAny(target.group).isPhotoField) {
           target = target.group as FabricObject;
         }
         if (target && asAny(target).isPhotoField) {
-          const fieldId = (asAny(target).id as string) ?? '';
-          setPhotoPickerFieldId(fieldId);
+          const fieldId = String((asAny(target).id as string) ?? '').trim();
+          if (!fieldId) return;
+          const cropCtx = getFilledPhotoCropContext(target);
+          if (cropCtx) {
+            setCropModal({
+              fieldId,
+              previewUrl: cropCtx.previewUrl,
+              frameW: cropCtx.frameW,
+              frameH: cropCtx.frameH,
+              iw: cropCtx.iw,
+              ih: cropCtx.ih,
+              panX: cropCtx.panX,
+              panY: cropCtx.panY,
+              fitMode: cropCtx.fitMode,
+            });
+            return;
+          }
+          photoPickerTargetIdRef.current = fieldId;
           setTimeout(() => photoFileInputRef.current?.click(), 0);
         }
       });
 
-      // Drag-and-drop images onto canvas
+      // Drag-and-drop images onto canvas (файлы ОС, URL, фото из галереи сайдбара)
       const wrapper = canvasElRef.current?.parentElement as HTMLElement | null;
+      let removeCanvasDropListeners: (() => void) | null = null;
       if (wrapper) {
         const onDragOver = (e: DragEvent) => {
           e.preventDefault();
           if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
         };
+
+        const scenePointFromDrop = (e: DragEvent) => {
+          const p = canvas.getScenePoint(e);
+          return { x: p.x, y: p.y };
+        };
+
         const onDrop = async (e: DragEvent) => {
           e.preventDefault();
           const dt = e.dataTransfer;
           if (!dt) return;
 
-          const file = Array.from(dt.files ?? []).find((f) => isLikelyImageFile(f));
-          if (!file) {
-            const raw =
-              dt.getData('text/uri-list') ||
-              dt.getData('text/plain') ||
-              dt.getData('URL') ||
-              '';
-            const firstUrl = raw
-              .split(/\r?\n/)
-              .map((s) => s.trim())
-              .find((s) => looksLikeHttpUrl(s));
-            if (firstUrl && remoteUrlHandlerRef.current) {
+          const { x, y } = scenePointFromDrop(e);
+          const hit = findPhotoFieldAtScene(canvas, x, y);
+
+          const sidebarRaw = dt.getData(SIDEBAR_PHOTO_DRAG_MIME);
+          if (sidebarRaw) {
+            let photoId: string | null = null;
+            try {
+              const parsed = JSON.parse(sidebarRaw) as { id?: unknown };
+              if (typeof parsed?.id === 'string') photoId = parsed.id;
+            } catch {
+              photoId = null;
+            }
+            const sideFile =
+              photoId && getSidebarPhotoFileRef.current
+                ? getSidebarPhotoFileRef.current(photoId)
+                : undefined;
+            if (photoId && sideFile && isLikelyImageFile(sideFile)) {
               try {
-                await remoteUrlHandlerRef.current(firstUrl);
+                if (hit) {
+                  await fillPhotoField(canvas, hit, sideFile, () => {
+                    if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+                    else releaseBasicModeConstraints(canvas);
+                  });
+                } else {
+                  await addImageFileToCanvas(canvas, sideFile);
+                }
+                onSidebarPhotoDroppedRef.current?.(photoId);
               } catch {
-                /* ошибку показывает родитель */
+                /* ошибки сети/декода — молча */
               }
+              return;
+            }
+          }
+
+          const file = Array.from(dt.files ?? []).find((f) => isLikelyImageFile(f));
+          if (file) {
+            if (hit) {
+              await fillPhotoField(canvas, hit, file, () => {
+                if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+                else releaseBasicModeConstraints(canvas);
+              });
+            } else {
+              await addImageFileToCanvas(canvas, file);
             }
             return;
           }
 
-          // Compute canvas coordinates from DOM event
-          const canvasEl = canvas.getElement();
-          const rect = canvasEl.getBoundingClientRect();
-          const vpt = canvas.viewportTransform;
-          const zoom = canvas.getZoom();
-          const x = ((e.clientX - rect.left) - (vpt ? vpt[4] : 0)) / zoom;
-          const y = ((e.clientY - rect.top) - (vpt ? vpt[5] : 0)) / zoom;
-
-          // Check for photo field under cursor (bounding rect — корректно для Group)
-          const hit = canvas.getObjects().find((obj) => {
-            if (!asAny(obj).isPhotoField) return false;
-            const br = obj.getBoundingRect();
-            return x >= br.left && x <= br.left + br.width && y >= br.top && y <= br.top + br.height;
-          });
-
-          if (hit) {
-            await fillPhotoField(canvas, hit, file, () => {
-              if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
-            });
-          } else {
-            await addImageFileToCanvas(canvas, file);
+          const raw =
+            dt.getData('text/uri-list') ||
+            dt.getData('text/plain') ||
+            dt.getData('URL') ||
+            '';
+          const firstUrl = raw
+            .split(/\r?\n/)
+            .map((s) => s.trim())
+            .find((s) => looksLikeHttpUrl(s));
+          if (firstUrl && remoteUrlHandlerRef.current) {
+            try {
+              await remoteUrlHandlerRef.current(firstUrl);
+            } catch {
+              /* ошибку показывает родитель */
+            }
           }
         };
+
         wrapper.addEventListener('dragover', onDragOver);
         wrapper.addEventListener('drop', onDrop);
+        removeCanvasDropListeners = () => {
+          wrapper.removeEventListener('dragover', onDragOver);
+          wrapper.removeEventListener('drop', onDrop);
+        };
       }
 
       // Keyboard: Delete, Ctrl+Z, Ctrl+Y
@@ -847,7 +1007,19 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           if (item.type.startsWith('image/')) {
             e.preventDefault();
             const file = item.getAsFile();
-            if (file) void addImageFileToCanvas(canvas, file);
+            if (!file) break;
+            const p = photoPasteSceneRef.current;
+            void (async () => {
+              const hit = findPhotoFieldAtScene(canvas, p.x, p.y);
+              if (hit) {
+                await fillPhotoField(canvas, hit, file, () => {
+                  if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+                  else releaseBasicModeConstraints(canvas);
+                });
+              } else {
+                await addImageFileToCanvas(canvas, file);
+              }
+            })();
             break;
           }
         }
@@ -855,10 +1027,12 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       window.addEventListener('paste', onPaste);
 
       return () => {
+        removeCanvasDropListeners?.();
         cancelAnimationFrame(textAnchorRafRef.current);
         scheduleTextAnchorRef.current = null;
         window.removeEventListener('keydown', onKeyDown);
         window.removeEventListener('paste', onPaste);
+        canvas.upperCanvasEl.removeEventListener('mousemove', trackPasteScene);
         canvas.dispose();
         fabricRef.current = null;
       };
@@ -991,31 +1165,28 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 
     // ── Photo field fill from file input ─────────────────────────────────────
 
-    const handlePhotoFileChange = useCallback(
-      async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        e.target.value = '';
-        if (!file || !fabricRef.current || !isLikelyImageFile(file)) return;
-        const canvas = fabricRef.current;
-        if (photoPickerFieldId) {
-          const field = canvas.getObjects().find(
-            (o) =>
-              asAny(o).isPhotoField && asAny(o).id === photoPickerFieldId,
-          ) as FabricObject | undefined;
-          if (field) {
-            await fillPhotoField(canvas, field, file, () => {
-              if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
-            });
-          } else {
-            await addImageFileToCanvas(canvas, file);
-          }
-          setPhotoPickerFieldId(null);
-        } else {
-          await addImageFileToCanvas(canvas, file);
+    const handlePhotoFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      const canvas = fabricRef.current;
+      if (!file || !canvas || !isLikelyImageFile(file)) return;
+
+      const targetId = photoPickerTargetIdRef.current;
+      photoPickerTargetIdRef.current = null;
+
+      if (targetId) {
+        const field = findPhotoFieldByIdDeep(canvas, targetId);
+        if (field) {
+          await fillPhotoField(canvas, field, file, () => {
+            if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+            else releaseBasicModeConstraints(canvas);
+          });
+          return;
         }
-      },
-      [photoPickerFieldId],
-    );
+      }
+
+      await addImageFileToCanvas(canvas, file);
+    }, []);
 
     // ── Imperative API ───────────────────────────────────────────────────────
 
@@ -1129,22 +1300,39 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             !asAny(o).isBackground &&
             !asAny(o).isPhotoField,
         ) as FabricImage[];
-        const targets = objects.filter(
-          (o) => asAny(o).isPhotoField && o.type === 'group',
-        ) as FabricObject[];
+        const targets = objects.filter((o) => {
+          if (!asAny(o).isPhotoField) return false;
+          /* Пустая рамка (group) или старый макет: одно image с флагом */
+          return o.type === 'group' || o.type === 'image';
+        }) as FabricObject[];
         if (sources.length === 0 || targets.length === 0) return;
-        const n = Math.min(sources.length, targets.length);
+
+        const sortReading = (objs: FabricObject[]) =>
+          [...objs].sort((a, b) => {
+            const ra = a.getBoundingRect();
+            const rb = b.getBoundingRect();
+            const cya = ra.top + ra.height / 2;
+            const cyb = rb.top + rb.height / 2;
+            const rowTol = Math.min(96, Math.max(24, canvas.height! * 0.04));
+            if (Math.abs(cya - cyb) > rowTol) return cya - cyb;
+            return ra.left + ra.width / 2 - (rb.left + rb.width / 2);
+          });
+
+        const sortSources = sortReading(sources as FabricObject[]) as FabricImage[];
+        const orderedTargets = sortReading(targets);
+        const n = Math.min(sortSources.length, orderedTargets.length);
         for (let i = 0; i < n; i++) {
-          const src = sources[i];
-          const field = targets[i];
-          if (!canvas.getObjects().includes(src) || !canvas.getObjects().includes(field)) continue;
+          const src = sortSources[i];
+          const field = orderedTargets[i];
+          if (src.canvas !== canvas || field.canvas !== canvas) continue;
           const dataUrl = src.toDataURL({ format: 'png', multiplier: 1 });
           const blob = await fetch(dataUrl).then((r) => r.blob());
           const file = new File([blob], `autofill-${i}.png`, { type: 'image/png' });
           await fillPhotoField(canvas, field, file, () => {
             if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+            else releaseBasicModeConstraints(canvas);
           });
-          if (canvas.getObjects().includes(src)) canvas.remove(src);
+          if (src.canvas === canvas) canvas.remove(src);
         }
         canvas.discardActiveObject();
         canvas.requestRenderAll();
@@ -1404,6 +1592,12 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       syncTextFloatingAnchor: () => {
         scheduleTextAnchorRef.current?.();
       },
+      syncCanvasOffset: () => {
+        const c = fabricRef.current;
+        if (!c) return;
+        c.calcOffset();
+        c.requestRenderAll();
+      },
     }));
 
     // ── Render ───────────────────────────────────────────────────────────────
@@ -1458,6 +1652,44 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           style={{ display: 'none' }}
           onChange={handlePhotoFileChange}
         />
+        {cropModal && (
+          <PhotoFieldCropModal
+            isOpen
+            previewUrl={cropModal.previewUrl}
+            frameW={cropModal.frameW}
+            frameH={cropModal.frameH}
+            intrinsicW={cropModal.iw}
+            intrinsicH={cropModal.ih}
+            initialPanX={cropModal.panX}
+            initialPanY={cropModal.panY}
+            fitMode={cropModal.fitMode}
+            onClose={() => setCropModal(null)}
+            onApply={(panX, panY) => {
+              void (async () => {
+                const c = fabricRef.current;
+                if (!c) return;
+                const id = cropModal.fieldId;
+                let hit = c.getObjects().find((o) => asAny(o).id === id && asAny(o).isPhotoField);
+                if (!hit) return;
+                if (hit.type === 'image') {
+                  const g = await wrapLegacyFilledPhotoImage(c, hit as FabricImage);
+                  hit = g ?? hit;
+                }
+                if (hit.type === 'group') applyPhotoFieldPanToGroup(hit as Group, panX, panY);
+                if (modeRef.current === 'basic') applyBasicModeConstraints(c);
+                else releaseBasicModeConstraints(c);
+                c.requestRenderAll();
+                saveSnapshot();
+              })();
+            }}
+            onReplaceFile={() => {
+              const id = cropModal.fieldId;
+              setCropModal(null);
+              photoPickerTargetIdRef.current = id;
+              setTimeout(() => photoFileInputRef.current?.click(), 0);
+            }}
+          />
+        )}
       </div>
     );
   },
@@ -1531,8 +1763,55 @@ function duplicateActiveObjects(canvas: Canvas, afterDone: () => void): void {
   });
 }
 
-/** Заполняет поле для фото: вписывает изображение в рамку без искажения (contain), по центру.
- *  Сохраняет id и isPhotoField — двойной клик и повторный дроп по зоне снова открывают выбор файла. */
+/** Удалить объект с канваса или из родительской группы (canvas.remove только для потомков корня). */
+function detachFabricObject(canvas: Canvas, obj: FabricObject): void {
+  const parent = obj.group;
+  if (parent) {
+    parent.remove(obj);
+    parent.set({ dirty: true });
+    parent.setCoords();
+  } else {
+    canvas.remove(obj);
+  }
+}
+
+/** Снимок трансформа без позиции. origin не копируем — заполненная группа всегда LT, иначе setXY по углу рамки даёт артефакты при center/center у плейсхолдера. */
+function snapshotPhotoFieldTransformNoPosition(field: FabricObject): Record<string, unknown> {
+  return {
+    angle: field.angle ?? 0,
+    scaleX: field.scaleX ?? 1,
+    scaleY: field.scaleY ?? 1,
+    skewX: field.skewX ?? 0,
+    skewY: field.skewY ?? 0,
+    flipX: !!field.flipX,
+    flipY: !!field.flipY,
+    opacity: field.opacity ?? 1,
+    originX: 'left',
+    originY: 'top',
+  };
+}
+
+/** Левый верх рамки поля на сцене — по серому rect пустого поля или fallback. */
+function resolvePhotoFieldFrameSceneTL(field: FabricObject): Point {
+  const emptyRect = pickEmptyPhotoFieldFrameRect(field);
+  if (emptyRect) {
+    const c = emptyRect.getCoords();
+    if (c.length >= 1) return c[0]!;
+  }
+  if (field.type === 'group') {
+    const inner = (field as Group).getObjects()[0];
+    if (inner?.type === 'rect') {
+      const c = inner.getCoords();
+      if (c.length >= 1) return c[0]!;
+    }
+  }
+  const c = field.getCoords();
+  if (c.length >= 1) return c[0]!;
+  const br = field.getBoundingRect();
+  return new Point(br.left, br.top);
+}
+
+/** Заполняет поле для фото: вписывание без искажений (по умолчанию cover со скрытой частью за клипом; явно contain — целиком в рамке). */
 async function fillPhotoField(
   canvas: Canvas,
   field: FabricObject,
@@ -1542,27 +1821,64 @@ async function fillPhotoField(
   const url = URL.createObjectURL(file);
   try {
     const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
-    const preservedId = asAny(field).id as string | undefined;
-    const br = field.getBoundingRect();
-    const fw = br.width;
-    const fh = br.height;
-    const iw = img.width || 1;
-    const ih = img.height || 1;
-    const scale = Math.min(fw / iw, fh / ih);
-    const sw = iw * scale;
-    const sh = ih * scale;
-    img.set({
-      left: br.left + (fw - sw) / 2,
-      top: br.top + (fh - sh) / 2,
-      scaleX: scale,
-      scaleY: scale,
+    const f = field as unknown as AnyObj;
+    const rawId = f.id;
+    const idCandidate =
+      rawId != null && String(rawId).trim() !== '' ? String(rawId) : undefined;
+    const { fw, fh } = resolvePhotoFieldFrameSize(field);
+    const fitMode = resolvePhotoFieldFitMode(f);
+    const panX = Number(f.photoFieldPanX ?? 0);
+    const panY = Number(f.photoFieldPanY ?? 0);
+
+    const anchorSceneTL = resolvePhotoFieldFrameSceneTL(field);
+    const placementSnap = snapshotPhotoFieldTransformNoPosition(field);
+
+    const parent = field.group;
+    const stackIndex =
+      parent != null ? parent.getObjects().indexOf(field) : -1;
+
+    detachFabricObject(canvas, field);
+
+    const { iw, ih } = getFabricImageIntrinsicSize(img);
+
+    const group = buildFilledPhotoFieldGroup({
+      left: 0,
+      top: 0,
+      frameW: fw,
+      frameH: fh,
+      intrinsicW: iw,
+      intrinsicH: ih,
+      image: img,
+      id: idCandidate ?? `field-${Date.now()}`,
+      panX,
+      panY,
+      fitMode,
     });
-    canvas.remove(field);
-    asAny(img).isPhotoField = true;
-    if (preservedId) asAny(img).id = preservedId;
-    canvas.add(img);
-    canvas.setActiveObject(img);
-    canvas.requestRenderAll();
+
+    if (parent != null && stackIndex >= 0) {
+      parent.insertAt(stackIndex, group);
+      parent.set({ dirty: true });
+      parent.setCoords();
+    } else if (parent != null) {
+      parent.add(group);
+      parent.set({ dirty: true });
+      parent.setCoords();
+    } else {
+      canvas.add(group);
+    }
+    const syncPlacement = (): void => {
+      group.set(placementSnap as Parameters<typeof group.set>[0]);
+      group.setXY(anchorSceneTL, 'left', 'top');
+      group.setCoords();
+      syncFilledPhotoFieldSceneAnchor(group, anchorSceneTL);
+      applyPhotoFieldPanToGroup(group, panX, panY);
+      parent?.setCoords();
+      canvas.requestRenderAll();
+    };
+    syncPlacement();
+    queueMicrotask(syncPlacement);
+    requestAnimationFrame(syncPlacement);
+    canvas.setActiveObject(group);
     afterFill?.();
   } finally {
     setTimeout(() => URL.revokeObjectURL(url), 750);

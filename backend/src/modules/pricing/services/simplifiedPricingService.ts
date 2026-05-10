@@ -13,6 +13,42 @@ import { LayoutCalculationService } from './layoutCalculationService';
 import { PrintPriceService } from './printPriceService';
 import { PriceTypeService } from './priceTypeService';
 import { BindingPricingService, BindingQuoteResult } from './bindingPricingService';
+import {
+  computeKnifePathMetersRoll,
+  computeKnifePathMetersSheet,
+  resolvePlotterMargins,
+  SHEET_PLOTTER_SRA3_MM,
+} from './plotterLayout';
+import { resolveRollCutLevelMultiplier } from './plotterCutLevel';
+import {
+  buildPlotterTiersFromDto,
+  findPlotterVolumeTier,
+  resolvePlotterTierVolumeQty,
+} from './plotterVolumeTier';
+import type {
+  PlotterCuttingTariffsBundleDTO,
+  PlotterVolumeTierBasis,
+} from '../dtos/plotterCuttingTariff.dto';
+import { PlotterCuttingTariffRepository } from '../repositories/plotterCuttingTariffRepository';
+import {
+  PLOTTER_FIN_ROLL,
+  PLOTTER_FIN_SHEET,
+  PLOTTER_FIN_WEEDING,
+  PLOTTER_FIN_MOUNTING,
+  isPlotterCuttingSyntheticServiceId,
+} from '../constants/plotterCuttingFinishingIds';
+
+function parseServiceMeterBasis(parametersRaw: string | null | undefined): 'knife_path' | 'feed' {
+  if (!parametersRaw) return 'knife_path';
+  try {
+    const o = typeof parametersRaw === 'string' ? JSON.parse(parametersRaw) : parametersRaw;
+    return o && typeof o === 'object' && (o as { meter_basis?: string }).meter_basis === 'feed'
+      ? 'feed'
+      : 'knife_path';
+  } catch {
+    return 'knife_path';
+  }
+}
 
 export interface SimplifiedPricingResult {
   productId: number;
@@ -104,6 +140,8 @@ export interface SimplifiedPricingResult {
     recommendedSheetSize?: { width: number; height: number };
     /** Количество резов на лист (для резки стопой) */
     cutsPerSheet?: number;
+    /** Оценка пробега ножа плоттера (м), если включён plotter в подтипе */
+    knifePathM?: number;
     /** Дозаливка (мм с каждой стороны), использованная в расчёте ячейки trim+2×bleed */
     bleedMm?: number;
   };
@@ -123,6 +161,24 @@ interface SimplifiedQtyTier {
   // Обратная совместимость - если unit_price нет, но есть price или tier_prices
   price?: number;
   tier_prices?: number[];
+}
+
+function plotterRollFinItemTiersToSimplifiedQty(
+  rows: Array<{ min_quantity: number; price_per_unit: number }> | undefined | null,
+  legacyScalar: number | null | undefined,
+): SimplifiedQtyTier[] {
+  const merged =
+    rows && rows.length > 0
+      ? rows
+      : legacyScalar != null && Number.isFinite(Number(legacyScalar))
+        ? [{ min_quantity: 1, price_per_unit: Number(legacyScalar) }]
+        : [{ min_quantity: 1, price_per_unit: 0 }];
+  const sorted = [...merged].sort((a, b) => a.min_quantity - b.min_quantity);
+  return sorted.map((row, idx) => ({
+    min_qty: row.min_quantity,
+    max_qty: idx < sorted.length - 1 ? sorted[idx + 1].min_quantity - 1 : undefined,
+    unit_price: row.price_per_unit,
+  }));
 }
 
 interface SimplifiedSizeConfig {
@@ -162,6 +218,13 @@ interface SimplifiedTypeConfig {
   sizes: SimplifiedSizeConfig[];
   /** Общие материалы типа: используются размерами с use_own_materials !== true */
   common_allowed_material_ids?: number[];
+  /** Плоттерная резка: одна точка включения в подтипе */
+  plotter?: {
+    enabled?: boolean;
+    mode?: 'sheet' | 'roll';
+    roll_allowed_material_ids?: number[];
+    mounting_film_material_id?: number;
+  };
 }
 
 function getEffectiveAllowedMaterialIds(typeConfig: SimplifiedTypeConfig, size: SimplifiedSizeConfig): number[] {
@@ -188,6 +251,8 @@ interface SimplifiedConfig {
    */
   allow_optimal_sheet_fallback?: boolean;
   prepress?: { bleedMm?: number };
+  /** Печать необязательна — только материал/плоттер без print_technology; цена печати 0 */
+  print_optional?: boolean;
   multiPageStructure?: {
     innerBlock?: {
       pagesSource?: 'parameter' | 'fixed';
@@ -248,6 +313,8 @@ export class SimplifiedPricingService {
       bleed_mm?: number;
       /** Якорь строки размера для тарифов при allow_custom_trim */
       pricing_size_id?: number | string;
+      plotter_weeding?: boolean;
+      plotter_mounting?: boolean;
     },
     quantity: number
   ): Promise<SimplifiedPricingResult> {
@@ -445,6 +512,19 @@ export class SimplifiedPricingService {
       ? Number((selectedSize as any).items_per_sheet_override)
       : undefined;
 
+    let materialSheetMm: { width: number; height: number } | null = null;
+    if (normalizedConfig.material_id) {
+      const matDim = await db.get<{ sheet_width: number | null; sheet_height: number | null }>(
+        `SELECT sheet_width, sheet_height FROM materials WHERE id = ?`,
+        [normalizedConfig.material_id]
+      );
+      const mw0 = matDim?.sheet_width != null && matDim.sheet_width > 0 ? Number(matDim.sheet_width) : 0;
+      const mh0 = matDim?.sheet_height != null && matDim.sheet_height > 0 ? Number(matDim.sheet_height) : 0;
+      if (mw0 > 0) {
+        materialSheetMm = { width: mw0, height: mh0 > 0 ? mh0 : 0 };
+      }
+    }
+
     // Учёт раскладки: use_layout=false → 1 изделие на лист (без оптимизации, для крупноформатных и т.п.)
     const useLayout = simplifiedConfig.use_layout !== false;
     let layoutCheck: { fitsOnSheet: boolean; itemsPerSheet: number; wastePercentage: number; recommendedSheetSize: { width: number; height: number }; layout: { rows: number; cols: number; actualItemsPerSheet: number }; cutsPerSheet: number };
@@ -470,12 +550,8 @@ export class SimplifiedPricingService {
       };
       logger.info('Раскладка отключена (use_layout=false): 1 изделие на лист', { productId });
     } else if (normalizedConfig.material_id) {
-      const materialSheet = await db.get<{ sheet_width: number | null; sheet_height: number | null }>(
-        `SELECT sheet_width, sheet_height FROM materials WHERE id = ?`,
-        [normalizedConfig.material_id]
-      );
-      const mw = materialSheet?.sheet_width != null && materialSheet.sheet_width > 0 ? Number(materialSheet.sheet_width) : 0;
-      const mh = materialSheet?.sheet_height != null && materialSheet.sheet_height > 0 ? Number(materialSheet.sheet_height) : 0;
+      const mw = materialSheetMm?.width ?? 0;
+      const mh = materialSheetMm?.height ?? 0;
       if (mw > 0 && mh > 0) {
         layoutCheck = LayoutCalculationService.calculateLayout(
           layoutTrim,
@@ -522,6 +598,9 @@ export class SimplifiedPricingService {
       ? await PrintPriceService.getByTechnology(normalizedConfig.print_technology)
       : undefined;
     const isRollPrint = centralPriceForRoll?.counter_unit === 'meters';
+    const plotterRollMode =
+      typeConfig?.plotter?.enabled === true && typeConfig?.plotter?.mode === 'roll';
+    const isRollMeterage = isRollPrint || plotterRollMode;
 
     // Офисный принтер, рулон или ручная норма вместимости (items_per_sheet_override): не привязываем
     // мин. тираж к «шт/лист» — иначе override 128 заставляет minQty=128 и отсекает 100 шт.
@@ -529,7 +608,7 @@ export class SimplifiedPricingService {
     const hasManualItemsPerSheet =
       itemsPerSheetOverride != null && itemsPerSheetOverride > 0;
     const minQtyLimit = selectedSize.min_qty ?? (
-      isOfficePrint || isRollPrint || hasManualItemsPerSheet ? 1 : itemsPerSheet
+      isOfficePrint || isRollPrint || plotterRollMode || hasManualItemsPerSheet ? 1 : itemsPerSheet
     );
     const maxQtyLimit = selectedSize.max_qty;
     if (quantity < minQtyLimit || (maxQtyLimit !== undefined && quantity > maxQtyLimit)) {
@@ -537,6 +616,7 @@ export class SimplifiedPricingService {
         useLayout &&
         !isOfficePrint &&
         !isRollPrint &&
+        !plotterRollMode &&
         !hasManualItemsPerSheet &&
         minQtyLimit === itemsPerSheet
           ? ` (по раскладке: ${itemsPerSheet} шт/лист)`
@@ -569,9 +649,9 @@ export class SimplifiedPricingService {
       ? Math.max(1, quantity * sheetsPerItem)
       : Math.ceil(quantity / itemsPerSheet);
     // Длина в направлении подачи: меньшая сторона (594×420 → 0.42 м, т.к. 420 мм вдоль рулона)
-    const metersPerItem = isRollPrint ? Math.min(layoutTrim.width, layoutTrim.height) / 1000 : 0;
-    const metersNeeded = isRollPrint ? metersPerItem * quantity : 0;
-    const effectivePrintQuantity = isRollPrint ? metersNeeded : sheetsNeeded;
+    const metersPerItem = isRollMeterage ? Math.min(layoutTrim.width, layoutTrim.height) / 1000 : 0;
+    const metersNeeded = isRollMeterage ? metersPerItem * quantity : 0;
+    const effectivePrintQuantity = isRollMeterage ? metersNeeded : sheetsNeeded;
 
     const isDuplexModeSelected =
       normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back';
@@ -767,6 +847,7 @@ export class SimplifiedPricingService {
     let serviceTypesMap: Map<number, string> = new Map();
     let servicePriceUnitMap: Map<number, string> = new Map();
     let serviceLimitsMap: Map<number, { min?: number; max?: number }> = new Map();
+    let serviceMeterBasisMap: Map<number, 'knife_path' | 'feed'> = new Map();
 
     // Источник finishing: приоритет у configuration.finishing (выбор пользователя), иначе — selectedSize.finishing (из шаблона размера)
     // При fallback на selectedSize.finishing фильтруем по is_default/is_required: только операции с галочкой «вкл по умолчанию» участвуют в расчёте
@@ -886,6 +967,107 @@ export class SimplifiedPricingService {
       }
     }
 
+    let knifePathMetersTotal = 0;
+    let plotterTariffsBundle: PlotterCuttingTariffsBundleDTO | null = null;
+    let rollPlotterCutLevelMultiplier = 1;
+    const plotterCfg = typeConfig?.plotter;
+    if (plotterCfg?.enabled === true && plotterCfg.mode) {
+      const rollAllow = plotterCfg.roll_allowed_material_ids;
+      if (plotterCfg.mode === 'roll' && Array.isArray(rollAllow) && rollAllow.length > 0) {
+        const mid = normalizedConfig.material_id;
+        if (!mid || !rollAllow.includes(mid)) {
+          const err: any = new Error(
+            'Для рулонного плоттера выберите материал из списка, разрешённого для этого подтипа.'
+          );
+          err.status = 400;
+          throw err;
+        }
+      }
+      const margins = resolvePlotterMargins(plotterCfg.mode, customMarginMm, customGapMm);
+      if (plotterCfg.mode === 'roll') {
+        const wRoll = materialSheetMm?.width ?? 0;
+        if (wRoll <= 0) {
+          pricingWarnings.push(
+            'Плоттер (рулон): у материала не задана ширина рулона (sheet_width) — пробег ножа не оценен.'
+          );
+        } else {
+          knifePathMetersTotal = computeKnifePathMetersRoll({
+            rollWidthMm: wRoll,
+            trimMm: layoutTrim,
+            bleedMm: resolvedBleedMm,
+            quantity,
+            margins,
+          }).knifePathM;
+        }
+      } else {
+        let sw = materialSheetMm?.width ?? 0;
+        let sh = materialSheetMm?.height ?? 0;
+        if (sw <= 0 || sh <= 0) {
+          sw = SHEET_PLOTTER_SRA3_MM.width;
+          sh = SHEET_PLOTTER_SRA3_MM.height;
+          pricingWarnings.push(
+            'Плоттер (лист): у материала не задан формат листа — для оценки пробега ножа принят SRA3 (320×450 мм), как на листовом плоттере.'
+          );
+        }
+        knifePathMetersTotal = computeKnifePathMetersSheet({
+          sheetMm: { width: sw, height: sh },
+          trimMm: layoutTrim,
+          bleedMm: resolvedBleedMm,
+          quantity,
+          margins,
+        }).knifePathM;
+      }
+
+      plotterTariffsBundle = await PlotterCuttingTariffRepository.getBundle();
+      if (plotterCfg.mode === 'roll') {
+        const rules = plotterTariffsBundle.roll.cut_level_rules;
+        if (rules?.length) {
+          const cellLong = Math.max(layoutTrim.width, layoutTrim.height) + 2 * resolvedBleedMm;
+          rollPlotterCutLevelMultiplier = resolveRollCutLevelMultiplier(cellLong, rules);
+          if (rollPlotterCutLevelMultiplier !== 1) {
+            pricingWarnings.push(
+              `Плоттер (рулон): уровень резки ×${rollPlotterCutLevelMultiplier.toFixed(2)} (длинная сторона ячейки ≈ ${Math.round(cellLong)} мм).`
+            );
+          }
+        }
+      }
+
+      const pushPlotterFin = (sid?: number) => {
+        if (sid == null || !Number.isFinite(Number(sid))) return;
+        const n = Number(sid);
+        if (n <= 0 && !isPlotterCuttingSyntheticServiceId(n)) return;
+        if (effectiveFinishingToUse.some((f) => Number(f.service_id) === n)) return;
+        effectiveFinishingToUse.push({ service_id: n });
+      };
+      if (plotterCfg.mode === 'roll') pushPlotterFin(PLOTTER_FIN_ROLL);
+      else pushPlotterFin(PLOTTER_FIN_SHEET);
+      if (plotterCfg.mode === 'roll' && normalizedConfig.plotter_weeding === true) {
+        pushPlotterFin(PLOTTER_FIN_WEEDING);
+      }
+      if (plotterCfg.mode === 'roll' && normalizedConfig.plotter_mounting === true) {
+        pushPlotterFin(PLOTTER_FIN_MOUNTING);
+      }
+    }
+
+    const pieceCutAreaTrimM2 =
+      layoutTrim.width > 0 && layoutTrim.height > 0
+        ? (layoutTrim.width * layoutTrim.height) / 1_000_000
+        : 0;
+    const plotterTierVolumeCtx =
+      plotterTariffsBundle != null
+        ? {
+            roll: {
+              volumeTierBasis: plotterTariffsBundle.roll.volume_tier_basis ?? null,
+              meterBasis: plotterTariffsBundle.roll.meter_basis,
+            },
+            sheet: {
+              volumeTierBasis: plotterTariffsBundle.sheet.volume_tier_basis ?? null,
+              meterBasis: plotterTariffsBundle.sheet.meter_basis,
+            },
+            pieceCutAreaTrimM2,
+          }
+        : undefined;
+
     if (effectiveFinishingToUse.length > 0) {
       logger.info('🔧 [SimplifiedPricingService] Используем finishing', {
         productId,
@@ -907,29 +1089,91 @@ export class SimplifiedPricingService {
       });
 
       if (uniqueServiceIds.length > 0) {
-        const services = await db.all<Array<{ id: number; name: string; operation_type: string | null; price_unit: string | null; min_quantity?: number | null; max_quantity?: number | null }>>(
-          `SELECT id, name, operation_type, price_unit, min_quantity, max_quantity FROM post_processing_services WHERE id IN (${uniqueServiceIds.map(() => '?').join(',')})`,
-          uniqueServiceIds
+        const synthPlotterIds = uniqueServiceIds.filter((id) => isPlotterCuttingSyntheticServiceId(id));
+        const normalServiceIds = uniqueServiceIds.filter((id) => !isPlotterCuttingSyntheticServiceId(id));
+
+        const services =
+          normalServiceIds.length > 0
+            ? await db.all<
+                Array<{
+                  id: number;
+                  name: string;
+                  operation_type: string | null;
+                  price_unit: string | null;
+                  min_quantity?: number | null;
+                  max_quantity?: number | null;
+                  parameters?: string | null;
+                }>
+              >(
+                `SELECT id, name, operation_type, price_unit, min_quantity, max_quantity, parameters FROM post_processing_services WHERE id IN (${normalServiceIds.map(() => '?').join(',')})`,
+                normalServiceIds
+              )
+            : [];
+
+        const serviceNamesMap = new Map<number, string>(services.map((s) => [s.id, s.name]));
+        serviceTypesMap = new Map(services.map((s) => [s.id, s.operation_type || '']));
+        servicePriceUnitMap = new Map(services.map((s) => [s.id, (s.price_unit || 'per_item').toLowerCase()]));
+        serviceLimitsMap = new Map(
+          services.map((s) => [s.id, { min: s.min_quantity ?? 1, max: s.max_quantity ?? undefined }])
         );
-        const serviceNamesMap = new Map(services.map(s => [s.id, s.name]));
-        serviceTypesMap = new Map(services.map(s => [s.id, s.operation_type || '']));
-        servicePriceUnitMap = new Map(services.map(s => [s.id, (s.price_unit || 'per_item').toLowerCase()]));
-        serviceLimitsMap = new Map(services.map(s => [s.id, { min: s.min_quantity ?? 1, max: s.max_quantity ?? undefined }]));
+        serviceMeterBasisMap = new Map<number, 'knife_path' | 'feed'>(
+          services.map((s): [number, 'knife_path' | 'feed'] => [
+            s.id,
+            parseServiceMeterBasis(s.parameters ?? null),
+          ])
+        );
 
         // Загружаем тарифы из service_volume_prices / service_variant_prices через репозиторий
-        // 🆕 Для услуг с вариантами используем тарифы варианта, иначе базовые тарифы услуги
-        serviceTiersMap = new Map<string, SimplifiedQtyTier[]>(); // Ключ: "serviceId" или "serviceId:variantId"
-        
+        serviceTiersMap = new Map<string, SimplifiedQtyTier[]>();
+
+        if (synthPlotterIds.length > 0) {
+          const bundle = plotterTariffsBundle ?? (await PlotterCuttingTariffRepository.getBundle());
+          for (const sid of synthPlotterIds) {
+            if (sid === PLOTTER_FIN_ROLL || sid === PLOTTER_FIN_SHEET) {
+              const mode = sid === PLOTTER_FIN_ROLL ? 'roll' : 'sheet';
+              const t = mode === 'roll' ? bundle.roll : bundle.sheet;
+              serviceNamesMap.set(sid, t.label);
+              serviceTypesMap.set(sid, 'plotter_cut');
+              servicePriceUnitMap.set(sid, 'per_meter');
+              serviceMeterBasisMap.set(sid, t.meter_basis === 'feed' ? 'feed' : 'knife_path');
+              serviceLimitsMap.set(sid, {
+                min: t.min_quantity ?? 1,
+                max: t.max_quantity ?? undefined,
+              });
+              serviceTiersMap.set(String(sid), buildPlotterTiersFromDto(t));
+              continue;
+            }
+
+            if (sid === PLOTTER_FIN_WEEDING || sid === PLOTTER_FIN_MOUNTING) {
+              const roll = bundle.roll;
+              const rawRows = sid === PLOTTER_FIN_WEEDING ? roll.weeding_tiers : roll.mounting_tiers;
+              const legacy =
+                sid === PLOTTER_FIN_WEEDING ? roll.weeding_price_per_item : roll.mounting_price_per_item;
+              const title = sid === PLOTTER_FIN_WEEDING ? 'Выборка' : 'Накатка монтажной плёнки';
+              serviceNamesMap.set(sid, title);
+              serviceTypesMap.set(sid, 'plotter_cut');
+              servicePriceUnitMap.set(sid, 'per_item');
+              serviceLimitsMap.set(sid, { min: 1, max: undefined });
+              serviceTiersMap.set(
+                String(sid),
+                plotterRollFinItemTiersToSimplifiedQty(rawRows, legacy),
+              );
+            }
+          }
+        }
+
         for (const finConfig of effectiveFinishingToUse) {
           const serviceId = Number(finConfig.service_id);
           const rawVid = (finConfig as any).variant_id;
           const variantId =
             rawVid != null && rawVid !== '' && Number.isFinite(Number(rawVid)) ? Number(rawVid) : undefined;
           const mapKey = variantId ? `${serviceId}:${variantId}` : String(serviceId);
-          
+
           // Пропускаем, если уже загрузили для этого ключа
           if (serviceTiersMap.has(mapKey)) continue;
-          
+
+          if (isPlotterCuttingSyntheticServiceId(serviceId)) continue;
+
           try {
             // 🆕 Если есть variantId, загружаем тарифы варианта, иначе базовые тарифы услуги
             let tiers =
@@ -1006,27 +1250,45 @@ export class SimplifiedPricingService {
 
           // Операции с price_unit=per_sheet: считаем по листам печати (или пог. м для рулонной). До резки обрабатываем целые листы.
           const isPerSheetOp = priceUnitFromDb === 'per_sheet';
+          const isPerMeterOp = priceUnitFromDb === 'per_meter';
+          const meterBasis = serviceMeterBasisMap.get(finConfig.service_id) ?? 'knife_path';
+          const meterUnits =
+            isPerMeterOp && meterBasis === 'feed'
+              ? metersNeeded
+              : isPerMeterOp
+                ? knifePathMetersTotal
+                : 0;
           const perSheetUnits = isPerSheetOp
-            ? (isRollPrint ? metersNeeded : sheetsNeeded)
+            ? (isRollMeterage ? metersNeeded : sheetsNeeded)
             : 0;
 
           if (limits) {
             const minLimit = limits.min ?? 1;
             const maxLimit = limits.max;
-            const checkQty = isPerSheetOp ? perSheetUnits : quantity;
+            const checkQty = isPerSheetOp
+              ? perSheetUnits
+              : isPerMeterOp
+                ? meterUnits
+                : quantity;
             if (maxLimit !== undefined && checkQty > maxLimit) {
               const serviceName = serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`;
-              const unitLabel = isPerSheetOp ? (isRollPrint ? 'пог. м' : 'листов') : 'шт';
+              const unitLabel = isPerSheetOp
+                ? (isRollMeterage ? 'пог. м' : 'листов')
+                : isPerMeterOp
+                  ? 'п.м.'
+                  : 'шт';
               const err: any = new Error(
                 `Тираж для операции "${serviceName}" должен быть от ${minLimit} до ${maxLimit} ${unitLabel}`
               );
               err.status = 400;
               throw err;
             }
-            // Ниже минимума: per_sheet / per_cut — считаем по минимуму услуги и предупреждаем (ламинатор 3 л мин при 1 л печати).
+            // Ниже минимума: per_sheet / per_cut / per_meter — считаем по минимуму услуги и предупреждаем (ламинатор 3 л мин при 1 л печати).
             if (checkQty < minLimit) {
               const canBumpByMin =
-                isPerSheetOp || String(priceUnitFromDb).toLowerCase() === 'per_cut';
+                isPerSheetOp ||
+                isPerMeterOp ||
+                String(priceUnitFromDb).toLowerCase() === 'per_cut';
               if (!canBumpByMin) {
                 const serviceName = serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`;
                 const unitLabel = 'шт';
@@ -1038,10 +1300,12 @@ export class SimplifiedPricingService {
               }
               const serviceName = serviceNamesMap.get(finConfig.service_id) || `Услуга #${finConfig.service_id}`;
               const unitLabel = isPerSheetOp
-                ? isRollPrint
+                ? isRollMeterage
                   ? 'пог. м'
                   : 'листов печати'
-                : 'единиц';
+                : isPerMeterOp
+                  ? 'п.м.'
+                  : 'единиц';
               const billed = minLimit;
               pricingWarnings.push(
                 `${serviceName}: по раскладке и тиражу ${quantity} шт. требуется ${checkQty} ${unitLabel}, минимальный объём услуги ${minLimit} ${unitLabel}. В стоимость заложено ${billed} ${unitLabel}.`
@@ -1063,14 +1327,38 @@ export class SimplifiedPricingService {
           const totalCutsForOrder = Math.max(unitsPerItem, 1);
           const billedPerSheetForTier =
             isPerSheetOp && limits ? Math.max(perSheetUnits, limits.min ?? 1) : perSheetUnits;
+          const billedMeterForTier =
+            isPerMeterOp && limits ? Math.max(meterUnits, limits.min ?? 1) : meterUnits;
           const billedCutsForTier =
             priceUnit === 'per_cut' && limits ? Math.max(totalCutsForOrder, limits.min ?? 1) : totalCutsForOrder;
           const tierQty = isPerSheetOp
             ? billedPerSheetForTier
-            : priceUnit === 'per_cut'
-              ? billedCutsForTier
-              : quantity;
-          const tier = this.findTierForQuantity(tiers, tierQty);
+            : isPerMeterOp
+              ? billedMeterForTier
+              : priceUnit === 'per_cut'
+                ? billedCutsForTier
+                : quantity;
+          const sidNum = Number(finConfig.service_id);
+          const isPlotterMainCutSynthetic = sidNum === PLOTTER_FIN_ROLL || sidNum === PLOTTER_FIN_SHEET;
+          const tierBracketQty =
+            isPlotterMainCutSynthetic && plotterTierVolumeCtx
+              ? resolvePlotterTierVolumeQty({
+                  basis:
+                    sidNum === PLOTTER_FIN_ROLL
+                      ? plotterTierVolumeCtx.roll.volumeTierBasis
+                      : plotterTierVolumeCtx.sheet.volumeTierBasis,
+                  tariffMeterBasis:
+                    sidNum === PLOTTER_FIN_ROLL
+                      ? plotterTierVolumeCtx.roll.meterBasis
+                      : plotterTierVolumeCtx.sheet.meterBasis,
+                  knifePathM: knifePathMetersTotal,
+                  feedM: metersNeeded,
+                  cutAreaM2: plotterTierVolumeCtx.pieceCutAreaTrimM2 * quantity,
+                })
+              : tierQty;
+          const tier = isPlotterMainCutSynthetic
+            ? findPlotterVolumeTier(tiers, tierBracketQty) ?? this.findTierForQuantity(tiers, tierQty)
+            : this.findTierForQuantity(tiers, tierQty);
           if (!tier) {
             logger.warn('Не найден диапазон для услуги отделки', {
               productId,
@@ -1082,20 +1370,26 @@ export class SimplifiedPricingService {
           }
 
           const priceForTier = this.getPriceForQuantityTier(tier);
+          const plotterRollMul =
+            Number(finConfig.service_id) === PLOTTER_FIN_ROLL ? rollPlotterCutLevelMultiplier : 1;
+          const effectivePriceForTier = priceForTier * plotterRollMul;
           const serviceMinQty = limits?.min ?? 0;
-          // per_sheet: листы/пог. м; per_cut: резы на позицию (units_per_item); иначе — тираж × units_per_item (per_item и др.)
+          // per_sheet: листы/пог. м; per_meter: пробег ножа или подача; per_cut: резы на позицию (units_per_item); иначе — тираж × units_per_item (per_item и др.)
 
           let servicePrice = 0;
           let totalUnits: number;
           if (isPerSheetOp) {
             totalUnits = Math.max(perSheetUnits, serviceMinQty);
-            servicePrice = priceForTier * totalUnits;
+            servicePrice = effectivePriceForTier * totalUnits;
+          } else if (priceUnit === 'per_meter') {
+            totalUnits = Math.max(meterUnits, serviceMinQty);
+            servicePrice = effectivePriceForTier * totalUnits;
           } else if (priceUnit === 'per_cut') {
             totalUnits = Math.max(totalCutsForOrder, serviceMinQty);
-            servicePrice = priceForTier * totalUnits;
+            servicePrice = effectivePriceForTier * totalUnits;
           } else {
             totalUnits = quantity * (unitsPerItem ?? 1);
-            servicePrice = priceForTier * totalUnits;
+            servicePrice = effectivePriceForTier * totalUnits;
           }
           
           finishingPrice += servicePrice;
@@ -1105,13 +1399,13 @@ export class SimplifiedPricingService {
             operationType,
             isPerSheetOp,
             perSheetUnits: isPerSheetOp ? perSheetUnits : undefined,
-            sheetsNeeded: isPerSheetOp && !isRollPrint ? sheetsNeeded : undefined,
-            metersNeeded: isPerSheetOp && isRollPrint ? metersNeeded : undefined,
+            sheetsNeeded: isPerSheetOp && !isRollMeterage ? sheetsNeeded : undefined,
+            metersNeeded: isPerSheetOp && isRollMeterage ? metersNeeded : undefined,
             priceUnit,
             unitsPerItem,
             quantity,
             totalUnits,
-            priceForTier,
+            priceForTier: effectivePriceForTier,
             servicePrice,
           });
           
@@ -1119,7 +1413,7 @@ export class SimplifiedPricingService {
             service_id: finConfig.service_id,
             variant_id: variantId,
             service_name: serviceNamesMap.get(finConfig.service_id) || `Service #${finConfig.service_id}`,
-            tier: { ...tier, price: priceForTier },
+            tier: { ...tier, price: effectivePriceForTier },
             units_needed: totalUnits,
             priceForQuantity: servicePrice,
             price_unit: priceUnit,
@@ -1134,7 +1428,8 @@ export class SimplifiedPricingService {
     // Цена: сначала из markup_settings.auto_cutting_price (если > 0), иначе из услуги резки
     // Пропускаем, если резка уже учтена в finishing (selectedOperations)
     const cuttingAlreadyInFinishing = finishingDetails.some(d => serviceTypesMap.get(d.service_id) === 'cut');
-    const configCutting = (configuration as any).cutting === true && !cuttingAlreadyInFinishing;
+    const plotterEnabled = typeConfig?.plotter?.enabled === true;
+    const configCutting = (configuration as any).cutting === true && !cuttingAlreadyInFinishing && !plotterEnabled;
     if (configCutting) {
       const cuttingService = await db.get<{ id: number; name: string }>(
         `SELECT id, name FROM post_processing_services WHERE operation_type = 'cut' AND price_unit = 'per_cut' AND is_active = 1 LIMIT 1`
@@ -1244,6 +1539,26 @@ export class SimplifiedPricingService {
         else operationMaterials.push({ material_id: src.material_id, material_name: name, quantity: totalQty });
       }
     }
+
+    if (
+      typeConfig?.plotter?.enabled === true &&
+      normalizedConfig.plotter_mounting === true &&
+      typeConfig.plotter.mounting_film_material_id != null &&
+      isRollMeterage &&
+      metersNeeded > 0
+    ) {
+      const mid = typeConfig.plotter.mounting_film_material_id;
+      const mrow = await db.get<{ name: string }>(
+        `SELECT name FROM materials WHERE id = ? AND is_active = 1`,
+        [mid]
+      );
+      if (mrow) {
+        const qMount = metersNeeded;
+        const existing = operationMaterials.find((m) => m.material_id === mid);
+        if (existing) existing.quantity += qMount;
+        else operationMaterials.push({ material_id: mid, material_name: mrow.name, quantity: qMount });
+      }
+    }
     
     let coverPrice = 0;
     if (usePagesMultiplier && multiPageStructure?.cover?.mode && multiPageStructure.cover.mode !== 'none') {
@@ -1343,6 +1658,36 @@ export class SimplifiedPricingService {
     const cuttingPricePerCut = configCutting && (layoutCheck.cutsPerSheet ?? 0) > 0
       ? (finishingDetails.find((d: any) => (serviceTypesMap.get(d.service_id) || '').toLowerCase() === 'cut')?.tier?.price ?? 0)
       : 0;
+    const knifePathByQty = (q: number): number => {
+      const pc = typeConfig?.plotter;
+      if (!pc?.enabled || !pc.mode) return 0;
+      const margins = resolvePlotterMargins(pc.mode, customMarginMm, customGapMm);
+      const qq = Math.max(1, Math.floor(Number(q) || 0));
+      if (pc.mode === 'roll') {
+        const wRoll = materialSheetMm?.width ?? 0;
+        if (wRoll <= 0) return 0;
+        return computeKnifePathMetersRoll({
+          rollWidthMm: wRoll,
+          trimMm: layoutTrim,
+          bleedMm: resolvedBleedMm,
+          quantity: qq,
+          margins,
+        }).knifePathM;
+      }
+      let sw = materialSheetMm?.width ?? 0;
+      let sh = materialSheetMm?.height ?? 0;
+      if (sw <= 0 || sh <= 0) {
+        sw = SHEET_PLOTTER_SRA3_MM.width;
+        sh = SHEET_PLOTTER_SRA3_MM.height;
+      }
+      return computeKnifePathMetersSheet({
+        sheetMm: { width: sw, height: sh },
+        trimMm: layoutTrim,
+        bleedMm: resolvedBleedMm,
+        quantity: qq,
+        margins,
+      }).knifePathM;
+    };
     const tierPricesResult = this.buildTierPricesForConfig({
       printPriceConfig: printPriceConfigForTiers,
       materialPricePerSheet,
@@ -1362,9 +1707,14 @@ export class SimplifiedPricingService {
       cutsPerSheet: layoutCheck.cutsPerSheet ?? 0,
       serviceTypesMap: serviceTypesMap ?? new Map(),
       servicePriceUnitMap: servicePriceUnitMap ?? new Map(),
+      serviceMeterBasisMap: serviceMeterBasisMap ?? new Map(),
       currentQuantity: quantity,
       isRollPrint,
+      isRollMeterage,
       metersPerItem,
+      knifePathByQty,
+      rollPlotterCutLevelMultiplier,
+      plotterTierVolumeCtx,
     });
     if (usePagesMultiplier && multiPageStructure && tierPricesResult.length > 0) {
       for (const tierRow of tierPricesResult) {
@@ -1433,15 +1783,16 @@ export class SimplifiedPricingService {
     const layoutResult: SimplifiedPricingResult['layout'] = {
       fitsOnSheet: layoutCheck.fitsOnSheet,
       itemsPerSheet: layoutCheck.itemsPerSheet,
-      sheetsNeeded: isRollPrint ? 0 : sheetsNeeded,
-      ...(isRollPrint && { metersNeeded }),
+      sheetsNeeded: isRollMeterage ? 0 : sheetsNeeded,
+      ...(isRollMeterage && { metersNeeded }),
+      ...(knifePathMetersTotal > 0 ? { knifePathM: knifePathMetersTotal } : {}),
       wastePercentage: layoutCheck.wastePercentage,
       recommendedSheetSize: layoutCheck.recommendedSheetSize,
       cutsPerSheet: layoutCheck.cutsPerSheet ?? 0,
       bleedMm: resolvedBleedMm,
     };
     const warnings: string[] = [...pricingWarnings];
-    if (!isRollPrint && !layoutCheck.fitsOnSheet) {
+    if (!isRollMeterage && !layoutCheck.fitsOnSheet) {
       warnings.push(
         `Формат ${layoutTrim.width}×${layoutTrim.height} мм (обрез) не помещается на печатный лист. Проверьте размер, материал или дозаливку.`
       );
@@ -1592,16 +1943,28 @@ export class SimplifiedPricingService {
     cutsPerSheet: number;
     serviceTypesMap: Map<number, string>;
     servicePriceUnitMap?: Map<number, string>;
+    serviceMeterBasisMap?: Map<number, 'knife_path' | 'feed'>;
     /** Текущее количество — добавляем в boundaries, чтобы «Цена» для выбранного тиража совпадала с итогом */
     currentQuantity?: number;
     isRollPrint?: boolean;
+    /** Рулонный метраж материала: печать рулоном или режим плоттера roll */
+    isRollMeterage?: boolean;
     metersPerItem?: number;
+    knifePathByQty?: (q: number) => number;
+    /** Рулонный плоттер: множитель уровня резки к ставке за п.м. */
+    rollPlotterCutLevelMultiplier?: number;
+    /** Оси объёма для тиражных ступеней плоттера (synthetic PLOTTER_FIN_*) */
+    plotterTierVolumeCtx?: {
+      roll: { volumeTierBasis: PlotterVolumeTierBasis | null; meterBasis: 'knife_path' | 'feed' };
+      sheet: { volumeTierBasis: PlotterVolumeTierBasis | null; meterBasis: 'knife_path' | 'feed' };
+      pieceCutAreaTrimM2: number;
+    };
   }): Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price: number }> {
     // Диапазоны ТОЛЬКО по раскладке листа: 1 лист, 2 листа, 3 листа... (itemsPerSheet, 2*itemsPerSheet, ...)
     const ips = Math.max(1, ctx.itemsPerSheet || 1);
     const boundaries = new Set<number>();
 
-    if (ctx.isRollPrint) {
+    if (ctx.isRollPrint || ctx.isRollMeterage) {
       // Рулонная печать: используем текущее кол-во + разумный шаг
       if (ctx.currentQuantity != null && ctx.currentQuantity > 0) {
         boundaries.add(ctx.currentQuantity);
@@ -1657,10 +2020,15 @@ export class SimplifiedPricingService {
 
       let materialPrice = 0;
       if (ctx.materialPricePerSheet > 0) {
-        const sheetsNeeded = ctx.usePagesMultiplier
-          ? Math.max(1, q * ctx.sheetsPerItem)
-          : Math.ceil(q / ctx.itemsPerSheet);
-        materialPrice = sheetsNeeded * ctx.materialPricePerSheet * ctx.billingModeMultiplier;
+        if (ctx.isRollMeterage && (ctx.metersPerItem ?? 0) > 0) {
+          const metersForQ = ctx.metersPerItem! * q;
+          materialPrice = metersForQ * ctx.materialPricePerSheet * ctx.billingModeMultiplier;
+        } else {
+          const sheetsNeeded = ctx.usePagesMultiplier
+            ? Math.max(1, q * ctx.sheetsPerItem)
+            : Math.ceil(q / ctx.itemsPerSheet);
+          materialPrice = sheetsNeeded * ctx.materialPricePerSheet * ctx.billingModeMultiplier;
+        }
       }
       if (ctx.baseMaterialPricePerItem > 0) {
         materialPrice += ctx.baseMaterialPricePerItem * q;
@@ -1668,7 +2036,7 @@ export class SimplifiedPricingService {
 
       let finishingPrice = 0;
       const sheetsForQ = ctx.usePagesMultiplier ? Math.max(1, q * ctx.sheetsPerItem) : Math.ceil(q / ctx.itemsPerSheet);
-      const metersForQ = ctx.isRollPrint && (ctx.metersPerItem ?? 0) > 0 ? (ctx.metersPerItem! * q) : 0;
+      const metersForQ = ctx.isRollMeterage && (ctx.metersPerItem ?? 0) > 0 ? ctx.metersPerItem! * q : 0;
       for (const finConfig of ctx.finishingConfig) {
         const mapKey = finConfig.variant_id ? `${finConfig.service_id}:${finConfig.variant_id}` : String(finConfig.service_id);
         const tiers = ctx.serviceTiersMap.get(mapKey);
@@ -1679,34 +2047,66 @@ export class SimplifiedPricingService {
           ctx.servicePriceUnitMap ?? new Map()
         );
         const isPerSheetOp = priceUnitFromDb === 'per_sheet';
-        const perSheetUnits = isPerSheetOp ? (ctx.isRollPrint ? metersForQ : sheetsForQ) : 0;
+        const isPerMeterOp = priceUnitFromDb === 'per_meter';
+        const meterBasis = ctx.serviceMeterBasisMap?.get(finConfig.service_id) ?? 'knife_path';
+        const meterUnits =
+          isPerMeterOp && meterBasis === 'feed'
+            ? metersForQ
+            : isPerMeterOp
+              ? ctx.knifePathByQty?.(q) ?? 0
+              : 0;
+        const perSheetUnits = isPerSheetOp ? (ctx.isRollMeterage ? metersForQ : sheetsForQ) : 0;
         const unitsPerItem = finConfig.units_per_item ?? 1;
-        // per_cut: только внесённое пользователем кол-во резов, без раскладки
         const totalCutsForOrder = Math.max(unitsPerItem, 1);
         const limitsFin = ctx.serviceLimitsMap?.get(finConfig.service_id);
         const billedPerSheetTier =
           isPerSheetOp && limitsFin ? Math.max(perSheetUnits, limitsFin.min ?? 1) : perSheetUnits;
+        const billedMeterTier =
+          isPerMeterOp && limitsFin ? Math.max(meterUnits, limitsFin.min ?? 1) : meterUnits;
         const billedCutsTier =
           priceUnitFromDb === 'per_cut' && limitsFin
             ? Math.max(totalCutsForOrder, limitsFin.min ?? 1)
             : totalCutsForOrder;
         const tierQty = isPerSheetOp
           ? billedPerSheetTier
-          : priceUnitFromDb === 'per_cut'
-            ? billedCutsTier
-            : q;
-        const tier = this.findTierForQuantity(tiers, tierQty);
+          : isPerMeterOp
+            ? billedMeterTier
+            : priceUnitFromDb === 'per_cut'
+              ? billedCutsTier
+              : q;
+        const sidFin = Number(finConfig.service_id);
+        const ptv = ctx.plotterTierVolumeCtx;
+        const tierBracketQty =
+          isPlotterCuttingSyntheticServiceId(sidFin) && ptv
+            ? resolvePlotterTierVolumeQty({
+                basis:
+                  sidFin === PLOTTER_FIN_ROLL ? ptv.roll.volumeTierBasis : ptv.sheet.volumeTierBasis,
+                tariffMeterBasis:
+                  sidFin === PLOTTER_FIN_ROLL ? ptv.roll.meterBasis : ptv.sheet.meterBasis,
+                knifePathM: ctx.knifePathByQty?.(q) ?? 0,
+                feedM:
+                  ctx.isRollMeterage && (ctx.metersPerItem ?? 0) > 0 ? ctx.metersPerItem! * q : 0,
+                cutAreaM2: ptv.pieceCutAreaTrimM2 * q,
+              })
+            : tierQty;
+        const tier = isPlotterCuttingSyntheticServiceId(sidFin)
+          ? findPlotterVolumeTier(tiers, tierBracketQty) ?? this.findTierForQuantity(tiers, tierQty)
+          : this.findTierForQuantity(tiers, tierQty);
         if (!tier) continue;
         const priceForTier = this.getPriceForQuantityTier(tier);
+        const rollMul =
+          finConfig.service_id === PLOTTER_FIN_ROLL ? (ctx.rollPlotterCutLevelMultiplier ?? 1) : 1;
+        const effectiveTierPrice = priceForTier * rollMul;
         const priceUnit = priceUnitFromDb;
         const serviceMinQty = ctx.serviceLimitsMap?.get(finConfig.service_id)?.min ?? 0;
         if (isPerSheetOp) {
-          const totalUnits = Math.max(perSheetUnits, serviceMinQty);
-          finishingPrice += priceForTier * totalUnits;
+          finishingPrice += effectiveTierPrice * Math.max(perSheetUnits, serviceMinQty);
+        } else if (priceUnit === 'per_meter') {
+          finishingPrice += effectiveTierPrice * Math.max(meterUnits, serviceMinQty);
         } else if (priceUnit === 'per_cut') {
-          finishingPrice += priceForTier * Math.max(totalCutsForOrder, serviceMinQty);
+          finishingPrice += effectiveTierPrice * Math.max(totalCutsForOrder, serviceMinQty);
         } else {
-          finishingPrice += priceForTier * (q * (unitsPerItem ?? 1));
+          finishingPrice += effectiveTierPrice * (q * (unitsPerItem ?? 1));
         }
       }
 

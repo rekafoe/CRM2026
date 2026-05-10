@@ -83,6 +83,44 @@ export async function getPricingServices(): Promise<PricingService[]> {
   return list.map(mapService);
 }
 
+export interface PlotterCuttingModeTariffApi {
+  mode: 'roll' | 'sheet';
+  label: string;
+  price_per_meter: number;
+  meter_basis: 'knife_path' | 'feed';
+  volume_tier_basis?: 'knife_m' | 'feed_m' | 'cut_area_m2' | null;
+  min_quantity: number;
+  max_quantity?: number | null;
+  operator_percent?: number | null;
+  material_id?: number | null;
+  qty_per_item?: number | null;
+  weeding_price_per_item?: number | null;
+  mounting_price_per_item?: number | null;
+  weeding_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
+  mounting_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
+  volume_tiers?: Array<{ min_quantity: number; price_per_unit: number }>;
+  cut_level_rules?: Array<{ max_cell_long_side_mm: number; multiplier: number }>;
+}
+
+export interface PlotterCuttingTariffsBundleApi {
+  roll: PlotterCuttingModeTariffApi;
+  sheet: PlotterCuttingModeTariffApi;
+}
+
+export async function getPlotterCuttingTariffs(): Promise<PlotterCuttingTariffsBundleApi> {
+  const response = await api.get('/pricing/plotter-cutting-tariffs');
+  const data = (response.data as any)?.data ?? response.data;
+  return data as PlotterCuttingTariffsBundleApi;
+}
+
+export async function putPlotterCuttingTariffs(
+  body: Partial<Record<'roll' | 'sheet', Partial<PlotterCuttingModeTariffApi>>>
+): Promise<PlotterCuttingTariffsBundleApi> {
+  const response = await api.put('/pricing/plotter-cutting-tariffs', body);
+  const data = (response.data as any)?.data ?? response.data;
+  return data as PlotterCuttingTariffsBundleApi;
+}
+
 export async function getBindingServices(): Promise<PricingService[]> {
   const response = await api.get('/pricing/bindings');
   const payload: any = (response.data as any)?.data ?? response.data ?? [];
@@ -92,7 +130,7 @@ export async function getBindingServices(): Promise<PricingService[]> {
 
 export async function createPricingService(payload: CreatePricingServicePayload): Promise<PricingService> {
   // Совместимость с существующей формой: поле unit в UI иногда содержит per_cut/per_sheet (это price_unit)
-  const isPriceUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(payload.unit);
+  const isPriceUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(payload.unit);
   const resolvedUnit = isPriceUnit ? 'item' : payload.unit;
   const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
 
@@ -116,7 +154,7 @@ export async function createPricingService(payload: CreatePricingServicePayload)
 }
 
 export async function createBindingService(payload: CreatePricingServicePayload): Promise<PricingService> {
-  const isPriceUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(payload.unit);
+  const isPriceUnit = ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(payload.unit);
   const resolvedUnit = isPriceUnit ? 'item' : payload.unit;
   const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
 
@@ -138,7 +176,7 @@ export async function createBindingService(payload: CreatePricingServicePayload)
 }
 
 export async function updatePricingService(id: number, payload: UpdatePricingServicePayload): Promise<PricingService> {
-  const isPriceUnit = payload.unit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(payload.unit) : false;
+  const isPriceUnit = payload.unit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(payload.unit) : false;
   const resolvedUnit = payload.unit ? (isPriceUnit ? 'item' : payload.unit) : undefined;
   const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
 
@@ -162,7 +200,7 @@ export async function updatePricingService(id: number, payload: UpdatePricingSer
 }
 
 export async function updateBindingService(id: number, payload: UpdatePricingServicePayload): Promise<PricingService> {
-  const isPriceUnit = payload.unit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order'].includes(payload.unit) : false;
+  const isPriceUnit = payload.unit ? ['per_cut', 'per_sheet', 'per_item', 'fixed', 'per_order', 'per_meter'].includes(payload.unit) : false;
   const resolvedUnit = payload.unit ? (isPriceUnit ? 'item' : payload.unit) : undefined;
   const resolvedPriceUnit = payload.priceUnit ?? (isPriceUnit ? payload.unit : undefined);
 

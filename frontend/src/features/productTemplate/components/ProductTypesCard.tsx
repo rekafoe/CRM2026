@@ -5,6 +5,7 @@ import type { SimplifiedConfig, SimplifiedTypeConfig, ProductTypeVariant, Produc
 import { sortSizesByArea, getEffectiveAllowedMaterialIds } from '../hooks/useProductTemplate'
 import { uploadProductImage } from '../../../services/products'
 import { SubtypeAllowedPriceTypesField } from './SubtypeAllowedPriceTypesField'
+import { PlotterSubtypeSection } from './PlotterSubtypeSection'
 import './SimplifiedTemplateSection.css'
 
 const updateType = (
@@ -792,6 +793,14 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                     allMaterials={allMaterials ?? []}
                   />
                 </div>
+              </section>
+              <section className="subtype-edit-panel">
+                <SubtypePanelHeader
+                  step={4}
+                  title="Плоттерная резка"
+                  lede="Режим лист/рулон и привязка услуг из справочника. Тарифы задаются в карточках услуг и объёмных ценах."
+                />
+                <PlotterSubtypeSection value={value} typeId={editingType.id} onChange={onChange} />
               </section>
             </div>
             <div className="simplified-template__type-modal-actions">

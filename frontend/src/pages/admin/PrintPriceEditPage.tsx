@@ -7,6 +7,7 @@ import { api } from '../../api';
 import type { PrintPrice, PrintPriceTier } from '../../components/admin/hooks/usePricingManagementState';
 import '../../components/admin/PricingManagement.css';
 import { useTierRangeFloating, TIER_RANGE_POPOVER_Z_INDEX, tierModalFloatingRef } from '../../features/productTemplate/hooks/useTierRangeFloating';
+import { PriceCell } from '../../features/productTemplate/components/PriceCell';
 
 const PRICE_MODES = [
   { key: 'color_single', label: 'Цвет, односторонняя' },
@@ -24,43 +25,6 @@ function buildDefaultTiers(priceMode: string): PrintPriceTier[] {
     max_sheets: i < DEFAULT_TIER_BOUNDARIES.length - 1 ? DEFAULT_TIER_BOUNDARIES[i + 1] - 1 : undefined,
     price_per_sheet: 0,
   }));
-}
-
-/** Поле цены: при вводе хранит строку для 3.05; число записывается по blur */
-const PriceCell: React.FC<{
-  value: number
-  onChange: (v: number) => void
-  className?: string
-}> = ({ value, onChange, className }) => {
-  const [inputValue, setInputValue] = useState('')
-  const [isFocused, setIsFocused] = useState(false)
-  const displayValue = isFocused ? inputValue : String(value ?? 0)
-  return (
-    <input
-      type="text"
-      inputMode="decimal"
-      className={className}
-      value={displayValue}
-      onFocus={() => {
-        setInputValue(String(value ?? 0))
-        setIsFocused(true)
-      }}
-      onChange={(e) => {
-        const raw = e.target.value
-        if (raw === '' || /^\d*[.,]?\d*$/.test(raw)) setInputValue(raw)
-      }}
-      onBlur={() => {
-        const normalized = inputValue.replace(',', '.')
-        if (normalized === '') {
-          onChange(0)
-        } else {
-          const num = parseFloat(normalized)
-          if (!Number.isNaN(num) && num >= 0) onChange(num)
-        }
-        setIsFocused(false)
-      }}
-    />
-  )
 }
 
 type SheetTier = { min_sheets: number; max_sheets?: number; price_per_sheet: number }

@@ -56,6 +56,7 @@ function parametersWithParentSync(
 const ALLOWED_OPERATION_TYPES = new Set<string>([
   'print',
   'cut',
+  'plotter_cut',
   'fold',
   'score',
   'laminate',

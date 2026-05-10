@@ -5,6 +5,8 @@ interface DynamicFieldsSectionProps {
   schema: any | null;
   specs: Record<string, any>;
   updateSpecs: (updates: Record<string, any>, instant?: boolean) => void; // 🆕 Добавили instant
+  /** Не показывать эти поля (например, выборка/накатка вне рулонного плоттера). */
+  hiddenFieldNames?: Set<string>;
 }
 
 // Поля, которые уже отрисовываются специализированными секциями
@@ -33,10 +35,17 @@ const RESERVED_FIELDS = new Set([
   'magnetic',
 ]);
 
-export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({ schema, specs, updateSpecs }) => {
+export const DynamicFieldsSection: React.FC<DynamicFieldsSectionProps> = ({
+  schema,
+  specs,
+  updateSpecs,
+  hiddenFieldNames,
+}) => {
   if (!schema || !Array.isArray(schema.fields)) return null;
 
-  const fields = schema.fields.filter((f: any) => !RESERVED_FIELDS.has(f.name));
+  const fields = schema.fields.filter(
+    (f: any) => !RESERVED_FIELDS.has(f.name) && !hiddenFieldNames?.has(f.name)
+  );
   if (fields.length === 0) return null;
 
   const renderField = (field: any) => {

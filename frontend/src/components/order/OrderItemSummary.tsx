@@ -11,6 +11,11 @@ interface ParameterSummaryItem {
 
 interface OrderItemSummaryProps {
   item: Item;
+  /**
+   * Узкая строка без повтора названия продукта и без листов/формата/материала —
+   * когда детали уже в таблице разбивки (OrderItemPositionBreakdown).
+   */
+  compact?: boolean;
   /** Тип цены заказа (если у позиции нет своего — используем этот) */
   orderPriceType?: string;
   qty: number;
@@ -30,6 +35,7 @@ interface OrderItemSummaryProps {
 
 export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
   item,
+  compact = false,
   orderPriceType,
   qty,
   price,
@@ -51,12 +57,14 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
   const noLayout = itemParamsHasNoLayout(item.params);
 
   return (
-    <div className="order-item-horizontal">
-      {/* Название товара */}
-      <span className="item-name">{(item as any).name || (item.params as any)?.productName || (item.params as any)?.name || item.type || 'Позиция'}</span>
-
-      {/* Разделитель */}
-      <span className="separator">|</span>
+    <div className={`order-item-horizontal${compact ? ' order-item-horizontal--compact' : ''}`}>
+      {/* Название — скрываем в compact: оно уже в заголовке позиции и в таблице разбивки */}
+      {!compact && (
+        <>
+          <span className="item-name">{(item as any).name || (item.params as any)?.productName || (item.params as any)?.name || item.type || 'Позиция'}</span>
+          <span className="separator">|</span>
+        </>
+      )}
 
       {/* Количество */}
       <span className="item-quantity">{qty.toLocaleString()} шт.</span>
@@ -128,19 +136,19 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
       )}
 
       {/* Информация по листам */}
-      {sheetCount !== null && (
+      {!compact && sheetCount !== null && (
         <>
           <span className="separator">|</span>
           <span className="detail-item">Листов: {sheetCount}</span>
         </>
       )}
-      {itemsPerSheet != null && itemsPerSheet > 0 && (
+      {!compact && itemsPerSheet != null && itemsPerSheet > 0 && (
         <>
           <span className="separator">|</span>
           <span className="detail-item">На листе: {itemsPerSheet}</span>
         </>
       )}
-      {sheetSize && (
+      {!compact && sheetSize && (
         <>
           <span className="separator">|</span>
           <span className="detail-item">Формат листа: {sheetSize}</span>
@@ -148,7 +156,7 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
       )}
 
       {/* Формат печати */}
-      {materialFormat && (
+      {!compact && materialFormat && (
         <>
           <span className="separator">|</span>
           <span className="detail-item">Формат печати: {materialFormat}</span>
@@ -156,7 +164,8 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
       )}
 
       {/* Тип материала - показываем display_name из типов бумаги со склада для оператора */}
-      {(() => {
+      {!compact &&
+      (() => {
         // 🆕 Приоритет: materialTypeDisplay (уже содержит display_name из склада), затем из parameterSummary
         // materialTypeDisplay загружается из склада и содержит транслированное название типа бумаги
         // Это позволяет оператору видеть понятное название (например, "Глянцевая" вместо "glossy")
@@ -181,7 +190,7 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
       })()}
 
       {/* Плотность */}
-      {materialDensity && (
+      {!compact && materialDensity && (
         <>
           <span className="separator">|</span>
           <span className="detail-item">Плотность: {materialDensity} г/м²</span>
@@ -189,7 +198,7 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
       )}
 
       {/* Материал */}
-      {item.params.paperName && (
+      {!compact && item.params.paperName && (
         <>
           <span className="separator">|</span>
           <span className="detail-item">Материал: {item.params.paperName}</span>
@@ -197,7 +206,7 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
       )}
 
       {/* Ламинация */}
-      {item.params.lamination && item.params.lamination !== 'none' && (
+      {!compact && item.params.lamination && item.params.lamination !== 'none' && (
         <>
           <span className="separator">|</span>
           <span className="detail-item">
@@ -209,7 +218,8 @@ export const OrderItemSummary: React.FC<OrderItemSummaryProps> = ({
       )}
 
       {/* Дополнительные параметры из parameterSummary */}
-      {(() => {
+      {!compact &&
+      (() => {
         // Параметры, которые нужно показать в основной строке
         const importantParams = parameterSummary.filter((param) => {
           const label = param.label.toLowerCase();

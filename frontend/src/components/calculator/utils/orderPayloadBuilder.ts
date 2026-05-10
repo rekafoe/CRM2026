@@ -95,10 +95,12 @@ export function buildOrderPayload({
   const cleanMaterials = result.materials
     ? result.materials.map((m: any) => ({
         materialId: m.materialId,
-        materialName: m.materialName,
+        materialName: m.materialName ?? m.material,
+        material: m.material ?? m.materialName,
         quantity: m.quantity,
-        unitPrice: m.unitPrice,
-        totalCost: m.totalCost,
+        unit: m.unit ?? m.unitName,
+        unitPrice: m.unitPrice ?? m.price,
+        totalCost: m.totalCost ?? m.total,
         density: m.density,
         paper_type_name: m.paper_type_name,
       }))

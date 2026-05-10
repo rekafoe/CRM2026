@@ -172,6 +172,10 @@
   background: #f8f9fa;
 }
 
+.admin-page-layout.plotter-cutting-page {
+  background: #f8f9fa;
+}
+
 /* Вкладки списка заказов — в стиле полей ввода */
 .orders-list-tabs,
 .orders-list-tab {

@@ -11,7 +11,6 @@ import { useCalculatorValidation } from './hooks/useCalculatorValidation';
 import { useCalculatorSchema } from './hooks/useCalculatorSchema';
 import { useCalculatorMaterials } from './hooks/useCalculatorMaterials';
 import { ResultSection } from './components/ResultSection';
-import { DynamicFieldsSection } from './components/DynamicFieldsSection';
 import { useCalculatorUI } from './hooks/useCalculatorUI';
 import { AdvancedSettingsSection } from './components/AdvancedSettingsSection';
 import { DynamicProductSelector, CUSTOM_PRODUCT_ID, POSTPRINT_PRODUCT_ID } from './components/DynamicProductSelector';

@@ -57,6 +57,9 @@ const PreflightPage = lazy(() =>
 const ServicesManagementPage = lazy(() =>
   import('./admin/ServicesManagementPage').then((m) => ({ default: m.ServicesManagementPage }))
 );
+const PlotterCuttingSettingsPage = lazy(() =>
+  import('./admin/PlotterCuttingSettingsPage').then((m) => ({ default: m.PlotterCuttingSettingsPage }))
+);
 const AdminProductManager = lazy(() =>
   import('../components/calculator/AdminProductManager').then((m) => ({ default: m.AdminProductManager }))
 );
@@ -160,6 +163,14 @@ const AdminPanelHome: React.FC = () => {
           <button onClick={() => navigate('/adminpanel/services-management')} className="nav-btn">
             <AppIcon name="wrench" size="xs" /> Настройка операций
           </button>
+          <button
+            type="button"
+            onClick={() => navigate('/adminpanel/plotter-cutting')}
+            className="nav-btn"
+            title="Тарифы рулон/лист за п.м., объёмные ступени; выборка и накатка — фикс. за изделие. Включение плоттера — в шаблоне продукта, подтип"
+          >
+            <AppIcon name="scissors" size="xs" /> Плоттерная резка
+          </button>
           <button onClick={() => navigate('/adminpanel/clients')} className="nav-btn">
             <AppIcon name="users" size="xs" /> Клиенты
           </button>
@@ -223,6 +234,18 @@ const AdminPanelHome: React.FC = () => {
               <span className="link-icon"><AppIcon name="puzzle" size="md" circle /></span>
               <span className="link-title">Калькулятор</span>
               <span className="link-desc">Настройки калькулятора</span>
+            </button>
+
+            <button
+              type="button"
+              className="admin-link-card"
+              onClick={() => navigate('/adminpanel/plotter-cutting')}
+            >
+              <span className="link-icon"><AppIcon name="scissors" size="md" circle /></span>
+              <span className="link-title">Плоттерная резка</span>
+              <span className="link-desc">
+                Основная резка и два доптарифа (выборка, накатка за изделие). В калькуляторе — чекбоксы только для рулонного подтипа
+              </span>
             </button>
             
             <button 
@@ -343,6 +366,7 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/pricing" element={<PricingPage onBack={() => window.history.back()} />} />
           <Route path="/cost-calculation" element={<Navigate to="/adminpanel/pricing" replace />} />
           <Route path="/services-management" element={<ServicesManagementPage />} />
+          <Route path="/plotter-cutting" element={<PlotterCuttingSettingsPage />} />
           <Route path="/discounts" element={<PricingPage onBack={() => window.history.back()} />} />
           <Route path="/earnings" element={<EarningsAdminPage />} />
           <Route path="/printers" element={<PrintersPage />} />

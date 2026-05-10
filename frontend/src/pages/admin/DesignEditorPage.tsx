@@ -53,6 +53,10 @@ import { ImagePickerModal } from '../../components/ImagePickerModal';
 import { TextFloatingToolbar } from './designEditor/TextFloatingToolbar';
 import '../../styles/admin-page-layout.css';
 import './DesignEditorPage.css';
+import './designEditor/designEditorGlassTheme.css';
+import './designEditor/designEditorPmThemeChrome.css';
+import './designEditor/designEditorPmButtons.css';
+import './designEditor/designEditorPmButtonsMore.css';
 
 const SIDEBAR_PHOTO_MAX = 500;
 const DEFAULT_PREPRESS_CONFIG: DesignPrepressConfig = {
@@ -227,6 +231,7 @@ export const DesignEditorPage: React.FC = () => {
     const el = scrollAreaRef.current;
     const sync = () => {
       canvasHandleRef.current?.syncTextFloatingAnchor();
+      canvasHandleRef.current?.syncCanvasOffset();
     };
     el?.addEventListener('scroll', sync, { passive: true });
     window.addEventListener('resize', sync);
@@ -238,6 +243,7 @@ export const DesignEditorPage: React.FC = () => {
 
   useEffect(() => {
     canvasHandleRef.current?.syncTextFloatingAnchor();
+    canvasHandleRef.current?.syncCanvasOffset();
   }, [fitZoom]);
 
   /** При выделении текста открываем раздел «Текст» в сайдбаре (расширенный режим) */
@@ -1091,6 +1097,8 @@ export const DesignEditorPage: React.FC = () => {
                   onZoomChange={setZoom}
                   onPageThumbReady={handlePageThumbReady}
                   onDropRemoteImageUrl={handleImageUrlSubmit}
+                  getSidebarPhotoFile={(id) => sidebarPhotos.find((p) => p.id === id)?.file}
+                  onSidebarPhotoDropped={removeSidebarPhoto}
                   guideLinesPx={guideLinesPx}
                   onSnapLinesChange={setSnapLines}
                   onTextFloatingAnchor={

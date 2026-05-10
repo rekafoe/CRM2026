@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Item } from '../types';
 import { updateOrderItem, deleteOrderItem, getPrinters } from '../api';
 import { numberInputFromString, numberInputToNumber, type NumberInputValue } from '../utils/numberInput';
@@ -12,6 +12,7 @@ import {
 } from './order/orderItemUtils';
 import './OrderItem.css';
 import { OrderItemSummary } from './order/OrderItemSummary';
+import { OrderItemPositionBreakdown } from './order/OrderItemPositionBreakdown';
 import { OrderItemEditForm } from './order/OrderItemEditForm';
 import { OrderItemActions } from './order/OrderItemActions';
 
@@ -203,6 +204,12 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
   
   // Получаем название товара
   const name = (item as any).name || (item as any).params?.productName || (item as any).params?.name || (item as any).type || 'Товар без названия';
+  const itemDisplayName =
+    (item as any).name ||
+    (item as any).params?.productName ||
+    (item as any).params?.name ||
+    (item as any).type ||
+    'Позиция';
   const parameterSummary = Array.isArray(item.params.parameterSummary) ? item.params.parameterSummary : [];
   const sheetCountRaw = item.sheets ?? item.params.sheetsNeeded ?? item.params.layout?.sheetsNeeded ?? null;
   const sheetCount = sheetCountRaw != null && sheetCountRaw > 0 ? sheetCountRaw : null;
@@ -260,12 +267,123 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     }
   };
 
+  const showPositionBreakdown =
+    !editing &&
+    ((Array.isArray(item.params.materials) && item.params.materials.length > 0) ||
+      (Array.isArray(item.params.services) && item.params.services.length > 0));
+
+  /** Чипы параметров справа — без дублей с таблицей разбивки и строкой итого */
+  const filteredParameterChips = useMemo(() => {
+    return parameterSummary.filter((param) => {
+      const label = param.label.toLowerCase();
+      if (
+        showPositionBreakdown &&
+        (label === 'формат печати' || label === 'формат' || label === 'размер')
+      ) {
+        return false;
+      }
+      return !(
+        label === 'формат' ||
+        label === 'размер' ||
+        label === 'тип материала' ||
+        label === 'материал' ||
+        label === 'плотность бумаги' ||
+        label === 'плотность' ||
+        label === 'тип продукта' ||
+        label === 'тираж' ||
+        label === 'стороны печати' ||
+        label === 'срок изготовления' ||
+        label === 'количество страниц' ||
+        label === 'формат печати'
+      );
+    });
+  }, [parameterSummary, showPositionBreakdown]);
+
+  /** Формат / тираж для строки без таблицы и для шапки таблицы разбивки */
+  const titleParts = useMemo(() => {
+    const formatFromSummary =
+      parameterSummary.find((p) => p.label === 'Формат печати')?.value ||
+      parameterSummary.find((p) => p.label === 'Формат')?.value ||
+      '';
+    const specs = (item.params as any)?.specifications || {};
+    const sizePart =
+      (formatFromSummary && String(formatFromSummary).trim()) ||
+      (typeof specs.format === 'string' && specs.format.trim()) ||
+      (typeof item.params.formatInfo === 'string' && item.params.formatInfo.trim()) ||
+      (materialFormat ? String(materialFormat).trim() : '');
+    const q = Math.max(1, numberInputToNumber(qty, Number(item.quantity) || 1));
+    const qtyStr = `${q.toLocaleString('ru-RU')} шт.`;
+    const metaInline = sizePart ? `${sizePart} | ${qtyStr}` : qtyStr;
+    return { formatText: sizePart, quantityText: qtyStr, metaInline };
+  }, [parameterSummary, item.params, item.quantity, qty, materialFormat]);
+
+  const useBreakdownChrome = showPositionBreakdown && !editing;
+  const canShowAssign =
+    (operatorsToday.length > 0 && onExecutorChange) || !readOnly;
+  const assignFields = canShowAssign ? (
+    <>
+      {operatorsToday.length > 0 && onExecutorChange && (
+        <div className="order-item-meta-field-row order-item-meta-field-row--assign-line">
+          <span className="order-item-meta-assign-label">Исполнитель</span>
+          <div className="order-item-meta-assign-select-wrap">
+            <select
+              className="order-item-meta-select order-item-meta-select--inline"
+              value={item.executor_user_id ?? (order as any)?.responsible_user_id ?? (order as any)?.userId ?? ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!onExecutorChange) return;
+                onExecutorChange(orderId, item.id, v === '' ? null : Number(v));
+              }}
+            >
+              <option value="">—</option>
+              {operatorsToday.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+      {!readOnly && (
+        <div className="order-item-meta-field-row order-item-meta-field-row--assign-line">
+          <span className="order-item-meta-assign-label">Принтер</span>
+          <div className="order-item-meta-assign-select-wrap">
+            <select
+              className="order-item-meta-select order-item-meta-select--inline"
+              value={printerId === '' ? '' : String(printerId)}
+              onFocus={loadPrintersIfNeeded}
+              onMouseDown={loadPrintersIfNeeded}
+              onChange={(e) => {
+                const v = e.target.value;
+                void handleQuickPrinterChange(v ? Number(v) : '');
+              }}
+              disabled={savingPrinter}
+              aria-busy={savingPrinter}
+            >
+              <option value="">Не выбран</option>
+              {printerId !== '' && !printers.some((p) => p.id === printerId) && (
+                <option value={String(printerId)}>{`Принтер #${printerId}`}</option>
+              )}
+              {printers.map((p) => (
+                <option key={p.id} value={String(p.id)}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            {savingPrinter ? (
+              <span className="order-item-meta-field-hint">Сохраняем…</span>
+            ) : null}
+          </div>
+        </div>
+      )}
+    </>
+  ) : null;
+
   return (
-    <div className="item" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{ flex: 1 }}>
+    <div className="item order-item-row">
+      <div className="order-item-body">
         {(() => {
-          // Заголовок — по имени (дизайн, ламинация, визитки и т.д.), не по типу
-          const itemName = (item as any).name || (item as any).params?.productName || (item as any).params?.name || (item as any).type || 'Позиция';
           const display = sanitizeOrderItemDescription(String(customDescription || ''), (item as any).type);
           const showDesc = Boolean(display) && display !== 'Без описания';
           // Инструкция: печать (листы) → послепечатные по имени → резка. Без названия не показываем.
@@ -274,37 +392,94 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
           const sheetsNeeded = Number(params.sheetsNeeded ?? params.specifications?.sheetsNeeded ?? layout.sheetsNeeded) || 0;
           const cutsPerSheet = Number(layout.cutsPerSheet) || 0;
           const parts: string[] = [];
-          if (sheetsNeeded > 0) {
-            const sheetWord = sheetsNeeded === 1 ? 'лист' : sheetsNeeded < 5 ? 'листа' : 'листов';
-            parts.push(`${sheetsNeeded} ${sheetWord} печати`);
-          }
-          const rawServices = params.services as Array<{ operationName?: string; service?: string; name?: string; quantity?: number; priceUnit?: string; unit?: string }> | undefined;
-          if (Array.isArray(rawServices)) {
-            for (const s of rawServices) {
-              const name = String(s.operationName || s.service || s.name || '').trim();
-              if (!name || name.toLowerCase() === 'операция') continue;
-              const q = Number(s.quantity);
-              if (!Number.isFinite(q) || q <= 0) continue;
-              const unit = String(s.priceUnit || s.unit || '').toLowerCase().includes('sheet') || String(s.priceUnit || '').toLowerCase().includes('лист') ? 'лист.' : 'шт.';
-              parts.push(`${name} ${q} ${unit}`);
+          if (!showPositionBreakdown) {
+            if (sheetsNeeded > 0) {
+              const sheetWord = sheetsNeeded === 1 ? 'лист' : sheetsNeeded < 5 ? 'листа' : 'листов';
+              parts.push(`${sheetsNeeded} ${sheetWord} печати`);
             }
-          }
-          if (cutsPerSheet > 0) {
-            const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
-            parts.push(`${cutsPerSheet} ${cutWord}`);
+            const rawServices = params.services as Array<{ operationName?: string; service?: string; name?: string; quantity?: number; priceUnit?: string; unit?: string }> | undefined;
+            if (Array.isArray(rawServices)) {
+              for (const s of rawServices) {
+                const name = String(s.operationName || s.service || s.name || '').trim();
+                if (!name || name.toLowerCase() === 'операция') continue;
+                const q = Number(s.quantity);
+                if (!Number.isFinite(q) || q <= 0) continue;
+                const unit = String(s.priceUnit || s.unit || '').toLowerCase().includes('sheet') || String(s.priceUnit || '').toLowerCase().includes('лист') ? 'лист.' : 'шт.';
+                parts.push(`${name} ${q} ${unit}`);
+              }
+            }
+            if (cutsPerSheet > 0) {
+              const cutWord = cutsPerSheet === 1 ? 'рез' : cutsPerSheet < 5 ? 'реза' : 'резок';
+              parts.push(`${cutsPerSheet} ${cutWord}`);
+            }
           }
           const productionBreakdown = parts.length > 0 ? parts.join(', ') : null;
           return (
             <>
-              <strong>{itemName}</strong>
+              {!showPositionBreakdown ? (
+                <>
+                  <strong>{itemDisplayName}</strong>
+                  <span className="order-item-title-meta"> | {titleParts.metaInline}</span>
+                </>
+              ) : null}
               {showDesc ? <> — {display}</> : null}
               {productionBreakdown && (
                 <span style={{ display: 'block', fontSize: 12, color: '#555', marginTop: 2 }}>{productionBreakdown}</span>
               )}
+              {!editing && showPositionBreakdown ? (
+                <OrderItemPositionBreakdown
+                  item={item}
+                  header={{
+                    productName: itemDisplayName,
+                    formatText: titleParts.formatText,
+                    quantityText: titleParts.quantityText,
+                  }}
+                  assignBar={useBreakdownChrome && assignFields ? assignFields : undefined}
+                  tableActions={
+                    useBreakdownChrome && !readOnly ? (
+                      <OrderItemActions
+                        variant="compact"
+                        editing={editing}
+                        onEditParameters={onEditParameters}
+                        orderId={orderId}
+                        item={item}
+                        onSave={handleSave}
+                        onCancel={() => setEditing(false)}
+                        onDelete={() => setShowDeleteConfirm(true)}
+                      />
+                    ) : undefined
+                  }
+                  footer={{
+                    unitPrice: Number(numberInputToNumber(price, 0)),
+                    total,
+                    sides: typeof sides === 'number' ? sides : Number(numberInputToNumber(sides, 0)),
+                    waste: typeof waste === 'number' ? waste : Number(numberInputToNumber(waste, 0)),
+                  }}
+                />
+              ) : null}
             </>
           );
         })()}
-        {item.params.paperName && (
+        {canShowAssign && !useBreakdownChrome && (
+          <div className="order-item-meta-panel order-item-meta-panel--grid">
+            <div className="order-item-meta-panel__col order-item-meta-panel__col--assign">{assignFields}</div>
+            {!readOnly && (
+              <div className="order-item-meta-panel__col order-item-meta-panel__col--actions">
+                <OrderItemActions
+                  variant="compact"
+                  editing={editing}
+                  onEditParameters={onEditParameters}
+                  orderId={orderId}
+                  item={item}
+                  onSave={handleSave}
+                  onCancel={() => setEditing(false)}
+                  onDelete={() => setShowDeleteConfirm(true)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        {item.params.paperName && !showPositionBreakdown && (
           <span style={{ marginLeft: 6, fontSize: 12, color: '#555' }}>({item.params.paperName}{item.params.lamination && item.params.lamination!=='none' ? `, ламинация: ${item.params.lamination==='matte'?'мат':'гл'}` : ''})</span>
         )}
         {" "}
@@ -331,8 +506,10 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
           />
         ) : (
           <>
+            {!showPositionBreakdown && (
             <OrderItemSummary
               item={item}
+              compact={showPositionBreakdown}
               orderPriceType={order?.priceType}
               qty={Number(numberInputToNumber(qty, 0))}
               price={Number(numberInputToNumber(price, 0))}
@@ -348,84 +525,35 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
               materialDensity={materialDensity}
               parameterSummary={parameterSummary}
             />
+            )}
           </>
         )}
       </div>
-      {/* Показываем только те параметры, которых нет в горизонтальной строке и которые реально нужны отдельно */}
-      {operatorsToday.length > 0 && onExecutorChange && (
-        <label className="order-item-executor" style={{ marginLeft: 8, fontSize: 12 }}>
-          Исполнитель:
-          <select
-            value={item.executor_user_id ?? (order as any)?.responsible_user_id ?? (order as any)?.userId ?? ''}
-            onChange={(e) => {
-              const v = e.target.value;
-              onExecutorChange(orderId, item.id, v === '' ? null : Number(v));
-            }}
-          >
-            <option value="">—</option>
-            {operatorsToday.map((u) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </select>
-        </label>
-      )}
-      {parameterSummary.length > 0 && (
-        <div className="order-parameter-summary">
-          {parameterSummary
-            .filter((param) => {
-              // Исключаем параметры, уже показанные в основной строке
-              const label = param.label.toLowerCase();
-              return !(
-                // Формат / размер / материал
-                label === 'формат' ||
-                label === 'размер' ||
-                label === 'тип материала' ||
-                label === 'материал' ||
-                label === 'плотность бумаги' ||
-                label === 'плотность' ||
-                // Базовые параметры продукта (как на скрине): тип, тираж, стороны, срок, страницы
-                label === 'тип продукта' ||
-                label === 'тираж' ||
-                label === 'стороны печати' ||
-                label === 'срок изготовления' ||
-                label === 'количество страниц'
-              );
-            })
-            .map((param) => (
-              <span className="parameter-chip" key={`${param.label}-${param.value}`}>
-                <span className="parameter-label">{param.label}:</span>
-                <span className="parameter-value">{param.value}</span>
-              </span>
-            ))}
-        </div>
-      )}
+      {filteredParameterChips.length > 0 ? (
+        <aside className="order-item-sidebar" aria-label="Доп. параметры позиции">
+          <div className="order-item-sidebar__row order-item-sidebar__row--chips">
+            <div className="order-parameter-summary order-parameter-summary--sidebar">
+              {filteredParameterChips.map((param) => (
+                <span className="parameter-chip" key={`${param.label}-${param.value}`}>
+                  <span className="parameter-label">{param.label}:</span>
+                  <span className="parameter-value">{param.value}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        </aside>
+      ) : null}
       {!readOnly && (
-        <OrderItemActions
-          editing={editing}
-          printerId={printerId}
-          printers={printers}
-          savingPrinter={savingPrinter}
-          onEditParameters={onEditParameters}
-          orderId={orderId}
-          item={item}
-          onSave={handleSave}
-          onCancel={() => setEditing(false)}
-          onDelete={() => setShowDeleteConfirm(true)}
-          onPrinterFocus={loadPrintersIfNeeded}
-          onPrinterChange={handleQuickPrinterChange}
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDelete}
+          title="Удаление позиции"
+          message="Вы уверены, что хотите удалить эту позицию из заказа?"
+          confirmText="Удалить"
+          cancelText="Отмена"
+          variant="danger"
         />
-      )}
-      {!readOnly && (
-      <ConfirmDialog
-        isOpen={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={handleDelete}
-        title="Удаление позиции"
-        message="Вы уверены, что хотите удалить эту позицию из заказа?"
-        confirmText="Удалить"
-        cancelText="Отмена"
-        variant="danger"
-      />
       )}
     </div>
   );

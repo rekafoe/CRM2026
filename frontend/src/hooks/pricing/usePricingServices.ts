@@ -47,5 +47,3 @@ export function usePricingServices(autoLoad: boolean = true): UsePricingServices
 }
 
 export default usePricingServices;
-
-

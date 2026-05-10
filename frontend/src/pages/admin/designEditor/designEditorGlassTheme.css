@@ -1,0 +1,246 @@
+/**
+ * Редактор макетов — визуал как /adminpanel/products (ProductManagement.css):
+ * фон #f8f9fa, карточки #fff + #e2e8f0, тень 0 2px 8px, кнопки — lg-btn / селект.
+ */
+
+.admin-page-layout.design-editor-fullbleed {
+  background: #f8f9fa;
+}
+
+.admin-page-layout.design-editor-fullbleed .admin-page-content {
+  background: transparent;
+}
+
+.admin-page-layout.design-editor-fullbleed .admin-page-header {
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.admin-page-layout.design-editor-fullbleed .design-editor-loading {
+  padding: 48px 24px;
+  text-align: center;
+  font-size: 15px;
+  color: #64748b;
+}
+
+.design-editor {
+  --de-pm-border: #e2e8f0;
+  --de-pm-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --de-lg-border: rgba(209, 213, 219, 0.6);
+  --de-lg-bg: rgba(229, 231, 235, 0.88);
+  --de-lg-inset: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  --de-lg-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.design-editor-main {
+  background: #f8f9fa;
+}
+
+/* Боковая колонка иконок — как узкая «карточка» */
+.design-editor-sidebar {
+  background: #fff;
+  border-right: 1px solid var(--de-pm-border);
+  box-shadow: var(--de-pm-card-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.design-editor-sidebar-item {
+  color: #64748b;
+}
+
+.design-editor-sidebar-item:hover {
+  background: #f8fafc;
+  color: #334155;
+}
+
+/* Активный пункт — как product-controls__toggle--active */
+.design-editor-sidebar-item.is-active {
+  background: rgba(71, 85, 105, 0.22);
+  color: #1e293b;
+}
+
+/* Тулбар — полоса как верх «product-controls» */
+.design-editor-toolbar {
+  padding: 10px 16px;
+  flex-shrink: 0;
+  gap: 10px;
+  background: #fff;
+  border-bottom: 1px solid var(--de-pm-border);
+  box-shadow: var(--de-pm-card-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.design-editor-toolbar-divider {
+  background: #e2e8f0;
+}
+
+/* === lg-btn (как .product-management .lg-btn) === */
+.design-editor-toolbar-icon-btn {
+  padding: 6px 10px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--de-lg-border);
+  background: var(--de-lg-bg);
+  color: #1f2937;
+  box-shadow: var(--de-lg-inset), var(--de-lg-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.design-editor-toolbar-icon-btn:hover:not(:disabled) {
+  background: rgba(229, 231, 235, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: var(--de-lg-inset), 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.design-editor-toolbar-icon-btn.is-active {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #1d4ed8;
+}
+
+.design-editor-toolbar-icon-btn.is-active:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.design-editor-zoom-group {
+  border: 1px solid var(--de-lg-border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--de-lg-bg);
+  box-shadow: var(--de-lg-inset), var(--de-lg-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.design-editor-zoom-label {
+  background: transparent;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.design-editor-zoom-label:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.design-editor-page-btn {
+  border-radius: 999px;
+  border: 1px solid var(--de-lg-border);
+  background: var(--de-lg-bg);
+  color: #1f2937;
+  box-shadow: var(--de-lg-inset), var(--de-lg-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.design-editor-page-btn:hover:not(:disabled) {
+  background: rgba(229, 231, 235, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Как product-controls__select */
+.design-editor-toolbar .design-editor-font-select,
+.design-editor-toolbar .design-editor-font-size {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--de-lg-border);
+  background: var(--de-lg-bg);
+  color: #1f2937;
+  box-shadow: var(--de-lg-inset), var(--de-lg-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.design-editor-toolbar .design-editor-font-select:hover,
+.design-editor-toolbar .design-editor-font-size:hover {
+  background: rgba(229, 231, 235, 0.95);
+}
+
+.design-editor-toolbar .design-editor-color-input {
+  border-radius: 10px;
+  border: 1px solid var(--de-pm-border);
+  background: #fff;
+  box-shadow: none;
+}
+
+/* Бейдж режима — нейтральный чип как product-filter-chip */
+.design-editor-toolbar-mode-badge {
+  background: #f8fafc;
+  border: 1px solid var(--de-pm-border);
+  color: #334155;
+  font-weight: 500;
+}
+
+/* Панель свойств — как .management-content / .product-controls */
+.design-editor-panel {
+  background: #fff;
+  border-right: 1px solid var(--de-pm-border);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.04);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.design-editor-panel-header {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.design-editor-panel-title {
+  color: #0f172a;
+}
+
+.design-editor-panel-close:hover {
+  background: #f8fafc;
+}
+
+.design-editor-bg-tabs {
+  border-bottom-color: #f1f5f9;
+}
+
+.design-editor-bg-tab.is-active {
+  color: #1d4ed8;
+}
+
+.design-editor-bg-tab:hover {
+  color: #334155;
+}
+
+.photo-panel {
+  background: transparent;
+}
+
+.photo-panel__header {
+  background: #fff;
+  border-bottom: 1px solid var(--de-pm-border);
+}
+
+.photo-panel__title {
+  color: #0f172a;
+}
+
+.photo-panel__body {
+  background: transparent;
+}
+
+/* Угол линейки — как фон полей product-controls */
+.ruler-corner {
+  background: #f8fafc;
+  border-right-color: var(--de-pm-border);
+  border-bottom-color: var(--de-pm-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}

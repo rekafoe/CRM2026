@@ -55,7 +55,19 @@ export const TEXT_FONTS: { value: string; label: string }[] = [
 ];
 
 /** Кастомные свойства Fabric-объектов, которые сохраняются в JSON */
-export const FABRIC_CUSTOM_PROPS = ['id', 'isBackground', 'isPhotoField', 'locked'];
+export const FABRIC_CUSTOM_PROPS = [
+  'id',
+  'isBackground',
+  'isPhotoField',
+  'locked',
+  'photoFieldFilled',
+  'photoFieldFw',
+  'photoFieldFh',
+  'photoFieldPanX',
+  'photoFieldPanY',
+  /** cover — заполнить рамку с обрезкой; contain — вписать целиком в рамку */
+  'photoFieldFitMode',
+];
 
 /** Пункты меню сайдбара */
 export const SIDEBAR_ITEMS: { id: SidebarSection; label: string; icon: IconName }[] = [
@@ -69,3 +81,7 @@ export const SIDEBAR_ITEMS: { id: SidebarSection; label: string; icon: IconName 
   { id: 'cliparts', label: 'Клипарты', icon: 'puzzle' },
   { id: 'frames', label: 'Рамки', icon: 'box' },
 ];
+
+/** MIME для drag&drop превью из галереи «Загружены в проект» → холст (payload: `JSON.stringify({ id })`). */
+export const SIDEBAR_PHOTO_DRAG_MIME = 'application/x-crm-design-editor-sidebar-photo';
+

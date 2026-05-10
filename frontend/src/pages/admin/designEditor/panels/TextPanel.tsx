@@ -193,6 +193,7 @@ export const TextPanel: React.FC<TextPanelProps> = ({
         onClose={() => setGlobalFontConfirmFamily(null)}
         title="Шрифт на всём макете"
         size="sm"
+        className="design-editor-flow-modal"
       >
         <p className="text-panel-v2__modal-scope" style={{ marginTop: 0 }}>
           Сейчас <strong>не выделен</strong> ни один текстовый блок на холсте. Шрифт{' '}
@@ -222,7 +223,13 @@ export const TextPanel: React.FC<TextPanelProps> = ({
         </div>
       </Modal>
 
-      <Modal isOpen={colorOpen} onClose={() => setColorOpen(false)} title="Цвет текста" size="sm">
+      <Modal
+        isOpen={colorOpen}
+        onClose={() => setColorOpen(false)}
+        title="Цвет текста"
+        size="sm"
+        className="design-editor-flow-modal"
+      >
         <div className="text-panel-v2__modal-field">
           <label className="text-panel-v2__modal-label">Цвет заливки</label>
           <div className="text-panel-v2__color-row">
@@ -258,7 +265,13 @@ export const TextPanel: React.FC<TextPanelProps> = ({
         </div>
       </Modal>
 
-      <Modal isOpen={fxOpen} onClose={() => setFxOpen(false)} title="Эффекты" size="sm">
+      <Modal
+        isOpen={fxOpen}
+        onClose={() => setFxOpen(false)}
+        title="Эффекты"
+        size="sm"
+        className="design-editor-flow-modal"
+      >
         <div className="text-panel-v2__modal-field">
           <label className="text-panel-v2__modal-label">
             Непрозрачность: {Math.round(fxDraft.opacity * 100)}%

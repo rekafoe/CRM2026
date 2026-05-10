@@ -1,4 +1,5 @@
 import type { Customer, Order } from '../../../types';
+import { formatReceiptPaperCaptionFromParams } from '../../../components/order/orderItemBreakdownUtils';
 
 export const getCustomerDisplayName = (customer: Customer) => {
   if (customer.type === 'legal') {
@@ -49,35 +50,13 @@ export const formatLastOrderAmount = (value: number | null | undefined) => {
 export const formatDateForFile = (date: Date) => date.toISOString().slice(0, 10).replace(/-/g, '');
 
 export const getOrderItemPaperPhrase = (item: any): string => {
-  const params = item.params || {};
-  const specs = params.specifications || {};
-  const ps: Array<{ label?: string; key?: string; value?: string }> = Array.isArray(params.parameterSummary) ? params.parameterSummary : [];
-  let paperType = specs.paperType ? String(specs.paperType).trim() : '';
-  let density = specs.paperDensity != null ? String(specs.paperDensity).replace(/\s*г\/м².*/i, '').trim() : '';
-  if (!paperType && ps.length) {
-    const ptEntry = ps.find((x: any) => /тип\s*бумаги|paperType|бумага|материал/i.test(String(x.label || x.key || '')));
-    if (ptEntry?.value) paperType = String(ptEntry.value).trim();
+  try {
+    const params =
+      typeof item.params === 'string' ? JSON.parse(item.params || '{}') : (item.params || {});
+    return formatReceiptPaperCaptionFromParams(params);
+  } catch {
+    return '';
   }
-  if (!density && ps.length) {
-    const denEntry = ps.find((x: any) => /плотность|density|г\/м/i.test(String(x.label || x.key || '')));
-    if (denEntry?.value) density = String(denEntry.value).replace(/\s*г\/м².*/i, '').trim();
-  }
-  const sides = specs.sides ?? (typeof specs.sides === 'number' ? specs.sides : undefined);
-  let sidesStr = '';
-  if (sides === 1) sidesStr = 'односторонняя';
-  else if (sides === 2) sidesStr = 'двухсторонняя';
-  if (!sidesStr && ps.length) {
-    const sidesEntry = ps.find((x: any) => /сторон|печать|sides/i.test(String(x.label || x.key || '')));
-    if (sidesEntry?.value) {
-      const v = String(sidesEntry.value);
-      sidesStr = /двух|2/i.test(v) ? 'двухсторонняя' : 'односторонняя';
-    }
-  }
-  if (!paperType && !density && !sidesStr) return '';
-  const typePart = paperType ? ` на ${paperType.toLowerCase()} бумаге` : (density && /\d/.test(density) ? ' на бумаге' : '');
-  const densityPart = density && /\d/.test(density) ? ` ${density}${/г\s*$/i.test(density) ? '' : ' г'}/м²` : '';
-  const sidesPart = sidesStr ? ` ${sidesStr}` : '';
-  return `Печать${typePart}${densityPart}${sidesPart}`.trim();
 };
 
 export const getOrderItemProductionName = (item: any): string => {
@@ -172,15 +151,24 @@ export const getOrderItemProductionRows = (
       if (!name || name.toLowerCase() === 'операция') continue;
       const q = Number(s.quantity);
       if (!Number.isFinite(q) || q <= 0) continue;
+      const totalCost =
+        typeof s.totalCost === 'number' ? s.totalCost : typeof s.total === 'number' ? s.total : undefined;
       const isPrintOp =
         String(s.operationType || s.operation_type || '').toLowerCase() === 'print' || /^печать$/i.test(name);
-      if (isPrintOp && rows.length > 0 && /печать|листы/i.test(rows[0].name)) {
-        continue;
+      if (isPrintOp && rows.length > 0 && typeof totalCost === 'number' && totalCost >= 0) {
+        if (/печать|листы/i.test(rows[0].name)) {
+          rows[0].totalCost = totalCost;
+          continue;
+        }
       }
       const pu = String(s.priceUnit || s.unit || '').toLowerCase();
       const unit = pu.includes('sheet') || pu.includes('лист') ? 'лист.' : 'шт.';
-      const totalCost = typeof s.totalCost === 'number' ? s.totalCost : (typeof s.total === 'number' ? s.total : undefined);
-      rows.push({ name, quantity: q, unit, ...(typeof totalCost === 'number' && totalCost >= 0 ? { totalCost } : {}) });
+      rows.push({
+        name,
+        quantity: q,
+        unit,
+        ...(typeof totalCost === 'number' && totalCost >= 0 ? { totalCost } : {}),
+      });
     }
   }
   if (cutsPerSheet > 0 && !hasCuttingInServices) {

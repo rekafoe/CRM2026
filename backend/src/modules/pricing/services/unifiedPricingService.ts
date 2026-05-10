@@ -134,6 +134,46 @@ export class UnifiedPricingService {
       quantity
     );
     
+    const printOperationRow =
+      result.printDetails &&
+      (() => {
+        const layout = result.layout;
+        const meters =
+          layout?.metersNeeded != null && Number.isFinite(Number(layout.metersNeeded))
+            ? Number(layout.metersNeeded)
+            : 0;
+        const sheets =
+          layout?.sheetsNeeded != null && Number.isFinite(Number(layout.sheetsNeeded))
+            ? Number(layout.sheetsNeeded)
+            : 0;
+        /** Фактический расход листов / п.м., как у строки материала — не тираж экземпляров */
+        let priceUnit: 'per_meter' | 'per_sheet' | 'per_item' = 'per_item';
+        let physQty = result.quantity;
+        if (meters > 0) {
+          priceUnit = 'per_meter';
+          physQty = meters;
+        } else if (sheets > 0) {
+          priceUnit = 'per_sheet';
+          physQty = sheets;
+        }
+        const q = physQty > 0 ? physQty : result.quantity;
+        const unitPrice = q > 0 ? result.printPrice / q : result.printDetails!.tier.price;
+        return {
+          operationId: 0,
+          operationName: 'Печать',
+          operationType: 'print',
+          priceUnit,
+          unitPrice,
+          quantity: q,
+          setupCost: 0,
+          totalCost: result.printPrice,
+          appliedRules: undefined,
+          pricingSource: 'simplified',
+          pricingKey: 'print',
+          technologyCode: result.selectedPrint?.technology_code,
+        };
+      })();
+
     // Преобразуем SimplifiedPricingResult в UnifiedPricingResult
     return {
       productId: result.productId,
@@ -187,20 +227,7 @@ export class UnifiedPricingService {
         })) ?? []),
       ],
       operations: [
-        ...(result.printDetails ? [{
-          operationId: 0,
-          operationName: 'Печать',
-          operationType: 'print',
-          priceUnit: 'per_item' as const,
-          unitPrice: result.printDetails.tier.price,
-          quantity: result.quantity,
-          setupCost: 0,
-          totalCost: result.printPrice,
-          appliedRules: undefined,
-          pricingSource: 'simplified',
-          pricingKey: 'print',
-          technologyCode: result.selectedPrint?.technology_code,
-        }] : []),
+        ...(printOperationRow ? [printOperationRow] : []),
         ...(result.finishingDetails?.map(f => ({
           operationId: f.service_id,
           operationName: f.service_name,

@@ -33,6 +33,9 @@ export interface ProductSpecs {
   pages?: number;
   magnetic?: boolean;
   cutting?: boolean;
+  /** Опции плоттера (упрощённый калькулятор, подтип с plotter) */
+  plotter_weeding?: boolean;
+  plotter_mounting?: boolean;
   folding?: boolean;
   roundCorners?: boolean;
   urgency?: 'standard' | 'urgent';

@@ -6,6 +6,7 @@ import {
   normalizeConfigDataForPersistence,
   normalizeSimplifiedTypeIds,
   sortSimplifiedTypesStable,
+  simplifiedHasRollPlotterSubtype,
   compactSimplifiedForSite,
   collectMaterialIdsFromSimplified,
   collectServiceIdsFromSimplified,
@@ -404,6 +405,28 @@ router.get('/:productId/schema', async (req, res) => {
     const normalizedSimplified = sortSimplifiedTypesStable(
       normalizeSimplifiedTypeIds(templateConfigData?.simplified),
     );
+
+    if (simplifiedHasRollPlotterSubtype(normalizedSimplified)) {
+      const plotterRollFinFields: Array<{ name: string; label: string; type: string; required: boolean }> = [
+        {
+          name: 'plotter_weeding',
+          label: 'Выборка винила (за 1 изделие; ставка в админке «Плоттерная резка»)',
+          type: 'boolean',
+          required: false,
+        },
+        {
+          name: 'plotter_mounting',
+          label: 'Накатка монтажной плёнки (за 1 изделие; ставка в админке «Плоттерная резка»)',
+          type: 'boolean',
+          required: false,
+        },
+      ];
+      for (const f of plotterRollFinFields) {
+        if (!fields.some((x: any) => x.name === f.name)) {
+          fields.push(f);
+        }
+      }
+    }
 
     // Для simplified с typeConfigs: подгружаем материалы из allowed_material_ids с density и paper_type_name.
     // Иначе на фронте приходят тип материала, но не плотности (подтип «Дизайнерские открытки» и др.).

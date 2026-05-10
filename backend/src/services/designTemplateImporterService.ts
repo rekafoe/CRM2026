@@ -2,22 +2,12 @@ import path from 'path'
 import { createDesignTemplate, getDesignTemplate, type DesignTemplateRow } from './designTemplateService'
 import { addSubtypeDesign } from './subtypeDesignService'
 import { saveBufferToUploads } from '../config/upload'
-
-type SvgRect = {
-  name: string
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-type SvgText = {
-  name: string
-  x: number
-  y: number
-  fontSize: number
-  text: string
-}
+import {
+  parseImportedSvgLayers,
+  type PrepressFromSvgGuides,
+  type SvgRect,
+  type SvgText,
+} from './designTemplateSvgParse'
 
 export interface ImportDesignTemplateInput {
   file: {
@@ -40,127 +30,12 @@ export interface ImportDesignTemplateResult {
   errors: string[]
 }
 
-const PX_TO_MM = 25.4 / 96
-
-function parseAttributes(source: string): Record<string, string> {
-  const attrs: Record<string, string> = {}
-  const attrRe = /([:\w-]+)\s*=\s*["']([^"']*)["']/g
-  let match: RegExpExecArray | null
-  while ((match = attrRe.exec(source))) {
-    attrs[match[1]] = match[2]
-  }
-  return attrs
-}
-
-function parseNumber(value: string | undefined): number | null {
-  if (!value) return null
-  const match = value.trim().match(/^-?\d+(?:\.\d+)?/)
-  if (!match) return null
-  const n = Number(match[0])
-  return Number.isFinite(n) ? n : null
-}
-
-function parseLengthMm(value: string | undefined): number | null {
-  const n = parseNumber(value)
-  if (n == null) return null
-  const unit = value?.trim().replace(/^-?\d+(?:\.\d+)?/, '').trim().toLowerCase()
-  if (unit === 'mm') return n
-  if (unit === 'cm') return n * 10
-  if (unit === 'in') return n * 25.4
-  if (unit === 'pt') return n * 25.4 / 72
-  return n * PX_TO_MM
-}
-
-function decodeXmlText(value: string): string {
-  return value
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .trim()
-}
-
 function sanitizeSvg(svg: string): string {
   return svg
     .replace(/<script\b[\s\S]*?<\/script>/gi, '')
     .replace(/<foreignObject\b[\s\S]*?<\/foreignObject>/gi, '')
     .replace(/\son[a-z]+\s*=\s*["'][^"']*["']/gi, '')
     .replace(/\s(?:href|xlink:href)\s*=\s*["']\s*javascript:[^"']*["']/gi, '')
-}
-
-function getLayerName(attrs: Record<string, string>): string | null {
-  return attrs.id || attrs['inkscape:label'] || attrs['data-name'] || null
-}
-
-function parseSvg(svg: string): {
-  widthMm: number
-  heightMm: number
-  photoRects: SvgRect[]
-  textItems: SvgText[]
-  warnings: string[]
-} {
-  const warnings: string[] = []
-  const svgTag = svg.match(/<svg\b[^>]*>/i)?.[0] ?? ''
-  const svgAttrs = parseAttributes(svgTag)
-  const viewBox = (svgAttrs.viewBox || '').split(/\s+/).map(Number).filter(Number.isFinite)
-  const viewBoxWidth = viewBox.length === 4 ? viewBox[2] : null
-  const viewBoxHeight = viewBox.length === 4 ? viewBox[3] : null
-  const widthMm = parseLengthMm(svgAttrs.width) ?? (viewBoxWidth != null ? viewBoxWidth * PX_TO_MM : 100)
-  const heightMm = parseLengthMm(svgAttrs.height) ?? (viewBoxHeight != null ? viewBoxHeight * PX_TO_MM : 100)
-
-  if (!svgAttrs.width || !svgAttrs.height) {
-    warnings.push('SVG не содержит явные width/height, размеры взяты из viewBox или fallback.')
-  }
-
-  const scaleX = viewBoxWidth && widthMm ? widthMm / viewBoxWidth : PX_TO_MM
-  const scaleY = viewBoxHeight && heightMm ? heightMm / viewBoxHeight : PX_TO_MM
-  const photoRects: SvgRect[] = []
-  const textItems: SvgText[] = []
-
-  const rectRe = /<rect\b([^>]*)\/?>/gi
-  let rectMatch: RegExpExecArray | null
-  while ((rectMatch = rectRe.exec(svg))) {
-    const attrs = parseAttributes(rectMatch[1])
-    const name = getLayerName(attrs)
-    if (!name) continue
-    if (name.startsWith('photo_')) {
-      const x = parseNumber(attrs.x) ?? 0
-      const y = parseNumber(attrs.y) ?? 0
-      const width = parseNumber(attrs.width)
-      const height = parseNumber(attrs.height)
-      if (width == null || height == null || width <= 0 || height <= 0) {
-        warnings.push(`Фото-поле ${name} пропущено: rect должен иметь width/height.`)
-        continue
-      }
-      photoRects.push({ name, x: x * scaleX, y: y * scaleY, width: width * scaleX, height: height * scaleY })
-    }
-  }
-
-  const textRe = /<text\b([^>]*)>([\s\S]*?)<\/text>/gi
-  let textMatch: RegExpExecArray | null
-  while ((textMatch = textRe.exec(svg))) {
-    const attrs = parseAttributes(textMatch[1])
-    const name = getLayerName(attrs)
-    if (!name || !name.startsWith('text_')) continue
-    const x = parseNumber(attrs.x) ?? 0
-    const y = parseNumber(attrs.y) ?? 0
-    const fontSize = parseNumber(attrs['font-size']) ?? 18
-    textItems.push({
-      name,
-      x: x * scaleX,
-      y: y * scaleY,
-      fontSize: fontSize * ((scaleX + scaleY) / 2),
-      text: decodeXmlText(textMatch[2]) || name.replace(/^text_/, ''),
-    })
-  }
-
-  if (photoRects.length === 0 && textItems.length === 0) {
-    warnings.push('В SVG не найдено объектов photo_* или text_*; шаблон будет импортирован только как фон.')
-  }
-
-  return { widthMm, heightMm, photoRects, textItems, warnings }
 }
 
 function toFabricRect(rect: SvgRect) {
@@ -200,6 +75,22 @@ function toFabricText(item: SvgText) {
   }
 }
 
+/** designState.prepress если в SVG были rect trim/bleed/safe. */
+function buildImportedPrepress(
+  hints: PrepressFromSvgGuides,
+  guideKeys: Partial<Record<'trim' | 'bleed' | 'safe', unknown>>,
+): Record<string, unknown> | undefined {
+  if (Object.keys(guideKeys).length === 0) return undefined
+  return {
+    bleedMm: hints.bleedMm,
+    safeZoneMm: hints.safeZoneMm,
+    showBleed: Boolean(guideKeys.bleed ?? guideKeys.trim),
+    showTrim: Boolean(guideKeys.trim),
+    showSafeZone: Boolean(guideKeys.safe),
+    cutMarks: true,
+  }
+}
+
 export async function importDesignTemplateFromFile(
   input: ImportDesignTemplateInput,
 ): Promise<ImportDesignTemplateResult> {
@@ -224,10 +115,17 @@ export async function importDesignTemplateFromFile(
   }
 
   const svg = sanitizeSvg(input.file.buffer!.toString('utf8'))
-  const parsed = parseSvg(svg)
+  const parsed = parseImportedSvgLayers(svg)
   warnings.push(...parsed.warnings)
 
-  const stored = saveBufferToUploads(Buffer.from(svg, 'utf8'), input.file.originalname, input.name)
+  const strippedForBg = parsed.strippedSvg
+  if (parsed.removalRanges.length > 0) {
+    warnings.push(
+      'Интерактивные и направляющие слои вырезаны из SVG-фона (без дубля с полями редактора и prepress overlay).',
+    )
+  }
+
+  const stored = saveBufferToUploads(Buffer.from(strippedForBg, 'utf8'), input.file.originalname, input.name)
   if (!stored) {
     throw Object.assign(new Error('Не удалось сохранить SVG.'), {
       importErrors: ['Не удалось сохранить SVG.'],
@@ -236,7 +134,12 @@ export async function importDesignTemplateFromFile(
   }
 
   const previewUrl = `/api/uploads/${stored.filename}`
-  const designState = {
+  const prepress =
+    parsed.prepressHints && Object.keys(parsed.guideRectsMm).length > 0
+      ? buildImportedPrepress(parsed.prepressHints, parsed.guideRectsMm)
+      : undefined
+
+  const designState: Record<string, unknown> = {
     templateId: null,
     pageWidth: parsed.widthMm,
     pageHeight: parsed.heightMm,
@@ -245,15 +148,13 @@ export async function importDesignTemplateFromFile(
       {
         fabricJSON: {
           version: '6.0.0',
-          objects: [
-            ...parsed.photoRects.map(toFabricRect),
-            ...parsed.textItems.map(toFabricText),
-          ],
+          objects: [...parsed.photoRects.map(toFabricRect), ...parsed.textItems.map(toFabricText)],
           background: 'white',
         },
       },
     ],
   }
+  if (prepress) designState.prepress = prepress
 
   const template = await createDesignTemplate({
     name: input.name.trim(),
@@ -272,11 +173,16 @@ export async function importDesignTemplateFromFile(
       source_format: 'svg',
       import: {
         importer: 'svg-named-layers',
+        importerVersion: 3,
         sourceFile: previewUrl,
         originalName: stored.originalName,
         warnings,
         errors,
-        layerConvention: 'locked_bg, photo_*, text_*, trim, bleed, safe',
+        layerConvention:
+          'id/inkscape:label: locked_bg (в фоне), photo_* rect, text_* text, группы <g>; trim/bleed/safe rect → prepress',
+        strippedInteractiveLayers: true,
+        guideRectsMmParsed: parsed.guideRectsMm,
+        lockedBgDetected: parsed.lockedBgDetected,
       },
       designState,
     },

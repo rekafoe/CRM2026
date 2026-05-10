@@ -56,6 +56,7 @@ const defaultUnitOptions = [
   { value: 'per_item', label: 'per_item (за изделие)' },
   { value: 'fixed', label: 'fixed (фикс. цена)' },
   { value: 'per_order', label: 'per_order (за заказ)' },
+  { value: 'per_meter', label: 'per_meter (п.м. пробега)' },
 ];
 
 const operationTypeOptions = [
@@ -63,6 +64,7 @@ const operationTypeOptions = [
   { value: 'print', label: 'print (печать)' },
   { value: 'laminate', label: 'laminate (ламинация)' },
   { value: 'cut', label: 'cut (резка)' },
+  { value: 'plotter_cut', label: 'plotter_cut (плоттер)' },
   { value: 'fold', label: 'fold (фальцовка)' },
   { value: 'score', label: 'score (биговка)' },
   { value: 'bind', label: 'bind (переплет)' },

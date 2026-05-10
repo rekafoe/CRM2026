@@ -54,6 +54,12 @@ export const ObjectPropsPanel: React.FC<ObjectPropsPanelProps> = ({
 
       {hasObj && (
         <>
+          {selectedObj?.type === 'photoField' && (
+            <p className="design-editor-panel-hint">
+              Фото без растяжения: рамка заполняется умной обрезкой (как cover). Двойной щелчок по полю —
+              сместить кадр или выбрать другое фото.
+            </p>
+          )}
           {/* Прозрачность */}
           <div className="design-editor-panel-field">
             <label className="design-editor-panel-label">
