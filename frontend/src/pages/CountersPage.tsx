@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { getCurrentUser, getUsers } from '../api';
-import { cashIncrementForRegisterDay } from '../utils/numberInput';
+import { calendarDateLocal, cashIncrementForRegisterDay } from '../utils/numberInput';
 import { AppIcon, MoneyAmount, BynSymbol } from '../components/ui';
 import './CountersPage.css';
 
@@ -191,10 +191,18 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         const channel = (order.payment_channel || 'cash').toLowerCase();
         if (channel !== 'cash') return sum;
         const orderAmount = cashIncrementForRegisterDay(order, selectedDate);
+        const issuedAmount = Number(order.cash_from_issue_today ?? 0);
+        const nonIssueAmount = Number.isFinite(issuedAmount)
+          ? Math.max(0, orderAmount - issuedAmount)
+          : orderAmount;
         const rawUserId = order.userId ?? order.user_id ?? null;
         const userId = rawUserId != null ? Number(rawUserId) : null;
-        if (userId && !Number.isNaN(userId)) {
-          contributionsByUser.set(userId, (contributionsByUser.get(userId) || 0) + orderAmount);
+        if (userId && !Number.isNaN(userId) && nonIssueAmount > 0) {
+          contributionsByUser.set(userId, (contributionsByUser.get(userId) || 0) + nonIssueAmount);
+        }
+        const issuerId = Number(order.cash_issued_by_user_id);
+        if (issuerId > 0 && Number.isFinite(issuedAmount) && issuedAmount > 0) {
+          contributionsByUser.set(issuerId, (contributionsByUser.get(issuerId) || 0) + issuedAmount);
         }
         return sum + orderAmount;
       }, 0);
@@ -246,6 +254,10 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
 
       const expectedClicks: Record<number, number> = {};
       ordersForDate.forEach((order: any) => {
+        const createdDate = calendarDateLocal(order.created_at ?? order.createdAt);
+        if (order.cash_from_issue_today != null && createdDate !== selectedDate) {
+          return;
+        }
         const items = Array.isArray(order.items) ? order.items : [];
         items.forEach((item: any) => {
           const printerId = Number(item.printerId || item.printer_id);

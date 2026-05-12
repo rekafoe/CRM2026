@@ -67,10 +67,11 @@ export function setAuthToken(token?: string) {
   }
 }
 
-export const getOrders = (params?: { all?: boolean; issued_on?: string }) => {
+export const getOrders = (params?: { all?: boolean; issued_on?: string; poolActiveOnly?: boolean }) => {
   const p: Record<string, string> = {};
   if (params?.all) p.all = '1';
   if (params?.issued_on) p.issued_on = params.issued_on.slice(0, 10);
+  if (params?.poolActiveOnly) p.poolActiveOnly = '1';
   return api.get<Order[]>('/orders', { params: Object.keys(p).length ? p : undefined });
 };
 
@@ -104,6 +105,10 @@ export const getOperatorsToday = (date?: string) =>
 // Order Pool helpers
 export const reassignOrderByNumber = (number: string, userId: number) =>
   api.post(`/orders/reassign/${encodeURIComponent(number)}`, { userId });
+
+/** Возврат заказа в пул без отмены: снимает ответственного и оставляет заказ активным. */
+export const unassignOrderByNumber = (number: string) =>
+  api.post(`/orders/unassign/${encodeURIComponent(number)}`, {});
 
 /** Мягкая отмена заказа (источник любой: сайт, Telegram, Mini App, CRM). Запись остаётся в БД с is_cancelled. */
 export const cancelOnlineOrder = (id: number, cancelReason: string) =>

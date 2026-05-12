@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useReducer, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order, OrderActivityEvent } from '../types';
-import { getOrders, getOrderPoolSync, reassignOrderByNumber, cancelOnlineOrder, deleteOrder, getUsers, createPrepaymentLink, issueOrder, getOperatorsToday, updateOrderItem, getOrderActivity, updateOrderNotes } from '../api';
+import { getOrders, getOrderPoolSync, reassignOrderByNumber, unassignOrderByNumber, cancelOnlineOrder, deleteOrder, getUsers, createPrepaymentLink, issueOrder, getOperatorsToday, updateOrderItem, getOrderActivity, updateOrderNotes } from '../api';
 import { useOrderStatuses } from '../hooks/useOrderStatuses';
 
 const ORDER_POOL_LAST_SEEN_KEY = 'orderPoolLastSeenAt';
@@ -293,7 +293,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await getOrders({ all: true });
+      const res = await getOrders({ all: true, poolActiveOnly: true });
       const list = res.data as Order[];
       orderIdsRef.current = new Set(list.map((o) => o.id));
       setOrders(list);
@@ -314,7 +314,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   /** Фоновое обновление списка (без индикатора загрузки) — вызывается при изменении маркера «заказ с сайта» */
   const refreshOrdersInBackground = useCallback(async () => {
     try {
-      const res = await getOrders({ all: true });
+      const res = await getOrders({ all: true, poolActiveOnly: true });
       const list = res.data as Order[];
       const prevIds = orderIdsRef.current;
       const newCount = list.filter((o) => !prevIds.has(o.id)).length;
@@ -579,6 +579,26 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     [allUsers, orders, toast, logger, updateOrderInList]
   );
 
+  const handleReturnToPool = useCallback(
+    async (orderNumber: string) => {
+      const ord = orders.find((o) => o.number === orderNumber);
+      if (ord && Number(ord.status) !== 0 && Number(ord.status) !== 1) {
+        toast.error('Нельзя вернуть в пул', 'Вернуть в пул можно только заказ со статусом «Ожидает» (0 или 1).');
+        return;
+      }
+      try {
+        await unassignOrderByNumber(orderNumber);
+        toast.success('Заказ возвращён в пул', `Заказ ${orderNumber} теперь без ответственного.`);
+        const o = orders.find((x) => x.number === orderNumber);
+        if (o) updateOrderInList(o.id, { userId: null as any, is_cancelled: 0 });
+      } catch (err) {
+        logger.error('Failed to return order to pool', err);
+        toast.error('Ошибка возврата в пул', (err as Error).message);
+      }
+    },
+    [orders, toast, logger, updateOrderInList]
+  );
+
 
   const issuingRef = useRef(false);
   const handleIssueOrder = useCallback(
@@ -620,9 +640,14 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           rememberKey: 'order_online_cancel_reason',
         });
         if (!reason) return;
-        await cancelOnlineOrder(orderId, reason);
-        toast.success('Заказ отменён', 'Запись помечена как отменённая и скрыта из списка активных.');
-        updateOrderInList(orderId, { is_cancelled: 1, status: 0 as any, userId: null as any });
+        const { data } = await cancelOnlineOrder(orderId, reason);
+        toast.success('Заказ отменён', 'Заказ переведён в статус «Отменён».');
+        updateOrderInList(orderId, {
+          is_cancelled: 1,
+          status: Number(data?.status ?? 0) as any,
+          userId: null as any,
+          responsible_user_id: null as any,
+        });
       } catch (err) {
         logger.error('Failed to cancel online order', err);
         toast.error('Ошибка отмены', (err as Error).message);
@@ -875,7 +900,12 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   value={selectedOrder.userId ?? ''}
                   onChange={(e) => {
                     const v = e.target.value;
-                    if (v === '') return;
+                    if (v === '') {
+                      if (selectedOrder.userId != null) {
+                        handleReturnToPool(selectedOrder.number!);
+                      }
+                      return;
+                    }
                     const uid = Number(v);
                     if (uid === selectedOrder.userId) return;
                     handleReassignTo(selectedOrder.number!, uid);

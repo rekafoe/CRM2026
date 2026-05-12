@@ -5,6 +5,10 @@ import { Item } from '../models/Item'
 import { Order } from '../models/Order'
 import { PhotoOrderRow } from '../models/mappers/telegramPhotoOrderMapper'
 
+type ListAllOrdersOptions = {
+  statuses?: number[]
+}
+
 /** Имя колонки принтера в items (на проде может быть printer_id). Кэш на время жизни процесса. */
 let itemPrinterColCache: string | null = null
 async function getItemSelectWithPrinterCol(db: Awaited<ReturnType<typeof getDb>>): Promise<string> {
@@ -358,7 +362,7 @@ export const OrderRepository = {
   },
 
   /** Все заказы (для пула): без фильтра по userId. Номер заказа — всегда из БД (ORD-XXXX). */
-  async listAllOrders(): Promise<Order[]> {
+  async listAllOrders(options: ListAllOrdersOptions = {}): Promise<Order[]> {
     const db = await getDb()
     let hasIsCancelled = false
     let hasPaymentChannel = false
@@ -381,6 +385,14 @@ export const OrderRepository = {
     const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
     const contactUserIdSel = hasContactUserId ? 'o.contact_user_id' : 'NULL as contact_user_id'
     const responsibleUserIdSel = hasResponsibleUserId ? 'o.responsible_user_id' : 'NULL as responsible_user_id'
+    const whereParts: string[] = []
+    const queryParams: number[] = []
+    if (options.statuses?.length) {
+      const placeholders = options.statuses.map(() => '?').join(',')
+      whereParts.push(`CAST(o.status AS INTEGER) IN (${placeholders})`)
+      queryParams.push(...options.statuses)
+    }
+    const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : ''
     const orders = await db.all<any>(
       `SELECT 
         o.id, 
@@ -404,7 +416,9 @@ export const OrderRepository = {
         c.email as customer__email
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      ORDER BY o.id DESC`
+      ${whereClause}
+      ORDER BY o.id DESC`,
+      ...queryParams
     )
     return orders.map((row: any) => {
       const {

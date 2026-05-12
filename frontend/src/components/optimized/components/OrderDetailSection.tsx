@@ -22,6 +22,7 @@ interface OrderDetailSectionProps {
   allUsers: Array<{ id: number; name: string }>;
   operatorsToday?: Array<{ id: number; name: string }>;
   onAssigneesChange?: (orderId: number, patch: { contact_user_id?: number | null; responsible_user_id?: number | null }) => void;
+  onReturnToPool?: (order: Order) => Promise<void>;
   onExecutorChange?: (orderId: number, itemId: number, executor_user_id: number | null) => void;
   onDateChange: (date: string) => void;
   onUserIdChange: (userId: number | null) => void;
@@ -48,6 +49,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   allUsers,
   operatorsToday = [],
   onAssigneesChange,
+  onReturnToPool,
   onExecutorChange,
   onDateChange,
   onUserIdChange,
@@ -523,6 +525,10 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                     value={(selectedOrder.responsible_user_id ?? selectedOrder.userId) ?? ''}
                     onChange={(e) => {
                       const v = e.target.value;
+                      if (v === '' && onReturnToPool) {
+                        void onReturnToPool(selectedOrder);
+                        return;
+                      }
                       onAssigneesChange(selectedOrder.id, { responsible_user_id: v === '' ? null : Number(v) });
                     }}
                   >

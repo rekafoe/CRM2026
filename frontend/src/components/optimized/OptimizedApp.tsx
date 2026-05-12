@@ -9,6 +9,7 @@ import {
   addOrderItem,
   getOperatorsToday,
   updateOrderAssignees,
+  unassignOrderByNumber,
 } from "../../api";
 import { useNavigate } from 'react-router-dom';
 import AddItemModal from "../AddItemModal";
@@ -119,6 +120,25 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
       }
     },
     [setOrders, toast]
+  );
+
+  const handleReturnOrderToPool = useCallback(
+    async (order: Order) => {
+      if (Number(order.status) !== 0 && Number(order.status) !== 1) {
+        toast.error('Нельзя вернуть в пул', 'Вернуть в пул можно только заказ со статусом «Ожидает» (0 или 1).');
+        return;
+      }
+      try {
+        await unassignOrderByNumber(order.number);
+        setOrders((prev) => prev.filter((o) => o.id !== order.id));
+        setSelectedId(null);
+        toast.success('Заказ возвращён в пул', `Заказ ${order.number} теперь без ответственного.`);
+      } catch (err: any) {
+        logger.error('Return order to pool failed', err);
+        toast.error('Ошибка', err?.message ?? 'Не удалось вернуть заказ в пул');
+      }
+    },
+    [logger, setOrders, toast]
   );
 
   const handleExecutorChange = useCallback(
@@ -401,6 +421,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
                 allUsers={activeUsers}
                 operatorsToday={operatorsToday}
                 onAssigneesChange={handleAssigneesChange}
+                onReturnToPool={handleReturnOrderToPool}
                 onExecutorChange={handleExecutorChange}
                 onDateChange={handleDateChange}
                 onUserIdChange={setContextUserId}

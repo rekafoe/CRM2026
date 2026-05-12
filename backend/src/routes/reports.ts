@@ -209,7 +209,7 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
     : "'cash' as payment_channel";
   const notesSelect = hasNotes ? 'o.notes' : 'NULL as notes';
   // Заказы за дату: созданные/обновлённые в этот день ИЛИ выданные в этот день (debt_closed_events.closed_date).
-  // Выданные заказы должны попадать в счётчики принтеров по дате выдачи.
+  // Выдача влияет на кассу дня, но производственные клики считаются по дате создания/работы заказа.
   let hasDebtClosed = false
   try {
     hasDebtClosed = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
@@ -245,26 +245,36 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
   // Иначе после issue prepaymentAmount = полный итог заказа и «выручка за день» завышается (дубль с днём предоплаты).
   if (hasDebtClosed) {
     try {
+      const hasIssuedBy = await hasColumn('debt_closed_events', 'issued_by_user_id')
       const debtRows = (await db.all(
-        'SELECT order_id, amount FROM debt_closed_events WHERE closed_date = ?',
+        hasIssuedBy
+          ? 'SELECT order_id, amount, issued_by_user_id FROM debt_closed_events WHERE closed_date = ?'
+          : 'SELECT order_id, amount, NULL as issued_by_user_id FROM debt_closed_events WHERE closed_date = ?',
         d
-      )) as Array<{ order_id: number; amount: number }>
-      const byOrder = new Map<number, number>()
+      )) as Array<{ order_id: number; amount: number; issued_by_user_id: number | null }>
+      const byOrder = new Map<number, { amount: number; issuedBy: number | null }>()
       for (const r of debtRows) {
-        byOrder.set(Number(r.order_id), Number(r.amount))
+        byOrder.set(Number(r.order_id), {
+          amount: Number(r.amount),
+          issuedBy: r.issued_by_user_id == null ? null : Number(r.issued_by_user_id)
+        })
       }
       for (const order of orders) {
         const oid = Number(order.id)
-        order.cash_from_issue_today = byOrder.has(oid) ? byOrder.get(oid)! : null
+        const issue = byOrder.get(oid)
+        order.cash_from_issue_today = issue ? issue.amount : null
+        order.cash_issued_by_user_id = issue ? issue.issuedBy : null
       }
     } catch {
       for (const order of orders) {
         order.cash_from_issue_today = null
+        order.cash_issued_by_user_id = null
       }
     }
   } else {
     for (const order of orders) {
       order.cash_from_issue_today = null
+      order.cash_issued_by_user_id = null
     }
   }
 
@@ -698,6 +708,9 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
   const limit = Math.min(500, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 100))
   const offsetRaw = Number(req.query.offset ?? 0)
   const offset = Math.max(0, Number.isFinite(offsetRaw) ? offsetRaw : 0)
+  const hasIsCancelledList = await hasColumn('orders', 'is_cancelled')
+  const cancelledListCond = hasIsCancelledList ? 'COALESCE(o.is_cancelled, 0) = 1' : 'o.status = 0'
+  const notCancelledListCond = hasIsCancelledList ? 'COALESCE(o.is_cancelled, 0) = 0' : 'o.status != 0'
 
   const where: string[] = [dateFilter('o')]
   const params: any[] = [...dateParams]
@@ -710,17 +723,17 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
   if (statusFilter && statusFilter !== 'all') {
     if (statusFilter === 'revenue') {
       where.push('o.status != 1')  // исключаем «Ожидает»
-      where.push('o.status != 0')  // исключаем мягко-отменённые
+      where.push(notCancelledListCond)
       where.push("(o.status = 7 OR o.prepaymentStatus IN ('paid', 'successful'))")
     } else if (statusFilter === 'paid') {
       where.push(`o.prepaymentStatus IN ('paid','successful')`)
     } else if (statusFilter === 'pending_payment') {
-      where.push('o.status != 0')  // не мягко-отменённые
+      where.push(notCancelledListCond)
       where.push(`COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
     } else if (statusFilter === 'completed') {
       where.push('o.status = 7')
     } else if (statusFilter === 'cancelled') {
-      where.push('o.status = 0')  // мягко-отменённые (status=0 + is_cancelled=1)
+      where.push(cancelledListCond)
     } else if (statusFilter === 'created') {
       where.push('o.status = 0')
     } else {
@@ -737,11 +750,11 @@ router.get('/analytics/orders/list', asyncHandler(async (req, res) => {
     // Отменённые = мягко удалённые (status=0, is_cancelled=1) или жёстко удалённые (нет в БД).
     // Status 5 = «Передан в ПВЗ» — активный статус, не отмена.
     if (reasonFilter === 'cancellation_no_prepayment') {
-      where.push('o.status = 0 AND COALESCE(o.prepaymentAmount, 0) = 0')
+      where.push(`${cancelledListCond} AND COALESCE(o.prepaymentAmount, 0) = 0`)
     } else if (reasonFilter === 'cancellation_unpaid_prepayment') {
-      where.push(`o.status = 0 AND COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
+      where.push(`${cancelledListCond} AND COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful')`)
     } else if (reasonFilter === 'cancellation_after_paid') {
-      where.push(`o.status = 0 AND o.prepaymentStatus IN ('paid','successful')`)
+      where.push(`${cancelledListCond} AND o.prepaymentStatus IN ('paid','successful')`)
     } else if (reasonFilter === 'delay_waiting_payment') {
       where.push(`o.status IN (1,2,3,4,5,6) AND COALESCE(o.prepaymentAmount, 0) > 0 AND o.prepaymentStatus NOT IN ('paid','successful') AND ${ageHoursExpr} > 24`)
     } else if (reasonFilter === 'delay_long_production') {

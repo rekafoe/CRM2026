@@ -147,6 +147,37 @@ export class OrderService {
     }
   }
 
+  private static async getOrCreateCancelledStatusId(db: any): Promise<number> {
+    try {
+      const statuses = await db.all(
+        'SELECT id, name FROM order_statuses ORDER BY sort_order, id'
+      ) as Array<{ id: number; name: string }>
+      const existing = (Array.isArray(statuses) ? statuses : []).find((status) => {
+        const name = String(status.name || '').trim().toLowerCase()
+        return name === 'отменён' || name === 'отменен' || name.includes('отмен') || name.includes('cancel')
+      })
+      if (existing?.id != null) return Number(existing.id)
+
+      const nextSort = await db.get(
+        'SELECT COALESCE(MAX(sort_order), 0) + 1 as sort_order FROM order_statuses'
+      ) as { sort_order: number } | undefined
+      await db.run(
+        'INSERT OR IGNORE INTO order_statuses (name, color, sort_order) VALUES (?, ?, ?)',
+        'Отменён',
+        '#d32f2f',
+        Number(nextSort?.sort_order ?? 99)
+      )
+      const created = await db.get(
+        'SELECT id FROM order_statuses WHERE name = ?',
+        'Отменён'
+      ) as { id: number } | undefined
+      if (created?.id != null) return Number(created.id)
+    } catch {
+      // Старые/частичные схемы без order_statuses продолжат использовать legacy status=0.
+    }
+    return 0
+  }
+
   // DB row types (internal)
   // use shared mapper
   static async getAllOrders(userId: number) {
@@ -209,8 +240,10 @@ export class OrderService {
   }
 
   /** Все заказы без фильтра по пользователю (для пула заказов). Batch loading — устранение N+1. */
-  static async getAllOrdersForPool() {
-    const fromOrders = (await OrderRepository.listAllOrders()) as Order[]
+  static async getAllOrdersForPool(options: { activeOnly?: boolean } = {}) {
+    const fromOrders = (await OrderRepository.listAllOrders(
+      options.activeOnly ? { statuses: [0, 1] } : undefined
+    )) as Order[]
     const orderIds = new Set(fromOrders.map((o) => o.id))
     const photoRows = await OrderRepository.listPhotoOrdersForPool()
     const fromPhoto: Order[] = []
@@ -1143,6 +1176,74 @@ export class OrderService {
     }
   }
 
+  // Возврат заказа в пул без отмены: снимаем ответственного, но не ставим is_cancelled.
+  static async unassignOrderByNumber(orderNumber: string, actorUserId?: number) {
+    const db = await getDb()
+    const trimmed = String(orderNumber || '').trim()
+    const siteMatch = /^site-ord-(\d+)$/i.exec(trimmed)
+    let row: { id: number; status: number; userId?: number | null; is_cancelled?: number } | undefined
+    const hasIsCancelled = await hasColumn('orders', 'is_cancelled').catch(() => false)
+    const isCancelledSelect = hasIsCancelled ? ', is_cancelled' : ''
+    if (siteMatch) {
+      const orderId = parseInt(siteMatch[1], 10)
+      row = await db.get<{ id: number; status: number; userId?: number | null; is_cancelled?: number }>(
+        `SELECT id, status, userId${isCancelledSelect} FROM orders WHERE id = ? AND source = ?`,
+        [orderId, 'website']
+      )
+    }
+    if (!row) {
+      row = await db.get<{ id: number; status: number; userId?: number | null; is_cancelled?: number }>(
+        `SELECT id, status, userId${isCancelledSelect} FROM orders WHERE number = ?`,
+        [trimmed]
+      )
+    }
+    if (!row) {
+      throw new Error('Заказ не найден')
+    }
+
+    const statusId = Number(row.status)
+    if (statusId !== 0 && statusId !== 1) {
+      throw new Error('Вернуть в пул можно только заказ в статусе «ожидает» (0 или 1)')
+    }
+
+    const previousUserId = row.userId != null && Number.isFinite(Number(row.userId)) ? Number(row.userId) : null
+    const hasResponsible = await hasColumn('orders', 'responsible_user_id').catch(() => false)
+    const hasUpdatedAt = await hasColumn('orders', 'updatedAt').catch(() => false)
+    const hasUpdatedAtSnake = await hasColumn('orders', 'updated_at').catch(() => false)
+    const updates = ['userId = NULL']
+    if (hasResponsible) updates.push('responsible_user_id = NULL')
+    if (hasIsCancelled) updates.push('is_cancelled = 0')
+    if (hasUpdatedAt) updates.push('updatedAt = datetime("now")')
+    else if (hasUpdatedAtSnake) updates.push('updated_at = datetime("now")')
+
+    await db.run(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`, [row.id])
+    try {
+      await db.run(
+        `DELETE FROM user_order_page_orders
+         WHERE order_id = ? AND order_type IN ('website', 'manual', 'crm') AND status != 'completed'`,
+        [row.id]
+      )
+    } catch {
+      // Таблицы страниц заказов может не быть в старых схемах.
+    }
+
+    await this.recordOrderActivity(db, {
+      orderId: row.id,
+      eventType: 'reassign',
+      message: 'Заказ возвращён в пул',
+      oldValue: previousUserId != null ? String(previousUserId) : null,
+      newValue: null,
+      userId: actorUserId ?? null,
+      meta: {
+        previous_user_id: previousUserId,
+        target_user_id: null,
+        action: 'unassign',
+      },
+    })
+
+    return { id: row.id, userId: null }
+  }
+
   // Переназначение по номеру: ORD-*, MAP-*, site-ord-*, тг tg-ord-* (photo_orders) — одна и та же логика userId.
   static async reassignOrderByNumber(orderNumber: string, targetUserId: number, actorUserId?: number) {
     const db = await getDb()
@@ -1235,7 +1336,7 @@ export class OrderService {
    * Мягкая отмена: запись остаётся в БД (is_cancelled=1), заказ уходит из активного пула.
    * Для CRM/сайта/TG/mini-app — одна и та же логика. Без физического DELETE.
    */
-  static async softCancelOrder(id: number, userId?: number, reason?: string): Promise<{ softCancelled: true }> {
+  static async softCancelOrder(id: number, userId?: number, reason?: string): Promise<{ softCancelled: true; status: number }> {
     const reasonText = String(reason || '').trim()
     if (!reasonText) {
       throw new Error('Для отмены заказа необходимо указать причину')
@@ -1260,8 +1361,9 @@ export class OrderService {
       throw new Error('Заказ не найден')
     }
     if (hasIsCancelled && Number(ord.is_cancelled) === 1) {
-      return { softCancelled: true }
+      return { softCancelled: true, status: Number(ord.status ?? 0) }
     }
+    const cancelledStatusId = await this.getOrCreateCancelledStatusId(db)
 
     await db.run('BEGIN')
     try {
@@ -1277,29 +1379,38 @@ export class OrderService {
       if (hasIsCancelled) {
         try {
           await db.run(
-            'UPDATE orders SET status = 0, userId = NULL, is_cancelled = 1, updatedAt = datetime("now") WHERE id = ?',
-            [id]
+            'UPDATE orders SET status = ?, userId = NULL, is_cancelled = 1, updatedAt = datetime("now") WHERE id = ?',
+            [cancelledStatusId, id]
           )
         } catch {
           try {
             await db.run(
-              'UPDATE orders SET status = 0, userId = NULL, is_cancelled = 1, updated_at = datetime("now") WHERE id = ?',
-              [id]
+              'UPDATE orders SET status = ?, userId = NULL, is_cancelled = 1, updated_at = datetime("now") WHERE id = ?',
+              [cancelledStatusId, id]
             )
           } catch {
-            await db.run('UPDATE orders SET status = 0, userId = NULL, is_cancelled = 1 WHERE id = ?', [id])
+            await db.run('UPDATE orders SET status = ?, userId = NULL, is_cancelled = 1 WHERE id = ?', [cancelledStatusId, id])
           }
         }
       } else {
         try {
-          await db.run('UPDATE orders SET status = 0, userId = NULL, updatedAt = datetime("now") WHERE id = ?', [id])
+          await db.run('UPDATE orders SET status = ?, userId = NULL, updatedAt = datetime("now") WHERE id = ?', [cancelledStatusId, id])
         } catch {
           try {
-            await db.run('UPDATE orders SET status = 0, userId = NULL, updated_at = datetime("now") WHERE id = ?', [id])
+            await db.run('UPDATE orders SET status = ?, userId = NULL, updated_at = datetime("now") WHERE id = ?', [cancelledStatusId, id])
           } catch {
-            await db.run('UPDATE orders SET status = 0, userId = NULL WHERE id = ?', [id])
+            await db.run('UPDATE orders SET status = ?, userId = NULL WHERE id = ?', [cancelledStatusId, id])
           }
         }
+      }
+      try {
+        await db.run(
+          `DELETE FROM user_order_page_orders
+           WHERE order_id = ? AND order_type IN ('website', 'manual', 'crm') AND status != 'completed'`,
+          [id]
+        )
+      } catch {
+        // Таблицы страниц заказов может не быть в старых схемах.
       }
       await db.run('DELETE FROM material_reservations WHERE order_id = ?', [id])
       await db.run('COMMIT')
@@ -1307,7 +1418,7 @@ export class OrderService {
         const date = String(ord.created_date).slice(0, 10)
         await EarningsService.recalculateForDate(date)
       }
-      return { softCancelled: true }
+      return { softCancelled: true, status: cancelledStatusId }
     } catch (e) {
       await db.run('ROLLBACK')
       throw e

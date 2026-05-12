@@ -23,6 +23,7 @@ export class OrderController {
       }
       const issuedOn = (req as any).query?.issued_on as string | undefined
       const all = (req as any).query?.all === '1' || (req as any).query?.all === true
+      const poolActiveOnly = (req as any).query?.poolActiveOnly === '1' || (req as any).query?.poolActiveOnly === true
       if (issuedOn && /^\d{4}-\d{2}-\d{2}$/.test(issuedOn.slice(0, 10))) {
         const orders = all
           ? await OrderService.getOrdersIssuedOnAll(issuedOn)
@@ -32,7 +33,7 @@ export class OrderController {
       }
       // all=1: страница Order Pool — все пользователи (не только админ) видят заказы всех
       const orders = all
-        ? await OrderService.getAllOrdersForPool()
+        ? await OrderService.getAllOrdersForPool({ activeOnly: poolActiveOnly })
         : await OrderService.getAllOrders(authUser.id)
       res.json(orders)
     } catch (error: any) {
@@ -69,8 +70,8 @@ export class OrderController {
         res.status(400).json({ error: 'Необходимо указать причину отмены' })
         return
       }
-      await OrderService.softCancelOrder(id, authUser?.id, cancelReason)
-      res.json({ id, softCancelled: true })
+      const result = await OrderService.softCancelOrder(id, authUser?.id, cancelReason)
+      res.json({ id, ...result })
     } catch (error: any) {
       res.status(400).json({ error: error.message })
     }

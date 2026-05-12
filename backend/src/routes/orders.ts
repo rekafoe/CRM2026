@@ -629,6 +629,21 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Order reassigned successfully' });
 }));
 
+// Возврат заказа в пул без отмены: снимаем ответственного, но не помечаем заказ отменённым.
+router.post('/unassign/:number', asyncHandler(async (req, res) => {
+  const param = req.params.number;
+  const authUser = (req as any).user as { id?: number } | undefined;
+  const result = await OrderService.unassignOrderByNumber(param, authUser?.id);
+  if (!/^tg-ord-/i.test(String(param).trim())) {
+    try {
+      await EarningsService.recalculateEarningsForOrderDays({ orderId: result.id });
+    } catch (e) {
+      console.error('Earnings recalc after unassign failed', e);
+    }
+  }
+  res.json({ success: true, message: 'Order returned to pool successfully' });
+}));
+
 // Order files routes
 router.get('/:id/files', asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
