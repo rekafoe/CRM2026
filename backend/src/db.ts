@@ -58,6 +58,14 @@ export async function initDB(): Promise<Database> {
 
     await db.exec('PRAGMA foreign_keys = ON;')
 
+    // Параллельные POST (например 100 файлов к заказу с сайта) без WAL/busy_timeout часто ловят SQLITE_BUSY → 500.
+    try {
+      await db.exec('PRAGMA journal_mode = WAL;')
+      await db.exec('PRAGMA busy_timeout = 30000;')
+    } catch (e) {
+      console.log('⚠️ PRAGMA WAL/busy_timeout не применены:', e)
+    }
+
     await runMigrations(db)
     await migrateLegacyMaterialMoves(db)
 

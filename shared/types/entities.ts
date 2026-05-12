@@ -169,6 +169,16 @@ export interface OrderFile {
   is_approved: boolean;
   created_at: string;
   updated_at: string;
+  storage?: 'local' | 's3' | string;
+  external_provider?: string | null;
+  external_bucket?: string | null;
+  external_key?: string | null;
+  external_url?: string | null;
+  external_status?: 'ready' | 'processing' | 'failed' | string;
+  artifact_type?: string | null;
+  checksum?: string | null;
+  part_number?: number | null;
+  metadata?: string | null;
 }
 
 export interface Printer {

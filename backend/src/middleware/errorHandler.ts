@@ -16,6 +16,38 @@ export const errorHandler = (err: ApiError, req: Request, res: Response, _next: 
   let status = err.status || 500
   let message = err.message || 'Internal Server Error'
   let code = err.code || 'INTERNAL_ERROR'
+
+  // Multer (multipart): без этого LIMIT_* уходит в 500
+  const multerCode = String((err as any).code || '')
+  if (err.name === 'MulterError' || multerCode.startsWith('LIMIT_')) {
+    if (multerCode === 'LIMIT_FILE_SIZE') {
+      status = 413
+      code = 'FILE_TOO_LARGE'
+      message = 'Файл превышает допустимый размер (см. UPLOAD_MAX_FILE_SIZE_BYTES)'
+    } else if (multerCode === 'LIMIT_FILE_COUNT' || multerCode === 'LIMIT_UNEXPECTED_FILE') {
+      status = 400
+      code = 'TOO_MANY_FILES'
+      message = 'Слишком много файлов в одном запросе (см. UPLOAD_MAX_FILES)'
+    } else if (multerCode === 'LIMIT_FIELD_KEY' || multerCode === 'LIMIT_FIELD_VALUE' || multerCode === 'LIMIT_FIELD_COUNT') {
+      status = 400
+      code = 'MULTIPART_FIELDS_LIMIT'
+      message = 'Превышен лимит полей формы (см. UPLOAD_MAX_FIELDS)'
+    } else if (multerCode === 'LIMIT_PART_COUNT') {
+      status = 400
+      code = 'MULTIPART_PARTS_LIMIT'
+      message = 'Слишком много частей multipart-запроса'
+    } else {
+      status = 400
+      code = 'MULTIPART_ERROR'
+      message = err.message || 'Ошибка загрузки файла'
+    }
+  }
+
+  if (multerCode === 'SQLITE_BUSY' || multerCode === 'SQLITE_LOCKED') {
+    status = 503
+    code = 'DATABASE_BUSY'
+    message = 'База занята, повторите запрос через несколько секунд'
+  }
   
   // Обработка специфических ошибок
   if (err.name === 'ValidationError') {
@@ -34,7 +66,8 @@ export const errorHandler = (err: ApiError, req: Request, res: Response, _next: 
     status = 409
     code = 'CONFLICT'
   }
-  if (isProduction && status >= 500) {
+  // Только «голый» 500 скрываем; 503 (занятость БД и т.п.) оставляем понятным текстом для ретраев на клиенте
+  if (isProduction && status === 500) {
     message = 'Internal Server Error'
     code = 'INTERNAL_ERROR'
   }

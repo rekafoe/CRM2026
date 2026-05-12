@@ -608,6 +608,26 @@ export interface PreflightReport {
 export const getPreflightReport = (orderId: number, fileId: number) =>
   api.get<PreflightReport>(`/orders/${orderId}/files/${fileId}/preflight`);
 
+export const getOrderFileExternalLink = (orderId: number, fileId: number) =>
+  api.get<{ url: string }>(`/orders/${orderId}/files/${fileId}/external-link`);
+
+export interface OrderFileAccessLog {
+  id: number;
+  orderId: number;
+  fileId: number;
+  userId?: number | null;
+  userName?: string | null;
+  userEmail?: string | null;
+  action: 'download' | 'external_link' | string;
+  storage?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
+}
+
+export const getOrderFileAccessLogs = (orderId: number, fileId: number) =>
+  api.get<OrderFileAccessLog[]>(`/orders/${orderId}/files/${fileId}/access-logs`);
+
 /** Скачивание файла по ID через fetch. Имя — из Content-Disposition. */
 export const downloadOrderFile = async (orderId: number, fileId: number, suggestedFileName: string) => {
   const base = api.defaults.baseURL || API_BASE_URL || '/api';

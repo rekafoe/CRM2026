@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { OrderFile, Item } from '../types';
-import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, downloadOrderFile, getPreflightReport, type PreflightReport } from '../api';
+import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, downloadOrderFile, getCurrentUser, getOrderFileAccessLogs, getOrderFileExternalLink, getPreflightReport, type OrderFileAccessLog, type PreflightReport } from '../api';
 import { AppIcon } from './ui/AppIcon';
+import { OrderFileAccessLogsModal } from './OrderFileAccessLogsModal';
 import { PreflightReportModal } from './PreflightReportModal';
 import './FilesModal.css';
 
@@ -20,6 +21,26 @@ interface FilesModalProps {
 function getItemLabel(item: Item, index: number): string {
   const desc = item.params?.description || item.type || '';
   return desc ? `Позиция ${index + 1}: ${desc}` : `Позиция ${index + 1}`;
+}
+
+function isExternalFile(file: OrderFile): boolean {
+  return Boolean(file.storage && file.storage !== 'local');
+}
+
+function formatFileSize(size?: number): string {
+  if (size == null || !Number.isFinite(Number(size))) return '—';
+  const bytes = Number(size);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${Math.round(bytes / 1024 / 102.4) / 10} MB`;
+  return `${Math.round(bytes / 1024 / 1024 / 102.4) / 10} GB`;
+}
+
+function getExternalStatusLabel(status?: string | null): string {
+  if (status === 'processing') return 'Готовится';
+  if (status === 'failed') return 'Ошибка подготовки';
+  if (status === 'ready') return 'Готов';
+  return status || 'Статус неизвестен';
 }
 
 export const FilesModal: React.FC<FilesModalProps> = ({
@@ -42,13 +63,28 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const [preflightError, setPreflightError] = useState<string | null>(null);
   /** Кэш результатов префлайта по fileId — для отображения статуса в списке */
   const [preflightCache, setPreflightCache] = useState<Record<number, PreflightReport>>({});
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [accessLogFile, setAccessLogFile] = useState<{ id: number; name: string } | null>(null);
+  const [accessLogs, setAccessLogs] = useState<OrderFileAccessLog[]>([]);
+  const [accessLogsLoading, setAccessLogsLoading] = useState(false);
+  const [accessLogsError, setAccessLogsError] = useState<string | null>(null);
 
   // Загружаем файлы при открытии модального окна
   React.useEffect(() => {
     if (isOpen) {
       loadFiles();
+      void loadCurrentUserRole();
     }
   }, [isOpen, orderId]);
+
+  const loadCurrentUserRole = async () => {
+    try {
+      const res = await getCurrentUser();
+      setIsAdmin(res.data?.role === 'admin');
+    } catch {
+      setIsAdmin(false);
+    }
+  };
 
   const loadFiles = async () => {
     setIsLoading(true);
@@ -93,12 +129,32 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const handleDownloadAll = () => {
     files.forEach((f, i) => {
       setTimeout(() => {
-        downloadOrderFile(orderId, f.id, f.originalName || f.filename).catch(() => alert('Не удалось скачать файл'));
+        void handleDownloadFile(f);
       }, i * 200);
     });
   };
 
-  const handleDownloadFile = (file: OrderFile) => {
+  const handleDownloadFile = async (file: OrderFile) => {
+    if (isExternalFile(file)) {
+      if (file.externalStatus && file.externalStatus !== 'ready') {
+        alert(`Файл ещё не готов: ${getExternalStatusLabel(file.externalStatus)}`);
+        return;
+      }
+      const tab = window.open('', '_blank', 'noopener,noreferrer');
+      try {
+        const res = await getOrderFileExternalLink(orderId, file.id);
+        if (tab) {
+          tab.location.href = res.data.url;
+        } else {
+          window.open(res.data.url, '_blank', 'noopener,noreferrer');
+        }
+      } catch (error) {
+        if (tab) tab.close();
+        const msg = error instanceof Error ? error.message : 'Не удалось получить внешнюю ссылку';
+        alert(msg);
+      }
+      return;
+    }
     downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch(() => alert('Не удалось скачать файл'));
   };
 
@@ -138,6 +194,27 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     }
   };
 
+  const handleAccessLogs = async (file: OrderFile) => {
+    setAccessLogFile({ id: file.id, name: file.originalName || file.filename });
+    setAccessLogs([]);
+    setAccessLogsError(null);
+    setAccessLogsLoading(true);
+    try {
+      const res = await getOrderFileAccessLogs(orderId, file.id);
+      setAccessLogs(res.data ?? []);
+    } catch (error) {
+      setAccessLogsError(error instanceof Error ? error.message : 'Не удалось загрузить журнал');
+    } finally {
+      setAccessLogsLoading(false);
+    }
+  };
+
+  const closeAccessLogs = () => {
+    setAccessLogFile(null);
+    setAccessLogs([]);
+    setAccessLogsError(null);
+  };
+
   /** Статус префлайта для отображения в списке */
   const getPreflightStatus = (report: PreflightReport): 'ok' | 'warning' | 'error' => {
     const hasError = report.issues?.some((i) => i.severity === 'error') ?? false;
@@ -154,6 +231,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   };
 
   const canPreflight = (file: OrderFile) => {
+    if (isExternalFile(file)) return false;
     const m = (file.mime || '').toLowerCase();
     return PREFLIGHT_MIME_TYPES.includes(m);
   };
@@ -183,13 +261,21 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     list.map(file => {
       const cached = canPreflight(file) ? preflightCache[file.id] : null;
       const status = cached ? getPreflightStatus(cached) : null;
+      const external = isExternalFile(file);
+      const canDownload = !external || !file.externalStatus || file.externalStatus === 'ready';
       return (
-      <div key={file.id} className={`file-item ${file.approved ? 'approved' : 'pending'}`}>
+      <div key={file.id} className={`file-item ${file.approved ? 'approved' : 'pending'} ${external ? `file-item--external file-item--external-${file.externalStatus || 'unknown'}` : ''}`}>
         <div className="file-info">
           <div className="file-name">
             <button type="button" className="file-name-link" onClick={() => handleDownloadFile(file)} title="Скачать">
               {file.originalName || file.filename}
             </button>
+            {external && (
+              <span className="file-storage-badge" title="Внешнее хранилище">
+                {file.externalProvider || file.storage}
+              </span>
+            )}
+            {file.artifactType && <span className="file-artifact-badge">{file.artifactType}</span>}
             {canPreflight(file) && (
               <span
                 className={`file-preflight-status file-preflight-status--${status ?? 'none'}`}
@@ -211,8 +297,10 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             )}
           </div>
           <div className="file-details">
-            <span className="file-size">{file.size ? Math.round(file.size / 1024) : 0} KB</span>
+            <span className="file-size">{formatFileSize(file.size)}</span>
             <span className="file-date">{file.uploadedAt ? new Date(file.uploadedAt).toLocaleDateString('ru-RU') : ''}</span>
+            {file.partNumber != null && <span>часть {file.partNumber}</span>}
+            {external && file.externalStatus && <span>{getExternalStatusLabel(file.externalStatus)}</span>}
           </div>
         </div>
         <div className="file-actions">
@@ -221,9 +309,14 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               <AppIcon name="shield" size="xs" />
             </button>
           )}
-          <button className="btn-download" onClick={() => handleDownloadFile(file)} title="Скачать файл">
+          <button className="btn-download" onClick={() => handleDownloadFile(file)} title={canDownload ? 'Скачать файл' : 'Файл ещё не готов'} disabled={!canDownload}>
             <AppIcon name="download" size="xs" />
           </button>
+          {isAdmin && (
+            <button className="btn-access-log" onClick={() => handleAccessLogs(file)} title="Журнал скачиваний">
+              <AppIcon name="shield" size="xs" />
+            </button>
+          )}
           {file.approved ? (
             <span className="status-approved" title="Файл утвержден"><AppIcon name="check" size="sm" /></span>
           ) : (
@@ -391,6 +484,14 @@ export const FilesModal: React.FC<FilesModalProps> = ({
         error={preflightError}
         orderId={orderId}
         fileId={preflightFile?.id ?? 0}
+      />
+      <OrderFileAccessLogsModal
+        isOpen={accessLogFile !== null}
+        fileName={accessLogFile?.name ?? ''}
+        logs={accessLogs}
+        isLoading={accessLogsLoading}
+        error={accessLogsError}
+        onClose={closeAccessLogs}
       />
     </div>
   );

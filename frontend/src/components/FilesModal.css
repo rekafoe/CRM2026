@@ -320,6 +320,20 @@
   background: rgba(255, 251, 235, 0.6);
 }
 
+.file-item--external-processing {
+  border-left-color: #2563eb;
+  background: rgba(239, 246, 255, 0.75);
+}
+
+.file-item--external-ready {
+  border-left-color: #15803d;
+}
+
+.file-item--external-failed {
+  border-left-color: #b91c1c;
+  background: rgba(254, 242, 242, 0.75);
+}
+
 .file-info {
   flex: 1;
   min-width: 0;
@@ -355,6 +369,27 @@
 .file-preflight-status--none {
   color: #9ca3af;
   opacity: 0.8;
+}
+
+.file-storage-badge,
+.file-artifact-badge {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.file-storage-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.file-artifact-badge {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
 }
 
 .preflight-warning-icon {
@@ -396,6 +431,7 @@
 
 .btn-preflight,
 .btn-download,
+.btn-access-log,
 .btn-approve,
 .btn-delete {
   width: 36px;
@@ -414,11 +450,18 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-.btn-preflight {
+.btn-download:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-preflight,
+.btn-access-log {
   color: #4a6a94;
 }
 
-.btn-preflight:hover {
+.btn-preflight:hover,
+.btn-access-log:hover {
   background: rgba(74, 106, 148, 0.15);
   color: #374151;
 }
@@ -466,6 +509,96 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.access-logs-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background-color: rgba(17, 24, 39, 0.45);
+}
+
+.access-logs-modal {
+  width: min(720px, 100%);
+  max-height: 78vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid rgba(209, 213, 219, 0.7);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
+}
+
+.access-logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+}
+
+.access-logs-header h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #1f2937;
+  font-size: 16px;
+}
+
+.access-logs-file {
+  padding: 12px 20px;
+  color: #4b5563;
+  background: #f9fafb;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.access-logs-state {
+  padding: 24px 20px;
+  color: #6b7280;
+}
+
+.access-logs-state--error {
+  color: #b91c1c;
+}
+
+.access-logs-list {
+  overflow: auto;
+  padding: 12px 16px 18px;
+}
+
+.access-log-row {
+  padding: 12px;
+  border: 1px solid rgba(229, 231, 235, 0.9);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+
+.access-log-main,
+.access-log-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.access-log-main {
+  justify-content: space-between;
+  color: #1f2937;
+}
+
+.access-log-meta {
+  margin-top: 6px;
+  color: #6b7280;
+  font-size: 12px;
 }
 
 @media (max-width: 768px) {

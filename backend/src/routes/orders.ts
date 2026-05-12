@@ -13,8 +13,44 @@ import { runPreflight, parseTargetFormatFromParams } from '../services/preflight
 import { OrderService } from '../modules/orders/services/orderService'
 import { sendOrderSmsManual } from '../services/orderStatusSmsService'
 import { EarningsService } from '../services/earningsService'
+import { registerExternalOrderFiles, updateExternalOrderFile } from '../services/externalOrderFilesService'
 
 const router = Router()
+
+function sanitizeOrderFileForClient(row: any): any {
+  if (!row || !row.storage || row.storage === 'local') return row
+  const { externalUrl, externalKey, externalBucket, metadata, ...safe } = row
+  return {
+    ...safe,
+    hasExternalUrl: Boolean(externalUrl),
+    hasExternalKey: Boolean(externalKey),
+    hasExternalBucket: Boolean(externalBucket),
+    hasExternalMetadata: Boolean(metadata),
+  }
+}
+
+async function logOrderFileAccess(
+  db: any,
+  req: any,
+  input: { orderId: number; fileId: number; action: 'download' | 'external_link'; storage?: string | null }
+): Promise<void> {
+  const user = req.user as { id?: number } | undefined
+  try {
+    await db.run(
+      `INSERT INTO order_file_access_logs (orderId, fileId, userId, action, storage, ip, userAgent)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      input.orderId,
+      input.fileId,
+      user?.id ?? null,
+      input.action,
+      input.storage ?? null,
+      req.ip ?? null,
+      req.get?.('User-Agent') ?? null
+    )
+  } catch (error) {
+    console.error('order_file_access_logs insert failed', error)
+  }
+}
 
 /** payment_channel='internal' когда is_internal=1 (для API) */
 function orderForApi(order: any): any {
@@ -217,6 +253,61 @@ router.post('/:id/files', (req, res, next) => {
     orderId
   )
   res.status(201).json(row)
+}))
+
+// Регистрация внешних файлов заказа: сайт кладёт JPG/PDF в S3 и сообщает CRM метаданные.
+router.post('/:id/external-files', (req, res, next) => {
+  if (isWebsiteOrderApiKeyValid(req)) {
+    (req as any).fromWebsite = true
+    return next()
+  }
+  return authenticate(req, res, next)
+}, asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  if (!Number.isFinite(orderId)) {
+    res.status(400).json({ message: 'Некорректный orderId' })
+    return
+  }
+
+  const body = req.body || {}
+  const files = Array.isArray(body.files) ? body.files : [body]
+  if (files.length === 0) {
+    res.status(400).json({ message: 'Передайте files[] или один объект файла' })
+    return
+  }
+
+  const registered = await registerExternalOrderFiles({
+    orderId,
+    files,
+    requireWebsiteSource: Boolean((req as any).fromWebsite),
+  })
+
+  res.status(201).json({ files: registered.map(sanitizeOrderFileForClient) })
+}))
+
+// Обновление внешнего файла: сайт может сначала зарегистрировать processing, потом ready/failed.
+router.patch('/:id/external-files/:fileId', (req, res, next) => {
+  if (isWebsiteOrderApiKeyValid(req)) {
+    (req as any).fromWebsite = true
+    return next()
+  }
+  return authenticate(req, res, next)
+}, asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  const fileId = Number(req.params.fileId)
+  if (!Number.isFinite(orderId) || !Number.isFinite(fileId)) {
+    res.status(400).json({ message: 'Некорректный orderId или fileId' })
+    return
+  }
+
+  const file = await updateExternalOrderFile({
+    orderId,
+    fileId,
+    data: req.body || {},
+    requireWebsiteSource: Boolean((req as any).fromWebsite),
+  })
+
+  res.json(sanitizeOrderFileForClient(file))
 }))
 
 // Все остальные маршруты заказов требуют аутентификации
@@ -543,10 +634,12 @@ router.get('/:id/files', asyncHandler(async (req, res) => {
   const id = Number(req.params.id)
   const db = await getDb()
   const rows = await db.all<any>(
-    'SELECT id, orderId, orderItemId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY (orderItemId IS NULL), orderItemId, id DESC',
+    `SELECT id, orderId, orderItemId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy,
+      storage, externalProvider, externalBucket, externalKey, externalUrl, externalStatus, artifactType, checksum, partNumber, metadata
+     FROM order_files WHERE orderId = ? ORDER BY (orderItemId IS NULL), orderItemId, id DESC`,
     id
   )
-  res.json(rows)
+  res.json(rows.map(sanitizeOrderFileForClient))
 }))
 
 // Скачивание файла с правильным именем (кириллица), отдача целиком с Content-Length
@@ -555,12 +648,24 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
   const fileId = Number(req.params.fileId)
   const db = await getDb()
   const row = await db.get<any>(
-    'SELECT filename, originalName, mime FROM order_files WHERE id = ? AND orderId = ?',
+    'SELECT filename, originalName, mime, storage, externalUrl, externalKey FROM order_files WHERE id = ? AND orderId = ?',
     fileId,
     orderId
   )
   if (!row || !row.filename) {
     res.status(404).json({ message: 'Файл не найден' })
+    return
+  }
+  if (row.storage && row.storage !== 'local') {
+    if (row.externalUrl) {
+      await logOrderFileAccess(db, req, { orderId, fileId, action: 'external_link', storage: row.storage })
+      res.redirect(302, String(row.externalUrl))
+      return
+    }
+    res.status(409).json({
+      message: 'Файл хранится во внешнем хранилище, но download URL не зарегистрирован',
+      storage: row.storage,
+    })
     return
   }
   const filePath = resolveSafeExistingPath([orderFilesDir, uploadsDir], String(row.filename))
@@ -574,7 +679,63 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${displayName.replace(/"/g, '%22')}"; filename*=UTF-8''${encodeURIComponent(displayName)}`)
   res.setHeader('Content-Length', String(buffer.length))
   if (row.mime) res.setHeader('Content-Type', row.mime)
+  await logOrderFileAccess(db, req, { orderId, fileId, action: 'download', storage: 'local' })
   res.send(buffer)
+}))
+
+// Получить внешнюю ссылку только по явному действию "Скачать".
+// В обычном списке файлов URL/key не раскрываем.
+router.get('/:id/files/:fileId/external-link', asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  const fileId = Number(req.params.fileId)
+  const db = await getDb()
+  const row = await db.get<any>(
+    'SELECT storage, externalUrl, externalStatus FROM order_files WHERE id = ? AND orderId = ?',
+    fileId,
+    orderId
+  )
+  if (!row) {
+    res.status(404).json({ message: 'Файл не найден' })
+    return
+  }
+  if (!row.storage || row.storage === 'local') {
+    res.status(400).json({ message: 'Файл хранится локально в CRM' })
+    return
+  }
+  if (row.externalStatus && row.externalStatus !== 'ready') {
+    res.status(409).json({ message: `Файл ещё не готов: ${row.externalStatus}` })
+    return
+  }
+  if (!row.externalUrl) {
+    res.status(409).json({ message: 'Внешняя ссылка для скачивания не зарегистрирована' })
+    return
+  }
+  await logOrderFileAccess(db, req, { orderId, fileId, action: 'external_link', storage: row.storage })
+  res.json({ url: row.externalUrl })
+}))
+
+router.get('/:id/files/:fileId/access-logs', asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  const fileId = Number(req.params.fileId)
+  const user = (req as any).user as { role?: string } | undefined
+  if (user?.role !== 'admin') {
+    res.status(403).json({ message: 'Доступ к журналу скачиваний только для администратора' })
+    return
+  }
+
+  const db = await getDb()
+  const rows = await db.all<any>(
+    `SELECT l.id, l.orderId, l.fileId, l.userId, u.name as userName, u.email as userEmail,
+      l.action, l.storage, l.ip, l.userAgent, l.createdAt
+     FROM order_file_access_logs l
+     LEFT JOIN users u ON u.id = l.userId
+     WHERE l.orderId = ? AND l.fileId = ?
+     ORDER BY l.id DESC
+     LIMIT 100`,
+    orderId,
+    fileId
+  )
+  res.json(rows)
 }))
 
 // Префлайт: проверка макета (PDF, JPG, PNG, TIFF)
@@ -583,12 +744,16 @@ router.get('/:id/files/:fileId/preflight', asyncHandler(async (req, res) => {
   const fileId = Number(req.params.fileId)
   const db = await getDb()
   const row = await db.get<any>(
-    'SELECT filename, mime, orderItemId FROM order_files WHERE id = ? AND orderId = ?',
+    'SELECT filename, mime, orderItemId, storage FROM order_files WHERE id = ? AND orderId = ?',
     fileId,
     orderId
   )
   if (!row || !row.filename) {
     res.status(404).json({ message: 'Файл не найден' })
+    return
+  }
+  if (row.storage && row.storage !== 'local') {
+    res.status(409).json({ message: 'Префлайт внешних файлов пока недоступен: файл не хранится на диске CRM' })
     return
   }
   let targetFormat: { width_mm: number; height_mm: number } | null = null
@@ -637,11 +802,13 @@ router.post('/:orderId/files/:fileId/approve', asyncHandler(async (req, res) => 
     orderId
   )
   const row = await db.get<any>(
-    'SELECT id, orderId, orderItemId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE id = ? AND orderId = ?',
+    `SELECT id, orderId, orderItemId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy,
+      storage, externalProvider, externalBucket, externalKey, externalUrl, externalStatus, artifactType, checksum, partNumber, metadata
+     FROM order_files WHERE id = ? AND orderId = ?`,
     fileId,
     orderId
   )
-  res.json(row)
+  res.json(sanitizeOrderFileForClient(row))
 }))
 
 // Выдать заказ: 100% остатка → предоплата, debt_closed_events, статус 7. Учёт в отчёте по дате выдачи.

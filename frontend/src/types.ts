@@ -282,6 +282,20 @@ export interface OrderFile {
   approved: number;
   approvedAt?: string;
   approvedBy?: number;
+  storage?: 'local' | 's3' | string;
+  externalProvider?: string | null;
+  externalBucket?: string | null;
+  externalKey?: string | null;
+  externalUrl?: string | null;
+  externalStatus?: 'ready' | 'processing' | 'failed' | string;
+  artifactType?: string | null;
+  checksum?: string | null;
+  partNumber?: number | null;
+  metadata?: string | null;
+  hasExternalUrl?: boolean;
+  hasExternalKey?: boolean;
+  hasExternalBucket?: boolean;
+  hasExternalMetadata?: boolean;
 }
 
 export interface Printer {
