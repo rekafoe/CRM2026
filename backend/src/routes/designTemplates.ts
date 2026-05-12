@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express'
-import { upload, uploadMemory } from '../config/upload'
+import { upload, uploadOrderFilesMemory } from '../config/upload'
 import { asyncHandler, authenticate } from '../middleware'
 import {
   getAllDesignTemplates,
@@ -106,12 +106,21 @@ router.post('/upload-preview', upload.single('preview'), asyncHandler(async (req
   res.json({ filename: file.filename, url: `/api/uploads/${file.filename}` })
 }))
 
-/** POST /api/design-templates/import — импорт SVG по стандарту слоёв */
-router.post('/import', uploadMemory.single('file'), asyncHandler(async (req: Request, res: Response) => {
+/** POST /api/design-templates/import — исходник шаблона + SVG по стандарту слоёв */
+router.post('/import', uploadOrderFilesMemory.fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'sourceFile', maxCount: 1 },
+]), asyncHandler(async (req: Request, res: Response) => {
   try {
     const body = req.body as Record<string, unknown>
+    const files = (req as any).files as Record<string, Array<{
+      buffer?: Buffer
+      originalname?: string
+      mimetype?: string
+    }>> | undefined
     const result = await importDesignTemplateFromFile({
-      file: (req as any).file,
+      file: files?.file?.[0],
+      sourceFile: files?.sourceFile?.[0],
       name: String(body.name || '').trim(),
       description: body.description != null ? String(body.description) : undefined,
       category: body.category != null ? String(body.category) : undefined,

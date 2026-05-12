@@ -43,6 +43,12 @@ export interface ImportedSvgLayers {
   guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>>
   lockedBgDetected: boolean
   prepressHints: PrepressFromSvgGuides | null
+  summary: {
+    photoFields: number
+    textFields: number
+    guides: string[]
+    strippedLayers: number
+  }
   /** Интервалы вырезаемых блоков SVG (слиянные). */
   removalRanges: RemovalRange[]
   /** Тот же SVG без интерактивных/guide слоёв — для загрузки фона без дубликатов. */
@@ -55,6 +61,85 @@ export const PX_TO_MM = 25.4 / 96
 const TECH_PREFIXES = ['hidden_', 'guide_']
 
 const GUIDE_NAMES = new Set(['trim', 'bleed', 'safe'])
+
+type SvgTransform = {
+  a: number
+  b: number
+  c: number
+  d: number
+  e: number
+  f: number
+}
+
+const IDENTITY_TRANSFORM: SvgTransform = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
+
+function multiplyTransform(left: SvgTransform, right: SvgTransform): SvgTransform {
+  return {
+    a: left.a * right.a + left.c * right.b,
+    b: left.b * right.a + left.d * right.b,
+    c: left.a * right.c + left.c * right.d,
+    d: left.b * right.c + left.d * right.d,
+    e: left.a * right.e + left.c * right.f + left.e,
+    f: left.b * right.e + left.d * right.f + left.f,
+  }
+}
+
+function applyTransform(t: SvgTransform, x: number, y: number): { x: number; y: number } {
+  return {
+    x: t.a * x + t.c * y + t.e,
+    y: t.b * x + t.d * y + t.f,
+  }
+}
+
+function parseTransformNumbers(value: string): number[] {
+  return value
+    .split(/[\s,]+/)
+    .map((v) => Number(v))
+    .filter(Number.isFinite)
+}
+
+function parseSvgTransform(value: string | undefined): SvgTransform {
+  if (!value) return IDENTITY_TRANSFORM
+  let current = IDENTITY_TRANSFORM
+  const re = /(matrix|translate|scale)\s*\(([^)]*)\)/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(value))) {
+    const [, kind, rawArgs] = match
+    const nums = parseTransformNumbers(rawArgs)
+    let next = IDENTITY_TRANSFORM
+    if (kind.toLowerCase() === 'matrix' && nums.length >= 6) {
+      next = { a: nums[0], b: nums[1], c: nums[2], d: nums[3], e: nums[4], f: nums[5] }
+    } else if (kind.toLowerCase() === 'translate' && nums.length >= 1) {
+      next = { ...IDENTITY_TRANSFORM, e: nums[0], f: nums[1] ?? 0 }
+    } else if (kind.toLowerCase() === 'scale' && nums.length >= 1) {
+      next = { ...IDENTITY_TRANSFORM, a: nums[0], d: nums[1] ?? nums[0] }
+    }
+    current = multiplyTransform(current, next)
+  }
+  return current
+}
+
+function transformedRect(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  transform: SvgTransform,
+): { x: number; y: number; width: number; height: number } {
+  const points = [
+    applyTransform(transform, x, y),
+    applyTransform(transform, x + width, y),
+    applyTransform(transform, x, y + height),
+    applyTransform(transform, x + width, y + height),
+  ]
+  const xs = points.map((p) => p.x)
+  const ys = points.map((p) => p.y)
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+  const minY = Math.min(...ys)
+  const maxY = Math.max(...ys)
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+}
 
 /** Среднее внешнее поле между outer и inner (мм). */
 function meanInsetOuterInnerMm(outer: MmRect, inner: MmRect): number | null {
@@ -324,6 +409,7 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
   const removalRanges: RemovalRange[] = []
 
   const groupStack: (string | null)[] = [null]
+  const transformStack: SvgTransform[] = [IDENTITY_TRANSFORM]
   const groupFrameStack: Array<{ openLt: number; removable: boolean }> = []
 
   let i = 0
@@ -365,6 +451,7 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
     if (closing && tagLc === 'g') {
       const framed = groupFrameStack.pop()
       if (groupStack.length > 1) groupStack.pop()
+      if (transformStack.length > 1) transformStack.pop()
       if (framed?.removable) removalRanges.push({ start: framed.openLt, end: gt + 1 })
       i = gt + 1
       continue
@@ -376,6 +463,7 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
       if (ln === 'locked_bg') lockedBgDetected = true
       if (ln) warnUnhandledLayerName('группа', ln, warnings, warnedNames)
       groupStack.push(ln)
+      transformStack.push(multiplyTransform(transformStack[transformStack.length - 1], parseSvgTransform(attrs.transform)))
       groupFrameStack.push({ openLt: lt, removable: groupRemovable(ln) })
       i = gt + 1
       continue
@@ -387,6 +475,7 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
     }
 
     const inherited = groupStack[groupStack.length - 1] ?? null
+    const inheritedTransform = transformStack[transformStack.length - 1]
 
     if (tagLc === 'rect') {
       const attrs = parseAttributes(attrPart)
@@ -396,6 +485,7 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
       const y = parseNumber(attrs.y) ?? 0
       const width = parseNumber(attrs.width)
       const height = parseNumber(attrs.height)
+      const objectTransform = multiplyTransform(inheritedTransform, parseSvgTransform(attrs.transform))
 
       let stripRect = false
       if (ef?.startsWith('photo_')) stripRect = true
@@ -416,22 +506,24 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
         height > 0
       ) {
         const key = ef as 'trim' | 'bleed' | 'safe'
+        const tr = transformedRect(x, y, width, height, objectTransform)
         guideRectsMm[key] = {
           name: ef,
-          x: x * scaleX,
-          y: y * scaleY,
-          width: width * scaleX,
-          height: height * scaleY,
+          x: tr.x * scaleX,
+          y: tr.y * scaleY,
+          width: tr.width * scaleX,
+          height: tr.height * scaleY,
         }
       }
 
       if (ef?.startsWith('photo_') && width != null && height != null && width > 0 && height > 0) {
+        const tr = transformedRect(x, y, width, height, objectTransform)
         photoRects.push({
           name: ef,
-          x: x * scaleX,
-          y: y * scaleY,
-          width: width * scaleX,
-          height: height * scaleY,
+          x: tr.x * scaleX,
+          y: tr.y * scaleY,
+          width: tr.width * scaleX,
+          height: tr.height * scaleY,
         })
       }
 
@@ -472,10 +564,15 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
         const xv = parseNumber(attrs.x) ?? 0
         const yv = parseNumber(attrs.y) ?? 0
         const fontSize = parseNumber(attrs['font-size']) ?? 18
+        const point = applyTransform(
+          multiplyTransform(inheritedTransform, parseSvgTransform(attrs.transform)),
+          xv,
+          yv,
+        )
         textItems.push({
           name: ef,
-          x: xv * scaleX,
-          y: yv * scaleY,
+          x: point.x * scaleX,
+          y: point.y * scaleY,
           fontSize: fontSize * avgScale,
           text: decodeXmlText(innerStr) || ef.replace(/^text_/, ''),
         })
@@ -501,6 +598,9 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
       'Не найдено объектов photo_* или text_*; добавьте поля вручную или проверьте имена групп.',
     )
   }
+  warnings.push(
+    `Импорт SVG: найдено фото-полей ${photoRects.length}, текстовых полей ${textItems.length}, направляющих ${Object.keys(guideRectsMm).length}.`,
+  )
 
   return {
     widthMm,
@@ -510,6 +610,12 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
     guideRectsMm,
     lockedBgDetected,
     prepressHints,
+    summary: {
+      photoFields: photoRects.length,
+      textFields: textItems.length,
+      guides: Object.keys(guideRectsMm),
+      strippedLayers: mergedRanges.length,
+    },
     removalRanges: mergedRanges,
     strippedSvg,
     warnings,

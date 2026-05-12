@@ -41,6 +41,7 @@ export const DesignTemplatesPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
+  const importSourceFileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -61,6 +62,7 @@ export const DesignTemplatesPage: React.FC = () => {
     typeId: '',
     sizeId: '',
     sortOrder: 0,
+    sourceFile: null as File | null,
     file: null as File | null,
   });
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
@@ -109,6 +111,7 @@ export const DesignTemplatesPage: React.FC = () => {
       typeId: '',
       sizeId: '',
       sortOrder: templates.length,
+      sourceFile: null,
       file: null,
     });
     setImportModalOpen(true);
@@ -181,8 +184,8 @@ export const DesignTemplatesPage: React.FC = () => {
   }, [form, editingId, loadTemplates]);
 
   const handleImport = useCallback(async () => {
-    if (!importForm.file) {
-      setError('Выберите SVG-файл для импорта');
+    if (!importForm.file && !importForm.sourceFile) {
+      setError('Выберите исходник или SVG-файл для импорта');
       return;
     }
     if (!importForm.name.trim()) {
@@ -195,6 +198,7 @@ export const DesignTemplatesPage: React.FC = () => {
       setImportWarnings([]);
       const res = await importDesignTemplateFile({
         file: importForm.file,
+        sourceFile: importForm.sourceFile,
         name: importForm.name.trim(),
         description: importForm.description.trim() || undefined,
         category: importForm.category.trim() || undefined,
@@ -245,7 +249,7 @@ export const DesignTemplatesPage: React.FC = () => {
             <AppIcon name="plus" size="xs" /> Добавить шаблон
           </Button>
           <Button variant="secondary" onClick={openImport}>
-            <AppIcon name="download" size="xs" /> Импорт SVG
+            <AppIcon name="download" size="xs" /> Импорт шаблона
           </Button>
           <div className="design-templates-filter">
             <label>Категория:</label>
@@ -348,12 +352,12 @@ export const DesignTemplatesPage: React.FC = () => {
                 type="file"
                 accept="image/*"
                 onChange={handlePreviewUpload}
-                style={{ display: 'none' }}
+                className="visually-hidden-file-input"
               />
               <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
                 Загрузить изображение
               </Button>
-              <p className="form-hint">Для фона в редакторе макетов нужен файл-картинка (PNG, JPG). Файлы InDesign (.indd, .indt) загружать сюда нельзя — экспортируйте из InDesign в PNG/JPG.</p>
+              <p className="form-hint">Для ручного шаблона нужен PNG/JPG/SVG-фон. Для автоматического разбора используйте мастер импорта ниже.</p>
             </div>
           </div>
           <div className="form-row form-row-inline">
@@ -413,23 +417,49 @@ export const DesignTemplatesPage: React.FC = () => {
         </div>
       </Modal>
 
-      <Modal isOpen={importModalOpen} onClose={() => setImportModalOpen(false)} title="Импорт SVG-шаблона">
+      <Modal isOpen={importModalOpen} onClose={() => setImportModalOpen(false)} title="Импорт шаблона">
         <div className="design-template-form">
+          <div className="design-template-import-intro">
+            <strong>Два файла, две роли:</strong>
+            <span>исходник хранится в CRM для производства, а SVG разбирается в поля редактора. Если SVG пока нет, шаблон сохранится как неактивный draft.</span>
+          </div>
           <div className="form-row">
-            <label>SVG-файл *</label>
+            <label>Исходник для CRM</label>
+            <div className="preview-upload">
+              <input
+                ref={importSourceFileInputRef}
+                type="file"
+                accept=".ai,.cdr,.indd,.indt,.pdf,.svg,application/pdf,image/svg+xml"
+                onChange={(e) => setImportForm((p) => ({ ...p, sourceFile: e.target.files?.[0] ?? null }))}
+                className="visually-hidden-file-input"
+              />
+              <Button variant="secondary" onClick={() => importSourceFileInputRef.current?.click()}>
+                Выбрать исходник
+              </Button>
+              <p className="form-hint">
+                {importForm.sourceFile
+                  ? importForm.sourceFile.name
+                  : 'Можно приложить AI/CDR/INDD/PDF/SVG как master-файл. Он не разбирается браузером, а хранится в карточке шаблона.'}
+              </p>
+            </div>
+          </div>
+          <div className="form-row">
+            <label>SVG для редактора</label>
             <div className="preview-upload">
               <input
                 ref={importFileInputRef}
                 type="file"
-                accept=".svg,image/svg+xml,.pdf,application/pdf"
+                accept=".svg,image/svg+xml"
                 onChange={(e) => setImportForm((p) => ({ ...p, file: e.target.files?.[0] ?? null }))}
-                style={{ display: 'none' }}
+                className="visually-hidden-file-input"
               />
               <Button variant="secondary" onClick={() => importFileInputRef.current?.click()}>
-                Выбрать файл
+                Выбрать SVG
               </Button>
               <p className="form-hint">
-                {importForm.file ? importForm.file.name : 'Загрузите SVG, экспортированный из AI/CDR по стандарту слоёв.'}
+                {importForm.file
+                  ? importForm.file.name
+                  : 'Загрузите SVG, экспортированный из AI/CDR/INDD по стандарту: photo_*, text_*, trim, bleed, safe.'}
               </p>
             </div>
           </div>

@@ -30,6 +30,23 @@ export interface DesignTemplateInput {
   sort_order?: number
 }
 
+function stripPrivateImportFields(row: DesignTemplateRow): DesignTemplateRow {
+  if (!row.spec) return row
+  try {
+    const spec = JSON.parse(row.spec) as Record<string, unknown>
+    const importMeta = spec.import as Record<string, unknown> | undefined
+    if (importMeta && typeof importMeta === 'object') {
+      delete importMeta.sourceFile
+      delete importMeta.sourceFileUrl
+      delete importMeta.sourceOriginalName
+      delete importMeta.sourceSize
+    }
+    return { ...row, spec: JSON.stringify(spec) }
+  } catch {
+    return row
+  }
+}
+
 export async function getAllDesignTemplates(): Promise<DesignTemplateRow[]> {
   const db = await getDb()
   const rows = await db.all(
@@ -59,7 +76,7 @@ export async function getPublicDesignTemplate(id: number): Promise<DesignTemplat
     'SELECT * FROM design_templates WHERE id = ? AND is_active = 1',
     [id],
   ) as DesignTemplateRow | undefined
-  return row ?? null
+  return row ? stripPrivateImportFields(row) : null
 }
 
 export async function getPublicDesignTemplates(params: {
@@ -84,8 +101,7 @@ export async function getPublicDesignTemplates(params: {
     ) as DesignTemplateRow[]
   }
 
-  if (!params.sizeId) return rows
-  return rows.filter((row) => {
+  const filteredRows = !params.sizeId ? rows : rows.filter((row) => {
     try {
       const spec = row.spec ? JSON.parse(row.spec) as Record<string, unknown> : {}
       return spec.sizeId == null || String(spec.sizeId) === params.sizeId
@@ -93,6 +109,7 @@ export async function getPublicDesignTemplates(params: {
       return true
     }
   })
+  return filteredRows.map(stripPrivateImportFields)
 }
 
 export async function createDesignTemplate(input: DesignTemplateInput): Promise<DesignTemplateRow> {

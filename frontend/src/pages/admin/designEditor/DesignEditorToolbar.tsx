@@ -21,6 +21,7 @@ interface DesignEditorToolbarProps {
   hasOrderContext: boolean;
   onExportPdf: () => void;
   exportingPdf: boolean;
+  exportProgress?: { current: number; total: number } | null;
   onClose: () => void;
   // History
   canUndo: boolean;
@@ -63,6 +64,7 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
   hasOrderContext,
   onExportPdf,
   exportingPdf,
+  exportProgress,
   onClose,
   canUndo,
   canRedo,
@@ -114,11 +116,10 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
         </button>
         <button
           type="button"
-          className="design-editor-toolbar-icon-btn"
           onClick={onRedo}
           disabled={!canRedo}
           title="Повторить (Ctrl+Y)"
-          style={{ transform: 'scaleX(-1)' }}
+          className="design-editor-toolbar-icon-btn design-editor-icon-flipped"
         >
           <AppIcon name="arrow-left" size="xs" />
         </button>
@@ -202,7 +203,7 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
             onClick={onUnderlineToggle}
             title="Подчёркнутый"
           >
-            <span style={{ textDecoration: 'underline' }}>Ч</span>
+            <span className="design-editor-underlined-glyph">Ч</span>
           </button>
           <div className="design-editor-toolbar-group design-editor-align-group">
             {(['left', 'center', 'right'] as const).map((align) => (
@@ -240,11 +241,10 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
           </span>
           <button
             type="button"
-            className="design-editor-page-btn"
+            className="design-editor-page-btn design-editor-icon-flipped"
             onClick={onPageNext}
             disabled={currentPage >= pageCount - 1}
             title="Следующая страница"
-            style={{ transform: 'scaleX(-1)' }}
           >
             <AppIcon name="arrow-left" size="xs" />
           </button>
@@ -296,7 +296,9 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
       <span title="Скачать все страницы в PDF">
         <Button variant="secondary" onClick={onExportPdf} disabled={exportingPdf}>
           <AppIcon name="document" size="xs" />
-          {exportingPdf ? 'Экспорт…' : 'PDF'}
+          {exportingPdf && exportProgress
+            ? `PDF ${exportProgress.current}/${exportProgress.total}`
+            : exportingPdf ? 'Экспорт…' : 'PDF'}
         </Button>
       </span>
 

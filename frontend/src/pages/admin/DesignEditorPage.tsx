@@ -23,7 +23,13 @@ import {
   EMPTY_PAGE,
   type TextBlockPresetKind,
 } from './designEditor/constants';
-import { mergePagesWithSavedSnapshot, type PageSaveSnapshot } from './designEditor/mergePagesSnapshot';
+import type { PageSaveSnapshot } from './designEditor/mergePagesSnapshot';
+import {
+  buildDesignState,
+  buildTemplateSpecWithDesignState,
+  mergeSavedEditorPages,
+  readDesignTemplateSpec,
+} from './designEditor/designEditorState';
 import {
   patchAllTextInFabricJSON,
   extractUsedFontFamiliesFromPages,
@@ -31,7 +37,6 @@ import {
 import type {
   DesignPrepressConfig,
   DesignPage,
-  DesignState,
   SidebarSection,
   SelectedObjProps,
   SidebarPhotoItem,
@@ -125,7 +130,7 @@ export const DesignEditorPage: React.FC = () => {
   // ── Thumbnails (pageIndex → data URL) ──────────────────────────────────────
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
   const handlePageThumbReady = useCallback((pageIdx: number, dataUrl: string) => {
-    setThumbnails((prev) => ({ ...prev, [pageIdx]: dataUrl }));
+    setThumbnails((prev) => (prev[pageIdx] === dataUrl ? prev : { ...prev, [pageIdx]: dataUrl }));
   }, []);
 
   // ── Spread mode ─────────────────────────────────────────────────────────────
@@ -134,6 +139,7 @@ export const DesignEditorPage: React.FC = () => {
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const fitScalerRef = useRef<HTMLDivElement>(null);
 
   const [showRulers, setShowRulers] = useState(true);
   const [stripCollapsed, setStripCollapsed] = useState(false);
@@ -224,6 +230,13 @@ export const DesignEditorPage: React.FC = () => {
   }, [bleedPx, isSpreadView, pageH, pageW, prepressConfig.showBleed]);
 
   useEffect(() => {
+    const el = fitScalerRef.current;
+    if (!el) return;
+    el.style.setProperty('--de-fit-zoom', String(fitZoom));
+    el.dataset.ready = fitReady ? 'true' : 'false';
+  }, [fitZoom, fitReady]);
+
+  useEffect(() => {
     if (editorMode === 'basic') setTextFloatingAnchor(null);
   }, [editorMode]);
 
@@ -287,6 +300,7 @@ export const DesignEditorPage: React.FC = () => {
   const { sort: photoSort } = photoPanel;
 
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportProgress, setExportProgress] = useState<{ current: number; total: number } | null>(null);
 
   /** Ошибки в рабочем режиме (загрузка по URL, сохранение и т.д.) */
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -322,20 +336,7 @@ export const DesignEditorPage: React.FC = () => {
       setTemplateState((s) => ({ ...s, loading: true, error: null }));
       const res = await getDesignTemplate(id);
       const t = res.data;
-      let spec: {
-        width_mm?: number;
-        height_mm?: number;
-        page_count?: number;
-        spread_mode?: boolean;
-        cover_pages?: number;
-        prepress?: unknown;
-        designState?: DesignState;
-      } = {};
-      try {
-        if (t.spec) spec = typeof t.spec === 'string' ? JSON.parse(t.spec) : (t.spec as object);
-      } catch {
-        // ignore parse error
-      }
+      const spec = readDesignTemplateSpec(t);
       const ds = spec.designState;
       const w = ds?.pageWidth ?? spec.width_mm ?? 90;
       const h = ds?.pageHeight ?? spec.height_mm ?? 55;
@@ -441,9 +442,9 @@ export const DesignEditorPage: React.FC = () => {
   const captureCurrentThumb = useCallback(() => {
     const url = canvasHandleRef.current?.captureThumb();
     if (!url) return;
-    setThumbnails((prev) => ({ ...prev, [leftPageIdx]: url }));
+    setThumbnails((prev) => (prev[leftPageIdx] === url ? prev : { ...prev, [leftPageIdx]: url }));
     if (isSpreadView && rightPageIdx >= 0) {
-      setThumbnails((prev) => ({ ...prev, [rightPageIdx]: url }));
+      setThumbnails((prev) => (prev[rightPageIdx] === url ? prev : { ...prev, [rightPageIdx]: url }));
     }
   }, [leftPageIdx, rightPageIdx, isSpreadView]);
 
@@ -618,11 +619,7 @@ export const DesignEditorPage: React.FC = () => {
         return;
       }
       const saved = await handle.saveCurrentPage();
-      const merged = mergePagesWithSavedSnapshot(pages, saved as PageSaveSnapshot, {
-        currentPage,
-        leftPageIdx,
-        rightPageIdx,
-      });
+      const merged = mergeSavedEditorPages(pages, saved as PageSaveSnapshot, currentPage, leftPageIdx, rightPageIdx);
       const nextPages = merged.map((p) => ({
         fabricJSON: patchAllTextInFabricJSON(p.fabricJSON as Record<string, unknown>, { fontFamily }),
       }));
@@ -641,11 +638,7 @@ export const DesignEditorPage: React.FC = () => {
         return;
       }
       const saved = await handle.saveCurrentPage();
-      const merged = mergePagesWithSavedSnapshot(pages, saved as PageSaveSnapshot, {
-        currentPage,
-        leftPageIdx,
-        rightPageIdx,
-      });
+      const merged = mergeSavedEditorPages(pages, saved as PageSaveSnapshot, currentPage, leftPageIdx, rightPageIdx);
       const nextPages = merged.map((p) => ({
         fabricJSON: patchAllTextInFabricJSON(p.fabricJSON as Record<string, unknown>, { fill }),
       }));
@@ -682,11 +675,7 @@ export const DesignEditorPage: React.FC = () => {
         stroke: v.strokeWidth > 0 ? v.stroke : '',
       };
       const saved = await handle.saveCurrentPage();
-      const merged = mergePagesWithSavedSnapshot(pages, saved as PageSaveSnapshot, {
-        currentPage,
-        leftPageIdx,
-        rightPageIdx,
-      });
+      const merged = mergeSavedEditorPages(pages, saved as PageSaveSnapshot, currentPage, leftPageIdx, rightPageIdx);
       const nextPages = merged.map((p) => ({
         fabricJSON: patchAllTextInFabricJSON(p.fabricJSON as Record<string, unknown>, patch),
       }));
@@ -701,29 +690,24 @@ export const DesignEditorPage: React.FC = () => {
     if (!canvasHandleRef.current) return;
 
     const saved = await canvasHandleRef.current.saveCurrentPage();
-    let updatedPages: DesignPage[];
-    if (saved.kind === 'spread') {
-      updatedPages = pages.map((p, i) => {
-        if (i === leftPageIdx) return { fabricJSON: saved.left };
-        if (i === rightPageIdx) return { fabricJSON: saved.right };
-        return p;
-      });
-    } else {
-      updatedPages = pages.map((p, i) =>
-        i === currentPage ? { fabricJSON: saved.json } : p,
-      );
-    }
+    const updatedPages = mergeSavedEditorPages(
+      pages,
+      saved as PageSaveSnapshot,
+      currentPage,
+      leftPageIdx,
+      rightPageIdx,
+    );
 
-    const designState: DesignState = {
-      templateId: templateId ? parseInt(templateId, 10) : null,
+    const designState = buildDesignState({
+      templateId,
       pageWidth,
       pageHeight,
       pageCount,
-      prepress: prepressConfig,
+      prepressConfig,
       pages: updatedPages,
-      spread_mode: spreadMode,
-      cover_pages: coverPages,
-    };
+      spreadMode,
+      coverPages,
+    });
 
     if (hasOrderContext) {
       const handle = canvasHandleRef.current;
@@ -765,25 +749,7 @@ export const DesignEditorPage: React.FC = () => {
       setSaving(true);
       setSaveSuccessMessage(null);
       setEditorError(null);
-      let specObj: Record<string, unknown> = {};
-      try {
-        if (template?.spec) {
-          specObj =
-            typeof template.spec === 'string' ? JSON.parse(template.spec) : { ...(template.spec as object) };
-        }
-      } catch {
-        specObj = {};
-      }
-      const mergedSpec = {
-        ...specObj,
-        width_mm: pageWidth,
-        height_mm: pageHeight,
-        page_count: pageCount,
-        spread_mode: spreadMode,
-        cover_pages: coverPages,
-        prepress: prepressConfig,
-        designState,
-      };
+      const mergedSpec = buildTemplateSpecWithDesignState(readDesignTemplateSpec(template), designState);
       const res = await updateDesignTemplate(tid, { spec: mergedSpec });
       setTemplateState((s) => ({ ...s, template: res.data }));
       setPages(updatedPages);
@@ -818,6 +784,7 @@ export const DesignEditorPage: React.FC = () => {
     if (!handle || pageCount < 1) return;
 
     setExportingPdf(true);
+    setExportProgress({ current: 0, total: pageCount });
     try {
       const saved = await handle.saveCurrentPage();
       let allPages = pages;
@@ -838,11 +805,13 @@ export const DesignEditorPage: React.FC = () => {
       });
 
       for (let i = 0; i < pageCount; i++) {
+        setExportProgress({ current: i + 1, total: pageCount });
         await handle.loadPageForExport(allPages[i] ?? EMPTY_PAGE);
         await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
-        const dataUrl = handle.getDataURL({ multiplier: 2 });
+        const dataUrl = handle.getDataURL({ multiplier: getExportPixelRatio() });
         if (i > 0) doc.addPage([pageWidth, pageHeight]);
         doc.addImage(dataUrl, 'PNG', 0, 0, pageWidth, pageHeight);
+        await new Promise<void>((r) => window.setTimeout(r, 0));
       }
 
       doc.save(`maket-${template?.name ?? 'maket'}-all.pdf`);
@@ -856,6 +825,7 @@ export const DesignEditorPage: React.FC = () => {
       }));
     } finally {
       setExportingPdf(false);
+      setExportProgress(null);
     }
   }, [pages, currentPage, pageCount, pageWidth, pageHeight, template?.name, leftPageIdx, rightPageIdx]);
 
@@ -969,7 +939,7 @@ export const DesignEditorPage: React.FC = () => {
             type="file"
             accept="image/*,.heic,.heif"
             onChange={handleAddImage}
-            style={{ display: 'none' }}
+            className="visually-hidden-file-input"
             aria-hidden
           />
 
@@ -995,6 +965,7 @@ export const DesignEditorPage: React.FC = () => {
             hasOrderContext={hasOrderContext}
             onExportPdf={() => void handleExportPdf()}
             exportingPdf={exportingPdf}
+            exportProgress={exportProgress}
             onClose={() => navigate(catalogPath)}
             canUndo={canUndo}
             canRedo={canRedo}
@@ -1048,27 +1019,17 @@ export const DesignEditorPage: React.FC = () => {
             </Alert>
           )}
 
-          <div
-            className="design-editor-fit-scaler"
-            style={{
-              transform: `scale(${fitZoom})`,
-              visibility: fitReady ? 'visible' : 'hidden',
-            }}
-          >
+          <div ref={fitScalerRef} className="design-editor-fit-scaler" data-ready="false">
 
           {/* Один экземпляр холста: при смене isSpreadView нельзя размонтировать второй canvas — правки теряются. */}
           <div
             className={isSpreadView ? 'design-editor-spread-wrap' : 'design-editor-canvas-wrap'}
           >
             <div
-              className={
-                isSpreadView ? 'design-editor-spread-book design-editor-spread-book--unified' : undefined
-              }
-              style={isSpreadView ? undefined : { display: 'contents' }}
+              className={isSpreadView ? 'design-editor-spread-book design-editor-spread-book--unified' : 'design-editor-contents'}
             >
               <div
-                className={isSpreadView ? 'design-editor-spread-unified-canvas' : undefined}
-                style={isSpreadView ? undefined : { display: 'contents' }}
+                className={isSpreadView ? 'design-editor-spread-unified-canvas' : 'design-editor-contents'}
               >
                 <DesignEditorCanvas
                   ref={canvasHandleRef}

@@ -10,7 +10,12 @@ import {
 } from './designTemplateSvgParse'
 
 export interface ImportDesignTemplateInput {
-  file: {
+  file?: {
+    buffer?: Buffer
+    originalname?: string
+    mimetype?: string
+  }
+  sourceFile?: {
     buffer?: Buffer
     originalname?: string
     mimetype?: string
@@ -29,6 +34,8 @@ export interface ImportDesignTemplateResult {
   warnings: string[]
   errors: string[]
 }
+
+const MASTER_SOURCE_EXTENSIONS = new Set(['.ai', '.cdr', '.indd', '.indt', '.pdf', '.svg'])
 
 function sanitizeSvg(svg: string): string {
   return svg
@@ -94,27 +101,77 @@ function buildImportedPrepress(
 export async function importDesignTemplateFromFile(
   input: ImportDesignTemplateInput,
 ): Promise<ImportDesignTemplateResult> {
-  const ext = path.extname(input.file.originalname || '').toLowerCase()
+  const ext = path.extname(input.file?.originalname || '').toLowerCase()
+  const sourceExt = path.extname(input.sourceFile?.originalname || '').toLowerCase()
   const errors: string[] = []
   const warnings: string[] = []
 
-  if (!input.file.buffer || input.file.buffer.length === 0) {
-    errors.push('Файл не загружен или пустой.')
-  }
+  const hasNormalizedSvg = Boolean(input.file?.buffer && input.file.buffer.length > 0)
+  const hasSourceFile = Boolean(input.sourceFile?.buffer && input.sourceFile.buffer.length > 0)
+  if (!hasNormalizedSvg && !hasSourceFile) errors.push('Файл не загружен или пустой.')
   if (!input.name.trim()) {
     errors.push('Укажите название шаблона.')
   }
-  if (ext === '.pdf') {
+  if (hasNormalizedSvg && ext === '.pdf') {
     errors.push('PDF importer будет добавлен вторым этапом. Сейчас загрузите SVG с именованными слоями.')
   }
-  if (ext !== '.svg' && ext !== '.pdf') {
+  if (hasNormalizedSvg && ext !== '.svg' && ext !== '.pdf') {
     errors.push('Поддерживаются SVG, позже PDF.')
+  }
+  if (input.sourceFile?.buffer && sourceExt && !MASTER_SOURCE_EXTENSIONS.has(sourceExt)) {
+    errors.push('Исходник шаблона должен быть AI, CDR, INDD, INDT, PDF или SVG.')
   }
   if (errors.length > 0) {
     throw Object.assign(new Error(errors.join(' ')), { importErrors: errors, importWarnings: warnings })
   }
 
-  const svg = sanitizeSvg(input.file.buffer!.toString('utf8'))
+  let storedSource: { filename: string; size: number; originalName: string } | null = null
+  if (input.sourceFile?.buffer && input.sourceFile.buffer.length > 0) {
+    storedSource = saveBufferToUploads(input.sourceFile.buffer, input.sourceFile.originalname, `${input.name}-source`)
+    if (!storedSource) {
+      throw Object.assign(new Error('Не удалось сохранить исходник шаблона.'), {
+        importErrors: ['Не удалось сохранить исходник шаблона.'],
+        importWarnings: warnings,
+      })
+    }
+  }
+
+  if (!hasNormalizedSvg) {
+    warnings.push('Исходник сохранён как draft-шаблон. Для редактора добавьте SVG с именованными слоями.')
+    const sourceFileUrl = `/api/uploads/${storedSource!.filename}`
+    const template = await createDesignTemplate({
+      name: input.name.trim(),
+      description: input.description,
+      category: input.category,
+      preview_url: undefined,
+      is_active: false,
+      sort_order: input.sortOrder ?? 0,
+      spec: {
+        productId: input.productId,
+        typeId: input.typeId,
+        sizeId: input.sizeId,
+        source_format: sourceExt.replace(/^\./, '') || 'source',
+        import: {
+          importer: 'source-only-draft',
+          importerVersion: 4,
+          status: 'draft',
+          sourceFormat: sourceExt.replace(/^\./, '') || 'source',
+          sourceFile: sourceFileUrl,
+          sourceFileUrl,
+          sourceOriginalName: storedSource!.originalName,
+          sourceSize: storedSource!.size,
+          normalizedFormat: null,
+          normalizedFileUrl: null,
+          warnings,
+          errors,
+        },
+      },
+    })
+    const fresh = await getDesignTemplate(template.id)
+    return { template: fresh ?? template, warnings, errors }
+  }
+
+  const svg = sanitizeSvg(input.file!.buffer!.toString('utf8'))
   const parsed = parseImportedSvgLayers(svg)
   warnings.push(...parsed.warnings)
 
@@ -125,7 +182,7 @@ export async function importDesignTemplateFromFile(
     )
   }
 
-  const stored = saveBufferToUploads(Buffer.from(strippedForBg, 'utf8'), input.file.originalname, input.name)
+  const stored = saveBufferToUploads(Buffer.from(strippedForBg, 'utf8'), input.file!.originalname, input.name)
   if (!stored) {
     throw Object.assign(new Error('Не удалось сохранить SVG.'), {
       importErrors: ['Не удалось сохранить SVG.'],
@@ -134,6 +191,8 @@ export async function importDesignTemplateFromFile(
   }
 
   const previewUrl = `/api/uploads/${stored.filename}`
+  const normalizedFileUrl = previewUrl
+  const sourceFileUrl = storedSource ? `/api/uploads/${storedSource.filename}` : normalizedFileUrl
   const prepress =
     parsed.prepressHints && Object.keys(parsed.guideRectsMm).length > 0
       ? buildImportedPrepress(parsed.prepressHints, parsed.guideRectsMm)
@@ -170,14 +229,23 @@ export async function importDesignTemplateFromFile(
       productId: input.productId,
       typeId: input.typeId,
       sizeId: input.sizeId,
-      source_format: 'svg',
+      source_format: storedSource ? sourceExt.replace(/^\./, '') : 'svg',
       import: {
         importer: 'svg-named-layers',
-        importerVersion: 3,
-        sourceFile: previewUrl,
+        importerVersion: 4,
+        sourceFormat: storedSource ? sourceExt.replace(/^\./, '') : 'svg',
+        sourceFile: sourceFileUrl,
+        sourceFileUrl,
+        sourceOriginalName: storedSource?.originalName ?? stored.originalName,
+        sourceSize: storedSource?.size ?? stored.size,
+        normalizedFormat: 'svg',
+        normalizedFile: normalizedFileUrl,
+        normalizedFileUrl,
+        normalizedOriginalName: stored.originalName,
         originalName: stored.originalName,
         warnings,
         errors,
+        parserSummary: parsed.summary,
         layerConvention:
           'id/inkscape:label: locked_bg (в фоне), photo_* rect, text_* text, группы <g>; trim/bleed/safe rect → prepress',
         strippedInteractiveLayers: true,

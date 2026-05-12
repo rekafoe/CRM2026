@@ -1073,7 +1073,8 @@ export const uploadDesignTemplatePreview = (file: File) => {
   return api.post<{ filename: string; url: string }>('/design-templates/upload-preview', formData);
 };
 export const importDesignTemplateFile = (payload: {
-  file: File;
+  file?: File | null;
+  sourceFile?: File | null;
   name: string;
   description?: string;
   category?: string;
@@ -1083,7 +1084,8 @@ export const importDesignTemplateFile = (payload: {
   sortOrder?: number;
 }) => {
   const formData = new FormData();
-  formData.append('file', payload.file);
+  if (payload.file) formData.append('file', payload.file);
+  if (payload.sourceFile) formData.append('sourceFile', payload.sourceFile);
   formData.append('name', payload.name);
   if (payload.description) formData.append('description', payload.description);
   if (payload.category) formData.append('category', payload.category);
