@@ -151,9 +151,10 @@ export function useVariantsTable(serviceId: number): UseVariantsTableResult {
         current.pendingChanges.rangeChanges.length === 0 &&
         current.pendingChanges.priceChanges.length === 0 &&
         current.pendingChanges.variantChanges.length === 0;
-      if (!current.hasUnsavedChanges && empty) {
-        syncWithExternalRef.current(serverVariants);
-      } else {
+      // Полный sync выполняется отдельным эффектом при «чистом» состоянии — иначе гонка:
+      // reload() успевает обновить serverVariants, пока очередь сохранения ещё не очищена,
+      // sync пропускается и после clear pending serverVariants уже не меняется — колонки цен исчезают.
+      if (current.hasUnsavedChanges || !empty) {
         const p = current.pendingChanges;
         // Пока есть несохранённые правки по вариантам — не подмешиваем tiers с сервера (меньше гонок с UI).
         if (
@@ -168,6 +169,18 @@ export function useVariantsTable(serviceId: number): UseVariantsTableResult {
   }, [serverVariants]);
 
   const pendingSnapshot = useMemo(() => JSON.stringify(localChanges.pendingChanges), [localChanges.pendingChanges]);
+
+  /** Подтянуть локальное состояние с сервера после сохранения и при первой загрузке (см. гонку в эффекте выше). */
+  useEffect(() => {
+    if (loading) return;
+    const current = localChangesRef.current;
+    const empty =
+      current.pendingChanges.rangeChanges.length === 0 &&
+      current.pendingChanges.priceChanges.length === 0 &&
+      current.pendingChanges.variantChanges.length === 0;
+    if (current.hasUnsavedChanges || !empty) return;
+    syncWithExternalRef.current(serverVariants);
+  }, [loading, serverVariants, localChanges.hasUnsavedChanges, pendingSnapshot]);
 
   useEffect(() => {
     if (!localChanges.hasUnsavedChanges) return;

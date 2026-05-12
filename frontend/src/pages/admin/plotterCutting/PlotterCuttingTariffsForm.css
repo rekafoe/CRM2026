@@ -1,5 +1,6 @@
 .plotter-tariffs-form {
   max-width: 100%;
+  min-width: 0;
 }
 
 .plotter-tariffs-form__panel {
@@ -57,6 +58,8 @@
   padding: 10px;
   background: var(--bg-primary, #ffffff);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  /* иначе широкая таблица диапазонов раздувает сетку/карточку за пределы страницы */
+  min-width: 0;
 }
 
 .plotter-tariff-mode__title {
@@ -89,6 +92,13 @@
 
 .plotter-tariff-mode__volume-tiers {
   margin-top: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.plotter-tier-table {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .plotter-tariffs-form .form-group {
@@ -201,6 +211,8 @@
   overflow-x: auto;
   overflow-y: hidden;
   max-width: 100%;
+  min-width: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .plotter-tier-table__table {
@@ -413,6 +425,10 @@
   gap: 16px;
 }
 
+.plotter-roll-finishing__tier-block {
+  min-width: 0;
+}
+
 @media (min-width: 800px) {
   .plotter-roll-finishing__tier-blocks {
     grid-template-columns: 1fr 1fr;
@@ -489,6 +505,7 @@
   padding: 10px;
   background: var(--bg-primary, #ffffff);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  min-width: 0;
 }
 
 .plotter-roll-finishing__hint {
