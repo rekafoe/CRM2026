@@ -38,6 +38,7 @@ npm run dev  # Запуск на порту 5173
 - [💰 Ценообразование](./pricing-architecture.md) - Канон: simplified + `/api/pricing/calculate`
 - [📐 Раскладка и дозаливка](./dynamic-layout-bleed.md) - Лист материала, `bleed_mm`, произвольный trim
 - [📄 Многостраничные продукты](./multipage-products-review.md) - Политика `multi_page` vs legacy multipage
+- [🗂️ S3-файлы заказов](./s3-order-files-integration.md) - Тяжёлые файлы сайта, external artifacts, signed URL и аудит скачиваний
 - [📦 Materials](./materials.md) - Управление материалами
 - [📊 Reports](./reports.md) - Отчеты и аналитика
 - [👥 Users](./users.md) - Пользователи и роли

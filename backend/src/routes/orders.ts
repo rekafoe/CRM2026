@@ -255,6 +255,92 @@ router.post('/:id/files', (req, res, next) => {
   res.status(201).json(row)
 }))
 
+/**
+ * @swagger
+ * /api/orders/{orderId}/external-files:
+ *   post:
+ *     summary: Зарегистрировать внешние файлы заказа (S3/object storage)
+ *     description: |
+ *       Используется для тяжёлых файлов сайта: JPG/PDF уже загружены в S3/object storage,
+ *       а CRM получает только метаданные. Файл телом запроса не передаётся.
+ *       По WEBSITE_ORDER_API_KEY разрешено только для заказов с source=website.
+ *       Регистрация идемпотентна по key, а если key не передан — по url.
+ *       Обычный список файлов CRM не раскрывает url/key/bucket.
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID заказа в CRM
+ *       - in: header
+ *         name: X-API-Key
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: API-ключ сайта. Альтернатива для backend сайта — Authorization Bearer <WEBSITE_ORDER_API_KEY>. CRM-пользователь может использовать JWT.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             oneOf:
+ *               - type: object
+ *                 properties:
+ *                   files:
+ *                     type: array
+ *                     items:
+ *                       $ref: '#/components/schemas/ExternalOrderFileInput'
+ *               - $ref: '#/components/schemas/ExternalOrderFileInput'
+ *           examples:
+ *             readyPdf:
+ *               summary: Готовая часть PDF на SRA3
+ *               value:
+ *                 storage: s3
+ *                 provider: s3
+ *                 bucket: site-orders
+ *                 key: orders/4745/production/sra3-part-001.pdf
+ *                 url: https://signed-url.example/...
+ *                 filename: 4745-sra3-part-001.pdf
+ *                 mime: application/pdf
+ *                 size: 734003200
+ *                 status: ready
+ *                 artifactType: sra3_pdf
+ *                 partNumber: 1
+ *                 checksum: sha256:...
+ *             processing:
+ *               summary: Файл ещё готовится
+ *               value:
+ *                 storage: s3
+ *                 provider: s3
+ *                 bucket: site-orders
+ *                 key: orders/4745/production/sra3-part-001.pdf
+ *                 filename: 4745-sra3-part-001.pdf
+ *                 status: processing
+ *                 artifactType: sra3_pdf
+ *                 partNumber: 1
+ *     responses:
+ *       201:
+ *         description: Внешние файлы зарегистрированы или обновлены
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 files:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ExternalOrderFile'
+ *       400:
+ *         description: Ошибка валидации payload или orderItemId
+ *       401:
+ *         description: Нет CRM JWT или неверный WEBSITE_ORDER_API_KEY
+ *       403:
+ *         description: API-ключ сайта использован для заказа не с source=website
+ *       404:
+ *         description: Заказ не найден
+ */
 // Регистрация внешних файлов заказа: сайт кладёт JPG/PDF в S3 и сообщает CRM метаданные.
 router.post('/:id/external-files', (req, res, next) => {
   if (isWebsiteOrderApiKeyValid(req)) {
@@ -285,6 +371,67 @@ router.post('/:id/external-files', (req, res, next) => {
   res.status(201).json({ files: registered.map(sanitizeOrderFileForClient) })
 }))
 
+/**
+ * @swagger
+ * /api/orders/{orderId}/external-files/{fileId}:
+ *   patch:
+ *     summary: Обновить внешний файл заказа
+ *     description: |
+ *       Используется для перехода processing -> ready/failed.
+ *       Например backend сайта сначала регистрирует будущий PDF, затем после загрузки в S3 передаёт signed URL, размер и checksum.
+ *       По WEBSITE_ORDER_API_KEY разрешено только для заказов с source=website.
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: fileId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: header
+ *         name: X-API-Key
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: API-ключ сайта или CRM JWT в Authorization
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ExternalOrderFileInput'
+ *           examples:
+ *             ready:
+ *               summary: Файл готов
+ *               value:
+ *                 url: https://signed-url.example/...
+ *                 size: 734003200
+ *                 status: ready
+ *                 checksum: sha256:...
+ *             failed:
+ *               summary: Генерация упала
+ *               value:
+ *                 status: failed
+ *                 metadata:
+ *                   error: PDF render failed
+ *     responses:
+ *       200:
+ *         description: Файл обновлён
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ExternalOrderFile'
+ *       400:
+ *         description: Некорректный запрос или файл не является внешним
+ *       403:
+ *         description: API-ключ сайта использован для заказа не с source=website
+ *       404:
+ *         description: Заказ или файл не найден
+ */
 // Обновление внешнего файла: сайт может сначала зарегистрировать processing, потом ready/failed.
 router.patch('/:id/external-files/:fileId', (req, res, next) => {
   if (isWebsiteOrderApiKeyValid(req)) {
@@ -698,6 +845,50 @@ router.get('/:id/files/:fileId/download', asyncHandler(async (req, res) => {
   res.send(buffer)
 }))
 
+/**
+ * @swagger
+ * /api/orders/{orderId}/files/{fileId}/external-link:
+ *   get:
+ *     summary: Получить signed URL внешнего файла
+ *     description: |
+ *       Возвращает ссылку на внешний файл только по явному авторизованному действию "Скачать".
+ *       Обычный список файлов не раскрывает url/key/bucket.
+ *       WEBSITE_ORDER_API_KEY не даёт доступ к этому endpoint — нужен CRM JWT.
+ *       Каждая выдача ссылки пишется в order_file_access_logs.
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: fileId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Signed URL для скачивания
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 url:
+ *                   type: string
+ *                   format: uri
+ *       400:
+ *         description: Файл локальный, используйте download endpoint
+ *       401:
+ *         description: Не авторизован в CRM
+ *       404:
+ *         description: Файл не найден
+ *       409:
+ *         description: Файл ещё не готов или ссылка не зарегистрирована
+ */
 // Получить внешнюю ссылку только по явному действию "Скачать".
 // В обычном списке файлов URL/key не раскрываем.
 router.get('/:id/files/:fileId/external-link', asyncHandler(async (req, res) => {
@@ -729,6 +920,42 @@ router.get('/:id/files/:fileId/external-link', asyncHandler(async (req, res) => 
   res.json({ url: row.externalUrl })
 }))
 
+/**
+ * @swagger
+ * /api/orders/{orderId}/files/{fileId}/access-logs:
+ *   get:
+ *     summary: Журнал скачиваний файла заказа
+ *     description: |
+ *       Админский endpoint для аудита доступа к файлам клиента.
+ *       Показывает скачивания локальных файлов и выдачу внешних ссылок.
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: fileId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Последние 100 событий доступа к файлу
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/OrderFileAccessLog'
+ *       401:
+ *         description: Не авторизован в CRM
+ *       403:
+ *         description: Только для администратора
+ */
 router.get('/:id/files/:fileId/access-logs', asyncHandler(async (req, res) => {
   const orderId = Number(req.params.id)
   const fileId = Number(req.params.fileId)

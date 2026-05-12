@@ -220,7 +220,7 @@ export class UnifiedWarehouseService {
           SELECT COALESCE(SUM(quantity_reserved), 0) as reserved
           FROM material_reservations 
           WHERE material_id = ? 
-            AND status = 'active' 
+            AND status IN ('active', 'reserved')
             AND (expires_at IS NULL OR expires_at > ?)
         `, [reservation.material_id, now]);
         
@@ -285,7 +285,7 @@ export class UnifiedWarehouseService {
       for (const reservationId of reservationIds) {
         // Получаем данные резерва
         const reservation = await db.get(`
-          SELECT * FROM material_reservations WHERE id = ? AND status = 'active'
+          SELECT * FROM material_reservations WHERE id = ? AND status IN ('active', 'reserved')
         `, reservationId);
         
         if (!reservation) {
@@ -293,7 +293,7 @@ export class UnifiedWarehouseService {
         }
         
         // Списываем материалы через единый сервис
-        await MaterialTransactionService.spend({
+        await MaterialTransactionService.spendInTransaction(db, {
           materialId: reservation.material_id,
           quantity: reservation.quantity_reserved,
           reason: reservation.notes || 'Списание по заказу (подтверждение резерва)',
@@ -313,7 +313,12 @@ export class UnifiedWarehouseService {
       
       logger.info('Резервы подтверждены', { count: reservationIds.length });
     } catch (error) {
-      // await db.run('ROLLBACK');
+      try {
+        const db = await getDb();
+        await db.run('ROLLBACK');
+      } catch (rollbackError) {
+        logger.error('Ошибка при откате подтверждения резервов', rollbackError);
+      }
       logger.error('Ошибка подтверждения резервов', error);
       throw error;
     }
