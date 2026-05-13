@@ -490,9 +490,9 @@ export const OrderRepository = {
             ELSE 'pending'
           END as status,
           CASE 
-            WHEN uopo.order_type = 'website' THEN COALESCE(o.created_at, o.createdAt)
-            WHEN uopo.order_type = 'telegram' THEN uopo.assigned_at
-            ELSE uopo.assigned_at
+            WHEN uopo.order_type = 'website' THEN COALESCE(uop.date, substr(uopo.assigned_at, 1, 10), COALESCE(o.created_at, o.createdAt))
+            WHEN uopo.order_type = 'telegram' THEN COALESCE(uop.date, uopo.assigned_at)
+            ELSE COALESCE(uop.date, uopo.assigned_at)
           END as created_at,
           CASE 
             WHEN uopo.order_type = 'website' THEN o.customerName
@@ -529,13 +529,12 @@ export const OrderRepository = {
             WHEN uopo.order_type = 'website' THEN o.paymentMethod
             ELSE 'telegram'
           END as paymentMethod,
-          uopo.page_id as userId
+          uop.user_id as userId
         FROM user_order_page_orders uopo
+        JOIN user_order_pages uop ON uop.id = uopo.page_id
         LEFT JOIN orders o ON uopo.order_type = 'website' AND uopo.order_id = o.id
         LEFT JOIN photo_orders po ON uopo.order_type = 'telegram' AND uopo.order_id = po.id
-        WHERE uopo.page_id IN (
-          SELECT id FROM user_order_pages WHERE user_id = ?
-        )
+        WHERE uop.user_id = ?
         ORDER BY uopo.assigned_at DESC`,
         [userId]
       )

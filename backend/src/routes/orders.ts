@@ -727,20 +727,26 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
   const hasUpdatedAtSnake = await hasColumn('orders', 'updated_at').catch(() => false);
   const hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt').catch(() => false);
 
-  // Для видимости в текущем рабочем отчёте переносим "дату оформления" на момент назначения,
-  // но делаем это безопасно для разных схем БД (camelCase/snake_case).
-  if (hasCreatedAt && hasUpdatedAt) {
-    await db.run('UPDATE orders SET createdAt = ?, updatedAt = datetime(\'now\') WHERE id = ?', currentDate, result.id);
-  } else if (hasCreatedAt && hasUpdatedAtSnake) {
-    await db.run('UPDATE orders SET createdAt = ?, updated_at = datetime(\'now\') WHERE id = ?', currentDate, result.id);
-  } else if (hasCreatedAtSnake && hasUpdatedAtSnake) {
-    await db.run('UPDATE orders SET created_at = ?, updated_at = datetime(\'now\') WHERE id = ?', currentDate, result.id);
-  } else if (hasCreatedAtSnake && hasUpdatedAt) {
-    await db.run('UPDATE orders SET created_at = ?, updatedAt = datetime(\'now\') WHERE id = ?', currentDate, result.id);
-  } else if (hasCreatedAt) {
-    await db.run('UPDATE orders SET createdAt = ? WHERE id = ?', currentDate, result.id);
-  } else if (hasCreatedAtSnake) {
-    await db.run('UPDATE orders SET created_at = ? WHERE id = ?', currentDate, result.id);
+  // Для видимости в текущем рабочем отчёте переносим "дату оформления" на момент назначения.
+  // Если есть обе timestamp-колонки, обновляем обе: списки заказов читают COALESCE(created_at, createdAt).
+  const dateUpdates: string[] = [];
+  const dateParams: string[] = [];
+  if (hasCreatedAt) {
+    dateUpdates.push('createdAt = ?');
+    dateParams.push(currentDate);
+  }
+  if (hasCreatedAtSnake) {
+    dateUpdates.push('created_at = ?');
+    dateParams.push(currentDate);
+  }
+  if (hasUpdatedAt) {
+    dateUpdates.push('updatedAt = datetime(\'now\')');
+  }
+  if (hasUpdatedAtSnake) {
+    dateUpdates.push('updated_at = datetime(\'now\')');
+  }
+  if (dateUpdates.length > 0) {
+    await db.run(`UPDATE orders SET ${dateUpdates.join(', ')} WHERE id = ?`, ...dateParams, result.id);
   }
 
   // Отчёты используют prepaymentUpdatedAt как приоритетную дату (если колонка существует).
