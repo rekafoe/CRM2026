@@ -107,13 +107,18 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   // Пересчёт ЗП: всегда пропускаем запрос в обработчик (авторизация там: admin или secret)
   const isRecalcPath = req.path.endsWith('/earnings/recalculate') || req.path === '/earnings/recalculate'
 
-  // POST /api/orders/:id/files с валидным API-ключом сайта (загрузка файлов к заказу с сайта)
-  const postOrderFilesPath = /\/api\/orders\/[0-9]+\/files$/
-  const isPostOrderFilesPath = req.method === 'POST' && (postOrderFilesPath.test(req.path) || (req.originalUrl && postOrderFilesPath.test(req.originalUrl.split('?')[0])))
-  const isPostOrderFilesWithWebsiteKey = isPostOrderFilesPath && isWebsiteOrderApiKeyValid(req)
+  // Интеграционные endpoints сайта с валидным API-ключом проходят в роуты,
+  // где дополнительно проверяются заказ/source и payload.
+  const websiteOrderFilesPath = /\/api\/orders\/[0-9]+\/files$/
+  const websiteExternalFilesPath = /\/api\/orders\/[0-9]+\/external-files(?:\/[0-9]+)?$/
+  const requestPath = req.originalUrl?.split('?')[0] || req.path
+  const isWebsiteOrderFilesPath = req.method === 'POST' && (websiteOrderFilesPath.test(req.path) || websiteOrderFilesPath.test(requestPath))
+  const isWebsiteExternalFilesPath = (req.method === 'POST' || req.method === 'PATCH')
+    && (websiteExternalFilesPath.test(req.path) || websiteExternalFilesPath.test(requestPath))
+  const isWebsiteOrderFilesWithWebsiteKey = (isWebsiteOrderFilesPath || isWebsiteExternalFilesPath) && isWebsiteOrderApiKeyValid(req)
 
   const isOpenPath = isRecalcPath
-    || isPostOrderFilesWithWebsiteKey
+    || isWebsiteOrderFilesWithWebsiteKey
     || isPublicRoute(req)
   
   if (isOpenPath) {
