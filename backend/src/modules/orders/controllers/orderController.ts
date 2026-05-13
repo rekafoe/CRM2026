@@ -363,7 +363,11 @@ export class OrderController {
       res.json(updated)
     } catch (error: any) {
       logger.error(`Error updating order ${req.params.id} status`, error)
-      res.status(500).json({ error: getSafeServerErrorMessage('Ошибка обновления статуса заказа', error) })
+      const message = error?.message ?? 'Ошибка обновления статуса заказа'
+      const statusCode = message === 'Некорректный статус заказа' || message === 'Статус отмены назначается только через отмену заказа'
+        ? 400
+        : 500
+      res.status(statusCode).json({ error: statusCode === 400 ? message : getSafeServerErrorMessage('Ошибка обновления статуса заказа', error) })
     }
   }
 
@@ -580,8 +584,12 @@ export class OrderController {
       res.json(result)
     } catch (error: any) {
       logger.error('Error bulk updating order status', error)
-      res.status(500).json({ 
-        error: getSafeServerErrorMessage('Failed to bulk update order status', error),
+      const message = error?.message ?? 'Failed to bulk update order status'
+      const statusCode = message === 'Некорректный статус заказа' || message === 'Статус отмены назначается только через отмену заказа'
+        ? 400
+        : 500
+      res.status(statusCode).json({
+        error: statusCode === 400 ? message : getSafeServerErrorMessage('Failed to bulk update order status', error),
       })
     }
   }

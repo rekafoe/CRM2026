@@ -147,6 +147,20 @@ export class OrderService {
     }
   }
 
+  private static async isCancellationStatusId(db: any, statusId: number): Promise<boolean> {
+    if (!Number.isFinite(statusId)) return false
+    try {
+      const status = await db.get(
+        'SELECT name FROM order_statuses WHERE id = ?',
+        [statusId]
+      ) as { name?: string } | undefined
+      const name = String(status?.name || '').trim().toLowerCase()
+      return name.includes('отмен') || name.includes('cancel')
+    } catch {
+      return false
+    }
+  }
+
   private static async getOrCreateCancelledStatusId(db: any): Promise<number> {
     try {
       const statuses = await db.all(
@@ -1106,6 +1120,13 @@ export class OrderService {
 
   static async updateOrderStatus(id: number, status: number, userId?: number, cancelReason?: string) {
     const db = await getDb()
+    const targetStatus = Number(status)
+    if (!Number.isFinite(targetStatus)) {
+      throw new Error('Некорректный статус заказа')
+    }
+    if (await this.isCancellationStatusId(db, targetStatus)) {
+      throw new Error('Статус отмены назначается только через отмену заказа')
+    }
     
     // Сначала проверяем, есть ли заказ в таблице photo_orders (Telegram заказы)
     let telegramOrder: any = null
@@ -1117,9 +1138,9 @@ export class OrderService {
     }
     
     if (telegramOrder) {
-      await db.run('UPDATE photo_orders SET status = ?, updated_at = datetime("now") WHERE id = ?', [status, id])
+      await db.run('UPDATE photo_orders SET status = ?, updated_at = datetime("now") WHERE id = ?', [targetStatus, id])
       const updatedTelegramOrder = await OrderRepository.getPhotoOrderById(id)
-      const updated: Order = updatedTelegramOrder ? mapPhotoOrderToOrder(updatedTelegramOrder) : { id, number: `tg-ord-${id}`, status, created_at: new Date().toISOString(), items: [] }
+      const updated: Order = updatedTelegramOrder ? mapPhotoOrderToOrder(updatedTelegramOrder) : { id, number: `tg-ord-${id}`, status: targetStatus, created_at: new Date().toISOString(), items: [] }
       return updated
     } else {
       // Проверяем, есть ли заказ в таблице orders
@@ -1135,15 +1156,15 @@ export class OrderService {
         // только при deleteOrder (handleDeleteOrder). Отмена через статус не используется.
         // Обновляем обычный заказ
         try {
-          await db.run('UPDATE orders SET status = ?, updatedAt = datetime(\"now\") WHERE id = ?', [status, id])
+          await db.run('UPDATE orders SET status = ?, updatedAt = datetime(\"now\") WHERE id = ?', [targetStatus, id])
         } catch {
           // На некоторых схемах есть только updated_at
-          await db.run('UPDATE orders SET status = ?, updated_at = datetime(\"now\") WHERE id = ?', [status, id])
+          await db.run('UPDATE orders SET status = ?, updated_at = datetime(\"now\") WHERE id = ?', [targetStatus, id])
         }
 
         // Если статус "Принят в работу", подтверждаем резервы по заказу
         const inWorkId = await this.getStatusIdByName(db, 'Принят в работу')
-        if (inWorkId != null && Number(status) === Number(inWorkId)) {
+        if (inWorkId != null && targetStatus === Number(inWorkId)) {
           const reservations = await UnifiedWarehouseService.getReservationsByOrder(id)
           const reservationIds = reservations
             .filter(r => r.status === 'reserved')
@@ -1153,7 +1174,7 @@ export class OrderService {
           }
         }
 
-        const newStatusId = Number(status);
+        const newStatusId = targetStatus;
         void tryEnqueueOrderStatusEmail({
           orderId: id,
           oldStatusId,
@@ -1164,7 +1185,7 @@ export class OrderService {
         void tryNotifyTelegramOrderStatusForMiniappOrder({
           orderId: id,
           oldStatusId,
-          newStatusId: Number(status),
+          newStatusId: targetStatus,
         });
 
         const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
@@ -1705,9 +1726,16 @@ export class OrderService {
 
   static async bulkUpdateOrderStatus(orderIds: number[], newStatus: number, userId?: number) {
     const db = await getDb()
+    const targetStatus = Number(newStatus)
     
     if (orderIds.length === 0) {
       throw new Error('Не выбрано ни одного заказа')
+    }
+    if (!Number.isFinite(targetStatus)) {
+      throw new Error('Некорректный статус заказа')
+    }
+    if (await this.isCancellationStatusId(db, targetStatus)) {
+      throw new Error('Статус отмены назначается только через отмену заказа')
     }
     
     const placeholders = orderIds.map(() => '?').join(',')
@@ -1715,13 +1743,13 @@ export class OrderService {
       `SELECT id, status, source FROM orders WHERE id IN (${placeholders})`,
       orderIds
     )) as { id: number; status: number; source?: Order['source'] | null }[];
-    const params = [newStatus, ...orderIds]
+    const params = [targetStatus, ...orderIds]
     
     await db.run(
       `UPDATE orders SET status = ? WHERE id IN (${placeholders})`,
       ...params
     )
-    const n = Number(newStatus);
+    const n = targetStatus;
     for (const row of before) {
       const old = Number(row.status);
       if (old !== n) {
@@ -1740,7 +1768,7 @@ export class OrderService {
       }
     }
     
-    return { updatedCount: orderIds.length, newStatus }
+    return { updatedCount: orderIds.length, newStatus: targetStatus }
   }
 
   static async bulkDeleteOrders(orderIds: number[], userId?: number, reason?: string) {

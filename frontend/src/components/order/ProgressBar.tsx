@@ -17,6 +17,11 @@ interface ProgressBarProps {
   height?: string;
 }
 
+const isCancellationStatus = (status: StatusStep): boolean => {
+  const name = status.name.trim().toLowerCase();
+  return name.includes('отмен') || name.includes('cancel');
+};
+
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   current,
   statuses,
@@ -24,7 +29,9 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   width = '100%',
   height = '12px',
 }) => {
-  const sortedStatuses = [...statuses].sort((a, b) => a.sort_order - b.sort_order);
+  const sortedStatuses = statuses
+    .filter((status) => !isCancellationStatus(status))
+    .sort((a, b) => a.sort_order - b.sort_order);
   const currentStep = sortedStatuses.find(s => s.id === current);
   const currentIndex = sortedStatuses.findIndex(s => s.id === current);
   const percent = currentIndex >= 0 ? ((currentIndex + 1) / sortedStatuses.length) * 100 : 0;
