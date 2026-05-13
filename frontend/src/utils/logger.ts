@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 // Уровни логирования
 export enum LogLevel {
   ERROR = 0,
@@ -227,12 +229,12 @@ export const logger = new Logger({
 
 // Хук для использования в React компонентах
 export const useLogger = (category: string) => {
-  return {
+  return useMemo(() => ({
     error: (message: string, data?: any) => logger.error(category, message, data),
     warn: (message: string, data?: any) => logger.warn(category, message, data),
     info: (message: string, data?: any) => logger.info(category, message, data),
     debug: (message: string, data?: any) => logger.debug(category, message, data),
-  };
+  }), [category]);
 };
 
 // Утилиты для работы с логами

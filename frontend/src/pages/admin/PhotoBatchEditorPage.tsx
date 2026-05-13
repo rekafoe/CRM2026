@@ -193,6 +193,7 @@ export const PhotoBatchEditorPage: React.FC = () => {
     try {
       const uploaded = await Promise.all(
         items.map(async (item) => {
+          if (!item.file) throw new Error(`Файл ${item.originalName} нужно загрузить заново`);
           const { data } = await uploadOrderFile(orderId, item.file, orderItemId);
           return { draftId: item.id, fileId: data.id };
         }),
@@ -236,6 +237,7 @@ export const PhotoBatchEditorPage: React.FC = () => {
           defaultSizeId={defaultSizeId}
           totalQuantity={totalQuantity}
           saving={saving}
+          footerText="Сохранение загрузит файлы и запишет params.photoBatch в позицию заказа."
           onDefaultSizeChange={setDefaultSizeId}
           onApplySizeToAll={applySizeToAll}
           onAddPhotoClick={() => inputRef.current?.click()}

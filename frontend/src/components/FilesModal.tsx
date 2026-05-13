@@ -5,6 +5,8 @@ import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, dow
 import { AppIcon } from './ui/AppIcon';
 import { OrderFileAccessLogsModal } from './OrderFileAccessLogsModal';
 import { PreflightReportModal } from './PreflightReportModal';
+import { getEditorItemSummary } from './order/editorItemSummary';
+import { EditorItemPreviewModal } from './order/EditorItemPreviewModal';
 import './FilesModal.css';
 
 const PREFLIGHT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/tiff'];
@@ -68,6 +70,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const [accessLogs, setAccessLogs] = useState<OrderFileAccessLog[]>([]);
   const [accessLogsLoading, setAccessLogsLoading] = useState(false);
   const [accessLogsError, setAccessLogsError] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<Item | null>(null);
 
   // Загружаем файлы при открытии модального окна
   React.useEffect(() => {
@@ -245,6 +248,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const selectedPhotoBatchSummary = selectedPhotoBatch
     ? `${selectedPhotoBatch.totalFiles ?? 0} файлов · ${selectedPhotoBatch.totalQuantity ?? 0} отпечатков`
     : null;
+  const selectedEditorSummary = selectedOrderItem ? getEditorItemSummary(selectedOrderItem) : null;
 
   /** Группировка файлов по позиции заказа для отображения */
   const filesByItem = useMemo(() => {
@@ -400,19 +404,6 @@ export const FilesModal: React.FC<FilesModalProps> = ({
           </label>
           <button
             type="button"
-            className="btn-create-design"
-            onClick={() => {
-              onClose();
-              const q = new URLSearchParams({ orderId: String(orderId) });
-              if (selectedOrderItemId != null) q.set('orderItemId', String(selectedOrderItemId));
-              navigate(`/design-templates?${q.toString()}`);
-            }}
-            title="Создать макет в редакторе"
-          >
-            <AppIcon name="image" size="xs" /> Создать макет
-          </button>
-          <button
-            type="button"
             className="btn-create-design btn-photo-batch"
             disabled={!selectedOrderItem}
             onClick={() => {
@@ -437,6 +428,36 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             <span className="files-photo-batch-summary">{selectedPhotoBatchSummary}</span>
           )}
         </div>
+        {selectedOrderItem && selectedEditorSummary && (
+          <div className={`files-editor-summary files-editor-summary--${selectedEditorSummary.kind}`}>
+            <div className="files-editor-summary__main">
+              <strong>{selectedEditorSummary.label}</strong>
+              <span>{selectedEditorSummary.detail}</span>
+            </div>
+            <div className="files-editor-summary__meta">
+              {(selectedOrderItem.params.designState || selectedOrderItem.params.photoBatch) && (
+                <button
+                  type="button"
+                  className="files-editor-summary__preview"
+                  onClick={() => setPreviewItem(selectedOrderItem)}
+                >
+                  Открыть preview
+                </button>
+              )}
+              {selectedOrderItem.params.editorDraftToken && (
+                <span title={selectedOrderItem.params.editorDraftToken}>
+                  Draft: {selectedOrderItem.params.editorDraftToken.slice(0, 12)}…
+                </span>
+              )}
+              {selectedOrderItem.params.designTemplateId != null && (
+                <span>Template ID: {selectedOrderItem.params.designTemplateId}</span>
+              )}
+              {selectedOrderItem.params.editorDraftMode && (
+                <span>Mode: {selectedOrderItem.params.editorDraftMode}</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Список файлов */}
         <div className="files-content">
@@ -492,6 +513,11 @@ export const FilesModal: React.FC<FilesModalProps> = ({
         isLoading={accessLogsLoading}
         error={accessLogsError}
         onClose={closeAccessLogs}
+      />
+      <EditorItemPreviewModal
+        item={previewItem}
+        isOpen={previewItem !== null}
+        onClose={() => setPreviewItem(null)}
       />
     </div>
   );

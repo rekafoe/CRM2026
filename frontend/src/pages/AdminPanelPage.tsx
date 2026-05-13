@@ -69,6 +69,9 @@ const DesignTemplatesPage = lazy(() =>
 const DesignEditorPage = lazy(() =>
   import('./admin/DesignEditorPage').then((m) => ({ default: m.DesignEditorPage }))
 );
+const PublicDesignEditorPreviewPage = lazy(() =>
+  import('../features/publicDesignEditor/PublicDesignEditorPreviewPage').then((m) => ({ default: m.PublicDesignEditorPreviewPage }))
+);
 
 // Компонент страницы уведомлений (исправлен - убраны инлайн стили)
 const NotificationsPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
@@ -376,6 +379,7 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/preflight" element={<PreflightPage />} />
           <Route path="/design-templates" element={<DesignTemplatesPage />} />
           <Route path="/design-editor/:templateId" element={<DesignEditorPage />} />
+          <Route path="/public-design-editor-preview/:templateId" element={<PublicDesignEditorPreviewPage />} />
           <Route path="/clients/:id" element={<CustomerDetailPage />} />
           <Route path="/clients" element={<CustomersAdminPage />} />
           <Route path="/document-templates" element={<DocumentTemplatesPage />} />

@@ -70,6 +70,12 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'POST', path: /^\/api\/orders\/from-website\/[0-9]+\/files$/ },
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/items$/ },
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/prepay$/ },
+  // Public design editor: templates are anonymous; draft mutations are checked by WEBSITE_ORDER_API_KEY in route.
+  { method: 'GET', path: /^\/api\/design-templates\/public(?:\/.*)?$/ },
+  { method: 'GET', path: /^\/api\/public-editor\/drafts\/[^/]+\/files\/[0-9]+\/content\/?$/ },
+  { method: 'GET', path: /^\/api\/public-editor\/drafts(?:\/.*)?$/ },
+  { method: 'POST', path: /^\/api\/public-editor\/drafts(?:\/.*)?$/ },
+  { method: 'PATCH', path: /^\/api\/public-editor\/drafts(?:\/.*)?$/ },
   // Telegram шлёт POST без Bearer — только сюда (опционально X-Telegram-Bot-Api-Secret-Token)
   { method: 'POST', path: /^\/api\/notifications\/telegram\/webhook\/?$/ },
   // Mini App: обмен initData → сессия (без CRM api_token)

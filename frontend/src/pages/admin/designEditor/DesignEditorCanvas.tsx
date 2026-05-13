@@ -116,6 +116,8 @@ export interface DesignEditorCanvasHandle {
 /** basic — только заполнение предопределённых зон; advanced — полный доступ */
 export type EditorMode = 'basic' | 'advanced';
 
+type ResolveImageFileUrl = (file: File) => Promise<string | null | undefined>;
+
 interface DesignEditorCanvasProps {
   template: DesignTemplate | null;
   /** Ширина одной страницы (логическая), px */
@@ -155,6 +157,8 @@ interface DesignEditorCanvasProps {
   onSnapLinesChange?: (lines: { axis: 'h' | 'v'; pos: number }[]) => void;
   /** Якорь плавающей панели текста (центр верхней границы bbox), экранные координаты */
   onTextFloatingAnchor?: (pos: { x: number; y: number } | null) => void;
+  /** Optional upload hook: returns stable URL that is persisted in Fabric JSON instead of blob:. */
+  resolveImageFileUrl?: ResolveImageFileUrl;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -441,6 +445,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       guideLinesPx,
       onSnapLinesChange,
       onTextFloatingAnchor,
+      resolveImageFileUrl,
     },
     ref,
   ) => {
@@ -483,6 +488,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     snapLinesRef.current = onSnapLinesChange;
     const onTextFloatingAnchorRef = useRef(onTextFloatingAnchor);
     onTextFloatingAnchorRef.current = onTextFloatingAnchor;
+    const resolveImageFileUrlRef = useRef(resolveImageFileUrl);
+    resolveImageFileUrlRef.current = resolveImageFileUrl;
     const textAnchorRafRef = useRef(0);
     const scheduleTextAnchorRef = useRef<(() => void) | null>(null);
 
@@ -792,12 +799,12 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             if (photoId && sideFile && isLikelyImageFile(sideFile)) {
               try {
                 if (hit) {
-                  await fillPhotoField(canvas, hit, sideFile, () => {
+                  await fillPhotoField(canvas, hit, sideFile, resolveImageFileUrlRef.current, () => {
                     if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
                     else releaseBasicModeConstraints(canvas);
                   });
                 } else {
-                  await addImageFileToCanvas(canvas, sideFile);
+                  await addImageFileToCanvas(canvas, sideFile, resolveImageFileUrlRef.current);
                 }
                 onSidebarPhotoDroppedRef.current?.(photoId);
               } catch {
@@ -810,12 +817,12 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           const file = Array.from(dt.files ?? []).find((f) => isLikelyImageFile(f));
           if (file) {
             if (hit) {
-              await fillPhotoField(canvas, hit, file, () => {
+              await fillPhotoField(canvas, hit, file, resolveImageFileUrlRef.current, () => {
                 if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
                 else releaseBasicModeConstraints(canvas);
               });
             } else {
-              await addImageFileToCanvas(canvas, file);
+              await addImageFileToCanvas(canvas, file, resolveImageFileUrlRef.current);
             }
             return;
           }
@@ -906,12 +913,12 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             void (async () => {
               const hit = findPhotoFieldAtScene(canvas, p.x, p.y);
               if (hit) {
-                await fillPhotoField(canvas, hit, file, () => {
+                await fillPhotoField(canvas, hit, file, resolveImageFileUrlRef.current, () => {
                   if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
                   else releaseBasicModeConstraints(canvas);
                 });
               } else {
-                await addImageFileToCanvas(canvas, file);
+                await addImageFileToCanvas(canvas, file, resolveImageFileUrlRef.current);
               }
             })();
             break;
@@ -1072,7 +1079,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       if (targetId) {
         const field = findPhotoFieldByIdDeep(canvas, targetId);
         if (field) {
-          await fillPhotoField(canvas, field, file, () => {
+          await fillPhotoField(canvas, field, file, resolveImageFileUrlRef.current, () => {
             if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
             else releaseBasicModeConstraints(canvas);
           });
@@ -1080,7 +1087,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         }
       }
 
-      await addImageFileToCanvas(canvas, file);
+      await addImageFileToCanvas(canvas, file, resolveImageFileUrlRef.current);
     }, []);
 
     // ── Imperative API ───────────────────────────────────────────────────────
@@ -1133,7 +1140,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       addImageFromFile: async (file: File) => {
         const canvas = fabricRef.current;
         if (!canvas) return;
-        await addImageFileToCanvas(canvas, file);
+        await addImageFileToCanvas(canvas, file, resolveImageFileUrlRef.current);
       },
       addPhotoField: () => {
         const canvas = fabricRef.current;
@@ -1156,7 +1163,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         const cells = Array.isArray(layout.cells) ? layout.cells : [];
         if (cells.length === 0) return;
 
-        const pageSafeLeft = spreadPairPagesRef.current ? (currentPageRef.current % 2 === 1 ? pageWidthRef.current : 0) : 0;
+        const pair = spreadPairPagesRef.current;
+        const pageSafeLeft = pair && currentPageRef.current === pair[1] ? pageWidthRef.current : 0;
         const safeLeft = pageSafeLeft + safeZonePx;
         const safeTop = safeZonePx;
         const safeWidth = Math.max(1, pageWidthRef.current - safeZonePx * 2);
@@ -1223,7 +1231,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           const dataUrl = src.toDataURL({ format: 'png', multiplier: 1 });
           const blob = await fetch(dataUrl).then((r) => r.blob());
           const file = new File([blob], `autofill-${i}.png`, { type: 'image/png' });
-          await fillPhotoField(canvas, field, file, () => {
+          await fillPhotoField(canvas, field, file, resolveImageFileUrlRef.current, () => {
             if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
             else releaseBasicModeConstraints(canvas);
           });
@@ -1591,8 +1599,13 @@ DesignEditorCanvas.displayName = 'DesignEditorCanvas';
 
 // ─── Canvas helpers (module-level) ───────────────────────────────────────────
 
-async function addImageFileToCanvas(canvas: Canvas, file: File): Promise<void> {
-  const url = URL.createObjectURL(file);
+async function addImageFileToCanvas(
+  canvas: Canvas,
+  file: File,
+  resolveImageFileUrl?: ResolveImageFileUrl,
+): Promise<void> {
+  const stableUrl = await resolveImageFileUrl?.(file);
+  const url = stableUrl || URL.createObjectURL(file);
   try {
     const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
     const maxW = canvas.width! * 0.6;
@@ -1611,8 +1624,10 @@ async function addImageFileToCanvas(canvas: Canvas, file: File): Promise<void> {
     canvas.setActiveObject(img);
     canvas.requestRenderAll();
   } finally {
-    // Fabric может догружать blob после await — откладываем revoke
-    setTimeout(() => URL.revokeObjectURL(url), 750);
+    if (!stableUrl) {
+      // Fabric может догружать blob после await — откладываем revoke
+      setTimeout(() => URL.revokeObjectURL(url), 750);
+    }
   }
 }
 
@@ -1708,9 +1723,11 @@ async function fillPhotoField(
   canvas: Canvas,
   field: FabricObject,
   file: File,
+  resolveImageFileUrl?: ResolveImageFileUrl,
   afterFill?: () => void,
 ): Promise<void> {
-  const url = URL.createObjectURL(file);
+  const stableUrl = await resolveImageFileUrl?.(file);
+  const url = stableUrl || URL.createObjectURL(file);
   try {
     const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
     const f = field as unknown as AnyObj;
@@ -1773,7 +1790,7 @@ async function fillPhotoField(
     canvas.setActiveObject(group);
     afterFill?.();
   } finally {
-    setTimeout(() => URL.revokeObjectURL(url), 750);
+    if (!stableUrl) setTimeout(() => URL.revokeObjectURL(url), 750);
   }
 }
 

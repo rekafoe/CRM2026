@@ -56,6 +56,12 @@ export interface ItemParams {
   };
   /** Состояние редактора макетов (позиции фото и т.д.) */
   designState?: Record<string, unknown>;
+  /** Token пользовательского draft из онлайн-редактора. */
+  editorDraftToken?: string;
+  /** Режим редактора, в котором создан draft. */
+  editorDraftMode?: 'single' | 'multipage' | 'photo_batch' | string;
+  /** Выбранные параметры редактора, перенесённые из draft. */
+  selectedEditorParams?: Record<string, unknown>;
   /** Пакетная фотопечать: группы по размерам и список фото с crop/quantity. */
   photoBatch?: {
     groups?: Array<{

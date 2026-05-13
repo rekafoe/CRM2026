@@ -50,4 +50,6 @@ Importer создаёт или обновляет запись в `design_templa
 
 ## Публичный сайт
 
-Отдельный сайт не использует CRM UI и не требует CRM-авторизации. Он должен получать шаблоны через public editor API, создавать editor draft, загружать пользовательские файлы в draft и финализировать заказ с `source = website`.
+Отдельный сайт не использует CRM UI и не требует CRM-авторизации. Он получает master-шаблоны через public editor API, создаёт editor draft, загружает пользовательские файлы в draft и финализирует заказ с `source = website`.
+
+Импортированный `design_templates.spec.designState` нельзя изменять под конкретного клиента. Пользовательская вариация макета сохраняется в `editor_drafts.payload.designState`, а после finalize переносится в `order_items.params.designState`. Подробный контракт публичного редактора описан в `docs/website-orders-integration.md` и `docs/DESIGN_EDITOR_SUMMARY.md`.

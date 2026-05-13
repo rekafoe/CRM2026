@@ -33,12 +33,6 @@ const LazyEarningsPage = React.lazy(() =>
 const LazyCustomersPage = React.lazy(() =>
   import('./pages/admin/CustomersAdminPage').then((m) => ({ default: m.default }))
 );
-const LazyDesignTemplatesPage = React.lazy(() =>
-  import('./pages/admin/DesignTemplatesPage').then((m) => ({ default: m.DesignTemplatesPage }))
-);
-const LazyDesignEditorPage = React.lazy(() =>
-  import('./pages/admin/DesignEditorPage').then((m) => ({ default: m.DesignEditorPage }))
-);
 const LazyPhotoBatchEditorPage = React.lazy(() =>
   import('./pages/admin/PhotoBatchEditorPage').then((m) => ({ default: m.PhotoBatchEditorPage }))
 );
@@ -159,23 +153,11 @@ root.render(
           />
           <Route
             path="/design-templates"
-            element={
-              <RequireAuth>
-                <React.Suspense fallback={<LoadingFallback />}>
-                  <LazyDesignTemplatesPage />
-                </React.Suspense>
-              </RequireAuth>
-            }
+            element={<Navigate to="/adminpanel/design-templates" replace />}
           />
           <Route
             path="/design-editor/:templateId"
-            element={
-              <RequireAuth>
-                <React.Suspense fallback={<LoadingFallback />}>
-                  <LazyDesignEditorPage />
-                </React.Suspense>
-              </RequireAuth>
-            }
+            element={<Navigate to="/adminpanel/design-templates" replace />}
           />
           <Route
             path="/photo-batch-editor"

@@ -15,6 +15,8 @@ import { OrderItemSummary } from './order/OrderItemSummary';
 import { OrderItemPositionBreakdown } from './order/OrderItemPositionBreakdown';
 import { OrderItemEditForm } from './order/OrderItemEditForm';
 import { OrderItemActions } from './order/OrderItemActions';
+import { getEditorItemSummary } from './order/editorItemSummary';
+import { EditorItemPreviewModal } from './order/EditorItemPreviewModal';
 
 // Кэш отображаемых имён типов бумаги из склада
 let paperTypeDisplayCache: Record<string, string> | null = null;
@@ -89,6 +91,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
   const [printers, setPrinters] = useState<Array<{ id: number; name: string; technology_code?: string | null; color_mode?: 'bw' | 'color' | 'both' }>>([]);
   const [savingPrinter, setSavingPrinter] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEditorPreview, setShowEditorPreview] = useState(false);
 
   useEffect(() => {
     setQty(item.quantity ?? 1);
@@ -225,6 +228,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
   const densityFromSummaryNum = densityFromSummary ? Number(densityFromSummary.replace(/[^\d]/g, '')) : null;
   const materialDensity = specsAny?.paperDensity || densityFromSummaryNum || item.params.paperDensity || null;
   const [materialTypeDisplay, setMaterialTypeDisplay] = useState<string | null>(null);
+  const editorSummary = useMemo(() => getEditorItemSummary(item), [item]);
 
   const handleSave = async () => {
     try {
@@ -424,7 +428,29 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
               ) : null}
               {showDesc ? <> — {display}</> : null}
               {productionBreakdown && (
-                <span style={{ display: 'block', fontSize: 12, color: '#555', marginTop: 2 }}>{productionBreakdown}</span>
+                <span className="order-item-production-breakdown">{productionBreakdown}</span>
+              )}
+              {!editing && (
+                <div className="order-item-editor-summary">
+                  <span className={`order-item-editor-badge order-item-editor-badge--${editorSummary.kind}`}>
+                    {editorSummary.label}
+                  </span>
+                  <span className="order-item-editor-summary__detail">{editorSummary.detail}</span>
+                  {item.params.editorDraftToken && (
+                    <span className="order-item-editor-summary__token" title={item.params.editorDraftToken}>
+                      draft {item.params.editorDraftToken.slice(0, 8)}…
+                    </span>
+                  )}
+                  {(item.params.designState || item.params.photoBatch) && (
+                    <button
+                      type="button"
+                      className="order-item-editor-preview-btn"
+                      onClick={() => setShowEditorPreview(true)}
+                    >
+                      Открыть preview
+                    </button>
+                  )}
+                </div>
               )}
               {!editing && showPositionBreakdown ? (
                 <OrderItemPositionBreakdown
@@ -555,6 +581,11 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
           variant="danger"
         />
       )}
+      <EditorItemPreviewModal
+        item={item}
+        isOpen={showEditorPreview}
+        onClose={() => setShowEditorPreview(false)}
+      />
     </div>
   );
 };

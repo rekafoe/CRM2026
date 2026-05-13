@@ -111,6 +111,104 @@ export async function addEditorDraftFile(
   }
 }
 
+export async function getEditorDraftFile(
+  token: string,
+  fileId: number,
+): Promise<{ filename: string; originalName: string | null; mime: string | null; size: number | null } | null> {
+  const draft = await getEditorDraft(token)
+  if (!draft) return null
+
+  const db = await getDb()
+  const file = await db.get<{
+    filename: string
+    originalName: string | null
+    mime: string | null
+    size: number | null
+  }>(
+    'SELECT filename, originalName, mime, size FROM editor_draft_files WHERE id = ? AND draft_id = ?',
+    [fileId, draft.id],
+  )
+  return file ?? null
+}
+
+export async function prepareWebsiteItemsWithEditorDrafts<
+  T extends { params: Record<string, unknown> }
+>(items: T[]): Promise<{ items: T[]; editorDraftItems: Array<{ index: number; token: string }> }> {
+  const editorDraftItems: Array<{ index: number; token: string }> = []
+  const nextItems: T[] = []
+
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index]
+    const params = item.params ?? {}
+    const token = typeof params.editorDraftToken === 'string'
+      ? params.editorDraftToken.trim()
+      : ''
+
+    if (!token) {
+      nextItems.push(item)
+      continue
+    }
+
+    const draft = await getEditorDraft(token)
+    if (!draft) throw new Error(`Editor draft не найден для позиции ${index + 1}`)
+    if (draft.status !== 'draft') throw new Error(`Editor draft уже использован для позиции ${index + 1}`)
+
+    const payload = draft.payloadParsed
+    if (!payload.designState && !payload.photoBatch) {
+      throw new Error(`Editor draft пустой для позиции ${index + 1}`)
+    }
+
+    nextItems.push({
+      ...item,
+      params: {
+        ...params,
+        editorDraftToken: token,
+        designTemplateId: draft.design_template_id ?? undefined,
+        designState: payload.designState,
+        photoBatch: payload.photoBatch,
+        selectedEditorParams: payload.selectedParams,
+        editorDraftMode: draft.mode,
+      },
+    })
+    editorDraftItems.push({ index, token })
+  }
+
+  return { items: nextItems, editorDraftItems }
+}
+
+export async function attachEditorDraftsToOrderItems(
+  orderId: number,
+  itemIds: number[],
+  editorDraftItems: Array<{ index: number; token: string }>,
+): Promise<void> {
+  if (editorDraftItems.length === 0) return
+  const db = await getDb()
+
+  for (const draftItem of editorDraftItems) {
+    const orderItemId = itemIds[draftItem.index]
+    if (!orderItemId) throw new Error(`Не найдена позиция заказа для editor draft ${draftItem.token}`)
+    const draft = await getEditorDraft(draftItem.token)
+    if (!draft) throw new Error('Draft не найден')
+    if (draft.status !== 'draft') throw new Error('Draft уже финализирован')
+
+    const draftFiles = await db.all<Array<{ filename: string; originalName: string | null; mime: string | null; size: number | null }>>(
+      'SELECT filename, originalName, mime, size FROM editor_draft_files WHERE draft_id = ? ORDER BY id ASC',
+      [draft.id],
+    )
+    for (const file of draftFiles ?? []) {
+      await db.run(
+        'INSERT INTO order_files (orderId, orderItemId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?, ?)',
+        [orderId, orderItemId, file.filename, file.originalName, file.mime, file.size],
+      )
+    }
+
+    await db.run(
+      `UPDATE editor_drafts SET status = 'finalized', order_id = ?, updated_at = datetime('now') WHERE token = ?`,
+      [orderId, draftItem.token],
+    )
+  }
+}
+
 export async function finalizeEditorDraft(
   token: string,
   input: {

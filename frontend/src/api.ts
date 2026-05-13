@@ -1109,10 +1109,34 @@ export const updatePublicEditorDraft = (token: string, patch: Record<string, unk
 export const uploadPublicEditorDraftFile = (token: string, file: File) => {
   const formData = new FormData();
   formData.append('file', file);
-  return api.post(`/public-editor/drafts/${encodeURIComponent(token)}/files`, formData);
+  return api.post<PublicEditorDraftFile>(`/public-editor/drafts/${encodeURIComponent(token)}/files`, formData);
 };
 export const finalizePublicEditorDraft = (token: string, payload: Record<string, unknown>) =>
   api.post(`/public-editor/drafts/${encodeURIComponent(token)}/finalize`, payload);
+
+export interface PublicEditorDraftFile {
+  id: number;
+  draftId: number;
+  filename: string;
+  originalName: string;
+  mime?: string | null;
+  size: number;
+  url: string;
+}
+
+export const createPublicEditorPreviewDraft = (payload: Record<string, unknown>) =>
+  api.post('/public-editor/admin-preview/drafts', payload);
+export const getPublicEditorPreviewDraft = (token: string) =>
+  api.get(`/public-editor/admin-preview/drafts/${encodeURIComponent(token)}`);
+export const updatePublicEditorPreviewDraft = (token: string, patch: Record<string, unknown>) =>
+  api.patch(`/public-editor/admin-preview/drafts/${encodeURIComponent(token)}`, patch);
+export const uploadPublicEditorPreviewDraftFile = (token: string, file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api.post<PublicEditorDraftFile>(`/public-editor/admin-preview/drafts/${encodeURIComponent(token)}/files`, formData);
+};
+export const finalizePublicEditorPreviewDraft = (token: string, payload: Record<string, unknown>) =>
+  api.post(`/public-editor/admin-preview/drafts/${encodeURIComponent(token)}/finalize`, payload);
 
 // ─── Subtype Design Templates API ──────────────────────────────────────────────
 // Привязка дизайн-шаблонов к подтипам продукта

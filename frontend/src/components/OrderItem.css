@@ -59,6 +59,79 @@
   white-space: normal;
 }
 
+.order-item-production-breakdown {
+  display: block;
+  margin-top: 2px;
+  color: #555;
+  font-size: 12px;
+}
+
+.order-item-editor-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.order-item-editor-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 700;
+}
+
+.order-item-editor-badge--designState {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.order-item-editor-badge--photoBatch {
+  color: #7c2d12;
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.order-item-editor-badge--clientFiles {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.order-item-editor-badge--noLayout {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.order-item-editor-summary__token {
+  max-width: 160px;
+  overflow: hidden;
+  color: #475569;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.order-item-editor-preview-btn {
+  min-height: 24px;
+  padding: 3px 8px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .order-item-sidebar {
   display: flex;
   flex-direction: column;

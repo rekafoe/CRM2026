@@ -1,32 +1,81 @@
-# Редактор макетов — сводка и план
+# Редактор макетов
 
-## Сводка сделанного
+## Назначение
 
-### Редактор (общее)
-- **Рефакторинг:** логика разнесена по модулям (`designEditor/`: types, constants, Sidebar, Panel, PhotoPanel, TextPanel, CollagesPanel, Canvas, Toolbar). Состояние сгруппировано (templateState, pageSpec, ui, photoPanel, pdfExport).
-- **Выбор и ресайз на канвасе:** при клике по изображению или тексту показывается Transformer (рамка с ручками). Ресайз без поворота (`rotateEnabled={false}`). Угловые ручки сохраняют пропорции (keepRatio по умолчанию). Для текста сохраняются scaleX/scaleY в state и в designState.
-- **Поле для фото:** тип `CanvasPhotoField` (id, x, y, width, height, src?). Кнопка «Поле для фото» в панели «Фото» добавляет пустой прямоугольник на страницу. В поле можно перетащить изображение с компьютера (дроп на Stage → поиск поля под курсором → запись `src` через URL.createObjectURL). Поля можно двигать и ресайзить (Transformer). Сохраняются в designState (в т.ч. src; blob-URL не переживут перезагрузку без загрузки на сервер).
-- **Выбор режима:** продукт не должен угадывать редактор по названию. В `config_data.simplified.design_editor_mode` хранится явный режим: `none`, `single`, `multipage`, `photo_batch`. Поле настраивается в админке шаблона продукта, в сайдбаре «Опции калькулятора».
-- **Prepress-настройки продукта:** в `config_data.simplified.prepress` хранятся `bleedMm`, `safeZoneMm`, `showBleed`, `showTrim`, `showSafeZone`, `cutMarks`. Эти поля задаются в UI шаблона продукта и должны использоваться редактором, preflight и production export.
-- **Визуальные зоны редактора:** `DesignEditorPage` читает `prepress` из `spec.designState.prepress` или `spec.prepress`, передаёт значения в canvas, а `PrepressOverlay` рисует bleed/trim/safe-zone слои. При сохранении `prepress` записывается обратно в `designState`.
-- **Importer дизайнерских файлов:** дизайнер отдаёт готовый `SVG` по стандарту слоёв/объектов, backend импортирует его в `designState`. CRM-редактор используется для проверки, а не для ручной сборки шаблона. Подробный контракт: `docs/design-template-importer.md`.
+Редактор работает с печатными макетами на базе `designState`. Важно разделять три сущности:
 
-### Importer шаблонов
-- `AI/CDR` остаются master-исходниками дизайнера и не являются рабочими форматами браузерного редактора.
-- Первый обязательный рабочий формат — `SVG` с именованными объектами: `locked_bg`, `photo_*`, `text_*`, `trim`, `bleed`, `safe`.
-- Backend endpoint импорта создаёт `design_templates.preview_url`, `spec.import`, `spec.designState` и, если указаны `productId/typeId`, привязывает шаблон к подтипу продукта.
-- Отдельный сайт получает импортированные шаблоны через public editor API, без CRM UI.
+- `design_templates.spec.designState` — master-шаблон: фон, размеры, prepress, фото-поля и текстовые плейсхолдеры.
+- `editor_drafts.payload.designState` — пользовательская вариация макета на отдельном сайте до оформления заказа.
+- `order_items.params.designState` — финальная вариация макета, привязанная к позиции заказа.
 
-### Public editor API
-- Публичная выдача шаблонов: `GET /api/design-templates/public` и `GET /api/design-templates/public/:id`.
-- Editor draft для отдельного сайта: `POST/PATCH/GET /api/public-editor/drafts/:token`.
-- Файлы клиента загружаются в draft через `POST /api/public-editor/drafts/:token/files`, а финализация создаёт заказ `source=website` через `POST /api/public-editor/drafts/:token/finalize`.
-- API draft/finalize защищён `WEBSITE_ORDER_API_KEY`; ключ должен использовать backend отдельного сайта, не браузер.
-- `photo_batch` вынесен в reusable модуль `frontend/src/features/publicEditor/`, а CRM-страница `/photo-batch-editor` остаётся контейнером вокруг общих компонентов.
+Клиентская правка не должна записываться обратно в `design_templates`. Шаблон остаётся исходной формой для новых клиентов, а конкретный печатный файл генерируется из draft/order item.
 
-### Общие prepress-поля продукта
+## Текущая архитектура
+
+- CRM-редактор находится в `frontend/src/pages/admin/DesignEditorPage.tsx`.
+- Canvas и основные операции Fabric.js находятся в `frontend/src/pages/admin/designEditor/DesignEditorCanvas.tsx`.
+- Состояние редактора сериализуется как `DesignState` из `frontend/src/pages/admin/designEditor/types.ts`.
+- Загрузка страницы/разворота и фон шаблона вынесены в `frontend/src/pages/admin/designEditor/designPageLoader.ts`.
+- Геометрия страницы, safe zone и bleed рассчитываются в `frontend/src/pages/admin/designEditor/designGeometry.ts`.
+- Каталог и импорт шаблонов находятся в `frontend/src/pages/admin/DesignTemplatesPage.tsx`.
+
+Редакторы разделены по ответственности:
+
+- админский редактор шаблона — `/adminpanel/design-editor/:templateId`, сохраняет master в `design_templates.spec.designState`;
+- клиентский редактор экземпляра — продуктовый слой `frontend/src/features/clientEditor/`, который выбирает сценарий и сохраняет пользовательскую копию в draft;
+- Fabric-документ внутри клиентского сценария находится в `frontend/src/features/publicDesignEditor/`;
+- sandbox для проверки клиентского редактора в CRM — `/adminpanel/public-design-editor-preview/:templateId`.
+
+Переключателя `advanced/basic` в UI админского редактора больше нет. Ограничения заполнения остаются низкоуровневой возможностью canvas для клиентского слоя.
+
+## Импорт шаблонов
+
+Дизайнер не собирает шаблон вручную в CRM. Он готовит исходник в AI/CDR и экспортирует рабочий SVG. Backend импортирует SVG в `design_templates.preview_url`, `spec.import` и `spec.designState`.
+
+Рабочий контракт SVG описан в `docs/design-template-importer.md`:
+
+- `locked_bg` — заблокированный фон/графика.
+- `photo_*` — прямоугольные области для фото клиента.
+- `text_*` — редактируемые текстовые поля.
+- `trim`, `bleed`, `safe` — направляющие печатных зон.
+- `hidden_*`, `guide_*` — технические объекты, которые не попадают в клиентский шаблон.
+
+Importer v3 вырезает интерактивные/технические слои из превью, чтобы фон не дублировал фото-поля и линии prepress. Распознанные поля попадают в `spec.designState`.
+
+## Public Editor API
+
+Отдельный сайт не использует CRM UI. Он получает master-шаблоны и работает с пользовательским draft через отдельные endpoint-ы:
+
+- `GET /api/design-templates/public?productId=...&typeId=...&sizeId=...` — список активных шаблонов.
+- `GET /api/design-templates/public/:id` — один активный шаблон с `spec.designState`.
+- `POST /api/public-editor/drafts` — создать draft для выбранного шаблона/продукта.
+- `GET /api/public-editor/drafts/:token` — получить draft.
+- `PATCH /api/public-editor/drafts/:token` — сохранить пользовательскую вариацию (`designState`, `photoBatch`, `selectedParams`).
+- `POST /api/public-editor/drafts/:token/files` — загрузить файл клиента в draft; ответ содержит стабильный `url` для записи в Fabric JSON.
+- `GET /api/public-editor/drafts/:token/files/:fileId/content` — стабильная ссылка на файл draft для браузерного рендера изображения.
+- `POST /api/public-editor/drafts/:token/finalize` — создать заказ `source=website`, перенести draft в позицию заказа и привязать файлы.
+
+Изменяющие draft endpoint-ы `/api/public-editor/*` защищены `WEBSITE_ORDER_API_KEY`. Ключ должен использовать backend отдельного сайта, не браузер. Ссылка на содержимое draft-файла доступна по секретному token/id, чтобы браузер мог отрисовать изображение без передачи API-ключа.
+
+При `finalize` сервис переносит:
+
+- `payload.designState` → `order_items.params.designState`;
+- `payload.photoBatch` → `order_items.params.photoBatch`;
+- `payload.selectedParams` → `order_items.params.selectedEditorParams`;
+- `editorDraftToken` и `designTemplateId` → params позиции заказа;
+- draft-файлы → `order_files`.
+
+## Контракт `designState`
+
+`designState` хранит сериализуемое состояние макета:
+
 ```json
 {
+  "templateId": 123,
+  "pageWidth": 90,
+  "pageHeight": 55,
+  "pageCount": 1,
+  "sceneScale": 1,
   "prepress": {
     "bleedMm": 2,
     "safeZoneMm": 5,
@@ -34,106 +83,123 @@
     "showTrim": true,
     "showSafeZone": true,
     "cutMarks": true
-  }
+  },
+  "pages": [
+    {
+      "fabricJSON": {}
+    }
+  ]
 }
 ```
 
+В `pages[].fabricJSON` сохраняется Fabric.js JSON. Для пользовательских файлов нельзя сохранять временные `blob:` URL как долговременное состояние: файлы нужно загрузить в draft/order files, а в `designState` хранить стабильную ссылку или имя файла.
+
+## Режимы продуктов
+
+Режим редактора задаётся явно в `config_data.simplified.design_editor_mode`:
+
+- `none` — редактор не открывается, клиент загружает готовый макет или просит разработку.
+- `single` — один печатный макет: открытка, постер, визитка, одиночное фото с дизайном.
+- `multipage` — страницы/развороты для фотокниг, календарей, буклетов и каталогов.
+- `photo_batch` — пакетная фотопечать для набора фото; это отдельный сценарий с сеткой фото, кропом, поворотом, количеством и массовыми действиями.
+
+## Client Editor Modes
+
+Клиентский входной компонент — `ClientEditorRouter` из `frontend/src/features/clientEditor/`. Он принимает `productId`, `typeId`, `sizeId`, `templateId` и режим продукта:
+
+- `single` показывает сценарий «Заполнить макет» и сохраняет `draft.payload.designState`;
+- `multipage` показывает сценарий «Собрать многостраничный макет», использует общий controller навигации страниц/разворотов и сохраняет `draft.payload.designState`;
+- `photo_batch` показывает сценарий «Загрузить фото на печать», грузит файлы в draft и сохраняет `draft.payload.photoBatch`.
+
+Sandbox CRM открывается по `/adminpanel/public-design-editor-preview/:templateId`. Режим можно выбрать query-параметром `mode`: `?mode=single`, `?mode=multipage` или `?mode=photo_batch`.
+
+## Prepress
+
+Общие prepress-поля:
+
 - `bleedMm` — насколько изображение выходит наружу от финального trim-размера.
 - `safeZoneMm` — насколько внутрь от trim-размера нужно держать важные объекты.
-- `showBleed/showTrim/showSafeZone` — отображение слоёв в редакторе.
-- `cutMarks` — дефолт для production export; сам export всё равно может включать/выключать метки как отдельную опцию.
-- На текущем этапе trim-формат остаётся рабочим размером существующего canvas для совместимости старых шаблонов; bleed отображается визуально вокруг trim. Расширение рабочей области canvas до bleed box нужно делать отдельной миграционно-безопасной задачей.
+- `showBleed`, `showTrim`, `showSafeZone` — отображение зон в редакторе.
+- `cutMarks` — дефолт для production export.
 
-### Режимы макетов
-- **`none`** — редактор не открывается: клиент загружает готовый макет или просит разработку.
-- **`single`** — один canvas для одного печатного макета: открытка, постер, визитка, одиночное фото с дизайном.
-- **`multipage`** — страницы/развороты для фотокниг, календарей, буклетов и каталогов.
-- **`photo_batch`** — пакетная фотопечать для `n` разных фото. Такой сценарий должен открывать не Fabric-редактор на множество страниц, а сетку фото с кропом, поворотом, количеством и массовыми действиями.
+`DesignEditorPage` читает настройки из `spec.designState.prepress` или `spec.prepress`, передаёт их в canvas и сохраняет обратно в `designState`. Сейчас trim-формат остаётся рабочим размером canvas, а bleed отображается визуально вокруг trim. Расширение рабочей области до bleed box нужно делать отдельной миграционно-безопасной задачей.
 
-### Photo batch: размеры и кадрирование
-- Базовый CRM-экран доступен по `/photo-batch-editor?orderId=...&orderItemId=...&productId=...&typeId=...`: можно загрузить пачку фото, выбрать размер/количество/fitMode/поворот по каждому файлу и сохранить `params.photoBatch` в позицию заказа.
-- В CRM вход добавлен из модалки файлов заказа: нужно выбрать позицию заказа и нажать «Пакетная фотопечать». Если в позиции уже есть `params.photoBatch`, модалка показывает краткую сводку файлов/отпечатков.
-- Размеры для выбора подтягиваются из схемы продукта (`template.simplified.sizes` или `template.simplified.typeConfigs[typeId].sizes`); стартовые `10×15`, `15×20`, `20×30` используются только как fallback.
-- Количество фото не является частью контракта: режим должен работать для `n` файлов, а ограничения должны быть только техническими (лимиты загрузки, батчи, фоновые задачи).
-- Для пачки фото выбранный размер продукта является **размером по умолчанию** для всех загруженных фото.
-- Каждое фото может переопределить размер из набора размеров этого же продукта/подтипа: например часть фото `10×15`, часть `15×20`, часть `10×10`.
-- Кадрирование хранится на уровне конкретного фото, а не как новый растрированный файл: оригинал + `size_id` / физический размер + crop-параметры.
-- Рекомендуемый контракт элемента пачки:
-  ```json
-  {
-    "fileId": 123,
-    "originalName": "IMG_0012.jpg",
-    "sizeId": "10x15",
-    "targetSizeMm": { "width": 100, "height": 150 },
-    "quantity": 1,
-    "fitMode": "cover",
-    "rotation": 0,
-    "crop": { "x": 0.12, "y": 0.04, "w": 0.76, "h": 0.92 }
-  }
-  ```
-- `fitMode = cover` — заполнить формат с обрезкой; `contain` — вписать целиком с полями. По умолчанию для фотопечати использовать `cover`, но явно показывать пользователю область обрезки.
-- Массовые действия: сменить размер для выбранных/всех фото, применить `cover/contain`, повернуть, задать количество.
-- В клиентском редакторе обязательно показывать дозаливку: фото отображается до bleed-рамки, а trim-рамка показывает финальный рез. Зона между trim и bleed должна быть визуально предупреждающей, чтобы клиент видел, какая часть изображения может срезаться.
-- Для UX использовать три слоя: `bleed` (картинка должна доходить сюда), `trim` (финальный размер/линия реза), `safe zone` (желательная зона для лиц, текста и важных объектов).
+## Photo Batch
 
-### Photo batch: производственный экспорт
-- Заказ должен группировать фото по выбранному размеру: например позиции `10×15`, `15×20`, `20×30`. Не создавать отдельную позицию на каждое фото.
-- Для печатника нужен серверный production export по заказу/позициям:
-  - ZIP с общей папкой заказа, например `ORD-0897/`;
-  - внутри папки по размерам/позициям: `01_10x15_30шт/`, `02_15x20_30шт/`, `03_20x30_40шт/`;
-  - в каждой папке — исходники или подготовленные JPEG/PDF + `manifest.json` с crop/quantity/size;
-  - опционально — PDF по каждой группе: `10x15_30шт.pdf`, `15x20_30шт.pdf`, `20x30_40шт.pdf`.
-- Для продукта «цифра» нужен режим imposition/раскладки на печатный лист: из фото-группы формируется многостраничный PDF, где каждая страница — лист SRA3 (или другой лист из материала/печати), а фото разложены по `itemsPerSheet` с учётом зазоров/резов.
-- Раскладка должна использовать уже существующую бизнес-логику размеров: `LayoutCalculationService` / данные материала (`sheet_width`, `sheet_height`) / SRA3 fallback `320×450`.
-- Печать `photo_batch` не должна заставлять оператора вручную сортировать 100 файлов: сортировка и имена файлов/папок должны генерироваться из номера заказа, позиции и размера.
-- `imposeToSheet` и `cutMarks` — необязательные флаги production export. Если они выключены, экспорт отдаёт файлы/групповые PDF без раскладки на SRA3.
-- При `imposeToSheet=true` и `cutMarks=true` метки реза ставятся по **обрезному размеру** (`targetSizeMm`, trim box), а изображение выводится наружу на **дозаливку** (`bleedMm`). Например для `100×150 мм` и `bleedMm=2` изображение занимает `104×154 мм`, но угловые метки показывают рез по `100×150 мм`.
-- Зазор между соседними элементами на листе должен учитывать две дозаливки и место под метки: фактический шаг раскладки = `targetSize + bleed*2 + gap`.
-- Crop preview в интерфейсе должен показывать три рамки: bleed (куда должна доходить картинка), trim (куда режем) и safe zone (где безопасно держать важные элементы).
+CRM-экран доступен по `/photo-batch-editor?orderId=...&orderItemId=...&productId=...&typeId=...`. Он сохраняет результат в `params.photoBatch` позиции заказа. Клиентский сценарий `photo_batch` сохраняет тот же контракт в `draft.payload.photoBatch`.
 
-### Модалка выбора изображений
-- **ImagePickerModal:** при «Добавить изображение» или клике/дропе на зону загрузки в панели «Фото» открывается модалка (табы: Мои файлы / Фотобанк / ВКонтакте / Яндекс.Диск — активен только «Мои файлы»). Слева — блоки «Дата загрузки», «Мои альбомы» (пока заглушки). В центре — «Загрузить с компьютера» и «Загрузить с телефона» (выбор файлов), список выбранных, кнопка «Выбрать». При выборе файлы добавляются на текущую страницу макета как изображения.
+Канонический контракт пачки — группы по размеру:
 
-### Коллажи (без хардкода)
-- **Backend:** таблица `collage_templates` (id, name, photo_count, layout JSON, padding_default, sort_order, is_active). Миграция `20260325000000_create_collage_templates.ts`. Сервис и роуты `GET/POST /api/collage-templates`, `GET/PUT/DELETE /api/collage-templates/:id`. Layout: `{ cells: [ { x, y, w, h } ] }` (0–1).
-- **Frontend:** API `getCollageTemplates({ photo_count?, only_suitable? })`, `getCollageTemplate(id)`. Панель «Коллажи»: выбор «Количество фото» (2–6), тумблер «Оставить только подходящие», слайдер «Отступ, %», сетка шаблонов из API (превью по layoutParsed). Выбранный шаблон применяется к текущей странице/развороту и создаёт поля для фото по `layout.cells`. В миграции `20260325001000_seed_default_collage_templates.ts` есть 15 стартовых раскладок для 2–6 фото.
+```json
+{
+  "groups": [
+    {
+      "groupSizeId": "10x15",
+      "groupLabel": "10×15",
+      "targetSizeMm": { "width": 100, "height": 150 },
+      "quantity": 30,
+      "items": [
+        {
+          "fileId": 123,
+          "originalName": "IMG_0012.jpg",
+          "quantity": 1,
+          "fitMode": "cover",
+          "rotation": 0,
+          "crop": { "x": 0.12, "y": 0.04, "w": 0.76, "h": 0.92 }
+        }
+      ]
+    }
+  ],
+  "totalFiles": 30,
+  "totalQuantity": 30
+}
+```
 
-### Ранее (кратко)
-- Префлайт (проверка макетов, авто при загрузке, статус в списке файлов).
-- Каталог шаблонов, редактор: фон из шаблона, зоны обрезки, текст, мультистраничность, экспорт PNG/PDF (все страницы), мобильная оптимизация, роуты в основном приложении и в админке.
-- Интеграция с заказом: «Создать макет» из FilesModal, сохранение PNG и params (designState, designTemplateId).
+Размер (`groupSizeId`, `targetSizeMm`) хранится на группе, не на каждом элементе. Для фотопечати crop хранится как параметры к оригиналу, а не как новый растрированный файл. Production export должен группировать файлы по размеру/позиции и генерировать ZIP/PDF/manifest для печати.
 
----
+## Что уже есть
 
-## План реализации (следующие шаги)
+- Каталог шаблонов и импорт SVG.
+- Админский редактор master-шаблона без клиентского режима заполнения.
+- Sandbox-страница клиентского редактора для проверки пользовательского экземпляра.
+- Загрузка шаблона из `spec.designState`.
+- Фото-поля, текстовые поля, изображения, фон, страницы/развороты.
+- Prepress-зоны: bleed, trim, safe zone.
+- Коллажи из `collage_templates`.
+- Экспорт всех страниц в PDF из CRM-редактора.
+- CRM-вход «Создать макет» из `FilesModal` отключён, чтобы операторы не попадали в старый смешанный flow.
+- Public editor draft API для отдельного сайта.
 
-| № | Задача | Детали |
-|---|--------|--------|
-| 1 | **Загрузка изображений в uploads** | При сохранении макета (и при дропе в поле для фото?) загружать изображения из designState (blob/file) на сервер (например `POST /api/orders/:id/files` или отдельный endpoint), получать стабильные URL, подставлять их в designState и в params. При открытии редактора из заказа подставлять эти URL в images/photoFields. |
-| 2 | ✅ **Применение шаблона коллажа** | По выбранному шаблону из панели «Коллажи» создаются поля для фото по layout.cells (пересчёт x,y,width,height в пиксели с учётом отступа и safe zone). |
-| 3 | **Список «Мои файлы» в ImagePickerModal** | Backend: хранить загруженные пользователем файлы (привязка к пользователю/сессии). Frontend: в модалке по табу «Мои файлы» подгружать список и показывать превью; выбор — в выбранные, затем «Выбрать». |
-| 4 | **Интеграции (Фотобанк, ВК, Яндекс.Диск)** | По мере необходимости: API сторонних сервисов, OAuth, выбор фото из каталога и подстановка URL в макет. |
-| 5 | **Сохранение полей для фото в заказе** | При сохранении макета в заказ: если в photoFields есть src (blob), конвертировать в file и загрузить, в designState записать уже URL из ответа. При загрузке макета из params — восстанавливать photoFields с этими URL. |
-| 6 | **Админка шаблонов коллажей** | Seed-набор типовых раскладок уже есть. Следующий шаг — страница CRUD для `collage_templates`: создание раскладки (превью по cells), задание photo_count, padding_default, сортировка. |
-| 7 | **Photo batch mode** | Для `design_editor_mode = photo_batch`: отдельный экран фотопечати с загрузкой пачки файлов, сеткой превью, кропом под выбранный размер, поворотом, количеством на каждое фото, выбором другого размера для конкретного фото и массовыми настройками. |
-| 8 | **Production export для фотопечати** | Backend endpoint для ZIP/PDF по группам размера: папки заказа, manifest, PDF по группе и/или imposed PDF на SRA3 для цифровой печати. |
+## Ограничения и следующие задачи
 
----
+| Задача | Детали |
+|---|---|
+| Клиентский UI public editor | Есть sandbox-контейнер в CRM и adapter-слой `publicDesignEditorAdapter`; для прода отдельного сайта нужен backend-прокси, чтобы не отдавать `WEBSITE_ORDER_API_KEY` в браузер. |
+| Стабильные URL файлов | Draft upload возвращает `url`, а клиентский слой передаёт его в canvas через `resolveImageFileUrl`. |
+| Автосохранение draft | `PublicDesignEditor` сохраняет полный `designState` через adapter с debounce; ручное сохранение остаётся как явное действие, при грязном draft включена защита `beforeunload`. |
+| Finalize draft | В sandbox есть форма имени/телефона/email, которая сохраняет draft и вызывает finalize; на прод-сайте эту форму должен заменить checkout сайта. |
+| Production export | Генерировать печатный PNG/PDF/JPEG из `order_items.params.designState`, а не из master-шаблона. |
+| Восстановление заказа | При повторном открытии позиции заказа восстанавливать макет из `order_items.params.designState`. |
+| Photo batch export | Нужен серверный ZIP/PDF по группам размера с `manifest.json`, опциональной раскладкой на лист и метками реза. |
 
 ## Важные файлы
 
 | Назначение | Путь |
-|------------|------|
-| Редактор (оркестратор) | `frontend/src/pages/admin/DesignEditorPage.tsx` |
-| Канвас, Transformer, поля для фото | `frontend/src/pages/admin/designEditor/DesignEditorCanvas.tsx` |
-| Панели (Фото, Текст, Коллажи) | `frontend/src/pages/admin/designEditor/panels/` |
+|---|---|
+| Клиентский product router | `frontend/src/features/clientEditor/ClientEditorRouter.tsx` |
+| Клиентская фотопечать через draft | `frontend/src/features/clientEditor/ClientPhotoBatchEditor.tsx` |
+| CRM-редактор | `frontend/src/pages/admin/DesignEditorPage.tsx` |
+| Canvas и операции Fabric.js | `frontend/src/pages/admin/designEditor/DesignEditorCanvas.tsx` |
+| Типы `DesignState` | `frontend/src/pages/admin/designEditor/types.ts` |
+| Загрузка страниц/фона | `frontend/src/pages/admin/designEditor/designPageLoader.ts` |
+| Геометрия canvas/prepress | `frontend/src/pages/admin/designEditor/designGeometry.ts` |
+| Клиентский редактор экземпляра | `frontend/src/features/publicDesignEditor/` |
+| Панели редактора | `frontend/src/pages/admin/designEditor/panels/` |
 | Модалка выбора изображений | `frontend/src/components/ImagePickerModal.tsx` |
-| Каталог шаблонов | `frontend/src/pages/admin/DesignTemplatesPage.tsx` |
-| Кнопка «Создать макет» | `frontend/src/components/FilesModal.tsx` |
-| API шаблонов дизайна | `backend/src/routes/designTemplates.ts` |
-| API шаблонов коллажей | `backend/src/routes/collageTemplates.ts`, `backend/src/services/collageTemplateService.ts` |
-| Миграция коллажей | `backend/src/migrations/20260325000000_create_collage_templates.ts` |
-| Seed коллажей | `backend/src/migrations/20260325001000_seed_default_collage_templates.ts` |
-| Поддержка params при PATCH items | `backend/src/modules/orders/controllers/orderItemController.ts` |
-| Раскладка на лист | `backend/src/modules/pricing/services/layoutCalculationService.ts` |
-| Обработка изображений | `sharp`, `backend/src/services/preflightService.ts`, `backend/src/services/imageProcessingService.ts` |
+| Каталог/импорт шаблонов | `frontend/src/pages/admin/DesignTemplatesPage.tsx` |
+| API шаблонов | `backend/src/routes/designTemplates.ts`, `backend/src/services/designTemplateService.ts` |
+| Importer SVG | `backend/src/services/designTemplateImporterService.ts`, `backend/src/services/designTemplateSvgParse.ts` |
+| Public editor API | `backend/src/routes/publicEditor.ts`, `backend/src/services/publicEditorDraftService.ts` |
+| Миграция drafts | `backend/src/migrations/20260424001000_create_public_editor_drafts.ts` |
+| Коллажи | `backend/src/routes/collageTemplates.ts`, `backend/src/services/collageTemplateService.ts` |
+| Вход из заказа | `frontend/src/components/FilesModal.tsx` |

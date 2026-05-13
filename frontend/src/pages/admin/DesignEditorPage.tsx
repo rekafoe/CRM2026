@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { AppIcon } from '../../components/ui/AppIcon';
 import { Alert, Button } from '../../components/common';
 import {
   getDesignTemplate,
-  uploadOrderFile,
-  updateOrderItem,
   updateDesignTemplate,
   fetchImageFromUrl,
   type DesignTemplate,
@@ -51,7 +49,6 @@ import { DesignEditorToolbar } from './designEditor/DesignEditorToolbar';
 import {
   DesignEditorCanvas,
   type DesignEditorCanvasHandle,
-  type EditorMode,
 } from './designEditor/DesignEditorCanvas';
 import { CanvasRulers, type GuideLine } from './designEditor/CanvasRulers';
 import { ImagePickerModal } from '../../components/ImagePickerModal';
@@ -98,17 +95,8 @@ export const DesignEditorPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { templateId } = useParams<{ templateId: string }>();
-  const [searchParams] = useSearchParams();
-  const orderId = parseInt(searchParams.get('orderId') ?? '0', 10);
-  const orderItemId = parseInt(searchParams.get('orderItemId') ?? '0', 10);
-  const hasOrderContext = orderId > 0;
   const isMainAppRoute = location.pathname.startsWith('/design-editor/');
   const catalogPath = isMainAppRoute ? '/design-templates' : '/adminpanel/design-templates';
-
-  /** Из заказа — сначала упрощённое заполнение; из каталога — полный редактор */
-  const [editorMode, setEditorMode] = useState<EditorMode>(() =>
-    hasOrderContext ? 'basic' : 'advanced',
-  );
 
   // ── Template ────────────────────────────────────────────────────────────────
   const [templateState, setTemplateState] = useState<{
@@ -208,10 +196,6 @@ export const DesignEditorPage: React.FC = () => {
   }, [fitZoom, fitReady]);
 
   useEffect(() => {
-    if (editorMode === 'basic') setTextFloatingAnchor(null);
-  }, [editorMode]);
-
-  useEffect(() => {
     const el = scrollAreaRef.current;
     const sync = () => {
       canvasHandleRef.current?.syncTextFloatingAnchor();
@@ -232,11 +216,10 @@ export const DesignEditorPage: React.FC = () => {
 
   /** При выделении текста открываем раздел «Текст» в сайдбаре (расширенный режим) */
   useEffect(() => {
-    if (editorMode !== 'advanced') return;
     if (selectedObj?.type === 'IText') {
       setUi((u) => ({ ...u, sidebarSection: 'text' }));
     }
-  }, [selectedObj?.type, editorMode]);
+  }, [selectedObj?.type]);
   /** Левая страница в виде разворота (= currentPage, всегда первая из пары) */
   const leftPageIdx = isSpreadView ? (currentStripItem?.pages[0] ?? currentPage) : currentPage;
   /** Правая страница разворота */
@@ -682,36 +665,6 @@ export const DesignEditorPage: React.FC = () => {
       coverPages,
     });
 
-    if (hasOrderContext) {
-      const handle = canvasHandleRef.current;
-      try {
-        setSaving(true);
-        setTemplateState((s) => ({ ...s, error: null }));
-        const dataUrl = handle.getDataURL({ multiplier: getExportPixelRatio() });
-        const res = await fetch(dataUrl);
-        const blob = await res.blob();
-        const file = new File([blob], `maket-${Date.now()}.png`, { type: 'image/png' });
-        await uploadOrderFile(orderId, file, orderItemId > 0 ? orderItemId : undefined);
-        if (orderItemId > 0) {
-          await updateOrderItem(orderId, orderItemId, {
-            params: {
-              designState: designState as unknown as Record<string, unknown>,
-              designTemplateId: templateId ? parseInt(templateId, 10) : undefined,
-            },
-          });
-        }
-        navigate(-1);
-      } catch (err: unknown) {
-        setTemplateState((s) => ({
-          ...s,
-          error: err instanceof Error ? err.message : 'Ошибка сохранения',
-        }));
-      } finally {
-        setSaving(false);
-      }
-      return;
-    }
-
     const tid = templateId ? parseInt(templateId, 10) : 0;
     if (!tid) {
       setEditorError('Не удалось сохранить: не указан шаблон.');
@@ -743,10 +696,6 @@ export const DesignEditorPage: React.FC = () => {
     prepressConfig,
     spreadMode,
     coverPages,
-    hasOrderContext,
-    orderId,
-    orderItemId,
-    navigate,
     leftPageIdx,
     rightPageIdx,
   ]);
@@ -917,8 +866,6 @@ export const DesignEditorPage: React.FC = () => {
           />
 
           <DesignEditorToolbar
-            mode={editorMode}
-            onModeChange={setEditorMode}
             onAddText={handleAddText}
             selectedObj={selectedObj}
             currentPage={currentPage}
@@ -935,7 +882,6 @@ export const DesignEditorPage: React.FC = () => {
             onGuidesToggle={() => setUi((u) => ({ ...u, showGuides: !u.showGuides }))}
             onSave={handleSave}
             saving={saving}
-            hasOrderContext={hasOrderContext}
             onExportPdf={() => void handleExportPdf()}
             exportingPdf={exportingPdf}
             exportProgress={exportProgress}
@@ -957,11 +903,7 @@ export const DesignEditorPage: React.FC = () => {
             onTextAlignChange={handleTextAlignChange}
             onFontChange={handleFontChange}
             onFontSizeChange={handleFontSizeChange}
-            suppressTextFormat={
-              editorMode === 'advanced' &&
-              selectedObj?.type === 'IText' &&
-              textFloatingAnchor !== null
-            }
+            suppressTextFormat={selectedObj?.type === 'IText' && textFloatingAnchor !== null}
           />
 
           <div
@@ -1022,7 +964,6 @@ export const DesignEditorPage: React.FC = () => {
                   spreadPairPages={spreadPairPages}
                   showGuides={showGuides}
                   apiBaseUrl={API_BASE_URL}
-                  mode={editorMode}
                   onSelectionChange={setSelectedObj}
                   onHistoryChange={(u, r) => {
                     setCanUndo(u);
@@ -1035,9 +976,7 @@ export const DesignEditorPage: React.FC = () => {
                   onSidebarPhotoDropped={removeSidebarPhoto}
                   guideLinesPx={guideLinesPx}
                   onSnapLinesChange={setSnapLines}
-                  onTextFloatingAnchor={
-                    editorMode === 'advanced' ? setTextFloatingAnchor : undefined
-                  }
+                  onTextFloatingAnchor={setTextFloatingAnchor}
                 />
               </div>
               {isSpreadView && (
@@ -1079,8 +1018,7 @@ export const DesignEditorPage: React.FC = () => {
           />
         </div>
 
-        {editorMode === 'advanced' &&
-          selectedObj?.type === 'IText' &&
+        {selectedObj?.type === 'IText' &&
           textFloatingAnchor && (
             <TextFloatingToolbar
               anchor={textFloatingAnchor}

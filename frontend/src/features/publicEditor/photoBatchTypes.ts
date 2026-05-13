@@ -9,7 +9,8 @@ export type PhotoBatchSizeOption = {
 
 export type PhotoBatchDraftItem = {
   id: string;
-  file: File;
+  file?: File;
+  fileId?: number;
   previewUrl: string;
   originalName: string;
   sizeId: string;

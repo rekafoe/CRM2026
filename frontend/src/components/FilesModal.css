@@ -186,6 +186,69 @@
   font-weight: 600;
 }
 
+.files-editor-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 24px 14px;
+  padding: 12px 14px;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.files-editor-summary--designState {
+  color: #1e40af;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.files-editor-summary--photoBatch {
+  color: #7c2d12;
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.files-editor-summary--clientFiles {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.files-editor-summary--noLayout {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.files-editor-summary__main,
+.files-editor-summary__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.files-editor-summary__meta {
+  justify-content: flex-end;
+  color: inherit;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.files-editor-summary__preview {
+  min-height: 28px;
+  padding: 4px 10px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .btn-download-all,
 .btn-upload {
   padding: 10px 18px;

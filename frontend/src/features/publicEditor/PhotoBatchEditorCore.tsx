@@ -10,6 +10,8 @@ type PhotoBatchEditorCoreProps = {
   defaultSizeId: string;
   totalQuantity: number;
   saving?: boolean;
+  footerText?: string;
+  saveLabel?: string;
   onDefaultSizeChange: (sizeId: string) => void;
   onApplySizeToAll: () => void;
   onAddPhotoClick: () => void;
@@ -26,6 +28,8 @@ export const PhotoBatchEditorCore: React.FC<PhotoBatchEditorCoreProps> = ({
   defaultSizeId,
   totalQuantity,
   saving = false,
+  footerText = 'Сохранение запишет пачку фото для дальнейшей печати.',
+  saveLabel = 'Сохранить пачку',
   onDefaultSizeChange,
   onApplySizeToAll,
   onAddPhotoClick,
@@ -78,6 +82,21 @@ export const PhotoBatchEditorCore: React.FC<PhotoBatchEditorCoreProps> = ({
       <span>Перетащите фото сюда или нажмите “Добавить фото”</span>
     </section>
 
+    <section className="photo-batch__fit-help" aria-label="Подсказка по вписыванию фото">
+      <div>
+        <strong>С обрезкой</strong>
+        <span>Фото заполняет весь формат, края могут уйти под trim/bleed.</span>
+      </div>
+      <div>
+        <strong>Целиком с полями</strong>
+        <span>Фото сохраняется полностью, вокруг могут появиться поля.</span>
+      </div>
+      <div>
+        <strong>Safe-zone</strong>
+        <span>Важные лица и текст держите ближе к центру, не у линии реза.</span>
+      </div>
+    </section>
+
     <section className="photo-batch__grid" aria-label="Фото в пачке">
       {items.map((item) => (
         <article key={item.id} className="photo-batch-card">
@@ -128,9 +147,9 @@ export const PhotoBatchEditorCore: React.FC<PhotoBatchEditorCoreProps> = ({
     </section>
 
     <footer className="photo-batch__footer">
-      <span>Сохранение загрузит файлы и запишет `params.photoBatch` в позицию заказа.</span>
+      <span>{footerText}</span>
       <Button type="button" variant="primary" onClick={onSave} disabled={saving || items.length === 0}>
-        {saving ? 'Сохраняем...' : 'Сохранить пачку'}
+        {saving ? 'Сохраняем...' : saveLabel}
       </Button>
     </footer>
   </>

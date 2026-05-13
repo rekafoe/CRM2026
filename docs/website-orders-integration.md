@@ -106,14 +106,34 @@ if (res.ok && data.order) {
 
 Онлайн-редактор сайта не зависит от CRM UI. Сайт получает шаблоны и работает с draft через отдельные endpoint-ы:
 
+Граница ответственности CRM и сайта описана отдельно: `docs/client-editor-crm-site-boundary.md`.
+
 - `GET /api/design-templates/public?productId=22&typeId=1&sizeId=10x15` — публичный список активных шаблонов.
 - `GET /api/design-templates/public/:id` — один активный шаблон с `spec.designState`.
 - `POST /api/public-editor/drafts` — создать draft редактора.
 - `PATCH /api/public-editor/drafts/:token` — сохранить состояние редактора (`designState`, `photoBatch`, выбранные параметры).
-- `POST /api/public-editor/drafts/:token/files` — загрузить файл клиента в draft.
-- `POST /api/public-editor/drafts/:token/finalize` — создать заказ `source=website` и привязать файлы draft к заказу.
+- `POST /api/public-editor/drafts/:token/files` — загрузить файл клиента в draft; ответ содержит стабильный `url` для записи в `designState`.
+- `GET /api/public-editor/drafts/:token/files/:fileId/content` — получить содержимое draft-файла по секретному token/id для отрисовки изображения.
+- `POST /api/public-editor/drafts/:token/finalize` — sandbox/debug-flow для создания тестового заказа из одного draft. В production checkout сайт отправляет заказ в Order Pool и передаёт `editorDraftToken` в позиции заказа.
 
-Для `/api/public-editor/*` используется `WEBSITE_ORDER_API_KEY`. Ключ должен храниться на backend отдельного сайта; браузеру его отдавать нельзя.
+Для изменяющих `/api/public-editor/*` endpoint-ов используется `WEBSITE_ORDER_API_KEY`. Ключ должен храниться на backend отдельного сайта; браузеру его отдавать нельзя.
+
+#### Контракт пользовательской вариации макета
+
+Публичный редактор не изменяет `design_templates`. Шаблон из `GET /api/design-templates/public/:id` считается master-версией: фон, фото-поля, текстовые плейсхолдеры, размеры и prepress берутся из `spec.designState`.
+
+Для конкретного клиента сайт создаёт draft и сохраняет в нём копию макета:
+
+- `POST /api/public-editor/drafts` фиксирует выбранный `designTemplateId`, `productId`, `typeId`, `sizeId` и режим редактора: `single`, `multipage` или `photo_batch`.
+- Для `single` и `multipage` `PATCH /api/public-editor/drafts/:token` сохраняет пользовательскую вариацию в `payload.designState`: введённые тексты, вставленные фото, crop/fit-параметры и выбранные настройки.
+- Для `photo_batch` `PATCH /api/public-editor/drafts/:token` сохраняет `payload.photoBatch`: группы по размеру и элементы с `fileId`, `quantity`, `fitMode`, `rotation`, `crop`.
+- `POST /api/public-editor/drafts/:token/files` загружает исходные файлы клиента в draft. В `designState` нужно хранить `url`/имена загруженных файлов, а в `photoBatch` — `fileId` из ответа upload.
+- После checkout сайт отправляет заказ в CRM Order Pool. В позициях, оформленных через редактор, сайт передаёт `editorDraftToken`, а CRM переносит `payload.designState` в `order_items.params.designState` или `payload.photoBatch` в `order_items.params.photoBatch`, добавляет `designTemplateId` и привязывает файлы draft к этой позиции заказа.
+- `editorDraftToken` опционален: продукты, которые клиент оформляет со своими готовыми файлами, отправляются без него и работают по обычному flow загрузки файлов заказа.
+
+Итоговый печатный файл (PNG/PDF/JPEG) должен генерироваться из `order_items.params.designState` отдельным production export. `design_templates.spec.designState` остаётся неизменяемым исходным шаблоном для новых клиентов.
+
+Для редакторских позиций сайт должен прикладывать к заказу производственный PDF, собранный из пользовательского draft постранично в порядке `1, 2, 3, ... n`. CRM хранит исходный `designState` для повторной генерации/проверки и показывает readonly preview в Order Pool; production export не должен брать master-шаблон вместо пользовательской вариации.
 
 ### Пример запроса на backend
 
@@ -132,7 +152,8 @@ curl -X POST "https://your-backend.example.com/api/orders/from-website" \
       {
         "type": "Визитки",
         "params": {
-          "description": "Визитки 90x50, меловка 300 г/м², 100 шт"
+          "description": "Визитки 90x50, меловка 300 г/м², 100 шт",
+          "editorDraftToken": "draft_secret_token"
         },
         "price": 25.00,
         "quantity": 1,
@@ -150,6 +171,8 @@ curl -X POST "https://your-backend.example.com/api/orders/from-website" \
     ]
   }'
 ```
+
+Если `params.editorDraftToken` передан, CRM валидирует draft до создания заказа, переносит его payload в params позиции и привязывает draft-файлы к этой позиции. Если token не передан, позиция считается обычным заказом с файлами клиента или без макета.
 
 **Минимальный запрос (пустой заказ, без позиций):**
 
@@ -243,10 +266,10 @@ curl -X POST "https://api.printcore.by/api/orders/from-website" \
 
 **Photo batch metadata (для пачки фото с индивидуальным размером/кропом):**
 
-Если продукт настроен как `design_editor_mode = photo_batch`, фото лучше передавать **позициями по группам размера**.
+Если продукт настроен как `design_editor_mode = photo_batch`, фото сохраняются **группами по размеру**.
 Количество фото в пачке не является частью контракта: режим работает для `n` файлов, а лимиты должны задаваться отдельно на уровне загрузки/обработки.
-Например заказ с 30 фото `10×15`, 30 фото `15×20` и 40 фото `20×30` создаёт три позиции заказа.
-Внутри каждой позиции лежит `params.photoBatch.items` с конкретными файлами, кропом и тиражом фото.
+Например пачка с 30 фото `10×15`, 30 фото `15×20` и 40 фото `20×30` содержит три группы внутри одного `photoBatch`.
+Внутри каждой группы лежит `items` с конкретными файлами, кропом и тиражом фото.
 В CRM первый экран редактирования пачки доступен из модалки файлов позиции заказа: `/photo-batch-editor?orderId=...&orderItemId=...&productId=...&typeId=...`.
 Размеры должны браться из конфигурации продукта, а не из фиксированного списка.
 
@@ -259,59 +282,67 @@ curl -X POST "https://api.printcore.by/api/orders/from-website" \
       "sides": 1
     },
     "photoBatch": {
-      "groupSizeId": "10x15",
-      "groupLabel": "10×15",
-      "targetSizeMm": { "width": 100, "height": 150 },
-      "production": {
-        "exportMode": "group_pdf",
-        "folderName": "01_10x15_30шт",
-        "imposeToSheet": false,
-        "sheetSizeMm": null
-      },
-      "items": [
+      "groups": [
         {
-          "fileId": 123,
-          "originalName": "IMG_0012.jpg",
-          "quantity": 1,
-          "fitMode": "cover",
-          "rotation": 0,
-          "crop": { "x": 0.12, "y": 0.04, "w": 0.76, "h": 0.92 }
-        },
-        {
-          "fileId": 124,
-          "originalName": "IMG_0013.jpg",
-          "quantity": 2,
-          "fitMode": "contain",
-          "rotation": 90,
-          "crop": { "x": 0, "y": 0, "w": 1, "h": 1 }
+          "groupSizeId": "10x15",
+          "groupLabel": "10×15",
+          "targetSizeMm": { "width": 100, "height": 150 },
+          "quantity": 3,
+          "items": [
+            {
+              "fileId": 123,
+              "originalName": "IMG_0012.jpg",
+              "quantity": 1,
+              "fitMode": "cover",
+              "rotation": 0,
+              "crop": { "x": 0.12, "y": 0.04, "w": 0.76, "h": 0.92 }
+            },
+            {
+              "fileId": 124,
+              "originalName": "IMG_0013.jpg",
+              "quantity": 2,
+              "fitMode": "contain",
+              "rotation": 90,
+              "crop": { "x": 0, "y": 0, "w": 1, "h": 1 }
+            }
+          ]
         }
-      ]
+      ],
+      "totalFiles": 2,
+      "totalQuantity": 3
     }
   }
 }
 ```
 
-`targetSizeMm` — физический размер печати группы, `crop` — относительные координаты области исходного фото (0–1), `quantity` — тираж конкретного фото.
+`targetSizeMm` — физический размер печати группы, `crop` — относительные координаты области исходного фото (0–1), `quantity` внутри item — тираж конкретного фото, `quantity` группы — сумма тиражей группы.
 
 Для цифровой печати на SRA3 позиция может попросить производственный экспорт с раскладкой:
 
 ```json
 {
   "photoBatch": {
-    "groupSizeId": "10x15",
-    "groupLabel": "10×15",
-    "targetSizeMm": { "width": 100, "height": 150 },
-    "production": {
-      "exportMode": "imposed_pdf",
-      "folderName": "01_10x15_30шт",
-      "imposeToSheet": true,
-      "sheetSizeMm": { "width": 320, "height": 450 },
-      "gapMm": 2,
-      "bleedMm": 2,
-      "cutMarks": true,
-      "cutMarksMode": "trim_box"
-    },
-    "items": []
+    "groups": [
+      {
+        "groupSizeId": "10x15",
+        "groupLabel": "10×15",
+        "targetSizeMm": { "width": 100, "height": 150 },
+        "quantity": 30,
+        "production": {
+          "exportMode": "imposed_pdf",
+          "folderName": "01_10x15_30шт",
+          "imposeToSheet": true,
+          "sheetSizeMm": { "width": 320, "height": 450 },
+          "gapMm": 2,
+          "bleedMm": 2,
+          "cutMarks": true,
+          "cutMarksMode": "trim_box"
+        },
+        "items": []
+      }
+    ],
+    "totalFiles": 30,
+    "totalQuantity": 30
   }
 }
 ```

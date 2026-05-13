@@ -6,11 +6,20 @@ import { getDb } from '../../../config/database'
 import { saveBufferToOrderFiles } from '../../../config/upload'
 import { setLastWebsiteOrderAt } from '../../../utils/poolSync'
 import { normalizeWebsiteItems } from '../utils/websiteOrderNormalize'
+import {
+  attachEditorDraftsToOrderItems,
+  prepareWebsiteItemsWithEditorDrafts,
+} from '../../../services/publicEditorDraftService'
 
 function getSafeServerErrorMessage(fallback: string, error: any): string {
   return process.env.NODE_ENV === 'production'
     ? fallback
     : (error?.message ?? fallback)
+}
+
+function isEditorDraftOrderError(error: any): boolean {
+  const message = String(error?.message ?? '')
+  return message.includes('Editor draft') || message.includes('Draft ')
 }
 
 export class OrderController {
@@ -142,6 +151,7 @@ export class OrderController {
 
       if (items != null && Array.isArray(items) && items.length > 0) {
         const normalizedItems = normalizeWebsiteItems(items)
+        const editorDraftPrepared = await prepareWebsiteItemsWithEditorDrafts(normalizedItems)
         const result = await OrderService.createOrderWithAutoDeduction({
           customerName: customerName || undefined,
           customerPhone: customerPhone || undefined,
@@ -150,8 +160,9 @@ export class OrderController {
           userId: undefined,
           customer_id,
           source: 'website',
-          items: normalizedItems
+          items: editorDraftPrepared.items
         })
+        await attachEditorDraftsToOrderItems(result.order.id, result.itemIds ?? [], editorDraftPrepared.editorDraftItems)
         setLastWebsiteOrderAt(Date.now())
         res.status(201).json({
           order: result.order,
@@ -176,6 +187,13 @@ export class OrderController {
       res.status(201).json({ order, message: 'Заказ с сайта создан' })
     } catch (error: any) {
       logger.error('createOrderFromWebsite error', { error: error?.message, stack: error?.stack })
+      if (isEditorDraftOrderError(error)) {
+        res.status(400).json({
+          error: getSafeServerErrorMessage('Ошибка editor draft', error),
+          message: 'Invalid editor draft'
+        })
+        return
+      }
       res.status(500).json({
         error: getSafeServerErrorMessage('Ошибка создания заказа', error),
         message: 'Internal server error'
@@ -251,6 +269,7 @@ export class OrderController {
 
       if (items != null && Array.isArray(items) && items.length > 0) {
         const normalizedItems = normalizeWebsiteItems(items)
+        const editorDraftPrepared = await prepareWebsiteItemsWithEditorDrafts(normalizedItems)
         const result = await OrderService.createOrderWithAutoDeduction({
           customerName,
           customerPhone,
@@ -259,10 +278,11 @@ export class OrderController {
           userId: undefined,
           customer_id,
           source: 'website',
-          items: normalizedItems
+          items: editorDraftPrepared.items
         })
         order = result.order as any
         deductionResult = result.deductionResult
+        await attachEditorDraftsToOrderItems(result.order.id, result.itemIds ?? [], editorDraftPrepared.editorDraftItems)
       } else {
         order = await OrderService.createOrder(
           customerName,
@@ -309,6 +329,13 @@ export class OrderController {
       res.status(201).json(payload)
     } catch (error: any) {
       logger.error('createOrderFromWebsiteWithFiles error', { error: error?.message, stack: error?.stack })
+      if (isEditorDraftOrderError(error)) {
+        res.status(400).json({
+          error: getSafeServerErrorMessage('Ошибка editor draft', error),
+          message: 'Invalid editor draft'
+        })
+        return
+      }
       res.status(500).json({
         error: getSafeServerErrorMessage('Ошибка создания заказа', error),
         message: 'Internal server error'

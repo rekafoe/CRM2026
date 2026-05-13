@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 
 // Типы уведомлений
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -173,7 +173,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 export const useToastNotifications = () => {
   const { addToast } = useToast();
 
-  return {
+  return useMemo(() => ({
     success: (title: string, message?: string, options?: Partial<Toast>) => {
       addToast({ type: 'success', title, message, ...options });
     },
@@ -186,7 +186,7 @@ export const useToastNotifications = () => {
     info: (title: string, message?: string, options?: Partial<Toast>) => {
       addToast({ type: 'info', title, message, ...options });
     },
-  };
+  }), [addToast]);
 };
 
 

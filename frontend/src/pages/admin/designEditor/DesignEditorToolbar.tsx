@@ -3,11 +3,8 @@ import { AppIcon } from '../../../components/ui/AppIcon';
 import { Button } from '../../../components/common';
 import { TEXT_FONTS } from './constants';
 import type { SelectedObjProps } from './types';
-import type { EditorMode } from './DesignEditorCanvas';
 
 interface DesignEditorToolbarProps {
-  mode: EditorMode;
-  onModeChange: (mode: EditorMode) => void;
   onAddText: () => void;
   selectedObj: SelectedObjProps | null;
   currentPage: number;
@@ -18,7 +15,6 @@ interface DesignEditorToolbarProps {
   onGuidesToggle: () => void;
   onSave: () => void;
   saving: boolean;
-  hasOrderContext: boolean;
   onExportPdf: () => void;
   exportingPdf: boolean;
   exportProgress?: { current: number; total: number } | null;
@@ -49,8 +45,6 @@ interface DesignEditorToolbarProps {
 }
 
 export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
-  mode,
-  onModeChange,
   onAddText,
   selectedObj,
   currentPage,
@@ -61,7 +55,6 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
   onGuidesToggle,
   onSave,
   saving,
-  hasOrderContext,
   onExportPdf,
   exportingPdf,
   exportProgress,
@@ -86,25 +79,11 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
   suppressTextFormat = false,
 }) => {
   const isText = selectedObj?.type === 'IText';
-  const isBasic = mode === 'basic';
 
   return (
     <div className="design-editor-toolbar">
-      {/* ── Режим basic: упрощённая панель ── */}
-      {isBasic && (
-        <>
-          <span className="design-editor-toolbar-mode-badge">Режим заполнения</span>
-          <span title="Открыть полный редактор">
-            <Button variant="secondary" onClick={() => onModeChange('advanced')}>
-              <AppIcon name="edit" size="xs" /> Расширенный режим
-            </Button>
-          </span>
-          <div className="design-editor-toolbar-divider" />
-        </>
-      )}
-
-      {/* ── История (только в advanced) ── */}
-      {!isBasic && <div className="design-editor-toolbar-group">
+      {/* ── История ── */}
+      <div className="design-editor-toolbar-group">
         <button
           type="button"
           className="design-editor-toolbar-icon-btn"
@@ -139,16 +118,14 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
         >
           <AppIcon name="x" size="xs" />
         </button>
-      </div>}
+      </div>
 
-      {!isBasic && <div className="design-editor-toolbar-divider" />}
+      <div className="design-editor-toolbar-divider" />
 
-      {/* ── Текст (только в advanced) ── */}
-      {!isBasic && (
+      {/* ── Текст ── */}
       <Button variant="secondary" onClick={onAddText}>
         <AppIcon name="edit" size="xs" /> Текст
       </Button>
-      )}
 
       {/* ── Форматирование текста ── */}
       {isText && !suppressTextFormat && (
@@ -251,8 +228,8 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
         </div>
       )}
 
-      {/* ── Зум (только в advanced) ── */}
-      {!isBasic && <div className="design-editor-toolbar-group design-editor-zoom-group">
+      {/* ── Зум ── */}
+      <div className="design-editor-toolbar-group design-editor-zoom-group">
         <button
           type="button"
           className="design-editor-toolbar-icon-btn"
@@ -277,9 +254,9 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
         >
           +
         </button>
-      </div>}
+      </div>
 
-      {!isBasic && <div className="design-editor-toolbar-divider" />}
+      <div className="design-editor-toolbar-divider" />
 
       {/* ── Виды / экспорт ── */}
       <span title="Линия обрезки и безопасная зона">
@@ -290,7 +267,7 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
 
       <Button variant="secondary" onClick={onSave} disabled={saving}>
         <AppIcon name="save" size="xs" />
-        {hasOrderContext ? (saving ? 'Сохранение…' : 'В заказ') : 'Сохранить'}
+        {saving ? 'Сохранение…' : 'Сохранить'}
       </Button>
 
       <span title="Скачать все страницы в PDF">
