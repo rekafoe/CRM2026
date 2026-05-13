@@ -564,6 +564,7 @@ export class OrderController {
       const searchParams = {
         ...q,
         all: q.all === '1' || q.all === 'true',
+        light: q.light === '1' || q.light === 'true',
         department_id: Number.isFinite(departmentId) ? departmentId : undefined,
         limit: Number.isFinite(limit) ? limit : undefined,
         offset: Number.isFinite(offset) ? offset : undefined,

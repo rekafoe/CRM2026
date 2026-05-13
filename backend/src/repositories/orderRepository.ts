@@ -603,6 +603,7 @@ export const OrderRepository = {
       limit?: number;
       offset?: number;
       all?: boolean;
+      light?: boolean;
     }
   ): Promise<Order[]> {
     const db = await getDb()
@@ -622,20 +623,41 @@ export const OrderRepository = {
       params.push(searchParams.department_id)
     }
 
-    if (searchParams.query) {
-      whereConditions.push(`(
-        o.number LIKE ? OR 
-        o.customerName LIKE ? OR 
-        o.customerPhone LIKE ? OR 
-        o.customerEmail LIKE ? OR
-        EXISTS (
-          SELECT 1 FROM items i 
-          WHERE i.orderId = o.id 
-          AND (i.type LIKE ? OR i.params LIKE ?)
-        )
-      )`)
-      const s = `%${searchParams.query}%`
-      params.push(s, s, s, s, s, s)
+    const rawQuery = String(searchParams.query || '').trim()
+    if (rawQuery) {
+      const normalizedQuery = rawQuery.replace(/^#/, '')
+      const orderLookupMatch = normalizedQuery.match(/^(?:ORD-|site-ord-|tg-ord-)?(\d+)$/i)
+
+      if (orderLookupMatch) {
+        const numericId = Number(orderLookupMatch[1])
+        const candidates = [
+          normalizedQuery,
+          orderLookupMatch[1],
+          `ORD-${orderLookupMatch[1]}`,
+          `site-ord-${orderLookupMatch[1]}`,
+        ]
+        const placeholders = candidates.map(() => '?').join(', ')
+        whereConditions.push(`(o.id = ? OR o.number IN (${placeholders}))`)
+        params.push(numericId, ...candidates)
+      } else {
+        const textConditions = [
+          'o.number LIKE ?',
+          'o.customerName LIKE ?',
+          'o.customerPhone LIKE ?',
+          'o.customerEmail LIKE ?',
+        ]
+        const s = `%${rawQuery}%`
+        params.push(s, s, s, s)
+        if (!searchParams.light) {
+          textConditions.push(`EXISTS (
+            SELECT 1 FROM items i 
+            WHERE i.orderId = o.id 
+            AND (i.type LIKE ? OR i.params LIKE ?)
+          )`)
+          params.push(s, s)
+        }
+        whereConditions.push(`(${textConditions.join(' OR ')})`)
+      }
     }
 
     if (searchParams.status !== undefined) {

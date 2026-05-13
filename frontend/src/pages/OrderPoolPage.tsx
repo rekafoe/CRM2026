@@ -219,6 +219,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showFilesModal, setShowFilesModal] = useState(false);
@@ -234,6 +235,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   const { statuses: orderStatuses } = useOrderStatuses();
   const [filters, dispatchFilters] = useReducer(filtersReducer, initialFilters);
   const orderIdsRef = useRef<Set<number>>(new Set());
+  const searchRequestSeqRef = useRef(0);
   const activityRequestSeqRef = useRef(0);
   const activityOrderIdRef = useRef<number | null>(null);
   const selectedItems = selectedOrder?.items ?? [];
@@ -291,12 +293,26 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   }, []);
 
   const loadOrders = useCallback(async (options: { activeOnly?: boolean; query?: string } = {}) => {
+    const requestSeq = ++searchRequestSeqRef.current;
+    const query = options.query?.trim();
+    const isSearch = Boolean(query);
+    const canSearch = query && (/^(#|ORD-|site-ord-|tg-ord-)?\d+$/i.test(query) || query.length >= 3);
+    if (query && !canSearch) {
+      setOrders([]);
+      setError(null);
+      setSearchLoading(false);
+      return;
+    }
     try {
-      setLoading(true);
-      const query = options.query?.trim();
-      const res = query
-        ? await api.get<Order[]>('/orders/search', { params: { all: '1', query, limit: '200' } })
+      if (isSearch) {
+        setSearchLoading(true);
+      } else {
+        setLoading(true);
+      }
+      const res = canSearch
+        ? await api.get<Order[]>('/orders/search', { params: { all: '1', light: '1', query, limit: '100' } })
         : await getOrders({ all: true, poolActiveOnly: options.activeOnly ?? true });
+      if (requestSeq !== searchRequestSeqRef.current) return;
       const list = res.data as Order[];
       orderIdsRef.current = new Set(list.map((o) => o.id));
       setOrders(list);
@@ -307,10 +323,16 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         return next ?? prev;
       });
     } catch (err) {
+      if (requestSeq !== searchRequestSeqRef.current) return;
       logger.error('Failed to load orders for pool', err);
       setError('Не удалось загрузить заказы.');
     } finally {
-      setLoading(false);
+      if (requestSeq !== searchRequestSeqRef.current) return;
+      if (isSearch) {
+        setSearchLoading(false);
+      } else {
+        setLoading(false);
+      }
     }
   }, [logger]);
 
@@ -437,7 +459,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   }, [isInitialized, refreshOrdersInBackground]);
 
   useEffect(() => {
-    const t = setTimeout(() => dispatchFilters({ type: 'setSearchTerm', value: filters.searchInput.trim() }), 200);
+    const t = setTimeout(() => dispatchFilters({ type: 'setSearchTerm', value: filters.searchInput.trim() }), 600);
     return () => clearTimeout(t);
   }, [filters.searchInput]);
 
@@ -451,29 +473,14 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     dispatchFilters({ type: 'resetVisible' });
   }, [filters.source, filters.cancelled, filters.assigned, filters.searchTerm, filters.quickFilter, filters.sortBy, filters.sortDirection]);
 
-  const matchesSearch = useCallback((o: Order, term: string) => {
-    const lower = term.toLowerCase();
-    if (String(o.id ?? '').includes(lower)) return true;
-    if (o.number?.toLowerCase().includes(lower)) return true;
-    if (o.customerName?.toLowerCase().includes(lower)) return true;
-    if (o.customerPhone?.toLowerCase().includes(lower)) return true;
-    if (o.customerEmail?.toLowerCase().includes(lower)) return true;
-    const desc = (o.items ?? []).some((item) => {
-      const t = String(item.type ?? '').toLowerCase();
-      const d = String((item.params as any)?.description ?? '').toLowerCase();
-      return t.includes(lower) || d.includes(lower);
-    });
-    if (desc) return true;
-    return false;
-  }, []);
-
   const filteredOrders = useMemo(() => {
     const hasSearch = Boolean(filters.searchTerm?.trim());
     // Без поиска: только ожидающие (0) и оформленные с долгом (1). С поиском — по всем заказам, только поиск.
     let filtered: Order[];
     if (hasSearch) {
-      const term = filters.searchTerm!.trim();
-      filtered = orders.filter((o) => matchesSearch(o, term));
+      // В режиме поиска backend уже вернул ограниченный релевантный результат.
+      // Не фильтруем и не сортируем его повторно на клиенте.
+      return orders;
     } else {
       filtered = orders.filter((o) => {
         const s = Number(o.status);
@@ -531,7 +538,6 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     getOrderTotal,
     getOrderDebt,
     getOrderPrepayment,
-    matchesSearch,
   ]);
 
   const visibleOrders = useMemo(
@@ -815,6 +821,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               value={filters.searchInput}
               onChange={(e) => dispatchFilters({ type: 'setSearchInput', value: e.target.value })}
             />
+            {searchLoading && <span className="order-pool-search-status">Ищем...</span>}
             <select value={filters.source} onChange={(e) => dispatchFilters({ type: 'setSource', value: e.target.value as any })}>
               <option value="all">Все источники</option>
               <option value="crm">CRM</option>

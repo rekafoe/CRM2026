@@ -132,6 +132,13 @@
   flex-shrink: 0;
 }
 
+.order-pool-search-status {
+  flex-shrink: 0;
+  color: #718096;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .filters input,
 .filters select {
   padding: 10px 14px;
