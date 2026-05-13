@@ -376,12 +376,12 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
               </button>
               <button
                 className="icon-btn"
-                title="Удалить выбранный заказ"
-                aria-label="Удалить выбранный заказ"
+                title="Вернуть выбранный заказ в пул"
+                aria-label="Вернуть выбранный заказ в пул"
                 disabled={!selectedOrder}
                 onClick={async () => {
                   if (!selectedOrder) return;
-                  await orderHandlers.handleDeleteOrder(selectedOrder.id);
+                  await handleReturnOrderToPool(selectedOrder);
                 }}
               >
                 <AppIcon name="trash" size="sm" />
