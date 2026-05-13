@@ -14,10 +14,14 @@ interface RulersProps {
   widthMM: number;
   heightMM: number;
   fitZoom: number;
+  /** Template scene scale: SVG imports can render one logical mm as several Fabric pixels. */
+  sceneScale?: number;
   /** px offset from ruler left edge to canvas (0,0) pixel in viewport */
   originX: number;
   /** px offset from ruler top edge to canvas (0,0) pixel in viewport */
   originY: number;
+  /** Admin editor uses safe-zone coordinates; client editor needs trim/page edge coordinates. */
+  coordinateOrigin?: 'safe' | 'trim';
   guides: GuideLine[];
   onGuidesChange: (guides: GuideLine[]) => void;
 }
@@ -74,9 +78,10 @@ function snapGuideToFractions(rawMM: number, totalMM: number, ppm: number): numb
 function drawH(
   c: HTMLCanvasElement,
   totalMM: number,
-  zoom: number,
+  pxPerMM: number,
   safeOriginPx: number,
   guides: GuideLine[],
+  coordinateOrigin: 'safe' | 'trim',
 ) {
   const ctx = c.getContext('2d');
   if (!ctx) return;
@@ -95,15 +100,15 @@ function drawH(
   ctx.lineTo(w, RULER_H - 0.5);
   ctx.stroke();
 
-  const ppm = MM_TO_PX * zoom;
+  const ppm = pxPerMM;
   const { major, minor } = pickStep(ppm);
   ctx.font = FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
 
   const usableMM = totalMM - 2 * SAFE_ZONE_MM;
-  const startMM = -SAFE_ZONE_MM;
-  const endMM = usableMM + SAFE_ZONE_MM;
+  const startMM = coordinateOrigin === 'safe' ? -SAFE_ZONE_MM : 0;
+  const endMM = coordinateOrigin === 'safe' ? usableMM + SAFE_ZONE_MM : totalMM;
   const firstTick = Math.floor(startMM / minor) * minor;
 
   for (let mm = firstTick; mm <= endMM; mm += minor) {
@@ -140,9 +145,10 @@ function drawH(
 function drawV(
   c: HTMLCanvasElement,
   totalMM: number,
-  zoom: number,
+  pxPerMM: number,
   safeOriginPx: number,
   guides: GuideLine[],
+  coordinateOrigin: 'safe' | 'trim',
 ) {
   const ctx = c.getContext('2d');
   if (!ctx) return;
@@ -161,14 +167,14 @@ function drawV(
   ctx.lineTo(RULER_H - 0.5, h);
   ctx.stroke();
 
-  const ppm = MM_TO_PX * zoom;
+  const ppm = pxPerMM;
   const { major, minor } = pickStep(ppm);
   ctx.font = FONT;
   ctx.textBaseline = 'middle';
 
   const usableMM = totalMM - 2 * SAFE_ZONE_MM;
-  const startMM = -SAFE_ZONE_MM;
-  const endMM = usableMM + SAFE_ZONE_MM;
+  const startMM = coordinateOrigin === 'safe' ? -SAFE_ZONE_MM : 0;
+  const endMM = coordinateOrigin === 'safe' ? usableMM + SAFE_ZONE_MM : totalMM;
   const firstTick = Math.floor(startMM / minor) * minor;
 
   for (let mm = firstTick; mm <= endMM; mm += minor) {
@@ -211,19 +217,20 @@ function drawV(
 /* ── Component ─────────────────────────────────────────────────────────────── */
 
 export const CanvasRulers: React.FC<RulersProps> = ({
-  widthMM, heightMM, fitZoom, originX, originY, guides, onGuidesChange,
+  widthMM, heightMM, fitZoom, sceneScale = 1, originX, originY, coordinateOrigin = 'safe', guides, onGuidesChange,
 }) => {
   const hRef = useRef<HTMLCanvasElement>(null);
   const vRef = useRef<HTMLCanvasElement>(null);
 
-  const safeOffPx = SAFE_ZONE_MM * MM_TO_PX * fitZoom;
-  const safeOriginX = originX + safeOffPx;
-  const safeOriginY = originY + safeOffPx;
+  const pxPerMM = MM_TO_PX * sceneScale * fitZoom;
+  const safeOffPx = SAFE_ZONE_MM * pxPerMM;
+  const safeOriginX = originX + (coordinateOrigin === 'safe' ? safeOffPx : 0);
+  const safeOriginY = originY + (coordinateOrigin === 'safe' ? safeOffPx : 0);
 
   const redraw = useCallback(() => {
-    if (hRef.current) drawH(hRef.current, widthMM, fitZoom, safeOriginX, guides);
-    if (vRef.current) drawV(vRef.current, heightMM, fitZoom, safeOriginY, guides);
-  }, [widthMM, heightMM, fitZoom, safeOriginX, safeOriginY, guides]);
+    if (hRef.current) drawH(hRef.current, widthMM, pxPerMM, safeOriginX, guides, coordinateOrigin);
+    if (vRef.current) drawV(vRef.current, heightMM, pxPerMM, safeOriginY, guides, coordinateOrigin);
+  }, [widthMM, heightMM, pxPerMM, safeOriginX, safeOriginY, guides, coordinateOrigin]);
 
   useEffect(() => { redraw(); }, [redraw]);
 
@@ -243,7 +250,7 @@ export const CanvasRulers: React.FC<RulersProps> = ({
     posMM: number;
   } | null>(null);
 
-  const ppm = MM_TO_PX * fitZoom;
+  const ppm = pxPerMM;
 
   const handleRulerMouseDown = useCallback(
     (axis: 'h' | 'v', e: React.MouseEvent<HTMLCanvasElement>) => {

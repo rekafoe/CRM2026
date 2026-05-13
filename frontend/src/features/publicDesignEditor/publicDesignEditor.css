@@ -266,11 +266,11 @@
   position: absolute;
   right: 42px;
   bottom: 34px;
-  z-index: 0;
+  z-index: 2;
   width: min(36vw, 460px);
   max-height: 48%;
   object-fit: contain;
-  opacity: 0.14;
+  opacity: 0.18;
   filter: grayscale(1);
   pointer-events: none;
   user-select: none;
@@ -284,6 +284,7 @@
 
 .public-design-editor .design-editor-canvas-wrap {
   background: transparent;
+  padding: 40px;
 }
 
 .public-design-editor__sidepanel {
@@ -416,6 +417,47 @@
   border: 1px solid rgba(15, 23, 42, 0.1);
   border-radius: 16px;
   background: #ffffff;
+}
+
+.public-design-editor__task-main,
+.public-design-editor__task-issue {
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.public-design-editor__task-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.public-design-editor__task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.public-design-editor__task-actions button {
+  padding: 5px 9px;
+  color: var(--pc-ink);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.public-design-editor__task-main:hover strong,
+.public-design-editor__task-actions button:hover,
+.public-design-editor__task-issue:hover {
+  color: var(--pc-blue);
 }
 
 .public-design-editor__task-item strong {

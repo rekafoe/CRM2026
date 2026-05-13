@@ -8,7 +8,7 @@ import { Alert, Button } from '../../components/common';
 import { API_BASE_URL } from '../../config/constants';
 import { DesignEditorCanvas, type DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import { CanvasRulers } from '../../pages/admin/designEditor/CanvasRulers';
-import { EMPTY_PAGE, MM_TO_PX, SAFE_ZONE_MM } from '../../pages/admin/designEditor/constants';
+import { EMPTY_PAGE, SAFE_ZONE_MM } from '../../pages/admin/designEditor/constants';
 import { createDesignSceneGeometry } from '../../pages/admin/designEditor/designGeometry';
 import {
   buildDesignState,
@@ -27,7 +27,11 @@ import {
   useDesignDocumentNavigation,
 } from './useDesignDocumentNavigation';
 import { PublicDesignTaskPanel, type PublicDesignTaskTab } from './PublicDesignTaskPanel';
-import { analyzePublicDesignPages } from './publicDesignPreflight';
+import {
+  analyzePublicDesignPages,
+  type PublicEditorPreflightField,
+  type PublicEditorPreflightIssue,
+} from './publicDesignPreflight';
 import '../../pages/admin/DesignEditorPage.css';
 import '../../pages/admin/designEditor/designEditorGlassTheme.css';
 import './publicDesignEditor.css';
@@ -39,6 +43,13 @@ const DEFAULT_PREPRESS_CONFIG: DesignPrepressConfig = {
   showTrim: true,
   showSafeZone: true,
   cutMarks: true,
+};
+
+type PendingTaskAction = {
+  type: 'focus' | 'replacePhoto';
+  fieldId?: string;
+  fieldKind?: 'photo' | 'text';
+  pageIndex: number;
 };
 
 function resolveEditorLogoUrl(rawLogoUrl: unknown): string | null {
@@ -117,6 +128,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const [helpOpen, setHelpOpen] = useState(false);
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState<string | null>(null);
   const [organizationLogoError, setOrganizationLogoError] = useState(false);
+  const [pendingTaskAction, setPendingTaskAction] = useState<PendingTaskAction | null>(null);
   const [customerForm, setCustomerForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -371,6 +383,74 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     [currentPage, navigation.leftPageIdx, navigation.rightPageIdx],
   );
 
+  const runTaskAction = useCallback((action: PendingTaskAction) => {
+    const handle = canvasHandleRef.current;
+    if (!handle) return false;
+    if (action.type === 'replacePhoto' && action.fieldId) {
+      return handle.replacePhotoField(action.fieldId);
+    }
+    if (action.fieldId) {
+      return handle.focusDesignObject(action.fieldId, { editText: action.fieldKind === 'text' });
+    }
+    return false;
+  }, []);
+
+  const requestTaskAction = useCallback(async (action: PendingTaskAction) => {
+    setError(null);
+    const needsPageSwitch = !navigation.stripItems.some((item) => item.pages.includes(currentPage) && item.pages.includes(action.pageIndex));
+    if (needsPageSwitch) {
+      setPendingTaskAction(action);
+      await handleGoToPage(action.pageIndex);
+      return;
+    }
+    window.setTimeout(() => {
+      if (!runTaskAction(action)) setError('Не удалось найти поле на текущем макете.');
+    }, 0);
+  }, [currentPage, handleGoToPage, navigation.stripItems, runTaskAction]);
+
+  useEffect(() => {
+    if (!pendingTaskAction) return;
+    const currentStrip = navigation.stripItems.find((item) => item.pages.includes(currentPage));
+    if (!currentStrip?.pages.includes(pendingTaskAction.pageIndex)) return;
+    const timer = window.setTimeout(() => {
+      if (!runTaskAction(pendingTaskAction)) setError('Не удалось найти поле на текущем макете.');
+      setPendingTaskAction(null);
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [currentPage, navigation.stripItems, pendingTaskAction, runTaskAction]);
+
+  const handleFieldFocus = useCallback((field: PublicEditorPreflightField, kind: 'photo' | 'text') => {
+    void requestTaskAction({
+      type: 'focus',
+      fieldId: field.id,
+      fieldKind: kind,
+      pageIndex: field.pageIndex,
+    });
+  }, [requestTaskAction]);
+
+  const handlePhotoReplace = useCallback((field: PublicEditorPreflightField) => {
+    void requestTaskAction({
+      type: 'replacePhoto',
+      fieldId: field.id,
+      fieldKind: 'photo',
+      pageIndex: field.pageIndex,
+    });
+  }, [requestTaskAction]);
+
+  const handleIssueFocus = useCallback((issue: PublicEditorPreflightIssue) => {
+    const photoField = preflight.photoFields.find((field) => field.pageIndex === issue.pageIndex && issue.id === `photo-${field.id}`);
+    if (photoField) {
+      handleFieldFocus(photoField, 'photo');
+      return;
+    }
+    const textField = preflight.textFields.find((field) => field.pageIndex === issue.pageIndex && field.status !== 'ready');
+    if (textField) {
+      handleFieldFocus(textField, 'text');
+      return;
+    }
+    void handleGoToPage(issue.pageIndex);
+  }, [handleFieldFocus, handleGoToPage, preflight.photoFields, preflight.textFields]);
+
   const saveStateLabel = {
     idle: 'Draft ещё не создан',
     dirty: 'Есть несохранённые изменения',
@@ -393,11 +473,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const currentStripItem = navigation.stripItems.find((item) => item.pages.includes(currentPage));
   const currentPageLabel = currentStripItem?.label ?? `${currentPage + 1} / ${pageSpec.pageCount}`;
   const showOrganizationLogo = organizationLogoUrl && !organizationLogoError;
-  const clientRulerSafeOffsetPx = SAFE_ZONE_MM * MM_TO_PX * fitZoom;
-  const clientRulerOrigin = {
-    x: rulerOrigin.x - clientRulerSafeOffsetPx,
-    y: rulerOrigin.y - clientRulerSafeOffsetPx,
-  };
   const handleZoomIn = useCallback(() => {
     const handle = canvasHandleRef.current;
     if (!handle) return;
@@ -488,8 +563,10 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
               widthMM={navigation.isSpreadView ? pageSpec.pageWidth * 2 : pageSpec.pageWidth}
               heightMM={pageSpec.pageHeight}
               fitZoom={fitZoom}
-              originX={clientRulerOrigin.x}
-              originY={clientRulerOrigin.y}
+              sceneScale={pageSpec.scale}
+              originX={rulerOrigin.x}
+              originY={rulerOrigin.y}
+              coordinateOrigin="trim"
               guides={[]}
               onGuidesChange={() => {}}
             />
@@ -547,6 +624,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             saving={saving}
             onSaveDraft={() => void handleSaveDraft(false)}
             onReadyForCart={() => void handleReadyForCart()}
+            onFieldFocus={handleFieldFocus}
+            onPhotoReplace={handlePhotoReplace}
+            onIssueFocus={handleIssueFocus}
           />
           {helpOpen && (
             <section className="public-design-editor__help">

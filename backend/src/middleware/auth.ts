@@ -53,6 +53,7 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'POST', path: /^\/api\/products\/[0-9]+\/calculate$/ },
   { method: 'POST', path: /^\/api\/products\/[0-9]+\/validate-size$/ },
   { method: 'POST', path: /^\/api\/pricing\/calculate$/ },
+  { method: 'GET', path: /^\/api\/public-editor\/branding\/?$/ },
   // печать документов / многостраничный калькулятор для публичного сайта (как karandash-style)
   { method: 'GET', path: /^\/api\/pricing\/multipage\/schema\/?$/ },
   { method: 'GET', path: /^\/api\/pricing\/multipage\/binding-types\/?$/ },

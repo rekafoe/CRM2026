@@ -1,6 +1,10 @@
 import React from 'react';
 import { Button } from '../../components/common';
-import type { PublicEditorPreflightSummary } from './publicDesignPreflight';
+import type {
+  PublicEditorPreflightField,
+  PublicEditorPreflightIssue,
+  PublicEditorPreflightSummary,
+} from './publicDesignPreflight';
 
 type TaskTab = 'photo' | 'text' | 'check' | 'checkout';
 
@@ -12,6 +16,9 @@ interface PublicDesignTaskPanelProps {
   saving: boolean;
   onSaveDraft: () => void;
   onReadyForCart: () => void;
+  onFieldFocus: (field: PublicEditorPreflightField, kind: 'photo' | 'text') => void;
+  onPhotoReplace: (field: PublicEditorPreflightField) => void;
+  onIssueFocus: (issue: PublicEditorPreflightIssue) => void;
 }
 
 const TABS: Array<{ id: TaskTab; label: string }> = [
@@ -29,8 +36,12 @@ export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
   saving,
   onSaveDraft,
   onReadyForCart,
+  onFieldFocus,
+  onPhotoReplace,
+  onIssueFocus,
 }) => {
   const renderFields = activeTab === 'photo' ? preflight.photoFields : preflight.textFields;
+  const fieldKind = activeTab === 'photo' ? 'photo' : 'text';
 
   return (
     <aside className="public-design-editor__tasks" aria-label="Задачи редактора">
@@ -60,8 +71,24 @@ export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
             </p>
           ) : renderFields.map((field) => (
             <div key={`${field.pageIndex}-${field.id}`} className={`public-design-editor__task-item public-design-editor__task-item--${field.status}`}>
-              <strong>{field.label}</strong>
-              <span>Стр. {field.pageIndex + 1} · {field.detail}</span>
+              <button
+                type="button"
+                className="public-design-editor__task-main"
+                onClick={() => onFieldFocus(field, fieldKind)}
+              >
+                <strong>{field.label}</strong>
+                <span>Стр. {field.pageIndex + 1} · {field.detail}</span>
+              </button>
+              <div className="public-design-editor__task-actions">
+                <button type="button" onClick={() => onFieldFocus(field, fieldKind)}>
+                  Показать
+                </button>
+                {activeTab === 'photo' && (
+                  <button type="button" onClick={() => onPhotoReplace(field)}>
+                    {field.status === 'ready' ? 'Заменить' : 'Добавить'}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -75,9 +102,14 @@ export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
           {preflight.issues.length === 0 ? (
             <p className="public-design-editor__task-empty">Макет выглядит готовым.</p>
           ) : preflight.issues.map((issue) => (
-            <div key={issue.id} className={`public-design-editor__task-issue public-design-editor__task-issue--${issue.level}`}>
+            <button
+              key={issue.id}
+              type="button"
+              className={`public-design-editor__task-issue public-design-editor__task-issue--${issue.level}`}
+              onClick={() => onIssueFocus(issue)}
+            >
               {issue.message}
-            </div>
+            </button>
           ))}
         </div>
       )}

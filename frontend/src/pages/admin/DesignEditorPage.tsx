@@ -915,6 +915,7 @@ export const DesignEditorPage: React.FC = () => {
               widthMM={isSpreadView ? pageWidth * 2 : pageWidth}
               heightMM={pageHeight}
               fitZoom={fitZoom}
+              sceneScale={scale}
               originX={rulerOrigin.x}
               originY={rulerOrigin.y}
               guides={guides}

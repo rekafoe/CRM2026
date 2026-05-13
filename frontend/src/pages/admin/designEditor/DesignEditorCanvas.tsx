@@ -68,6 +68,8 @@ export type SavePageResult =
 export interface DesignEditorCanvasHandle {
   undo: () => void;
   redo: () => void;
+  focusDesignObject: (id: string, options?: { editText?: boolean }) => boolean;
+  replacePhotoField: (id: string) => boolean;
   deleteSelected: () => void;
   duplicateSelected: () => void;
   addText: () => void;
@@ -251,6 +253,22 @@ function findPhotoFieldByIdDeep(canvas: Canvas, fieldId: string): FabricObject |
       if (typeof (o as Group).getObjects === 'function') {
         const nested = walk((o as Group).getObjects());
         if (nested) return nested;
+      }
+    }
+    return undefined;
+  };
+  return walk(canvas.getObjects());
+}
+
+function findDesignObjectByIdDeep(canvas: Canvas, id: string): FabricObject | undefined {
+  const targetId = id.trim();
+  if (!targetId) return undefined;
+  const walk = (list: FabricObject[]): FabricObject | undefined => {
+    for (const o of list) {
+      if (String(asAny(o).id ?? '') === targetId) return o;
+      if (typeof (o as Group).getObjects === 'function') {
+        const nested = walk((o as Group).getObjects());
+        if (nested) return nested.group ?? nested;
       }
     }
     return undefined;
@@ -1095,6 +1113,38 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     useImperativeHandle(ref, () => ({
       undo,
       redo,
+      focusDesignObject: (id, options) => {
+        const canvas = fabricRef.current;
+        if (!canvas) return false;
+        const target = findDesignObjectByIdDeep(canvas, id);
+        if (!target) return false;
+        const selectableTarget = target.group ?? target;
+        canvas.setActiveObject(selectableTarget);
+        if (
+          options?.editText &&
+          (selectableTarget.type === 'i-text' || selectableTarget.type === 'textbox') &&
+          typeof (selectableTarget as IText).enterEditing === 'function'
+        ) {
+          (selectableTarget as IText).enterEditing();
+        }
+        canvas.requestRenderAll();
+        onSelectionChange(getObjProps(selectableTarget));
+        scheduleTextAnchorRef.current?.();
+        return true;
+      },
+      replacePhotoField: (id) => {
+        const canvas = fabricRef.current;
+        if (!canvas) return false;
+        const field = findPhotoFieldByIdDeep(canvas, id);
+        if (!field) return false;
+        const selectableTarget = field.group ?? field;
+        canvas.setActiveObject(selectableTarget);
+        canvas.requestRenderAll();
+        onSelectionChange(getObjProps(selectableTarget));
+        photoPickerTargetIdRef.current = id;
+        setTimeout(() => photoFileInputRef.current?.click(), 0);
+        return true;
+      },
       deleteSelected: () => {
         const canvas = fabricRef.current;
         if (!canvas || modeRef.current === 'basic') return;
