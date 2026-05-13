@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { OrderFile, Item } from '../types';
-import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, downloadOrderFile, getCurrentUser, getOrderFileAccessLogs, getOrderFileExternalLink, getPreflightReport, type OrderFileAccessLog, type PreflightReport } from '../api';
+import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, downloadOrderFile, getCurrentUser, getOrderFileAccessLogs, getPreflightReport, type OrderFileAccessLog, type PreflightReport } from '../api';
 import { AppIcon } from './ui/AppIcon';
 import { OrderFileAccessLogsModal } from './OrderFileAccessLogsModal';
 import { PreflightReportModal } from './PreflightReportModal';
@@ -143,24 +143,10 @@ export const FilesModal: React.FC<FilesModalProps> = ({
         alert(`Файл ещё не готов: ${getExternalStatusLabel(file.externalStatus)}`);
         return;
       }
-      const tab = window.open('about:blank', '_blank');
-      if (tab) tab.opener = null;
-      try {
-        const res = await getOrderFileExternalLink(orderId, file.id);
-        const url = res.data?.url;
-        if (!url) {
-          throw new Error('CRM не вернула ссылку на внешний файл');
-        }
-        if (tab) {
-          tab.location.href = url;
-        } else {
-          window.open(url, '_blank', 'noopener,noreferrer');
-        }
-      } catch (error) {
-        if (tab) tab.close();
-        const msg = error instanceof Error ? error.message : 'Не удалось получить внешнюю ссылку';
+      downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch((error) => {
+        const msg = error instanceof Error ? error.message : 'Не удалось скачать внешний файл';
         alert(msg);
-      }
+      });
       return;
     }
     downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch(() => alert('Не удалось скачать файл'));
