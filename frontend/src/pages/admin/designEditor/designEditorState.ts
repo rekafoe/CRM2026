@@ -45,6 +45,7 @@ export function buildDesignState(input: {
   pageWidth: number;
   pageHeight: number;
   pageCount: number;
+  sceneScale?: number;
   prepressConfig: DesignPrepressConfig;
   pages: DesignPage[];
   spreadMode: boolean;
@@ -55,6 +56,7 @@ export function buildDesignState(input: {
     pageWidth: input.pageWidth,
     pageHeight: input.pageHeight,
     pageCount: input.pageCount,
+    sceneScale: input.sceneScale,
     prepress: input.prepressConfig,
     pages: input.pages,
     spread_mode: input.spreadMode,

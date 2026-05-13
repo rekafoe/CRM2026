@@ -58,6 +58,8 @@ export const TEXT_FONTS: { value: string; label: string }[] = [
 export const FABRIC_CUSTOM_PROPS = [
   'id',
   'isBackground',
+  'backgroundFit',
+  'backgroundSceneScale',
   'isPhotoField',
   'locked',
   'photoFieldFilled',

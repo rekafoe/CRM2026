@@ -36,6 +36,7 @@ export interface ImportDesignTemplateResult {
 }
 
 const MASTER_SOURCE_EXTENSIONS = new Set(['.ai', '.cdr', '.indd', '.indt', '.pdf', '.svg'])
+const IMPORTED_TEMPLATE_SCENE_SCALE = 3
 
 function sanitizeSvg(svg: string): string {
   return svg
@@ -51,10 +52,10 @@ function toFabricRect(rect: SvgRect) {
     version: '6.0.0',
     originX: 'left',
     originY: 'top',
-    left: rect.x,
-    top: rect.y,
-    width: rect.width,
-    height: rect.height,
+    left: rect.scene.x,
+    top: rect.scene.y,
+    width: rect.scene.width,
+    height: rect.scene.height,
     fill: 'rgba(248, 250, 252, 0.25)',
     stroke: '#2563eb',
     strokeWidth: 0.8,
@@ -67,18 +68,53 @@ function toFabricRect(rect: SvgRect) {
 }
 
 function toFabricText(item: SvgText) {
+  const fontSizePx = Math.max(6, item.scene.fontSize)
+  const originX = item.textAnchor === 'middle' ? 'center' : item.textAnchor === 'end' ? 'right' : 'left'
   return {
     type: 'i-text',
     version: '6.0.0',
-    originX: 'left',
+    originX,
     originY: 'top',
-    left: item.x,
-    top: item.y - item.fontSize,
+    left: item.scene.x,
+    top: item.scene.y - fontSizePx * 0.8,
     text: item.text,
-    fontSize: Math.max(6, item.fontSize),
+    fontSize: fontSizePx,
     fontFamily: 'Arial',
     fill: '#111827',
+    textAlign: item.textAnchor === 'end' ? 'right' : item.textAnchor === 'middle' ? 'center' : 'left',
     id: item.name,
+  }
+}
+
+function toFabricBackground(src: string, scene: { width: number; height: number }, sceneScale: number) {
+  const safeScale = Number.isFinite(sceneScale) && sceneScale > 0 ? sceneScale : 1
+  return {
+    type: 'image',
+    version: '6.0.0',
+    originX: 'left',
+    originY: 'top',
+    left: 0,
+    top: 0,
+    width: scene.width / safeScale,
+    height: scene.height / safeScale,
+    scaleX: safeScale,
+    scaleY: safeScale,
+    src,
+    crossOrigin: 'anonymous',
+    selectable: false,
+    evented: false,
+    id: 'locked_bg',
+    isBackground: true,
+    backgroundFit: 'page',
+    backgroundSceneScale: safeScale,
+  }
+}
+
+function layerDebug(parsed: ReturnType<typeof parseImportedSvgLayers>) {
+  return {
+    photo: parsed.photoRects.map((r) => ({ name: r.name, svg: r.svg, mm: { x: r.x, y: r.y, width: r.width, height: r.height }, scene: r.scene })),
+    text: parsed.textItems.map((t) => ({ name: t.name, text: t.text, textAnchor: t.textAnchor, svg: t.svg, mm: { x: t.x, y: t.y, fontSize: t.fontSize }, scene: t.scene })),
+    guides: parsed.guideRectsMm,
   }
 }
 
@@ -153,7 +189,7 @@ export async function importDesignTemplateFromFile(
         source_format: sourceExt.replace(/^\./, '') || 'source',
         import: {
           importer: 'source-only-draft',
-          importerVersion: 4,
+          importerVersion: 5,
           status: 'draft',
           sourceFormat: sourceExt.replace(/^\./, '') || 'source',
           sourceFile: sourceFileUrl,
@@ -172,7 +208,7 @@ export async function importDesignTemplateFromFile(
   }
 
   const svg = sanitizeSvg(input.file!.buffer!.toString('utf8'))
-  const parsed = parseImportedSvgLayers(svg)
+  const parsed = parseImportedSvgLayers(svg, { sceneScale: IMPORTED_TEMPLATE_SCENE_SCALE })
   warnings.push(...parsed.warnings)
 
   const strippedForBg = parsed.strippedSvg
@@ -203,11 +239,16 @@ export async function importDesignTemplateFromFile(
     pageWidth: parsed.widthMm,
     pageHeight: parsed.heightMm,
     pageCount: 1,
+    sceneScale: IMPORTED_TEMPLATE_SCENE_SCALE,
     pages: [
       {
         fabricJSON: {
           version: '6.0.0',
-          objects: [...parsed.photoRects.map(toFabricRect), ...parsed.textItems.map(toFabricText)],
+          objects: [
+            toFabricBackground(previewUrl, parsed.geometry.scenePx, parsed.geometry.sceneScale),
+            ...parsed.photoRects.map(toFabricRect),
+            ...parsed.textItems.map(toFabricText),
+          ],
           background: 'white',
         },
       },
@@ -232,7 +273,7 @@ export async function importDesignTemplateFromFile(
       source_format: storedSource ? sourceExt.replace(/^\./, '') : 'svg',
       import: {
         importer: 'svg-named-layers',
-        importerVersion: 4,
+        importerVersion: 5,
         sourceFormat: storedSource ? sourceExt.replace(/^\./, '') : 'svg',
         sourceFile: sourceFileUrl,
         sourceFileUrl,
@@ -245,6 +286,8 @@ export async function importDesignTemplateFromFile(
         originalName: stored.originalName,
         warnings,
         errors,
+        geometry: parsed.geometry,
+        layers: layerDebug(parsed),
         parserSummary: parsed.summary,
         layerConvention:
           'id/inkscape:label: locked_bg (в фоне), photo_* rect, text_* text, группы <g>; trim/bleed/safe rect → prepress',

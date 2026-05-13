@@ -4,12 +4,22 @@
  * фоновый файл без этих элементов и без дубля с редактором overlay.
  */
 
+import {
+  createSvgGeometry,
+  PX_TO_MM,
+  type DesignTemplateGeometryDebug,
+  type GeometryPoint,
+  type GeometryRect,
+} from './designTemplateSvgGeometry'
+
 export type SvgRect = {
   name: string
   x: number
   y: number
   width: number
   height: number
+  svg: GeometryRect
+  scene: GeometryRect
 }
 
 export type SvgText = {
@@ -18,6 +28,9 @@ export type SvgText = {
   y: number
   fontSize: number
   text: string
+  textAnchor: 'start' | 'middle' | 'end'
+  svg: GeometryPoint & { fontSize: number }
+  scene: GeometryPoint & { fontSize: number }
 }
 
 export type MmRect = {
@@ -43,6 +56,7 @@ export interface ImportedSvgLayers {
   guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>>
   lockedBgDetected: boolean
   prepressHints: PrepressFromSvgGuides | null
+  geometry: DesignTemplateGeometryDebug
   summary: {
     photoFields: number
     textFields: number
@@ -55,8 +69,6 @@ export interface ImportedSvgLayers {
   strippedSvg: string
   warnings: string[]
 }
-
-export const PX_TO_MM = 25.4 / 96
 
 const TECH_PREFIXES = ['hidden_', 'guide_']
 
@@ -89,6 +101,13 @@ function applyTransform(t: SvgTransform, x: number, y: number): { x: number; y: 
     x: t.a * x + t.c * y + t.e,
     y: t.b * x + t.d * y + t.f,
   }
+}
+
+function transformScale(t: SvgTransform): number {
+  const xScale = Math.hypot(t.a, t.b)
+  const yScale = Math.hypot(t.c, t.d)
+  const scale = (xScale + yScale) / 2
+  return Number.isFinite(scale) && scale > 0 ? scale : 1
 }
 
 function parseTransformNumbers(value: string): number[] {
@@ -270,6 +289,75 @@ function parseAttributes(source: string): Record<string, string> {
   return attrs
 }
 
+function parseStyle(style: string | undefined): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (!style) return out
+  style.split(';').forEach((part) => {
+    const idx = part.indexOf(':')
+    if (idx <= 0) return
+    const key = part.slice(0, idx).trim()
+    const value = part.slice(idx + 1).trim()
+    if (key && value) out[key] = value
+  })
+  return out
+}
+
+function parseCssClassStyles(svg: string): Record<string, Record<string, string>> {
+  const styles: Record<string, Record<string, string>> = {}
+  const styleRe = /<style\b[^>]*>([\s\S]*?)<\/style>/gi
+  let styleMatch: RegExpExecArray | null
+  while ((styleMatch = styleRe.exec(svg))) {
+    const css = (styleMatch[1] ?? '')
+      .replace(/<!\[CDATA\[/g, '')
+      .replace(/\]\]>/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+    const ruleRe = /\.([_a-zA-Z][\w-]*)\s*\{([^}]*)\}/g
+    let ruleMatch: RegExpExecArray | null
+    while ((ruleMatch = ruleRe.exec(css))) {
+      styles[ruleMatch[1]] = {
+        ...(styles[ruleMatch[1]] ?? {}),
+        ...parseStyle(ruleMatch[2]),
+      }
+    }
+  }
+  return styles
+}
+
+function styleFromClassNames(
+  className: string | undefined,
+  styles: Record<string, Record<string, string>>,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (!className) return out
+  for (const name of className.split(/\s+/).filter(Boolean)) {
+    Object.assign(out, styles[name] ?? {})
+  }
+  return out
+}
+
+function pickAttr(
+  primary: Record<string, string>,
+  secondary: Record<string, string>,
+  name: string,
+): string | undefined {
+  return primary[name] ?? secondary[name]
+}
+
+function normalizeTextAnchor(value: string | undefined): SvgText['textAnchor'] {
+  if (value === 'middle' || value === 'center') return 'middle'
+  if (value === 'end' || value === 'right') return 'end'
+  return 'start'
+}
+
+function parseFontSizeFromStyle(style: Record<string, string>): number | null {
+  const direct = parseNumber(style['font-size'])
+  if (direct != null) return direct
+  const shorthand = style.font
+  if (!shorthand) return null
+  const match = shorthand.match(/(?:^|\s)(\d+(?:\.\d+)?)(?:px|pt|mm|cm|in)?(?:\/[\d.]+)?(?:\s|$)/i)
+  return match ? Number(match[1]) : null
+}
+
 function parseNumber(value: string | undefined): number | null {
   if (!value) return null
   const match = value.trim().match(/^-?\d+(?:\.\d+)?/)
@@ -298,6 +386,15 @@ export function decodeXmlText(value: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .trim()
+}
+
+function firstTspan(innerSvg: string): { attrs: Record<string, string>; text: string } | null {
+  const match = innerSvg.match(/<tspan\b([^>]*)>([\s\S]*?)<\/tspan>/i)
+  if (!match) return null
+  return {
+    attrs: parseAttributes(match[1] ?? ''),
+    text: decodeXmlText(match[2] ?? ''),
+  }
 }
 
 function getLayerName(attrs: Record<string, string>): string | null {
@@ -389,16 +486,23 @@ function groupRemovable(layerName: string | null): boolean {
   return TECH_PREFIXES.some((p) => layerName.startsWith(p))
 }
 
-export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
+export function parseImportedSvgLayers(
+  svg: string,
+  options: { sceneScale?: number } = {},
+): ImportedSvgLayers {
   const dims = dimsFromSvgRoot(svg)
   const vb = (dims.svgAttrs.viewBox || '').split(/\s+/).map(Number).filter(Number.isFinite)
-  const viewBoxWidth = vb.length === 4 ? vb[2] : null
-  const viewBoxHeight = vb.length === 4 ? vb[3] : null
+  const viewBox = vb.length === 4
+    ? { minX: vb[0], minY: vb[1], width: vb[2], height: vb[3] }
+    : null
   const widthMm = dims.widthMm
   const heightMm = dims.heightMm
-  const scaleX = viewBoxWidth && widthMm ? widthMm / viewBoxWidth : PX_TO_MM
-  const scaleY = viewBoxHeight && heightMm ? heightMm / viewBoxHeight : PX_TO_MM
-  const avgScale = (scaleX + scaleY) / 2
+  const cssClassStyles = parseCssClassStyles(svg)
+  const geometry = createSvgGeometry({
+    pageMm: { width: widthMm, height: heightMm },
+    viewBox,
+    sceneScale: options.sceneScale,
+  })
 
   const warnings = [...dims.warnings]
   const photoRects: SvgRect[] = []
@@ -507,23 +611,21 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
       ) {
         const key = ef as 'trim' | 'bleed' | 'safe'
         const tr = transformedRect(x, y, width, height, objectTransform)
+        const mmRect = geometry.svgRectToMm(tr)
         guideRectsMm[key] = {
           name: ef,
-          x: tr.x * scaleX,
-          y: tr.y * scaleY,
-          width: tr.width * scaleX,
-          height: tr.height * scaleY,
+          ...mmRect,
         }
       }
 
       if (ef?.startsWith('photo_') && width != null && height != null && width > 0 && height > 0) {
         const tr = transformedRect(x, y, width, height, objectTransform)
+        const mmRect = geometry.svgRectToMm(tr)
         photoRects.push({
           name: ef,
-          x: tr.x * scaleX,
-          y: tr.y * scaleY,
-          width: tr.width * scaleX,
-          height: tr.height * scaleY,
+          ...mmRect,
+          svg: tr,
+          scene: geometry.mmRectToScene(mmRect),
         })
       }
 
@@ -561,20 +663,48 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
       const innerStr = closeLt > gt ? svg.slice(gt + 1, closeLt) : ''
 
       if (ef?.startsWith('text_')) {
-        const xv = parseNumber(attrs.x) ?? 0
-        const yv = parseNumber(attrs.y) ?? 0
-        const fontSize = parseNumber(attrs['font-size']) ?? 18
-        const point = applyTransform(
-          multiplyTransform(inheritedTransform, parseSvgTransform(attrs.transform)),
-          xv,
-          yv,
+        const textStyle = {
+          ...styleFromClassNames(attrs.class, cssClassStyles),
+          ...parseStyle(attrs.style),
+        }
+        const tspan = firstTspan(innerStr)
+        const tspanAttrs = tspan?.attrs ?? {}
+        const tspanStyle = {
+          ...styleFromClassNames(tspanAttrs.class, cssClassStyles),
+          ...parseStyle(tspanAttrs.style),
+        }
+        const xv = parseNumber(pickAttr(tspanAttrs, attrs, 'x')) ?? 0
+        const yv = parseNumber(pickAttr(tspanAttrs, attrs, 'y')) ?? 0
+        const fontSize =
+          parseNumber(tspanAttrs['font-size']) ??
+          parseFontSizeFromStyle(tspanStyle) ??
+          parseNumber(attrs['font-size']) ??
+          parseFontSizeFromStyle(textStyle) ??
+          18
+        const textAnchor = normalizeTextAnchor(
+          tspanAttrs['text-anchor'] ??
+          tspanStyle['text-anchor'] ??
+          attrs['text-anchor'] ??
+          textStyle['text-anchor'],
         )
+        const textTransform = multiplyTransform(
+          multiplyTransform(inheritedTransform, parseSvgTransform(attrs.transform)),
+          parseSvgTransform(tspanAttrs.transform),
+        )
+        const point = applyTransform(textTransform, xv, yv)
+        const mmPoint = geometry.svgPointToMm(point)
+        const transformedFontSize = fontSize * transformScale(textTransform)
+        const fontSizeMm = geometry.svgFontSizeToMm(transformedFontSize)
+        const scenePoint = geometry.mmPointToScene(mmPoint)
         textItems.push({
           name: ef,
-          x: point.x * scaleX,
-          y: point.y * scaleY,
-          fontSize: fontSize * avgScale,
-          text: decodeXmlText(innerStr) || ef.replace(/^text_/, ''),
+          x: mmPoint.x,
+          y: mmPoint.y,
+          fontSize: fontSizeMm,
+          text: tspan?.text || decodeXmlText(innerStr) || ef.replace(/^text_/, ''),
+          textAnchor,
+          svg: { ...point, fontSize: transformedFontSize },
+          scene: { ...scenePoint, fontSize: geometry.mmToPx(fontSizeMm) },
         })
       }
 
@@ -610,6 +740,7 @@ export function parseImportedSvgLayers(svg: string): ImportedSvgLayers {
     guideRectsMm,
     lockedBgDetected,
     prepressHints,
+    geometry,
     summary: {
       photoFields: photoRects.length,
       textFields: textItems.length,

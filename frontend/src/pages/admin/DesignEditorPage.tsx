@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
@@ -56,6 +56,8 @@ import {
 import { CanvasRulers, type GuideLine } from './designEditor/CanvasRulers';
 import { ImagePickerModal } from '../../components/ImagePickerModal';
 import { TextFloatingToolbar } from './designEditor/TextFloatingToolbar';
+import { useDesignEditorViewport } from './designEditor/useDesignEditorViewport';
+import { createDesignSceneGeometry } from './designEditor/designGeometry';
 import '../../styles/admin-page-layout.css';
 import './DesignEditorPage.css';
 import './designEditor/designEditorGlassTheme.css';
@@ -146,11 +148,6 @@ export const DesignEditorPage: React.FC = () => {
   const [guides, setGuides] = useState<GuideLine[]>([]);
   const [snapLines, setSnapLines] = useState<{ axis: 'h' | 'v'; pos: number }[]>([]);
 
-  // ── fit-zoom: CSS-масштаб, чтобы вписать холст в контейнер ─────────────────
-  const [fitZoom, setFitZoom] = useState(1);
-  const [fitReady, setFitReady] = useState(false);
-  const [rulerOrigin, setRulerOrigin] = useState({ x: 0, y: 0 });
-
   // ── Page spec (scale=1 — натуральный размер; fitZoom вписывает в экран) ─────
   const [pageSpec, setPageSpec] = useState({
     pageWidth: 90,
@@ -160,10 +157,20 @@ export const DesignEditorPage: React.FC = () => {
   });
   const [prepressConfig, setPrepressConfig] = useState<DesignPrepressConfig>(DEFAULT_PREPRESS_CONFIG);
   const { pageWidth, pageHeight, pageCount, scale } = pageSpec;
-  const pageW = Math.round(pageWidth * MM_TO_PX * scale);
-  const pageH = Math.round(pageHeight * MM_TO_PX * scale);
-  const safeZonePx = prepressConfig.safeZoneMm * MM_TO_PX * scale;
-  const bleedPx = prepressConfig.bleedMm * MM_TO_PX * scale;
+  const sceneGeometry = useMemo(
+    () => createDesignSceneGeometry({
+      pageWidthMm: pageWidth,
+      pageHeightMm: pageHeight,
+      safeZoneMm: prepressConfig.safeZoneMm,
+      bleedMm: prepressConfig.bleedMm,
+      scale,
+    }),
+    [pageWidth, pageHeight, prepressConfig.safeZoneMm, prepressConfig.bleedMm, scale],
+  );
+  const pageW = sceneGeometry.pageWidthPx;
+  const pageH = sceneGeometry.pageHeightPx;
+  const safeZonePx = sceneGeometry.safeZonePx;
+  const bleedPx = sceneGeometry.bleedPx;
 
   /** Guide lines converted from mm (safe-zone-relative) to canvas px */
   const guideLinesPx = useMemo(
@@ -183,51 +190,15 @@ export const DesignEditorPage: React.FC = () => {
   const stripItems = buildStripItems(pageCount, spreadMode, coverPages);
   const currentStripItem = stripItems.find((item) => item.pages.includes(currentPage));
   const isSpreadView = spreadMode && (currentStripItem?.pages.length ?? 1) === 2;
-
-  // ── Пересчитываем fitZoom при изменении контейнера / формата / режима ────────
-  useLayoutEffect(() => {
-    const el = viewportRef.current ?? scrollAreaRef.current;
-    if (!el || !pageW || !pageH) return;
-    setFitReady(false);
-    const visibleBleedPx = prepressConfig.showBleed ? bleedPx : 0;
-    const wrapperPadX = isSpreadView ? 64 : 80;
-    const wrapperPadY = isSpreadView ? 98 : 80;
-    const contentW = (isSpreadView ? pageW * 2 : pageW) + wrapperPadX + visibleBleedPx * 2;
-    const contentH = pageH + wrapperPadY + visibleBleedPx * 2;
-    const canvasPadX = isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx;
-    const canvasPadY = isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx;
-    const cw = Math.max(contentW, 1);
-    const ch = Math.max(contentH, 1);
-    let rafId = 0;
-    let alive = true;
-    const compute = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        if (!alive) return;
-        const aw = Math.round(el.clientWidth);
-        const ah = Math.round(el.clientHeight);
-        if (aw < 100 || ah < 100) return;
-        const zW = aw / cw;
-        const zH = ah / ch;
-        const zRaw = Math.max(0.1, Math.min(zW, zH, 3));
-        const z = Math.round(zRaw * 1000) / 1000;
-        setFitZoom(z);
-        setRulerOrigin({
-          x: (aw - cw * z) / 2 + canvasPadX * z,
-          y: (ah - ch * z) / 2 + canvasPadY * z,
-        });
-        setFitReady(true);
-      });
-    };
-    const ro = new ResizeObserver(compute);
-    ro.observe(el);
-    compute();
-    return () => {
-      alive = false;
-      cancelAnimationFrame(rafId);
-      ro.disconnect();
-    };
-  }, [bleedPx, isSpreadView, pageH, pageW, prepressConfig.showBleed]);
+  const { fitZoom, viewportReady: fitReady, rulerOrigin } = useDesignEditorViewport({
+    viewportRef,
+    fallbackRef: scrollAreaRef,
+    pageWidthPx: pageW,
+    pageHeightPx: pageH,
+    bleedPx,
+    showBleed: prepressConfig.showBleed,
+    isSpreadView,
+  });
 
   useEffect(() => {
     const el = fitScalerRef.current;
@@ -344,7 +315,8 @@ export const DesignEditorPage: React.FC = () => {
         ? Math.max(1, Math.min(99, ds.pages.length))
         : Math.max(1, Math.min(99, Number(spec.page_count) || 1));
       const sm = !!(ds?.spread_mode ?? spec.spread_mode);
-      const sc = 1; // fitZoom обеспечивает визуальное вписывание
+      const rawSceneScale = Number(ds?.sceneScale ?? 1);
+      const sc = Number.isFinite(rawSceneScale) && rawSceneScale > 0 ? rawSceneScale : 1;
       const cp = Math.max(0, Math.min(3, Number(ds?.cover_pages ?? spec.cover_pages ?? 1)));
       const prepress = normalizePrepressConfig(ds?.prepress ?? spec.prepress);
       setTemplateState((s) => ({ ...s, template: t, loading: false, error: null }));
@@ -703,6 +675,7 @@ export const DesignEditorPage: React.FC = () => {
       pageWidth,
       pageHeight,
       pageCount,
+      sceneScale: scale,
       prepressConfig,
       pages: updatedPages,
       spreadMode,

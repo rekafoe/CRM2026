@@ -48,19 +48,15 @@ import {
 } from './photoFieldGeometry';
 import { PhotoFieldCropModal } from './PhotoFieldCropModal';
 import { findPhotoFieldAtScene } from './photoFieldHitTest';
+import {
+  fabricDeserializeReviver,
+  loadDesignPageScene,
+  loadSpreadMergedScene,
+} from './designPageLoader';
 
 // ─── Custom property names saved in Fabric JSON ───────────────────────────────
 
 const CUSTOM_PROPS = FABRIC_CUSTOM_PROPS;
-
-/** После enlarge гарантированно восстанавливаем доменные поля (fabric не всегда прокидывает их в экземпляр). */
-function fabricDeserializeReviver(serializedObj: Record<string, unknown>, instance: unknown): void {
-  const t = instance as Record<string, unknown>;
-  for (const k of CUSTOM_PROPS) {
-    if (!Object.prototype.hasOwnProperty.call(serializedObj, k)) continue;
-    t[k] = serializedObj[k];
-  }
-}
 
 // ─── Public handle exposed via forwardRef ────────────────────────────────────
 
@@ -258,13 +254,6 @@ function findPhotoFieldByIdDeep(canvas: Canvas, fieldId: string): FabricObject |
   return walk(canvas.getObjects());
 }
 
-function resolvePreviewUrl(template: DesignTemplate | null, apiBaseUrl: string): string | null {
-  if (!template?.preview_url) return null;
-  if (template.preview_url.startsWith('http')) return template.preview_url;
-  const base = apiBaseUrl.replace(/\/api\/?$/, '');
-  return `${base}${template.preview_url.startsWith('/') ? '' : '/'}${template.preview_url}`;
-}
-
 function getObjProps(obj: unknown): SelectedObjProps {
   const o = asAny(obj);
   const typeName = (o.type as string) ?? '';
@@ -410,66 +399,6 @@ function createPhotoFieldGroup(opts: {
   return group;
 }
 
-async function addTemplatePreviewBackground(
-  canvas: Canvas,
-  template: DesignTemplate | null,
-  pageW: number,
-  pageH: number,
-  apiBaseUrl: string,
-): Promise<void> {
-  const previewUrl = resolvePreviewUrl(template, apiBaseUrl);
-  if (!previewUrl) return;
-  try {
-    const img = await FabricImage.fromURL(previewUrl, { crossOrigin: 'anonymous' });
-    img.set({
-      left: 0,
-      top: 0,
-      scaleX: pageW / (img.width || pageW),
-      scaleY: pageH / (img.height || pageH),
-      selectable: false,
-      evented: false,
-    });
-    (img as unknown as AnyObj).isBackground = true;
-    canvas.add(img);
-    canvas.sendObjectToBack(img);
-  } catch {
-    // preview not available
-  }
-}
-
-async function loadPageIntoCanvas(
-  canvas: Canvas,
-  pageData: DesignPage | undefined,
-  template: DesignTemplate | null,
-  pageW: number,
-  pageH: number,
-  apiBaseUrl: string,
-  isLoadingRef: React.MutableRefObject<boolean>,
-): Promise<void> {
-  isLoadingRef.current = true;
-  try {
-    if (pageData?.fabricJSON && Object.keys(pageData.fabricJSON).length > 0) {
-      await canvas.loadFromJSON(pageData.fabricJSON, fabricDeserializeReviver);
-      canvas.getObjects().forEach((obj) => {
-        if (asAny(obj).isBackground) {
-          obj.set({ selectable: false, evented: false });
-        }
-      });
-      const hasBackgroundObject = canvas.getObjects().some((obj) => !!asAny(obj).isBackground);
-      if (!hasBackgroundObject) {
-        await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
-      }
-    } else {
-      canvas.clear();
-      (canvas as unknown as AnyObj).backgroundColor = 'white';
-      await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
-    }
-    canvas.requestRenderAll();
-  } finally {
-    isLoadingRef.current = false;
-  }
-}
-
 function parsePageLoadKey(
   key: string,
 ): { type: 'single'; index: number } | { type: 'spread'; left: number; right: number } | null {
@@ -478,41 +407,6 @@ function parsePageLoadKey(
   const s = key.match(/^spread-(\d+)-(\d+)$/);
   if (s) return { type: 'spread', left: parseInt(s[1], 10), right: parseInt(s[2], 10) };
   return null;
-}
-
-/** Левая страница + правая, сдвинутая на +pageW */
-async function loadSpreadMerged(
-  canvas: Canvas,
-  leftPage: DesignPage | undefined,
-  rightPage: DesignPage | undefined,
-  pageW: number,
-  pageH: number,
-  template: DesignTemplate | null,
-  apiBaseUrl: string,
-  isLoadingRef: React.MutableRefObject<boolean>,
-): Promise<void> {
-  isLoadingRef.current = true;
-  try {
-    await loadPageIntoCanvas(canvas, leftPage, template, pageW, pageH, apiBaseUrl, isLoadingRef);
-    const tempEl = document.createElement('canvas');
-    const temp = new Canvas(tempEl, {
-      width: pageW,
-      height: pageH,
-      backgroundColor: 'white',
-      preserveObjectStacking: true,
-    });
-    await loadPageIntoCanvas(temp, rightPage, template, pageW, pageH, apiBaseUrl, isLoadingRef);
-    isLoadingRef.current = true;
-    for (const obj of [...temp.getObjects()]) {
-      const c = await obj.clone();
-      c.set({ left: (c.left ?? 0) + pageW });
-      canvas.add(c);
-    }
-    temp.dispose();
-    canvas.requestRenderAll();
-  } finally {
-    isLoadingRef.current = false;
-  }
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -1096,28 +990,28 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           if (parsedNext?.type === 'spread') {
             canvas.setDimensions({ width: pw * 2, height: ph });
             if (pageLoadKeyRef.current !== targetKey) return;
-            await loadSpreadMerged(
+            isLoadingRef.current = true;
+            await loadSpreadMergedScene({
               canvas,
-              snapshotPages[parsedNext.left],
-              snapshotPages[parsedNext.right],
-              pw,
-              ph,
-              templateRef.current,
+              leftPage: snapshotPages[parsedNext.left],
+              rightPage: snapshotPages[parsedNext.right],
+              pageW: pw,
+              pageH: ph,
+              template: templateRef.current,
               apiBaseUrl,
-              isLoadingRef,
-            );
+            });
           } else if (parsedNext?.type === 'single') {
             canvas.setDimensions({ width: pw, height: ph });
             if (pageLoadKeyRef.current !== targetKey) return;
-            await loadPageIntoCanvas(
+            isLoadingRef.current = true;
+            await loadDesignPageScene({
               canvas,
-              snapshotPages[parsedNext.index],
-              templateRef.current,
-              pw,
-              ph,
+              pageData: snapshotPages[parsedNext.index],
+              template: templateRef.current,
+              pageW: pw,
+              pageH: ph,
               apiBaseUrl,
-              isLoadingRef,
-            );
+            });
           }
 
           if (pageLoadKeyRef.current !== targetKey) return;
@@ -1135,6 +1029,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 
           prevPageLoadKeyRef.current = targetKey;
         } finally {
+          isLoadingRef.current = false;
           if (pageLoadKeyRef.current === targetKey) {
             pageTransitionLockRef.current = false;
           }
@@ -1384,15 +1279,14 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         isLoadingRef.current = true;
         try {
           canvas.setDimensions({ width: pw, height: ph });
-          await loadPageIntoCanvas(
+          await loadDesignPageScene({
             canvas,
             pageData,
-            templateRef.current,
-            pw,
-            ph,
+            template: templateRef.current,
+            pageW: pw,
+            pageH: ph,
             apiBaseUrl,
-            isLoadingRef,
-          );
+          });
           if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
           canvas.requestRenderAll();
         } finally {
@@ -1411,27 +1305,25 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         try {
           if (pair && key?.type === 'spread') {
             canvas.setDimensions({ width: pw * 2, height: ph });
-            await loadSpreadMerged(
+            await loadSpreadMergedScene({
               canvas,
-              pagesSource[pair[0]],
-              pagesSource[pair[1]],
-              pw,
-              ph,
-              templateRef.current,
+              leftPage: pagesSource[pair[0]],
+              rightPage: pagesSource[pair[1]],
+              pageW: pw,
+              pageH: ph,
+              template: templateRef.current,
               apiBaseUrl,
-              isLoadingRef,
-            );
+            });
           } else if (key?.type === 'single') {
             canvas.setDimensions({ width: pw, height: ph });
-            await loadPageIntoCanvas(
+            await loadDesignPageScene({
               canvas,
-              pagesSource[key.index],
-              templateRef.current,
-              pw,
-              ph,
+              pageData: pagesSource[key.index],
+              template: templateRef.current,
+              pageW: pw,
+              pageH: ph,
               apiBaseUrl,
-              isLoadingRef,
-            );
+            });
           }
           if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
           canvas.requestRenderAll();

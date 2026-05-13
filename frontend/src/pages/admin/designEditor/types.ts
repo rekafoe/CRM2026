@@ -71,6 +71,7 @@ export interface DesignState {
   pageWidth: number;
   pageHeight: number;
   pageCount: number;
+  sceneScale?: number;
   prepress?: DesignPrepressConfig;
   pages: Array<{ fabricJSON: Record<string, unknown> }>;
   spread_mode?: boolean;
