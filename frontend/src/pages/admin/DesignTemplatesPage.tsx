@@ -415,7 +415,7 @@ export const DesignTemplatesPage: React.FC = () => {
         <div className="design-template-form">
           <div className="design-template-import-intro">
             <strong>Два файла, две роли:</strong>
-            <span>исходник хранится в CRM для производства, а SVG разбирается в поля редактора. Если SVG пока нет, шаблон сохранится как неактивный draft.</span>
+            <span>исходник хранится в CRM для производства, а SVG или ZIP с SVG-страницами разбирается в поля редактора. Если SVG пока нет, шаблон сохранится как неактивный draft.</span>
           </div>
           <div className="form-row">
             <label>Исходник для CRM</label>
@@ -438,22 +438,22 @@ export const DesignTemplatesPage: React.FC = () => {
             </div>
           </div>
           <div className="form-row">
-            <label>SVG для редактора</label>
+            <label>SVG/ZIP для редактора</label>
             <div className="preview-upload">
               <input
                 ref={importFileInputRef}
                 type="file"
-                accept=".svg,image/svg+xml"
+                accept=".svg,.zip,image/svg+xml,application/zip,application/x-zip-compressed"
                 onChange={(e) => setImportForm((p) => ({ ...p, file: e.target.files?.[0] ?? null }))}
                 className="visually-hidden-file-input"
               />
               <Button variant="secondary" onClick={() => importFileInputRef.current?.click()}>
-                Выбрать SVG
+                Выбрать SVG/ZIP
               </Button>
               <p className="form-hint">
                 {importForm.file
                   ? importForm.file.name
-                  : 'Загрузите SVG, экспортированный из AI/CDR/INDD по стандарту: photo_*, text_*, trim, bleed, safe.'}
+                  : 'Загрузите SVG или ZIP со страницами SVG по стандарту: photo_*, text_*, trim, bleed, safe.'}
               </p>
             </div>
           </div>

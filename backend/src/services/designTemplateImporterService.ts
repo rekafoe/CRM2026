@@ -3,11 +3,10 @@ import { createDesignTemplate, getDesignTemplate, type DesignTemplateRow } from 
 import { addSubtypeDesign } from './subtypeDesignService'
 import { saveBufferToUploads } from '../config/upload'
 import {
-  parseImportedSvgLayers,
-  type PrepressFromSvgGuides,
-  type SvgRect,
-  type SvgText,
-} from './designTemplateSvgParse'
+  buildImportedSvgTemplateDocument,
+  isSupportedNormalizedTemplateExt,
+  layerDebug,
+} from './designTemplateSvgImportBuilder'
 
 export interface ImportDesignTemplateInput {
   file?: {
@@ -36,103 +35,6 @@ export interface ImportDesignTemplateResult {
 }
 
 const MASTER_SOURCE_EXTENSIONS = new Set(['.ai', '.cdr', '.indd', '.indt', '.pdf', '.svg'])
-const IMPORTED_TEMPLATE_SCENE_SCALE = 3
-
-function sanitizeSvg(svg: string): string {
-  return svg
-    .replace(/<script\b[\s\S]*?<\/script>/gi, '')
-    .replace(/<foreignObject\b[\s\S]*?<\/foreignObject>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*["'][^"']*["']/gi, '')
-    .replace(/\s(?:href|xlink:href)\s*=\s*["']\s*javascript:[^"']*["']/gi, '')
-}
-
-function toFabricRect(rect: SvgRect) {
-  return {
-    type: 'rect',
-    version: '6.0.0',
-    originX: 'left',
-    originY: 'top',
-    left: rect.scene.x,
-    top: rect.scene.y,
-    width: rect.scene.width,
-    height: rect.scene.height,
-    fill: 'rgba(248, 250, 252, 0.25)',
-    stroke: '#2563eb',
-    strokeWidth: 0.8,
-    strokeDashArray: [4, 3],
-    rx: 2,
-    ry: 2,
-    id: rect.name,
-    isPhotoField: true,
-  }
-}
-
-function toFabricText(item: SvgText) {
-  const fontSizePx = Math.max(6, item.scene.fontSize)
-  const originX = item.textAnchor === 'middle' ? 'center' : item.textAnchor === 'end' ? 'right' : 'left'
-  return {
-    type: 'i-text',
-    version: '6.0.0',
-    originX,
-    originY: 'top',
-    left: item.scene.x,
-    top: item.scene.y - fontSizePx * 0.8,
-    text: item.text,
-    fontSize: fontSizePx,
-    fontFamily: 'Arial',
-    fill: '#111827',
-    textAlign: item.textAnchor === 'end' ? 'right' : item.textAnchor === 'middle' ? 'center' : 'left',
-    id: item.name,
-  }
-}
-
-function toFabricBackground(src: string, scene: { width: number; height: number }, sceneScale: number) {
-  const safeScale = Number.isFinite(sceneScale) && sceneScale > 0 ? sceneScale : 1
-  return {
-    type: 'image',
-    version: '6.0.0',
-    originX: 'left',
-    originY: 'top',
-    left: 0,
-    top: 0,
-    width: scene.width / safeScale,
-    height: scene.height / safeScale,
-    scaleX: safeScale,
-    scaleY: safeScale,
-    src,
-    crossOrigin: 'anonymous',
-    selectable: false,
-    evented: false,
-    id: 'locked_bg',
-    isBackground: true,
-    backgroundFit: 'page',
-    backgroundSceneScale: safeScale,
-  }
-}
-
-function layerDebug(parsed: ReturnType<typeof parseImportedSvgLayers>) {
-  return {
-    photo: parsed.photoRects.map((r) => ({ name: r.name, svg: r.svg, mm: { x: r.x, y: r.y, width: r.width, height: r.height }, scene: r.scene })),
-    text: parsed.textItems.map((t) => ({ name: t.name, text: t.text, textAnchor: t.textAnchor, svg: t.svg, mm: { x: t.x, y: t.y, fontSize: t.fontSize }, scene: t.scene })),
-    guides: parsed.guideRectsMm,
-  }
-}
-
-/** designState.prepress если в SVG были rect trim/bleed/safe. */
-function buildImportedPrepress(
-  hints: PrepressFromSvgGuides,
-  guideKeys: Partial<Record<'trim' | 'bleed' | 'safe', unknown>>,
-): Record<string, unknown> | undefined {
-  if (Object.keys(guideKeys).length === 0) return undefined
-  return {
-    bleedMm: hints.bleedMm,
-    safeZoneMm: hints.safeZoneMm,
-    showBleed: Boolean(guideKeys.bleed ?? guideKeys.trim),
-    showTrim: Boolean(guideKeys.trim),
-    showSafeZone: Boolean(guideKeys.safe),
-    cutMarks: true,
-  }
-}
 
 export async function importDesignTemplateFromFile(
   input: ImportDesignTemplateInput,
@@ -142,17 +44,17 @@ export async function importDesignTemplateFromFile(
   const errors: string[] = []
   const warnings: string[] = []
 
-  const hasNormalizedSvg = Boolean(input.file?.buffer && input.file.buffer.length > 0)
+  const hasNormalizedFile = Boolean(input.file?.buffer && input.file.buffer.length > 0)
   const hasSourceFile = Boolean(input.sourceFile?.buffer && input.sourceFile.buffer.length > 0)
-  if (!hasNormalizedSvg && !hasSourceFile) errors.push('Файл не загружен или пустой.')
+  if (!hasNormalizedFile && !hasSourceFile) errors.push('Файл не загружен или пустой.')
   if (!input.name.trim()) {
     errors.push('Укажите название шаблона.')
   }
-  if (hasNormalizedSvg && ext === '.pdf') {
-    errors.push('PDF importer будет добавлен вторым этапом. Сейчас загрузите SVG с именованными слоями.')
+  if (hasNormalizedFile && ext === '.pdf') {
+    errors.push('PDF importer будет добавлен вторым этапом. Сейчас загрузите SVG или ZIP с SVG-страницами.')
   }
-  if (hasNormalizedSvg && ext !== '.svg' && ext !== '.pdf') {
-    errors.push('Поддерживаются SVG, позже PDF.')
+  if (hasNormalizedFile && ext !== '.pdf' && !isSupportedNormalizedTemplateExt(ext)) {
+    errors.push('Поддерживаются SVG или ZIP с SVG-страницами, позже PDF.')
   }
   if (input.sourceFile?.buffer && sourceExt && !MASTER_SOURCE_EXTENSIONS.has(sourceExt)) {
     errors.push('Исходник шаблона должен быть AI, CDR, INDD, INDT, PDF или SVG.')
@@ -172,7 +74,7 @@ export async function importDesignTemplateFromFile(
     }
   }
 
-  if (!hasNormalizedSvg) {
+  if (!hasNormalizedFile) {
     warnings.push('Исходник сохранён как draft-шаблон. Для редактора добавьте SVG с именованными слоями.')
     const sourceFileUrl = `/api/uploads/${storedSource!.filename}`
     const template = await createDesignTemplate({
@@ -207,54 +109,21 @@ export async function importDesignTemplateFromFile(
     return { template: fresh ?? template, warnings, errors }
   }
 
-  const svg = sanitizeSvg(input.file!.buffer!.toString('utf8'))
-  const parsed = parseImportedSvgLayers(svg, { sceneScale: IMPORTED_TEMPLATE_SCENE_SCALE })
-  warnings.push(...parsed.warnings)
-
-  const strippedForBg = parsed.strippedSvg
-  if (parsed.removalRanges.length > 0) {
-    warnings.push(
-      'Интерактивные и направляющие слои вырезаны из SVG-фона (без дубля с полями редактора и prepress overlay).',
-    )
-  }
-
-  const stored = saveBufferToUploads(Buffer.from(strippedForBg, 'utf8'), input.file!.originalname, input.name)
-  if (!stored) {
-    throw Object.assign(new Error('Не удалось сохранить SVG.'), {
-      importErrors: ['Не удалось сохранить SVG.'],
-      importWarnings: warnings,
-    })
-  }
-
-  const previewUrl = `/api/uploads/${stored.filename}`
-  const normalizedFileUrl = previewUrl
+  const importedDocument = buildImportedSvgTemplateDocument(input.file!, input.name, warnings)
+  const previewUrl = importedDocument.previewUrl
+  const normalizedFileUrl = importedDocument.normalizedFileUrl
   const sourceFileUrl = storedSource ? `/api/uploads/${storedSource.filename}` : normalizedFileUrl
-  const prepress =
-    parsed.prepressHints && Object.keys(parsed.guideRectsMm).length > 0
-      ? buildImportedPrepress(parsed.prepressHints, parsed.guideRectsMm)
-      : undefined
+  const documentPrepress = importedDocument.pages.find((page) => page.prepress)?.prepress
 
   const designState: Record<string, unknown> = {
     templateId: null,
-    pageWidth: parsed.widthMm,
-    pageHeight: parsed.heightMm,
-    pageCount: 1,
-    sceneScale: IMPORTED_TEMPLATE_SCENE_SCALE,
-    pages: [
-      {
-        fabricJSON: {
-          version: '6.0.0',
-          objects: [
-            toFabricBackground(previewUrl, parsed.geometry.scenePx, parsed.geometry.sceneScale),
-            ...parsed.photoRects.map(toFabricRect),
-            ...parsed.textItems.map(toFabricText),
-          ],
-          background: 'white',
-        },
-      },
-    ],
+    pageWidth: importedDocument.pageWidthMm,
+    pageHeight: importedDocument.pageHeightMm,
+    pageCount: importedDocument.pageCount,
+    sceneScale: 3,
+    pages: importedDocument.pages.map((page) => page.designPage),
   }
-  if (prepress) designState.prepress = prepress
+  if (documentPrepress) designState.prepress = documentPrepress
 
   const template = await createDesignTemplate({
     name: input.name.trim(),
@@ -264,36 +133,48 @@ export async function importDesignTemplateFromFile(
     is_active: true,
     sort_order: input.sortOrder ?? 0,
     spec: {
-      width_mm: parsed.widthMm,
-      height_mm: parsed.heightMm,
-      page_count: 1,
+      width_mm: importedDocument.pageWidthMm,
+      height_mm: importedDocument.pageHeightMm,
+      page_count: importedDocument.pageCount,
       productId: input.productId,
       typeId: input.typeId,
       sizeId: input.sizeId,
-      source_format: storedSource ? sourceExt.replace(/^\./, '') : 'svg',
+      source_format: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
       import: {
-        importer: 'svg-named-layers',
-        importerVersion: 5,
-        sourceFormat: storedSource ? sourceExt.replace(/^\./, '') : 'svg',
+        importer: importedDocument.pageCount > 1 ? 'svg-named-layers-multipage' : 'svg-named-layers',
+        importerVersion: 6,
+        sourceFormat: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
         sourceFile: sourceFileUrl,
         sourceFileUrl,
-        sourceOriginalName: storedSource?.originalName ?? stored.originalName,
-        sourceSize: storedSource?.size ?? stored.size,
-        normalizedFormat: 'svg',
+        sourceOriginalName: storedSource?.originalName ?? importedDocument.normalizedOriginalName,
+        sourceSize: storedSource?.size ?? importedDocument.normalizedSize,
+        normalizedFormat: importedDocument.normalizedFormat,
         normalizedFile: normalizedFileUrl,
         normalizedFileUrl,
-        normalizedOriginalName: stored.originalName,
-        originalName: stored.originalName,
+        normalizedFiles: importedDocument.pages.map((page, index) => ({
+          page: index + 1,
+          originalName: page.originalName,
+          normalizedFileUrl: page.normalizedFileUrl,
+          normalizedOriginalName: page.normalizedOriginalName,
+          normalizedSize: page.normalizedSize,
+        })),
+        normalizedOriginalName: importedDocument.normalizedOriginalName,
+        originalName: importedDocument.normalizedOriginalName,
         warnings,
         errors,
-        geometry: parsed.geometry,
-        layers: layerDebug(parsed),
-        parserSummary: parsed.summary,
+        geometry: importedDocument.pages[0]?.parsed.geometry,
+        pages: importedDocument.pages.map((page, index) => ({
+          page: index + 1,
+          originalName: page.originalName,
+          geometry: page.parsed.geometry,
+          layers: layerDebug(page.parsed),
+          parserSummary: page.parsed.summary,
+          guideRectsMmParsed: page.parsed.guideRectsMm,
+          lockedBgDetected: page.parsed.lockedBgDetected,
+          strippedInteractiveLayers: page.parsed.removalRanges.length > 0,
+        })),
         layerConvention:
           'id/inkscape:label: locked_bg (в фоне), photo_* rect, text_* text, группы <g>; trim/bleed/safe rect → prepress',
-        strippedInteractiveLayers: true,
-        guideRectsMmParsed: parsed.guideRectsMm,
-        lockedBgDetected: parsed.lockedBgDetected,
       },
       designState,
     },

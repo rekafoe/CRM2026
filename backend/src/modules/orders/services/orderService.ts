@@ -1710,6 +1710,7 @@ export class OrderService {
     department_id?: number;
     limit?: number;
     offset?: number;
+    all?: boolean;
   }) {
     const orders = await OrderRepository.searchOrders(userId, searchParams)
     const orderIds = (orders as Order[]).map((o) => o.id)

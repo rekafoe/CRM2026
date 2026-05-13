@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useReducer, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order, OrderActivityEvent } from '../types';
-import { getOrders, getOrderPoolSync, reassignOrderByNumber, unassignOrderByNumber, cancelOnlineOrder, deleteOrder, getUsers, createPrepaymentLink, issueOrder, getOperatorsToday, updateOrderItem, getOrderActivity, updateOrderNotes } from '../api';
+import { api, getOrders, getOrderPoolSync, reassignOrderByNumber, unassignOrderByNumber, cancelOnlineOrder, deleteOrder, getUsers, createPrepaymentLink, issueOrder, getOperatorsToday, updateOrderItem, getOrderActivity, updateOrderNotes } from '../api';
 import { useOrderStatuses } from '../hooks/useOrderStatuses';
 
 const ORDER_POOL_LAST_SEEN_KEY = 'orderPoolLastSeenAt';
@@ -290,10 +290,13 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     );
   }, []);
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (options: { activeOnly?: boolean; query?: string } = {}) => {
     try {
       setLoading(true);
-      const res = await getOrders({ all: true, poolActiveOnly: true });
+      const query = options.query?.trim();
+      const res = query
+        ? await api.get<Order[]>('/orders/search', { params: { all: '1', query, limit: '200' } })
+        : await getOrders({ all: true, poolActiveOnly: options.activeOnly ?? true });
       const list = res.data as Order[];
       orderIdsRef.current = new Set(list.map((o) => o.id));
       setOrders(list);
@@ -437,6 +440,12 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     const t = setTimeout(() => dispatchFilters({ type: 'setSearchTerm', value: filters.searchInput.trim() }), 200);
     return () => clearTimeout(t);
   }, [filters.searchInput]);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+    const query = filters.searchTerm.trim();
+    loadOrders(query ? { query } : { activeOnly: true });
+  }, [filters.searchTerm, isInitialized, loadOrders]);
 
   useEffect(() => {
     dispatchFilters({ type: 'resetVisible' });

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  getPublicEditorBranding,
   getPublicDesignTemplate,
   type DesignTemplate,
 } from '../../api';
@@ -7,7 +8,7 @@ import { Alert, Button } from '../../components/common';
 import { API_BASE_URL } from '../../config/constants';
 import { DesignEditorCanvas, type DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import { CanvasRulers } from '../../pages/admin/designEditor/CanvasRulers';
-import { EMPTY_PAGE, SAFE_ZONE_MM } from '../../pages/admin/designEditor/constants';
+import { EMPTY_PAGE, MM_TO_PX, SAFE_ZONE_MM } from '../../pages/admin/designEditor/constants';
 import { createDesignSceneGeometry } from '../../pages/admin/designEditor/designGeometry';
 import {
   buildDesignState,
@@ -39,6 +40,17 @@ const DEFAULT_PREPRESS_CONFIG: DesignPrepressConfig = {
   showSafeZone: true,
   cutMarks: true,
 };
+
+function resolveEditorLogoUrl(rawLogoUrl: unknown): string | null {
+  if (typeof rawLogoUrl !== 'string') return null;
+  const logoUrl = rawLogoUrl.trim();
+  if (logoUrl.length <= 10) return null;
+  if (logoUrl.startsWith('data:') || logoUrl.startsWith('http://') || logoUrl.startsWith('https://') || logoUrl.startsWith('blob:')) {
+    return logoUrl;
+  }
+  if (logoUrl.startsWith('/')) return `${window.location.origin}${logoUrl}`;
+  return null;
+}
 
 function normalizePrepressConfig(input: unknown): DesignPrepressConfig {
   const raw = input && typeof input === 'object' ? input as Partial<DesignPrepressConfig> : {};
@@ -84,6 +96,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const fitScalerRef = useRef<HTMLDivElement>(null);
+  const savedDirtyVersionRef = useRef(0);
 
   const [template, setTemplate] = useState<DesignTemplate | null>(null);
   const [draftToken, setDraftToken] = useState<string | null>(initialDraftToken ?? null);
@@ -101,6 +114,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTaskTab, setActiveTaskTab] = useState<PublicDesignTaskTab>('photo');
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [organizationLogoUrl, setOrganizationLogoUrl] = useState<string | null>(null);
+  const [organizationLogoError, setOrganizationLogoError] = useState(false);
   const [customerForm, setCustomerForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -201,6 +217,21 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     return () => { cancelled = true; };
   }, [adapter, templateId, initialDraftToken, documentMode]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await getPublicEditorBranding();
+        if (cancelled) return;
+        setOrganizationLogoUrl(resolveEditorLogoUrl(res.data?.logoUrl));
+        setOrganizationLogoError(false);
+      } catch {
+        if (!cancelled) setOrganizationLogoUrl(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const ensureDraft = useCallback(async () => {
     if (draftToken) return draftToken;
     const res = await adapter.createDraft({
@@ -250,6 +281,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       const { pages: updatedPages, designState } = await buildCurrentDesignState();
       await adapter.updateDraft(token, { designState });
       setPages(updatedPages);
+      savedDirtyVersionRef.current = dirtyVersion;
       setSaveState('saved');
       if (!silent) setStatus('Вариация макета сохранена в draft.');
     } catch (err) {
@@ -258,10 +290,11 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     } finally {
       setSaving(false);
     }
-  }, [adapter, buildCurrentDesignState, ensureDraft]);
+  }, [adapter, buildCurrentDesignState, dirtyVersion, ensureDraft]);
 
   useEffect(() => {
     if (dirtyVersion === 0 || loading || saving) return;
+    if (dirtyVersion === savedDirtyVersionRef.current) return;
     const timer = window.setTimeout(() => {
       void handleSaveDraft(true);
     }, autosaveDelayMs);
@@ -334,9 +367,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
         ));
       }
       setCurrentPage(pageIndex);
-      markDirty();
     },
-    [currentPage, markDirty, navigation.leftPageIdx, navigation.rightPageIdx],
+    [currentPage, navigation.leftPageIdx, navigation.rightPageIdx],
   );
 
   const saveStateLabel = {
@@ -346,108 +378,212 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     saved: 'Сохранено',
     error: 'Ошибка сохранения',
   }[saveState];
+  const isMultipageDocument = documentMode === 'multipage';
+  const isTwoSidedDocument = !isMultipageDocument && pageSpec.pageCount === 2;
+  const documentLabel = isMultipageDocument
+    ? 'Многостраничный макет'
+    : isTwoSidedDocument
+      ? 'Двухсторонний макет'
+      : 'Одностраничный макет';
+  const navigationLabel = isMultipageDocument
+    ? (spreadMode ? 'Развороты' : 'Страницы')
+    : isTwoSidedDocument
+      ? 'Стороны'
+      : 'Страница';
+  const currentStripItem = navigation.stripItems.find((item) => item.pages.includes(currentPage));
+  const currentPageLabel = currentStripItem?.label ?? `${currentPage + 1} / ${pageSpec.pageCount}`;
+  const showOrganizationLogo = organizationLogoUrl && !organizationLogoError;
+  const clientRulerSafeOffsetPx = SAFE_ZONE_MM * MM_TO_PX * fitZoom;
+  const clientRulerOrigin = {
+    x: rulerOrigin.x - clientRulerSafeOffsetPx,
+    y: rulerOrigin.y - clientRulerSafeOffsetPx,
+  };
+  const handleZoomIn = useCallback(() => {
+    const handle = canvasHandleRef.current;
+    if (!handle) return;
+    handle.setZoom(handle.getZoom() * 1.15);
+  }, []);
+  const handleZoomOut = useCallback(() => {
+    const handle = canvasHandleRef.current;
+    if (!handle) return;
+    handle.setZoom(handle.getZoom() / 1.15);
+  }, []);
+  const handleZoomReset = useCallback(() => {
+    canvasHandleRef.current?.setZoom(1);
+  }, []);
 
   if (loading) return <div className="public-design-editor__state">Загрузка редактора...</div>;
   if (!template) return <Alert type="error">{error ?? 'Шаблон не найден'}</Alert>;
 
   return (
-    <div className="public-design-editor">
-      <div className="public-design-editor__toolbar">
-        <strong>{template.name}</strong>
-        <span className="public-design-editor__hint">
-          {documentMode === 'multipage' ? 'Многостраничный макет' : 'Листовой макет'} · master-шаблон не меняется
-        </span>
-        <span className={`public-design-editor__save-state public-design-editor__save-state--${saveState}`}>
-          {saveStateLabel}
-        </span>
-        <span className="public-design-editor__draft-state">
-          {draftResumeState === 'restored' ? 'Открыт сохранённый draft' : 'Новый draft'}
-        </span>
-        <Button variant="secondary" onClick={() => canvasHandleRef.current?.undo()} disabled={!canUndo}>Отменить</Button>
-        <Button variant="secondary" onClick={() => canvasHandleRef.current?.redo()} disabled={!canRedo}>Повторить</Button>
-        <Button variant="secondary" onClick={() => void handleSaveDraft(false)} disabled={saving}>{saving ? 'Сохранение...' : 'Сохранить draft'}</Button>
-      </div>
-      {status && <Alert type="success" onClose={() => setStatus(null)}>{status}</Alert>}
-      {error && <Alert type="error" onClose={() => setError(null)}>{error}</Alert>}
+    <div className={`public-design-editor public-design-editor--${isMultipageDocument ? 'multipage' : 'single'}`}>
+      <header className="public-design-editor__topbar">
+        <div className="public-design-editor__brand">
+          <div className="public-design-editor__logo" aria-label="PrintCore">
+            <span className="public-design-editor__logo-mark">P</span>
+            <span className="public-design-editor__logo-text">PrintCore Studio</span>
+          </div>
+          <div className="public-design-editor__title">
+            <span className="public-design-editor__eyebrow">Онлайн-редактор макета</span>
+            <h1>{template.name}</h1>
+          </div>
+        </div>
+        <div className="public-design-editor__meta">
+          <span className="public-design-editor__document-badge">{documentLabel}</span>
+          <span className={`public-design-editor__save-state public-design-editor__save-state--${saveState}`}>
+            {saveStateLabel}
+          </span>
+          <span className="public-design-editor__draft-state">
+            {draftResumeState === 'restored' ? 'Открыт draft' : 'Новый draft'}
+          </span>
+        </div>
+        <div className="public-design-editor__top-actions">
+          <Button variant="secondary" onClick={() => setHelpOpen((open) => !open)}>
+            Помощь
+          </Button>
+          <Button variant="secondary" onClick={() => void handleSaveDraft(false)} disabled={saving}>
+            {saving ? 'Сохраняем...' : 'Сохранить'}
+          </Button>
+          <Button onClick={() => void handleReadyForCart()} disabled={saving}>
+            В корзину
+          </Button>
+        </div>
+      </header>
+
+      {(status || error) && (
+        <div className="public-design-editor__alerts">
+          {status && <Alert type="success" onClose={() => setStatus(null)}>{status}</Alert>}
+          {error && <Alert type="error" onClose={() => setError(null)}>{error}</Alert>}
+        </div>
+      )}
+
       <div className="public-design-editor__workspace">
-        <PublicDesignTaskPanel
-          activeTab={activeTaskTab}
-          onTabChange={setActiveTaskTab}
-          preflight={preflight}
-          saveStateLabel={saveStateLabel}
-          saving={saving}
-          onSaveDraft={() => void handleSaveDraft(false)}
-          onReadyForCart={() => void handleReadyForCart()}
-        />
-        <div className="design-editor-scroll-area public-design-editor__scroll" ref={scrollAreaRef}>
-          <CanvasRulers
-            widthMM={navigation.isSpreadView ? pageSpec.pageWidth * 2 : pageSpec.pageWidth}
-            heightMM={pageSpec.pageHeight}
-            fitZoom={fitZoom}
-            originX={rulerOrigin.x}
-            originY={rulerOrigin.y}
-            guides={[]}
-            onGuidesChange={() => {}}
-          />
-          <div className="design-editor-viewport" ref={viewportRef}>
-            <div ref={fitScalerRef} className="design-editor-fit-scaler" data-ready="false">
-              <div className="design-editor-canvas-wrap">
-                <DesignEditorCanvas
-                  ref={canvasHandleRef}
-                  template={template}
-                  pageWidthPx={sceneGeometry.pageWidthPx}
-                  canvasWidthPx={navigation.isSpreadView ? sceneGeometry.pageWidthPx * 2 : sceneGeometry.pageWidthPx}
-                  pageHeightPx={sceneGeometry.pageHeightPx}
-                  safeZonePx={sceneGeometry.safeZonePx}
-                  bleedPx={sceneGeometry.bleedPx}
-                  showBleed={prepressConfig.showBleed}
-                  showTrim={prepressConfig.showTrim}
-                  showSafeZone={prepressConfig.showSafeZone}
-                  pages={pages}
-                  setPages={setPages}
-                  currentPage={currentPage}
-                  pageLoadKey={navigation.pageLoadKey}
-                  spreadPairPages={navigation.spreadPairPages}
-                  showGuides
-                  apiBaseUrl={API_BASE_URL}
-                  mode="basic"
-                  onSelectionChange={setSelectedObj}
-                  onHistoryChange={(u, r) => {
-                    setCanUndo(u);
-                    setCanRedo(r);
-                    markDirty();
-                  }}
-                  onZoomChange={setZoom}
-                  resolveImageFileUrl={resolveImageFileUrl}
-                />
+        <section className="public-design-editor__stage" aria-label="Рабочая область макета">
+          <div className="public-design-editor__stage-toolbar">
+            <div className="public-design-editor__page-caption">
+              <strong>{navigationLabel}</strong>
+              <span>{currentPageLabel}</span>
+            </div>
+            <div className="public-design-editor__canvas-actions">
+              <Button variant="secondary" size="sm" onClick={() => canvasHandleRef.current?.undo()} disabled={!canUndo}>Отменить</Button>
+              <Button variant="secondary" size="sm" onClick={() => canvasHandleRef.current?.redo()} disabled={!canRedo}>Повторить</Button>
+              <Button variant="secondary" size="sm" onClick={handleZoomOut}>−</Button>
+              <button type="button" className="public-design-editor__zoom-value" onClick={handleZoomReset}>
+                {Math.round(zoom * 100)}%
+              </button>
+              <Button variant="secondary" size="sm" onClick={handleZoomIn}>+</Button>
+            </div>
+          </div>
+          <div className="design-editor-scroll-area public-design-editor__scroll" ref={scrollAreaRef}>
+            {showOrganizationLogo && (
+              <img
+                className="public-design-editor__stage-logo"
+                src={organizationLogoUrl}
+                alt=""
+                aria-hidden="true"
+                onError={() => setOrganizationLogoError(true)}
+              />
+            )}
+            <CanvasRulers
+              widthMM={navigation.isSpreadView ? pageSpec.pageWidth * 2 : pageSpec.pageWidth}
+              heightMM={pageSpec.pageHeight}
+              fitZoom={fitZoom}
+              originX={clientRulerOrigin.x}
+              originY={clientRulerOrigin.y}
+              guides={[]}
+              onGuidesChange={() => {}}
+            />
+            <div className="design-editor-viewport" ref={viewportRef}>
+              <div ref={fitScalerRef} className="design-editor-fit-scaler" data-ready="false">
+                <div className="design-editor-canvas-wrap">
+                  <DesignEditorCanvas
+                    ref={canvasHandleRef}
+                    template={template}
+                    pageWidthPx={sceneGeometry.pageWidthPx}
+                    canvasWidthPx={navigation.isSpreadView ? sceneGeometry.pageWidthPx * 2 : sceneGeometry.pageWidthPx}
+                    pageHeightPx={sceneGeometry.pageHeightPx}
+                    safeZonePx={sceneGeometry.safeZonePx}
+                    bleedPx={sceneGeometry.bleedPx}
+                    showBleed={prepressConfig.showBleed}
+                    showTrim={prepressConfig.showTrim}
+                    showSafeZone={prepressConfig.showSafeZone}
+                    pages={pages}
+                    setPages={setPages}
+                    currentPage={currentPage}
+                    pageLoadKey={navigation.pageLoadKey}
+                    spreadPairPages={navigation.spreadPairPages}
+                    showGuides
+                    apiBaseUrl={API_BASE_URL}
+                    mode="basic"
+                    onSelectionChange={setSelectedObj}
+                    onHistoryChange={(u, r) => {
+                      setCanUndo(u);
+                      setCanRedo(r);
+                      if (u || r) markDirty();
+                    }}
+                    onZoomChange={setZoom}
+                    resolveImageFileUrl={resolveImageFileUrl}
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
+
+        <aside className="public-design-editor__sidepanel" aria-label="Инструменты макета">
+          <section className="public-design-editor__prep-card">
+            <span className="public-design-editor__prep-kicker">Подготовка к печати</span>
+            <strong>{preflight.hasBlockingIssues ? 'Нужно проверить макет' : 'Макет выглядит готовым'}</strong>
+            <div className="public-design-editor__prep-stats">
+              <span>{preflight.photoReady}/{preflight.photoTotal} фото</span>
+              <span>{preflight.textReady}/{preflight.textTotal} текст</span>
+            </div>
+          </section>
+          <PublicDesignTaskPanel
+            activeTab={activeTaskTab}
+            onTabChange={setActiveTaskTab}
+            preflight={preflight}
+            saveStateLabel={saveStateLabel}
+            saving={saving}
+            onSaveDraft={() => void handleSaveDraft(false)}
+            onReadyForCart={() => void handleReadyForCart()}
+          />
+          {helpOpen && (
+            <section className="public-design-editor__help">
+              <h2>Как пользоваться редактором</h2>
+              <ul>
+                <li>Выберите фото или текст на макете, чтобы заменить содержимое.</li>
+                <li>Перетаскивайте элементы внутри безопасной зоны.</li>
+                <li>Используйте масштаб, если нужно точно поставить кадр.</li>
+                <li>Перед корзиной проверьте вкладку «Проверка».</li>
+              </ul>
+            </section>
+          )}
+          {selectedObj?.type === 'IText' && (
+            <div className="public-design-editor__selection-hint">
+              Текст можно редактировать прямо на макете.
+            </div>
+          )}
+        </aside>
       </div>
+
       {pageSpec.pageCount > 1 && (
-        <div className="public-design-editor__pages">
-          {documentMode === 'multipage' ? (
-            navigation.stripItems.map((item) => (
-              <Button
+        <nav className="public-design-editor__page-rail" aria-label={navigationLabel}>
+          <div className="public-design-editor__page-rail-title">{navigationLabel}</div>
+          <div className="public-design-editor__page-rail-items">
+            {navigation.stripItems.map((item) => (
+              <button
                 key={item.label}
-                variant={item.pages.includes(currentPage) ? 'primary' : 'secondary'}
-                size="sm"
+                type="button"
+                className={`public-design-editor__page-chip${item.pages.includes(currentPage) ? ' public-design-editor__page-chip--active' : ''}`}
                 onClick={() => void handleGoToPage(item.goToPage)}
               >
                 {item.label}
-              </Button>
-            ))
-          ) : (
-            <>
-              <Button variant="secondary" disabled={currentPage <= 0} onClick={() => void handleGoToPage(Math.max(0, currentPage - 1))}>Назад</Button>
-              <span>{currentPage + 1} / {pageSpec.pageCount} · {Math.round(zoom * 100)}%</span>
-              <Button variant="secondary" disabled={currentPage >= pageSpec.pageCount - 1} onClick={() => void handleGoToPage(Math.min(pageSpec.pageCount - 1, currentPage + 1))}>Вперёд</Button>
-            </>
-          )}
-        </div>
+              </button>
+            ))}
+          </div>
+        </nav>
       )}
-      {selectedObj?.type === 'IText' && <div className="public-design-editor__hint">Текст можно редактировать прямо на макете.</div>}
       {showFinalizeButton && (
         <form
           className="public-design-editor__finalize"

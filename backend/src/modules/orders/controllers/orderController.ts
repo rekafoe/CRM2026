@@ -559,9 +559,14 @@ export class OrderController {
       
       const q = req.query as Record<string, string | undefined>
       const departmentId = q.department_id != null ? parseInt(q.department_id, 10) : undefined
+      const limit = q.limit != null ? parseInt(q.limit, 10) : undefined
+      const offset = q.offset != null ? parseInt(q.offset, 10) : undefined
       const searchParams = {
         ...q,
-        department_id: Number.isFinite(departmentId) ? departmentId : undefined
+        all: q.all === '1' || q.all === 'true',
+        department_id: Number.isFinite(departmentId) ? departmentId : undefined,
+        limit: Number.isFinite(limit) ? limit : undefined,
+        offset: Number.isFinite(offset) ? offset : undefined,
       }
       const orders = await OrderService.searchOrders(authUser.id, searchParams)
       res.json(orders)

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express'
+import { getDb } from '../config/database'
 import { orderFilesDir, resolveSafeExistingPath, uploadOrderFilesMemory } from '../config/upload'
 import { asyncHandler, authenticate } from '../middleware'
 import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
@@ -12,6 +13,24 @@ import {
 } from '../services/publicEditorDraftService'
 
 const router = Router()
+
+async function getPublicBranding(): Promise<{ logoUrl: string | null; organizationName: string | null }> {
+  try {
+    const db = await getDb()
+    const row = await db.get<{ name: string | null; logo_url: string | null }>(
+      `SELECT name, logo_url FROM organizations
+       WHERE TRIM(COALESCE(logo_url, '')) != ''
+       ORDER BY is_default DESC, sort_order ASC, id ASC
+       LIMIT 1`,
+    )
+    return {
+      logoUrl: row?.logo_url != null && String(row.logo_url).trim() ? String(row.logo_url).trim() : null,
+      organizationName: row?.name != null && String(row.name).trim() ? String(row.name).trim() : null,
+    }
+  } catch {
+    return { logoUrl: null, organizationName: null }
+  }
+}
 
 function withDraftFileUrl(req: Request, token: string, file: Record<string, unknown>): Record<string, unknown> {
   return {
@@ -49,6 +68,11 @@ async function sendDraftFileContent(req: Request, res: Response): Promise<void> 
 
 /** Stable draft file URL for browser image rendering; token scopes file access. */
 router.get('/drafts/:token/files/:fileId/content', asyncHandler(sendDraftFileContent))
+
+/** Public branding for website/client editor shell. Does not expose requisites. */
+router.get('/branding', asyncHandler(async (_req: Request, res: Response) => {
+  res.json(await getPublicBranding())
+}))
 
 /** Authenticated CRM sandbox for debugging public editor flow without exposing WEBSITE_ORDER_API_KEY. */
 router.post('/admin-preview/drafts', authenticate, asyncHandler(async (req: Request, res: Response) => {

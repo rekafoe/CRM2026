@@ -52,22 +52,25 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
   onReadyForCart,
 }) => {
   const scenario = SCENARIO_COPY[mode];
+  const showIntro = mode === 'photo_batch';
 
   return (
-    <div className="client-editor">
-      <header className="client-editor__hero">
-        <div>
-          <span className="client-editor__eyebrow">Клиентский редактор</span>
-          <h1>{scenario.title}</h1>
-          <p>{scenario.text}</p>
-        </div>
-        <nav className="client-editor__steps" aria-label="Этапы подготовки">
-          <span>Фото</span>
-          <span>Текст</span>
-          <span>Проверка</span>
-          <span>Оформление</span>
-        </nav>
-      </header>
+    <div className={`client-editor client-editor--${mode}`}>
+      {showIntro && (
+        <header className="client-editor__hero">
+          <div>
+            <span className="client-editor__eyebrow">Клиентский редактор</span>
+            <h1>{scenario.title}</h1>
+            <p>{scenario.text}</p>
+          </div>
+          <nav className="client-editor__steps" aria-label="Этапы подготовки">
+            <span>Фото</span>
+            <span>Текст</span>
+            <span>Проверка</span>
+            <span>Оформление</span>
+          </nav>
+        </header>
+      )}
 
       {mode === 'photo_batch' ? (
         <ClientPhotoBatchEditor

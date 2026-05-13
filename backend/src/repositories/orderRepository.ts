@@ -602,14 +602,20 @@ export const OrderRepository = {
       department_id?: number;
       limit?: number;
       offset?: number;
+      all?: boolean;
     }
   ): Promise<Order[]> {
     const db = await getDb()
 
-    let whereConditions = [
-      '(o.userId = ? OR EXISTS (SELECT 1 FROM user_order_page_orders uopo JOIN user_order_pages uop ON uopo.page_id = uop.id WHERE uopo.order_id = o.id AND uopo.order_type = \'website\' AND uop.user_id = ?))'
-    ]
-    const params: any[] = [userId, userId]
+    const whereConditions: string[] = []
+    const params: any[] = []
+
+    if (!searchParams.all) {
+      whereConditions.push(
+        '(o.userId = ? OR EXISTS (SELECT 1 FROM user_order_page_orders uopo JOIN user_order_pages uop ON uopo.page_id = uop.id WHERE uopo.order_id = o.id AND uopo.order_type = \'website\' AND uop.user_id = ?))'
+      )
+      params.push(userId, userId)
+    }
 
     if (searchParams.department_id != null && Number.isFinite(searchParams.department_id)) {
       whereConditions.push('o.userId IN (SELECT id FROM users WHERE department_id = ?)')
@@ -668,7 +674,7 @@ export const OrderRepository = {
       params.push(searchParams.paymentMethod)
     }
 
-    const whereClause = whereConditions.join(' AND ')
+    const whereClause = whereConditions.length > 0 ? whereConditions.join(' AND ') : '1=1'
     const hasAmountFilter = searchParams.minAmount !== undefined || searchParams.maxAmount !== undefined
     const hasPagination = searchParams.limit !== undefined || searchParams.offset !== undefined
 

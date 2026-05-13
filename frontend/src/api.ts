@@ -1100,6 +1100,14 @@ export const getPublicDesignTemplates = (params?: { productId?: number; typeId?:
 export const getPublicDesignTemplate = (id: number) =>
   api.get<DesignTemplate>(`/design-templates/public/${id}`);
 
+export interface PublicEditorBranding {
+  logoUrl: string | null;
+  organizationName: string | null;
+}
+
+export const getPublicEditorBranding = () =>
+  api.get<PublicEditorBranding>('/public-editor/branding');
+
 export const createPublicEditorDraft = (payload: Record<string, unknown>) =>
   api.post('/public-editor/drafts', payload);
 export const getPublicEditorDraft = (token: string) =>
