@@ -815,13 +815,22 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
             </button>
           </div>
           <div className="filters-row">
-            <input
-              type="text"
-              placeholder="Поиск по заказам..."
-              value={filters.searchInput}
-              onChange={(e) => dispatchFilters({ type: 'setSearchInput', value: e.target.value })}
-            />
-            {searchLoading && <span className="order-pool-search-status">Ищем...</span>}
+            <div className={`order-pool-search ${searchLoading ? 'order-pool-search--loading' : ''}`}>
+              <span className="order-pool-search__icon" aria-hidden="true">⌕</span>
+              <input
+                type="text"
+                placeholder="Поиск по номеру, клиенту, телефону..."
+                value={filters.searchInput}
+                onChange={(e) => dispatchFilters({ type: 'setSearchInput', value: e.target.value })}
+              />
+              {searchLoading && (
+                <span className="order-pool-search__loader" aria-label="Идёт поиск">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              )}
+            </div>
             <select value={filters.source} onChange={(e) => dispatchFilters({ type: 'setSource', value: e.target.value as any })}>
               <option value="all">Все источники</option>
               <option value="crm">CRM</option>
@@ -850,7 +859,13 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           </div>
         </div>
 
-        <div className="order-list">
+        <div className={`order-list ${searchLoading ? 'order-list--searching' : ''}`}>
+          {searchLoading && (
+            <div className="order-pool-search-hint" role="status">
+              <span className="order-pool-search-hint__pulse" />
+              Обновляем результаты поиска
+            </div>
+          )}
           {filteredOrders.length === 0 ? (
             <p>Нет заказов в пуле, соответствующих фильтрам.</p>
           ) : (
