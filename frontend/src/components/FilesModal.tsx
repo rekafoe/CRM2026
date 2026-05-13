@@ -143,13 +143,18 @@ export const FilesModal: React.FC<FilesModalProps> = ({
         alert(`Файл ещё не готов: ${getExternalStatusLabel(file.externalStatus)}`);
         return;
       }
-      const tab = window.open('', '_blank', 'noopener,noreferrer');
+      const tab = window.open('about:blank', '_blank');
+      if (tab) tab.opener = null;
       try {
         const res = await getOrderFileExternalLink(orderId, file.id);
+        const url = res.data?.url;
+        if (!url) {
+          throw new Error('CRM не вернула ссылку на внешний файл');
+        }
         if (tab) {
-          tab.location.href = res.data.url;
+          tab.location.href = url;
         } else {
-          window.open(res.data.url, '_blank', 'noopener,noreferrer');
+          window.open(url, '_blank', 'noopener,noreferrer');
         }
       } catch (error) {
         if (tab) tab.close();
