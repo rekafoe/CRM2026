@@ -11,7 +11,6 @@ import {
   type DesignTemplate,
 } from '../../api';
 import { filterLikelyImageFiles, isLikelyImageFile, looksLikeHttpUrl } from '../../utils/imageFile';
-import { API_BASE_URL } from '../../config/constants';
 import { Shadow } from 'fabric';
 import {
   MM_TO_PX,
@@ -42,25 +41,26 @@ import type {
 } from './designEditor/types';
 
 import { buildStripItems } from './designEditor/spreadUtils';
-import { PageStrip } from './designEditor/PageStrip';
 import { DesignEditorSidebar } from './designEditor/DesignEditorSidebar';
 import { DesignEditorPanel } from './designEditor/DesignEditorPanel';
-import { DesignEditorToolbar } from './designEditor/DesignEditorToolbar';
-import {
-  DesignEditorCanvas,
-  type DesignEditorCanvasHandle,
-} from './designEditor/DesignEditorCanvas';
-import { CanvasRulers, type GuideLine } from './designEditor/CanvasRulers';
+import type { DesignEditorCanvasHandle } from './designEditor/DesignEditorCanvas';
+import type { GuideLine } from './designEditor/CanvasRulers';
 import { ImagePickerModal } from '../../components/ImagePickerModal';
 import { TextFloatingToolbar } from './designEditor/TextFloatingToolbar';
 import { useDesignEditorViewport } from './designEditor/useDesignEditorViewport';
 import { createDesignSceneGeometry } from './designEditor/designGeometry';
+import { EditorCanvasStage } from '../../features/designEditorShell/EditorCanvasStage';
+import { EditorPageNavigator } from '../../features/designEditorShell/EditorPageNavigator';
+import { EditorTopBar } from '../../features/designEditorShell/EditorTopBar';
+import type { EditorViewOptions } from '../../features/designEditorShell/EditorViewControls';
 import '../../styles/admin-page-layout.css';
 import './DesignEditorPage.css';
 import './designEditor/designEditorGlassTheme.css';
 import './designEditor/designEditorPmThemeChrome.css';
 import './designEditor/designEditorPmButtons.css';
 import './designEditor/designEditorPmButtonsMore.css';
+import '../../features/designEditorShell/editorShell.css';
+import './DesignEditorAdminShell.css';
 
 const SIDEBAR_PHOTO_MAX = 500;
 const DEFAULT_PREPRESS_CONFIG: DesignPrepressConfig = {
@@ -131,7 +131,13 @@ export const DesignEditorPage: React.FC = () => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const fitScalerRef = useRef<HTMLDivElement>(null);
 
-  const [showRulers, setShowRulers] = useState(true);
+  const [viewOptions, setViewOptions] = useState<EditorViewOptions>({
+    showRulers: true,
+    showGuides: true,
+    showBleed: true,
+    showTrim: true,
+    showSafeZone: true,
+  });
   const [stripCollapsed, setStripCollapsed] = useState(false);
   const [guides, setGuides] = useState<GuideLine[]>([]);
   const [snapLines, setSnapLines] = useState<{ axis: 'h' | 'v'; pos: number }[]>([]);
@@ -184,7 +190,7 @@ export const DesignEditorPage: React.FC = () => {
     pageWidthPx: pageW,
     pageHeightPx: pageH,
     bleedPx,
-    showBleed: prepressConfig.showBleed,
+    showBleed: prepressConfig.showBleed && viewOptions.showBleed,
     isSpreadView,
   });
 
@@ -242,11 +248,10 @@ export const DesignEditorPage: React.FC = () => {
   const activeCanvas = useCallback(() => canvasHandleRef.current, []);
 
   // ── UI ──────────────────────────────────────────────────────────────────────
-  const [ui, setUi] = useState<{ showGuides: boolean; sidebarSection: SidebarSection | null }>({
-    showGuides: true,
+  const [ui, setUi] = useState<{ sidebarSection: SidebarSection | null }>({
     sidebarSection: 'photo',
   });
-  const { showGuides, sidebarSection } = ui;
+  const { sidebarSection } = ui;
 
   const [photoPanel, setPhotoPanel] = useState({
     sort: 'name' as 'name' | 'date',
@@ -781,6 +786,17 @@ export const DesignEditorPage: React.FC = () => {
     );
   }
 
+  const adminFragmentLabel = currentStripItem?.label ?? `Страница ${currentPage + 1}`;
+  const adminFragmentDetail = isSpreadView
+    ? 'Редактирование разворота шаблона'
+    : `Страница ${currentPage + 1} из ${pageCount}`;
+  const adminNavigation = {
+    stripItems,
+    isSpreadView,
+    pageLoadKey,
+    spreadPairPages,
+  };
+
   return (
     <AdminPageLayout
       title={`Редактор: ${template.name}`}
@@ -788,8 +804,18 @@ export const DesignEditorPage: React.FC = () => {
       onBack={() => navigate(-1)}
       className="design-editor-fullbleed"
     >
-      <div className="design-editor">
-        <DesignEditorSidebar
+      <div className="public-design-editor public-design-editor--admin">
+        <EditorTopBar
+          templateName={template.name}
+          documentLabel="Админский шаблон"
+          saving={saving}
+          orderLabel="Сохранить"
+          savingLabel="Сохраняем..."
+          onPrimaryAction={() => void handleSave()}
+        />
+
+        <div className="design-editor public-design-editor__workspace public-design-editor__workspace--admin">
+          <DesignEditorSidebar
           activeSection={sidebarSection}
           onSectionChange={(v) => setUi((u) => ({ ...u, sidebarSection: v }))}
         />
@@ -865,65 +891,6 @@ export const DesignEditorPage: React.FC = () => {
             aria-hidden
           />
 
-          <DesignEditorToolbar
-            onAddText={handleAddText}
-            selectedObj={selectedObj}
-            currentPage={currentPage}
-            pageCount={pageCount}
-            onPagePrev={() => {
-              const step = isSpreadView ? 2 : 1;
-              handleGoToPage(Math.max(0, leftPageIdx - step));
-            }}
-            onPageNext={() => {
-              const step = isSpreadView ? 2 : 1;
-              handleGoToPage(Math.min(pageCount - 1, leftPageIdx + step));
-            }}
-            showGuides={showGuides}
-            onGuidesToggle={() => setUi((u) => ({ ...u, showGuides: !u.showGuides }))}
-            onSave={handleSave}
-            saving={saving}
-            onExportPdf={() => void handleExportPdf()}
-            exportingPdf={exportingPdf}
-            exportProgress={exportProgress}
-            onClose={() => navigate(catalogPath)}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onUndo={() => activeCanvas()?.undo()}
-            onRedo={() => activeCanvas()?.redo()}
-            onDeleteSelected={() => activeCanvas()?.deleteSelected()}
-            onDuplicateSelected={() => activeCanvas()?.duplicateSelected()}
-            zoom={zoom}
-            onZoomIn={() => { const c = activeCanvas(); c?.setZoom((c.getZoom() * 1.2)); }}
-            onZoomOut={() => { const c = activeCanvas(); c?.setZoom((c.getZoom() / 1.2)); }}
-            onZoomReset={() => activeCanvas()?.setZoom(1)}
-            onTextColorChange={handleTextColorChange}
-            onFontWeightToggle={handleFontWeightToggle}
-            onFontStyleToggle={handleFontStyleToggle}
-            onUnderlineToggle={handleUnderlineToggle}
-            onTextAlignChange={handleTextAlignChange}
-            onFontChange={handleFontChange}
-            onFontSizeChange={handleFontSizeChange}
-            suppressTextFormat={selectedObj?.type === 'IText' && textFloatingAnchor !== null}
-          />
-
-          <div
-            className={`design-editor-scroll-area${showRulers ? '' : ' no-rulers'}`}
-            ref={scrollAreaRef}
-          >
-          {showRulers && (
-            <CanvasRulers
-              widthMM={isSpreadView ? pageWidth * 2 : pageWidth}
-              heightMM={pageHeight}
-              fitZoom={fitZoom}
-              sceneScale={scale}
-              originX={rulerOrigin.x}
-              originY={rulerOrigin.y}
-              guides={guides}
-              onGuidesChange={setGuides}
-            />
-          )}
-          <div className="design-editor-viewport" ref={viewportRef}>
-
           {editorError && (
             <Alert type="error" onClose={() => setEditorError(null)}>
               {editorError}
@@ -935,86 +902,124 @@ export const DesignEditorPage: React.FC = () => {
             </Alert>
           )}
 
-          <div ref={fitScalerRef} className="design-editor-fit-scaler" data-ready="false">
-
-          {/* Один экземпляр холста: при смене isSpreadView нельзя размонтировать второй canvas — правки теряются. */}
-          <div
-            className={isSpreadView ? 'design-editor-spread-wrap' : 'design-editor-canvas-wrap'}
-          >
-            <div
-              className={isSpreadView ? 'design-editor-spread-book design-editor-spread-book--unified' : 'design-editor-contents'}
-            >
-              <div
-                className={isSpreadView ? 'design-editor-spread-unified-canvas' : 'design-editor-contents'}
-              >
-                <DesignEditorCanvas
-                  ref={canvasHandleRef}
-                  template={template}
-                  pageWidthPx={pageW}
-                  canvasWidthPx={isSpreadView ? pageW * 2 : pageW}
-                  pageHeightPx={pageH}
-                  safeZonePx={safeZonePx}
-                  bleedPx={bleedPx}
-                  showBleed={prepressConfig.showBleed}
-                  showTrim={prepressConfig.showTrim}
-                  showSafeZone={prepressConfig.showSafeZone}
-                  pages={pages}
-                  setPages={setPages}
-                  currentPage={currentPage}
-                  pageLoadKey={pageLoadKey}
-                  spreadPairPages={spreadPairPages}
-                  showGuides={showGuides}
-                  apiBaseUrl={API_BASE_URL}
-                  onSelectionChange={setSelectedObj}
-                  onHistoryChange={(u, r) => {
-                    setCanUndo(u);
-                    setCanRedo(r);
-                  }}
-                  onZoomChange={setZoom}
-                  onPageThumbReady={handlePageThumbReady}
-                  onDropRemoteImageUrl={handleImageUrlSubmit}
-                  getSidebarPhotoFile={(id) => sidebarPhotos.find((p) => p.id === id)?.file}
-                  onSidebarPhotoDropped={removeSidebarPhoto}
-                  guideLinesPx={guideLinesPx}
-                  onSnapLinesChange={setSnapLines}
-                  onTextFloatingAnchor={setTextFloatingAnchor}
-                />
-              </div>
-              {isSpreadView && (
-                <div className="design-editor-spread-fold">
-                  <div className="design-editor-spread-fold-label">
-                    не размещайте на разворотах лица/текст
-                  </div>
+          <EditorCanvasStage
+            template={template}
+            refs={{
+              canvasHandleRef,
+              scrollAreaRef,
+              viewportRef,
+              fitScalerRef,
+            }}
+            fragment={{
+              fragmentLabel: adminFragmentLabel,
+              fragmentDetail: adminFragmentDetail,
+            }}
+            navigation={adminNavigation}
+            document={{
+              currentPage,
+              pages,
+              setPages,
+            }}
+            geometry={{
+              pageWidthPx: pageW,
+              pageHeightPx: pageH,
+              canvasWidthPx: isSpreadView ? pageW * 2 : pageW,
+              safeZonePx,
+              bleedPx,
+              pageWidthMm: pageWidth,
+              pageHeightMm: pageHeight,
+              sceneScale: scale,
+            }}
+            view={{
+              showBleed: prepressConfig.showBleed && viewOptions.showBleed,
+              showTrim: prepressConfig.showTrim && viewOptions.showTrim,
+              showSafeZone: prepressConfig.showSafeZone && viewOptions.showSafeZone,
+              viewOptions,
+              guides,
+              guideLinesPx,
+              fitZoom,
+              rulerOrigin,
+            }}
+            history={{
+              canUndo,
+              canRedo,
+              zoom,
+            }}
+            assets={{
+              sidebarPhotos,
+            }}
+            toolsSlot={(
+              <div className="public-design-editor__admin-actions">
+                <div className="public-design-editor__admin-action-group">
+                  <Button variant="secondary" size="sm" onClick={handleAddText}>+ Текст</Button>
+                  <Button variant="secondary" size="sm" onClick={() => activeCanvas()?.duplicateSelected()} disabled={!selectedObj}>
+                    Дублировать
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => activeCanvas()?.deleteSelected()} disabled={!selectedObj}>
+                    Удалить
+                  </Button>
                 </div>
-              )}
-            </div>
-            {isSpreadView && (
-              <div className="design-editor-spread-label">
-                {currentStripItem?.label ?? `Разворот`}
+                <div className="public-design-editor__admin-action-group">
+                  <Button variant="secondary" size="sm" onClick={() => void handleExportPdf()} disabled={exportingPdf}>
+                    {exportingPdf ? `PDF ${exportProgress}%` : 'PDF'}
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => navigate(catalogPath)}>Закрыть</Button>
+                </div>
               </div>
             )}
-          </div>
+            handlers={{
+              onViewOptionsChange: setViewOptions,
+              onGuidesChange: setGuides,
+              onUndo: () => activeCanvas()?.undo(),
+              onRedo: () => activeCanvas()?.redo(),
+              onZoomOut: () => { const c = activeCanvas(); c?.setZoom((c.getZoom() / 1.2)); },
+              onZoomIn: () => { const c = activeCanvas(); c?.setZoom((c.getZoom() * 1.2)); },
+              onZoomReset: () => activeCanvas()?.setZoom(1),
+              onSelectionChange: setSelectedObj,
+              onHistoryChange: (u, r) => {
+                setCanUndo(u);
+                setCanRedo(r);
+              },
+              onZoomChange: setZoom,
+              onPageThumbReady: handlePageThumbReady,
+              onDropRemoteImageUrl: handleImageUrlSubmit,
+              onSidebarPhotoDropped: removeSidebarPhoto,
+              onSnapLinesChange: setSnapLines,
+            }}
+          />
 
-          </div>{/* /design-editor-fit-scaler */}
-
-          </div>{/* /design-editor-viewport */}
-          </div>{/* /design-editor-scroll-area */}
-
-          <PageStrip
-            items={buildStripItems(pageCount, spreadMode, coverPages)}
+          <EditorPageNavigator
+            pageCount={pageCount}
+            navigationLabel={spreadMode ? 'Развороты шаблона' : 'Страницы шаблона'}
+            navigation={{ stripItems, isSpreadView }}
             currentPage={currentPage}
             thumbnails={thumbnails}
             thumbW={pageW}
             thumbH={pageH}
+            pageWidth={pageWidth}
+            pageHeight={pageHeight}
+            zoom={zoom}
             spreadMode={spreadMode}
+            collapsed={stripCollapsed}
+            canAddPages
+            canAddSpread
+            canDeletePages={pageCount > (spreadMode ? 1 + coverPages : 1)}
+            titleLabel={spreadMode ? 'Менеджер разворотов' : 'Менеджер страниц'}
+            labels={{
+              addPage: 'Добавить страницу',
+              addSpread: 'Добавить разворот',
+              deletePage: 'Удалить последнюю страницу',
+              deleteSpread: 'Удалить последний разворот',
+              pagesMode: 'Режим страниц',
+              spreadsMode: 'Режим разворотов',
+              collapse: 'Свернуть менеджер страниц',
+              expand: 'Развернуть менеджер страниц',
+            }}
             onGoTo={handleGoToPage}
             onAddSpread={handleAddSpread}
             onAddPage={handleAddPage}
             onDeleteLast={handleDeleteLast}
-            canDelete={pageCount > (spreadMode ? 1 + coverPages : 1)}
             onSpreadModeToggle={() => setSpreadMode((v) => !v)}
-            infoLine={`${pageWidth}×${pageHeight} мм · bleed ${prepressConfig.bleedMm} мм · safe ${prepressConfig.safeZoneMm} мм · ${Math.round(zoom * 100)}%`}
-            collapsed={stripCollapsed}
             onCollapse={() => setStripCollapsed((v) => !v)}
           />
         </div>
@@ -1048,6 +1053,7 @@ export const DesignEditorPage: React.FC = () => {
           onSelect={handleImagePickerSelect}
           initialFiles={imagePickerInitialFiles}
         />
+        </div>
       </div>
     </AdminPageLayout>
   );

@@ -1,0 +1,393 @@
+.public-design-editor--client .public-design-editor__workspace {
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 10px;
+  padding: 10px 12px 0;
+}
+
+.public-design-editor--client .public-design-editor__sidepanel {
+  padding: 0;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 20px;
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.1);
+}
+
+.public-design-editor--client .public-design-editor__inspector-head {
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.public-design-editor--client .public-design-editor__inspector-head strong {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.public-design-editor--client .public-design-editor__inspector-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 10px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.public-design-editor--client .public-design-editor__inspector-tab {
+  justify-items: center;
+  padding: 9px 8px;
+  background: #f8fafc;
+  border-color: rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  text-align: center;
+}
+
+.public-design-editor--client .public-design-editor__inspector-tab small {
+  display: none;
+}
+
+.public-design-editor--client .public-design-editor__inspector-section {
+  padding: 12px;
+}
+
+.public-design-editor--client .public-design-editor__photo-library,
+.public-design-editor--client .public-design-editor__tasks,
+.public-design-editor--client .public-design-editor__prep-card,
+.public-design-editor--client .public-design-editor__page-overview,
+.public-design-editor--client .public-design-editor__help {
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.public-design-editor--client .public-design-editor__task-tabs {
+  display: none;
+}
+
+.public-design-editor__page-overview {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  color: var(--pc-ink);
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.public-design-editor__page-overview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.public-design-editor__page-overview-head span {
+  color: var(--pc-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-design-editor__page-overview-head strong {
+  color: var(--pc-ink);
+  font-size: 14px;
+}
+
+.public-design-editor__page-overview-list {
+  display: grid;
+  gap: 8px;
+  max-height: 300px;
+  overflow: auto;
+}
+
+.public-design-editor__page-overview-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 9px 11px;
+  color: var(--pc-ink);
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.public-design-editor__page-overview-item:hover,
+.public-design-editor__page-overview-item--active {
+  background: #ffffff;
+  border-color: rgba(37, 99, 235, 0.24);
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.1);
+}
+
+.public-design-editor__page-overview-item span {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.public-design-editor__page-overview-item b {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.public-design-editor__page-overview-item--ready b {
+  color: #166534;
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.public-design-editor__page-overview-item--warning b {
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.public-design-editor__page-overview-item--error b {
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.public-design-editor--client .public-design-editor__advanced-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 3px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+}
+
+.public-design-editor--client .public-design-editor__advanced-tab {
+  display: inline-flex;
+  width: auto;
+  height: 30px;
+  gap: 6px;
+  padding: 0 10px;
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.public-design-editor--client .public-design-editor__advanced-tab--active {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--pc-cyan), var(--pc-blue));
+  border-color: rgba(37, 99, 235, 0.24);
+}
+
+.public-design-editor--client .public-design-editor__advanced-tab-label {
+  display: inline;
+}
+
+.public-design-editor--client .public-design-editor__advanced-panel {
+  overflow: hidden;
+  color: var(--pc-ink);
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.1);
+  border-radius: 20px;
+}
+
+.public-design-editor--client .public-design-editor__advanced-panel-head {
+  display: grid;
+  gap: 3px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.public-design-editor--client .public-design-editor__advanced-panel-head span {
+  color: var(--pc-cyan);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-design-editor--client .public-design-editor__advanced-panel-head strong {
+  color: var(--pc-ink);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.public-design-editor--client .public-design-editor__advanced-panel .design-editor-panel-header,
+.public-design-editor--client .public-design-editor__advanced-panel .photo-panel__header {
+  display: none;
+}
+
+.public-design-editor__client-tool-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.public-design-editor__client-tool-card p,
+.public-design-editor__client-tool-card span {
+  margin: 0;
+  color: var(--pc-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.public-design-editor__client-tool-primary {
+  min-height: 36px;
+  padding: 8px 13px;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--pc-cyan), var(--pc-blue));
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.public-design-editor__client-tool-primary:hover {
+  filter: brightness(0.98);
+}
+
+.public-design-editor__client-tool-secondary,
+.public-design-editor__client-tool-grid button {
+  min-height: 34px;
+  padding: 8px 11px;
+  color: var(--pc-ink);
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.public-design-editor__client-tool-secondary:hover,
+.public-design-editor__client-tool-grid button:hover {
+  color: var(--pc-blue);
+  background: #ffffff;
+  border-color: rgba(37, 99, 235, 0.24);
+}
+
+.public-design-editor__client-tool-actions,
+.public-design-editor__client-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.public-design-editor__client-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.public-design-editor__client-tool-danger {
+  color: #991b1b !important;
+  background: #fef2f2 !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+.public-design-editor__client-tool-field {
+  display: grid;
+  gap: 6px;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.public-design-editor__client-tool-field--small {
+  flex: 0 0 86px;
+}
+
+.public-design-editor__client-tool-field--color {
+  max-width: 160px;
+}
+
+.public-design-editor__client-tool-field span {
+  color: var(--pc-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-design-editor__client-tool-field textarea,
+.public-design-editor__client-tool-field select,
+.public-design-editor__client-tool-field input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  color: var(--pc-ink);
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px;
+  font: inherit;
+}
+
+.public-design-editor__client-tool-field input[type="color"] {
+  width: 52px;
+  height: 38px;
+  padding: 4px;
+}
+
+.public-design-editor__client-color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 32px);
+  gap: 8px;
+}
+
+.public-design-editor__client-color {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.72);
+}
+
+.public-design-editor__client-color--white {
+  background: #ffffff;
+}
+
+.public-design-editor__client-color--gray {
+  background: #f8fafc;
+}
+
+.public-design-editor__client-color--blue {
+  background: #e0f2fe;
+}
+
+.public-design-editor__client-color--cream {
+  background: #fef3c7;
+}
+
+.public-design-editor__client-color--rose {
+  background: #fee2e2;
+}
+
+.public-design-editor__client-color--dark {
+  background: #111827;
+}
+
+.public-design-editor--client .public-design-editor__page-strip {
+  padding: 10px 12px;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-root {
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 18px;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-add-wrap {
+  display: flex;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-add-btn {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.18);
+  border-radius: 14px;
+}
+
+@media (max-width: 1180px) {
+  .public-design-editor--client .public-design-editor__workspace {
+    grid-template-columns: 1fr;
+  }
+}

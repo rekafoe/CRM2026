@@ -1,0 +1,101 @@
+.public-design-editor--client .public-design-editor__page-strip {
+  padding: 8px 12px 12px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0), rgba(226, 232, 240, 0.5));
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-root {
+  color: var(--pc-ink);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.12);
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-header {
+  min-height: 38px;
+  padding: 9px 12px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-header-title {
+  color: var(--pc-ink);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-header-count,
+.public-design-editor--client .public-design-editor__page-strip .ps-header-info {
+  color: var(--pc-muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-strip {
+  gap: 10px;
+  padding: 10px 12px 12px;
+  background: #f8fafc;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .psitem {
+  min-width: 96px;
+  padding: 8px;
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+}
+
+.public-design-editor--client .public-design-editor__page-strip .psitem:hover,
+.public-design-editor--client .public-design-editor__page-strip .psitem.is-active {
+  background: #ffffff;
+  border-color: rgba(37, 99, 235, 0.32);
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.14);
+}
+
+.public-design-editor--client .public-design-editor__page-strip .psitem-thumbs {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .psitem-label {
+  margin-top: 7px;
+  color: var(--pc-ink);
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .psitem-status-label {
+  max-width: 120px;
+  margin-top: 5px;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-add-wrap {
+  display: flex;
+  align-items: stretch;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-add-btn {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.18);
+  border-radius: 16px;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-del-btn {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
+@media (max-width: 900px) {
+  .public-design-editor--client .public-design-editor__page-strip {
+    padding: 6px 10px 10px;
+  }
+
+  .public-design-editor--client .public-design-editor__page-strip .ps-header-info {
+    display: none;
+  }
+}

@@ -35,25 +35,26 @@ function normAbsScaleMag(s: unknown): number {
   return Math.abs(v);
 }
 
-/** Размер ячейки: у пустого поля — локальный размер серого rect × его scale (масштаб родительской группы копируется на новую группу и второй раз не делится). */
+/** Размер ячейки в сцене: ручной scale поля запекается в frameW/frameH перед заполнением. */
 export function resolvePhotoFieldFrameSize(field: FabricObject): { fw: number; fh: number } {
   const surface = pickEmptyPhotoFieldFrameRect(field);
   if (surface != null) {
     const iw = Math.abs(Number(surface.width) || 0);
     const ih = Math.abs(Number(surface.height) || 0);
+    const gsx = normAbsScaleMag((field as { scaleX?: unknown }).scaleX);
+    const gsy = normAbsScaleMag((field as { scaleY?: unknown }).scaleY);
     if (iw >= 1 && ih >= 1) {
-      const fw0 = iw * normAbsScaleMag(surface.scaleX);
-      const fh0 = ih * normAbsScaleMag(surface.scaleY);
+      const fw0 = iw * normAbsScaleMag(surface.scaleX) * gsx;
+      const fh0 = ih * normAbsScaleMag(surface.scaleY) * gsy;
       return { fw: Math.max(1, fw0), fh: Math.max(1, fh0) };
     }
     const br = surface.getBoundingRect();
-    const gsx = normAbsScaleMag((field as { scaleX?: unknown }).scaleX);
-    const gsy = normAbsScaleMag((field as { scaleY?: unknown }).scaleY);
     return {
-      fw: Math.max(1, br.width / gsx),
-      fh: Math.max(1, br.height / gsy),
+      fw: Math.max(1, br.width),
+      fh: Math.max(1, br.height),
     };
-  }  const mw = Math.max(1, field.getScaledWidth());
+  }
+  const mw = Math.max(1, field.getScaledWidth());
   const mh = Math.max(1, field.getScaledHeight());
   const o = ax(field);
   const pW = Number(o.photoFieldFw);

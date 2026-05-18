@@ -30,7 +30,8 @@ import {
 } from './constants';
 import type { TextBlockPresetKind } from './constants';
 import { isLikelyImageFile, looksLikeHttpUrl } from '../../../utils/imageFile';
-import { computeSnap } from './snapGuide';
+import { createSmartGuideSession, resolveSmartGuideSnapAtPointer } from './smartGuides/snapSession';
+import type { SmartGuidePointer, SmartGuideSession } from './smartGuides/types';
 import { splitSpreadCanvasToPagesSync } from './spreadCanvas';
 import { PrepressOverlay } from './PrepressOverlay';
 import {
@@ -48,6 +49,11 @@ import {
 } from './photoFieldGeometry';
 import { PhotoFieldCropModal } from './PhotoFieldCropModal';
 import { findPhotoFieldAtScene } from './photoFieldHitTest';
+import {
+  clearPhotoFieldDropHighlight,
+  createPhotoFieldDropHighlightState,
+  updatePhotoFieldDropHighlight,
+} from './photoFieldDropHighlight';
 import {
   fabricDeserializeReviver,
   loadDesignPageScene,
@@ -77,7 +83,7 @@ export interface DesignEditorCanvasHandle {
   addTextPreset: (kind: TextBlockPresetKind) => void;
   addImageFromFile: (file: File) => Promise<void>;
   addImageFromUrl: (url: string) => Promise<void>;
-  addPhotoField: () => void;
+  addPhotoField: (options?: { width?: number; height?: number }) => void;
   /** Создаёт набор пустых полей для фото по шаблону коллажа. */
   applyCollageLayout: (layout: CollageLayout, paddingPercent: number) => void;
   /** Подставляет свободные изображения на макете в пустые поля для фото (по порядку объектов). */
@@ -166,6 +172,10 @@ interface DesignEditorCanvasProps {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 type AnyObj = Record<string, unknown>;
+type FabricDragTransform = {
+  offsetX?: number;
+  offsetY?: number;
+};
 
 /** Применяет ограничения basic-режима к объектам холста */
 function applyBasicModeConstraints(canvas: Canvas): void {
@@ -242,6 +252,13 @@ function releaseBasicModeConstraints(canvas: Canvas): void {
 
 function asAny(obj: unknown): AnyObj {
   return obj as unknown as AnyObj;
+}
+
+function keepGrabPointAlignedWithSnap(event: unknown, dx: number, dy: number): void {
+  const transform = (event as { transform?: FabricDragTransform }).transform;
+  if (!transform) return;
+  if (dx !== 0 && typeof transform.offsetX === 'number') transform.offsetX -= dx;
+  if (dy !== 0 && typeof transform.offsetY === 'number') transform.offsetY -= dy;
 }
 
 /** Поле для фото может быть внутри группы; `canvas.getObjects().find` его не находит. */
@@ -517,6 +534,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const photoPasteSceneRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const [localSnapLines, setLocalSnapLines] = useState<{ axis: 'h' | 'v'; pos: number }[]>([]);
     const snapOverlayKeyRef = useRef('');
+    const smartGuideSessionRef = useRef<SmartGuideSession | null>(null);
+    const photoFieldDropHighlightRef = useRef(createPhotoFieldDropHighlightState());
 
     /** Модалка смещения кадра (cover) в заполненном поле для фото */
     const [cropModal, setCropModal] = useState<{
@@ -552,6 +571,24 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       historyRef.current = { stack: newStack, index: newStack.length - 1 };
       onHistoryChange(newStack.length > 1, false);
     }, [onHistoryChange]);
+
+    const fillPhotoFieldWithSnapshot = useCallback(
+      async (canvas: Canvas, field: FabricObject, file: File): Promise<void> => {
+        let changed = false;
+        isLoadingRef.current = true;
+        try {
+          await fillPhotoField(canvas, field, file, resolveImageFileUrlRef.current, () => {
+            if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+            else releaseBasicModeConstraints(canvas);
+          });
+          changed = true;
+        } finally {
+          isLoadingRef.current = false;
+        }
+        if (changed) saveSnapshot();
+      },
+      [saveSnapshot],
+    );
 
     const undo = useCallback(async () => {
       const canvas = fabricRef.current;
@@ -660,50 +697,71 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       canvas.on('object:added', () => { if (!isLoadingRef.current) saveSnapshot(); });
       canvas.on('object:removed', () => { if (!isLoadingRef.current) saveSnapshot(); });
 
-      // Smart snapping on move
+      // Smart guides: targets are fixed for one drag, hysteresis keeps snapping stable.
       canvas.on('object:moving', (opt) => {
         const target = opt.target;
         if (!target) return;
         if (target.lockMovementX && target.lockMovementY) return;
         const brT = target.getBoundingRect();
-        const excludePeerSnap =
-          !!(asAny(target).isPhotoField || (target.group && asAny(target.group).isPhotoField));
-        const others = excludePeerSnap
-          ? []
-          : canvas
-              .getObjects()
-              .filter((o) => o !== target && !(asAny(o).isBackground))
-              .map((o) => {
-                const r = o.getBoundingRect();
-                return {
-                  left: r.left,
-                  top: r.top,
-                  width: r.width,
-                  height: r.height,
-                  scaleX: 1,
-                  scaleY: 1,
-                };
-              });
-        const cW = canvas.getWidth() ?? canvasWidthRef.current;
-        const snap = computeSnap(
+        let snapPointer: SmartGuidePointer | undefined;
+        try {
+          if (opt.e) {
+            const pointer = canvas.getScenePoint(opt.e);
+            snapPointer = { x: pointer.x, y: pointer.y };
+          }
+        } catch {
+          snapPointer = undefined;
+        }
+        if (!smartGuideSessionRef.current) {
+          const excludePeerSnap =
+            !!(asAny(target).isPhotoField || (target.group && asAny(target.group).isPhotoField));
+          const others = excludePeerSnap
+            ? []
+            : canvas
+                .getObjects()
+                .filter((o) => o !== target && !(asAny(o).isBackground))
+                .map((o) => {
+                  const r = o.getBoundingRect();
+                  return {
+                    left: r.left,
+                    top: r.top,
+                    width: r.width,
+                    height: r.height,
+                  };
+                });
+          smartGuideSessionRef.current = createSmartGuideSession({
+            activeRect: {
+              left: brT.left,
+              top: brT.top,
+              width: brT.width,
+              height: brT.height,
+            },
+            pointer: snapPointer,
+            otherObjects: others,
+            guidesPx: guidesRef.current ?? [],
+            canvasW: canvas.getWidth() ?? canvasWidthRef.current,
+            canvasH: pageHeightPx,
+            safeZonePx,
+            spreadHalfWidthPx: spreadPairPagesRef.current ? pageWidthRef.current : undefined,
+          });
+        }
+        const snap = resolveSmartGuideSnapAtPointer(
+          smartGuideSessionRef.current,
           {
             left: brT.left,
             top: brT.top,
             width: brT.width,
             height: brT.height,
-            scaleX: 1,
-            scaleY: 1,
           },
-          others,
-          guidesRef.current ?? [],
-          cW,
-          pageHeightPx,
-          safeZonePx,
-          spreadPairPagesRef.current ? { spreadHalfWidthPx: pageWidthRef.current } : undefined,
+          snapPointer,
         );
+        smartGuideSessionRef.current = snap.session;
         if (snap.dx !== 0) target.set('left', (target.left ?? 0) + snap.dx);
         if (snap.dy !== 0) target.set('top', (target.top ?? 0) + snap.dy);
-        if (snap.dx !== 0 || snap.dy !== 0) target.setCoords();
+        if (snap.dx !== 0 || snap.dy !== 0) {
+          keepGrabPointAlignedWithSnap(opt, snap.dx, snap.dy);
+          target.setCoords();
+        }
         const sig = snapLinesSignature(snap.lines);
         if (sig !== snapOverlayKeyRef.current) {
           snapOverlayKeyRef.current = sig;
@@ -712,6 +770,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         }
       });
       const clearSnaps = () => {
+        smartGuideSessionRef.current = null;
         snapOverlayKeyRef.current = '';
         setLocalSnapLines([]);
         snapLinesRef.current?.([]);
@@ -786,11 +845,22 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         const onDragOver = (e: DragEvent) => {
           e.preventDefault();
           if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+          const { x, y } = scenePointFromDrop(e);
+          updatePhotoFieldDropHighlight(
+            canvas,
+            photoFieldDropHighlightRef.current,
+            findPhotoFieldAtScene(canvas, x, y),
+          );
         };
 
         const scenePointFromDrop = (e: DragEvent) => {
           const p = canvas.getScenePoint(e);
           return { x: p.x, y: p.y };
+        };
+
+        const onDragLeave = (e: DragEvent) => {
+          if (wrapper.contains(e.relatedTarget as Node | null)) return;
+          clearPhotoFieldDropHighlight(canvas, photoFieldDropHighlightRef.current);
         };
 
         const onDrop = async (e: DragEvent) => {
@@ -800,6 +870,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 
           const { x, y } = scenePointFromDrop(e);
           const hit = findPhotoFieldAtScene(canvas, x, y);
+          clearPhotoFieldDropHighlight(canvas, photoFieldDropHighlightRef.current);
 
           const sidebarRaw = dt.getData(SIDEBAR_PHOTO_DRAG_MIME);
           if (sidebarRaw) {
@@ -817,10 +888,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             if (photoId && sideFile && isLikelyImageFile(sideFile)) {
               try {
                 if (hit) {
-                  await fillPhotoField(canvas, hit, sideFile, resolveImageFileUrlRef.current, () => {
-                    if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
-                    else releaseBasicModeConstraints(canvas);
-                  });
+                  await fillPhotoFieldWithSnapshot(canvas, hit, sideFile);
                 } else {
                   await addImageFileToCanvas(canvas, sideFile, resolveImageFileUrlRef.current);
                 }
@@ -835,10 +903,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           const file = Array.from(dt.files ?? []).find((f) => isLikelyImageFile(f));
           if (file) {
             if (hit) {
-              await fillPhotoField(canvas, hit, file, resolveImageFileUrlRef.current, () => {
-                if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
-                else releaseBasicModeConstraints(canvas);
-              });
+              await fillPhotoFieldWithSnapshot(canvas, hit, file);
             } else {
               await addImageFileToCanvas(canvas, file, resolveImageFileUrlRef.current);
             }
@@ -864,9 +929,11 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         };
 
         wrapper.addEventListener('dragover', onDragOver);
+        wrapper.addEventListener('dragleave', onDragLeave);
         wrapper.addEventListener('drop', onDrop);
         removeCanvasDropListeners = () => {
           wrapper.removeEventListener('dragover', onDragOver);
+          wrapper.removeEventListener('dragleave', onDragLeave);
           wrapper.removeEventListener('drop', onDrop);
         };
       }
@@ -931,10 +998,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             void (async () => {
               const hit = findPhotoFieldAtScene(canvas, p.x, p.y);
               if (hit) {
-                await fillPhotoField(canvas, hit, file, resolveImageFileUrlRef.current, () => {
-                  if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
-                  else releaseBasicModeConstraints(canvas);
-                });
+                await fillPhotoFieldWithSnapshot(canvas, hit, file);
               } else {
                 await addImageFileToCanvas(canvas, file, resolveImageFileUrlRef.current);
               }
@@ -1097,10 +1161,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       if (targetId) {
         const field = findPhotoFieldByIdDeep(canvas, targetId);
         if (field) {
-          await fillPhotoField(canvas, field, file, resolveImageFileUrlRef.current, () => {
-            if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
-            else releaseBasicModeConstraints(canvas);
-          });
+          await fillPhotoFieldWithSnapshot(canvas, field, file);
           return;
         }
       }
@@ -1192,15 +1253,17 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         if (!canvas) return;
         await addImageFileToCanvas(canvas, file, resolveImageFileUrlRef.current);
       },
-      addPhotoField: () => {
+      addPhotoField: (options) => {
         const canvas = fabricRef.current;
         if (!canvas || modeRef.current === 'basic') return;
+        const width = Math.max(32, Number(options?.width) || 140);
+        const height = Math.max(32, Number(options?.height) || width);
         const field = createPhotoFieldGroup({
           id: `field-${Date.now()}`,
-          left: canvas.width! / 2 - 70,
-          top: canvas.height! / 2 - 70,
-          width: 140,
-          height: 140,
+          left: canvas.width! / 2 - width / 2,
+          top: canvas.height! / 2 - height / 2,
+          width,
+          height,
         });
         canvas.add(field);
         canvas.setActiveObject(field);
@@ -1281,10 +1344,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           const dataUrl = src.toDataURL({ format: 'png', multiplier: 1 });
           const blob = await fetch(dataUrl).then((r) => r.blob());
           const file = new File([blob], `autofill-${i}.png`, { type: 'image/png' });
-          await fillPhotoField(canvas, field, file, resolveImageFileUrlRef.current, () => {
-            if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
-            else releaseBasicModeConstraints(canvas);
-          });
+          await fillPhotoFieldWithSnapshot(canvas, field, file);
           if (src.canvas === canvas) canvas.remove(src);
         }
         canvas.discardActiveObject();
@@ -1733,11 +1793,14 @@ function detachFabricObject(canvas: Canvas, obj: FabricObject): void {
 }
 
 /** Снимок трансформа без позиции. origin не копируем — заполненная группа всегда LT, иначе setXY по углу рамки даёт артефакты при center/center у плейсхолдера. */
-function snapshotPhotoFieldTransformNoPosition(field: FabricObject): Record<string, unknown> {
+function snapshotPhotoFieldTransformNoPosition(
+  field: FabricObject,
+  options?: { bakeScaleIntoFrame?: boolean },
+): Record<string, unknown> {
   return {
     angle: field.angle ?? 0,
-    scaleX: field.scaleX ?? 1,
-    scaleY: field.scaleY ?? 1,
+    scaleX: options?.bakeScaleIntoFrame ? 1 : (field.scaleX ?? 1),
+    scaleY: options?.bakeScaleIntoFrame ? 1 : (field.scaleY ?? 1),
     skewX: field.skewX ?? 0,
     skewY: field.skewY ?? 0,
     flipX: !!field.flipX,
@@ -1790,7 +1853,7 @@ async function fillPhotoField(
     const panY = Number(f.photoFieldPanY ?? 0);
 
     const anchorSceneTL = resolvePhotoFieldFrameSceneTL(field);
-    const placementSnap = snapshotPhotoFieldTransformNoPosition(field);
+    const placementSnap = snapshotPhotoFieldTransformNoPosition(field, { bakeScaleIntoFrame: true });
 
     const parent = field.group;
     const stackIndex =

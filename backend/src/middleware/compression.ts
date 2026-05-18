@@ -12,6 +12,15 @@ function isUploadsOrStaticPath(req: Request): boolean {
   )
 }
 
+function isBinaryFileResponsePath(req: Request): boolean {
+  const path = req.path || ''
+  const base = (req.originalUrl || '').split('?')[0] || path
+  return (
+    /\/api\/public-editor\/drafts\/[^/]+\/files\/[0-9]+\/content\/?$/.test(path) ||
+    /\/api\/public-editor\/drafts\/[^/]+\/files\/[0-9]+\/content\/?$/.test(base)
+  )
+}
+
 export function compressionMiddleware(req: Request, res: Response, next: NextFunction) {
   // Исключаем Swagger UI из сжатия, чтобы избежать проблем с отображением
   if (req.path.startsWith('/api-docs')) {
@@ -19,6 +28,10 @@ export function compressionMiddleware(req: Request, res: Response, next: NextFun
   }
   // Не сжимаем изображения и файлы — PNG/JPEG уже сжаты; gzip + бинарники даёт сбои у HTTP/2/прокси
   if (isUploadsOrStaticPath(req)) {
+    return next()
+  }
+  // Draft-файлы редактора отдаются через sendFile; нельзя заранее ставить Content-Encoding.
+  if (isBinaryFileResponsePath(req)) {
     return next()
   }
   // Не сжимаем скачивание файлов заказов — отдаём бинарные данные как есть

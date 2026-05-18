@@ -164,7 +164,9 @@ CRM-экран доступен по `/photo-batch-editor?orderId=...&orderItemI
 - Sandbox-страница клиентского редактора для проверки пользовательского экземпляра.
 - Загрузка шаблона из `spec.designState`.
 - Фото-поля, текстовые поля, изображения, фон, страницы/развороты.
+- Фото-поля сохраняют ручной размер при заполнении фото; в клиентской панели есть быстрые формы поля: квадрат, горизонтальное, вертикальное, широкое.
 - Prepress-зоны: bleed, trim, safe zone.
+- Smart Guides при перетаскивании объектов: стабильная drag-сессия, hysteresis и привязка к safe zone, центрам страниц/разворотов, ручным направляющим и краям/центрам объектов.
 - Коллажи из `collage_templates`.
 - Экспорт всех страниц в PDF из CRM-редактора.
 - CRM-вход «Создать макет» из `FilesModal` отключён, чтобы операторы не попадали в старый смешанный flow.
@@ -190,6 +192,7 @@ CRM-экран доступен по `/photo-batch-editor?orderId=...&orderItemI
 | Клиентская фотопечать через draft | `frontend/src/features/clientEditor/ClientPhotoBatchEditor.tsx` |
 | CRM-редактор | `frontend/src/pages/admin/DesignEditorPage.tsx` |
 | Canvas и операции Fabric.js | `frontend/src/pages/admin/designEditor/DesignEditorCanvas.tsx` |
+| Smart Guides / snapping | `frontend/src/pages/admin/designEditor/smartGuides/` |
 | Типы `DesignState` | `frontend/src/pages/admin/designEditor/types.ts` |
 | Загрузка страниц/фона | `frontend/src/pages/admin/designEditor/designPageLoader.ts` |
 | Геометрия canvas/prepress | `frontend/src/pages/admin/designEditor/designGeometry.ts` |

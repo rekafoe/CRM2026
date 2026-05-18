@@ -2,6 +2,24 @@ import React, { useRef, useEffect } from 'react';
 import type { StripItem } from './spreadUtils';
 import { findStripItemForPage } from './spreadUtils';
 
+export interface PageStripStatus {
+  tone: 'ready' | 'warning' | 'error';
+  label: string;
+}
+
+export interface PageStripLabels {
+  titlePages?: string;
+  titleSpreads?: string;
+  addPage?: string;
+  addSpread?: string;
+  deletePage?: string;
+  deleteSpread?: string;
+  pagesMode?: string;
+  spreadsMode?: string;
+  collapse?: string;
+  expand?: string;
+}
+
 interface PageStripProps {
   items: StripItem[];
   currentPage: number;
@@ -14,10 +32,16 @@ interface PageStripProps {
   onAddPage: () => void;
   onDeleteLast: () => void;
   canDelete: boolean;
+  canAdd?: boolean;
+  canAddPage?: boolean;
+  canAddSpread?: boolean;
   onSpreadModeToggle: () => void;
   infoLine?: string;
   collapsed?: boolean;
   onCollapse?: () => void;
+  pageStatuses?: Record<number, PageStripStatus>;
+  titleLabel?: string;
+  labels?: PageStripLabels;
 }
 
 const STRIP_THUMB_H = 82;
@@ -34,10 +58,16 @@ export const PageStrip: React.FC<PageStripProps> = ({
   onAddPage,
   onDeleteLast,
   canDelete,
+  canAdd = true,
+  canAddPage,
+  canAddSpread,
   onSpreadModeToggle,
   infoLine,
   collapsed = false,
   onCollapse,
+  pageStatuses,
+  titleLabel,
+  labels,
 }) => {
   const stripRef = useRef<HTMLDivElement>(null);
   const activeIdx = findStripItemForPage(items, currentPage);
@@ -51,6 +81,9 @@ export const PageStrip: React.FC<PageStripProps> = ({
 
   const ratio = thumbH > 0 ? thumbW / thumbH : 1;
   const singleW = Math.round(STRIP_THUMB_H * ratio);
+  const allowAddPage = canAddPage ?? canAdd;
+  const allowAddSpread = canAddSpread ?? canAdd;
+  const canAddCurrentMode = spreadMode ? allowAddSpread : allowAddPage;
 
   return (
     <div className={`ps-root${collapsed ? ' is-collapsed' : ''}`}>
@@ -59,7 +92,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
         <div className="ps-header-left">
           {onCollapse && (
             <button type="button" className="ps-collapse-btn" onClick={onCollapse}
-              title={collapsed ? 'Развернуть' : 'Свернуть'}>
+              title={collapsed ? (labels?.expand ?? 'Развернуть') : (labels?.collapse ?? 'Свернуть')}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -77,7 +110,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
             </svg>
           )}
           <span className="ps-header-title">
-            {spreadMode ? 'Менеджер разворотов' : 'Менеджер страниц'}
+            {titleLabel ?? (spreadMode ? (labels?.titleSpreads ?? 'Менеджер разворотов') : (labels?.titlePages ?? 'Менеджер страниц'))}
           </span>
           <span className="ps-header-count">
             {spreadMode
@@ -92,12 +125,12 @@ export const PageStrip: React.FC<PageStripProps> = ({
 
         <div className="ps-header-right">
           {/* Переключатель режима */}
-          <div className="ps-mode-toggle" title={spreadMode ? 'Режим разворотов' : 'Режим страниц'}>
+          <div className="ps-mode-toggle" title={spreadMode ? (labels?.spreadsMode ?? 'Режим разворотов') : (labels?.pagesMode ?? 'Режим страниц')}>
             <button
               type="button"
               className={`ps-mode-btn${!spreadMode ? ' is-active' : ''}`}
               onClick={() => spreadMode && onSpreadModeToggle()}
-              title="Режим страниц"
+              title={labels?.pagesMode ?? 'Режим страниц'}
             >
               <svg width="10" height="12" viewBox="0 0 10 12" fill="none">
                 <rect x="0.75" y="0.75" width="8.5" height="10.5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
@@ -107,7 +140,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
               type="button"
               className={`ps-mode-btn${spreadMode ? ' is-active' : ''}`}
               onClick={() => !spreadMode && onSpreadModeToggle()}
-              title="Режим разворотов"
+              title={labels?.spreadsMode ?? 'Режим разворотов'}
             >
               <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
                 <rect x="0.75" y="0.75" width="6.5" height="10.5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
@@ -125,6 +158,8 @@ export const PageStrip: React.FC<PageStripProps> = ({
           const isActive = idx === activeIdx;
           const isSpread = item.pages.length === 2;
           const thumbsW = isSpread ? singleW * 2 + 2 : singleW;
+          const itemStatus = resolveStripItemStatus(item.pages, pageStatuses);
+          const itemTitle = itemStatus ? `${item.label}: ${itemStatus.label}` : item.label;
 
           return (
             <button
@@ -132,7 +167,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
               type="button"
               className={`psitem${isActive ? ' is-active' : ''}`}
               onClick={() => onGoTo(item.goToPage)}
-              title={item.label}
+              title={itemTitle}
             >
               <div className="psitem-thumbs" style={{ width: thumbsW, height: STRIP_THUMB_H }}>
                 {item.pages.map((pIdx, pi) => (
@@ -158,49 +193,73 @@ export const PageStrip: React.FC<PageStripProps> = ({
                         </svg>
                       </div>
                     )}
+                    {pageStatuses?.[pIdx] && (
+                      <span
+                        className={`psitem-status psitem-status--${pageStatuses[pIdx].tone}`}
+                        aria-label={pageStatuses[pIdx].label}
+                      />
+                    )}
                     {isSpread && pi === 0 && <div className="psitem-spine" />}
                   </div>
                 ))}
               </div>
               <span className="psitem-label">{item.label}</span>
+              {itemStatus && <span className={`psitem-status-label psitem-status-label--${itemStatus.tone}`}>{itemStatus.label}</span>}
             </button>
           );
         })}
 
-        {/* Добавить */}
-        <div className="ps-add-wrap">
-          <button
-            type="button"
-            className="ps-add-btn"
-            style={{ height: STRIP_THUMB_H }}
-            onClick={spreadMode ? onAddSpread : onAddPage}
-            title={spreadMode ? 'Добавить разворот' : 'Добавить страницу'}
-          >
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-              <circle cx="11" cy="11" r="10" stroke="currentColor" strokeWidth="1.5"/>
-              <line x1="11" y1="6" x2="11" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <line x1="6" y1="11" x2="16" y2="11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            <span className="ps-add-label">
-              {spreadMode ? 'Добавить\nразворот' : 'Добавить\nстраницу'}
-            </span>
-          </button>
+        {(canAddCurrentMode || canDelete) && (
+          <div className="ps-add-wrap">
+            {canAddCurrentMode && (
+              <button
+                type="button"
+                className="ps-add-btn"
+                style={{ height: STRIP_THUMB_H }}
+                onClick={spreadMode ? onAddSpread : onAddPage}
+                title={spreadMode ? (labels?.addSpread ?? 'Добавить разворот') : (labels?.addPage ?? 'Добавить страницу')}
+              >
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                  <circle cx="11" cy="11" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                  <line x1="11" y1="6" x2="11" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <line x1="6" y1="11" x2="16" y2="11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <span className="ps-add-label">
+                  {spreadMode ? (labels?.addSpread ?? 'Добавить\nразворот') : (labels?.addPage ?? 'Добавить\nстраницу')}
+                </span>
+              </button>
+            )}
 
-          {canDelete && (
+            {canDelete && (
             <button
               type="button"
               className="ps-del-btn"
               onClick={onDeleteLast}
-              title={spreadMode ? 'Удалить последний разворот' : 'Удалить последнюю страницу'}
+              title={spreadMode ? (labels?.deleteSpread ?? 'Удалить последний разворот') : (labels?.deletePage ?? 'Удалить последнюю страницу')}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <line x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                 <line x1="10.5" y1="1.5" x2="1.5" y2="10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
               </svg>
             </button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+function resolveStripItemStatus(
+  pages: number[],
+  pageStatuses?: Record<number, PageStripStatus>,
+): PageStripStatus | null {
+  if (!pageStatuses) return null;
+  const statuses = pages.map((pageIndex) => pageStatuses[pageIndex]).filter(Boolean);
+  if (statuses.length === 0) return null;
+  const errorStatus = statuses.find((status) => status.tone === 'error');
+  if (errorStatus) return errorStatus;
+  const warningStatus = statuses.find((status) => status.tone === 'warning');
+  if (warningStatus) return warningStatus;
+  return { tone: 'ready', label: 'Готово' };
+}
