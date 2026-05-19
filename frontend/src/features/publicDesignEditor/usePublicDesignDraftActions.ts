@@ -9,6 +9,7 @@ import type { PageSaveSnapshot } from '../../pages/admin/designEditor/mergePages
 import type { DesignPage, DesignPrepressConfig } from '../../pages/admin/designEditor/types';
 import { analyzePublicDesignPages } from './publicDesignPreflight';
 import type { PublicDesignEditorAdapter } from './publicDesignEditorAdapter';
+import type { PublicEditorDraftFile } from '../../api';
 import type { PublicDesignDocumentMode } from './useDesignDocumentNavigation';
 import type { PublicDesignPageSpec } from './usePublicDesignPageActions';
 
@@ -78,6 +79,7 @@ export function usePublicDesignDraftActions({
   onReadyForCart,
 }: UsePublicDesignDraftActionsInput) {
   const savedDirtyVersionRef = useRef(0);
+  const draftVersionRef = useRef<number | null>(null);
 
   const ensureDraft = useCallback(async () => {
     if (draftToken) return draftToken;
@@ -88,6 +90,7 @@ export function usePublicDesignDraftActions({
     });
     const token = res.token;
     if (!token) throw new Error('Не удалось подготовить макет.');
+    draftVersionRef.current = typeof res.version === 'number' ? res.version : null;
     setDraftToken(token);
     onDraftTokenChange?.(token);
     return token;
@@ -138,7 +141,11 @@ export function usePublicDesignDraftActions({
       if (!silent) setStatus(null);
       const token = await ensureDraft();
       const { pages: updatedPages, designState } = await buildCurrentDesignState();
-      await adapter.updateDraft(token, { designState });
+      const savedDraft = await adapter.updateDraft(token, {
+        designState,
+        ...(draftVersionRef.current ? { expectedVersion: draftVersionRef.current } : {}),
+      });
+      if (savedDraft && typeof savedDraft.version === 'number') draftVersionRef.current = savedDraft.version;
       setPages(updatedPages);
       savedDirtyVersionRef.current = dirtyVersion;
       setSaveState('saved');
@@ -170,11 +177,18 @@ export function usePublicDesignDraftActions({
     return () => window.clearTimeout(timer);
   }, [autosaveDelayMs, dirtyVersion, handleSaveDraft, loading, saving]);
 
-  const resolveImageFileUrl = useCallback(async (file: File) => {
+  const resolveImageAsset = useCallback(async (
+    file: File,
+    onProgress?: (progress: number) => void,
+  ): Promise<PublicEditorDraftFile> => {
     const token = await ensureDraft();
-    const uploaded = await adapter.uploadDraftFile(token, file);
-    return uploaded.url;
+    return adapter.uploadDraftFile(token, file, onProgress);
   }, [adapter, ensureDraft]);
+
+  const resolveImageFileUrl = useCallback(async (file: File) => {
+    const uploaded = await resolveImageAsset(file);
+    return uploaded.url;
+  }, [resolveImageAsset]);
 
   const handleFinalize = useCallback(async () => {
     try {
@@ -234,6 +248,7 @@ export function usePublicDesignDraftActions({
     handleFinalize,
     handleReadyForCart,
     handleSaveDraft,
+    resolveImageAsset,
     resolveImageFileUrl,
   };
 }

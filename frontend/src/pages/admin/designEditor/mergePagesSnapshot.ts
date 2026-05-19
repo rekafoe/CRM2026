@@ -10,12 +10,16 @@ export function mergePagesWithSavedSnapshot(
   saved: PageSaveSnapshot,
   ctx: { currentPage: number; leftPageIdx: number; rightPageIdx: number },
 ): DesignPage[] {
+  const requiredLength = saved.kind === 'spread'
+    ? Math.max(pages.length, ctx.leftPageIdx + 1, ctx.rightPageIdx + 1)
+    : Math.max(pages.length, ctx.currentPage + 1);
+  const normalizedPages = Array.from({ length: requiredLength }, (_, index) => pages[index] ?? { fabricJSON: {} });
   if (saved.kind === 'spread') {
-    return pages.map((p, i) => {
+    return normalizedPages.map((p, i) => {
       if (i === ctx.leftPageIdx) return { fabricJSON: saved.left };
       if (i === ctx.rightPageIdx) return { fabricJSON: saved.right };
       return p;
     });
   }
-  return pages.map((p, i) => (i === ctx.currentPage ? { fabricJSON: saved.json } : p));
+  return normalizedPages.map((p, i) => (i === ctx.currentPage ? { fabricJSON: saved.json } : p));
 }

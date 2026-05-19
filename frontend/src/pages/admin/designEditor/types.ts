@@ -48,7 +48,15 @@ export interface SidebarPhotoItem {
   id: string;
   name: string;
   previewUrl: string;
+  fallbackPreviewUrl?: string;
   file: File;
+  fileId?: number;
+  url?: string;
+  thumbUrl?: string | null;
+  uploadStatus?: 'queued' | 'uploading' | 'ready' | 'error';
+  uploadProgress?: number;
+  uploadError?: string;
+  used?: boolean;
   addedAt: number;
 }
 

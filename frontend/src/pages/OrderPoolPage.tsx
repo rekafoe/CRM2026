@@ -292,10 +292,11 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     );
   }, []);
 
-  const loadOrders = useCallback(async (options: { activeOnly?: boolean; query?: string } = {}) => {
+  const loadOrders = useCallback(async (options: { activeOnly?: boolean; query?: string; soft?: boolean } = {}) => {
     const requestSeq = ++searchRequestSeqRef.current;
     const query = options.query?.trim();
     const isSearch = Boolean(query);
+    const useSoftLoading = isSearch || options.soft === true;
     const canSearch = query && (/^(#|ORD-|site-ord-|tg-ord-)?\d+$/i.test(query) || query.length >= 3);
     if (query && !canSearch) {
       setOrders([]);
@@ -304,7 +305,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       return;
     }
     try {
-      if (isSearch) {
+      if (useSoftLoading) {
         setSearchLoading(true);
       } else {
         setLoading(true);
@@ -328,7 +329,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       setError('Не удалось загрузить заказы.');
     } finally {
       if (requestSeq !== searchRequestSeqRef.current) return;
-      if (isSearch) {
+      if (useSoftLoading) {
         setSearchLoading(false);
       } else {
         setLoading(false);
@@ -466,7 +467,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
   useEffect(() => {
     if (!isInitialized) return;
     const query = filters.searchTerm.trim();
-    loadOrders(query ? { query } : { activeOnly: true });
+    loadOrders(query ? { query } : { activeOnly: true, soft: true });
   }, [filters.searchTerm, isInitialized, loadOrders]);
 
   useEffect(() => {

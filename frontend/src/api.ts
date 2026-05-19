@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type AxiosProgressEvent } from 'axios';
 import { calculatePrice as unifiedCalculatePrice } from './services/pricing';
 import { Order, Item, PresetCategory, MaterialRow, Material, DailyReport, UserRef, OrderFile, Printer, APP_CONFIG, Customer, CustomerLegalDocument, DocumentTemplate, TemplateData, OrderActivityResponse } from './types';
 import { API_BASE_URL } from './config/constants';
@@ -1114,13 +1114,22 @@ export const getPublicEditorDraft = (token: string) =>
   api.get(`/public-editor/drafts/${encodeURIComponent(token)}`);
 export const updatePublicEditorDraft = (token: string, patch: Record<string, unknown>) =>
   api.patch(`/public-editor/drafts/${encodeURIComponent(token)}`, patch);
-export const uploadPublicEditorDraftFile = (token: string, file: File) => {
+export const listPublicEditorDraftFiles = (token: string) =>
+  api.get<PublicEditorDraftFile[]>(`/public-editor/drafts/${encodeURIComponent(token)}/files`);
+export const uploadPublicEditorDraftFile = (
+  token: string,
+  file: File,
+  onUploadProgress?: (event: AxiosProgressEvent) => void,
+) => {
   const formData = new FormData();
   formData.append('file', file);
-  return api.post<PublicEditorDraftFile>(`/public-editor/drafts/${encodeURIComponent(token)}/files`, formData);
+  return api.post<PublicEditorDraftFile>(`/public-editor/drafts/${encodeURIComponent(token)}/files`, formData, { onUploadProgress });
 };
 export const finalizePublicEditorDraft = (token: string, payload: Record<string, unknown>) =>
   api.post(`/public-editor/drafts/${encodeURIComponent(token)}/finalize`, payload);
+
+export const getOrderItemEditorProductionManifest = (orderId: number, orderItemId: number) =>
+  api.get<Record<string, unknown>>(`/orders/${orderId}/items/${orderItemId}/editor-production-manifest`);
 
 export interface PublicEditorDraftFile {
   id: number;
@@ -1130,6 +1139,11 @@ export interface PublicEditorDraftFile {
   mime?: string | null;
   size: number;
   url: string;
+  thumbUrl?: string | null;
+  width?: number | null;
+  height?: number | null;
+  uploadStatus?: string | null;
+  uploadError?: string | null;
 }
 
 export const createPublicEditorPreviewDraft = (payload: Record<string, unknown>) =>
@@ -1138,13 +1152,22 @@ export const getPublicEditorPreviewDraft = (token: string) =>
   api.get(`/public-editor/admin-preview/drafts/${encodeURIComponent(token)}`);
 export const updatePublicEditorPreviewDraft = (token: string, patch: Record<string, unknown>) =>
   api.patch(`/public-editor/admin-preview/drafts/${encodeURIComponent(token)}`, patch);
-export const uploadPublicEditorPreviewDraftFile = (token: string, file: File) => {
+export const listPublicEditorPreviewDraftFiles = (token: string) =>
+  api.get<PublicEditorDraftFile[]>(`/public-editor/admin-preview/drafts/${encodeURIComponent(token)}/files`);
+export const uploadPublicEditorPreviewDraftFile = (
+  token: string,
+  file: File,
+  onUploadProgress?: (event: AxiosProgressEvent) => void,
+) => {
   const formData = new FormData();
   formData.append('file', file);
-  return api.post<PublicEditorDraftFile>(`/public-editor/admin-preview/drafts/${encodeURIComponent(token)}/files`, formData);
+  return api.post<PublicEditorDraftFile>(`/public-editor/admin-preview/drafts/${encodeURIComponent(token)}/files`, formData, { onUploadProgress });
 };
 export const finalizePublicEditorPreviewDraft = (token: string, payload: Record<string, unknown>) =>
   api.post(`/public-editor/admin-preview/drafts/${encodeURIComponent(token)}/finalize`, payload);
+
+export const createPublicEditorPreviewDraftFromOrderItem = (payload: { orderId: number; orderItemId: number }) =>
+  api.post('/public-editor/admin-preview/from-order-item', payload);
 
 // ─── Subtype Design Templates API ──────────────────────────────────────────────
 // Привязка дизайн-шаблонов к подтипам продукта

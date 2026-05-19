@@ -8,6 +8,7 @@ import React, {
   useCallback,
 } from 'react';
 import {
+  ActiveSelection,
   Canvas,
   FabricImage,
   IText,
@@ -83,6 +84,8 @@ export interface DesignEditorCanvasHandle {
   addTextPreset: (kind: TextBlockPresetKind) => void;
   addImageFromFile: (file: File) => Promise<void>;
   addImageFromUrl: (url: string) => Promise<void>;
+  fillPhotoFieldFromFile: (id: string, file: File) => Promise<boolean>;
+  fillPhotoFieldFromUrl: (id: string, url: string, originalName?: string) => Promise<boolean>;
   addPhotoField: (options?: { width?: number; height?: number }) => void;
   /** Создаёт набор пустых полей для фото по шаблону коллажа. */
   applyCollageLayout: (layout: CollageLayout, paddingPercent: number) => void;
@@ -92,7 +95,7 @@ export interface DesignEditorCanvasHandle {
   getDataURL: (opts?: { multiplier?: number }) => string;
   saveCurrentPage: () => Promise<SavePageResult>;
   /** Загрузка одной страницы в узкий холст (экспорт PDF и т.п.). */
-  loadPageForExport: (pageData: DesignPage) => Promise<void>;
+  loadPageForExport: (pageData: DesignPage, pageIndex?: number) => Promise<void>;
   /** Восстановить ширину холста и контент после export (разворот или одна страница). */
   applyEditorViewState: (pagesOverride?: DesignPage[]) => Promise<void>;
   setTextProp: (key: string, value: unknown) => void;
@@ -177,6 +180,9 @@ type FabricDragTransform = {
   offsetY?: number;
 };
 
+const KEYBOARD_NUDGE_FAST_MULTIPLIER = 10;
+const CLIPBOARD_PASTE_OFFSET_PX = 16;
+
 /** Применяет ограничения basic-режима к объектам холста */
 function applyBasicModeConstraints(canvas: Canvas): void {
   canvas.getObjects().forEach((obj) => {
@@ -252,6 +258,80 @@ function releaseBasicModeConstraints(canvas: Canvas): void {
 
 function asAny(obj: unknown): AnyObj {
   return obj as unknown as AnyObj;
+}
+
+function isTextLikeObject(obj: FabricObject): boolean {
+  return obj.type === 'i-text' || obj.type === 'textbox';
+}
+
+function canKeyboardTransformObject(obj: FabricObject, mode: EditorMode): boolean {
+  const o = asAny(obj);
+  if (o.isBackground) return false;
+  if (mode === 'basic') return !!o.isPhotoField || isTextLikeObject(obj);
+  return obj.selectable !== false;
+}
+
+function getKeyboardTargetObjects(canvas: Canvas, mode: EditorMode): FabricObject[] {
+  return canvas.getActiveObjects().filter((obj) => canKeyboardTransformObject(obj, mode));
+}
+
+function resolveKeyboardNudgePx(canvas: Canvas, fast: boolean): number {
+  const shortSide = Math.max(1, Math.min(canvas.getWidth(), canvas.getHeight()));
+  const baseStep = Math.max(1, Math.round(shortSide / 350));
+  return fast ? baseStep * KEYBOARD_NUDGE_FAST_MULTIPLIER : baseStep;
+}
+
+function moveActiveObjectsByKeyboard(canvas: Canvas, dx: number, dy: number, mode: EditorMode): boolean {
+  const targets = getKeyboardTargetObjects(canvas, mode);
+  if (targets.length === 0) return false;
+  targets.forEach((obj) => {
+    obj.set({
+      left: (obj.left ?? 0) + dx,
+      top: (obj.top ?? 0) + dy,
+    });
+    obj.setCoords();
+  });
+  canvas.getActiveObject()?.setCoords();
+  canvas.requestRenderAll();
+  return true;
+}
+
+async function cloneFabricObjects(
+  objects: FabricObject[],
+  options?: { offset?: number; regenerateIds?: boolean },
+): Promise<FabricObject[]> {
+  const clones = await Promise.all(objects.map((obj) => obj.clone() as Promise<FabricObject>));
+  clones.forEach((clone) => {
+    if (options?.offset) {
+      clone.set({
+        left: (clone.left ?? 0) + options.offset,
+        top: (clone.top ?? 0) + options.offset,
+      });
+    }
+    if (options?.regenerateIds) regenerateClonedObjectIdentity(clone);
+    clone.setCoords();
+  });
+  return clones;
+}
+
+function regenerateClonedObjectIdentity(obj: FabricObject): void {
+  const o = asAny(obj);
+  if (typeof o.id === 'string' && o.id.trim()) {
+    const prefix = o.isPhotoField ? 'field' : 'obj';
+    o.id = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+  if (typeof (obj as Group).getObjects === 'function') {
+    (obj as Group).getObjects().forEach(regenerateClonedObjectIdentity);
+  }
+}
+
+function activateClonedObjects(canvas: Canvas, objects: FabricObject[]): void {
+  canvas.discardActiveObject();
+  if (objects.length === 1) {
+    canvas.setActiveObject(objects[0]!);
+  } else if (objects.length > 1) {
+    canvas.setActiveObject(new ActiveSelection(objects, { canvas }));
+  }
 }
 
 function keepGrabPointAlignedWithSnap(event: unknown, dx: number, dy: number): void {
@@ -525,6 +605,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     onTextFloatingAnchorRef.current = onTextFloatingAnchor;
     const resolveImageFileUrlRef = useRef(resolveImageFileUrl);
     resolveImageFileUrlRef.current = resolveImageFileUrl;
+    const clipboardObjectsRef = useRef<FabricObject[]>([]);
     const textAnchorRafRef = useRef(0);
     const scheduleTextAnchorRef = useRef<(() => void) | null>(null);
 
@@ -532,6 +613,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const photoFileInputRef = useRef<HTMLInputElement>(null);
     /** Последняя точка над холстом — для Ctrl+V во фото-поле (иначе попадало в addImage). */
     const photoPasteSceneRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const lastPhotoFieldTapRef = useRef<{ id: string; at: number } | null>(null);
     const [localSnapLines, setLocalSnapLines] = useState<{ axis: 'h' | 'v'; pos: number }[]>([]);
     const snapOverlayKeyRef = useRef('');
     const smartGuideSessionRef = useRef<SmartGuideSession | null>(null);
@@ -547,6 +629,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       ih: number;
       panX: number;
       panY: number;
+      zoom: number;
       fitMode: 'cover' | 'contain';
     } | null>(null);
 
@@ -794,11 +877,54 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       // Alt+drag pan
       let isPanning = false;
       let lastPan = { x: 0, y: 0 };
+      const openPhotoFieldEditor = (target: FabricObject | undefined) => {
+        let field = target;
+        if (field?.group && asAny(field.group).isPhotoField) {
+          field = field.group as FabricObject;
+        }
+        if (!field || !asAny(field).isPhotoField) return false;
+        const fieldId = String((asAny(field).id as string) ?? '').trim();
+        if (!fieldId) return false;
+        const cropCtx = getFilledPhotoCropContext(field);
+        if (cropCtx) {
+          setCropModal({
+            fieldId,
+            previewUrl: cropCtx.previewUrl,
+            frameW: cropCtx.frameW,
+            frameH: cropCtx.frameH,
+            iw: cropCtx.iw,
+            ih: cropCtx.ih,
+            panX: cropCtx.panX,
+            panY: cropCtx.panY,
+              zoom: cropCtx.zoom,
+            fitMode: cropCtx.fitMode,
+          });
+          return true;
+        }
+        photoPickerTargetIdRef.current = fieldId;
+        setTimeout(() => photoFileInputRef.current?.click(), 0);
+        return true;
+      };
       canvas.on('mouse:down', (opt) => {
         if ((opt.e as MouseEvent).altKey) {
           isPanning = true;
           canvas.selection = false;
           lastPan = { x: (opt.e as MouseEvent).clientX, y: (opt.e as MouseEvent).clientY };
+          return;
+        }
+        const pointerEvent = opt.e as PointerEvent;
+        if (pointerEvent.pointerType === 'touch') {
+          let target = opt.target as FabricObject | undefined;
+          if (target?.group && asAny(target.group).isPhotoField) target = target.group as FabricObject;
+          const fieldId = target && asAny(target).isPhotoField ? String((asAny(target).id as string) ?? '') : '';
+          const now = Date.now();
+          const lastTap = lastPhotoFieldTapRef.current;
+          if (fieldId && lastTap?.id === fieldId && now - lastTap.at < 380) {
+            lastPhotoFieldTapRef.current = null;
+            openPhotoFieldEditor(target);
+          } else if (fieldId) {
+            lastPhotoFieldTapRef.current = { id: fieldId, at: now };
+          }
         }
       });
       canvas.on('mouse:move', (opt) => {
@@ -811,31 +937,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 
       // Double-click: пустое поле — выбор файла; заполненное — кадрирование
       canvas.on('mouse:dblclick', (opt) => {
-        let target = opt.target as FabricObject | undefined;
-        if (target?.group && asAny(target.group).isPhotoField) {
-          target = target.group as FabricObject;
-        }
-        if (target && asAny(target).isPhotoField) {
-          const fieldId = String((asAny(target).id as string) ?? '').trim();
-          if (!fieldId) return;
-          const cropCtx = getFilledPhotoCropContext(target);
-          if (cropCtx) {
-            setCropModal({
-              fieldId,
-              previewUrl: cropCtx.previewUrl,
-              frameW: cropCtx.frameW,
-              frameH: cropCtx.frameH,
-              iw: cropCtx.iw,
-              ih: cropCtx.ih,
-              panX: cropCtx.panX,
-              panY: cropCtx.panY,
-              fitMode: cropCtx.fitMode,
-            });
-            return;
-          }
-          photoPickerTargetIdRef.current = fieldId;
-          setTimeout(() => photoFileInputRef.current?.click(), 0);
-        }
+        openPhotoFieldEditor(opt.target as FabricObject | undefined);
       });
 
       // Drag-and-drop images onto canvas (файлы ОС, URL, фото из галереи сайдбара)
@@ -849,7 +951,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           updatePhotoFieldDropHighlight(
             canvas,
             photoFieldDropHighlightRef.current,
-            findPhotoFieldAtScene(canvas, x, y),
+            findPhotoFieldAtScene(canvas, x, y) ?? null,
           );
         };
 
@@ -938,7 +1040,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         };
       }
 
-      // Keyboard: Delete, Ctrl+Z, Ctrl+Y
+      // Keyboard: Delete, undo/redo, copy/paste and precise movement.
       const onKeyDown = (e: KeyboardEvent) => {
         const active = document.activeElement;
         const wrapper2 = canvasElRef.current?.closest('.fabric-canvas-outer') as HTMLElement | null;
@@ -948,6 +1050,60 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         // IText in edit mode — let Fabric handle keys
         const activeObj = canvas.getActiveObject();
         if (activeObj && (activeObj as unknown as AnyObj).isEditing) return;
+        const key = e.key.toLowerCase();
+        const isModifierShortcut = e.ctrlKey || e.metaKey;
+
+        if (isModifierShortcut && key === 'c') {
+          const targets = getKeyboardTargetObjects(canvas, modeRef.current);
+          if (targets.length > 0) {
+            e.preventDefault();
+            void cloneFabricObjects(targets).then((clones) => {
+              clipboardObjectsRef.current = clones;
+            });
+          }
+          return;
+        }
+
+        if (isModifierShortcut && key === 'v') {
+          if (clipboardObjectsRef.current.length > 0) {
+            e.preventDefault();
+            void cloneFabricObjects(clipboardObjectsRef.current, {
+              offset: CLIPBOARD_PASTE_OFFSET_PX,
+              regenerateIds: true,
+            }).then((clones) => {
+              let pastedClones = clones;
+              if (modeRef.current === 'basic') {
+                pastedClones = clones.filter((clone) => canKeyboardTransformObject(clone, 'basic'));
+                pastedClones.forEach((clone) => canvas.add(clone));
+                applyBasicModeConstraints(canvas);
+              } else {
+                pastedClones.forEach((clone) => canvas.add(clone));
+              }
+              if (pastedClones.length === 0) return;
+              activateClonedObjects(canvas, pastedClones);
+              clipboardObjectsRef.current = pastedClones;
+              canvas.requestRenderAll();
+              onSelectionChange(pastedClones.length === 1 ? getObjProps(pastedClones[0]!) : null);
+              scheduleTextAnchorRef.current?.();
+              saveSnapshot();
+            });
+          }
+          return;
+        }
+
+        if (!e.altKey && !isModifierShortcut && ['arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(key)) {
+          const step = resolveKeyboardNudgePx(canvas, e.shiftKey);
+          const dx = key === 'arrowleft' ? -step : key === 'arrowright' ? step : 0;
+          const dy = key === 'arrowup' ? -step : key === 'arrowdown' ? step : 0;
+          if (moveActiveObjectsByKeyboard(canvas, dx, dy, modeRef.current)) {
+            e.preventDefault();
+            const nextActive = canvas.getActiveObject();
+            if (nextActive) onSelectionChange(getObjProps(nextActive));
+            scheduleTextAnchorRef.current?.();
+            saveSnapshot();
+          }
+          return;
+        }
 
         if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault();
@@ -959,15 +1115,15 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             canvas.requestRenderAll();
           }
         }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (isModifierShortcut && key === 'z') {
           e.preventDefault();
           void undo();
         }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        if (isModifierShortcut && key === 'y') {
           e.preventDefault();
           void redo();
         }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        if (isModifierShortcut && key === 'd') {
           e.preventDefault();
           if (modeRef.current !== 'basic') duplicateActiveObjects(canvas, saveSnapshot);
         }
@@ -1084,6 +1240,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
               canvas,
               leftPage: snapshotPages[parsedNext.left],
               rightPage: snapshotPages[parsedNext.right],
+              leftPageIndex: parsedNext.left,
+              rightPageIndex: parsedNext.right,
               pageW: pw,
               pageH: ph,
               template: templateRef.current,
@@ -1096,6 +1254,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             await loadDesignPageScene({
               canvas,
               pageData: snapshotPages[parsedNext.index],
+              pageIndex: parsedNext.index,
               template: templateRef.current,
               pageW: pw,
               pageH: ph,
@@ -1253,6 +1412,28 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         if (!canvas) return;
         await addImageFileToCanvas(canvas, file, resolveImageFileUrlRef.current);
       },
+      fillPhotoFieldFromFile: async (id: string, file: File) => {
+        const canvas = fabricRef.current;
+        if (!canvas) return false;
+        const field = findPhotoFieldByIdDeep(canvas, id);
+        if (!field) return false;
+        await fillPhotoFieldWithSnapshot(canvas, field, file);
+        return true;
+      },
+      fillPhotoFieldFromUrl: async (id: string, url: string, originalName?: string) => {
+        const canvas = fabricRef.current;
+        if (!canvas) return false;
+        const field = findPhotoFieldByIdDeep(canvas, id);
+        if (!field) return false;
+        const response = await fetch(url);
+        if (!response.ok) return false;
+        const blob = await response.blob();
+        const contentType = blob.type || 'image/jpeg';
+        const ext = (contentType.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+        const file = new File([blob], originalName || `photo-field-${Date.now()}.${ext}`, { type: contentType });
+        await fillPhotoFieldWithSnapshot(canvas, field, file);
+        return true;
+      },
       addPhotoField: (options) => {
         const canvas = fabricRef.current;
         if (!canvas || modeRef.current === 'basic') return;
@@ -1383,23 +1564,26 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         const canvas = fabricRef.current;
         if (!canvas) return { kind: 'single', json: {} };
         const pw = pageWidthRef.current;
+        clearPhotoFieldDropHighlight(canvas, photoFieldDropHighlightRef.current);
         if (spreadPairPagesRef.current) {
           const { left, right } = splitSpreadCanvasToPagesSync(canvas, pw);
           return { kind: 'spread', left, right };
         }
         return { kind: 'single', json: canvasToJSON(canvas) };
       },
-      loadPageForExport: async (pageData: DesignPage) => {
+      loadPageForExport: async (pageData: DesignPage, pageIndex = 0) => {
         const canvas = fabricRef.current;
         if (!canvas) return;
         const pw = pageWidthRef.current;
         const ph = pageHeightRef.current;
+        clearPhotoFieldDropHighlight(canvas, photoFieldDropHighlightRef.current);
         isLoadingRef.current = true;
         try {
           canvas.setDimensions({ width: pw, height: ph });
           await loadDesignPageScene({
             canvas,
             pageData,
+            pageIndex,
             template: templateRef.current,
             pageW: pw,
             pageH: ph,
@@ -1414,6 +1598,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       applyEditorViewState: async (pagesOverride?: DesignPage[]) => {
         const canvas = fabricRef.current;
         if (!canvas) return;
+        clearPhotoFieldDropHighlight(canvas, photoFieldDropHighlightRef.current);
         const pagesSource = pagesOverride ?? pagesRef.current;
         const pair = spreadPairPagesRef.current;
         const key = parsePageLoadKey(pageLoadKeyRef.current);
@@ -1427,6 +1612,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
               canvas,
               leftPage: pagesSource[pair[0]],
               rightPage: pagesSource[pair[1]],
+              leftPageIndex: pair[0],
+              rightPageIndex: pair[1],
               pageW: pw,
               pageH: ph,
               template: templateRef.current,
@@ -1437,6 +1624,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             await loadDesignPageScene({
               canvas,
               pageData: pagesSource[key.index],
+              pageIndex: key.index,
               template: templateRef.current,
               pageW: pw,
               pageH: ph,
@@ -1659,7 +1847,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           ref={photoFileInputRef}
           type="file"
           accept="image/*,.heic,.heif"
-          style={{ display: 'none' }}
+          className="visually-hidden-file-input"
           onChange={handlePhotoFileChange}
         />
         {cropModal && (
@@ -1672,9 +1860,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             intrinsicH={cropModal.ih}
             initialPanX={cropModal.panX}
             initialPanY={cropModal.panY}
+            initialZoom={cropModal.zoom}
             fitMode={cropModal.fitMode}
             onClose={() => setCropModal(null)}
-            onApply={(panX, panY) => {
+            onApply={(panX, panY, zoom) => {
               void (async () => {
                 const c = fabricRef.current;
                 if (!c) return;
@@ -1685,7 +1874,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
                   const g = await wrapLegacyFilledPhotoImage(c, hit as FabricImage);
                   hit = g ?? hit;
                 }
-                if (hit.type === 'group') applyPhotoFieldPanToGroup(hit as Group, panX, panY);
+                if (hit.type === 'group') applyPhotoFieldPanToGroup(hit as Group, panX, panY, zoom);
                 if (modeRef.current === 'basic') applyBasicModeConstraints(c);
                 else releaseBasicModeConstraints(c);
                 c.requestRenderAll();
@@ -1761,22 +1950,16 @@ async function addImageUrlToCanvas(canvas: Canvas, url: string): Promise<void> {
 }
 
 function duplicateActiveObjects(canvas: Canvas, afterDone: () => void): void {
-  const active = canvas.getActiveObjects();
+  const active = canvas.getActiveObjects().filter((obj) => canKeyboardTransformObject(obj, 'advanced'));
   if (!active.length) return;
-  const copies: Parameters<typeof canvas.add>[0][] = [];
-  let pending = active.length;
-  active.forEach((obj) => {
-    obj.clone().then((cloned: typeof obj) => {
-      cloned.set({ left: (cloned.left ?? 0) + 16, top: (cloned.top ?? 0) + 16 });
-      copies.push(cloned);
-      pending--;
-      if (pending === 0) {
-        canvas.discardActiveObject();
-        copies.forEach((c) => canvas.add(c));
-        canvas.requestRenderAll();
-        afterDone();
-      }
-    });
+  void cloneFabricObjects(active, {
+    offset: CLIPBOARD_PASTE_OFFSET_PX,
+    regenerateIds: true,
+  }).then((copies) => {
+    copies.forEach((copy) => canvas.add(copy));
+    activateClonedObjects(canvas, copies);
+    canvas.requestRenderAll();
+    afterDone();
   });
 }
 
@@ -1851,6 +2034,7 @@ async function fillPhotoField(
     const fitMode = resolvePhotoFieldFitMode(f);
     const panX = Number(f.photoFieldPanX ?? 0);
     const panY = Number(f.photoFieldPanY ?? 0);
+    const zoom = Number(f.photoFieldZoom ?? 1);
 
     const anchorSceneTL = resolvePhotoFieldFrameSceneTL(field);
     const placementSnap = snapshotPhotoFieldTransformNoPosition(field, { bakeScaleIntoFrame: true });
@@ -1874,7 +2058,9 @@ async function fillPhotoField(
       id: idCandidate ?? `field-${Date.now()}`,
       panX,
       panY,
+      zoom,
       fitMode,
+      fileSize: file.size,
     });
 
     if (parent != null && stackIndex >= 0) {
@@ -1893,7 +2079,7 @@ async function fillPhotoField(
       group.setXY(anchorSceneTL, 'left', 'top');
       group.setCoords();
       syncFilledPhotoFieldSceneAnchor(group, anchorSceneTL);
-      applyPhotoFieldPanToGroup(group, panX, panY);
+      applyPhotoFieldPanToGroup(group, panX, panY, zoom);
       parent?.setCoords();
       canvas.requestRenderAll();
     };

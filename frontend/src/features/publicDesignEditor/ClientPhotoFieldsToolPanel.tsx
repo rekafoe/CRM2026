@@ -42,6 +42,6 @@ export const ClientPhotoFieldsToolPanel: React.FC<ClientPhotoFieldsToolPanelProp
         Разложить фото
       </button>
     </div>
-    <span>Фото можно перетащить в поле прямо из панели «Фото».</span>
+    <span>Фото можно перетащить в поле прямо из панели «Фото». При наведении нужное поле подсветится.</span>
   </div>
 );

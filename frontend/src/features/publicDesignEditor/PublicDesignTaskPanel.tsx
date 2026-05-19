@@ -23,6 +23,7 @@ interface PublicDesignTaskPanelProps {
   onNextAction: () => void;
   onFieldFocus: (field: PublicEditorPreflightField, kind: 'photo' | 'text') => void;
   onPhotoReplace: (field: PublicEditorPreflightField) => void;
+  onPlaceSelectedPhoto?: (field: PublicEditorPreflightField) => void;
   onIssueFocus: (issue: PublicEditorPreflightIssue) => void;
 }
 
@@ -38,6 +39,27 @@ const FIELD_STATUS_LABELS: Record<PublicEditorPreflightField['status'], string> 
   warning: 'Проверьте',
 };
 
+function summarizeCheck(preflight: PublicEditorPreflightSummary): { title: string; detail: string } {
+  const errors = preflight.issues.filter((issue) => issue.level === 'error').length;
+  const warnings = preflight.issues.filter((issue) => issue.level === 'warning').length;
+  if (errors > 0) {
+    return {
+      title: `Нужно исправить ${errors} ${errors === 1 ? 'ошибку' : 'ошибок'}`,
+      detail: 'Заказ лучше не оформлять, пока в макете есть обязательные ошибки.',
+    };
+  }
+  if (warnings > 0) {
+    return {
+      title: `Есть ${warnings} ${warnings === 1 ? 'предупреждение' : 'предупреждений'}`,
+      detail: 'Печать возможна, но лучше проверить качество фото и текст.',
+    };
+  }
+  return {
+    title: 'Можно оформлять',
+    detail: 'Фото, текст и сохранение выглядят готовыми для заказа.',
+  };
+}
+
 export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
   activeTab,
   onTabChange,
@@ -52,6 +74,7 @@ export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
   onNextAction,
   onFieldFocus,
   onPhotoReplace,
+  onPlaceSelectedPhoto,
   onIssueFocus,
 }) => {
   const readinessPreflight = checkPreflight ?? preflight;
@@ -60,6 +83,7 @@ export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
   const photoLeft = Math.max(0, preflight.photoTotal - preflight.photoReady);
   const textLeft = Math.max(0, preflight.textTotal - preflight.textReady);
   const issueLeft = readinessPreflight.issues.length;
+  const checkSummary = summarizeCheck(readinessPreflight);
 
   const resolveTabCount = (tab: TaskTab) => {
     if (tab === 'photo') return photoLeft;
@@ -130,9 +154,16 @@ export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
                   Показать
                 </button>
                 {activeTab === 'photo' && (
+                  <>
+                  {onPlaceSelectedPhoto && (
+                    <button type="button" onClick={() => onPlaceSelectedPhoto(field)}>
+                      Поставить выбранное
+                    </button>
+                  )}
                   <button type="button" onClick={() => onPhotoReplace(field)}>
                     {field.status === 'ready' ? 'Заменить' : 'Добавить'}
                   </button>
+                  </>
                 )}
               </div>
             </div>
@@ -143,8 +174,9 @@ export const PublicDesignTaskPanel: React.FC<PublicDesignTaskPanelProps> = ({
       {activeTab === 'check' && (
         <div className="public-design-editor__task-list">
           <div className="public-design-editor__task-summary">
-            <span>Проверка перед заказом</span>
-            <strong>{readinessPreflight.hasBlockingIssues ? 'Нужно заполнить макет' : 'Макет готов к заказу'}</strong>
+            <span>Проверка всего макета</span>
+            <strong>{checkSummary.title}</strong>
+            <p>{checkSummary.detail}</p>
           </div>
           {readinessPreflight.issues.length === 0 ? (
             <p className="public-design-editor__task-empty">Можно нажимать «Заказать».</p>

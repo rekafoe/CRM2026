@@ -65,20 +65,27 @@ export function usePublicDesignBootstrap({
           : ds;
         const w = sourceState?.pageWidth ?? spec.width_mm ?? 90;
         const h = sourceState?.pageHeight ?? spec.height_mm ?? 55;
-        const count = sourceState?.pages?.length
-          ? Math.max(1, Math.min(99, sourceState.pages.length))
-          : Math.max(1, Math.min(99, Number(spec.page_count) || 1));
+        const statePageCount = Number(sourceState?.pageCount ?? spec.page_count ?? 1);
+        const sourcePages = sourceState?.pages?.length ? sourceState.pages : [];
+        const requestedPageCount = Math.max(
+          sourcePages.length,
+          Number.isFinite(statePageCount) ? statePageCount : 1,
+          Number(spec.page_count) || 1,
+        );
+        const count = Math.max(1, Math.min(99, requestedPageCount));
         const scale = Number(sourceState?.sceneScale ?? 1);
-        const nextSpreadMode = !!sourceState?.spread_mode && documentMode === 'multipage';
+        const savedSpreadMode = sourceState?.spread_mode;
+        const nextSpreadMode = documentMode === 'multipage'
+          && (typeof savedSpreadMode === 'boolean' ? savedSpreadMode : true);
         const nextCoverPages = Math.max(0, Math.min(3, Number(sourceState?.cover_pages ?? spec.cover_pages ?? 1)));
-        setMinimumPageCount(count);
+        setMinimumPageCount(1);
         setTemplate(t);
         setSaveState(initialDraftToken ? 'saved' : 'idle');
         setPageSpec({ pageWidth: w, pageHeight: h, pageCount: count, scale: Number.isFinite(scale) && scale > 0 ? scale : 1 });
         setSpreadMode(nextSpreadMode);
         setCoverPages(nextCoverPages);
         setPrepressConfig(normalizePrepressConfig(sourceState?.prepress ?? spec.prepress));
-        setPages(sourceState?.pages?.length ? sourceState.pages : Array.from({ length: count }, () => ({ ...EMPTY_PAGE })));
+        setPages(Array.from({ length: count }, (_, index) => sourcePages[index] ?? { ...EMPTY_PAGE }));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось открыть клиентский редактор');
       } finally {

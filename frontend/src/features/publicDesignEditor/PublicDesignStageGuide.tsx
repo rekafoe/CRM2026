@@ -18,17 +18,18 @@ export const PublicDesignStageGuide: React.FC<PublicDesignStageGuideProps> = ({
 }) => (
   <section className="public-design-editor__stage-guide" aria-label="Подсказка по текущей части макета">
     <div className="public-design-editor__stage-guide-copy">
-      <span>{fragmentDetail}</span>
+      <span>Текущая часть</span>
       <strong>{fragmentLabel}</strong>
-      <p>{issueCount > 0 ? `${issueCount} пункт(ов) нужно проверить` : 'Эта часть макета выглядит готовой'}</p>
+      <p>{issueCount > 0 ? `${issueCount} пункт(ов) нужно проверить · ${fragmentDetail}` : 'Эта часть макета выглядит готовой'}</p>
     </div>
     <button
       type="button"
       className={`public-design-editor__stage-guide-action public-design-editor__stage-guide-action--${nextAction.kind}`}
       onClick={onNextAction}
     >
-      <span>Дальше</span>
+      <span>Следующий шаг</span>
       <strong>{nextAction.label}</strong>
+      <small>{nextAction.description}</small>
     </button>
   </section>
 );

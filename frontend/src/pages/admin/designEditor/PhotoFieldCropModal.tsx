@@ -15,12 +15,17 @@ export interface PhotoFieldCropModalProps {
   intrinsicH: number;
   initialPanX: number;
   initialPanY: number;
-  onApply: (panX: number, panY: number) => void;
+  initialZoom: number;
+  onApply: (panX: number, panY: number, zoom: number) => void;
   onReplaceFile: () => void;
   fitMode: PhotoFieldFitMode;
 }
 
-const PREVIEW_MAX = 360;
+const EDITOR_MAX_W = 720;
+const EDITOR_MAX_H = 580;
+const PREVIEW_MIN_MARGIN = 56;
+const MIN_CROP_SOURCE_PX = 80;
+const MAX_ZOOM = 6;
 
 export const PhotoFieldCropModal: React.FC<PhotoFieldCropModalProps> = ({
   isOpen,
@@ -32,91 +37,155 @@ export const PhotoFieldCropModal: React.FC<PhotoFieldCropModalProps> = ({
   intrinsicH,
   initialPanX,
   initialPanY,
+  initialZoom,
   onApply,
   onReplaceFile,
   fitMode,
 }) => {
   const [panX, setPanX] = useState(initialPanX);
   const [panY, setPanY] = useState(initialPanY);
-  const panRef = useRef({ x: initialPanX, y: initialPanY });
-  useEffect(() => {
-    panRef.current = { x: panX, y: panY };
-  }, [panX, panY]);
+  const [zoom, setZoom] = useState(initialZoom);
 
-  const drag = useRef<{
+  const sourceDrag = useRef<{
     active: boolean;
     startX: number;
     startY: number;
-    basePX: number;
-    basePY: number;
+    baseSourceX: number;
+    baseSourceY: number;
+  } | null>(null);
+  const cropResize = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    baseSourceX: number;
+    baseSourceY: number;
+    baseSourceW: number;
   } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setPanX(initialPanX);
       setPanY(initialPanY);
-      panRef.current = { x: initialPanX, y: initialPanY };
+      setZoom(initialZoom);
     }
-  }, [isOpen, initialPanX, initialPanY]);
+  }, [isOpen, initialPanX, initialPanY, initialZoom]);
 
-  const layout = useMemo(
+  const baseLayout = useMemo(
     () => computePhotoFieldLayout(fitMode, frameW, frameH, intrinsicW, intrinsicH),
     [fitMode, frameW, frameH, intrinsicW, intrinsicH],
   );
 
-  const { previewW, previewH, scale } = useMemo(() => {
-    const asp = frameW / Math.max(1, frameH);
+  const layout = useMemo(() => {
+    const safeZoom = Math.max(1, Math.min(MAX_ZOOM, Number(zoom) || 1));
+    return {
+      scale: baseLayout.scale * safeZoom,
+      displayW: baseLayout.displayW * safeZoom,
+      displayH: baseLayout.displayH * safeZoom,
+      baseLeft: baseLayout.baseLeft - ((baseLayout.displayW * safeZoom) - baseLayout.displayW) / 2,
+      baseTop: baseLayout.baseTop - ((baseLayout.displayH * safeZoom) - baseLayout.displayH) / 2,
+    };
+  }, [baseLayout, zoom]);
+
+  const { editorW, editorH, sourceScale } = useMemo(() => {
     const maxW =
-      typeof window !== 'undefined' ? Math.min(PREVIEW_MAX, window.innerWidth - 48) : PREVIEW_MAX;
-    let w = Math.min(PREVIEW_MAX, maxW);
-    let h = w / asp;
-    if (h > PREVIEW_MAX) {
-      h = PREVIEW_MAX;
-      w = h * asp;
-    }
-    return { previewW: w, previewH: h, scale: w / Math.max(1, frameW) };
-  }, [frameW, frameH]);
+      typeof window !== 'undefined' ? Math.min(EDITOR_MAX_W, window.innerWidth - PREVIEW_MIN_MARGIN) : EDITOR_MAX_W;
+    const maxH =
+      typeof window !== 'undefined' ? Math.min(EDITOR_MAX_H, window.innerHeight * 0.68) : EDITOR_MAX_H;
+    const nextSourceScale = Math.min(
+      maxW / Math.max(1, intrinsicW),
+      maxH / Math.max(1, intrinsicH),
+    );
+    return {
+      editorW: intrinsicW * nextSourceScale,
+      editorH: intrinsicH * nextSourceScale,
+      sourceScale: nextSourceScale,
+    };
+  }, [intrinsicW, intrinsicH]);
 
   const clamped = clampPhotoFieldPan(frameW, frameH, layout, panX, panY, fitMode);
+  const applySourceCrop = useCallback((sourceX: number, sourceY: number, nextZoom = zoom) => {
+    const safeZoom = Math.max(1, Math.min(MAX_ZOOM, Number(nextZoom) || 1));
+    const nextLayout = {
+      scale: baseLayout.scale * safeZoom,
+      displayW: baseLayout.displayW * safeZoom,
+      displayH: baseLayout.displayH * safeZoom,
+      baseLeft: baseLayout.baseLeft - ((baseLayout.displayW * safeZoom) - baseLayout.displayW) / 2,
+      baseTop: baseLayout.baseTop - ((baseLayout.displayH * safeZoom) - baseLayout.displayH) / 2,
+    };
+    const cropW = frameW / nextLayout.scale;
+    const cropH = frameH / nextLayout.scale;
+    const clampedSourceX = Math.max(0, Math.min(Math.max(0, intrinsicW - cropW), sourceX));
+    const clampedSourceY = Math.max(0, Math.min(Math.max(0, intrinsicH - cropH), sourceY));
+    const next = clampPhotoFieldPan(
+      frameW,
+      frameH,
+      nextLayout,
+      -(clampedSourceX * nextLayout.scale) - nextLayout.baseLeft,
+      -(clampedSourceY * nextLayout.scale) - nextLayout.baseTop,
+      fitMode,
+    );
+    setZoom(safeZoom);
+    setPanX(next.panX);
+    setPanY(next.panY);
+  }, [baseLayout, fitMode, frameW, frameH, intrinsicW, intrinsicH, zoom]);
 
   const endDrag = useCallback(() => {
-    drag.current = null;
+    sourceDrag.current = null;
+    cropResize.current = null;
   }, []);
 
-  const moveDrag = useCallback(
-    (clientX: number, clientY: number) => {
-      const d = drag.current;
-      if (!d?.active) return;
-      const dx = (clientX - d.startX) / scale;
-      const dy = (clientY - d.startY) / scale;
-      const next = clampPhotoFieldPan(
-        frameW,
-        frameH,
-        layout,
-        d.basePX + dx,
-        d.basePY + dy,
-        fitMode,
-      );
-      setPanX(next.panX);
-      setPanY(next.panY);
-    },
-    [layout, frameW, frameH, scale, fitMode],
-  );
-
-  const frameVars = useMemo(() => {
-    const imw = layout.displayW * scale;
-    const imh = layout.displayH * scale;
-    const iml = (layout.baseLeft + clamped.panX) * scale;
-    const imt = (layout.baseTop + clamped.panY) * scale;
+  const cropSource = useMemo(() => {
+    if (fitMode === 'contain') {
+      return { x: 0, y: 0, w: intrinsicW, h: intrinsicH };
+    }
+    const imageLeft = layout.baseLeft + clamped.panX;
+    const imageTop = layout.baseTop + clamped.panY;
+    const sourceX = Math.max(0, Math.min(intrinsicW, -imageLeft / layout.scale));
+    const sourceY = Math.max(0, Math.min(intrinsicH, -imageTop / layout.scale));
     return {
-      ['--pf-frame-w' as string]: `${previewW}px`,
-      ['--pf-frame-h' as string]: `${previewH}px`,
-      ['--pf-img-w' as string]: `${imw}px`,
-      ['--pf-img-h' as string]: `${imh}px`,
-      ['--pf-img-l' as string]: `${iml}px`,
-      ['--pf-img-t' as string]: `${imt}px`,
+      x: sourceX,
+      y: sourceY,
+      w: Math.max(1, Math.min(intrinsicW - sourceX, frameW / layout.scale)),
+      h: Math.max(1, Math.min(intrinsicH - sourceY, frameH / layout.scale)),
     };
-  }, [layout, scale, previewW, previewH, clamped.panX, clamped.panY]);
+  }, [clamped.panX, clamped.panY, fitMode, frameW, frameH, intrinsicW, intrinsicH, layout]);
+
+  const editorVars = useMemo(() => ({
+    ['--pf-source-w' as string]: `${editorW}px`,
+    ['--pf-source-h' as string]: `${editorH}px`,
+    ['--pf-crop-l' as string]: `${cropSource.x * sourceScale}px`,
+    ['--pf-crop-t' as string]: `${cropSource.y * sourceScale}px`,
+    ['--pf-crop-w' as string]: `${cropSource.w * sourceScale}px`,
+    ['--pf-crop-h' as string]: `${cropSource.h * sourceScale}px`,
+  }), [cropSource, editorW, editorH, sourceScale]);
+
+  const moveSourceCrop = useCallback((clientX: number, clientY: number) => {
+    const d = sourceDrag.current;
+    if (!d?.active || fitMode === 'contain') return;
+    const dx = (clientX - d.startX) / sourceScale;
+    const dy = (clientY - d.startY) / sourceScale;
+    const nextSourceX = d.baseSourceX + dx;
+    const nextSourceY = d.baseSourceY + dy;
+    applySourceCrop(nextSourceX, nextSourceY);
+  }, [applySourceCrop, fitMode, sourceScale]);
+
+  const moveCropResize = useCallback((clientX: number, clientY: number) => {
+    const d = cropResize.current;
+    if (!d?.active || fitMode === 'contain') return;
+    const aspect = frameW / Math.max(1, frameH);
+    const dx = (clientX - d.startX) / sourceScale;
+    const dy = (clientY - d.startY) / sourceScale;
+    const requestedW = d.baseSourceW + Math.max(dx, dy * aspect);
+    const maxWByBounds = Math.min(intrinsicW - d.baseSourceX, (intrinsicH - d.baseSourceY) * aspect);
+    const maxWByZoom = frameW / baseLayout.scale;
+    const minWByZoom = frameW / (baseLayout.scale * MAX_ZOOM);
+    const nextW = Math.max(
+      Math.max(MIN_CROP_SOURCE_PX, minWByZoom),
+      Math.min(Math.min(maxWByBounds, maxWByZoom), requestedW),
+    );
+    const nextZoom = frameW / (nextW * baseLayout.scale);
+    applySourceCrop(d.baseSourceX, d.baseSourceY, nextZoom);
+  }, [applySourceCrop, baseLayout.scale, fitMode, frameW, frameH, intrinsicW, intrinsicH, sourceScale]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -131,47 +200,79 @@ export const PhotoFieldCropModal: React.FC<PhotoFieldCropModalProps> = ({
 
   const hint =
     fitMode === 'contain'
-      ? 'Перетащите фото, чтобы сдвинуть его внутри рамки (вписывание целиком без обрезки; рамка задаёт пропорции ячейки).'
-      : 'Перетащите фото, чтобы выбрать видимую область (заполнение рамки с обрезкой). Растягивание отключено.';
+      ? 'Фото уже видно целиком. Если нужно, замените изображение или примените текущий кадр.'
+      : 'Передвиньте рамку, чтобы выбрать фрагмент. Потяните угол рамки, чтобы изменить масштаб.';
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Кадрирование в поле фото"
-      size="md"
+      title="Настроить кадр"
+      size="lg"
       className="photo-field-crop-modal"
+      overlayClassName="photo-field-crop-backdrop"
+      headerClassName="photo-field-crop-modal-head"
       bodyClassName="photo-field-crop-modal-body"
     >
-      <p className="photo-field-crop-hint">{hint}</p>
-      <div className="photo-field-crop-visual">
+      <div className="photo-field-crop-header">
+        <span>{fitMode === 'contain' ? 'Фото видно целиком' : 'Выберите область фото'}</span>
+        <p>{hint}</p>
+      </div>
+      <div className="photo-field-crop-editor" style={editorVars} aria-label="Область кадрирования фото">
+        <img src={previewUrl} alt="" draggable={false} />
         <div
-          className="photo-field-crop-frame"
-          style={frameVars}
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.currentTarget.setPointerCapture(e.pointerId);
-            const { x, y } = panRef.current;
-            drag.current = {
+          className="photo-field-source-crop"
+          role="presentation"
+          onPointerDown={(event) => {
+            if (fitMode === 'contain') return;
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            sourceDrag.current = {
               active: true,
-              startX: e.clientX,
-              startY: e.clientY,
-              basePX: x,
-              basePY: y,
+              startX: event.clientX,
+              startY: event.clientY,
+              baseSourceX: cropSource.x,
+              baseSourceY: cropSource.y,
             };
           }}
-          onPointerMove={(e) => {
-            if (drag.current?.active) moveDrag(e.clientX, e.clientY);
+          onPointerMove={(event) => {
+            moveSourceCrop(event.clientX, event.clientY);
+            moveCropResize(event.clientX, event.clientY);
           }}
           onPointerUp={endDrag}
         >
-          <img className="photo-field-crop-img" src={previewUrl} alt="" draggable={false} />
+          <span>видимая область</span>
+          {fitMode !== 'contain' && (
+            <button
+              type="button"
+              className="photo-field-source-resize"
+              aria-label="Изменить размер видимой области"
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                cropResize.current = {
+                  active: true,
+                  startX: event.clientX,
+                  startY: event.clientY,
+                  baseSourceX: cropSource.x,
+                  baseSourceY: cropSource.y,
+                  baseSourceW: cropSource.w,
+                };
+              }}
+            />
+          )}
         </div>
       </div>
       <div className="photo-field-crop-actions">
-        <Button type="button" variant="secondary" onClick={onReplaceFile}>
-          Другое фото…
-        </Button>
+        <div className="photo-field-crop-actions-left">
+          <Button type="button" variant="secondary" onClick={() => applySourceCrop(0, 0, 1)}>
+            Сбросить кадр
+          </Button>
+          <Button type="button" variant="secondary" onClick={onReplaceFile}>
+            Другое фото
+          </Button>
+        </div>
         <div className="photo-field-crop-actions-right">
           <Button type="button" variant="secondary" onClick={onClose}>
             Отмена
@@ -180,7 +281,7 @@ export const PhotoFieldCropModal: React.FC<PhotoFieldCropModalProps> = ({
             type="button"
             variant="primary"
             onClick={() => {
-              onApply(clamped.panX, clamped.panY);
+              onApply(clamped.panX, clamped.panY, zoom);
               onClose();
             }}
           >

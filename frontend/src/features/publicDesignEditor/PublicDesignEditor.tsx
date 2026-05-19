@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert } from '../../components/common';
+import { Alert, ConfirmDialog } from '../../components/common';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import type { GuideLine } from '../../pages/admin/designEditor/CanvasRulers';
 import { EMPTY_PAGE, MM_TO_PX } from '../../pages/admin/designEditor/constants';
@@ -20,6 +20,7 @@ import { PublicDesignStageGuide } from './PublicDesignStageGuide';
 import { PublicDesignAdvancedTools } from './PublicDesignAdvancedTools';
 import { PublicDesignEditorAlerts } from './PublicDesignEditorAlerts';
 import { PublicDesignFinalizeForm } from './PublicDesignFinalizeForm';
+import { PublicDesignCheckoutPreview } from './PublicDesignCheckoutPreview';
 import { PublicDesignTextFloatingControls } from './PublicDesignTextFloatingControls';
 import { EditorCanvasStage } from '../designEditorShell/EditorCanvasStage';
 import { EditorPageNavigator } from '../designEditorShell/EditorPageNavigator';
@@ -42,6 +43,11 @@ import { usePublicDesignDraftActions } from './usePublicDesignDraftActions';
 import { usePublicDesignGuidedActions } from './usePublicDesignGuidedActions';
 import { usePublicDesignPageActions } from './usePublicDesignPageActions';
 import { usePublicDesignPhotoLibrary } from './usePublicDesignPhotoLibrary';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import {
+  PublicDesignEditorMobileDock,
+  type PublicDesignMobilePanel,
+} from './PublicDesignEditorMobileDock';
 import '../../pages/admin/DesignEditorPage.css';
 import '../../pages/admin/designEditor/designEditorGlassTheme.css';
 import '../designEditorShell/editorShell.css';
@@ -79,12 +85,18 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   documentMode = 'single',
   onReadyForCart,
 }) => {
+  const bootstrapKey = `${documentMode}:${templateId}`;
+  const bootstrapDraftTokenRef = useRef<{ key: string; token: string | null } | null>(null);
+  if (!bootstrapDraftTokenRef.current || bootstrapDraftTokenRef.current.key !== bootstrapKey) {
+    bootstrapDraftTokenRef.current = { key: bootstrapKey, token: initialDraftToken ?? null };
+  }
+  const bootstrapDraftToken = bootstrapDraftTokenRef.current.token;
   const canvasHandleRef = useRef<DesignEditorCanvasHandle | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const fitScalerRef = useRef<HTMLDivElement>(null);
 
-  const [draftToken, setDraftToken] = useState<string | null>(initialDraftToken ?? null);
+  const [draftToken, setDraftToken] = useState<string | null>(bootstrapDraftToken);
   const [pages, setPages] = useState<DesignPage[]>([{ ...EMPTY_PAGE }]);
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedObj, setSelectedObj] = useState<SelectedObjProps | null>(null);
@@ -100,18 +112,37 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const [dirtyVersion, setDirtyVersion] = useState(0);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTaskTab, setActiveTaskTab] = useState<PublicDesignTaskTab>('photo');
+  const [, setActiveTaskTab] = useState<PublicDesignTaskTab>('photo');
   const [helpOpen, setHelpOpen] = useState(false);
+  const [selectedLibraryPhotoId, setSelectedLibraryPhotoId] = useState<string | null>(null);
+  const [checkoutPreviewOpen, setCheckoutPreviewOpen] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<PublicDesignMobilePanel>('canvas');
+  const isMobile = useMediaQuery('(max-width: 760px)');
+  const [pendingDeletePage, setPendingDeletePage] = useState<number | null>(null);
   const [customerForm, setCustomerForm] = useState({
     customerName: '',
     customerPhone: '',
     customerEmail: '',
   });
   const [pageSpec, setPageSpec] = useState({ pageWidth: 90, pageHeight: 55, pageCount: 1, scale: 1 });
-  const [spreadMode, setSpreadMode] = useState(false);
+  const [spreadMode, setSpreadMode] = useState(() => documentMode === 'multipage');
   const [coverPages, setCoverPages] = useState(1);
   const [prepressConfig, setPrepressConfig] = useState<DesignPrepressConfig>(DEFAULT_PUBLIC_DESIGN_PREPRESS_CONFIG);
   const [viewOptions, setViewOptions] = useState<EditorViewOptions>(DEFAULT_VIEW_OPTIONS);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    setViewOptions((prev) => ({
+      ...prev,
+      showRulers: false,
+      showGuides: false,
+    }));
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile || documentMode !== 'multipage') return;
+    if (mobilePanel === 'canvas') setStripCollapsed(false);
+  }, [documentMode, isMobile, mobilePanel]);
   const {
     loading,
     minimumPageCount,
@@ -122,7 +153,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   } = usePublicDesignBootstrap({
     adapter,
     documentMode,
-    initialDraftToken,
+    initialDraftToken: bootstrapDraftToken,
     templateId,
     setCoverPages,
     setError,
@@ -201,25 +232,13 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     bleedPx: sceneGeometry.bleedPx,
     showBleed: visibleShowBleed,
     isSpreadView: navigation.isSpreadView,
+    compactPadding: isMobile,
   });
 
   const markDirty = useCallback(() => {
     setSaveState('dirty');
     setDirtyVersion((v) => v + 1);
   }, []);
-
-  const {
-    sidebarPhotos,
-    addSidebarPhotos,
-    removeSidebarPhoto,
-    handleLibraryPhotoClick,
-    handleImageUrlSubmit,
-    handleAutofillPhotos,
-  } = usePublicDesignPhotoLibrary({
-    canvasHandleRef,
-    markDirty,
-    setError,
-  });
 
   const handlePageThumbReady = useCallback((pageIdx: number, dataUrl: string) => {
     setThumbnails((prev) => (prev[pageIdx] === dataUrl ? prev : { ...prev, [pageIdx]: dataUrl }));
@@ -228,9 +247,40 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   useEffect(() => {
     const el = fitScalerRef.current;
     if (!el) return;
-    el.style.setProperty('--de-fit-zoom', String(fitZoom));
     el.dataset.ready = fitReady ? 'true' : 'false';
-  }, [fitZoom, fitReady]);
+
+    if (!fitReady) {
+      el.style.removeProperty('width');
+      el.style.removeProperty('height');
+      el.style.setProperty('--de-fit-zoom', '1');
+      return;
+    }
+
+    if (!isMobile) {
+      el.style.zoom = '';
+      el.style.removeProperty('width');
+      el.style.removeProperty('height');
+      el.style.setProperty('--de-fit-zoom', String(fitZoom));
+      return;
+    }
+
+    el.style.removeProperty('width');
+    el.style.removeProperty('height');
+    el.style.setProperty('--de-fit-zoom', '1');
+    el.style.zoom = String(fitZoom);
+  }, [fitZoom, fitReady, isMobile, currentPage, navigation.pageLoadKey]);
+
+  useEffect(() => {
+    setDraftToken(bootstrapDraftToken);
+    setCurrentPage(0);
+    setSelectedObj(null);
+    setTextFloatingAnchor(null);
+    setThumbnails({});
+    setGuides([]);
+    setCanUndo(false);
+    setCanRedo(false);
+    setZoom(1);
+  }, [bootstrapDraftToken, documentMode, templateId]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -246,6 +296,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     handleFinalize,
     handleReadyForCart,
     handleSaveDraft,
+    resolveImageAsset,
     resolveImageFileUrl,
   } = usePublicDesignDraftActions({
     adapter,
@@ -277,11 +328,28 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   });
 
   const {
+    sidebarPhotos,
+    addSidebarPhotos,
+    removeSidebarPhoto,
+    retrySidebarPhoto,
+    markSidebarPhotoUsed,
+    handleLibraryPhotoClick,
+    handleImageUrlSubmit,
+  } = usePublicDesignPhotoLibrary({
+    canvasHandleRef,
+    resolveImageAsset,
+    markDirty,
+    setError,
+  });
+
+  const {
     saveCurrentCanvasPage,
     handleGoToPage,
     handleAddClientPage,
+    handleInsertClientPage,
     handleAddClientSpread,
     handleDeleteClientLast,
+    handleDeleteClientPage,
   } = usePublicDesignPageActions({
     canvasHandleRef,
     currentPage,
@@ -289,6 +357,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     navigation,
     pageSpec,
     spreadMode,
+    coverPages,
     minimumPageCount,
     setPages,
     setCurrentPage,
@@ -311,8 +380,81 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setActiveTaskTab,
     setError,
     onGoToPage: handleGoToPage,
-    onReadyForCart: handleReadyForCart,
+    onReadyForCart: () => setCheckoutPreviewOpen(true),
   });
+
+  const selectedLibraryPhoto = useMemo(
+    () => sidebarPhotos.find((photo) => photo.id === selectedLibraryPhotoId) ?? null,
+    [selectedLibraryPhotoId, sidebarPhotos],
+  );
+
+  const handlePlaceSelectedPhoto = useCallback(async (field: typeof preflight.photoFields[number]) => {
+    const photo = selectedLibraryPhoto;
+    if (!photo) {
+      setActiveTaskTab('photo');
+      setError('Сначала выберите фото в библиотеке.');
+      return;
+    }
+    try {
+      setError(null);
+      const needsPageSwitch = !navigation.stripItems.some((item) =>
+        item.pages.includes(currentPage) && item.pages.includes(field.pageIndex));
+      if (needsPageSwitch) await handleGoToPage(field.pageIndex);
+      window.setTimeout(async () => {
+        const handle = canvasHandleRef.current;
+        if (!handle) return;
+        const placed = photo.url && photo.uploadStatus === 'ready'
+          ? await handle.fillPhotoFieldFromUrl(field.id, photo.url, photo.name)
+          : photo.file
+            ? await handle.fillPhotoFieldFromFile(field.id, photo.file)
+            : false;
+        if (!placed) {
+          setError('Не удалось поставить выбранное фото в поле.');
+          return;
+        }
+        markSidebarPhotoUsed(photo.id);
+        markDirty();
+        if (isMobile) setMobilePanel('canvas');
+      }, needsPageSwitch ? 220 : 0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось поставить выбранное фото.');
+    }
+  }, [
+    canvasHandleRef,
+    currentPage,
+    handleGoToPage,
+    isMobile,
+    markDirty,
+    markSidebarPhotoUsed,
+    navigation.stripItems,
+    selectedLibraryPhoto,
+  ]);
+
+  const handleMobileFilesSelected = useCallback((files: File[]) => {
+    addSidebarPhotos(files);
+    if (isMobile) setMobilePanel('photos');
+  }, [addSidebarPhotos, isMobile]);
+
+  const handleMobileFieldFocus = useCallback((
+    field: Parameters<typeof handleFieldFocus>[0],
+    kind: Parameters<typeof handleFieldFocus>[1],
+  ) => {
+    if (isMobile) setMobilePanel('canvas');
+    handleFieldFocus(field, kind);
+  }, [handleFieldFocus, isMobile]);
+
+  const handleRequestReadyForCart = useCallback(() => {
+    if (preflight.hasBlockingIssues) {
+      void handleReadyForCart();
+      return;
+    }
+    setCheckoutPreviewOpen(true);
+  }, [handleReadyForCart, preflight.hasBlockingIssues]);
+
+  const handleConfirmReadyForCart = useCallback(() => {
+    setCheckoutPreviewOpen(false);
+    void handleReadyForCart();
+  }, [handleReadyForCart]);
 
   const isMultipageDocument = documentMode === 'multipage';
   const isTwoSidedDocument = !isMultipageDocument && pageSpec.pageCount === 2;
@@ -341,18 +483,44 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     canvasHandleRef.current?.setZoom(1);
   }, []);
 
+  const missingPhotoCount = Math.max(0, fragmentPreflight.photoTotal - fragmentPreflight.photoReady);
+
+  const handleMobileNextAction = useCallback(() => {
+    if (editorNextAction.kind === 'replacePhoto') {
+      setMobilePanel('photos');
+    } else {
+      setMobilePanel('canvas');
+    }
+    handleNextAction();
+  }, [editorNextAction, handleNextAction]);
+
   if (loading) return <div className="public-design-editor__state">Загрузка редактора...</div>;
   if (!template) return <Alert type="error">{error ?? 'Шаблон не найден'}</Alert>;
 
+  const editorRootClassName = [
+    'public-design-editor',
+    'public-design-editor--client',
+    `public-design-editor--${isMultipageDocument ? 'multipage' : 'single'}`,
+    isMobile ? 'public-design-editor--mobile' : '',
+    isMobile ? `public-design-editor--mobile-panel-${mobilePanel}` : '',
+  ].filter(Boolean).join(' ');
+
+  const workspaceClassName = [
+    'public-design-editor__workspace',
+    isMobile ? `public-design-editor__workspace--panel-${mobilePanel}` : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className={`public-design-editor public-design-editor--client public-design-editor--${isMultipageDocument ? 'multipage' : 'single'}`}>
+    <div className={editorRootClassName}>
       <EditorTopBar
         templateName={template.name}
         documentLabel={documentLabel}
         saving={saving}
+        saveState={saveState}
         helpOpen={helpOpen}
+        compact={isMobile}
+        onSaveRetry={() => void handleSaveDraft(false)}
         onHelpToggle={() => setHelpOpen((open) => !open)}
-        onPrimaryAction={() => void handleReadyForCart()}
       />
 
       <PublicDesignEditorAlerts
@@ -362,7 +530,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
         onErrorClose={() => setError(null)}
       />
 
-      <div className="public-design-editor__workspace">
+      <div className={workspaceClassName}>
         <EditorCanvasStage
           template={template}
           refs={{
@@ -419,7 +587,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
               onDirty={markDirty}
             />
           )}
-          guideSlot={(
+          guideSlot={isMobile ? null : (
             <PublicDesignStageGuide
               fragmentLabel={currentFragment.label}
               fragmentDetail={currentFragment.detail}
@@ -460,68 +628,80 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
         <PublicDesignInspector
           fragmentLabel={currentFragment.label}
           fragmentPreflight={fragmentPreflight}
-          globalPreflight={preflight}
-          activeTaskTab={activeTaskTab}
           saving={saving}
           nextAction={editorNextAction}
           sidebarPhotos={sidebarPhotos}
+          selectedPhotoId={selectedLibraryPhotoId}
           helpOpen={helpOpen}
-          pageCount={pageSpec.pageCount}
-          currentPage={currentPage}
-          pageStatuses={pageStatuses}
-          onTaskTabChange={setActiveTaskTab}
-          onPageSelect={(pageIndex) => void handleGoToPage(pageIndex)}
-          onFilesSelected={addSidebarPhotos}
-          onImageUrlSubmit={handleImageUrlSubmit}
-          onAutofill={handleAutofillPhotos}
+          onFilesSelected={handleMobileFilesSelected}
           onPhotoClick={handleLibraryPhotoClick}
+          onPhotoSelect={setSelectedLibraryPhotoId}
           onPhotoRemove={removeSidebarPhoto}
-          onReadyForCart={() => void handleReadyForCart()}
+          onPhotoRetry={retrySidebarPhoto}
           onNextAction={handleNextAction}
-          onFieldFocus={handleFieldFocus}
+          onFieldFocus={handleMobileFieldFocus}
           onPhotoReplace={handlePhotoReplace}
-          onIssueFocus={handleIssueFocus}
+          onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
         />
       </div>
 
-      <EditorPageNavigator
-        pageCount={pageSpec.pageCount}
-        navigationLabel={navigationLabel}
-        navigation={navigation}
-        currentPage={currentPage}
-        thumbnails={thumbnails}
-        thumbW={sceneGeometry.pageWidthPx}
-        thumbH={sceneGeometry.pageHeightPx}
-        pageWidth={pageSpec.pageWidth}
-        pageHeight={pageSpec.pageHeight}
-        zoom={zoom}
-        spreadMode={spreadMode}
-        collapsed={stripCollapsed}
-        pageStatuses={pageStatuses}
-        showWhenSingle
-        canAddPages={documentMode === 'multipage' || pageSpec.pageCount > 1}
-        canAddSpread={documentMode === 'multipage'}
-        canDeletePages={(documentMode === 'multipage' || pageSpec.pageCount > 1) && pageSpec.pageCount > minimumPageCount}
-        titleLabel="Страницы макета"
-        labels={{
-          addPage: '+ Страница',
-          addSpread: '+ Разворот',
-          deletePage: 'Убрать добавленную',
-          deleteSpread: 'Убрать добавленный разворот',
-          pagesMode: 'Страницы',
-          spreadsMode: 'Развороты',
-          collapse: 'Свернуть страницы',
-          expand: 'Показать страницы',
-        }}
-        onGoTo={(pageIndex) => void handleGoToPage(pageIndex)}
-        onAddPage={() => void handleAddClientPage()}
-        onAddSpread={() => void handleAddClientSpread()}
-        onDeleteLast={() => void handleDeleteClientLast()}
-        onSpreadModeToggle={() => {
-          if (documentMode === 'multipage') setSpreadMode((value) => !value);
-        }}
-        onCollapse={() => setStripCollapsed((value) => !value)}
-      />
+      <footer
+        className={isMobile ? 'public-design-editor__mobile-chrome' : 'public-design-editor__page-chrome'}
+        aria-label={isMobile ? 'Навигация по макету' : undefined}
+      >
+        <EditorPageNavigator
+          pageCount={pageSpec.pageCount}
+          navigationLabel={navigationLabel}
+          navigation={navigation}
+          currentPage={currentPage}
+          thumbnails={thumbnails}
+          thumbW={sceneGeometry.pageWidthPx}
+          thumbH={sceneGeometry.pageHeightPx}
+          pageWidth={pageSpec.pageWidth}
+          pageHeight={pageSpec.pageHeight}
+          zoom={zoom}
+          spreadMode={spreadMode}
+          collapsed={isMobile ? false : stripCollapsed}
+          pageStatuses={pageStatuses}
+          showWhenSingle
+          canAddPages={documentMode === 'multipage' || pageSpec.pageCount > 1}
+          canAddSpread={documentMode === 'multipage'}
+          canDeletePages={(documentMode === 'multipage' || pageSpec.pageCount > 1) && pageSpec.pageCount > minimumPageCount}
+          titleLabel="Страницы макета"
+          labels={{
+            addPage: 'Добавить страницу',
+            addSpread: 'Добавить разворот',
+            deletePage: 'Убрать добавленную',
+            deleteSpread: 'Убрать добавленный разворот',
+            pagesMode: 'Страницы',
+            spreadsMode: 'Развороты',
+            collapse: 'Свернуть страницы',
+            expand: 'Показать страницы',
+          }}
+          onGoTo={(pageIndex) => void handleGoToPage(pageIndex)}
+          onAddPage={() => void handleAddClientPage()}
+          onInsertPage={(pageIndex) => void handleInsertClientPage(pageIndex)}
+          onDeletePage={setPendingDeletePage}
+          onAddSpread={() => void handleAddClientSpread()}
+          onDeleteLast={() => void handleDeleteClientLast()}
+          onSpreadModeToggle={() => {
+            if (documentMode === 'multipage') setSpreadMode((value) => !value);
+          }}
+          onCollapse={() => setStripCollapsed((value) => !value)}
+          compact={isMobile}
+        />
+        {isMobile && (
+          <PublicDesignEditorMobileDock
+            activePanel={mobilePanel}
+            photoCount={sidebarPhotos.length}
+            missingPhotoCount={missingPhotoCount}
+            nextAction={editorNextAction}
+            onPanelChange={setMobilePanel}
+            onNextAction={handleMobileNextAction}
+          />
+        )}
+      </footer>
+
       {showFinalizeButton && (
         <PublicDesignFinalizeForm
           form={customerForm}
@@ -534,6 +714,29 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
         anchor={textFloatingAnchor}
         canvasHandleRef={canvasHandleRef}
         selectedObj={selectedObj}
+      />
+      <PublicDesignCheckoutPreview
+        open={checkoutPreviewOpen}
+        thumbnails={thumbnails}
+        pageCount={pageSpec.pageCount}
+        preflight={preflight}
+        saving={saving}
+        onClose={() => setCheckoutPreviewOpen(false)}
+        onConfirm={handleConfirmReadyForCart}
+        onIssueFocus={handleIssueFocus}
+      />
+      <ConfirmDialog
+        isOpen={pendingDeletePage != null}
+        onClose={() => setPendingDeletePage(null)}
+        title="Удалить страницу?"
+        message="Вы действительно хотите удалить страницу? Данное действие отменить будет нельзя."
+        confirmText="Удалить страницу"
+        cancelText="Отмена"
+        variant="danger"
+        onConfirm={() => {
+          if (pendingDeletePage == null) return;
+          void handleDeleteClientPage(pendingDeletePage);
+        }}
       />
     </div>
   );

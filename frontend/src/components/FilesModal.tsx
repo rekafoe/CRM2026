@@ -1,7 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { OrderFile, Item } from '../types';
-import { listOrderFiles, uploadOrderFile, deleteOrderFile, approveOrderFile, downloadOrderFile, getCurrentUser, getOrderFileAccessLogs, getPreflightReport, type OrderFileAccessLog, type PreflightReport } from '../api';
+import {
+  listOrderFiles,
+  uploadOrderFile,
+  deleteOrderFile,
+  approveOrderFile,
+  downloadOrderFile,
+  getCurrentUser,
+  getOrderFileAccessLogs,
+  getPreflightReport,
+  createPublicEditorPreviewDraftFromOrderItem,
+  getOrderItemEditorProductionManifest,
+  type OrderFileAccessLog,
+  type PreflightReport,
+} from '../api';
 import { AppIcon } from './ui/AppIcon';
 import { OrderFileAccessLogsModal } from './OrderFileAccessLogsModal';
 import { PreflightReportModal } from './PreflightReportModal';
@@ -71,6 +84,8 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const [accessLogsLoading, setAccessLogsLoading] = useState(false);
   const [accessLogsError, setAccessLogsError] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<Item | null>(null);
+  const [editorActionLoading, setEditorActionLoading] = useState(false);
+  const [editorActionError, setEditorActionError] = useState<string | null>(null);
 
   // Загружаем файлы при открытии модального окна
   React.useEffect(() => {
@@ -98,6 +113,43 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       console.error('Ошибка загрузки файлов:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRestoreEditorDraft = async (item: Item) => {
+    if (!item.params?.designState || item.params.designTemplateId == null) return;
+    setEditorActionLoading(true);
+    setEditorActionError(null);
+    try {
+      const res = await createPublicEditorPreviewDraftFromOrderItem({ orderId, orderItemId: item.id });
+      const token = res.data?.token;
+      if (!token) throw new Error('Сервер не вернул draft token');
+      const mode = item.params.editorDraftMode === 'multipage' ? 'multipage' : 'single';
+      onClose();
+      navigate(`/adminpanel/public-design-editor-preview/${item.params.designTemplateId}?mode=${mode}&draft=${encodeURIComponent(token)}`);
+    } catch (error) {
+      setEditorActionError(error instanceof Error ? error.message : 'Не удалось открыть макет на правку');
+    } finally {
+      setEditorActionLoading(false);
+    }
+  };
+
+  const handleDownloadProductionManifest = async (item: Item) => {
+    setEditorActionLoading(true);
+    setEditorActionError(null);
+    try {
+      const res = await getOrderItemEditorProductionManifest(orderId, item.id);
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `order-${orderNumber || orderId}-item-${item.id}-editor-manifest.json`;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setEditorActionError(error instanceof Error ? error.message : 'Не удалось подготовить production manifest');
+    } finally {
+      setEditorActionLoading(false);
     }
   };
 
@@ -435,6 +487,26 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                   Открыть preview
                 </button>
               )}
+              {selectedOrderItem.params.designState && selectedOrderItem.params.designTemplateId != null && (
+                <button
+                  type="button"
+                  className="files-editor-summary__preview"
+                  onClick={() => void handleRestoreEditorDraft(selectedOrderItem)}
+                  disabled={editorActionLoading}
+                >
+                  Редактировать копию
+                </button>
+              )}
+              {(selectedOrderItem.params.designState || selectedOrderItem.params.photoBatch) && (
+                <button
+                  type="button"
+                  className="files-editor-summary__preview"
+                  onClick={() => void handleDownloadProductionManifest(selectedOrderItem)}
+                  disabled={editorActionLoading}
+                >
+                  Production manifest
+                </button>
+              )}
               {selectedOrderItem.params.editorDraftToken && (
                 <span title={selectedOrderItem.params.editorDraftToken}>
                   Draft: {selectedOrderItem.params.editorDraftToken.slice(0, 12)}…
@@ -447,6 +519,11 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                 <span>Mode: {selectedOrderItem.params.editorDraftMode}</span>
               )}
             </div>
+          </div>
+        )}
+        {editorActionError && (
+          <div className="files-editor-action-error">
+            {editorActionError}
           </div>
         )}
 

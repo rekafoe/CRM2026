@@ -1,4 +1,5 @@
 import React from 'react';
+import { EditorMobilePagePager } from './EditorMobilePagePager';
 import { PageStrip, type PageStripLabels, type PageStripStatus } from '../../pages/admin/designEditor/PageStrip';
 
 export interface EditorShellNavigationState {
@@ -28,10 +29,13 @@ interface EditorPageNavigatorProps {
   labels?: PageStripLabels;
   onGoTo: (pageIndex: number) => void;
   onAddPage: () => void;
+  onInsertPage?: (pageIndex: number) => void;
+  onDeletePage?: (pageIndex: number) => void;
   onAddSpread: () => void;
   onDeleteLast: () => void;
   onSpreadModeToggle: () => void;
   onCollapse: () => void;
+  compact?: boolean;
 }
 
 export const EditorPageNavigator: React.FC<EditorPageNavigatorProps> = ({
@@ -56,12 +60,34 @@ export const EditorPageNavigator: React.FC<EditorPageNavigatorProps> = ({
   labels,
   onGoTo,
   onAddPage,
+  onInsertPage,
+  onDeletePage,
   onAddSpread,
   onDeleteLast,
   onSpreadModeToggle,
   onCollapse,
+  compact = false,
 }) => {
   if (!showWhenSingle && pageCount <= 1 && !canAddPages && !canAddSpread) return null;
+
+  if (compact) {
+    return (
+      <div className="public-design-editor__page-strip public-design-editor__page-strip--pager" aria-label={navigationLabel}>
+        <EditorMobilePagePager
+          items={navigation.stripItems}
+          currentPage={currentPage}
+          thumbnails={thumbnails}
+          thumbW={thumbW}
+          thumbH={thumbH}
+          pageStatuses={pageStatuses}
+          canAddSpread={canAddSpread && spreadMode}
+          addSpreadLabel={labels?.addSpread}
+          onGoTo={onGoTo}
+          onAddSpread={onAddSpread}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="public-design-editor__page-strip" aria-label={navigationLabel}>
@@ -75,6 +101,8 @@ export const EditorPageNavigator: React.FC<EditorPageNavigatorProps> = ({
         onGoTo={onGoTo}
         onAddSpread={onAddSpread}
         onAddPage={onAddPage}
+        onInsertPage={onInsertPage}
+        onDeletePage={onDeletePage}
         onDeleteLast={onDeleteLast}
         canDelete={canDeletePages}
         canAdd={canAddPages || canAddSpread}
@@ -87,6 +115,7 @@ export const EditorPageNavigator: React.FC<EditorPageNavigatorProps> = ({
         pageStatuses={pageStatuses}
         titleLabel={titleLabel}
         labels={labels}
+        compact={compact}
       />
     </div>
   );

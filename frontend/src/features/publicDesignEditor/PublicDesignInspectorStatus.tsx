@@ -5,6 +5,7 @@ import type { PageStripStatus } from '../../pages/admin/designEditor/PageStrip';
 
 interface PublicDesignInspectorStatusProps {
   fragmentLabel: string;
+  fragmentPreflight: PublicEditorPreflightSummary;
   globalPreflight: PublicEditorPreflightSummary;
   nextAction: PublicEditorNextAction;
   pageCount: number;
@@ -15,6 +16,7 @@ interface PublicDesignInspectorStatusProps {
 
 export const PublicDesignInspectorStatus: React.FC<PublicDesignInspectorStatusProps> = ({
   fragmentLabel,
+  fragmentPreflight,
   globalPreflight,
   nextAction,
   pageCount,
@@ -24,13 +26,27 @@ export const PublicDesignInspectorStatus: React.FC<PublicDesignInspectorStatusPr
 }) => {
   const readyPages = Array.from({ length: pageCount }, (_, pageIndex) => pageStatuses[pageIndex])
     .filter((status) => status?.tone === 'ready').length;
+  const fragmentErrors = fragmentPreflight.issues.filter((issue) => issue.level === 'error').length;
+  const fragmentWarnings = fragmentPreflight.issues.filter((issue) => issue.level === 'warning').length;
+  const globalErrors = globalPreflight.issues.filter((issue) => issue.level === 'error').length;
+  const statusTitle = globalErrors > 0
+    ? `Нужно исправить ${globalErrors}`
+    : globalPreflight.issues.length > 0
+      ? 'Есть предупреждения'
+      : 'Можно оформлять';
 
   return (
     <section className="public-design-editor__inspector-status">
       <div className="public-design-editor__inspector-status-head">
         <span>Работа с макетом</span>
-        <strong>{globalPreflight.hasBlockingIssues ? 'Осталось заполнить' : 'Можно заказывать'}</strong>
-        <p>{fragmentLabel}</p>
+        <strong>{statusTitle}</strong>
+        <p>
+          {fragmentLabel}: {fragmentErrors > 0
+            ? `${fragmentErrors} ошибок`
+            : fragmentWarnings > 0
+              ? `${fragmentWarnings} предупреждений`
+              : 'готово'}
+        </p>
       </div>
 
       <div className="public-design-editor__inspector-metrics" aria-label="Готовность макета">
@@ -45,8 +61,9 @@ export const PublicDesignInspectorStatus: React.FC<PublicDesignInspectorStatusPr
         onClick={onNextAction}
         disabled={saving}
       >
-        <span>Следующий шаг</span>
+        <span>Главное действие</span>
         <strong>{nextAction.label}</strong>
+        <small>{nextAction.description}</small>
       </button>
     </section>
   );

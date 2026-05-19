@@ -75,3 +75,21 @@
     justify-content: flex-start;
   }
 }
+
+@media (max-width: 760px) {
+  .client-editor--single,
+  .client-editor--multipage {
+    height: 100%;
+    height: -webkit-fill-available;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .client-editor--single > *,
+  .client-editor--multipage > * {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+}

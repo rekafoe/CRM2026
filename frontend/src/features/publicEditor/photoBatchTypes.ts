@@ -12,12 +12,21 @@ export type PhotoBatchDraftItem = {
   file?: File;
   fileId?: number;
   previewUrl: string;
+  fallbackPreviewUrl?: string;
+  url?: string;
+  thumbUrl?: string | null;
   originalName: string;
+  size?: number | null;
+  width?: number | null;
+  height?: number | null;
   sizeId: string;
   quantity: number;
   fitMode: PhotoBatchFitMode;
   rotation: number;
   crop: { x: number; y: number; w: number; h: number };
+  uploadStatus?: 'queued' | 'uploading' | 'ready' | 'error';
+  uploadProgress?: number;
+  uploadError?: string;
 };
 
 export type PhotoBatchSavedItem = {

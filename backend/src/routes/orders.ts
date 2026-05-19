@@ -14,6 +14,7 @@ import { OrderService } from '../modules/orders/services/orderService'
 import { sendOrderSmsManual } from '../services/orderStatusSmsService'
 import { EarningsService } from '../services/earningsService'
 import { registerExternalOrderFiles, updateExternalOrderFile } from '../services/externalOrderFilesService'
+import { buildEditorProductionManifest } from '../services/editorProductionExportService'
 
 const router = Router()
 
@@ -808,6 +809,21 @@ router.get('/:id/files', asyncHandler(async (req, res) => {
     id
   )
   res.json(rows.map(sanitizeOrderFileForClient))
+}))
+
+router.get('/:id/items/:itemId/editor-production-manifest', asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  const orderItemId = Number(req.params.itemId)
+  if (!Number.isFinite(orderId) || !Number.isFinite(orderItemId)) {
+    res.status(400).json({ message: 'Некорректный orderId или itemId' })
+    return
+  }
+  try {
+    const manifest = await buildEditorProductionManifest(orderId, orderItemId)
+    res.json(manifest)
+  } catch (err: unknown) {
+    res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось подготовить production manifest' })
+  }
 }))
 
 // Скачивание файла с правильным именем (кириллица), отдача целиком с Content-Length

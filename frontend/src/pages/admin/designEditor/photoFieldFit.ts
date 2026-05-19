@@ -99,7 +99,24 @@ function placeFitImageInPhotoFieldFrame(
     scaleY: layout.scale,
     selectable: false,
     evented: true,
+    objectCaching: false,
   });
+}
+
+function normalizePhotoFieldZoom(value: unknown): number {
+  const zoom = Number(value ?? 1);
+  return Number.isFinite(zoom) ? Math.max(1, Math.min(6, zoom)) : 1;
+}
+
+function zoomPhotoFieldLayout(layout: PhotoFitLayout, zoom: number): PhotoFitLayout {
+  const safeZoom = normalizePhotoFieldZoom(zoom);
+  return {
+    scale: layout.scale * safeZoom,
+    displayW: layout.displayW * safeZoom,
+    displayH: layout.displayH * safeZoom,
+    baseLeft: layout.baseLeft - ((layout.displayW * safeZoom) - layout.displayW) / 2,
+    baseTop: layout.baseTop - ((layout.displayH * safeZoom) - layout.displayH) / 2,
+  };
 }
 
 export function buildFilledPhotoFieldGroup(opts: {
@@ -113,13 +130,16 @@ export function buildFilledPhotoFieldGroup(opts: {
   id?: string;
   panX?: number;
   panY?: number;
+  zoom?: number;
   fitMode?: PhotoFieldFitMode;
+  fileSize?: number;
 }): Group {
   const { left, top, frameW, frameH, image, id } = opts;
   const iw = opts.intrinsicW;
   const ih = opts.intrinsicH;
   const fitMode = opts.fitMode ?? 'cover';
-  const layout = computePhotoFieldLayout(fitMode, frameW, frameH, iw, ih);
+  const zoom = normalizePhotoFieldZoom(opts.zoom);
+  const layout = zoomPhotoFieldLayout(computePhotoFieldLayout(fitMode, frameW, frameH, iw, ih), zoom);
   const { panX, panY } = clampPhotoFieldPan(
     frameW,
     frameH,
@@ -144,6 +164,7 @@ export function buildFilledPhotoFieldGroup(opts: {
     strokeWidth: 0,
     selectable: false,
     evented: false,
+    objectCaching: false,
   });
 
   const clipRect = new Rect({
@@ -153,6 +174,7 @@ export function buildFilledPhotoFieldGroup(opts: {
     top: oy,
     width: frameW,
     height: frameH,
+    objectCaching: false,
   });
 
   const group = new Group([frameAnchor, image], {
@@ -165,6 +187,7 @@ export function buildFilledPhotoFieldGroup(opts: {
     layoutManager: createPhotoFieldStaticLayoutManager(),
     clipPath: clipRect,
     subTargetCheck: true,
+    objectCaching: false,
   });
 
   const g = ax(group);
@@ -175,12 +198,16 @@ export function buildFilledPhotoFieldGroup(opts: {
   g.photoFieldFitMode = fitMode;
   g.photoFieldPanX = panX;
   g.photoFieldPanY = panY;
+  g.photoFieldZoom = zoom;
+  g.photoFieldIntrinsicW = iw;
+  g.photoFieldIntrinsicH = ih;
+  if (Number.isFinite(opts.fileSize)) g.photoFieldFileSize = opts.fileSize;
   if (id) g.id = id;
 
   return group;
 }
 
-export function applyPhotoFieldPanToGroup(group: Group, panX: number, panY: number): void {
+export function applyPhotoFieldPanToGroup(group: Group, panX: number, panY: number, zoom?: number): void {
   const g = ax(group);
   if (!g.isPhotoField || !g.photoFieldFilled) return;
   const fw = Number(g.photoFieldFw ?? group.width ?? 1);
@@ -190,10 +217,12 @@ export function applyPhotoFieldPanToGroup(group: Group, panX: number, panY: numb
   const inner = innerList[0] as FabricImage | undefined;
   if (!inner) return;
   const { iw, ih } = getFabricImageIntrinsicSize(inner);
-  const layout = computePhotoFieldLayout(fitMode, fw, fh, iw, ih);
+  const nextZoom = normalizePhotoFieldZoom(zoom ?? g.photoFieldZoom ?? 1);
+  const layout = zoomPhotoFieldLayout(computePhotoFieldLayout(fitMode, fw, fh, iw, ih), nextZoom);
   const clamped = clampPhotoFieldPan(fw, fh, layout, panX, panY, fitMode);
   g.photoFieldPanX = clamped.panX;
   g.photoFieldPanY = clamped.panY;
+  g.photoFieldZoom = nextZoom;
   placeFitImageInPhotoFieldFrame(inner, layout, clamped.panX, clamped.panY);
   inner.setCoords();
   group.setCoords();
@@ -207,6 +236,7 @@ export function getFilledPhotoCropContext(field: FabricObject): {
   ih: number;
   panX: number;
   panY: number;
+  zoom: number;
   fitMode: PhotoFieldFitMode;
 } | null {
   const o = ax(field);
@@ -229,6 +259,7 @@ export function getFilledPhotoCropContext(field: FabricObject): {
       ih,
       panX: Number(o.photoFieldPanX ?? 0),
       panY: Number(o.photoFieldPanY ?? 0),
+      zoom: normalizePhotoFieldZoom(o.photoFieldZoom ?? 1),
       fitMode: resolvePhotoFieldFitMode(o),
     };
   }
@@ -250,6 +281,7 @@ export function getFilledPhotoCropContext(field: FabricObject): {
       ih,
       panX: Number(o.photoFieldPanX ?? 0),
       panY: Number(o.photoFieldPanY ?? 0),
+      zoom: normalizePhotoFieldZoom(o.photoFieldZoom ?? 1),
       fitMode: resolvePhotoFieldFitMode(o),
     };
   }

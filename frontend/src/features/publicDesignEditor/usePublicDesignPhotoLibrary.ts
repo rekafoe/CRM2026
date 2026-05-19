@@ -1,64 +1,107 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { fetchImageFromUrl } from '../../api';
+import type { PublicEditorDraftFile } from '../../api';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import type { SidebarPhotoItem } from '../../pages/admin/designEditor/types';
 import { filterLikelyImageFiles, looksLikeHttpUrl } from '../../utils/imageFile';
+import { useDraftAssetUploadQueue, type DraftAssetUploadItem } from '../publicEditor';
 
 interface UsePublicDesignPhotoLibraryInput {
   canvasHandleRef: RefObject<DesignEditorCanvasHandle | null>;
+  resolveImageAsset?: (file: File, onProgress?: (progress: number) => void) => Promise<PublicEditorDraftFile>;
   markDirty: () => void;
   setError: (message: string | null) => void;
 }
 
-function createSidebarPhotoId(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `photo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 export function usePublicDesignPhotoLibrary({
   canvasHandleRef,
+  resolveImageAsset,
   markDirty,
   setError,
 }: UsePublicDesignPhotoLibraryInput) {
-  const [sidebarPhotos, setSidebarPhotos] = useState<SidebarPhotoItem[]>([]);
+  const [usedPhotoIds, setUsedPhotoIds] = useState<Set<string>>(() => new Set());
+  const uploadQueue = useDraftAssetUploadQueue({
+    uploadFile: async (file, onProgress) => {
+      if (!resolveImageAsset) throw new Error('Загрузка фото пока недоступна.');
+      return resolveImageAsset(file, onProgress);
+    },
+  });
+  const sidebarPhotos = useMemo<SidebarPhotoItem[]>(() => uploadQueue.items
+    .filter((item): item is DraftAssetUploadItem & { file: File } => Boolean(item.file))
+    .map((item) => ({
+      id: item.id,
+      name: item.originalName,
+      previewUrl: item.thumbUrl || item.previewUrl,
+      fallbackPreviewUrl: item.fallbackPreviewUrl,
+      file: item.file,
+      fileId: item.fileId,
+      url: item.url,
+      thumbUrl: item.thumbUrl,
+      uploadStatus: item.status,
+      uploadProgress: item.progress,
+      uploadError: item.error,
+      used: usedPhotoIds.has(item.id),
+      addedAt: 0,
+    })), [uploadQueue.items, usedPhotoIds]);
   const sidebarPhotosRef = useRef<SidebarPhotoItem[]>([]);
   sidebarPhotosRef.current = sidebarPhotos;
 
   const addSidebarPhotos = useCallback((files: File[]) => {
     const images = filterLikelyImageFiles(files, { trustOsPicker: true });
     if (images.length === 0) return;
-    setSidebarPhotos((prev) => [
-      ...prev,
-      ...images.map((file) => ({
-        id: createSidebarPhotoId(),
-        name: file.name,
-        previewUrl: URL.createObjectURL(file),
-        file,
-        addedAt: Date.now(),
-      })),
-    ]);
-  }, []);
+    uploadQueue.addFiles(images);
+  }, [uploadQueue]);
 
   const removeSidebarPhoto = useCallback((id: string) => {
-    setSidebarPhotos((prev) => {
-      const target = prev.find((photo) => photo.id === id);
-      if (target) URL.revokeObjectURL(target.previewUrl);
-      return prev.filter((photo) => photo.id !== id);
+    uploadQueue.removeItem(id);
+    setUsedPhotoIds((current) => {
+      if (!current.has(id)) return current;
+      const next = new Set(current);
+      next.delete(id);
+      return next;
     });
+  }, [uploadQueue]);
+
+  const retrySidebarPhoto = useCallback((id: string) => {
+    uploadQueue.retryItem(id);
+  }, [uploadQueue]);
+
+  const clearErroredPhotos = useCallback(() => {
+    sidebarPhotosRef.current
+      .filter((photo) => photo.uploadStatus === 'error')
+      .forEach((photo) => uploadQueue.removeItem(photo.id));
+  }, [uploadQueue]);
+
+  const clearUsedPhotos = useCallback(() => {
+    const usedIds = sidebarPhotosRef.current.filter((photo) => photo.used).map((photo) => photo.id);
+    usedIds.forEach((id) => uploadQueue.removeItem(id));
+    setUsedPhotoIds((current) => {
+      const next = new Set(current);
+      usedIds.forEach((id) => next.delete(id));
+      return next;
+    });
+  }, [uploadQueue]);
+
+  const markSidebarPhotoUsed = useCallback((id: string) => {
+    setUsedPhotoIds((current) => new Set(current).add(id));
   }, []);
 
   const handleLibraryPhotoClick = useCallback(async (id: string) => {
     const photo = sidebarPhotosRef.current.find((item) => item.id === id);
     if (!photo) return;
     try {
-      await canvasHandleRef.current?.addImageFromFile(photo.file);
-      removeSidebarPhoto(id);
+      if (photo.url && photo.uploadStatus === 'ready') {
+        await canvasHandleRef.current?.addImageFromUrl(photo.url);
+      } else {
+        await canvasHandleRef.current?.addImageFromFile(photo.file);
+      }
+      setUsedPhotoIds((current) => new Set(current).add(id));
+      markDirty();
     } catch {
       setError('Не удалось поставить фото на макет.');
     }
-  }, [canvasHandleRef, removeSidebarPhoto, setError]);
+  }, [canvasHandleRef, markDirty, setError]);
 
   const handleImageUrlSubmit = useCallback(async (url: string) => {
     const value = url.trim();
@@ -86,27 +129,29 @@ export function usePublicDesignPhotoLibrary({
     if (!handle || photos.length === 0) return;
     try {
       for (const photo of photos) {
-        await handle.addImageFromFile(photo.file);
+        if (photo.url && photo.uploadStatus === 'ready') await handle.addImageFromUrl(photo.url);
+        else await handle.addImageFromFile(photo.file);
       }
       await handle.autofillPhotoFields();
-      setSidebarPhotos((prev) => {
-        prev.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
-        return [];
+      setUsedPhotoIds((current) => {
+        const next = new Set(current);
+        photos.forEach((photo) => next.add(photo.id));
+        return next;
       });
       markDirty();
     } catch {
       setError('Не удалось разложить фото по полям.');
     }
-  }, [canvasHandleRef, markDirty, setError]);
-
-  useEffect(() => () => {
-    sidebarPhotosRef.current.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
-  }, []);
+  }, [canvasHandleRef, markDirty, setError, uploadQueue]);
 
   return {
     sidebarPhotos,
     addSidebarPhotos,
     removeSidebarPhoto,
+    retrySidebarPhoto,
+    clearErroredPhotos,
+    clearUsedPhotos,
+    markSidebarPhotoUsed,
     handleLibraryPhotoClick,
     handleImageUrlSubmit,
     handleAutofillPhotos,

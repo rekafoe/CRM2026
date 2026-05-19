@@ -6,9 +6,11 @@ import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
 import {
   addEditorDraftFile,
   createEditorDraft,
+  createEditorDraftFromOrderItem,
   finalizeEditorDraft,
   getEditorDraft,
   getEditorDraftFile,
+  listEditorDraftFiles,
   updateEditorDraftPayload,
 } from '../services/publicEditorDraftService'
 
@@ -32,10 +34,17 @@ async function getPublicBranding(): Promise<{ logoUrl: string | null; organizati
   }
 }
 
-function withDraftFileUrl(req: Request, token: string, file: Record<string, unknown>): Record<string, unknown> {
+function withDraftFileUrl<T extends { id: number | string; thumbFilename?: string | null }>(
+  req: Request,
+  token: string,
+  file: T,
+): T & { url: string; thumbUrl: string | null } {
+  const fileId = encodeURIComponent(String(file.id))
+  const base = `${req.baseUrl}/drafts/${encodeURIComponent(token)}/files/${fileId}`
   return {
     ...file,
-    url: `${req.baseUrl}/drafts/${encodeURIComponent(token)}/files/${encodeURIComponent(String(file.id))}/content`,
+    url: `${base}/content`,
+    thumbUrl: file.thumbFilename ? `${base}/thumb` : null,
   }
 }
 
@@ -66,8 +75,25 @@ async function sendDraftFileContent(req: Request, res: Response): Promise<void> 
   res.sendFile(filePath)
 }
 
+async function sendDraftFileThumb(req: Request, res: Response): Promise<void> {
+  const fileId = Number(req.params.fileId)
+  if (!Number.isFinite(fileId)) {
+    res.status(400).json({ message: 'Неверный ID файла' })
+    return
+  }
+  const file = await getEditorDraftFile(req.params.token, fileId)
+  const filePath = file?.thumbFilename ? resolveSafeExistingPath([orderFilesDir], file.thumbFilename) : null
+  if (!file || !filePath) {
+    res.status(404).json({ message: 'Миниатюра не найдена' })
+    return
+  }
+  res.type('image/jpeg')
+  res.sendFile(filePath)
+}
+
 /** Stable draft file URL for browser image rendering; token scopes file access. */
 router.get('/drafts/:token/files/:fileId/content', asyncHandler(sendDraftFileContent))
+router.get('/drafts/:token/files/:fileId/thumb', asyncHandler(sendDraftFileThumb))
 
 /** Public branding for website/client editor shell. Does not expose requisites. */
 router.get('/branding', asyncHandler(async (_req: Request, res: Response) => {
@@ -89,9 +115,33 @@ router.get('/admin-preview/drafts/:token', authenticate, asyncHandler(async (req
   res.json(draft)
 }))
 
+router.get('/admin-preview/drafts/:token/files', authenticate, asyncHandler(async (req: Request, res: Response) => {
+  const files = await listEditorDraftFiles(req.params.token)
+  res.json(files.map((file) => withDraftFileUrl(req, req.params.token, file)))
+}))
+
+router.post('/admin-preview/from-order-item', authenticate, asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const orderId = Number(req.body?.orderId)
+    const orderItemId = Number(req.body?.orderItemId)
+    if (!Number.isFinite(orderId) || !Number.isFinite(orderItemId)) {
+      res.status(400).json({ message: 'Нужны корректные orderId и orderItemId' })
+      return
+    }
+    const draft = await createEditorDraftFromOrderItem({ orderId, orderItemId })
+    res.status(201).json(draft)
+  } catch (err: unknown) {
+    res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось создать draft из позиции заказа' })
+  }
+}))
+
 router.patch('/admin-preview/drafts/:token', authenticate, asyncHandler(async (req: Request, res: Response) => {
-  const draft = await updateEditorDraftPayload(req.params.token, req.body ?? {})
-  res.json(draft)
+  try {
+    const draft = await updateEditorDraftPayload(req.params.token, req.body ?? {})
+    res.json(draft)
+  } catch (err: unknown) {
+    res.status(409).json({ message: err instanceof Error ? err.message : 'Не удалось сохранить draft' })
+  }
 }))
 
 router.post(
@@ -99,8 +149,12 @@ router.post(
   authenticate,
   uploadOrderFilesMemory.single('file'),
   asyncHandler(async (req: Request, res: Response) => {
-    const file = await addEditorDraftFile(req.params.token, (req as any).file)
-    res.status(201).json(withDraftFileUrl(req, req.params.token, file))
+    try {
+      const file = await addEditorDraftFile(req.params.token, (req as any).file)
+      res.status(201).json(withDraftFileUrl(req, req.params.token, file))
+    } catch (err: unknown) {
+      res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось загрузить файл draft' })
+    }
   }),
 )
 
@@ -132,10 +186,19 @@ router.get('/drafts/:token', asyncHandler(async (req: Request, res: Response) =>
   res.json(draft)
 }))
 
+router.get('/drafts/:token/files', asyncHandler(async (req: Request, res: Response) => {
+  const files = await listEditorDraftFiles(req.params.token)
+  res.json(files.map((file) => withDraftFileUrl(req, req.params.token, file)))
+}))
+
 /** PATCH /api/public-editor/drafts/:token — сохранить состояние редактора */
 router.patch('/drafts/:token', asyncHandler(async (req: Request, res: Response) => {
-  const draft = await updateEditorDraftPayload(req.params.token, req.body ?? {})
-  res.json(draft)
+  try {
+    const draft = await updateEditorDraftPayload(req.params.token, req.body ?? {})
+    res.json(draft)
+  } catch (err: unknown) {
+    res.status(409).json({ message: err instanceof Error ? err.message : 'Не удалось сохранить draft' })
+  }
 }))
 
 /** POST /api/public-editor/drafts/:token/files — загрузить файл клиента в draft */
@@ -143,8 +206,12 @@ router.post(
   '/drafts/:token/files',
   uploadOrderFilesMemory.single('file'),
   asyncHandler(async (req: Request, res: Response) => {
-    const file = await addEditorDraftFile(req.params.token, (req as any).file)
-    res.status(201).json(withDraftFileUrl(req, req.params.token, file))
+    try {
+      const file = await addEditorDraftFile(req.params.token, (req as any).file)
+      res.status(201).json(withDraftFileUrl(req, req.params.token, file))
+    } catch (err: unknown) {
+      res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось загрузить файл draft' })
+    }
   }),
 )
 

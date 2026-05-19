@@ -14,6 +14,8 @@ export function useDesignEditorViewport(input: {
   bleedPx: number;
   showBleed: boolean;
   isSpreadView: boolean;
+  /** Меньше отступы вокруг холста — лучше вписывается на узком экране */
+  compactPadding?: boolean;
 }): DesignEditorViewportState {
   const [fitZoom, setFitZoom] = useState(1);
   const [viewportReady, setViewportReady] = useState(false);
@@ -25,12 +27,21 @@ export function useDesignEditorViewport(input: {
     setViewportReady(false);
 
     const visibleBleedPx = input.showBleed ? input.bleedPx : 0;
-    const wrapperPadX = input.isSpreadView ? 64 : 80;
-    const wrapperPadY = input.isSpreadView ? 98 : 80;
+    const compact = input.compactPadding === true;
+    const wrapperPadX = compact
+      ? (input.isSpreadView ? 20 : 12)
+      : (input.isSpreadView ? 64 : 80);
+    const wrapperPadY = compact
+      ? (input.isSpreadView ? 28 : 20)
+      : (input.isSpreadView ? 98 : 80);
     const contentW = (input.isSpreadView ? input.pageWidthPx * 2 : input.pageWidthPx) + wrapperPadX + visibleBleedPx * 2;
     const contentH = input.pageHeightPx + wrapperPadY + visibleBleedPx * 2;
-    const canvasPadX = input.isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx;
-    const canvasPadY = input.isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx;
+    const canvasPadX = compact
+      ? (input.isSpreadView ? 12 + visibleBleedPx : 8 + visibleBleedPx)
+      : (input.isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx);
+    const canvasPadY = compact
+      ? (input.isSpreadView ? 12 + visibleBleedPx : 8 + visibleBleedPx)
+      : (input.isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx);
     const cw = Math.max(contentW, 1);
     const ch = Math.max(contentH, 1);
     let rafId = 0;
@@ -42,7 +53,7 @@ export function useDesignEditorViewport(input: {
         if (!alive) return;
         const aw = Math.round(el.clientWidth);
         const ah = Math.round(el.clientHeight);
-        if (aw < 100 || ah < 100) return;
+        if (aw < 48 || ah < 48) return;
         const zRaw = Math.max(0.1, Math.min(aw / cw, ah / ch, 3));
         const z = Math.round(zRaw * 1000) / 1000;
         setFitZoom(z);
@@ -69,6 +80,7 @@ export function useDesignEditorViewport(input: {
     input.pageHeightPx,
     input.pageWidthPx,
     input.showBleed,
+    input.compactPadding,
     input.viewportRef,
   ]);
 

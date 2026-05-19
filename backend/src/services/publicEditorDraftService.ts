@@ -1,8 +1,14 @@
 import crypto from 'crypto'
 import { getDb } from '../config/database'
-import { saveBufferToOrderFiles } from '../config/upload'
 import { OrderService } from '../modules/orders/services/orderService'
 import { setLastWebsiteOrderAt } from '../utils/poolSync'
+import { hasColumn, invalidateTableSchemaCache } from '../utils/tableSchemaCache'
+import {
+  createEditorDraftAsset,
+  getEditorDraftAsset,
+  listEditorDraftAssets,
+  type EditorDraftFileRecord,
+} from './publicEditorAssetService'
 
 export interface EditorDraftRow {
   id: number
@@ -13,10 +19,21 @@ export interface EditorDraftRow {
   size_id: string | null
   mode: string
   payload: string | null
+  version?: number
   status: string
   order_id: number | null
   created_at: string
   updated_at: string
+}
+
+const MAX_DRAFT_PAYLOAD_BYTES = Number(process.env.EDITOR_DRAFT_MAX_PAYLOAD_BYTES || 2 * 1024 * 1024)
+
+async function ensureEditorDraftVersionColumn(): Promise<void> {
+  const exists = await hasColumn('editor_drafts', 'version').catch(() => false)
+  if (exists) return
+  const db = await getDb()
+  await db.exec('ALTER TABLE editor_drafts ADD COLUMN version INTEGER NOT NULL DEFAULT 1')
+  invalidateTableSchemaCache('editor_drafts')
 }
 
 function parsePayload(row: EditorDraftRow): Record<string, unknown> {
@@ -29,6 +46,26 @@ function parsePayload(row: EditorDraftRow): Record<string, unknown> {
 
 function createToken(): string {
   return crypto.randomBytes(18).toString('base64url')
+}
+
+function stringifyDraftPayload(payload: Record<string, unknown>): string {
+  const serialized = JSON.stringify(payload)
+  if (Buffer.byteLength(serialized, 'utf8') > MAX_DRAFT_PAYLOAD_BYTES) {
+    throw new Error('Draft слишком большой. Уменьшите количество данных в макете.')
+  }
+  return serialized
+}
+
+function readExpectedVersion(patch: Record<string, unknown>): number | null {
+  const raw = patch.expectedVersion ?? patch.__expectedVersion
+  if (raw == null || raw === '') return null
+  const expected = Number(raw)
+  return Number.isInteger(expected) && expected > 0 ? expected : null
+}
+
+function stripDraftControlKeys(patch: Record<string, unknown>): Record<string, unknown> {
+  const { expectedVersion: _expectedVersion, __expectedVersion: _legacyExpectedVersion, ...payloadPatch } = patch
+  return payloadPatch
 }
 
 export async function createEditorDraft(input: {
@@ -51,7 +88,7 @@ export async function createEditorDraft(input: {
       input.typeId ?? null,
       input.sizeId ?? null,
       input.mode ?? 'single',
-      JSON.stringify(input.payload ?? {}),
+      stringifyDraftPayload(input.payload ?? {}),
     ],
   )
   const row = await db.get<EditorDraftRow>('SELECT * FROM editor_drafts WHERE id = ?', result.lastID)
@@ -69,66 +106,100 @@ export async function updateEditorDraftPayload(
   token: string,
   patch: Record<string, unknown>,
 ): Promise<EditorDraftRow & { payloadParsed: Record<string, unknown> }> {
+  await ensureEditorDraftVersionColumn()
   const existing = await getEditorDraft(token)
   if (!existing) throw new Error('Draft не найден')
   if (existing.status !== 'draft') throw new Error('Draft уже финализирован')
 
-  const payload = { ...existing.payloadParsed, ...patch }
+  const expectedVersion = readExpectedVersion(patch)
+  const payload = { ...existing.payloadParsed, ...stripDraftControlKeys(patch) }
   const db = await getDb()
-  await db.run(
-    `UPDATE editor_drafts SET payload = ?, updated_at = datetime('now') WHERE token = ?`,
-    [JSON.stringify(payload), token],
-  )
+  const serializedPayload = stringifyDraftPayload(payload)
+  const result = expectedVersion
+    ? await db.run(
+      `UPDATE editor_drafts
+       SET payload = ?, version = COALESCE(version, 1) + 1, updated_at = datetime('now')
+       WHERE token = ? AND status = 'draft' AND COALESCE(version, 1) = ?`,
+      [serializedPayload, token, expectedVersion],
+    )
+    : await db.run(
+      `UPDATE editor_drafts
+       SET payload = ?, version = COALESCE(version, 1) + 1, updated_at = datetime('now')
+       WHERE token = ? AND status = 'draft'`,
+      [serializedPayload, token],
+    )
+  if ((result.changes ?? 0) === 0) {
+    throw new Error('Draft изменился в другой вкладке. Обновите страницу и повторите сохранение.')
+  }
   const updated = await getEditorDraft(token)
   if (!updated) throw new Error('Draft не найден')
   return updated
 }
 
+function parseItemParams(value: unknown): Record<string, unknown> {
+  if (!value) return {}
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
+    } catch {
+      return {}
+    }
+  }
+  return typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+export async function createEditorDraftFromOrderItem(input: {
+  orderId: number
+  orderItemId: number
+}): Promise<EditorDraftRow & { payloadParsed: Record<string, unknown> }> {
+  const db = await getDb()
+  const item = await db.get<{ id: number; orderId: number; params: string | null }>(
+    'SELECT id, orderId, params FROM items WHERE id = ? AND orderId = ?',
+    [input.orderItemId, input.orderId],
+  )
+  if (!item) throw new Error('Позиция заказа не найдена')
+  const params = parseItemParams(item.params)
+  const payload: Record<string, unknown> = {}
+  if (params.designState) payload.designState = params.designState
+  if (params.photoBatch) payload.photoBatch = params.photoBatch
+  if (params.selectedEditorParams) payload.selectedParams = params.selectedEditorParams
+  if (!payload.designState && !payload.photoBatch) throw new Error('В позиции нет сохранённого состояния редактора')
+
+  return createEditorDraft({
+    designTemplateId: params.designTemplateId != null ? Number(params.designTemplateId) : undefined,
+    productId: params.productId != null ? Number(params.productId) : undefined,
+    typeId: params.typeId != null ? Number(params.typeId) : undefined,
+    sizeId: params.sizeId != null ? String(params.sizeId) : undefined,
+    mode: typeof params.editorDraftMode === 'string' ? params.editorDraftMode : payload.photoBatch ? 'photo_batch' : 'single',
+    payload,
+  })
+}
+
 export async function addEditorDraftFile(
   token: string,
   file: { buffer?: Buffer; originalname?: string; mimetype?: string },
-): Promise<Record<string, unknown>> {
+): Promise<EditorDraftFileRecord> {
   const draft = await getEditorDraft(token)
   if (!draft) throw new Error('Draft не найден')
   if (draft.status !== 'draft') throw new Error('Draft уже финализирован')
 
-  const saved = saveBufferToOrderFiles(file.buffer, file.originalname)
-  if (!saved) throw new Error('Файл пустой или не загружен')
-
-  const db = await getDb()
-  const result = await db.run(
-    `INSERT INTO editor_draft_files (draft_id, filename, originalName, mime, size)
-     VALUES (?, ?, ?, ?, ?)`,
-    [draft.id, saved.filename, saved.originalName, file.mimetype ?? null, saved.size],
-  )
-  return {
-    id: result.lastID,
-    draftId: draft.id,
-    filename: saved.filename,
-    originalName: saved.originalName,
-    mime: file.mimetype ?? null,
-    size: saved.size,
-  }
+  return createEditorDraftAsset(draft.id, file)
 }
 
 export async function getEditorDraftFile(
   token: string,
   fileId: number,
-): Promise<{ filename: string; originalName: string | null; mime: string | null; size: number | null } | null> {
+): Promise<EditorDraftFileRecord | null> {
   const draft = await getEditorDraft(token)
   if (!draft) return null
+  return getEditorDraftAsset(draft.id, fileId)
+}
 
-  const db = await getDb()
-  const file = await db.get<{
-    filename: string
-    originalName: string | null
-    mime: string | null
-    size: number | null
-  }>(
-    'SELECT filename, originalName, mime, size FROM editor_draft_files WHERE id = ? AND draft_id = ?',
-    [fileId, draft.id],
-  )
-  return file ?? null
+export async function listEditorDraftFiles(token: string): Promise<EditorDraftFileRecord[]> {
+  const draft = await getEditorDraft(token)
+  if (!draft) return []
+  return listEditorDraftAssets(draft.id)
 }
 
 export async function prepareWebsiteItemsWithEditorDrafts<
@@ -270,10 +341,11 @@ export async function finalizeEditorDraft(
     'SELECT filename, originalName, mime, size FROM editor_draft_files WHERE draft_id = ? ORDER BY id ASC',
     [draft.id],
   )
+  const primaryOrderItemId = Array.isArray(result.itemIds) && result.itemIds.length > 0 ? Number(result.itemIds[0]) : null
   for (const file of draftFiles ?? []) {
     await db.run(
-      'INSERT INTO order_files (orderId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?)',
-      [result.order.id, file.filename, file.originalName, file.mime, file.size],
+      'INSERT INTO order_files (orderId, orderItemId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?, ?)',
+      [result.order.id, primaryOrderItemId, file.filename, file.originalName, file.mime, file.size],
     )
   }
 

@@ -67,8 +67,12 @@ export const FABRIC_CUSTOM_PROPS = [
   'photoFieldFh',
   'photoFieldPanX',
   'photoFieldPanY',
+  'photoFieldZoom',
   /** cover — заполнить рамку с обрезкой; contain — вписать целиком в рамку */
   'photoFieldFitMode',
+  'photoFieldIntrinsicW',
+  'photoFieldIntrinsicH',
+  'photoFieldFileSize',
 ];
 
 /** Пункты меню сайдбара */

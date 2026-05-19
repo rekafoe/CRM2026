@@ -733,7 +733,7 @@ export const DesignEditorPage: React.FC = () => {
 
       for (let i = 0; i < pageCount; i++) {
         setExportProgress({ current: i + 1, total: pageCount });
-        await handle.loadPageForExport(allPages[i] ?? EMPTY_PAGE);
+        await handle.loadPageForExport(allPages[i] ?? EMPTY_PAGE, i);
         await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
         const dataUrl = handle.getDataURL({ multiplier: getExportPixelRatio() });
         if (i > 0) doc.addPage([pageWidth, pageHeight]);

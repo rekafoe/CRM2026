@@ -43,12 +43,9 @@ export function buildStripItems(
     });
   }
 
-  // Последняя страница резервируется под заднюю обложку, если общее
-  // число страниц чётное относительно разворотов (т.е. останется одна)
+  // Последняя страница — задняя обложка (фотокнига: лицевая + развороты + задняя)
   const lastPageIdx = pageCount - 1;
-  const remainingAfterCovers = pageCount - covers;
-  // Задняя обложка — одиночная, если оставшихся страниц нечётное кол-во
-  const hasBackCover = remainingAfterCovers % 2 !== 0;
+  const hasBackCover = pageCount > covers;
   const innerEnd = hasBackCover ? lastPageIdx : pageCount;
 
   // Развороты (внутренние страницы)
@@ -92,4 +89,36 @@ export function findStripItemForPage(
   pageIndex: number,
 ): number {
   return items.findIndex((item) => item.pages.includes(pageIndex));
+}
+
+/** Индекс вставки нового разворота: перед задней обложкой, если она есть. */
+export function getSpreadInsertIndex(pageCount: number, coverPages = 1): number {
+  const covers = Math.min(coverPages, pageCount);
+  return pageCount > covers ? pageCount - 1 : pageCount;
+}
+
+/** Последний внутренний блок (разворот или одиночная) перед задней обложкой — для удаления. */
+export function getLastInnerSpreadRange(
+  pageCount: number,
+  coverPages = 1,
+): { start: number; length: number } | null {
+  const covers = Math.min(coverPages, pageCount);
+  if (pageCount <= covers) return null;
+
+  const innerEnd = pageCount - 1;
+  let pageIdx = covers;
+  let last: { start: number; length: number } | null = null;
+
+  while (pageIdx < innerEnd) {
+    if (pageIdx + 1 < innerEnd) {
+      last = { start: pageIdx, length: 2 };
+      pageIdx += 2;
+    } else {
+      last = { start: pageIdx, length: 1 };
+      pageIdx += 1;
+    }
+  }
+
+  if (!last || pageCount - last.length < covers + 1) return null;
+  return last;
 }

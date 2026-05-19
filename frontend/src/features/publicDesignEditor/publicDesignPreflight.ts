@@ -73,12 +73,22 @@ export function analyzePublicDesignPages(pages: DesignPage[], saveState: string)
       if (obj.isPhotoField === true) {
         const id = String(obj.id ?? `photo-${pageIndex + 1}-${photoFields.length + 1}`);
         const filled = obj.photoFieldFilled === true;
+        const fieldWidth = Number(obj.photoFieldFw ?? obj.width ?? 0);
+        const fieldHeight = Number(obj.photoFieldFh ?? obj.height ?? 0);
+        const intrinsicWidth = Number(obj.photoFieldIntrinsicW ?? 0);
+        const intrinsicHeight = Number(obj.photoFieldIntrinsicH ?? 0);
+        const lowQuality = filled &&
+          fieldWidth > 0 &&
+          fieldHeight > 0 &&
+          intrinsicWidth > 0 &&
+          intrinsicHeight > 0 &&
+          (intrinsicWidth < fieldWidth * 1.5 || intrinsicHeight < fieldHeight * 1.5);
         photoFields.push({
           id,
           pageIndex,
           label: `Фото ${photoFields.length + 1}`,
-          status: filled ? 'ready' : 'missing',
-          detail: filled ? 'Фото добавлено' : 'Нужно добавить фото',
+          status: filled ? lowQuality ? 'warning' : 'ready' : 'missing',
+          detail: filled ? lowQuality ? 'Фото может быть низкого качества для печати' : 'Фото добавлено' : 'Нужно добавить фото',
         });
         if (!filled) {
           issues.push({
@@ -86,6 +96,13 @@ export function analyzePublicDesignPages(pages: DesignPage[], saveState: string)
             level: 'error',
             pageIndex,
             message: `Страница ${pageIndex + 1}: не заполнено фото-поле`,
+          });
+        } else if (lowQuality) {
+          issues.push({
+            id: `photo-quality-${id}`,
+            level: 'warning',
+            pageIndex,
+            message: `Страница ${pageIndex + 1}: фото может быть низкого качества для печати`,
           });
         }
       }

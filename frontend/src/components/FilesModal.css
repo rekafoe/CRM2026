@@ -249,6 +249,22 @@
   font-weight: 700;
 }
 
+.files-editor-summary__preview:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.files-editor-action-error {
+  margin: -6px 24px 14px;
+  padding: 10px 12px;
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .btn-download-all,
 .btn-upload {
   padding: 10px 18px;

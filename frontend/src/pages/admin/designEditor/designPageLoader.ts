@@ -79,23 +79,27 @@ export async function addTemplatePreviewBackground(
 export async function loadDesignPageScene(input: {
   canvas: Canvas;
   pageData: DesignPage | undefined;
+  pageIndex?: number;
   template: DesignTemplate | null;
   pageW: number;
   pageH: number;
   apiBaseUrl: string;
 }): Promise<void> {
-  const { canvas, pageData, template, pageW, pageH, apiBaseUrl } = input;
+  const { canvas, pageData, pageIndex, template, pageW, pageH, apiBaseUrl } = input;
+  const useTemplatePreviewBackground = pageIndex == null || pageIndex === 0;
   const hasJson = pageData?.fabricJSON && Object.keys(pageData.fabricJSON).length > 0;
   if (hasJson) {
     await canvas.loadFromJSON(pageData!.fabricJSON, fabricDeserializeReviver);
     normalizeBackgroundObjects(canvas, pageW, pageH);
-    if (!hasBackgroundObject(canvas)) {
+    if (useTemplatePreviewBackground && !hasBackgroundObject(canvas)) {
       await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
     }
   } else {
     canvas.clear();
     (canvas as unknown as AnyObj).backgroundColor = 'white';
-    await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
+    if (useTemplatePreviewBackground) {
+      await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
+    }
   }
   canvas.requestRenderAll();
 }
@@ -104,13 +108,15 @@ export async function loadSpreadMergedScene(input: {
   canvas: Canvas;
   leftPage: DesignPage | undefined;
   rightPage: DesignPage | undefined;
+  leftPageIndex?: number;
+  rightPageIndex?: number;
   pageW: number;
   pageH: number;
   template: DesignTemplate | null;
   apiBaseUrl: string;
 }): Promise<void> {
-  const { canvas, leftPage, rightPage, pageW, pageH, template, apiBaseUrl } = input;
-  await loadDesignPageScene({ canvas, pageData: leftPage, template, pageW, pageH, apiBaseUrl });
+  const { canvas, leftPage, rightPage, leftPageIndex, rightPageIndex, pageW, pageH, template, apiBaseUrl } = input;
+  await loadDesignPageScene({ canvas, pageData: leftPage, pageIndex: leftPageIndex, template, pageW, pageH, apiBaseUrl });
   const tempEl = document.createElement('canvas');
   const temp = new Canvas(tempEl, {
     width: pageW,
@@ -118,7 +124,7 @@ export async function loadSpreadMergedScene(input: {
     backgroundColor: 'white',
     preserveObjectStacking: true,
   });
-  await loadDesignPageScene({ canvas: temp, pageData: rightPage, template, pageW, pageH, apiBaseUrl });
+  await loadDesignPageScene({ canvas: temp, pageData: rightPage, pageIndex: rightPageIndex, template, pageW, pageH, apiBaseUrl });
   for (const obj of [...temp.getObjects()]) {
     const clone = await obj.clone();
     clone.set({ left: (clone.left ?? 0) + pageW });

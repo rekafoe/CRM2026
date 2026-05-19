@@ -43,7 +43,12 @@ export const EditorStageToolbar: React.FC<EditorStageToolbarProps> = ({
     </div>
     <div className="public-design-editor__canvas-actions">
       {toolsSlot}
-      <EditorViewControls value={viewOptions} onChange={onViewOptionsChange} />
+      <details className="public-design-editor__stage-hints">
+        <summary>Подсказки</summary>
+        <div className="public-design-editor__stage-hints-panel">
+          <EditorViewControls value={viewOptions} onChange={onViewOptionsChange} />
+        </div>
+      </details>
       <Button variant="secondary" size="sm" onClick={onUndo} disabled={!canUndo} title="Отменить">↶</Button>
       <Button variant="secondary" size="sm" onClick={onRedo} disabled={!canRedo} title="Повторить">↷</Button>
       <Button variant="secondary" size="sm" onClick={onZoomOut} title="Уменьшить">−</Button>

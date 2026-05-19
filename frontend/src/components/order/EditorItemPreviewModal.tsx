@@ -27,6 +27,7 @@ function isDesignState(value: unknown): value is DesignState {
 async function renderDesignPageToDataUrl(
   page: DesignPage,
   designState: DesignState,
+  pageIndex: number,
   multiplier = 1,
 ): Promise<string> {
   const geometry = createDesignSceneGeometry({
@@ -47,6 +48,7 @@ async function renderDesignPageToDataUrl(
     await loadDesignPageScene({
       canvas,
       pageData: page,
+      pageIndex,
       template: null,
       pageW: geometry.pageWidthPx,
       pageH: geometry.pageHeightPx,
@@ -68,7 +70,7 @@ async function exportDesignStatePdf(designState: DesignState): Promise<void> {
 
   for (let i = 0; i < designState.pages.length; i++) {
     if (i > 0) doc.addPage([designState.pageWidth, designState.pageHeight], designState.pageWidth > designState.pageHeight ? 'landscape' : 'portrait');
-    const dataUrl = await renderDesignPageToDataUrl(designState.pages[i], designState, 2);
+    const dataUrl = await renderDesignPageToDataUrl(designState.pages[i], designState, i, 2);
     doc.addImage(dataUrl, 'PNG', 0, 0, designState.pageWidth, designState.pageHeight);
   }
 
@@ -95,7 +97,7 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({ 
     Promise.all(
       designState.pages.map(async (page, index) => ({
         page: index + 1,
-        url: await renderDesignPageToDataUrl(page, designState, 1),
+        url: await renderDesignPageToDataUrl(page, designState, index, 1),
       })),
     )
       .then((previews) => {
