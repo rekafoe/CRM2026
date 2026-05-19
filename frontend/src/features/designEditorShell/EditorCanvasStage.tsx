@@ -1,6 +1,10 @@
 import React from 'react';
 import type { GuideLine } from '../../pages/admin/designEditor/CanvasRulers';
-import { DesignEditorCanvas, type DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
+import {
+  DesignEditorCanvas,
+  type DesignEditorCanvasHandle,
+  type EditorMode,
+} from '../../pages/admin/designEditor/DesignEditorCanvas';
 import type { DesignTemplate } from '../../api';
 import type { DesignPage } from '../../pages/admin/designEditor/types';
 import { EditorCanvasRulersLayer } from './EditorCanvasRulersLayer';
@@ -90,6 +94,7 @@ export interface EditorCanvasHandlers {
 
 interface EditorCanvasStageProps {
   template: DesignTemplate;
+  editorMode?: EditorMode;
   refs: EditorCanvasRefs;
   fragment: EditorCanvasFragmentInfo;
   navigation: EditorCanvasNavigationState;
@@ -105,6 +110,7 @@ interface EditorCanvasStageProps {
 
 export const EditorCanvasStage: React.FC<EditorCanvasStageProps> = ({
   template,
+  editorMode = 'advanced',
   refs,
   fragment,
   navigation,
@@ -161,6 +167,7 @@ export const EditorCanvasStage: React.FC<EditorCanvasStageProps> = ({
       />
       <EditorCanvasViewport
         template={template}
+        editorMode={editorMode}
         canvasHandleRef={refs.canvasHandleRef}
         viewportRef={refs.viewportRef}
         fitScalerRef={refs.fitScalerRef}

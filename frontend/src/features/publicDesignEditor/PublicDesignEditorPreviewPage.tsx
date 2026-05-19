@@ -5,6 +5,8 @@ import { Button } from '../../components/common';
 import { AppIcon } from '../../components/ui/AppIcon';
 import { finalizePublicEditorPreviewDraft } from '../../api';
 import { ClientEditorRouter, type ClientEditorMode } from '../clientEditor';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { PublicEditorPreviewModeBar } from './PublicEditorPreviewModeBar';
 import './publicDesignEditorPreview.css';
 
 const CLIENT_EDITOR_MODES: ClientEditorMode[] = ['single', 'multipage', 'photo_batch'];
@@ -31,6 +33,7 @@ export const PublicDesignEditorPreviewPage: React.FC = () => {
   const requestedMode = searchParams.get('mode') as ClientEditorMode | null;
   const mode = requestedMode && CLIENT_EDITOR_MODES.includes(requestedMode) ? requestedMode : 'single';
   const draftToken = searchParams.get('draft');
+  const isMobile = useMediaQuery('(max-width: 760px)');
 
   const updateSearchParam = React.useCallback((key: string, value: string | null) => {
     const next = new URLSearchParams(searchParams);
@@ -153,10 +156,17 @@ export const PublicDesignEditorPreviewPage: React.FC = () => {
       title="Предпросмотр клиентского редактора"
       icon={<AppIcon name="image" size="sm" />}
       onBack={() => navigate('/adminpanel/design-templates')}
-      className="design-editor-fullbleed"
-      headerExtra={headerExtra}
+      className={`design-editor-fullbleed${isMobile ? ' design-editor-fullbleed--mobile-preview' : ''}`}
+      headerExtra={isMobile ? undefined : headerExtra}
     >
       <div className="public-editor-preview-shell">
+        {isMobile && (
+          <PublicEditorPreviewModeBar
+            mode={mode}
+            onModeChange={handleModeChange}
+            onBack={() => navigate('/adminpanel/design-templates')}
+          />
+        )}
         <div className="public-editor-preview-editor">
           <ClientEditorRouter
             key={`${mode}-${id}`}

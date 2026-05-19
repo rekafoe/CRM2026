@@ -512,16 +512,17 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
 
   return (
     <div className={editorRootClassName}>
-      <EditorTopBar
-        templateName={template.name}
-        documentLabel={documentLabel}
-        saving={saving}
-        saveState={saveState}
-        helpOpen={helpOpen}
-        compact={isMobile}
-        onSaveRetry={() => void handleSaveDraft(false)}
-        onHelpToggle={() => setHelpOpen((open) => !open)}
-      />
+      {!isMobile && (
+        <EditorTopBar
+          templateName={template.name}
+          documentLabel={documentLabel}
+          saving={saving}
+          saveState={saveState}
+          helpOpen={helpOpen}
+          onSaveRetry={() => void handleSaveDraft(false)}
+          onHelpToggle={() => setHelpOpen((open) => !open)}
+        />
+      )}
 
       <PublicDesignEditorAlerts
         status={status}
@@ -533,6 +534,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       <div className={workspaceClassName}>
         <EditorCanvasStage
           template={template}
+          editorMode="basic"
           refs={{
             canvasHandleRef,
             scrollAreaRef,

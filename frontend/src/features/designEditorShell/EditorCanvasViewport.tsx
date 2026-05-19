@@ -1,6 +1,10 @@
 import React from 'react';
 import { API_BASE_URL } from '../../config/constants';
-import { DesignEditorCanvas, type DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
+import {
+  DesignEditorCanvas,
+  type DesignEditorCanvasHandle,
+  type EditorMode,
+} from '../../pages/admin/designEditor/DesignEditorCanvas';
 import type { DesignTemplate } from '../../api';
 import type { DesignPage } from '../../pages/admin/designEditor/types';
 
@@ -34,6 +38,7 @@ interface EditorCanvasViewportProps {
   onDropRemoteImageUrl?: (url: string) => Promise<void>;
   onSidebarPhotoDropped?: (id: string) => void;
   resolveImageFileUrl?: (file: File) => Promise<string>;
+  editorMode?: EditorMode;
 }
 
 export const EditorCanvasViewport: React.FC<EditorCanvasViewportProps> = ({
@@ -66,6 +71,7 @@ export const EditorCanvasViewport: React.FC<EditorCanvasViewportProps> = ({
   onDropRemoteImageUrl,
   onSidebarPhotoDropped,
   resolveImageFileUrl,
+  editorMode = 'advanced',
 }) => (
   <div className="design-editor-viewport" ref={viewportRef}>
     <div ref={fitScalerRef} className="design-editor-fit-scaler" data-ready="false">
@@ -88,7 +94,7 @@ export const EditorCanvasViewport: React.FC<EditorCanvasViewportProps> = ({
           spreadPairPages={spreadPairPages}
           showGuides={showGuides}
           apiBaseUrl={API_BASE_URL}
-          mode="advanced"
+          mode={editorMode}
           onSelectionChange={onSelectionChange}
           onHistoryChange={onHistoryChange}
           onZoomChange={onZoomChange}

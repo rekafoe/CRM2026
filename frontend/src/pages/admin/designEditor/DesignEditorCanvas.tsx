@@ -192,6 +192,8 @@ function applyBasicModeConstraints(canvas: Canvas): void {
     } else if (o.isPhotoField) {
       // фото-поле: можно кликнуть, но нельзя двигать
       obj.set({
+        selectable: true,
+        evented: true,
         lockMovementX: true,
         lockMovementY: true,
         lockScalingX: true,
@@ -203,6 +205,9 @@ function applyBasicModeConstraints(canvas: Canvas): void {
     } else if (obj.type === 'i-text' || obj.type === 'textbox') {
       // текстовое поле: только редактирование текста
       obj.set({
+        selectable: true,
+        evented: true,
+        editable: true,
         lockMovementX: true,
         lockMovementY: true,
         lockScalingX: true,
@@ -262,6 +267,30 @@ function asAny(obj: unknown): AnyObj {
 
 function isTextLikeObject(obj: FabricObject): boolean {
   return obj.type === 'i-text' || obj.type === 'textbox';
+}
+
+function resolvePhotoFieldTarget(target: FabricObject | undefined): FabricObject | undefined {
+  let field = target;
+  if (field?.group && asAny(field.group).isPhotoField) field = field.group as FabricObject;
+  if (!field || !asAny(field).isPhotoField) return undefined;
+  return field;
+}
+
+function isTouchPointerEvent(e: Event | undefined): boolean {
+  return !!e && (e as PointerEvent).pointerType === 'touch';
+}
+
+function beginTextEditingOnCanvas(canvas: Canvas, target: FabricObject): void {
+  if (!isTextLikeObject(target)) return;
+  const text = target as IText;
+  if ((text as unknown as AnyObj).isEditing) return;
+  canvas.setActiveObject(text);
+  if (typeof text.enterEditing === 'function') {
+    text.enterEditing();
+    const hidden = (text as unknown as { hiddenTextarea?: HTMLTextAreaElement }).hiddenTextarea;
+    hidden?.focus();
+  }
+  canvas.requestRenderAll();
 }
 
 function canKeyboardTransformObject(obj: FabricObject, mode: EditorMode): boolean {
@@ -613,7 +642,6 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const photoFileInputRef = useRef<HTMLInputElement>(null);
     /** Последняя точка над холстом — для Ctrl+V во фото-поле (иначе попадало в addImage). */
     const photoPasteSceneRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-    const lastPhotoFieldTapRef = useRef<{ id: string; at: number } | null>(null);
     const [localSnapLines, setLocalSnapLines] = useState<{ axis: 'h' | 'v'; pos: number }[]>([]);
     const snapOverlayKeyRef = useRef('');
     const smartGuideSessionRef = useRef<SmartGuideSession | null>(null);
@@ -902,7 +930,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           return true;
         }
         photoPickerTargetIdRef.current = fieldId;
-        setTimeout(() => photoFileInputRef.current?.click(), 0);
+        photoFileInputRef.current?.click();
         return true;
       };
       canvas.on('mouse:down', (opt) => {
@@ -912,18 +940,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           lastPan = { x: (opt.e as MouseEvent).clientX, y: (opt.e as MouseEvent).clientY };
           return;
         }
-        const pointerEvent = opt.e as PointerEvent;
-        if (pointerEvent.pointerType === 'touch') {
-          let target = opt.target as FabricObject | undefined;
-          if (target?.group && asAny(target.group).isPhotoField) target = target.group as FabricObject;
-          const fieldId = target && asAny(target).isPhotoField ? String((asAny(target).id as string) ?? '') : '';
-          const now = Date.now();
-          const lastTap = lastPhotoFieldTapRef.current;
-          if (fieldId && lastTap?.id === fieldId && now - lastTap.at < 380) {
-            lastPhotoFieldTapRef.current = null;
-            openPhotoFieldEditor(target);
-          } else if (fieldId) {
-            lastPhotoFieldTapRef.current = { id: fieldId, at: now };
+        if (isTouchPointerEvent(opt.e)) {
+          const photoField = resolvePhotoFieldTarget(opt.target as FabricObject | undefined);
+          if (photoField) {
+            openPhotoFieldEditor(photoField);
           }
         }
       });
@@ -933,7 +953,16 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         canvas.relativePan(new Point(e.clientX - lastPan.x, e.clientY - lastPan.y));
         lastPan = { x: e.clientX, y: e.clientY };
       });
-      canvas.on('mouse:up', () => { isPanning = false; canvas.selection = true; });
+      canvas.on('mouse:up', (opt) => {
+        isPanning = false;
+        canvas.selection = true;
+        if (isTouchPointerEvent(opt.e) && !resolvePhotoFieldTarget(opt.target as FabricObject | undefined)) {
+          const target = opt.target as FabricObject | undefined;
+          if (target && isTextLikeObject(target)) {
+            beginTextEditingOnCanvas(canvas, target);
+          }
+        }
+      });
 
       // Double-click: пустое поле — выбор файла; заполненное — кадрирование
       canvas.on('mouse:dblclick', (opt) => {
@@ -1340,12 +1369,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         if (!target) return false;
         const selectableTarget = target.group ?? target;
         canvas.setActiveObject(selectableTarget);
-        if (
-          options?.editText &&
-          (selectableTarget.type === 'i-text' || selectableTarget.type === 'textbox') &&
-          typeof (selectableTarget as IText).enterEditing === 'function'
-        ) {
-          (selectableTarget as IText).enterEditing();
+        if (options?.editText && isTextLikeObject(selectableTarget)) {
+          beginTextEditingOnCanvas(canvas, selectableTarget);
         }
         canvas.requestRenderAll();
         onSelectionChange(getObjProps(selectableTarget));
@@ -1362,7 +1387,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         canvas.requestRenderAll();
         onSelectionChange(getObjProps(selectableTarget));
         photoPickerTargetIdRef.current = id;
-        setTimeout(() => photoFileInputRef.current?.click(), 0);
+        photoFileInputRef.current?.click();
         return true;
       },
       deleteSelected: () => {
@@ -1848,6 +1873,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           type="file"
           accept="image/*,.heic,.heif"
           className="visually-hidden-file-input"
+          aria-hidden
+          tabIndex={-1}
           onChange={handlePhotoFileChange}
         />
         {cropModal && (
@@ -1885,7 +1912,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
               const id = cropModal.fieldId;
               setCropModal(null);
               photoPickerTargetIdRef.current = id;
-              setTimeout(() => photoFileInputRef.current?.click(), 0);
+              photoFileInputRef.current?.click();
             }}
           />
         )}
