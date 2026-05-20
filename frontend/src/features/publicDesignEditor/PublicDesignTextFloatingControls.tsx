@@ -1,8 +1,9 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import type { RefObject } from 'react';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import { TextFloatingToolbar } from '../../pages/admin/designEditor/TextFloatingToolbar';
 import type { SelectedObjProps } from '../../pages/admin/designEditor/types';
+import { usePublicDesignTextFormatting } from './usePublicDesignTextFormatting';
 
 interface PublicDesignTextFloatingControlsProps {
   anchor: { x: number; y: number } | null;
@@ -10,46 +11,13 @@ interface PublicDesignTextFloatingControlsProps {
   selectedObj: SelectedObjProps | null;
 }
 
+/** Плавающая панель форматирования — только десктоп (на мобилке — PublicDesignTextMobileToolbar). */
 export const PublicDesignTextFloatingControls: React.FC<PublicDesignTextFloatingControlsProps> = ({
   anchor,
   canvasHandleRef,
   selectedObj,
 }) => {
-  const handleFontChange = useCallback((fontFamily: string) => {
-    canvasHandleRef.current?.setTextProp('fontFamily', fontFamily);
-  }, [canvasHandleRef]);
-
-  const handleFontSizeChange = useCallback((fontSize: number) => {
-    canvasHandleRef.current?.setTextProp('fontSize', fontSize);
-  }, [canvasHandleRef]);
-
-  const handleTextColorChange = useCallback((fill: string) => {
-    canvasHandleRef.current?.setTextProp('fill', fill);
-  }, [canvasHandleRef]);
-
-  const handleTextFontVariant = useCallback((fontWeight: string, fontStyle: string) => {
-    canvasHandleRef.current?.setTextStyle({ fontWeight, fontStyle });
-  }, [canvasHandleRef]);
-
-  const handleFontWeightToggle = useCallback(() => {
-    canvasHandleRef.current?.setTextProp('fontWeight', selectedObj?.fontWeight === 'bold' ? 'normal' : 'bold');
-  }, [canvasHandleRef, selectedObj?.fontWeight]);
-
-  const handleFontStyleToggle = useCallback(() => {
-    canvasHandleRef.current?.setTextProp('fontStyle', selectedObj?.fontStyle === 'italic' ? 'normal' : 'italic');
-  }, [canvasHandleRef, selectedObj?.fontStyle]);
-
-  const handleUnderlineToggle = useCallback(() => {
-    canvasHandleRef.current?.setTextProp('underline', !selectedObj?.underline);
-  }, [canvasHandleRef, selectedObj?.underline]);
-
-  const handleTextAlignChange = useCallback((textAlign: string) => {
-    canvasHandleRef.current?.setTextProp('textAlign', textAlign);
-  }, [canvasHandleRef]);
-
-  const handleLineHeightChange = useCallback((lineHeight: number) => {
-    canvasHandleRef.current?.setTextProp('lineHeight', lineHeight);
-  }, [canvasHandleRef]);
+  const handlers = usePublicDesignTextFormatting(canvasHandleRef, selectedObj);
 
   if (selectedObj?.type !== 'IText' || !anchor) return null;
 
@@ -57,18 +25,7 @@ export const PublicDesignTextFloatingControls: React.FC<PublicDesignTextFloating
     <TextFloatingToolbar
       anchor={anchor}
       selectedObj={selectedObj}
-      onFontChange={handleFontChange}
-      onFontSizeChange={handleFontSizeChange}
-      onTextColorChange={handleTextColorChange}
-      onFontVariantChange={handleTextFontVariant}
-      onFontWeightToggle={handleFontWeightToggle}
-      onFontStyleToggle={handleFontStyleToggle}
-      onUnderlineToggle={handleUnderlineToggle}
-      onTextAlignChange={handleTextAlignChange}
-      onLineHeightChange={handleLineHeightChange}
-      onDuplicate={() => canvasHandleRef.current?.duplicateSelected()}
-      onBringForward={() => canvasHandleRef.current?.bringForward()}
-      onDelete={() => canvasHandleRef.current?.deleteSelected()}
+      {...handlers}
     />
   );
 };

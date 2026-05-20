@@ -1,0 +1,49 @@
+.text-mobile-toolbar {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+.text-mobile-toolbar__scroll {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.text-mobile-toolbar__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.text-mobile-toolbar .text-mobile-toolbar__controls {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  min-width: min-content;
+  padding-bottom: 2px;
+}
+
+.text-mobile-toolbar .text-floating-toolbar__select--font {
+  min-width: 108px;
+  max-width: 132px;
+}
+
+.text-mobile-toolbar .text-floating-toolbar__select--narrow {
+  min-width: 96px;
+}
+
+.text-mobile-toolbar .text-floating-toolbar__fx,
+.text-mobile-toolbar .text-floating-toolbar__sep {
+  display: none;
+}
+
+.text-mobile-toolbar .text-floating-toolbar__icon-btn,
+.text-mobile-toolbar .text-floating-toolbar__color {
+  flex-shrink: 0;
+}

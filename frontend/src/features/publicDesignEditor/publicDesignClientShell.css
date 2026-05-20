@@ -530,6 +530,10 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 
+  .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage--text-toolbar {
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage-toolbar {
     flex-wrap: wrap;
     gap: 6px;

@@ -23,7 +23,7 @@ export interface TextFormattingHandlers {
 
 interface TextFormattingControlsProps extends TextFormattingHandlers {
   selectedObj: SelectedObjProps;
-  variant: 'floating' | 'panel';
+  variant: 'floating' | 'panel' | 'mobile-dock';
   /** Позиция только для variant=floating */
   floatingStyle?: React.CSSProperties;
   onFloatingMouseDown?: (e: React.SyntheticEvent) => void;
@@ -227,6 +227,14 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
         aria-label="Форматирование текста"
         onMouseDown={onFloatingMouseDown}
       >
+        {controls}
+      </div>
+    );
+  }
+
+  if (variant === 'mobile-dock') {
+    return (
+      <div className="text-mobile-toolbar__controls" role="group" aria-label="Форматирование текста">
         {controls}
       </div>
     );

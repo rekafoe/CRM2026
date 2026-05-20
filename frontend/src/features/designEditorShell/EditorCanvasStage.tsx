@@ -105,6 +105,9 @@ interface EditorCanvasStageProps {
   assets?: EditorCanvasAssets;
   toolsSlot?: React.ReactNode;
   guideSlot?: React.ReactNode;
+  /** Мобильная панель форматирования текста (в потоке стадии, не portal). */
+  textToolbarSlot?: React.ReactNode;
+  stageClassName?: string;
   handlers: EditorCanvasHandlers;
 }
 
@@ -121,10 +124,16 @@ export const EditorCanvasStage: React.FC<EditorCanvasStageProps> = ({
   assets,
   toolsSlot,
   guideSlot,
+  textToolbarSlot,
+  stageClassName,
   handlers,
 }) => (
   <section
-    className={`public-design-editor__stage${guideSlot ? ' public-design-editor__stage--with-guide' : ''}`}
+    className={[
+      'public-design-editor__stage',
+      guideSlot ? 'public-design-editor__stage--with-guide' : '',
+      stageClassName ?? '',
+    ].filter(Boolean).join(' ')}
     aria-label="Рабочая область макета"
   >
     <EditorStageToolbar
@@ -143,6 +152,7 @@ export const EditorCanvasStage: React.FC<EditorCanvasStageProps> = ({
       onZoomIn={handlers.onZoomIn}
       onZoomReset={handlers.onZoomReset}
     />
+    {textToolbarSlot}
     {guideSlot}
     <div
       className={`design-editor-scroll-area public-design-editor__scroll${view.viewOptions.showRulers ? '' : ' no-rulers'}`}

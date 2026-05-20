@@ -209,13 +209,13 @@ function applyBasicModeConstraints(canvas: Canvas): void {
         hasBorders: true,
       });
     } else if (obj.type === 'i-text' || obj.type === 'textbox') {
-      // текстовое поле: только редактирование текста
+      // текстовое поле: правка текста + перетаскивание (без масштаба/поворота)
       obj.set({
         selectable: true,
         evented: true,
         editable: true,
-        lockMovementX: true,
-        lockMovementY: true,
+        lockMovementX: false,
+        lockMovementY: false,
         lockScalingX: true,
         lockScalingY: true,
         lockRotation: true,
@@ -1007,6 +1007,40 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         return true;
       };
 
+      let lastBasicTextTap: { fieldId: string; at: number } | null = null;
+
+      const activateTextTarget = (target: FabricObject, e?: Event): boolean => {
+        const fieldId = String(asAny(target).id ?? '').trim();
+        if (!fieldId) return false;
+        e?.preventDefault();
+        const now = Date.now();
+        const isDoubleTap =
+          lastBasicTextTap?.fieldId === fieldId && now - lastBasicTextTap.at < 450;
+        lastBasicTextTap = { fieldId, at: now };
+
+        if (isRestrictiveInAppBrowser()) {
+          const props = getObjProps(target);
+          setTextEditSheet({
+            fieldId,
+            label: props.text?.trim() ? props.text.trim().slice(0, 28) : 'Текст',
+            text: props.text ?? '',
+            fontFamily: typeof props.fontFamily === 'string' ? props.fontFamily : 'Arial',
+            fontSize: Math.round(Number(props.fontSize) || 24),
+            fill: typeof props.fill === 'string' ? props.fill : '#111827',
+          });
+          canvas.setActiveObject(target);
+          onSelectionChange(getObjProps(target));
+          return true;
+        }
+
+        canvas.setActiveObject(target);
+        onSelectionChange(getObjProps(target));
+        if (isDoubleTap) {
+          beginTextEditingOnCanvas(canvas, target);
+        }
+        return true;
+      };
+
       const activateInteractiveTarget = (target: FabricObject | undefined, e?: Event): boolean => {
         if (!target) return false;
         const photoField = resolvePhotoFieldTarget(target);
@@ -1015,28 +1049,13 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           return openPhotoFieldEditor(photoField);
         }
         if (isTextLikeObject(target)) {
-          e?.preventDefault();
-          if (isRestrictiveInAppBrowser()) {
-            const props = getObjProps(target);
-            const fieldId = String(asAny(target).id ?? '').trim();
-            if (!fieldId) return false;
-            setTextEditSheet({
-              fieldId,
-              label: props.text?.trim() ? props.text.trim().slice(0, 28) : 'Текст',
-              text: props.text ?? '',
-              fontFamily: typeof props.fontFamily === 'string' ? props.fontFamily : 'Arial',
-              fontSize: Math.round(Number(props.fontSize) || 24),
-              fill: typeof props.fill === 'string' ? props.fill : '#111827',
-            });
-            return true;
-          }
-          beginTextEditingOnCanvas(canvas, target);
-          return true;
+          return activateTextTarget(target, e);
         }
         return false;
       };
 
       let lastCoarseTapHandledAt = 0;
+      let coarseTouchStart: { x: number; y: number } | null = null;
       const shouldUseCoarseTapActions = () =>
         modeRef.current === 'basic' || isCoarsePointerEnvironment() || isRestrictiveInAppBrowser();
 
@@ -1060,9 +1079,26 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         return handled;
       };
 
+      const onCanvasTouchStart = (ev: TouchEvent) => {
+        if (!shouldUseCoarseTapActions()) return;
+        const touch = ev.touches[0];
+        if (!touch) {
+          coarseTouchStart = null;
+          return;
+        }
+        coarseTouchStart = { x: touch.clientX, y: touch.clientY };
+      };
+
       const onCanvasTouchEnd = (ev: TouchEvent) => {
         if (!shouldUseCoarseTapActions()) return;
         if (ev.changedTouches.length === 0) return;
+        const touch = ev.changedTouches[0]!;
+        if (coarseTouchStart) {
+          const dx = touch.clientX - coarseTouchStart.x;
+          const dy = touch.clientY - coarseTouchStart.y;
+          coarseTouchStart = null;
+          if (Math.hypot(dx, dy) > 12) return;
+        }
         handleCoarseTap(ev, undefined);
       };
       const onCanvasPointerUp = (ev: PointerEvent) => {
@@ -1071,6 +1107,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         handleCoarseTap(ev, undefined);
       };
       const touchOpts = { passive: false, capture: true } as const;
+      canvas.upperCanvasEl.addEventListener('touchstart', onCanvasTouchStart, touchOpts);
+      canvas.lowerCanvasEl.addEventListener('touchstart', onCanvasTouchStart, touchOpts);
       canvas.upperCanvasEl.addEventListener('touchend', onCanvasTouchEnd, touchOpts);
       canvas.lowerCanvasEl.addEventListener('touchend', onCanvasTouchEnd, touchOpts);
       canvas.upperCanvasEl.addEventListener('pointerup', onCanvasPointerUp, touchOpts);
@@ -1097,9 +1135,13 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         }
       });
 
-      // Double-click: пустое поле — выбор файла; заполненное — кадрирование
       canvas.on('mouse:dblclick', (opt) => {
-        openPhotoFieldEditor(opt.target as FabricObject | undefined);
+        const raw = opt.target as FabricObject | undefined;
+        if (raw && isTextLikeObject(raw)) {
+          activateTextTarget(raw, opt.e);
+          return;
+        }
+        openPhotoFieldEditor(raw);
       });
 
       // Drag-and-drop images onto canvas (файлы ОС, URL, фото из галереи сайдбара)
@@ -1334,6 +1376,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         window.removeEventListener('keydown', onKeyDown);
         window.removeEventListener('paste', onPaste);
         canvas.upperCanvasEl.removeEventListener('mousemove', trackPasteScene);
+        canvas.upperCanvasEl.removeEventListener('touchstart', onCanvasTouchStart, true);
+        canvas.lowerCanvasEl.removeEventListener('touchstart', onCanvasTouchStart, true);
         canvas.upperCanvasEl.removeEventListener('touchend', onCanvasTouchEnd, true);
         canvas.lowerCanvasEl.removeEventListener('touchend', onCanvasTouchEnd, true);
         canvas.upperCanvasEl.removeEventListener('pointerup', onCanvasPointerUp, true);

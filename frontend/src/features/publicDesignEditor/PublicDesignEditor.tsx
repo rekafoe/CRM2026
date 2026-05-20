@@ -22,6 +22,7 @@ import { PublicDesignEditorAlerts } from './PublicDesignEditorAlerts';
 import { PublicDesignFinalizeForm } from './PublicDesignFinalizeForm';
 import { PublicDesignCheckoutPreview } from './PublicDesignCheckoutPreview';
 import { PublicDesignTextFloatingControls } from './PublicDesignTextFloatingControls';
+import { PublicDesignTextMobileToolbar } from './PublicDesignTextMobileToolbar';
 import { EditorCanvasStage } from '../designEditorShell/EditorCanvasStage';
 import { EditorPageNavigator } from '../designEditorShell/EditorPageNavigator';
 import { EditorTopBar } from '../designEditorShell/EditorTopBar';
@@ -601,6 +602,19 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
               onDirty={markDirty}
             />
           )}
+          stageClassName={
+            isMobile && selectedObj?.type === 'IText'
+              ? 'public-design-editor__stage--text-toolbar'
+              : undefined
+          }
+          textToolbarSlot={
+            isMobile && selectedObj?.type === 'IText' ? (
+              <PublicDesignTextMobileToolbar
+                canvasHandleRef={canvasHandleRef}
+                selectedObj={selectedObj}
+              />
+            ) : null
+          }
           guideSlot={isMobile ? null : (
             <PublicDesignStageGuide
               fragmentLabel={currentFragment.label}
@@ -632,7 +646,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             },
             onZoomChange: setZoom,
             onPageThumbReady: handlePageThumbReady,
-            onTextFloatingAnchor: setTextFloatingAnchor,
+            onTextFloatingAnchor: isMobile ? undefined : setTextFloatingAnchor,
             onDropRemoteImageUrl: handleImageUrlSubmit,
             onSidebarPhotoDropped: removeSidebarPhoto,
             resolveImageFileUrl,
@@ -724,11 +738,13 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           onSubmit={() => void handleFinalize()}
         />
       )}
-      <PublicDesignTextFloatingControls
-        anchor={textFloatingAnchor}
-        canvasHandleRef={canvasHandleRef}
-        selectedObj={selectedObj}
-      />
+      {!isMobile && (
+        <PublicDesignTextFloatingControls
+          anchor={textFloatingAnchor}
+          canvasHandleRef={canvasHandleRef}
+          selectedObj={selectedObj}
+        />
+      )}
       <PublicDesignCheckoutPreview
         open={checkoutPreviewOpen}
         thumbnails={thumbnails}
