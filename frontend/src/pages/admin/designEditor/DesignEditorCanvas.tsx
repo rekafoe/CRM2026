@@ -54,7 +54,7 @@ import {
   type PhotoPickSheetState,
   type TextEditSheetState,
 } from './EditorInAppFieldSheets';
-import { isRestrictiveInAppBrowser } from './inAppBrowser';
+import { isRestrictiveInAppBrowser, shouldPreferTextEditSheet } from './inAppBrowser';
 import { findPhotoFieldAtScene, findTextAtScene } from './photoFieldHitTest';
 import {
   clearPhotoFieldDropHighlight,
@@ -126,6 +126,7 @@ export interface DesignEditorCanvasHandle {
   syncTextFloatingAnchor: () => void;
   /** После CSS fit-zoom / скролла — синхронизировать hit-test и рамку выделения с экраном */
   syncCanvasOffset: () => void;
+  openTextEditSheetForActive: () => boolean;
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -345,6 +346,16 @@ function resolveInteractiveTargetAtScene(
   const photo = findPhotoFieldAtScene(canvas, sceneX, sceneY);
   if (photo) return photo;
   return findTextAtScene(canvas, sceneX, sceneY);
+}
+
+
+function normalizeTextForDisplay(text: string | undefined): string {
+  return String(text ?? '').replace(/\u200b/g, '');
+}
+
+function normalizeTextForFabric(text: string): string {
+  const normalized = text.replace(/\r\n/g, '\n');
+  return normalized.length > 0 ? normalized : '\u200b';
 }
 
 function beginTextEditingOnCanvas(canvas: Canvas, target: FabricObject): void {
@@ -730,6 +741,38 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const [photoPickSheet, setPhotoPickSheet] = useState<PhotoPickSheetState | null>(null);
     const [textEditSheet, setTextEditSheet] = useState<TextEditSheetState | null>(null);
 
+    const openTextEditSheetForTarget = useCallback((target: FabricObject): boolean => {
+      const canvas = fabricRef.current;
+      if (!canvas || !isTextLikeObject(target)) return false;
+      const fieldId = String(asAny(target).id ?? '').trim();
+      if (!fieldId) return false;
+      const active = canvas.getActiveObject();
+      if (active && isTextLikeObject(active)) {
+        const editing = active as IText;
+        if (typeof editing.exitEditing === 'function' && (editing as unknown as AnyObj).isEditing) {
+          editing.exitEditing();
+        }
+      }
+      const props = getObjProps(target);
+      const rawText = normalizeTextForDisplay(props.text);
+      setTextEditSheet({
+        fieldId,
+        label: rawText.trim() ? rawText.trim().slice(0, 28) : 'Текст',
+        text: rawText,
+        fontFamily: typeof props.fontFamily === 'string' ? props.fontFamily : 'Arial',
+        fontSize: Math.round(Number(props.fontSize) || 24),
+        fill: typeof props.fill === 'string' ? props.fill : '#111827',
+      });
+      canvas.setActiveObject(target);
+      onSelectionChange(getObjProps(target));
+      canvas.requestRenderAll();
+      return true;
+    }, [onSelectionChange]);
+
+    const openTextEditSheetRef = useRef(openTextEditSheetForTarget);
+    openTextEditSheetRef.current = openTextEditSheetForTarget;
+
+
     const snapLinesSignature = useCallback((lines: { axis: 'h' | 'v'; pos: number }[]) => {
       if (lines.length === 0) return '';
       return [...lines]
@@ -956,11 +999,16 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         snapLinesRef.current?.([]);
       };
       canvas.on('mouse:up', clearSnaps);
+      let textChangedSnapshotTimer: ReturnType<typeof setTimeout> | null = null;
       canvas.on('text:changed', () => {
         const active = canvas.getActiveObject();
         if (active) onSelectionChange(getObjProps(active));
-        saveSnapshot();
         scheduleTextAnchor();
+        if (textChangedSnapshotTimer) clearTimeout(textChangedSnapshotTimer);
+        textChangedSnapshotTimer = setTimeout(() => {
+          textChangedSnapshotTimer = null;
+          saveSnapshot();
+        }, 400);
       });
 
       // Ctrl+wheel: без масштаба сцены Fabric; plain scroll страницы не трогаем
@@ -1018,23 +1066,14 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           lastBasicTextTap?.fieldId === fieldId && now - lastBasicTextTap.at < 450;
         lastBasicTextTap = { fieldId, at: now };
 
-        if (isRestrictiveInAppBrowser()) {
-          const props = getObjProps(target);
-          setTextEditSheet({
-            fieldId,
-            label: props.text?.trim() ? props.text.trim().slice(0, 28) : 'Текст',
-            text: props.text ?? '',
-            fontFamily: typeof props.fontFamily === 'string' ? props.fontFamily : 'Arial',
-            fontSize: Math.round(Number(props.fontSize) || 24),
-            fill: typeof props.fill === 'string' ? props.fill : '#111827',
-          });
-          canvas.setActiveObject(target);
-          onSelectionChange(getObjProps(target));
+        canvas.setActiveObject(target);
+        onSelectionChange(getObjProps(target));
+
+        if (shouldPreferTextEditSheet()) {
+          if (isDoubleTap) openTextEditSheetRef.current(target);
           return true;
         }
 
-        canvas.setActiveObject(target);
-        onSelectionChange(getObjProps(target));
         if (isDoubleTap) {
           beginTextEditingOnCanvas(canvas, target);
         }
@@ -1138,7 +1177,11 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       canvas.on('mouse:dblclick', (opt) => {
         const raw = opt.target as FabricObject | undefined;
         if (raw && isTextLikeObject(raw)) {
-          activateTextTarget(raw, opt.e);
+          if (shouldPreferTextEditSheet()) {
+            openTextEditSheetRef.current(raw);
+          } else {
+            beginTextEditingOnCanvas(canvas, raw);
+          }
           return;
         }
         openPhotoFieldEditor(raw);
@@ -1550,19 +1593,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         const selectableTarget = target.group ?? target;
         canvas.setActiveObject(selectableTarget);
         if (options?.editText && isTextLikeObject(selectableTarget)) {
-          if (isRestrictiveInAppBrowser()) {
-            const props = getObjProps(selectableTarget);
-            const fieldId = String(asAny(selectableTarget).id ?? '').trim();
-            if (fieldId) {
-              setTextEditSheet({
-                fieldId,
-                label: props.text?.trim() ? props.text.trim().slice(0, 28) : 'Текст',
-                text: props.text ?? '',
-                fontFamily: typeof props.fontFamily === 'string' ? props.fontFamily : 'Arial',
-                fontSize: Math.round(Number(props.fontSize) || 24),
-                fill: typeof props.fill === 'string' ? props.fill : '#111827',
-              });
-            }
+          if (shouldPreferTextEditSheet()) {
+            openTextEditSheetForTarget(selectableTarget);
           } else {
             beginTextEditingOnCanvas(canvas, selectableTarget);
           }
@@ -2020,6 +2052,13 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         c.calcOffset();
         c.requestRenderAll();
       },
+      openTextEditSheetForActive: () => {
+        const canvas = fabricRef.current;
+        if (!canvas) return false;
+        const active = canvas.getActiveObject();
+        if (!active || !isTextLikeObject(active)) return false;
+        return openTextEditSheetForTarget(active);
+      },
     }));
 
 
@@ -2048,7 +2087,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         return;
       }
       const textObj = target as IText;
-      textObj.set('text', text);
+      textObj.set('text', normalizeTextForFabric(text));
       canvas.setActiveObject(textObj);
       canvas.requestRenderAll();
       onSelectionChange(getObjProps(textObj));

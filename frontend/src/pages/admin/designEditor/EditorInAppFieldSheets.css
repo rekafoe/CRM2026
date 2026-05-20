@@ -65,3 +65,46 @@
   gap: 8px;
   justify-content: flex-end;
 }
+
+
+.de-text-edit-modal-overlay {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.de-text-edit-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  max-height: min(92dvh, 640px);
+  margin: 0;
+  border-radius: 16px 16px 0 0;
+}
+
+.de-text-edit-modal__header {
+  flex-shrink: 0;
+  padding: 14px 16px;
+}
+
+.de-text-edit-modal__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 16px 16px;
+  overflow: auto;
+}
+
+.de-text-edit-modal .de-inapp-text-edit__field textarea {
+  min-height: min(42dvh, 320px);
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.de-text-edit-modal .de-inapp-field-sheet__actions {
+  position: sticky;
+  bottom: 0;
+  padding-top: 12px;
+  background: #ffffff;
+}

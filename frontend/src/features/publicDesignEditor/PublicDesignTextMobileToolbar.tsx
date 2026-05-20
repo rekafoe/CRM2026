@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import type { RefObject } from 'react';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import { TextMobileToolbar } from '../../pages/admin/designEditor/TextMobileToolbar';
@@ -16,5 +16,15 @@ export const PublicDesignTextMobileToolbar: React.FC<PublicDesignTextMobileToolb
 }) => {
   const handlers = usePublicDesignTextFormatting(canvasHandleRef, selectedObj);
 
-  return <TextMobileToolbar selectedObj={selectedObj} {...handlers} />;
+  const handleOpenTextEdit = useCallback(() => {
+    canvasHandleRef.current?.openTextEditSheetForActive();
+  }, [canvasHandleRef]);
+
+  return (
+    <TextMobileToolbar
+      selectedObj={selectedObj}
+      onOpenTextEdit={handleOpenTextEdit}
+      {...handlers}
+    />
+  );
 };

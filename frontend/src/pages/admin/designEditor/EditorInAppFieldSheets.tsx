@@ -76,9 +76,13 @@ export const EditorInAppFieldSheets: React.FC<EditorInAppFieldSheetsProps> = ({
         onClose={onTextClose}
         title={textEdit?.label ? `Текст: ${textEdit.label}` : 'Редактировать текст'}
         size="sm"
+        className="de-text-edit-modal"
+        overlayClassName="de-text-edit-modal-overlay"
+        bodyClassName="de-text-edit-modal__body"
+        headerClassName="de-text-edit-modal__header"
       >
         <p className="de-inapp-field-sheet__hint">
-          Введите текст ниже. В браузере Telegram клавиатура надёжнее, чем правка прямо на макете.
+          Введите или измените текст. Пустое поле на макете останется с пробелом-заглушкой.
         </p>
         <label className="de-inapp-text-edit__field">
           <span>Текст на макете</span>

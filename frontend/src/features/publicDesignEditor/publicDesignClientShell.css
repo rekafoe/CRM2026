@@ -534,6 +534,15 @@
     grid-template-rows: auto auto minmax(0, 1fr);
   }
 
+  .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage--text-toolbar > .text-mobile-toolbar {
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage--text-toolbar > .public-design-editor__scroll {
+    grid-row: 3;
+  }
+
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage-toolbar {
     flex-wrap: wrap;
     gap: 6px;
