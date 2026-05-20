@@ -606,7 +606,8 @@
     flex-shrink: 0;
     max-width: 100%;
     overflow: hidden;
-    transform-origin: center center;
+    transform: none;
+    transform-origin: top left;
   }
 
   .public-design-editor--client.public-design-editor--mobile .design-editor-fit-scaler[data-ready='true'] {
@@ -614,7 +615,11 @@
   }
 
   .public-design-editor--client.public-design-editor--mobile .design-editor-fit-scaler .design-editor-canvas-wrap {
-    transform-origin: center center;
+    box-sizing: border-box;
+    width: calc(var(--de-content-w, 1) * 1px);
+    height: calc(var(--de-content-h, 1) * 1px);
+    transform: scale(var(--de-fit-zoom, 1));
+    transform-origin: top left;
   }
 
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__page-strip {

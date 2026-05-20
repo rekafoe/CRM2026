@@ -224,7 +224,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     [guides, pageSpec.scale],
   );
 
-  const { fitZoom, viewportReady: fitReady, rulerOrigin } = useDesignEditorViewport({
+  const { fitZoom, viewportReady: fitReady, rulerOrigin, layoutWidthPx, layoutHeightPx } = useDesignEditorViewport({
     viewportRef,
     fallbackRef: scrollAreaRef,
     pageWidthPx: sceneGeometry.pageWidthPx,
@@ -257,10 +257,22 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     }
 
     el.style.zoom = '';
+    el.style.setProperty('--de-content-w', String(layoutWidthPx));
+    el.style.setProperty('--de-content-h', String(layoutHeightPx));
+
+    if (isMobile) {
+      const scaledW = Math.max(1, Math.round(layoutWidthPx * fitZoom));
+      const scaledH = Math.max(1, Math.round(layoutHeightPx * fitZoom));
+      el.style.width = `${scaledW}px`;
+      el.style.height = `${scaledH}px`;
+      el.style.setProperty('--de-fit-zoom', String(fitZoom));
+      return;
+    }
+
     el.style.removeProperty('width');
     el.style.removeProperty('height');
     el.style.setProperty('--de-fit-zoom', String(fitZoom));
-  }, [fitZoom, fitReady, currentPage, navigation.pageLoadKey]);
+  }, [fitZoom, fitReady, isMobile, layoutWidthPx, layoutHeightPx, currentPage, navigation.pageLoadKey]);
 
   useEffect(() => {
     if (!fitReady) return;

@@ -4,6 +4,9 @@ export type DesignEditorViewportState = {
   fitZoom: number;
   viewportReady: boolean;
   rulerOrigin: { x: number; y: number };
+  /** Полный layout-размер макета до scale (для мобильного контейнера без обрезки) */
+  layoutWidthPx: number;
+  layoutHeightPx: number;
 }
 
 export function useDesignEditorViewport(input: {
@@ -20,6 +23,8 @@ export function useDesignEditorViewport(input: {
   const [fitZoom, setFitZoom] = useState(1);
   const [viewportReady, setViewportReady] = useState(false);
   const [rulerOrigin, setRulerOrigin] = useState({ x: 0, y: 0 });
+  const [layoutWidthPx, setLayoutWidthPx] = useState(1);
+  const [layoutHeightPx, setLayoutHeightPx] = useState(1);
 
   useLayoutEffect(() => {
     const el = input.viewportRef.current ?? input.fallbackRef.current;
@@ -57,6 +62,8 @@ export function useDesignEditorViewport(input: {
         const zRaw = Math.max(0.1, Math.min(aw / cw, ah / ch, 3));
         const z = Math.round(zRaw * 1000) / 1000;
         setFitZoom(z);
+        setLayoutWidthPx(cw);
+        setLayoutHeightPx(ch);
         setRulerOrigin({
           x: (aw - cw * z) / 2 + canvasPadX * z,
           y: (ah - ch * z) / 2 + canvasPadY * z,
@@ -84,5 +91,5 @@ export function useDesignEditorViewport(input: {
     input.viewportRef,
   ]);
 
-  return { fitZoom, viewportReady, rulerOrigin };
+  return { fitZoom, viewportReady, rulerOrigin, layoutWidthPx, layoutHeightPx };
 }
