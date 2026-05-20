@@ -5,7 +5,7 @@ function ax(o: FabricObject): Record<string, unknown> {
 }
 
 /** Попадание в bbox объекта в координатах сцены. */
-function ptInFieldScene(o: FabricObject, sceneX: number, sceneY: number): boolean {
+export function ptInFieldScene(o: FabricObject, sceneX: number, sceneY: number): boolean {
   const br = o.getBoundingRect();
   return (
     sceneX >= br.left &&
@@ -40,6 +40,22 @@ export function findPhotoFieldAtScene(
   for (let i = top.length - 1; i >= 0; i--) {
     const hit = probe(top[i]!);
     if (hit) return hit;
+  }
+  return undefined;
+}
+
+/** Последний сверху текстовый объект под точкой сцены. */
+export function findTextAtScene(
+  canvas: Canvas,
+  sceneX: number,
+  sceneY: number,
+): FabricObject | undefined {
+  const objects = canvas.getObjects();
+  for (let i = objects.length - 1; i >= 0; i--) {
+    const o = objects[i]!;
+    if ((o.type === 'i-text' || o.type === 'textbox') && ptInFieldScene(o, sceneX, sceneY)) {
+      return o;
+    }
   }
   return undefined;
 }

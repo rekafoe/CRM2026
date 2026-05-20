@@ -49,7 +49,7 @@ import {
   syncFilledPhotoFieldSceneAnchor,
 } from './photoFieldGeometry';
 import { PhotoFieldCropModal } from './PhotoFieldCropModal';
-import { findPhotoFieldAtScene } from './photoFieldHitTest';
+import { findPhotoFieldAtScene, findTextAtScene } from './photoFieldHitTest';
 import {
   clearPhotoFieldDropHighlight,
   createPhotoFieldDropHighlightState,
@@ -276,8 +276,66 @@ function resolvePhotoFieldTarget(target: FabricObject | undefined): FabricObject
   return field;
 }
 
-function isTouchPointerEvent(e: Event | undefined): boolean {
-  return !!e && (e as PointerEvent).pointerType === 'touch';
+function isCoarsePointerEnvironment(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(pointer: coarse)').matches
+    || window.matchMedia('(max-width: 760px)').matches
+  );
+}
+
+function isCoarsePointerEvent(e: Event | undefined): boolean {
+  if (!e) return false;
+  const pe = e as PointerEvent;
+  if (pe.pointerType === 'touch' || pe.pointerType === 'pen') return true;
+  if ('TouchEvent' in window) {
+    const te = e as TouchEvent;
+    if (te.touches?.length || te.changedTouches?.length) return true;
+  }
+  return isCoarsePointerEnvironment();
+}
+
+function scenePointFromClientPointer(canvas: Canvas, clientX: number, clientY: number): Point {
+  const el = canvas.upperCanvasEl;
+  const rect = el.getBoundingClientRect();
+  const canvasW = canvas.getWidth() ?? 0;
+  const canvasH = canvas.getHeight() ?? 0;
+  if (rect.width <= 0 || rect.height <= 0 || canvasW <= 0 || canvasH <= 0) {
+    return new Point(0, 0);
+  }
+  // Пропорция по экранному bbox: корректно при CSS zoom на .design-editor-fit-scaler (мобилка).
+  const x = ((clientX - rect.left) / rect.width) * canvasW;
+  const y = ((clientY - rect.top) / rect.height) * canvasH;
+  return new Point(x, y);
+}
+
+function scenePointFromInteractionEvent(canvas: Canvas, e: Event): Point {
+  const pe = e as PointerEvent & TouchEvent;
+  const touch = pe.changedTouches?.[0] ?? pe.touches?.[0];
+  if (touch) return scenePointFromClientPointer(canvas, touch.clientX, touch.clientY);
+  if (typeof pe.clientX === 'number' && typeof pe.clientY === 'number') {
+    return scenePointFromClientPointer(canvas, pe.clientX, pe.clientY);
+  }
+  try {
+    return canvas.getScenePoint(e as never);
+  } catch {
+    return new Point(0, 0);
+  }
+}
+
+function resolveInteractiveTargetAtScene(
+  canvas: Canvas,
+  sceneX: number,
+  sceneY: number,
+  directTarget?: FabricObject,
+): FabricObject | undefined {
+  const photoFromTarget = resolvePhotoFieldTarget(directTarget);
+  if (photoFromTarget) return photoFromTarget;
+  if (directTarget && isTextLikeObject(directTarget)) return directTarget;
+
+  const photo = findPhotoFieldAtScene(canvas, sceneX, sceneY);
+  if (photo) return photo;
+  return findTextAtScene(canvas, sceneX, sceneY);
 }
 
 function beginTextEditingOnCanvas(canvas: Canvas, target: FabricObject): void {
@@ -933,18 +991,56 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         photoFileInputRef.current?.click();
         return true;
       };
+
+      const activateInteractiveTarget = (target: FabricObject | undefined, e?: Event): boolean => {
+        if (!target) return false;
+        const photoField = resolvePhotoFieldTarget(target);
+        if (photoField) {
+          e?.preventDefault();
+          return openPhotoFieldEditor(photoField);
+        }
+        if (isTextLikeObject(target)) {
+          e?.preventDefault();
+          beginTextEditingOnCanvas(canvas, target);
+          return true;
+        }
+        return false;
+      };
+
+      let lastCoarseTapHandledAt = 0;
+      const shouldUseCoarseTapActions = () =>
+        modeRef.current === 'basic' || isCoarsePointerEnvironment();
+
+      const handleCoarseTap = (e: Event, directTarget?: FabricObject): boolean => {
+        if (!shouldUseCoarseTapActions()) return false;
+        const now = Date.now();
+        if (now - lastCoarseTapHandledAt < 350) return false;
+        const scene = scenePointFromInteractionEvent(canvas, e);
+        const target = resolveInteractiveTargetAtScene(
+          canvas,
+          scene.x,
+          scene.y,
+          directTarget,
+        );
+        const handled = activateInteractiveTarget(target, e);
+        if (handled) lastCoarseTapHandledAt = now;
+        return handled;
+      };
+
+      const onCanvasTouchEnd = (ev: TouchEvent) => {
+        if (!shouldUseCoarseTapActions()) return;
+        if (ev.changedTouches.length === 0) return;
+        handleCoarseTap(ev, undefined);
+      };
+      canvas.upperCanvasEl.addEventListener('touchend', onCanvasTouchEnd, { passive: false, capture: true });
+      canvas.lowerCanvasEl.addEventListener('touchend', onCanvasTouchEnd, { passive: false, capture: true });
+
       canvas.on('mouse:down', (opt) => {
         if ((opt.e as MouseEvent).altKey) {
           isPanning = true;
           canvas.selection = false;
           lastPan = { x: (opt.e as MouseEvent).clientX, y: (opt.e as MouseEvent).clientY };
           return;
-        }
-        if (isTouchPointerEvent(opt.e)) {
-          const photoField = resolvePhotoFieldTarget(opt.target as FabricObject | undefined);
-          if (photoField) {
-            openPhotoFieldEditor(photoField);
-          }
         }
       });
       canvas.on('mouse:move', (opt) => {
@@ -956,11 +1052,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       canvas.on('mouse:up', (opt) => {
         isPanning = false;
         canvas.selection = true;
-        if (isTouchPointerEvent(opt.e) && !resolvePhotoFieldTarget(opt.target as FabricObject | undefined)) {
-          const target = opt.target as FabricObject | undefined;
-          if (target && isTextLikeObject(target)) {
-            beginTextEditingOnCanvas(canvas, target);
-          }
+        if (shouldUseCoarseTapActions() || isCoarsePointerEvent(opt.e)) {
+          handleCoarseTap(opt.e, opt.target as FabricObject | undefined);
         }
       });
 
@@ -1201,6 +1294,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         window.removeEventListener('keydown', onKeyDown);
         window.removeEventListener('paste', onPaste);
         canvas.upperCanvasEl.removeEventListener('mousemove', trackPasteScene);
+        canvas.upperCanvasEl.removeEventListener('touchend', onCanvasTouchEnd, true);
+        canvas.lowerCanvasEl.removeEventListener('touchend', onCanvasTouchEnd, true);
         canvas.dispose();
         fabricRef.current = null;
       };
