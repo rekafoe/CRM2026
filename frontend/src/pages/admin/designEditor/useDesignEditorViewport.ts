@@ -29,18 +29,18 @@ export function useDesignEditorViewport(input: {
     const visibleBleedPx = input.showBleed ? input.bleedPx : 0;
     const compact = input.compactPadding === true;
     const wrapperPadX = compact
-      ? (input.isSpreadView ? 20 : 12)
+      ? (input.isSpreadView ? 16 : 8)
       : (input.isSpreadView ? 64 : 80);
     const wrapperPadY = compact
-      ? (input.isSpreadView ? 28 : 20)
+      ? (input.isSpreadView ? 20 : 12)
       : (input.isSpreadView ? 98 : 80);
     const contentW = (input.isSpreadView ? input.pageWidthPx * 2 : input.pageWidthPx) + wrapperPadX + visibleBleedPx * 2;
     const contentH = input.pageHeightPx + wrapperPadY + visibleBleedPx * 2;
     const canvasPadX = compact
-      ? (input.isSpreadView ? 12 + visibleBleedPx : 8 + visibleBleedPx)
+      ? (input.isSpreadView ? 8 + visibleBleedPx : 4 + visibleBleedPx)
       : (input.isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx);
     const canvasPadY = compact
-      ? (input.isSpreadView ? 12 + visibleBleedPx : 8 + visibleBleedPx)
+      ? (input.isSpreadView ? 8 + visibleBleedPx : 4 + visibleBleedPx)
       : (input.isSpreadView ? 32 + visibleBleedPx : 40 + visibleBleedPx);
     const cw = Math.max(contentW, 1);
     const ch = Math.max(contentH, 1);

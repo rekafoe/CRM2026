@@ -599,7 +599,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             />
           )}
           assets={{
-            showOrganizationLogo,
+            showOrganizationLogo: showOrganizationLogo && !isMobile,
             organizationLogoUrl,
             sidebarPhotos,
           }}
