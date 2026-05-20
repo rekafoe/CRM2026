@@ -49,6 +49,7 @@ import {
   syncFilledPhotoFieldSceneAnchor,
 } from './photoFieldGeometry';
 import { PhotoFieldCropModal } from './PhotoFieldCropModal';
+import { PhotoFieldFillOverlay } from './PhotoFieldFillOverlay';
 import {
   EditorInAppFieldSheets,
   type PhotoPickSheetState,
@@ -134,7 +135,10 @@ export interface DesignEditorCanvasHandle {
 /** basic — только заполнение предопределённых зон; advanced — полный доступ */
 export type EditorMode = 'basic' | 'advanced';
 
-type ResolveImageFileUrl = (file: File) => Promise<string | null | undefined>;
+type ResolveImageFileUrl = (
+  file: File,
+  onProgress?: (progress: number) => void,
+) => Promise<string | null | undefined>;
 
 interface DesignEditorCanvasProps {
   template: DesignTemplate | null;
@@ -741,6 +745,17 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const [photoPickSheet, setPhotoPickSheet] = useState<PhotoPickSheetState | null>(null);
     const [textEditSheet, setTextEditSheet] = useState<TextEditSheetState | null>(null);
 
+    const [photoFieldFillLoading, setPhotoFieldFillLoading] = useState<{ progress: number } | null>(null);
+
+    const reportPhotoFillProgress = useCallback((progress: number | null) => {
+      if (progress == null) {
+        setPhotoFieldFillLoading(null);
+        return;
+      }
+      const clamped = Math.min(100, Math.max(0, Math.round(progress)));
+      setPhotoFieldFillLoading({ progress: clamped });
+    }, []);
+
     const openTextEditSheetForTarget = useCallback((target: FabricObject): boolean => {
       const canvas = fabricRef.current;
       if (!canvas || !isTextLikeObject(target)) return false;
@@ -799,18 +814,29 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       async (canvas: Canvas, field: FabricObject, file: File): Promise<void> => {
         let changed = false;
         isLoadingRef.current = true;
+        reportPhotoFillProgress(0);
         try {
-          await fillPhotoField(canvas, field, file, resolveImageFileUrlRef.current, () => {
-            if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
-            else releaseBasicModeConstraints(canvas);
-          });
+          await fillPhotoField(
+            canvas,
+            field,
+            file,
+            (file, onProgress) =>
+              resolveImageFileUrlRef.current?.(file, onProgress) ?? Promise.resolve(null),
+            () => {
+              if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+              else releaseBasicModeConstraints(canvas);
+            },
+            (value) => reportPhotoFillProgress(value),
+          );
+          reportPhotoFillProgress(96);
           changed = true;
         } finally {
           isLoadingRef.current = false;
+          reportPhotoFillProgress(null);
         }
         if (changed) saveSnapshot();
       },
-      [saveSnapshot],
+      [reportPhotoFillProgress, saveSnapshot],
     );
 
     const undo = useCallback(async () => {
@@ -2140,6 +2166,9 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
               )}
             </svg>
           )}
+          {photoFieldFillLoading && (
+            <PhotoFieldFillOverlay progress={photoFieldFillLoading.progress} />
+          )}
         </div>
         <input
           ref={photoFileInputRef}
@@ -2333,8 +2362,9 @@ async function fillPhotoField(
   file: File,
   resolveImageFileUrl?: ResolveImageFileUrl,
   afterFill?: () => void,
+  onUploadProgress?: (progress: number) => void,
 ): Promise<void> {
-  const stableUrl = await resolveImageFileUrl?.(file);
+  const stableUrl = await resolveImageFileUrl?.(file, onUploadProgress);
   const url = stableUrl || URL.createObjectURL(file);
   try {
     const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });

@@ -185,8 +185,11 @@ export function usePublicDesignDraftActions({
     return adapter.uploadDraftFile(token, file, onProgress);
   }, [adapter, ensureDraft]);
 
-  const resolveImageFileUrl = useCallback(async (file: File) => {
-    const uploaded = await resolveImageAsset(file);
+  const resolveImageFileUrl = useCallback(async (
+    file: File,
+    onProgress?: (progress: number) => void,
+  ) => {
+    const uploaded = await resolveImageAsset(file, onProgress);
     return uploaded.url;
   }, [resolveImageAsset]);
 

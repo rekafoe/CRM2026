@@ -579,6 +579,10 @@
     padding: 6px;
   }
 
+  .public-design-editor--client.public-design-editor--mobile .photo-field-fill-overlay {
+    z-index: 50;
+  }
+
   .public-design-editor--client.public-design-editor--mobile .design-editor-canvas-wrap {
     padding: 4px;
     touch-action: none;
