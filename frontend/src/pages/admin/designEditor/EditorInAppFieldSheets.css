@@ -1,0 +1,67 @@
+.de-inapp-field-sheet__hint {
+  margin: 0 0 14px;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.de-inapp-photo-pick__label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  color: #ffffff;
+  background: linear-gradient(135deg, #00a6d6, #2563eb);
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.de-inapp-photo-pick__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 24px;
+}
+
+.de-inapp-text-edit__field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.de-inapp-text-edit__field span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.de-inapp-text-edit__field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 120px;
+  padding: 12px 14px;
+  color: #0f172a;
+  font-size: 16px;
+  line-height: 1.4;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  resize: vertical;
+}
+
+.de-inapp-field-sheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}

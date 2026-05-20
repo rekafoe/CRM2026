@@ -256,19 +256,19 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       return;
     }
 
-    if (!isMobile) {
-      el.style.zoom = '';
-      el.style.removeProperty('width');
-      el.style.removeProperty('height');
-      el.style.setProperty('--de-fit-zoom', String(fitZoom));
-      return;
-    }
-
+    el.style.zoom = '';
     el.style.removeProperty('width');
     el.style.removeProperty('height');
-    el.style.setProperty('--de-fit-zoom', '1');
-    el.style.zoom = String(fitZoom);
-  }, [fitZoom, fitReady, isMobile, currentPage, navigation.pageLoadKey]);
+    el.style.setProperty('--de-fit-zoom', String(fitZoom));
+  }, [fitZoom, fitReady, currentPage, navigation.pageLoadKey]);
+
+  useEffect(() => {
+    if (!fitReady) return;
+    const id = requestAnimationFrame(() => {
+      canvasHandleRef.current?.syncCanvasOffset();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [fitZoom, fitReady, currentPage, navigation.pageLoadKey]);
 
   useEffect(() => {
     setDraftToken(bootstrapDraftToken);

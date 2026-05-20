@@ -552,12 +552,12 @@
 
   .public-design-editor--client.public-design-editor--mobile .design-editor-canvas-wrap {
     padding: 8px;
-    touch-action: manipulation;
+    touch-action: none;
   }
 
   .public-design-editor--client.public-design-editor--mobile .fabric-canvas-outer .upper-canvas,
   .public-design-editor--client.public-design-editor--mobile .fabric-canvas-outer .lower-canvas {
-    touch-action: manipulation;
+    touch-action: none;
   }
 
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage > .public-design-editor__scroll {
@@ -588,7 +588,6 @@
     flex-shrink: 0;
     max-width: 100%;
     overflow: hidden;
-    transform: none !important;
     transform-origin: center center;
   }
 

@@ -1,11 +1,17 @@
-import type { Canvas, FabricObject, Group } from 'fabric';
+import { Point, type Canvas, type FabricObject, type Group } from 'fabric';
 
 function ax(o: FabricObject): Record<string, unknown> {
   return o as unknown as Record<string, unknown>;
 }
 
-/** Попадание в bbox объекта в координатах сцены. */
+/** Попадание в объект в координатах сцены. */
 export function ptInFieldScene(o: FabricObject, sceneX: number, sceneY: number): boolean {
+  const point = new Point(sceneX, sceneY);
+  try {
+    if (typeof o.containsPoint === 'function' && o.containsPoint(point)) return true;
+  } catch {
+    /* bbox fallback */
+  }
   const br = o.getBoundingRect();
   return (
     sceneX >= br.left &&

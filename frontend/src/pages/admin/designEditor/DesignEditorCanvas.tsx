@@ -49,6 +49,12 @@ import {
   syncFilledPhotoFieldSceneAnchor,
 } from './photoFieldGeometry';
 import { PhotoFieldCropModal } from './PhotoFieldCropModal';
+import {
+  EditorInAppFieldSheets,
+  type PhotoPickSheetState,
+  type TextEditSheetState,
+} from './EditorInAppFieldSheets';
+import { isRestrictiveInAppBrowser } from './inAppBrowser';
 import { findPhotoFieldAtScene, findTextAtScene } from './photoFieldHitTest';
 import {
   clearPhotoFieldDropHighlight,
@@ -303,24 +309,27 @@ function scenePointFromClientPointer(canvas: Canvas, clientX: number, clientY: n
   if (rect.width <= 0 || rect.height <= 0 || canvasW <= 0 || canvasH <= 0) {
     return new Point(0, 0);
   }
-  // Пропорция по экранному bbox: корректно при CSS zoom на .design-editor-fit-scaler (мобилка).
+  // Пропорция по экранному bbox: запасной путь, если getScenePoint недоступен.
   const x = ((clientX - rect.left) / rect.width) * canvasW;
   const y = ((clientY - rect.top) / rect.height) * canvasH;
   return new Point(x, y);
 }
 
 function scenePointFromInteractionEvent(canvas: Canvas, e: Event): Point {
+  canvas.calcOffset();
+  try {
+    const p = canvas.getScenePoint(e as never);
+    if (Number.isFinite(p.x) && Number.isFinite(p.y)) return p;
+  } catch {
+    /* fallback */
+  }
   const pe = e as PointerEvent & TouchEvent;
   const touch = pe.changedTouches?.[0] ?? pe.touches?.[0];
   if (touch) return scenePointFromClientPointer(canvas, touch.clientX, touch.clientY);
   if (typeof pe.clientX === 'number' && typeof pe.clientY === 'number') {
     return scenePointFromClientPointer(canvas, pe.clientX, pe.clientY);
   }
-  try {
-    return canvas.getScenePoint(e as never);
-  } catch {
-    return new Point(0, 0);
-  }
+  return new Point(0, 0);
 }
 
 function resolveInteractiveTargetAtScene(
@@ -718,6 +727,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       zoom: number;
       fitMode: 'cover' | 'contain';
     } | null>(null);
+    const [photoPickSheet, setPhotoPickSheet] = useState<PhotoPickSheetState | null>(null);
+    const [textEditSheet, setTextEditSheet] = useState<TextEditSheetState | null>(null);
 
     const snapLinesSignature = useCallback((lines: { axis: 'h' | 'v'; pos: number }[]) => {
       if (lines.length === 0) return '';
@@ -987,6 +998,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           });
           return true;
         }
+        if (isRestrictiveInAppBrowser()) {
+          setPhotoPickSheet({ fieldId, label: 'Фото-поле' });
+          return true;
+        }
         photoPickerTargetIdRef.current = fieldId;
         photoFileInputRef.current?.click();
         return true;
@@ -1001,6 +1016,20 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         }
         if (isTextLikeObject(target)) {
           e?.preventDefault();
+          if (isRestrictiveInAppBrowser()) {
+            const props = getObjProps(target);
+            const fieldId = String(asAny(target).id ?? '').trim();
+            if (!fieldId) return false;
+            setTextEditSheet({
+              fieldId,
+              label: props.text?.trim() ? props.text.trim().slice(0, 28) : 'Текст',
+              text: props.text ?? '',
+              fontFamily: typeof props.fontFamily === 'string' ? props.fontFamily : 'Arial',
+              fontSize: Math.round(Number(props.fontSize) || 24),
+              fill: typeof props.fill === 'string' ? props.fill : '#111827',
+            });
+            return true;
+          }
           beginTextEditingOnCanvas(canvas, target);
           return true;
         }
@@ -1009,12 +1038,12 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 
       let lastCoarseTapHandledAt = 0;
       const shouldUseCoarseTapActions = () =>
-        modeRef.current === 'basic' || isCoarsePointerEnvironment();
+        modeRef.current === 'basic' || isCoarsePointerEnvironment() || isRestrictiveInAppBrowser();
 
       const handleCoarseTap = (e: Event, directTarget?: FabricObject): boolean => {
         if (!shouldUseCoarseTapActions()) return false;
         const now = Date.now();
-        if (now - lastCoarseTapHandledAt < 350) return false;
+        if (now - lastCoarseTapHandledAt < 200) return false;
         const scene = scenePointFromInteractionEvent(canvas, e);
         const target = resolveInteractiveTargetAtScene(
           canvas,
@@ -1023,7 +1052,11 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           directTarget,
         );
         const handled = activateInteractiveTarget(target, e);
-        if (handled) lastCoarseTapHandledAt = now;
+        if (handled) {
+          lastCoarseTapHandledAt = now;
+          e.preventDefault();
+          e.stopPropagation();
+        }
         return handled;
       };
 
@@ -1032,8 +1065,15 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         if (ev.changedTouches.length === 0) return;
         handleCoarseTap(ev, undefined);
       };
-      canvas.upperCanvasEl.addEventListener('touchend', onCanvasTouchEnd, { passive: false, capture: true });
-      canvas.lowerCanvasEl.addEventListener('touchend', onCanvasTouchEnd, { passive: false, capture: true });
+      const onCanvasPointerUp = (ev: PointerEvent) => {
+        if (!shouldUseCoarseTapActions()) return;
+        if (ev.pointerType !== 'touch' && ev.pointerType !== 'pen') return;
+        handleCoarseTap(ev, undefined);
+      };
+      const touchOpts = { passive: false, capture: true } as const;
+      canvas.upperCanvasEl.addEventListener('touchend', onCanvasTouchEnd, touchOpts);
+      canvas.lowerCanvasEl.addEventListener('touchend', onCanvasTouchEnd, touchOpts);
+      canvas.upperCanvasEl.addEventListener('pointerup', onCanvasPointerUp, touchOpts);
 
       canvas.on('mouse:down', (opt) => {
         if ((opt.e as MouseEvent).altKey) {
@@ -1296,6 +1336,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         canvas.upperCanvasEl.removeEventListener('mousemove', trackPasteScene);
         canvas.upperCanvasEl.removeEventListener('touchend', onCanvasTouchEnd, true);
         canvas.lowerCanvasEl.removeEventListener('touchend', onCanvasTouchEnd, true);
+        canvas.upperCanvasEl.removeEventListener('pointerup', onCanvasPointerUp, true);
         canvas.dispose();
         fabricRef.current = null;
       };
@@ -1465,7 +1506,22 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         const selectableTarget = target.group ?? target;
         canvas.setActiveObject(selectableTarget);
         if (options?.editText && isTextLikeObject(selectableTarget)) {
-          beginTextEditingOnCanvas(canvas, selectableTarget);
+          if (isRestrictiveInAppBrowser()) {
+            const props = getObjProps(selectableTarget);
+            const fieldId = String(asAny(selectableTarget).id ?? '').trim();
+            if (fieldId) {
+              setTextEditSheet({
+                fieldId,
+                label: props.text?.trim() ? props.text.trim().slice(0, 28) : 'Текст',
+                text: props.text ?? '',
+                fontFamily: typeof props.fontFamily === 'string' ? props.fontFamily : 'Arial',
+                fontSize: Math.round(Number(props.fontSize) || 24),
+                fill: typeof props.fill === 'string' ? props.fill : '#111827',
+              });
+            }
+          } else {
+            beginTextEditingOnCanvas(canvas, selectableTarget);
+          }
         }
         canvas.requestRenderAll();
         onSelectionChange(getObjProps(selectableTarget));
@@ -1481,6 +1537,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         canvas.setActiveObject(selectableTarget);
         canvas.requestRenderAll();
         onSelectionChange(getObjProps(selectableTarget));
+        if (isRestrictiveInAppBrowser()) {
+          setPhotoPickSheet({ fieldId: id, label: 'Фото-поле' });
+          return true;
+        }
         photoPickerTargetIdRef.current = id;
         photoFileInputRef.current?.click();
         return true;
@@ -1918,6 +1978,41 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       },
     }));
 
+
+    const applyPhotoFileToTarget = useCallback(async (fieldId: string, file: File) => {
+      const canvas = fabricRef.current;
+      if (!canvas || !isLikelyImageFile(file)) return;
+      const field = findPhotoFieldByIdDeep(canvas, fieldId);
+      if (!field) return;
+      await fillPhotoFieldWithSnapshot(canvas, field, file);
+    }, [fillPhotoFieldWithSnapshot]);
+
+    const handleInAppPhotoSelected = useCallback(async (file: File) => {
+      const fieldId = photoPickSheet?.fieldId ?? photoPickerTargetIdRef.current;
+      if (!fieldId) return;
+      setPhotoPickSheet(null);
+      photoPickerTargetIdRef.current = null;
+      await applyPhotoFileToTarget(fieldId, file);
+    }, [photoPickSheet, applyPhotoFileToTarget]);
+
+    const handleInAppTextSave = useCallback((text: string) => {
+      const canvas = fabricRef.current;
+      if (!canvas || !textEditSheet) return;
+      const target = findDesignObjectByIdDeep(canvas, textEditSheet.fieldId);
+      if (!target || !isTextLikeObject(target)) {
+        setTextEditSheet(null);
+        return;
+      }
+      const textObj = target as IText;
+      textObj.set('text', text);
+      canvas.setActiveObject(textObj);
+      canvas.requestRenderAll();
+      onSelectionChange(getObjProps(textObj));
+      saveSnapshot();
+      scheduleTextAnchorRef.current?.();
+      setTextEditSheet(null);
+    }, [textEditSheet, onSelectionChange, saveSnapshot]);
+
     // ── Render ───────────────────────────────────────────────────────────────
 
     return (
@@ -2006,11 +2101,23 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             onReplaceFile={() => {
               const id = cropModal.fieldId;
               setCropModal(null);
+              if (isRestrictiveInAppBrowser()) {
+                setPhotoPickSheet({ fieldId: id, label: 'Фото-поле' });
+                return;
+              }
               photoPickerTargetIdRef.current = id;
               photoFileInputRef.current?.click();
             }}
           />
         )}
+        <EditorInAppFieldSheets
+          photoPick={photoPickSheet}
+          textEdit={textEditSheet}
+          onPhotoClose={() => setPhotoPickSheet(null)}
+          onPhotoSelected={(file) => void handleInAppPhotoSelected(file)}
+          onTextClose={() => setTextEditSheet(null)}
+          onTextSave={handleInAppTextSave}
+        />
       </div>
     );
   },
