@@ -9,7 +9,8 @@ import { normalizeWebsiteItems } from '../utils/websiteOrderNormalize'
 import {
   attachEditorDraftsToOrderItems,
   prepareWebsiteItemsWithEditorDrafts,
-} from '../../../services/publicEditorDraftService'
+} from '../../../services/editorDraftWebsitePrepare'
+import { completeEditorOrderIntake } from '../../../services/editorOrderIntakeService'
 
 function getSafeServerErrorMessage(fallback: string, error: any): string {
   return process.env.NODE_ENV === 'production'
@@ -163,6 +164,12 @@ export class OrderController {
           items: editorDraftPrepared.items
         })
         await attachEditorDraftsToOrderItems(result.order.id, result.itemIds ?? [], editorDraftPrepared.editorDraftItems)
+        await completeEditorOrderIntake({
+          orderId: result.order.id,
+          customerId: customer_id,
+          itemIds: result.itemIds ?? [],
+          editorDraftItems: editorDraftPrepared.editorDraftItems,
+        })
         setLastWebsiteOrderAt(Date.now())
         res.status(201).json({
           order: result.order,
@@ -283,6 +290,12 @@ export class OrderController {
         order = result.order as any
         deductionResult = result.deductionResult
         await attachEditorDraftsToOrderItems(result.order.id, result.itemIds ?? [], editorDraftPrepared.editorDraftItems)
+        await completeEditorOrderIntake({
+          orderId: result.order.id,
+          customerId: customer_id,
+          itemIds: result.itemIds ?? [],
+          editorDraftItems: editorDraftPrepared.editorDraftItems,
+        })
       } else {
         order = await OrderService.createOrder(
           customerName,

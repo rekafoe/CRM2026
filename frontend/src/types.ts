@@ -83,6 +83,21 @@ export interface ItemParams {
   };
   /** ID шаблона дизайна из design_templates */
   designTemplateId?: number;
+  /** Preflight: макет принят в заказ, но есть blocking issues (пустые поля и т.д.) */
+  layoutIncomplete?: boolean;
+  layoutIssues?: Array<{
+    id: string;
+    level: 'error' | 'warning';
+    message: string;
+    pageIndex: number;
+  }>;
+  /** Человекочитаемый путь для менеджера (страница/поле) */
+  layoutReviewPath?: string;
+  /** Группа открыток: несколько draft в одной позиции (см. ADR) */
+  editorLayoutGroup?: {
+    groupKey?: string;
+    slots?: Array<{ editorDraftToken?: string; label?: string }>;
+  };
 }
 
 export interface Item {

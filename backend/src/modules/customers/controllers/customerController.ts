@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { CustomerService } from '../services/customerService'
 import { CustomerLegalDocumentService } from '../services/customerLegalDocumentService'
+import { listCustomerProjects } from '../../../services/customerProjectService'
 import { asyncHandler } from '../../../middleware'
 
 export class CustomerController {
@@ -270,6 +271,19 @@ export class CustomerController {
       }
       res.status(400).json({ error: error.message || 'Ошибка обновления клиента' })
     }
+  })
+
+  /**
+   * GET /api/customers/:id/projects — макеты клиента (архив ~1 год)
+   */
+  static listProjects = asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'Неверный ID клиента' })
+      return
+    }
+    const projects = await listCustomerProjects(id)
+    res.json(projects)
   })
 
   /**

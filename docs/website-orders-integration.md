@@ -133,7 +133,13 @@ if (res.ok && data.order) {
 
 Итоговый печатный файл (PNG/PDF/JPEG) должен генерироваться из `order_items.params.designState` отдельным production export. `design_templates.spec.designState` остаётся неизменяемым исходным шаблоном для новых клиентов.
 
-Для редакторских позиций сайт должен прикладывать к заказу производственный PDF, собранный из пользовательского draft постранично в порядке `1, 2, 3, ... n`. CRM хранит исходный `designState` для повторной генерации/проверки и показывает readonly preview в Order Pool; production export не должен брать master-шаблон вместо пользовательской вариации.
+Сайт **не обязан** прикладывать production PDF при checkout. CRM генерирует `production_pdf` (multipage, mm + bleed) из `order_items.params.designState` после попадания заказа в пул. CRM хранит `designState` для повторной генерации, readonly preview в Order Pool и флаги неполного макета.
+
+#### Неполный макет и группировка открыток
+
+- При checkout заказ **принимается** даже с незаполненными полями. CRM пишет в `params`: `layoutIncomplete: true`, `layoutIssues: [...]`, опционально `layoutReviewPath`.
+- Группа N открыток: одна позиция, `params.editorLayoutGroup.slots[]` с разными `editorDraftToken` — см. [ADR-editor-postcard-grouping.md](./adr/ADR-editor-postcard-grouping.md).
+- Полный контракт: [EDITOR_PRODUCTION_RELEASE.md](./EDITOR_PRODUCTION_RELEASE.md).
 
 ### Пример запроса на backend
 

@@ -13,6 +13,7 @@ import {
   listEditorDraftFiles,
   updateEditorDraftPayload,
 } from '../services/publicEditorDraftService'
+import { cloneCustomerProjectToDraft } from '../services/customerProjectService'
 
 const router = Router()
 
@@ -214,6 +215,21 @@ router.post(
     }
   }),
 )
+
+/** POST /api/public-editor/projects/:id/clone-draft — новый draft из проекта клиента (сайт) */
+router.post('/projects/:id/clone-draft', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const projectId = Number(req.params.id)
+    if (!Number.isFinite(projectId)) {
+      res.status(400).json({ message: 'Некорректный id проекта' })
+      return
+    }
+    const result = await cloneCustomerProjectToDraft(projectId)
+    res.status(201).json(result)
+  } catch (err: unknown) {
+    res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось создать draft из проекта' })
+  }
+}))
 
 /** POST /api/public-editor/drafts/:token/finalize — создать заказ source=website */
 router.post('/drafts/:token/finalize', asyncHandler(async (req: Request, res: Response) => {

@@ -15,6 +15,10 @@ import { sendOrderSmsManual } from '../services/orderStatusSmsService'
 import { EarningsService } from '../services/earningsService'
 import { registerExternalOrderFiles, updateExternalOrderFile } from '../services/externalOrderFilesService'
 import { buildEditorProductionManifest } from '../services/editorProductionExportService'
+import {
+  getProductionStatus,
+  requestManualProductionRegeneration,
+} from '../services/editorProductionJobService'
 
 const router = Router()
 
@@ -824,6 +828,28 @@ router.get('/:id/items/:itemId/editor-production-manifest', asyncHandler(async (
   } catch (err: unknown) {
     res.status(400).json({ message: err instanceof Error ? err.message : 'Не удалось подготовить production manifest' })
   }
+}))
+
+router.get('/:id/items/:itemId/production-status', authenticate, asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  const orderItemId = Number(req.params.itemId)
+  if (!Number.isFinite(orderId) || !Number.isFinite(orderItemId)) {
+    res.status(400).json({ message: 'Некорректный orderId или itemId' })
+    return
+  }
+  const status = await getProductionStatus(orderId, orderItemId)
+  res.json(status)
+}))
+
+router.post('/:id/items/:itemId/generate-production', authenticate, asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  const orderItemId = Number(req.params.itemId)
+  if (!Number.isFinite(orderId) || !Number.isFinite(orderItemId)) {
+    res.status(400).json({ message: 'Некорректный orderId или itemId' })
+    return
+  }
+  const job = await requestManualProductionRegeneration(orderId, orderItemId)
+  res.status(202).json({ jobId: job.jobId, message: 'Production export поставлен в очередь' })
 }))
 
 // Скачивание файла с правильным именем (кириллица), отдача целиком с Content-Length

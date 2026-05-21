@@ -30,21 +30,26 @@ router.post(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
     const productId = parseInt(req.params.productId, 10)
-    const { typeId, designTemplateId } = req.body as {
+    const { typeId, designTemplateId, sizeId } = req.body as {
       typeId: number
       designTemplateId: number
+      sizeId: string
     }
     if (!productId || !typeId || !designTemplateId) {
       res.status(400).json({ error: 'productId, typeId и designTemplateId обязательны' })
       return
     }
     try {
-      const row = await addSubtypeDesign(productId, typeId, designTemplateId)
+      const row = await addSubtypeDesign(productId, typeId, designTemplateId, sizeId)
       res.status(201).json(row)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       if (msg.includes('UNIQUE constraint')) {
-        res.status(409).json({ error: 'Дизайн уже привязан к этому подтипу' })
+        res.status(409).json({ error: 'Дизайн уже привязан к этому размеру подтипа' })
+        return
+      }
+      if (msg.includes('sizeId обязателен')) {
+        res.status(400).json({ error: msg })
         return
       }
       throw err
@@ -68,15 +73,16 @@ router.put(
   '/reorder',
   asyncHandler(async (req: Request, res: Response) => {
     const productId = parseInt(req.params.productId, 10)
-    const { typeId, orderedLinkIds } = req.body as {
+    const { typeId, sizeId, orderedLinkIds } = req.body as {
       typeId: number
+      sizeId: string
       orderedLinkIds: number[]
     }
     if (!productId || !typeId || !Array.isArray(orderedLinkIds)) {
       res.status(400).json({ error: 'productId, typeId и orderedLinkIds обязательны' })
       return
     }
-    await reorderSubtypeDesigns(productId, typeId, orderedLinkIds)
+    await reorderSubtypeDesigns(productId, typeId, sizeId, orderedLinkIds)
     res.json({ ok: true })
   }),
 )

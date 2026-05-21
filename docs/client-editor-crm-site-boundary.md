@@ -106,32 +106,24 @@ Backend сайта не должен рендерить редактор. Его
 
 `editorDraftToken` хранится на backend сайта рядом с позицией корзины. Если клиент вернулся в редактор, сайт открывает тот же draft, а не создаёт новый.
 
-## Что нужно доделать в CRM
+## Реализовано в CRM (production backend)
 
-1. Довести CRM public editor API до стабильного контракта для сайта:
-   - явно документировать payload для `createDraft`, `updateDraft`, `uploadDraftFile`;
-   - проверить, что `mode`, `productId`, `typeId`, `sizeId`, `designTemplateId` сохраняются и доступны при чтении draft.
+См. [EDITOR_PRODUCTION_RELEASE.md](./EDITOR_PRODUCTION_RELEASE.md).
 
-2. Доделать checkout-контракт для Order Pool:
-   - сайт после checkout отправляет заказ в CRM обычным order endpoint-ом для сайта;
-   - в каждой позиции с редактором сайт передаёт `editorDraftToken`;
-   - позиции без редактора отправляются без `editorDraftToken` и работают как обычные заказы с файлами клиента;
-   - CRM при создании заказа переносит payload draft в соответствующую позицию;
-   - для корзины с несколькими позициями поддержан перенос нескольких draft в соответствующие order items.
+- Checkout: `POST /api/orders/from-website` + `editorDraftToken` в `items[].params` (без обязательного PDF с сайта).
+- Смешанная корзина, несколько token, `layoutIncomplete` / `layoutIssues` по позиции.
+- Группировка открыток: `params.editorLayoutGroup` — [ADR](./adr/ADR-editor-postcard-grouping.md).
+- Очередь `production_pdf` при intake website/miniapp; ручная перегенерация `POST /api/orders/:id/items/:itemId/generate-production`.
+- `customer_projects` + `GET /api/customers/:id/projects`, clone draft `POST /api/public-editor/projects/:id/clone-draft`.
+- Mini App: тот же prepare/attach/intake при finalize checkout.
+- Imposition: job `imposition_pdf` (MVP placeholder после готовности production).
 
-3. Доделать production export:
-   - для `designState` генерировать печатные PNG/PDF/JPEG из `order_items.params.designState`;
-   - для `photoBatch` генерировать ZIP/PDF/manifest по группам размера.
+## Что ещё вне scope CRM backend
 
-4. Подготовить editor package к выносу:
-   - убрать зависимости от CRM layout и admin styles;
-   - оставить внешний adapter как обязательную границу;
-   - проверить сборку как отдельного frontend-модуля/виджета.
-
-5. Доделать восстановление:
-   - открытие draft по token;
-   - восстановление `payload.designState`;
-   - восстановление `payload.photoBatch` для фотопечати.
+1. Editor package на вынос с сайта (отдельный npm-модуль, без CRM layout).
+2. `photo_batch` production export — до переписывания фоторедактора.
+3. Полная SRA3 imposition (сейчас placeholder PDF).
+4. CMYK в PDF — целевое качество; рендер через headless (RGB), см. [EDITOR_PRODUCTION_SPIKE.md](./EDITOR_PRODUCTION_SPIKE.md).
 
 ## Что нужно доделать на сайте
 

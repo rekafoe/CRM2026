@@ -1,6 +1,12 @@
 import { CustomerService, type Customer } from '../modules/customers/services/customerService';
 import { OrderService } from '../modules/orders/services/orderService';
 import { normalizeWebsiteItems } from '../modules/orders/utils/websiteOrderNormalize';
+import {
+  attachEditorDraftsToOrderItems,
+  collectEditorDraftItemsFromOrder,
+  prepareWebsiteItemsWithEditorDrafts,
+} from './editorDraftWebsitePrepare';
+import { completeEditorOrderIntake } from './editorOrderIntakeService';
 import { TelegramUserService } from './telegramUserService';
 import { setLastWebsiteOrderAt } from '../utils/poolSync';
 import { getDb } from '../config/database';
@@ -316,6 +322,7 @@ async function getOwnedMiniappOrderRow(telegramChatId: string, orderId: number) 
 
 export async function createMiniappDraft(telegramChatId: string, body: MiniappCheckoutBody) {
   const prepared = await prepareMiniappCheckoutContext(telegramChatId, body);
+  const editorDraftPrepared = await prepareWebsiteItemsWithEditorDrafts(prepared.normalized);
   const result = await OrderService.createOrderWithItems({
     customerName: prepared.customerName,
     customerPhone: prepared.customerPhone,
@@ -327,7 +334,7 @@ export async function createMiniappDraft(telegramChatId: string, body: MiniappCh
     telegramChatId,
     miniappCheckoutState: MINIAPP_CHECKOUT_STATE_DRAFT,
     miniappDesignHelpRequested: prepared.designHelpRequested,
-    items: prepared.normalized,
+    items: editorDraftPrepared.items,
   });
 
   if (prepared.orderNotes) {
@@ -397,6 +404,27 @@ export async function finalizeMiniappDraft(telegramChatId: string, orderId: numb
       ? String(draftOrder.notes || '').trim() || null
       : clearMiniappLayoutsPendingNote(draftOrder.notes ?? null) || null;
     await OrderService.updateOrderNotes(orderId, nextNotes, undefined);
+
+    const itemIdRows = await db.all<Array<{ id: number }>>(
+      'SELECT id FROM items WHERE orderId = ? ORDER BY id ASC',
+      [orderId],
+    );
+    const itemIds = (itemIdRows ?? []).map((r) => r.id);
+    const editorDraftItems = await collectEditorDraftItemsFromOrder(orderId);
+    if (editorDraftItems.length > 0) {
+      await attachEditorDraftsToOrderItems(orderId, itemIds, editorDraftItems);
+      const orderCustomer = await db.get<{ customer_id: number | null }>(
+        'SELECT customer_id FROM orders WHERE id = ?',
+        [orderId],
+      );
+      await completeEditorOrderIntake({
+        orderId,
+        customerId: orderCustomer?.customer_id ?? undefined,
+        itemIds,
+        editorDraftItems,
+      });
+    }
+
     await db.run('COMMIT');
 
     const order = await db.get<{ id: number; number: string }>(

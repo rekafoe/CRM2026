@@ -2,6 +2,13 @@ import type { Item } from '../../types';
 
 export type EditorItemKind = 'designState' | 'photoBatch' | 'clientFiles' | 'noLayout';
 
+export interface EditorLayoutIssue {
+  id: string;
+  level: 'error' | 'warning';
+  message: string;
+  pageIndex: number;
+}
+
 export interface EditorItemSummary {
   kind: EditorItemKind;
   label: string;
@@ -9,6 +16,9 @@ export interface EditorItemSummary {
   pages?: number;
   photoFiles?: number;
   photoQuantity?: number;
+  layoutIncomplete?: boolean;
+  layoutIssues?: EditorLayoutIssue[];
+  layoutReviewPath?: string;
 }
 
 export function getEditorItemSummary(item: Item): EditorItemSummary {
@@ -30,11 +40,23 @@ export function getEditorItemSummary(item: Item): EditorItemSummary {
 
   if (designState) {
     const pageCount = Number((designState as { pageCount?: unknown }).pageCount) || 1;
+    const layoutIncomplete = params.layoutIncomplete === true;
+    const layoutIssues = Array.isArray(params.layoutIssues)
+      ? params.layoutIssues as EditorLayoutIssue[]
+      : undefined;
+    const layoutReviewPath = typeof params.layoutReviewPath === 'string'
+      ? params.layoutReviewPath
+      : undefined;
     return {
       kind: 'designState',
       label: 'Макет из редактора',
-      detail: `${pageCount} стр. · шаблон ${params.designTemplateId ?? '—'}`,
+      detail: layoutIncomplete
+        ? `${pageCount} стр. · макет неполный`
+        : `${pageCount} стр. · шаблон ${params.designTemplateId ?? '—'}`,
       pages: pageCount,
+      layoutIncomplete,
+      layoutIssues,
+      layoutReviewPath,
     };
   }
 

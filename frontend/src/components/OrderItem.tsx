@@ -435,6 +435,11 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
                   <span className={`order-item-editor-badge order-item-editor-badge--${editorSummary.kind}`}>
                     {editorSummary.label}
                   </span>
+                  {editorSummary.layoutIncomplete && (
+                    <span className="order-item-editor-badge order-item-editor-badge--incomplete" title="Макет неполный">
+                      Макет неполный
+                    </span>
+                  )}
                   <span className="order-item-editor-summary__detail">{editorSummary.detail}</span>
                   {item.params.editorDraftToken && (
                     <span className="order-item-editor-summary__token" title={item.params.editorDraftToken}>
@@ -583,6 +588,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
       )}
       <EditorItemPreviewModal
         item={item}
+        orderId={orderId}
         isOpen={showEditorPreview}
         onClose={() => setShowEditorPreview(false)}
       />

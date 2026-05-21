@@ -15,6 +15,8 @@ router.get('/', CustomerController.getAll)
 /**
  * Документы юридического лица (даты выдачи / возврата) — до /:id, иначе сегмент перехватится как id
  */
+router.get('/:id/projects', CustomerController.listProjects)
+
 router.get('/:customerId/legal-documents', CustomerController.listLegalDocuments)
 router.post('/:customerId/legal-documents', CustomerController.createLegalDocument)
 router.put('/:customerId/legal-documents/:documentId', CustomerController.updateLegalDocument)

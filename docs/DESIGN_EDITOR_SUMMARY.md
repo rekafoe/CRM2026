@@ -17,7 +17,7 @@
 - Состояние редактора сериализуется как `DesignState` из `frontend/src/pages/admin/designEditor/types.ts`.
 - Загрузка страницы/разворота и фон шаблона вынесены в `frontend/src/pages/admin/designEditor/designPageLoader.ts`.
 - Геометрия страницы, safe zone и bleed рассчитываются в `frontend/src/pages/admin/designEditor/designGeometry.ts`.
-- Каталог и импорт шаблонов находятся в `frontend/src/pages/admin/DesignTemplatesPage.tsx`.
+- Каталог и импорт шаблонов: `frontend/src/pages/admin/DesignTemplatesPage.tsx`, инструкция — `docs/design-templates-catalog.md`.
 
 Редакторы разделены по ответственности:
 

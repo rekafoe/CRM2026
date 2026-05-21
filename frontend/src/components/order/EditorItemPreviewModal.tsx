@@ -1,7 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from 'fabric';
 import { jsPDF } from 'jspdf';
 import type { Item } from '../../types';
+import {
+  downloadOrderFile,
+  generateOrderItemProduction,
+  getOrderItemProductionStatus,
+} from '../../api';
 import { API_BASE_URL } from '../../config/constants';
 import { createDesignSceneGeometry } from '../../pages/admin/designEditor/designGeometry';
 import { loadDesignPageScene } from '../../pages/admin/designEditor/designPageLoader';
@@ -9,8 +14,24 @@ import type { DesignPage, DesignState } from '../../pages/admin/designEditor/typ
 import { getEditorItemSummary } from './editorItemSummary';
 import './EditorItemPreviewModal.css';
 
+type ProductionJobRow = {
+  id: number;
+  jobType: string;
+  status: string;
+  lastError: string | null;
+  attempts: number;
+};
+
+type ProductionFileRow = {
+  id: number;
+  filename: string;
+  originalName: string | null;
+  metadata: string | null;
+};
+
 interface EditorItemPreviewModalProps {
   item: Item | null;
+  orderId?: number;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -77,7 +98,19 @@ async function exportDesignStatePdf(designState: DesignState): Promise<void> {
   doc.save(`order-item-${designState.templateId ?? 'design'}-pages.pdf`);
 }
 
-export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({ item, isOpen, onClose }) => {
+const JOB_STATUS_LABEL: Record<string, string> = {
+  pending: 'В очереди',
+  processing: 'Генерация…',
+  done: 'Готово',
+  failed: 'Ошибка',
+};
+
+export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
+  item,
+  orderId,
+  isOpen,
+  onClose,
+}) => {
   const summary = useMemo(() => (item ? getEditorItemSummary(item) : null), [item]);
   const designState = isDesignState(item?.params.designState) ? item.params.designState : null;
   const photoBatch = item?.params.photoBatch ?? null;
@@ -85,6 +118,33 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({ 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [productionJobs, setProductionJobs] = useState<ProductionJobRow[]>([]);
+  const [productionFiles, setProductionFiles] = useState<ProductionFileRow[]>([]);
+  const [productionLoading, setProductionLoading] = useState(false);
+  const [productionRegenerating, setProductionRegenerating] = useState(false);
+
+  const loadProductionStatus = useCallback(async () => {
+    if (!orderId || !item?.id || !designState) return;
+    setProductionLoading(true);
+    try {
+      const { data } = await getOrderItemProductionStatus(orderId, item.id);
+      setProductionJobs((data as { jobs?: ProductionJobRow[] }).jobs ?? []);
+      setProductionFiles((data as { productionFiles?: ProductionFileRow[] }).productionFiles ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось загрузить статус production PDF');
+    } finally {
+      setProductionLoading(false);
+    }
+  }, [designState, item?.id, orderId]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setProductionJobs([]);
+      setProductionFiles([]);
+      return;
+    }
+    void loadProductionStatus();
+  }, [isOpen, loadProductionStatus]);
 
   useEffect(() => {
     if (!isOpen || !designState) {
@@ -129,6 +189,28 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({ 
     }
   };
 
+  const handleRegenerateProduction = async () => {
+    if (!orderId || !item?.id) return;
+    try {
+      setProductionRegenerating(true);
+      setError(null);
+      await generateOrderItemProduction(orderId, item.id);
+      await loadProductionStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось поставить production PDF в очередь');
+    } finally {
+      setProductionRegenerating(false);
+    }
+  };
+
+  const handleDownloadProductionFile = (file: ProductionFileRow) => {
+    if (!orderId) return;
+    const name = file.originalName || file.filename;
+    downloadOrderFile(orderId, file.id, name).catch((err) => {
+      setError(err instanceof Error ? err.message : 'Не удалось скачать production PDF');
+    });
+  };
+
   return (
     <div className="editor-preview-modal__overlay" onClick={onClose}>
       <div className="editor-preview-modal" onClick={(event) => event.stopPropagation()}>
@@ -147,6 +229,73 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({ 
         </div>
 
         {error && <div className="editor-preview-modal__error">{error}</div>}
+
+        {orderId && designState && (
+          <section className="editor-preview-modal__production" aria-labelledby="editor-production-heading">
+            <div className="editor-preview-modal__production-header">
+              <h4 id="editor-production-heading">Production PDF (CRM)</h4>
+              <button
+                type="button"
+                className="editor-preview-modal__primary"
+                onClick={() => void handleRegenerateProduction()}
+                disabled={productionRegenerating || productionLoading}
+              >
+                {productionRegenerating ? 'В очереди…' : 'Перегенерировать'}
+              </button>
+            </div>
+            {productionLoading ? (
+              <p className="editor-preview-modal__production-hint">Загрузка статуса…</p>
+            ) : (
+              <>
+                {productionJobs.length > 0 && (
+                  <ul className="editor-preview-modal__production-jobs">
+                    {productionJobs.slice(0, 5).map((job) => (
+                      <li key={job.id}>
+                        {job.jobType}: {JOB_STATUS_LABEL[job.status] ?? job.status}
+                        {job.lastError ? ` — ${job.lastError}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {productionFiles.length > 0 ? (
+                  <ul className="editor-preview-modal__production-files">
+                    {productionFiles.map((file) => (
+                      <li key={file.id}>
+                        <button
+                          type="button"
+                          className="editor-preview-modal__production-file-link"
+                          onClick={() => handleDownloadProductionFile(file)}
+                        >
+                          {file.originalName || file.filename}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="editor-preview-modal__production-hint">
+                    Файл ещё не сгенерирован. Воркер создаёт PDF после заказа с сайта (нужен Puppeteer на сервере).
+                  </p>
+                )}
+              </>
+            )}
+          </section>
+        )}
+
+        {summary.layoutIncomplete && summary.layoutIssues && summary.layoutIssues.length > 0 && (
+          <div className="editor-preview-modal__layout-issues" role="alert">
+            <strong>Макет неполный</strong>
+            <ul>
+              {summary.layoutIssues.map((issue) => (
+                <li key={issue.id} className={`editor-preview-modal__issue editor-preview-modal__issue--${issue.level}`}>
+                  {issue.message}
+                </li>
+              ))}
+            </ul>
+            {summary.layoutReviewPath && (
+              <p className="editor-preview-modal__review-path">Путь: {summary.layoutReviewPath}</p>
+            )}
+          </div>
+        )}
 
         {designState && (
           <>

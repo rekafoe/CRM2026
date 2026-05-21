@@ -4,15 +4,34 @@ declare module 'pdf-lib' {
   export interface PDFDocumentLoadOptions {
     ignoreEncryption?: boolean;
   }
-  export interface PDFPage {
-    getSize(): { width: number; height: number };
-    getBleedBox?(): { x: number; y: number; width: number; height: number };
+  export interface RGB {
+    r: number;
+    g: number;
+    b: number;
+  }
+  export const StandardFonts: {
+    Helvetica: string;
+  };
+  export function rgb(r: number, g: number, b: number): RGB;
+  export interface PDFFont {
+    name: string;
   }
   export class PDFDocument {
     static load(data: ArrayBuffer | Uint8Array, options?: PDFDocumentLoadOptions): Promise<PDFDocument>;
+    static create(): Promise<PDFDocument>;
     getPageCount(): number;
     getPages(): PDFPage[];
     getPage(index: number): PDFPage;
+    getPageIndices(): number[];
+    addPage(size?: [number, number] | PDFPage): PDFPage;
+    copyPages(source: PDFDocument, indices: number[]): Promise<PDFPage[]>;
+    embedFont(font: string): Promise<PDFFont>;
+    save(): Promise<Uint8Array>;
+  }
+  export class PDFPage {
+    getSize(): { width: number; height: number };
+    getBleedBox?(): { x: number; y: number; width: number; height: number };
+    drawText(text: string, options?: { x?: number; y?: number; size?: number; font?: PDFFont; color?: RGB }): void;
   }
 }
 

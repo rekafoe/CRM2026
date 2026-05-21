@@ -181,11 +181,15 @@ export async function importDesignTemplateFromFile(
   })
 
   if (input.productId && input.typeId) {
-    try {
-      await addSubtypeDesign(input.productId, input.typeId, template.id)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (!msg.includes('UNIQUE constraint')) warnings.push(`Шаблон создан, но не привязан к подтипу: ${msg}`)
+    if (!input.sizeId) {
+      warnings.push('Укажите sizeId при импорте, чтобы привязать шаблон к размеру подтипа в продукте.')
+    } else {
+      try {
+        await addSubtypeDesign(input.productId, input.typeId, template.id, input.sizeId)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (!msg.includes('UNIQUE constraint')) warnings.push(`Шаблон создан, но не привязан к размеру: ${msg}`)
+      }
     }
   }
 

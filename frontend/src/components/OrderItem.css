@@ -94,6 +94,12 @@
   border-color: #bfdbfe;
 }
 
+.order-item-editor-badge--incomplete {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
 .order-item-editor-badge--photoBatch {
   color: #7c2d12;
   background: #fff7ed;

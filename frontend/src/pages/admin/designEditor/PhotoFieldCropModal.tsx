@@ -24,8 +24,43 @@ export interface PhotoFieldCropModalProps {
 const EDITOR_MAX_W = 720;
 const EDITOR_MAX_H = 580;
 const PREVIEW_MIN_MARGIN = 56;
+const MOBILE_BREAKPOINT_PX = 720;
+/** Шапка модалки + подзаголовок + кнопки (мобильная колонка). */
+const MOBILE_MODAL_CHROME_PX = 300;
 const MIN_CROP_SOURCE_PX = 80;
 const MAX_ZOOM = 6;
+
+function useCropEditorViewportBounds(isOpen: boolean) {
+  const [bounds, setBounds] = useState({ maxW: EDITOR_MAX_W, maxH: EDITOR_MAX_H });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const update = () => {
+      const vv = window.visualViewport;
+      const vw = vv?.width ?? window.innerWidth;
+      const vh = vv?.height ?? window.innerHeight;
+      const mobile = vw <= MOBILE_BREAKPOINT_PX;
+      const margin = mobile ? 20 : PREVIEW_MIN_MARGIN;
+      const chrome = mobile ? MOBILE_MODAL_CHROME_PX : 140;
+      setBounds({
+        maxW: Math.min(EDITOR_MAX_W, vw - margin),
+        maxH: Math.min(EDITOR_MAX_H, mobile ? Math.max(180, vh - chrome) : vh * 0.68),
+      });
+    };
+    update();
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', update);
+    vv?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => {
+      vv?.removeEventListener('resize', update);
+      vv?.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [isOpen]);
+
+  return bounds;
+}
 
 export const PhotoFieldCropModal: React.FC<PhotoFieldCropModalProps> = ({
   isOpen,
@@ -86,21 +121,19 @@ export const PhotoFieldCropModal: React.FC<PhotoFieldCropModalProps> = ({
     };
   }, [baseLayout, zoom]);
 
+  const viewportBounds = useCropEditorViewportBounds(isOpen);
+
   const { editorW, editorH, sourceScale } = useMemo(() => {
-    const maxW =
-      typeof window !== 'undefined' ? Math.min(EDITOR_MAX_W, window.innerWidth - PREVIEW_MIN_MARGIN) : EDITOR_MAX_W;
-    const maxH =
-      typeof window !== 'undefined' ? Math.min(EDITOR_MAX_H, window.innerHeight * 0.68) : EDITOR_MAX_H;
     const nextSourceScale = Math.min(
-      maxW / Math.max(1, intrinsicW),
-      maxH / Math.max(1, intrinsicH),
+      viewportBounds.maxW / Math.max(1, intrinsicW),
+      viewportBounds.maxH / Math.max(1, intrinsicH),
     );
     return {
       editorW: intrinsicW * nextSourceScale,
       editorH: intrinsicH * nextSourceScale,
       sourceScale: nextSourceScale,
     };
-  }, [intrinsicW, intrinsicH]);
+  }, [intrinsicW, intrinsicH, viewportBounds]);
 
   const clamped = clampPhotoFieldPan(frameW, frameH, layout, panX, panY, fitMode);
   const applySourceCrop = useCallback((sourceX: number, sourceY: number, nextZoom = zoom) => {

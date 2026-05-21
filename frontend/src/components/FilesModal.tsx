@@ -584,6 +584,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       />
       <EditorItemPreviewModal
         item={previewItem}
+        orderId={orderId}
         isOpen={previewItem !== null}
         onClose={() => setPreviewItem(null)}
       />

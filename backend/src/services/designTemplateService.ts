@@ -87,29 +87,53 @@ export async function getPublicDesignTemplates(params: {
   const db = await getDb()
   let rows: DesignTemplateRow[]
   if (params.productId && params.typeId) {
-    rows = await db.all(
-      `SELECT dt.*
-       FROM product_subtype_designs psd
-       JOIN design_templates dt ON dt.id = psd.design_template_id
-       WHERE psd.product_id = ? AND psd.type_id = ? AND dt.is_active = 1
-       ORDER BY psd.sort_order ASC, dt.sort_order ASC, dt.name ASC`,
-      [params.productId, params.typeId],
-    ) as DesignTemplateRow[]
+    const sizeId = params.sizeId != null ? String(params.sizeId).trim() : ''
+    if (sizeId) {
+      rows = await db.all(
+        `SELECT dt.*
+         FROM product_subtype_designs psd
+         JOIN design_templates dt ON dt.id = psd.design_template_id
+         WHERE psd.product_id = ? AND psd.type_id = ? AND psd.size_id = ? AND dt.is_active = 1
+         ORDER BY psd.sort_order ASC, dt.sort_order ASC, dt.name ASC`,
+        [params.productId, params.typeId, sizeId],
+      ) as DesignTemplateRow[]
+      // Legacy: привязки без size_id — фильтр по spec.sizeId
+      const legacy = await db.all(
+        `SELECT dt.*
+         FROM product_subtype_designs psd
+         JOIN design_templates dt ON dt.id = psd.design_template_id
+         WHERE psd.product_id = ? AND psd.type_id = ? AND (psd.size_id IS NULL OR psd.size_id = '') AND dt.is_active = 1`,
+        [params.productId, params.typeId],
+      ) as DesignTemplateRow[]
+      const legacyFiltered = legacy.filter((row) => {
+        try {
+          const spec = row.spec ? JSON.parse(row.spec) as Record<string, unknown> : {}
+          return spec.sizeId == null || String(spec.sizeId) === sizeId
+        } catch {
+          return false
+        }
+      })
+      const seen = new Set(rows.map((r) => r.id))
+      for (const row of legacyFiltered) {
+        if (!seen.has(row.id)) rows.push(row)
+      }
+    } else {
+      rows = await db.all(
+        `SELECT dt.*
+         FROM product_subtype_designs psd
+         JOIN design_templates dt ON dt.id = psd.design_template_id
+         WHERE psd.product_id = ? AND psd.type_id = ? AND dt.is_active = 1
+         ORDER BY psd.size_id ASC, psd.sort_order ASC, dt.sort_order ASC, dt.name ASC`,
+        [params.productId, params.typeId],
+      ) as DesignTemplateRow[]
+    }
   } else {
     rows = await db.all(
       'SELECT * FROM design_templates WHERE is_active = 1 ORDER BY sort_order ASC, name ASC',
     ) as DesignTemplateRow[]
   }
 
-  const filteredRows = !params.sizeId ? rows : rows.filter((row) => {
-    try {
-      const spec = row.spec ? JSON.parse(row.spec) as Record<string, unknown> : {}
-      return spec.sizeId == null || String(spec.sizeId) === params.sizeId
-    } catch {
-      return true
-    }
-  })
-  return filteredRows.map(stripPrivateImportFields)
+  return rows.map(stripPrivateImportFields)
 }
 
 export async function createDesignTemplate(input: DesignTemplateInput): Promise<DesignTemplateRow> {

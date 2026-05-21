@@ -909,6 +909,12 @@ export const getCustomers = (params?: { type?: 'individual' | 'legal'; search?: 
   api.get<Customer[]>('/customers', { params });
 export const getCustomer = (id: number) => 
   api.get<Customer>(`/customers/${id}`);
+export const getCustomerProjects = (customerId: number) =>
+  api.get(`/customers/${customerId}/projects`);
+export const generateOrderItemProduction = (orderId: number, orderItemId: number) =>
+  api.post(`/orders/${orderId}/items/${orderItemId}/generate-production`);
+export const getOrderItemProductionStatus = (orderId: number, orderItemId: number) =>
+  api.get(`/orders/${orderId}/items/${orderItemId}/production-status`);
 export const createCustomer = (customer: Omit<Customer, 'id' | 'created_at' | 'updated_at'>) => 
   api.post<Customer>('/customers', customer);
 export const updateCustomer = (id: number, customer: Partial<Omit<Customer, 'id' | 'created_at' | 'updated_at'>>) => 
@@ -1176,6 +1182,8 @@ export interface SubtypeDesignLink {
   id: number;
   product_id: number;
   type_id: number;
+  /** id размера из typeConfigs[typeId].sizes[].id */
+  size_id: string;
   design_template_id: number;
   sort_order: number;
   created_at: string;
@@ -1186,21 +1194,33 @@ export interface SubtypeDesignLink {
   is_active: number;
 }
 
-/** Список дизайнов, привязанных к подтипу */
-export const getSubtypeDesigns = (productId: number, typeId: number) =>
-  api.get<SubtypeDesignLink[]>(`/products/${productId}/subtype-designs?typeId=${typeId}`);
+/** Список дизайнов, привязанных к подтипу (опционально — один размер) */
+export const getSubtypeDesigns = (productId: number, typeId: number, sizeId?: string) =>
+  api.get<SubtypeDesignLink[]>(`/products/${productId}/subtype-designs`, {
+    params: { typeId, ...(sizeId ? { sizeId } : {}) },
+  });
 
-/** Привязать дизайн-шаблон к подтипу */
-export const addSubtypeDesign = (productId: number, typeId: number, designTemplateId: number) =>
-  api.post<SubtypeDesignLink>(`/products/${productId}/subtype-designs`, { typeId, designTemplateId });
+/** Привязать дизайн-шаблон к размеру подтипа */
+export const addSubtypeDesign = (
+  productId: number,
+  typeId: number,
+  designTemplateId: number,
+  sizeId: string,
+) =>
+  api.post<SubtypeDesignLink>(`/products/${productId}/subtype-designs`, { typeId, designTemplateId, sizeId });
 
 /** Отвязать дизайн-шаблон от подтипа */
 export const removeSubtypeDesign = (productId: number, linkId: number) =>
   api.delete(`/products/${productId}/subtype-designs/${linkId}`);
 
 /** Изменить порядок дизайнов подтипа */
-export const reorderSubtypeDesigns = (productId: number, typeId: number, orderedLinkIds: number[]) =>
-  api.put(`/products/${productId}/subtype-designs/reorder`, { typeId, orderedLinkIds });
+export const reorderSubtypeDesigns = (
+  productId: number,
+  typeId: number,
+  sizeId: string,
+  orderedLinkIds: number[],
+) =>
+  api.put(`/products/${productId}/subtype-designs/reorder`, { typeId, sizeId, orderedLinkIds });
 
 // Collage Templates API (шаблоны раскладки для коллажей в редакторе макетов)
 export interface CollageLayoutCell {

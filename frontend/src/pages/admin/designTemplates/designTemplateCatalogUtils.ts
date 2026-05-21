@@ -1,0 +1,80 @@
+import type { DesignTemplate } from '../../../api';
+
+export type TemplateCatalogStatus = 'active' | 'inactive' | 'draft';
+
+export type ParsedTemplateCatalogSpec = {
+  width_mm?: number;
+  height_mm?: number;
+  page_count?: number;
+  productId?: number;
+  typeId?: number;
+  sizeId?: string;
+  hasDesignState: boolean;
+  importStatus?: string;
+  importWarnings: string[];
+  importerVersion?: number;
+};
+
+export function parseTemplateSpec(template: DesignTemplate): ParsedTemplateCatalogSpec {
+  const empty: ParsedTemplateCatalogSpec = {
+    hasDesignState: false,
+    importWarnings: [],
+  };
+  if (!template.spec) return empty;
+  try {
+    const spec = typeof template.spec === 'string'
+      ? (JSON.parse(template.spec) as Record<string, unknown>)
+      : (template.spec as Record<string, unknown>);
+    const importMeta = spec.import as Record<string, unknown> | undefined;
+    const designState = spec.designState as Record<string, unknown> | undefined;
+    const warnings = Array.isArray(importMeta?.warnings)
+      ? importMeta.warnings.filter((w): w is string => typeof w === 'string')
+      : [];
+    return {
+      width_mm: Number(spec.width_mm ?? designState?.pageWidth) || undefined,
+      height_mm: Number(spec.height_mm ?? designState?.pageHeight) || undefined,
+      page_count: Number(spec.page_count ?? designState?.pageCount) || undefined,
+      productId: spec.productId != null ? Number(spec.productId) : undefined,
+      typeId: spec.typeId != null ? Number(spec.typeId) : undefined,
+      sizeId: spec.sizeId != null ? String(spec.sizeId) : undefined,
+      hasDesignState: Boolean(designState && Array.isArray(designState.pages) && designState.pages.length > 0),
+      importStatus: typeof importMeta?.status === 'string' ? importMeta.status : undefined,
+      importWarnings: warnings,
+      importerVersion: typeof importMeta?.importerVersion === 'number' ? importMeta.importerVersion : undefined,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+export function getTemplateCatalogStatus(template: DesignTemplate): TemplateCatalogStatus {
+  const parsed = parseTemplateSpec(template);
+  if (!parsed.hasDesignState) return 'draft';
+  return template.is_active === 1 ? 'active' : 'inactive';
+}
+
+export function resolveTemplatePreviewUrl(previewUrl: string | null | undefined, apiBaseUrl: string): string | null {
+  if (!previewUrl) return null;
+  if (previewUrl.startsWith('http')) return previewUrl;
+  const origin = apiBaseUrl.replace(/\/api\/?$/, '');
+  return `${origin}${previewUrl.startsWith('/') ? '' : '/'}${previewUrl}`;
+}
+
+export function formatTemplateSize(parsed: ParsedTemplateCatalogSpec): string | null {
+  if (parsed.width_mm && parsed.height_mm) {
+    const pages = parsed.page_count && parsed.page_count > 1 ? ` · ${parsed.page_count} стр.` : '';
+    return `${parsed.width_mm}×${parsed.height_mm} мм${pages}`;
+  }
+  if (parsed.page_count && parsed.page_count > 1) return `${parsed.page_count} стр.`;
+  return null;
+}
+
+export function formatProductBinding(parsed: ParsedTemplateCatalogSpec): string | null {
+  if (!parsed.productId && !parsed.typeId && !parsed.sizeId) return null;
+  const parts = [
+    parsed.productId != null ? `product ${parsed.productId}` : null,
+    parsed.typeId != null ? `type ${parsed.typeId}` : null,
+    parsed.sizeId ? `size ${parsed.sizeId}` : null,
+  ].filter(Boolean);
+  return parts.join(' · ');
+}

@@ -26,6 +26,7 @@ import { DEFAULT_CUSTOMER_DETAIL_TAB, type CustomerDetailTab } from './customerD
 import { CustomerDetailOverviewPanel } from './customerDetail/CustomerDetailOverviewPanel';
 import { CustomerDetailProfilePanel } from './customerDetail/CustomerDetailProfilePanel';
 import { CustomerDetailOrdersPanel } from './customerDetail/CustomerDetailOrdersPanel';
+import { CustomerDetailProjectsPanel } from './customerDetail/CustomerDetailProjectsPanel';
 
 export const CustomerDetailView: React.FC<{
   customerId: number;
@@ -899,6 +900,7 @@ export const CustomerDetailView: React.FC<{
       key: 'orders',
       label: customer.type === 'legal' ? 'Заказы и документы' : 'Заказы',
     },
+    { key: 'projects', label: 'Макеты' },
   ];
   const visibleTabs = tabItems;
   const displayName = getCustomerDisplayName(customer);
@@ -988,6 +990,9 @@ export const CustomerDetailView: React.FC<{
                   : null
               }
             />
+          )}
+          {activeTab === 'projects' && (
+            <CustomerDetailProjectsPanel customerId={customer.id} />
           )}
         </div>
       </div>

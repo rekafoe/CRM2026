@@ -6,7 +6,10 @@
   --pc-card: rgba(255, 255, 255, 0.94);
   --pc-cyan: #00a6d6;
   --pc-blue: #2563eb;
+  display: flex;
+  flex-direction: column;
   max-width: min(900px, calc(100vw - 32px));
+  max-height: min(90vh, 900px);
   overflow: hidden;
   color: var(--pc-ink);
   background:
@@ -23,6 +26,7 @@
 }
 
 .photo-field-crop-modal-head {
+  flex-shrink: 0;
   padding: 14px 16px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96)),
@@ -57,7 +61,13 @@
 .photo-field-crop-modal-body {
   display: grid;
   gap: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
   padding: 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .photo-field-crop-header {
@@ -241,14 +251,27 @@
 }
 
 @media (max-width: 720px) {
+  .common-modal__backdrop.photo-field-crop-backdrop {
+    align-items: flex-end;
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
   .modal-content.photo-field-crop-modal {
-    max-width: calc(100vw - 16px);
-    border-radius: 20px;
+    width: 100%;
+    max-width: 100%;
+    max-height: min(92dvh, 100%);
+    margin: 0;
+    border-radius: 20px 20px 0 0;
+  }
+
+  .photo-field-crop-modal-head {
+    flex-shrink: 0;
   }
 
   .photo-field-crop-modal-body {
     gap: 12px;
-    padding: 14px;
+    padding: 12px 14px 14px;
   }
 
   .photo-field-crop-header span {
@@ -256,12 +279,19 @@
   }
 
   .photo-field-crop-editor {
+    width: min(var(--pf-source-w), 100%);
+    height: min(var(--pf-source-h), min(48dvh, calc(92dvh - 280px)));
     border-radius: 18px;
   }
 
   .photo-field-crop-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
     align-items: stretch;
     flex-direction: column;
+    padding-top: 8px;
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0), #f8fafc 28%);
   }
 
   .photo-field-crop-actions-left,

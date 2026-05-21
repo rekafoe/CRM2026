@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '../../../components/common'
 import { AppIcon } from '../../../components/ui/AppIcon'
 import {
@@ -19,11 +19,11 @@ import {
 interface SubtypeDesignsCardProps {
   productId: number
   typeId: number
-  /** Обрезные форматы выбранного подтипа — для предупреждения, если мм шаблона не совпадают */
-  subtypeSizes?: SimplifiedSizeConfig[]
-  /** Опции числа страниц подтипа (если заданы) */
+  subtypeSizes: SimplifiedSizeConfig[]
   pagesConfig?: SimplifiedPagesConfig
 }
+
+const LEGACY_SIZE_KEY = ''
 
 export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
   productId,
@@ -35,8 +35,8 @@ export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Состояние модалки выбора
   const [modalOpen, setModalOpen] = useState(false)
+  const [modalSizeId, setModalSizeId] = useState<string | null>(null)
   const [allTemplates, setAllTemplates] = useState<DesignTemplate[]>([])
   const [loadingTemplates, setLoadingTemplates] = useState(false)
   const [adding, setAdding] = useState<number | null>(null)
@@ -59,13 +59,35 @@ export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
     void load()
   }, [load])
 
-  const openModal = useCallback(async () => {
+  const linksBySize = useMemo(() => {
+    const map = new Map<string, SubtypeDesignLink[]>()
+    for (const link of links) {
+      const key = link.size_id?.trim() || LEGACY_SIZE_KEY
+      const list = map.get(key) ?? []
+      list.push(link)
+      map.set(key, list)
+    }
+    return map
+  }, [links])
+
+  const legacyLinks = linksBySize.get(LEGACY_SIZE_KEY) ?? []
+
+  const sizesMissingDesigns = useMemo(() => {
+    if (subtypeSizes.length === 0) return []
+    return subtypeSizes.filter((size) => {
+      const key = String(size.id)
+      return !(linksBySize.get(key)?.length)
+    })
+  }, [subtypeSizes, linksBySize])
+
+  const openModalForSize = useCallback(async (sizeId: string) => {
+    setModalSizeId(sizeId)
     setModalOpen(true)
     if (allTemplates.length > 0) return
     setLoadingTemplates(true)
     try {
       const res = await getDesignTemplates()
-      setAllTemplates(res.data.filter((t) => t.is_active))
+      setAllTemplates(res.data.filter((t) => t.is_active === 1))
     } catch {
       // ignore
     } finally {
@@ -74,33 +96,32 @@ export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
   }, [allTemplates.length])
 
   const handleAdd = useCallback(
-    async (templateId: number) => {
+    async (templateId: number, sizeId: string) => {
+      const size = subtypeSizes.find((s) => String(s.id) === sizeId)
       const t = allTemplates.find((x) => x.id === templateId)
-      if (t) {
+      if (t && size) {
         const dim = parseDesignTemplateDimensions(t)
-        if (dim) {
-          if (subtypeSizes && subtypeSizes.length > 0 && !sizeMatchesTrimFormat(dim.width_mm, dim.height_mm, subtypeSizes)) {
-            const ok = window.confirm(
-              `Размер макета шаблона (${dim.width_mm}×${dim.height_mm} мм) не совпадает ни с одним обрезным форматом этого подтипа. Прикрепить всё равно?`,
-            )
-            if (!ok) return
-          }
-          if (pagesConfig?.options?.length && !pageCountAllowedForSubtype(dim.page_count, pagesConfig)) {
-            const opts = pagesConfig.options.join(', ')
-            const ok = window.confirm(
-              `В шаблоне ${dim.page_count} стр., у подтипа допустимы страницы: ${opts}. Прикрепить всё равно?`,
-            )
-            if (!ok) return
-          }
+        if (dim && !sizeMatchesTrimFormat(dim.width_mm, dim.height_mm, [size])) {
+          const ok = window.confirm(
+            `Размер макета (${dim.width_mm}×${dim.height_mm} мм) не совпадает с форматом «${size.label}» (${size.width_mm}×${size.height_mm} мм). Прикрепить всё равно?`,
+          )
+          if (!ok) return
+        }
+        if (dim && pagesConfig?.options?.length && !pageCountAllowedForSubtype(dim.page_count, pagesConfig)) {
+          const ok = window.confirm(
+            `В шаблоне ${dim.page_count} стр., у подтипа допустимы: ${pagesConfig.options.join(', ')}. Прикрепить всё равно?`,
+          )
+          if (!ok) return
         }
       }
       setAdding(templateId)
       try {
-        await addSubtypeDesign(productId, typeId, templateId)
+        await addSubtypeDesign(productId, typeId, templateId, sizeId)
         await load()
+        setModalOpen(false)
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
-        if (!msg.includes('409')) alert('Ошибка: ' + msg)
+        alert(msg.includes('409') ? 'Этот дизайн уже привязан к этому размеру' : `Ошибка: ${msg}`)
       } finally {
         setAdding(null)
       }
@@ -110,7 +131,7 @@ export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
 
   const handleRemove = useCallback(
     async (linkId: number) => {
-      if (!confirm('Убрать этот дизайн из подтипа?')) return
+      if (!confirm('Убрать этот дизайн с размера?')) return
       try {
         await removeSubtypeDesign(productId, linkId)
         setLinks((prev) => prev.filter((l) => l.id !== linkId))
@@ -121,87 +142,145 @@ export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
     [productId],
   )
 
-  const linkedIds = new Set(links.map((l) => l.design_template_id))
+  const modalSize = modalSizeId
+    ? subtypeSizes.find((s) => String(s.id) === modalSizeId)
+    : null
+  const modalLinks = modalSizeId ? linksBySize.get(modalSizeId) ?? [] : []
+  const linkedIds = new Set(modalLinks.map((l) => l.design_template_id))
+
+  if (subtypeSizes.length === 0) {
+    return (
+      <div className="subtype-designs-card">
+        <p className="subtype-designs-card__hint subtype-designs-card__hint--warn">
+          У подтипа нет размеров в конфиге. Сначала добавьте форматы (мм) на вкладке «Размеры», затем привязывайте дизайны к каждому размеру.
+        </p>
+        {legacyLinks.length > 0 && (
+          <p className="subtype-designs-card__hint">
+            Есть устаревшие привязки без размера ({legacyLinks.length}). Перепривяжите их к конкретным форматам после настройки размеров.
+          </p>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="subtype-designs-card">
       <div className="subtype-designs-card__header">
         <h4 className="subtype-designs-card__title">
-          <AppIcon name="image" size="xs" /> Готовые дизайны подтипа
+          <AppIcon name="image" size="xs" /> Дизайны по размерам подтипа
         </h4>
-        <Button variant="secondary" onClick={openModal}>
-          <AppIcon name="plus" size="xs" /> Добавить дизайн
-        </Button>
       </div>
+      <p className="subtype-designs-card__hint">
+        Для каждого обрезного формата подтипа нужен хотя бы один активный шаблон. Сайт запрашивает каталог с{' '}
+        <code>sizeId</code>, совпадающим с <code>sizes[].id</code> в продукте.
+      </p>
 
-      {error && <p className="subtype-designs-card__error">{error}</p>}
-
-      {loading ? (
-        <p className="subtype-designs-card__hint">Загрузка…</p>
-      ) : links.length === 0 ? (
-        <p className="subtype-designs-card__hint">
-          Дизайны не привязаны. Нажмите «Добавить дизайн», чтобы выбрать шаблон из каталога — он будет
-          предлагаться для этого подтипа. Размер макета в шаблоне желательно совпадать с обрезными
-          форматами подтипа (иначе будет предупреждение).
-        </p>
-      ) : (
-        <div className="subtype-designs-grid">
-          {links.map((link) => (
-            <div key={link.id} className="subtype-designs-item">
-              <div className="subtype-designs-item__preview">
-                {link.preview_url ? (
-                  <img
-                    src={link.preview_url}
-                    alt={link.name}
-                    className="subtype-designs-item__img"
-                  />
-                ) : (
-                  <div className="subtype-designs-item__no-preview">
-                    <AppIcon name="image" size="sm" />
-                  </div>
-                )}
-              </div>
-              <div className="subtype-designs-item__name">{link.name}</div>
-              <button
-                type="button"
-                className="subtype-designs-item__remove"
-                onClick={() => void handleRemove(link.id)}
-                title="Убрать из подтипа"
-              >
-                <AppIcon name="x" size="xs" />
-              </button>
-            </div>
-          ))}
+      {sizesMissingDesigns.length > 0 && (
+        <div className="subtype-designs-coverage-alert" role="alert">
+          <strong>Нет дизайнов для размеров:</strong>{' '}
+          {sizesMissingDesigns.map((s) => s.label || String(s.id)).join(', ')}
         </div>
       )}
 
-      {/* ── Модалка выбора дизайна ── */}
-      {modalOpen && (
+      {error && <p className="subtype-designs-card__error">{error}</p>}
+      {loading && <p className="subtype-designs-card__hint">Загрузка…</p>}
+
+      <div className="subtype-designs-by-size">
+        {subtypeSizes.map((size) => {
+          const sizeKey = String(size.id)
+          const sizeLinks = linksBySize.get(sizeKey) ?? []
+          const missing = sizeLinks.length === 0
+          return (
+            <section
+              key={sizeKey}
+              className={`subtype-designs-size-block${missing ? ' subtype-designs-size-block--missing' : ''}`}
+            >
+              <div className="subtype-designs-size-block__header">
+                <div>
+                  <h5>{size.label || sizeKey}</h5>
+                  <span className="subtype-designs-size-block__meta">
+                    {size.width_mm}×{size.height_mm} мм · id: <code>{sizeKey}</code>
+                  </span>
+                </div>
+                <Button variant="secondary" onClick={() => void openModalForSize(sizeKey)}>
+                  <AppIcon name="plus" size="xs" /> Добавить
+                </Button>
+              </div>
+              {missing ? (
+                <p className="subtype-designs-card__hint">Нет привязанных шаблонов — клиент не увидит макеты для этого размера.</p>
+              ) : (
+                <div className="subtype-designs-grid">
+                  {sizeLinks.map((link) => (
+                    <div key={link.id} className="subtype-designs-item">
+                      <div className="subtype-designs-item__preview">
+                        {link.preview_url ? (
+                          <img src={link.preview_url} alt={link.name} className="subtype-designs-item__img" />
+                        ) : (
+                          <div className="subtype-designs-item__no-preview">
+                            <AppIcon name="image" size="sm" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="subtype-designs-item__name">{link.name}</div>
+                      <button
+                        type="button"
+                        className="subtype-designs-item__remove"
+                        onClick={() => void handleRemove(link.id)}
+                        title="Убрать с этого размера"
+                      >
+                        <AppIcon name="x" size="xs" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )
+        })}
+      </div>
+
+      {legacyLinks.length > 0 && (
+        <section className="subtype-designs-legacy">
+          <h5>Устаревшие привязки (без размера)</h5>
+          <p className="subtype-designs-card__hint">
+            Перенесите шаблоны в блоки размеров выше и удалите старые связи.
+          </p>
+          <div className="subtype-designs-grid">
+            {legacyLinks.map((link) => (
+              <div key={link.id} className="subtype-designs-item">
+                <div className="subtype-designs-item__name">{link.name}</div>
+                <button type="button" className="subtype-designs-item__remove" onClick={() => void handleRemove(link.id)}>
+                  <AppIcon name="x" size="xs" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {modalOpen && modalSizeId && (
         <div className="subtype-designs-modal-overlay" onClick={() => setModalOpen(false)}>
-          <div
-            className="subtype-designs-modal"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-          >
+          <div className="subtype-designs-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="subtype-designs-modal__header">
-              <h3 className="subtype-designs-modal__title">Выбрать дизайн из каталога</h3>
-              <button
-                type="button"
-                className="subtype-designs-modal__close"
-                onClick={() => setModalOpen(false)}
-              >
+              <h3 className="subtype-designs-modal__title">
+                Дизайн для «{modalSize?.label ?? modalSizeId}»
+              </h3>
+              <button type="button" className="subtype-designs-modal__close" onClick={() => setModalOpen(false)}>
                 <AppIcon name="x" size="sm" />
               </button>
             </div>
+            <p className="subtype-designs-modal__hint">
+              sizeId для сайта: <code>{modalSizeId}</code>
+              {modalSize ? ` · ${modalSize.width_mm}×${modalSize.height_mm} мм` : ''}
+            </p>
 
             {loadingTemplates ? (
               <p className="subtype-designs-modal__hint">Загрузка каталога…</p>
             ) : allTemplates.length === 0 ? (
               <p className="subtype-designs-modal__hint">
-                Нет доступных дизайн-шаблонов. Создайте их в разделе{' '}
+                Нет шаблонов. Создайте в{' '}
                 <a href="/adminpanel/design-templates" target="_blank" rel="noopener noreferrer">
-                  Дизайн-шаблоны
+                  каталоге шаблонов
                 </a>
                 .
               </p>
@@ -210,17 +289,10 @@ export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
                 {allTemplates.map((t) => {
                   const alreadyLinked = linkedIds.has(t.id)
                   return (
-                    <div
-                      key={t.id}
-                      className={`subtype-designs-modal-item${alreadyLinked ? ' is-linked' : ''}`}
-                    >
+                    <div key={t.id} className={`subtype-designs-modal-item${alreadyLinked ? ' is-linked' : ''}`}>
                       <div className="subtype-designs-modal-item__preview">
                         {t.preview_url ? (
-                          <img
-                            src={t.preview_url}
-                            alt={t.name}
-                            className="subtype-designs-item__img"
-                          />
+                          <img src={t.preview_url} alt={t.name} className="subtype-designs-item__img" />
                         ) : (
                           <div className="subtype-designs-item__no-preview">
                             <AppIcon name="image" size="sm" />
@@ -228,19 +300,12 @@ export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
                         )}
                       </div>
                       <div className="subtype-designs-modal-item__name">{t.name}</div>
-                      {t.category && (
-                        <div className="subtype-designs-modal-item__cat">{t.category}</div>
-                      )}
                       <Button
                         variant={alreadyLinked ? 'secondary' : 'primary'}
-                        onClick={() => !alreadyLinked && void handleAdd(t.id)}
+                        onClick={() => !alreadyLinked && void handleAdd(t.id, modalSizeId)}
                         disabled={alreadyLinked || adding === t.id}
                       >
-                        {alreadyLinked
-                          ? '✓ Привязан'
-                          : adding === t.id
-                            ? 'Добавление…'
-                            : 'Прикрепить'}
+                        {alreadyLinked ? '✓ Привязан' : adding === t.id ? 'Добавление…' : 'Прикрепить'}
                       </Button>
                     </div>
                   )

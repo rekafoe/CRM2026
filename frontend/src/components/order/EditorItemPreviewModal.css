@@ -86,6 +86,83 @@
   border-radius: 12px;
 }
 
+.editor-preview-modal__layout-issues {
+  margin: 12px 20px 0;
+  padding: 12px 14px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 12px;
+  font-size: 13px;
+  color: #78350f;
+}
+
+.editor-preview-modal__layout-issues strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.editor-preview-modal__layout-issues ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.editor-preview-modal__issue--error {
+  color: #991b1b;
+}
+
+.editor-preview-modal__review-path {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #92400e;
+}
+
+.editor-preview-modal__production {
+  margin: 12px 20px 0;
+  padding: 12px 14px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  font-size: 13px;
+  color: #0c4a6e;
+}
+
+.editor-preview-modal__production-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.editor-preview-modal__production-header h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.editor-preview-modal__production-hint {
+  margin: 0;
+  color: #475569;
+}
+
+.editor-preview-modal__production-jobs,
+.editor-preview-modal__production-files {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.editor-preview-modal__production-file-link {
+  padding: 0;
+  color: #1d4ed8;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .editor-preview-modal__loading {
   padding: 36px 20px;
   color: #64748b;

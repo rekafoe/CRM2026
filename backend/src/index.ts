@@ -23,6 +23,7 @@ import { startOrderFilesCleanup } from './services/orderFilesCleanupService'
 import { startStorageMonitor } from './services/storageMonitorService'
 import { logger } from './utils/logger'
 import { startMailOutboxWorker } from './services/mailOutboxWorker'
+import { startEditorProductionWorker } from './services/editorProductionWorker'
 import { startSmsDebounceWorker } from './services/smsDebounceWorker'
 import { startCampaignWorker } from './modules/campaigns/services/campaignWorker'
 import { AuthController } from './controllers'
@@ -288,6 +289,7 @@ async function startServer() {
       startMailOutboxWorker()
       startSmsDebounceWorker()
       startCampaignWorker()
+      startEditorProductionWorker()
       logger.info(`Server running on port ${port}`)
       logger.info(`Uploads directory: ${uploadsDir}`)
       const tgMode = !telegramConfig.enabled
