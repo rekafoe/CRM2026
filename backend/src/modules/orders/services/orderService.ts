@@ -19,6 +19,7 @@ import { PriceTypeService } from '../../pricing/services/priceTypeService'
 import { tryEnqueueOrderStatusEmail } from '../../../services/orderStatusEmailService'
 import { tryScheduleOrderStatusSms } from '../../../services/orderStatusSmsService'
 import { tryNotifyTelegramOrderStatusForMiniappOrder } from '../../../services/miniappOrderStatusTelegramService'
+import { trySyncWebsiteOrderStatusFromCrm } from '../../../services/websiteOrderStatusSyncService'
 import { logger } from '../../../utils/logger'
 import { MINIAPP_CHECKOUT_STATE_FINALIZED, type MiniappCheckoutState } from '../../../utils/miniappCheckoutState'
 
@@ -1187,6 +1188,7 @@ export class OrderService {
           oldStatusId,
           newStatusId: targetStatus,
         });
+        void trySyncWebsiteOrderStatusFromCrm(db, id);
 
         const raw = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
         const updated: Order = { ...(raw as Order), items: [] }
@@ -1439,6 +1441,7 @@ export class OrderService {
         const date = String(ord.created_date).slice(0, 10)
         await EarningsService.recalculateForDate(date)
       }
+      void trySyncWebsiteOrderStatusFromCrm(db, id)
       return { softCancelled: true, status: cancelledStatusId }
     } catch (e) {
       await db.run('ROLLBACK')
@@ -1767,6 +1770,7 @@ export class OrderService {
           oldStatusId: old,
           newStatusId: n,
         });
+        void trySyncWebsiteOrderStatusFromCrm(db, row.id);
       }
     }
     

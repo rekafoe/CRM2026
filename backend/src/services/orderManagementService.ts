@@ -3,6 +3,7 @@ import { hasColumn } from '../utils/tableSchemaCache';
 import { PhotoOrderService } from './photoOrderService';
 import { UserOrderPageService } from './userOrderPageService';
 import { NotificationService } from './notificationService';
+import { trySyncWebsiteOrderStatusFromCrm } from './websiteOrderStatusSyncService';
 
 export interface UnifiedOrder {
   id: number;
@@ -536,6 +537,9 @@ export class OrderManagementService {
         }
 
         await db.run('COMMIT');
+        if (orderType === 'website') {
+          void trySyncWebsiteOrderStatusFromCrm(db, orderId);
+        }
       } catch (error) {
         await db.run('ROLLBACK');
         throw error;
