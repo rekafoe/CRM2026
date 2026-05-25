@@ -69,6 +69,7 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'POST', path: /^\/api\/orders\/from-website$/ },
   { method: 'POST', path: /^\/api\/orders\/from-website\/with-files$/ },
   { method: 'POST', path: /^\/api\/orders\/from-website\/[0-9]+\/files$/ },
+  { method: 'GET', path: /^\/api\/orders\/from-website\/[0-9]+\/status$/ },
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/items$/ },
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/prepay$/ },
   // Public design editor: templates are anonymous; draft mutations are checked by WEBSITE_ORDER_API_KEY in route.

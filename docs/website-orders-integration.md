@@ -702,9 +702,13 @@ Payload содержит `crmOrderId`, `crmOrderNumber`, исходные `crmSt
 
 Маппинг по умолчанию:
 
-- `Ожидает` / `Оформлен` → `pending`;
-- `Принят в работу` → `processing`;
+- `Ожидает` → `pending`;
+- `Оформлен` / `Принят в работу` → `processing`;
 - `Выполнен` / `Готов` → `completed`;
 - `Передан в ПВЗ` → `ready`;
 - `Получен в ПВЗ` / `Завершён` → `issued`;
 - статусы отмены → `cancelled`.
+
+**Pull для ЛК (Nest):** `GET /api/orders/from-website/:orderId/status` с тем же `X-API-Key`.
+Эндпоинт должен быть в whitelist `PUBLIC_ROUTE_RULES` (`auth.ts`), иначе глобальный JWT middleware
+вернёт `401 {"message":"Unauthorized"}` до проверки API-ключа.
