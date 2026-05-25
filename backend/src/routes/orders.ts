@@ -161,6 +161,9 @@ router.post('/from-website', requireWebsiteOrderApiKey, asyncHandler(OrderContro
 // Используем uploadMemory + ручная запись буфера, чтобы файлы не сохранялись как 0 КБ.
 router.post('/from-website/with-files', requireWebsiteOrderApiKey, uploadOrderFilesMemory.any(), asyncHandler(OrderController.createOrderFromWebsiteWithFiles))
 
+/** Актуальный статус website-заказа для личного кабинета (pull-синхронизация на localhost). */
+router.get('/from-website/:orderId/status', requireWebsiteOrderApiKey, asyncHandler(OrderController.getWebsiteOrderStatus))
+
 // Загрузка файлов к заказу с сайта (тот же API-ключ; только заказы с source=website)
 router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, uploadOrderFilesMemory.single('file'), asyncHandler(async (req, res) => {
   const orderId = Number(req.params.orderId)

@@ -11,6 +11,7 @@ import {
   prepareWebsiteItemsWithEditorDrafts,
 } from '../../../services/editorDraftWebsitePrepare'
 import { completeEditorOrderIntake } from '../../../services/editorOrderIntakeService'
+import { mapCrmStatusToWebsiteStatus } from '../../../services/websiteOrderStatusSyncService'
 
 function getSafeServerErrorMessage(fallback: string, error: any): string {
   return process.env.NODE_ENV === 'production'
@@ -206,6 +207,48 @@ export class OrderController {
         message: 'Internal server error'
       })
     }
+  }
+
+  /** GET /api/orders/from-website/:orderId/status — статус для личного кабинета сайта. */
+  static async getWebsiteOrderStatus(req: Request, res: Response) {
+    const orderId = Number(req.params.orderId)
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      res.status(400).json({ error: 'Некорректный ID заказа' })
+      return
+    }
+
+    const db = await getDb()
+    const row = await db.get<{
+      id: number
+      number?: string | null
+      source?: string | null
+      status?: number | null
+      statusName?: string | null
+    }>(
+      `SELECT o.id, o.number, o.source, o.status, os.name as statusName
+       FROM orders o
+       LEFT JOIN order_statuses os ON os.id = o.status
+       WHERE o.id = ?`,
+      [orderId]
+    )
+
+    if (!row) {
+      res.status(404).json({ error: 'Заказ не найден' })
+      return
+    }
+    if (row.source !== 'website') {
+      res.status(403).json({ error: 'Статус доступен только для заказов с сайта' })
+      return
+    }
+
+    const crmStatusId = Number(row.status ?? 0)
+    res.json({
+      id: row.id,
+      number: row.number,
+      crmStatusId,
+      crmStatusName: row.statusName ?? null,
+      websiteStatus: mapCrmStatusToWebsiteStatus(crmStatusId, row.statusName),
+    })
   }
 
   /**

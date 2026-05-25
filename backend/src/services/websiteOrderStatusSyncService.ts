@@ -21,7 +21,8 @@ export function mapCrmStatusToWebsiteStatus(statusId: number, statusName?: strin
   if (name.includes('передан') || name.includes('пвз')) return 'ready';
   if (name.includes('получен') || name.includes('заверш')) return 'issued';
   if (name.includes('выполн') || name.includes('готов')) return 'completed';
-  if (name.includes('ожида') || name.includes('оформ') || name.includes('нов')) return 'pending';
+  if (name.includes('ожида') || name.includes('нов')) return 'pending';
+  if (name.includes('оформ')) return 'processing';
 
   switch (Number(statusId)) {
     case 2:
@@ -67,7 +68,14 @@ function statusSyncApiKey(): string | null {
 export async function trySyncWebsiteOrderStatusFromCrm(db: DbLike, orderId: number): Promise<void> {
   const endpoint = statusSyncEndpoint();
   const apiKey = statusSyncApiKey();
-  if (!endpoint || !apiKey) return;
+  if (!endpoint || !apiKey) {
+    logger.warn('Website order status sync skipped: endpoint or API key is not configured', {
+      orderId,
+      hasEndpoint: Boolean(endpoint),
+      hasApiKey: Boolean(apiKey),
+    });
+    return;
+  }
 
   try {
     const row = await db.get<{
