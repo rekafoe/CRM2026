@@ -5,7 +5,7 @@ import { EMPTY_PAGE } from '../../pages/admin/designEditor/constants';
 import type { PageSaveSnapshot } from '../../pages/admin/designEditor/mergePagesSnapshot';
 import { mergeSavedEditorPages } from '../../pages/admin/designEditor/designEditorState';
 import type { DesignPage } from '../../pages/admin/designEditor/types';
-import { getLastInnerSpreadRange, getSpreadInsertIndex } from '../../pages/admin/designEditor/spreadUtils';
+import { buildSpreadPageInsert, getLastInnerSpreadRange } from '../../pages/admin/designEditor/spreadUtils';
 import type { DesignDocumentNavigationState, PublicDesignDocumentMode } from './useDesignDocumentNavigation';
 
 export interface PublicDesignPageSpec {
@@ -109,9 +109,9 @@ export function usePublicDesignPageActions({
 
   const handleAddClientSpread = useCallback(async () => {
     await saveCurrentCanvasPage();
-    const insertAt = spreadMode && documentMode === 'multipage'
-      ? getSpreadInsertIndex(pageSpec.pageCount, coverPages)
-      : pageSpec.pageCount;
+    const { insertAt, addCount } = spreadMode && documentMode === 'multipage'
+      ? buildSpreadPageInsert(pageSpec.pageCount, coverPages)
+      : { insertAt: pageSpec.pageCount, addCount: 2 as const };
     setPages((prev) => {
       const normalized = Array.from(
         { length: pageSpec.pageCount },
@@ -119,13 +119,18 @@ export function usePublicDesignPageActions({
       );
       return [
         ...normalized.slice(0, insertAt),
-        { ...EMPTY_PAGE },
-        { ...EMPTY_PAGE },
+        ...Array.from({ length: addCount }, () => ({ ...EMPTY_PAGE })),
         ...normalized.slice(insertAt),
       ];
     });
-    setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + 2 }));
-    setThumbnails((prev) => shiftThumbnails(shiftThumbnails(prev, insertAt, 1), insertAt, 1));
+    setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + addCount }));
+    setThumbnails((prev) => {
+      let next = prev;
+      for (let i = 0; i < addCount; i += 1) {
+        next = shiftThumbnails(next, insertAt, 1);
+      }
+      return next;
+    });
     setCurrentPage(insertAt);
     markDirty();
   }, [

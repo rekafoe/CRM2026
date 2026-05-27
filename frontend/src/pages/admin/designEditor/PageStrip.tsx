@@ -46,9 +46,12 @@ interface PageStripProps {
   labels?: PageStripLabels;
   /** Компактная полоса для мобильного редактора */
   compact?: boolean;
+  /** Светлая полоса клиентского редактора (без админской тёмной темы) */
+  appearance?: 'admin' | 'client';
 }
 
 const DEFAULT_STRIP_THUMB_H = 82;
+const CLIENT_STRIP_THUMB_H = 68;
 const COMPACT_STRIP_THUMB_H = 56;
 
 export const PageStrip: React.FC<PageStripProps> = ({
@@ -59,6 +62,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
   thumbH,
   spreadMode,
   compact = false,
+  appearance = 'admin',
   onGoTo,
   onAddSpread,
   onAddPage,
@@ -81,7 +85,11 @@ export const PageStrip: React.FC<PageStripProps> = ({
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const activeIdx = findStripItemForPage(items, currentPage);
-  const stripThumbH = compact ? COMPACT_STRIP_THUMB_H : DEFAULT_STRIP_THUMB_H;
+  const stripThumbH = compact
+    ? COMPACT_STRIP_THUMB_H
+    : appearance === 'client'
+      ? CLIENT_STRIP_THUMB_H
+      : DEFAULT_STRIP_THUMB_H;
 
   const updateScrollState = useCallback(() => {
     const strip = stripRef.current;
@@ -144,7 +152,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
   };
 
   return (
-    <div className={`ps-root${collapsed ? ' is-collapsed' : ''}${compact ? ' ps-root--compact' : ''}`}>
+    <div className={`ps-root${collapsed ? ' is-collapsed' : ''}${compact ? ' ps-root--compact' : ''}${appearance === 'client' ? ' ps-root--client' : ''}`}>
       {/* Заголовок */}
       <div className="ps-header">
         <div className="ps-header-left">
@@ -264,30 +272,11 @@ export const PageStrip: React.FC<PageStripProps> = ({
                     className="psitem-main"
                     onClick={() => onGoTo(item.goToPage)}
                   >
-                    {isSpread ? (
-                      <div className="psitem-thumbs psitem-thumbs--spread" style={{ width: thumbsW, height: stripThumbH }}>
-                        {thumbnails[item.pages[0]] || thumbnails[item.pages[1]] ? (
-                          <img
-                            src={thumbnails[item.pages[0]] || thumbnails[item.pages[1]]}
-                            alt=""
-                            className="psitem-img psitem-img--spread"
-                            draggable={false}
-                          />
-                        ) : (
-                          <div className="psitem-blank">
-                            <svg width="16" height="20" viewBox="0 0 16 20" fill="none" opacity="0.3">
-                              <rect x="1" y="1" width="14" height="18" rx="2" stroke="#888" strokeWidth="1.5"/>
-                              <line x1="4" y1="7" x2="12" y2="7" stroke="#888" strokeWidth="1"/>
-                              <line x1="4" y1="10" x2="12" y2="10" stroke="#888" strokeWidth="1"/>
-                              <line x1="4" y1="13" x2="9" y2="13" stroke="#888" strokeWidth="1"/>
-                            </svg>
-                          </div>
-                        )}
-                        <div className="psitem-spine" />
-                      </div>
-                    ) : (
-                      <div className="psitem-thumbs" style={{ width: thumbsW, height: stripThumbH }}>
-                        {item.pages.map((pIdx) => (
+                    <div
+                      className={`psitem-thumbs${isSpread ? ' psitem-thumbs--spread' : ''}`}
+                      style={{ width: thumbsW, height: stripThumbH }}
+                    >
+                      {item.pages.map((pIdx) => (
                         <div
                           key={pIdx}
                           className="psitem-page"
@@ -318,8 +307,8 @@ export const PageStrip: React.FC<PageStripProps> = ({
                           )}
                         </div>
                       ))}
+                      {isSpread && <div className="psitem-spine" aria-hidden="true" />}
                     </div>
-                    )}
                     <span className="psitem-label">{item.label}</span>
                     {itemStatus && <span className={`psitem-status-label psitem-status-label--${itemStatus.tone}`}>{itemStatus.label}</span>}
                   </button>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '../../../components/common'
 import { AppIcon } from '../../../components/ui/AppIcon'
 import {
@@ -169,6 +170,12 @@ export const SubtypeDesignsCard: React.FC<SubtypeDesignsCardProps> = ({
         <h4 className="subtype-designs-card__title">
           <AppIcon name="image" size="xs" /> Дизайны по размерам подтипа
         </h4>
+        <Link
+          className="subtype-designs-card__matrix-link"
+          to={`/adminpanel/design-templates?tab=bindings&productId=${productId}&typeId=${typeId}`}
+        >
+          <AppIcon name="link" size="xs" /> Полная матрица в каталоге
+        </Link>
       </div>
       <p className="subtype-designs-card__hint">
         Для каждого обрезного формата подтипа нужен хотя бы один активный шаблон. Сайт запрашивает каталог с{' '}

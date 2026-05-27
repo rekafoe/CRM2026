@@ -126,6 +126,11 @@ export const PublicDesignAdvancedTools: React.FC<PublicDesignAdvancedToolsProps>
     onDirty();
   }, [canvasHandleRef, onDirty]);
 
+  const handleAddTextPreset = useCallback((kind: Parameters<NonNullable<DesignEditorCanvasHandle['addTextPreset']>>[0]) => {
+    canvasHandleRef.current?.addTextPreset(kind);
+    onDirty();
+  }, [canvasHandleRef, onDirty]);
+
   return (
     <section className="public-design-editor__advanced-tools" aria-label="Инструменты макета">
       <div className="public-design-editor__advanced-tabs">
@@ -159,7 +164,7 @@ export const PublicDesignAdvancedTools: React.FC<PublicDesignAdvancedToolsProps>
                   <ClientTextToolPanel
                     selectedObj={selectedObj}
                     fontOptions={fontOptions}
-                    onAddTextPreset={(kind) => canvasHandleRef.current?.addTextPreset(kind)}
+                    onAddTextPreset={handleAddTextPreset}
                     onTextChange={(text) => {
                       canvasHandleRef.current?.setTextProp('text', text);
                       onDirty();

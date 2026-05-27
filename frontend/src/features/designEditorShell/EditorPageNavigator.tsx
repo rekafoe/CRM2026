@@ -36,6 +36,8 @@ interface EditorPageNavigatorProps {
   onSpreadModeToggle: () => void;
   onCollapse: () => void;
   compact?: boolean;
+  appearance?: 'admin' | 'client';
+  showInfoLine?: boolean;
 }
 
 export const EditorPageNavigator: React.FC<EditorPageNavigatorProps> = ({
@@ -67,6 +69,8 @@ export const EditorPageNavigator: React.FC<EditorPageNavigatorProps> = ({
   onSpreadModeToggle,
   onCollapse,
   compact = false,
+  appearance = 'admin',
+  showInfoLine = true,
 }) => {
   if (!showWhenSingle && pageCount <= 1 && !canAddPages && !canAddSpread) return null;
 
@@ -109,13 +113,14 @@ export const EditorPageNavigator: React.FC<EditorPageNavigatorProps> = ({
         canAddPage={canAddPages}
         canAddSpread={canAddSpread}
         onSpreadModeToggle={onSpreadModeToggle}
-        infoLine={`${pageWidth}×${pageHeight} мм · ${Math.round(zoom * 100)}%`}
+        infoLine={showInfoLine ? `${pageWidth}×${pageHeight} мм · ${Math.round(zoom * 100)}%` : undefined}
         collapsed={collapsed}
         onCollapse={onCollapse}
         pageStatuses={pageStatuses}
         titleLabel={titleLabel}
         labels={labels}
         compact={compact}
+        appearance={appearance}
       />
     </div>
   );

@@ -97,6 +97,82 @@ export function getSpreadInsertIndex(pageCount: number, coverPages = 1): number 
   return pageCount > covers ? pageCount - 1 : pageCount;
 }
 
+/** Число внутренних страниц между обложками (без лицевой и задней). */
+export function countInnerSpreadPages(pageCount: number, coverPages = 1): number {
+  const covers = Math.min(coverPages, pageCount);
+  if (pageCount <= covers + 1) return 0;
+  return pageCount - covers - 1;
+}
+
+/**
+ * В режиме разворотов между обложками должно быть чётное число страниц.
+ * Иначе в полосе появляется «разворот» из одной страницы, а «Добавить разворот» даёт +1, а не +2.
+ */
+export function ensureEvenInnerSpreadPages<T>(
+  pages: T[],
+  pageCount: number,
+  coverPages: number,
+  createEmptyPage: () => T,
+): { pages: T[]; pageCount: number } {
+  const covers = Math.min(coverPages, pageCount);
+  const normalized = Array.from({ length: pageCount }, (_, index) => pages[index] ?? createEmptyPage());
+  if (pageCount <= covers + 1) {
+    return { pages: normalized, pageCount };
+  }
+  const innerCount = pageCount - covers - 1;
+  if (innerCount % 2 === 0) {
+    return { pages: normalized, pageCount };
+  }
+  const insertAt = pageCount - 1;
+  return {
+    pages: [
+      ...normalized.slice(0, insertAt),
+      createEmptyPage(),
+      ...normalized.slice(insertAt),
+    ],
+    pageCount: pageCount + 1,
+  };
+}
+
+/** Вставка нового разворота: всегда 2 страницы перед задней обложкой. */
+export function buildSpreadPageInsert(
+  pageCount: number,
+  coverPages: number,
+): { insertAt: number; addCount: 2 } {
+  return {
+    insertAt: getSpreadInsertIndex(pageCount, coverPages),
+    addCount: 2,
+  };
+}
+
+export function needsInnerSpreadPadding(pageCount: number, coverPages = 1): boolean {
+  return countInnerSpreadPages(pageCount, coverPages) % 2 === 1;
+}
+
+/**
+ * Подготовка макета и вставка разворота (+2 стр.) перед задней обложкой.
+ * Сначала выравнивает нечётное число внутренних страниц (если нужно), затем добавляет пару.
+ */
+export function appendSpreadPages<T>(
+  pages: T[],
+  pageCount: number,
+  coverPages: number,
+  createEmptyPage: () => T,
+): { pages: T[]; pageCount: number; insertAt: number } {
+  const even = ensureEvenInnerSpreadPages(pages, pageCount, coverPages, createEmptyPage);
+  const { insertAt, addCount } = buildSpreadPageInsert(even.pageCount, coverPages);
+  return {
+    pages: [
+      ...even.pages.slice(0, insertAt),
+      createEmptyPage(),
+      createEmptyPage(),
+      ...even.pages.slice(insertAt),
+    ],
+    pageCount: even.pageCount + addCount,
+    insertAt,
+  };
+}
+
 /** Последний внутренний блок (разворот или одиночная) перед задней обложкой — для удаления. */
 export function getLastInnerSpreadRange(
   pageCount: number,
@@ -121,4 +197,10 @@ export function getLastInnerSpreadRange(
 
   if (!last || pageCount - last.length < covers + 1) return null;
   return last;
+}
+
+/** Индекс страницы для перехода по полосе (разворот → левая страница пары). */
+export function resolveStripGoToPage(stripItems: StripItem[], pageIndex: number): number {
+  const item = stripItems.find((entry) => entry.pages.includes(pageIndex));
+  return item?.goToPage ?? pageIndex;
 }

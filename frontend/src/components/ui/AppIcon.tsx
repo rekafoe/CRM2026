@@ -23,7 +23,8 @@ export type IconName =
   | 'shield' | 'arrow-left'
   | 'info' | 'warning'
   | 'power'
-  | 'tag';
+  | 'tag'
+  | 'link';
 
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -92,6 +93,7 @@ const iconPaths: Record<IconName, string> = {
   warning: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01',
   power: 'M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10',
   tag: 'M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82zM7 7h.01',
+  link: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
 };
 
 export const AppIcon: React.FC<AppIconProps> = ({

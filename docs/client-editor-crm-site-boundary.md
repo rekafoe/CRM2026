@@ -24,6 +24,17 @@ flowchart TD
   draft --> orderPool
 ```
 
+### Четыре экрана сайта (контекст для API)
+
+| # | Экран | CRM |
+|---|--------|-----|
+| 1 | Продукт | `productId`, `design_editor_mode` |
+| 2 | Подтип | `typeId` из `types[]` |
+| 3 | Галерея макетов | `GET /api/design-templates/public?productId&typeId` (+ `sizeId`) |
+| 4 | Калькулятор → редактор | `calculate`, `GET public/:id`, `POST/PATCH` draft |
+
+Полная матрица id, примеры запросов, превью и smoke-проверка: **[site-design-gallery-integration.md](./site-design-gallery-integration.md)**.
+
 ## Что остаётся в CRM
 
 CRM должна отвечать за данные и операции, которые нужны производству:
@@ -93,7 +104,7 @@ Backend сайта не должен рендерить редактор. Его
 {
   "cartItemId": "site-cart-item-123",
   "productId": 58,
-  "typeId": "business_cards_standard",
+  "typeId": 1,
   "sizeId": "90x50",
   "quantity": 100,
   "calculatorConfig": {},
@@ -127,7 +138,7 @@ Backend сайта не должен рендерить редактор. Его
 
 ## Что нужно доделать на сайте
 
-1. Backend-proxy для editor API:
+1. Backend-proxy для editor API (см. [site-design-gallery-integration.md](./site-design-gallery-integration.md)):
    - `GET` публичных шаблонов;
    - `POST/PATCH` draft;
    - upload draft-файлов;

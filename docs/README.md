@@ -42,6 +42,8 @@ npm run dev  # Запуск на порту 5173
 - [📦 Materials](./materials.md) - Управление материалами
 - [📊 Reports](./reports.md) - Отчеты и аналитика
 - [👥 Users](./users.md) - Пользователи и роли
+- [🎨 Галерея дизайнов на сайте](./site-design-gallery-integration.md) - 4 экрана, `productId`/`typeId`/`sizeId`, public API
+- [📐 Каталог шаблонов CRM](./design-templates-catalog.md) - автор, плата в бел. руб., привязки к размерам, `design_author` в ЗП
 
 ## 🛠️ Технологии
 

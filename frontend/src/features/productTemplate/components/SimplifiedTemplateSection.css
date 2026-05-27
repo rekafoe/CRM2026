@@ -1783,6 +1783,20 @@
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.subtype-designs-card__matrix-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.subtype-designs-card__matrix-link:hover {
+  text-decoration: underline;
 }
 
 .subtype-designs-card__title {

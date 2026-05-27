@@ -1,6 +1,12 @@
 import type { Item } from '../../types';
+import { formatBynAmount } from '../../pages/admin/designTemplates/designTemplateCatalogUtils';
 
 export type EditorItemKind = 'designState' | 'photoBatch' | 'clientFiles' | 'noLayout';
+
+export type DesignTemplateRoyaltyInfo = {
+  authorName?: string | null;
+  authorPayoutPerUnit?: number | null;
+};
 
 export interface EditorLayoutIssue {
   id: string;
@@ -21,7 +27,10 @@ export interface EditorItemSummary {
   layoutReviewPath?: string;
 }
 
-export function getEditorItemSummary(item: Item): EditorItemSummary {
+export function getEditorItemSummary(
+  item: Item,
+  designRoyalty?: DesignTemplateRoyaltyInfo | null,
+): EditorItemSummary {
   const params = item.params ?? {};
   const photoBatch = params.photoBatch;
   const designState = params.designState;
@@ -47,12 +56,15 @@ export function getEditorItemSummary(item: Item): EditorItemSummary {
     const layoutReviewPath = typeof params.layoutReviewPath === 'string'
       ? params.layoutReviewPath
       : undefined;
+    const royaltySuffix = designRoyalty?.authorName && designRoyalty.authorPayoutPerUnit != null
+      ? ` · автор ${designRoyalty.authorName} · ${formatBynAmount(designRoyalty.authorPayoutPerUnit)}/ед. (внутр.)`
+      : '';
     return {
       kind: 'designState',
       label: 'Макет из редактора',
       detail: layoutIncomplete
-        ? `${pageCount} стр. · макет неполный`
-        : `${pageCount} стр. · шаблон ${params.designTemplateId ?? '—'}`,
+        ? `${pageCount} стр. · макет неполный${royaltySuffix}`
+        : `${pageCount} стр. · шаблон ${params.designTemplateId ?? '—'}${royaltySuffix}`,
       pages: pageCount,
       layoutIncomplete,
       layoutIssues,

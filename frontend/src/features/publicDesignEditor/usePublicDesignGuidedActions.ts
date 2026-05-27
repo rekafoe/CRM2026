@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { RefObject } from 'react';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
+import { resolveStripGoToPage } from '../../pages/admin/designEditor/spreadUtils';
 import type { DesignDocumentNavigationState } from './useDesignDocumentNavigation';
 import type {
   PublicEditorPreflightField,
@@ -63,7 +64,7 @@ export function usePublicDesignGuidedActions({
       item.pages.includes(currentPage) && item.pages.includes(action.pageIndex));
     if (needsPageSwitch) {
       setPendingTaskAction(action);
-      await onGoToPage(action.pageIndex);
+      await onGoToPage(resolveStripGoToPage(navigation.stripItems, action.pageIndex));
       return;
     }
     window.setTimeout(() => {
@@ -111,8 +112,16 @@ export function usePublicDesignGuidedActions({
       handleFieldFocus(textField, 'text');
       return;
     }
-    void onGoToPage(issue.pageIndex);
-  }, [handleFieldFocus, onGoToPage, preflight.photoFields, preflight.textFields]);
+    setActiveTaskTab('check');
+    void onGoToPage(resolveStripGoToPage(navigation.stripItems, issue.pageIndex));
+  }, [
+    handleFieldFocus,
+    navigation.stripItems,
+    onGoToPage,
+    preflight.photoFields,
+    preflight.textFields,
+    setActiveTaskTab,
+  ]);
 
   const handleNextAction = useCallback(() => {
     if (editorNextAction.kind === 'replacePhoto') {

@@ -7,9 +7,12 @@ import type {
 } from './publicDesignPreflight';
 import type { SidebarPhotoItem } from '../../pages/admin/designEditor/types';
 
+export type PublicDesignInspectorPanel = 'all' | 'photos' | 'text';
+
 interface PublicDesignInspectorProps {
   fragmentLabel: string;
   fragmentPreflight: PublicEditorPreflightSummary;
+  panel: PublicDesignInspectorPanel;
   saving: boolean;
   nextAction: PublicEditorNextAction;
   sidebarPhotos: SidebarPhotoItem[];
@@ -26,9 +29,22 @@ interface PublicDesignInspectorProps {
   onPlaceSelectedPhoto?: (field: PublicEditorPreflightField) => void;
 }
 
+const PHOTO_FIELD_STATUS_LABELS: Record<PublicEditorPreflightField['status'], string> = {
+  ready: 'Заполнено',
+  missing: 'Нужно фото',
+  warning: 'Проверьте',
+};
+
+const TEXT_FIELD_STATUS_LABELS: Record<PublicEditorPreflightField['status'], string> = {
+  ready: 'Заполнен',
+  missing: 'Нужен текст',
+  warning: 'Проверьте',
+};
+
 export const PublicDesignInspector: React.FC<PublicDesignInspectorProps> = ({
   fragmentLabel,
   fragmentPreflight,
+  panel,
   saving,
   nextAction,
   sidebarPhotos,
@@ -44,78 +60,123 @@ export const PublicDesignInspector: React.FC<PublicDesignInspectorProps> = ({
   onPhotoReplace,
   onPlaceSelectedPhoto,
 }) => {
+  const showPhotos = panel === 'all' || panel === 'photos';
+  const showText = panel === 'all' || panel === 'text';
   const selectedPhoto = selectedPhotoId
     ? sidebarPhotos.find((photo) => photo.id === selectedPhotoId)
     : null;
   const photoFields = fragmentPreflight.photoFields;
+  const textFields = fragmentPreflight.textFields;
   const missingPhotoCount = Math.max(0, fragmentPreflight.photoTotal - fragmentPreflight.photoReady);
+  const missingTextCount = Math.max(0, fragmentPreflight.textTotal - fragmentPreflight.textReady);
   const hasPhotoFields = photoFields.length > 0;
+  const hasTextFields = textFields.length > 0;
+
+  const sidepanelClassName = [
+    'public-design-editor__sidepanel',
+    panel === 'text' ? 'public-design-editor__sidepanel--text' : 'public-design-editor__sidepanel--photos',
+  ].join(' ');
+
+  const ariaLabel = panel === 'text' ? 'Текст в макете' : 'Фото для макета';
 
   return (
-    <aside className="public-design-editor__sidepanel public-design-editor__sidepanel--photos" aria-label="Фото для макета">
-      <header className="public-design-editor__photo-assistant-head">
-        <span>Фото для макета</span>
-        <strong>{sidebarPhotos.length > 0 ? 'Выберите фото и поставьте в поле' : 'Сначала загрузите фото'}</strong>
-        <p>
-          {selectedPhoto
-            ? `Выбрано: ${selectedPhoto.name}. Нажмите поле ниже или перетащите фото на макет.`
-            : 'Добавьте изображения, затем перетащите их на макет или выберите фото для нужного поля.'}
-        </p>
-      </header>
+    <aside className={sidepanelClassName} aria-label={ariaLabel}>
+      {showPhotos && (
+        <>
+          <header className="public-design-editor__photo-assistant-head">
+            <span>Фото для макета</span>
+            <strong>{sidebarPhotos.length > 0 ? 'Выберите фото и поставьте в поле' : 'Сначала загрузите фото'}</strong>
+            <p>
+              {selectedPhoto
+                ? `Выбрано: ${selectedPhoto.name}. Нажмите поле ниже или перетащите фото на макет.`
+                : 'Добавьте изображения, затем перетащите их на макет или выберите фото для нужного поля.'}
+            </p>
+          </header>
 
-      <div className="public-design-editor__inspector-section public-design-editor__inspector-section--photos">
-        <PublicDesignPhotoLibrary
-          photos={sidebarPhotos}
-          selectedPhotoId={selectedPhotoId}
-          onFilesSelected={onFilesSelected}
-          onPhotoClick={onPhotoClick}
-          onPhotoSelect={onPhotoSelect}
-          onPhotoRemove={onPhotoRemove}
-          onPhotoRetry={onPhotoRetry}
-        />
+          <div className="public-design-editor__inspector-section public-design-editor__inspector-section--photos">
+            <PublicDesignPhotoLibrary
+              photos={sidebarPhotos}
+              selectedPhotoId={selectedPhotoId}
+              onFilesSelected={onFilesSelected}
+              onPhotoClick={onPhotoClick}
+              onPhotoSelect={onPhotoSelect}
+              onPhotoRemove={onPhotoRemove}
+              onPhotoRetry={onPhotoRetry}
+            />
 
-        {hasPhotoFields && (
-          <PhotoFieldTargets
+            {hasPhotoFields && (
+              <PhotoFieldTargets
+                fragmentLabel={fragmentLabel}
+                fields={photoFields}
+                missingCount={missingPhotoCount}
+                hasSelectedPhoto={!!selectedPhoto}
+                onFieldFocus={onFieldFocus}
+                onPhotoReplace={onPhotoReplace}
+                onPlaceSelectedPhoto={onPlaceSelectedPhoto}
+              />
+            )}
+
+            {(panel === 'all' || panel === 'photos') && nextAction.kind !== 'readyForCart' && (
+              <button
+                type="button"
+                className="public-design-editor__photo-assistant-order"
+                onClick={onNextAction}
+                disabled={saving}
+              >
+                {nextAction.label}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {showText && (
+        <div className="public-design-editor__inspector-section public-design-editor__inspector-section--text">
+          <header className="public-design-editor__text-assistant-head">
+            <span>Текст в макете</span>
+            <strong>
+              {missingTextCount > 0
+                ? `Осталось заполнить ${missingTextCount}`
+                : hasTextFields
+                  ? 'Все текстовые поля заполнены'
+                  : 'Нет редактируемого текста'}
+            </strong>
+            <p>Нажмите поле — откроется макет, можно править текст и оформление.</p>
+          </header>
+
+          <TextFieldTargets
             fragmentLabel={fragmentLabel}
-            fields={photoFields}
-            missingCount={missingPhotoCount}
-            hasSelectedPhoto={!!selectedPhoto}
+            fields={textFields}
+            missingCount={missingTextCount}
             onFieldFocus={onFieldFocus}
-            onPhotoReplace={onPhotoReplace}
-            onPlaceSelectedPhoto={onPlaceSelectedPhoto}
           />
-        )}
 
-        {nextAction.kind !== 'readyForCart' && (
-          <button
-            type="button"
-            className="public-design-editor__photo-assistant-order"
-            onClick={onNextAction}
-            disabled={saving}
-          >
-            {nextAction.label}
-          </button>
-        )}
-      </div>
+          {panel === 'text' && nextAction.kind === 'editText' && (
+            <button
+              type="button"
+              className="public-design-editor__photo-assistant-order"
+              onClick={onNextAction}
+              disabled={saving}
+            >
+              {nextAction.label}
+            </button>
+          )}
+        </div>
+      )}
 
-      {helpOpen && (
+      {helpOpen && panel === 'all' && (
         <section className="public-design-editor__help">
           <h2>Как пользоваться редактором</h2>
           <ul>
             <li>Загрузите фото в правой панели.</li>
             <li>Перетащите фото на макет или нажмите «Поставить» у нужного поля.</li>
+            <li>Текстовые поля — в блоке «Текст в макете»; на телефоне вкладка «Текст» внизу.</li>
             <li>Финальная проверка откроется перед оформлением заказа.</li>
           </ul>
         </section>
       )}
     </aside>
   );
-};
-
-const FIELD_STATUS_LABELS: Record<PublicEditorPreflightField['status'], string> = {
-  ready: 'Заполнено',
-  missing: 'Нужно фото',
-  warning: 'Проверьте',
 };
 
 const PhotoFieldTargets: React.FC<{
@@ -161,7 +222,7 @@ const PhotoFieldTargets: React.FC<{
                 onClick={() => onFieldFocus(field, 'photo')}
               >
                 <span>{field.label}</span>
-                <strong>{FIELD_STATUS_LABELS[field.status]}</strong>
+                <strong>{PHOTO_FIELD_STATUS_LABELS[field.status]}</strong>
               </button>
               <div className="public-design-editor__photo-target-actions">
                 {hasSelectedPhoto && onPlaceSelectedPhoto && (
@@ -173,6 +234,56 @@ const PhotoFieldTargets: React.FC<{
                   {field.status === 'ready' ? 'Заменить' : 'Выбрать'}
                 </button>
               </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+};
+
+const TextFieldTargets: React.FC<{
+  fragmentLabel: string;
+  fields: PublicEditorPreflightField[];
+  missingCount: number;
+  onFieldFocus: (field: PublicEditorPreflightField, kind: 'photo' | 'text') => void;
+}> = ({ fragmentLabel, fields, missingCount, onFieldFocus }) => {
+  const visibleFields = fields
+    .filter((field) => field.status !== 'ready')
+    .concat(fields.filter((field) => field.status === 'ready'))
+    .slice(0, 8);
+
+  return (
+    <section className="public-design-editor__text-targets" aria-label="Текстовые поля текущей части макета">
+      <div className="public-design-editor__photo-targets-head">
+        <span>{fragmentLabel}</span>
+        <strong>{missingCount > 0 ? `Осталось ${missingCount}` : 'Текст заполнен'}</strong>
+      </div>
+      {fields.length === 0 ? (
+        <p className="public-design-editor__photo-targets-empty">В этой части макета нет текстовых полей.</p>
+      ) : (
+        <div className="public-design-editor__photo-targets-list">
+          {visibleFields.map((field) => (
+            <article
+              key={`text-${field.pageIndex}-${field.id}`}
+              className={`public-design-editor__photo-target public-design-editor__photo-target--${field.status}`}
+            >
+              <button
+                type="button"
+                className="public-design-editor__photo-target-main"
+                onClick={() => onFieldFocus(field, 'text')}
+              >
+                <span title={field.label}>{field.label}</span>
+                <strong>{TEXT_FIELD_STATUS_LABELS[field.status]}</strong>
+              </button>
+              <div className="public-design-editor__photo-target-actions">
+                <button type="button" onClick={() => onFieldFocus(field, 'text')}>
+                  {field.status === 'ready' ? 'Изменить' : 'Заполнить'}
+                </button>
+              </div>
+              {field.status === 'warning' && field.detail && (
+                <p className="public-design-editor__text-target-hint">{field.detail}</p>
+              )}
             </article>
           ))}
         </div>

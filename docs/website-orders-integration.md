@@ -106,9 +106,11 @@ if (res.ok && data.order) {
 
 Онлайн-редактор сайта не зависит от CRM UI. Сайт получает шаблоны и работает с draft через отдельные endpoint-ы:
 
-Граница ответственности CRM и сайта описана отдельно: `docs/client-editor-crm-site-boundary.md`.
+Граница ответственности CRM и сайта: [client-editor-crm-site-boundary.md](./client-editor-crm-site-boundary.md).  
+Матрица id и галерея (экран 3): [site-design-gallery-integration.md](./site-design-gallery-integration.md).
 
-- `GET /api/design-templates/public?productId=22&typeId=1&sizeId=10x15` — публичный список активных шаблонов.
+- `GET /api/design-templates/public?productId=22&typeId=1` — список шаблонов подтипа (обязательны **оба** query-параметра).
+- `GET /api/design-templates/public?productId=22&typeId=1&sizeId=10x15` — только шаблоны для размера `10x15`.
 - `GET /api/design-templates/public/:id` — один активный шаблон с `spec.designState`.
 - `POST /api/public-editor/drafts` — создать draft редактора.
 - `PATCH /api/public-editor/drafts/:token` — сохранить состояние редактора (`designState`, `photoBatch`, выбранные параметры).

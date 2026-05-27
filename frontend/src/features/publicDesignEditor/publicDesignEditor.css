@@ -295,6 +295,7 @@
 }
 
 .public-design-editor__photo-targets,
+.public-design-editor__text-targets,
 .public-design-editor__photo-assistant-checkout {
   display: grid;
   gap: 10px;
@@ -990,18 +991,14 @@
   box-shadow: 0 14px 30px rgba(0, 166, 214, 0.26);
 }
 
-.public-design-editor__page-strip {
+/* Полоса страниц в клиентском редакторе — см. publicDesignPageStrip.css */
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip {
   position: relative;
   z-index: 1;
   padding: 0 16px 14px;
 }
 
-.public-design-editor--client.public-design-editor--mobile .public-design-editor__page-strip {
-  z-index: 0;
-  padding: 0;
-}
-
-.public-design-editor__page-strip .ps-root {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .ps-root {
   overflow: hidden;
   color: var(--pc-ink);
   background:
@@ -1012,39 +1009,39 @@
   box-shadow: 0 18px 50px rgba(2, 8, 23, 0.2);
 }
 
-.public-design-editor__page-strip .ps-header {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .ps-header {
   background: transparent;
   border-bottom-color: rgba(15, 23, 42, 0.08);
 }
 
-.public-design-editor__page-strip .ps-header-title,
-.public-design-editor__page-strip .ps-header-count,
-.public-design-editor__page-strip .ps-header-info {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .ps-header-title,
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .ps-header-count,
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .ps-header-info {
   color: var(--pc-ink-soft);
 }
 
-.public-design-editor__page-strip .ps-strip {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .ps-strip {
   background: transparent;
 }
 
-.public-design-editor__page-strip .psitem.is-active {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .psitem.is-active {
   background: rgba(0, 166, 214, 0.08);
   border-color: var(--pc-cyan);
 }
 
-.public-design-editor__page-strip .psitem-label {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .psitem-label {
   color: var(--pc-muted);
 }
 
-.public-design-editor__page-strip .ps-add-wrap {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .ps-add-wrap {
   display: none;
 }
 
-.public-design-editor__page-strip .psitem {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .psitem {
   position: relative;
 }
 
-.public-design-editor__page-strip .psitem-status {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .psitem-status {
   position: absolute;
   top: 5px;
   right: 5px;
@@ -1055,19 +1052,19 @@
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
 }
 
-.public-design-editor__page-strip .psitem-status--ready {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .psitem-status--ready {
   background: #16a34a;
 }
 
-.public-design-editor__page-strip .psitem-status--warning {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .psitem-status--warning {
   background: #f59e0b;
 }
 
-.public-design-editor__page-strip .psitem-status--error {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .psitem-status--error {
   background: #ef4444;
 }
 
-.public-design-editor__page-strip .psitem-status-label {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .psitem-status-label {
   max-width: 88px;
   padding: 3px 7px;
   overflow: hidden;
@@ -1079,17 +1076,17 @@
   white-space: nowrap;
 }
 
-.public-design-editor__page-strip .psitem-status-label--ready {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .psitem-status-label--ready {
   color: #166534;
   background: rgba(22, 163, 74, 0.12);
 }
 
-.public-design-editor__page-strip .psitem-status-label--warning {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .psitem-status-label--warning {
   color: #92400e;
   background: rgba(245, 158, 11, 0.16);
 }
 
-.public-design-editor__page-strip .psitem-status-label--error {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-strip .psitem-status-label--error {
   color: #991b1b;
   background: rgba(239, 68, 68, 0.14);
 }
@@ -1221,6 +1218,31 @@
   border-radius: 16px;
 }
 
+.public-design-editor__checkout-page--spread {
+  grid-column: span 2;
+}
+
+.public-design-editor__checkout-page-spread {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.public-design-editor__checkout-page-half {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.public-design-editor__checkout-page-half-label {
+  color: var(--pc-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
 .public-design-editor__checkout-page img,
 .public-design-editor__checkout-page-empty {
   width: 100%;
@@ -1228,6 +1250,11 @@
   object-fit: contain;
   background: #e2e8f0;
   border-radius: 10px;
+}
+
+.public-design-editor__checkout-page--spread .public-design-editor__checkout-page-half img,
+.public-design-editor__checkout-page--spread .public-design-editor__checkout-page-half .public-design-editor__checkout-page-empty {
+  aspect-ratio: 3 / 4;
 }
 
 .public-design-editor__checkout-page-empty {
@@ -1287,6 +1314,27 @@
   color: #92400e;
   background: #fffbeb;
   border: 1px solid #fde68a;
+}
+
+@media (max-width: 640px) {
+  .public-design-editor__checkout-preview {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .public-design-editor__checkout-card {
+    width: 100%;
+    max-height: min(92dvh, 100%);
+    border-radius: 20px 20px 0 0;
+  }
+
+  .public-design-editor__checkout-pages {
+    grid-template-columns: 1fr;
+  }
+
+  .public-design-editor__checkout-page--spread {
+    grid-column: 1;
+  }
 }
 
 @media (max-width: 1180px) {

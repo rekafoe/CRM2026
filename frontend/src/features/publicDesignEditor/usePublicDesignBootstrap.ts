@@ -4,6 +4,7 @@ import { EMPTY_PAGE, SAFE_ZONE_MM } from '../../pages/admin/designEditor/constan
 import { readDesignTemplateSpec } from '../../pages/admin/designEditor/designEditorState';
 import type { DesignPage, DesignPrepressConfig } from '../../pages/admin/designEditor/types';
 import type { PublicDesignEditorAdapter } from './publicDesignEditorAdapter';
+import { ensureEvenInnerSpreadPages } from '../../pages/admin/designEditor/spreadUtils';
 import type { PublicDesignDocumentMode } from './useDesignDocumentNavigation';
 import type { PublicDesignPageSpec } from './usePublicDesignPageActions';
 
@@ -77,15 +78,26 @@ export function usePublicDesignBootstrap({
         const savedSpreadMode = sourceState?.spread_mode;
         const nextSpreadMode = documentMode === 'multipage'
           && (typeof savedSpreadMode === 'boolean' ? savedSpreadMode : true);
-        const nextCoverPages = Math.max(0, Math.min(3, Number(sourceState?.cover_pages ?? spec.cover_pages ?? 1)));
+        const nextCoverPages = documentMode === 'multipage'
+          ? Math.max(1, Math.min(3, Number(sourceState?.cover_pages ?? spec.cover_pages ?? 1)))
+          : Math.max(0, Math.min(3, Number(sourceState?.cover_pages ?? spec.cover_pages ?? 1)));
+        const loadedPages = Array.from({ length: count }, (_, index) => sourcePages[index] ?? { ...EMPTY_PAGE });
+        const spreadLayout = nextSpreadMode
+          ? ensureEvenInnerSpreadPages(loadedPages, count, nextCoverPages, () => ({ ...EMPTY_PAGE }))
+          : { pages: loadedPages, pageCount: count };
         setMinimumPageCount(1);
         setTemplate(t);
         setSaveState(initialDraftToken ? 'saved' : 'idle');
-        setPageSpec({ pageWidth: w, pageHeight: h, pageCount: count, scale: Number.isFinite(scale) && scale > 0 ? scale : 1 });
+        setPageSpec({
+          pageWidth: w,
+          pageHeight: h,
+          pageCount: spreadLayout.pageCount,
+          scale: Number.isFinite(scale) && scale > 0 ? scale : 1,
+        });
         setSpreadMode(nextSpreadMode);
         setCoverPages(nextCoverPages);
         setPrepressConfig(normalizePrepressConfig(sourceState?.prepress ?? spec.prepress));
-        setPages(Array.from({ length: count }, (_, index) => sourcePages[index] ?? { ...EMPTY_PAGE }));
+        setPages(spreadLayout.pages);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось открыть клиентский редактор');
       } finally {

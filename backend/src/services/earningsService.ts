@@ -2,6 +2,7 @@ import { getDb } from '../config/database';
 import { logger } from '../utils/logger';
 import { hasColumn } from '../utils/tableSchemaCache';
 import { effectiveEarningsUserId, type EarningsOrderItemRow } from './earningsEffectiveUserId';
+import { getDesignTemplatesByIds } from './designTemplateService';
 
 export interface EarningsSchedulerConfig {
   enabled: boolean;
@@ -181,10 +182,15 @@ export class EarningsService {
 
     const productIds = new Set<number>();
     const operationIds = new Set<number>();
-    
+    const designTemplateIds = new Set<number>();
+
     rows.forEach((row) => {
       try {
         const parsed = JSON.parse(row.params || '{}');
+        const designTemplateId = Number(parsed?.designTemplateId);
+        if (Number.isFinite(designTemplateId) && designTemplateId > 0) {
+          designTemplateIds.add(designTemplateId);
+        }
         const productId = Number(parsed?.productId);
         if (Number.isFinite(productId)) {
           productIds.add(productId);
@@ -262,6 +268,12 @@ export class EarningsService {
       }
     }
 
+    const designTemplateMap = await getDesignTemplatesByIds(Array.from(designTemplateIds));
+    let hasEarningType = false;
+    try {
+      hasEarningType = await hasColumn('order_item_earnings', 'earning_type');
+    } catch { /* ignore */ }
+
     await db.run('BEGIN');
     try {
       await db.run('DELETE FROM order_item_earnings WHERE earned_date = ?', [date]);
@@ -322,23 +334,75 @@ export class EarningsService {
 
         const itemTotal = (Number(row.price) || 0) * (Number(row.quantity) || 0);
         const amount = (itemTotal * percent) / 100;
+        const qty = Number(row.quantity) || 0;
 
-        await db.run(
-          `
-          INSERT OR REPLACE INTO order_item_earnings
-          (order_id, order_item_id, user_id, order_item_total, percent, amount, earned_date, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-          `,
-          [
-            row.orderId,
-            row.itemId,
-            effectiveUserId,
-            itemTotal,
-            percent,
-            amount,
-            date,
-          ]
-        );
+        if (hasEarningType) {
+          await db.run(
+            `
+            INSERT OR REPLACE INTO order_item_earnings
+            (order_id, order_item_id, user_id, order_item_total, percent, amount, earned_date, earning_type, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'operator', datetime('now'))
+            `,
+            [
+              row.orderId,
+              row.itemId,
+              effectiveUserId,
+              itemTotal,
+              percent,
+              amount,
+              date,
+            ],
+          );
+        } else {
+          await db.run(
+            `
+            INSERT OR REPLACE INTO order_item_earnings
+            (order_id, order_item_id, user_id, order_item_total, percent, amount, earned_date, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            `,
+            [
+              row.orderId,
+              row.itemId,
+              effectiveUserId,
+              itemTotal,
+              percent,
+              amount,
+              date,
+            ],
+          );
+        }
+
+        const designTemplateId = Number(params?.designTemplateId);
+        if (
+          hasEarningType
+          && Number.isFinite(designTemplateId)
+          && designTemplateId > 0
+        ) {
+          const template = designTemplateMap.get(designTemplateId);
+          const authorId = template?.author_user_id;
+          const usageFee = Number(template?.usage_fee) || 0;
+          const authorPercent = Number(template?.author_percent) || 0;
+          if (authorId && usageFee > 0 && authorPercent > 0 && qty > 0) {
+            const authorBase = usageFee * qty;
+            const authorAmount = (authorBase * authorPercent) / 100;
+            await db.run(
+              `
+              INSERT OR REPLACE INTO order_item_earnings
+              (order_id, order_item_id, user_id, order_item_total, percent, amount, earned_date, earning_type, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, 'design_author', datetime('now'))
+              `,
+              [
+                row.orderId,
+                row.itemId,
+                authorId,
+                authorBase,
+                authorPercent,
+                authorAmount,
+                date,
+              ],
+            );
+          }
+        }
       }
 
       await db.run('COMMIT');

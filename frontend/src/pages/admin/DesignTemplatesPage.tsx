@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { AppIcon } from '../../components/ui/AppIcon';
+import { BynSymbol } from '../../components/ui/BynSymbol';
 import { Alert, Button, Modal } from '../../components/common';
 import {
   getDesignTemplates,
@@ -10,11 +11,17 @@ import {
   deleteDesignTemplate,
   uploadDesignTemplatePreview,
   importDesignTemplateFile,
+  getUsers,
   type DesignTemplate,
   type DesignTemplateInput,
 } from '../../api';
+import type { UserRef } from '../../types';
 import { API_BASE_URL } from '../../config/constants';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
+import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import {
+  formatAuthorRoyaltyLine,
+  formatBynAmount,
   formatProductBinding,
   formatTemplateSize,
   getTemplateCatalogStatus,
@@ -22,6 +29,7 @@ import {
   resolveTemplatePreviewUrl,
   type TemplateCatalogStatus,
 } from './designTemplates/designTemplateCatalogUtils';
+import { DesignTemplateBindingsPanel } from './designTemplates/DesignTemplateBindingsPanel';
 import '../../styles/admin-page-layout.css';
 import './DesignTemplatesPage.css';
 
@@ -35,6 +43,10 @@ const STATUS_LABELS: Record<TemplateCatalogStatus, string> = {
 
 type StatusFilter = 'all' | TemplateCatalogStatus;
 type SortKey = 'sort_order' | 'name' | 'updated';
+type PageTab = 'catalog' | 'bindings';
+
+const DEFAULT_USAGE_FEE = 3;
+const DEFAULT_AUTHOR_PERCENT = 10;
 
 function mergeSpecOnSave(
   existingSpec: Record<string, unknown> | null,
@@ -55,8 +67,16 @@ function mergeSpecOnSave(
 
 export const DesignTemplatesPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentUser = useCurrentUser();
+  const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
   const editorPathPrefix = '/adminpanel/design-editor';
+  const pageTab: PageTab = searchParams.get('tab') === 'bindings' ? 'bindings' : 'catalog';
+  const bindingsProductId = searchParams.get('productId');
+  const bindingsTypeId = searchParams.get('typeId');
+  const highlightTemplateId = searchParams.get('templateId');
   const [templates, setTemplates] = useState<DesignTemplate[]>([]);
+  const [users, setUsers] = useState<UserRef[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -66,6 +86,7 @@ export const DesignTemplatesPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [authorFilter, setAuthorFilter] = useState<string>('all');
   const [sortKey, setSortKey] = useState<SortKey>('sort_order');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +106,9 @@ export const DesignTemplatesPage: React.FC = () => {
     sizeId: '',
     is_active: true,
     sort_order: 0,
+    author_user_id: '',
+    usage_fee: String(DEFAULT_USAGE_FEE),
+    author_percent: String(DEFAULT_AUTHOR_PERCENT),
   });
   const [importForm, setImportForm] = useState({
     name: '',
@@ -94,6 +118,9 @@ export const DesignTemplatesPage: React.FC = () => {
     typeId: '',
     sizeId: '',
     sortOrder: 0,
+    author_user_id: '',
+    usage_fee: String(DEFAULT_USAGE_FEE),
+    author_percent: String(DEFAULT_AUTHOR_PERCENT),
     sourceFile: null as File | null,
     file: null as File | null,
   });
@@ -117,6 +144,33 @@ export const DesignTemplatesPage: React.FC = () => {
     loadTemplates();
   }, [loadTemplates]);
 
+  useEffect(() => {
+    void initializeDirectory();
+  }, [initializeDirectory]);
+
+  useEffect(() => {
+    getUsers()
+      .then((res) => setUsers(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setUsers([]));
+  }, []);
+
+  const setPageTab = useCallback((tab: PageTab) => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'bindings') next.set('tab', 'bindings');
+    else next.delete('tab');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const openBindingsForTemplate = useCallback((t: DesignTemplate) => {
+    const parsed = parseTemplateSpec(t);
+    const next = new URLSearchParams();
+    next.set('tab', 'bindings');
+    if (parsed.productId != null) next.set('productId', String(parsed.productId));
+    if (parsed.typeId != null) next.set('typeId', String(parsed.typeId));
+    next.set('templateId', String(t.id));
+    setSearchParams(next);
+  }, [setSearchParams]);
+
   const categories = useMemo(
     () => Array.from(new Set([...DEFAULT_CATEGORIES, ...templates.map((t) => t.category).filter(Boolean) as string[]])),
     [templates],
@@ -130,6 +184,14 @@ export const DesignTemplatesPage: React.FC = () => {
     }
     if (statusFilter !== 'all') {
       list = list.filter((t) => getTemplateCatalogStatus(t) === statusFilter);
+    }
+    if (authorFilter === 'mine' && currentUser?.id) {
+      list = list.filter((t) => t.author_user_id === currentUser.id);
+    } else if (authorFilter !== 'all') {
+      const aid = Number(authorFilter);
+      if (Number.isFinite(aid)) {
+        list = list.filter((t) => t.author_user_id === aid);
+      }
     }
     if (q) {
       list = list.filter((t) => {
@@ -154,7 +216,7 @@ export const DesignTemplatesPage: React.FC = () => {
       return (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name, 'ru');
     });
     return sorted;
-  }, [templates, categoryFilter, statusFilter, searchQuery, sortKey]);
+  }, [templates, categoryFilter, statusFilter, authorFilter, searchQuery, sortKey, currentUser?.id]);
 
   const counts = useMemo(() => {
     const c = { all: templates.length, active: 0, inactive: 0, draft: 0 };
@@ -180,6 +242,9 @@ export const DesignTemplatesPage: React.FC = () => {
       sizeId: '',
       is_active: true,
       sort_order: templates.length,
+      author_user_id: currentUser?.id != null ? String(currentUser.id) : '',
+      usage_fee: String(DEFAULT_USAGE_FEE),
+      author_percent: String(DEFAULT_AUTHOR_PERCENT),
     });
     setModalOpen(true);
   };
@@ -194,6 +259,9 @@ export const DesignTemplatesPage: React.FC = () => {
       typeId: '',
       sizeId: '',
       sortOrder: templates.length,
+      author_user_id: currentUser?.id != null ? String(currentUser.id) : '',
+      usage_fee: String(DEFAULT_USAGE_FEE),
+      author_percent: String(DEFAULT_AUTHOR_PERCENT),
       sourceFile: null,
       file: null,
     });
@@ -223,9 +291,20 @@ export const DesignTemplatesPage: React.FC = () => {
       sizeId: parsed.sizeId ?? '',
       is_active: t.is_active === 1,
       sort_order: t.sort_order ?? 0,
+      author_user_id: t.author_user_id != null ? String(t.author_user_id) : '',
+      usage_fee: t.usage_fee != null ? String(t.usage_fee) : '',
+      author_percent: t.author_percent != null ? String(t.author_percent) : '',
     });
     setModalOpen(true);
   };
+
+  const royaltyPreview = useMemo(() => {
+    const fee = parseFloat(form.usage_fee);
+    const pct = parseFloat(form.author_percent);
+    if (!Number.isFinite(fee) || !Number.isFinite(pct) || fee <= 0 || pct <= 0) return null;
+    const payout = Math.round((fee * pct / 100) * 100) / 100;
+    return { fee, pct, payout };
+  }, [form.usage_fee, form.author_percent]);
 
   const handlePreviewUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -263,6 +342,10 @@ export const DesignTemplatesPage: React.FC = () => {
         sizeId,
       });
 
+      const authorUserId = form.author_user_id.trim() ? parseInt(form.author_user_id, 10) : null;
+      const usageFee = form.usage_fee.trim() ? parseFloat(form.usage_fee) : 0;
+      const authorPercent = form.author_percent.trim() ? parseFloat(form.author_percent) : 0;
+
       const payload: DesignTemplateInput = {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
@@ -271,6 +354,9 @@ export const DesignTemplatesPage: React.FC = () => {
         spec: Object.keys(spec).length ? spec : undefined,
         is_active: form.is_active,
         sort_order: form.sort_order,
+        author_user_id: Number.isFinite(authorUserId) ? authorUserId : null,
+        usage_fee: Number.isFinite(usageFee) ? usageFee : 0,
+        author_percent: Number.isFinite(authorPercent) ? authorPercent : 0,
       };
       if (editingId) {
         await updateDesignTemplate(editingId, payload);
@@ -315,12 +401,15 @@ export const DesignTemplatesPage: React.FC = () => {
         spec,
         is_active: false,
         sort_order: (t.sort_order ?? 0) + 1,
+        author_user_id: currentUser?.id ?? t.author_user_id ?? null,
+        usage_fee: t.usage_fee ?? 0,
+        author_percent: t.author_percent ?? 0,
       });
       await loadTemplates();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Не удалось создать копию');
     }
-  }, [loadTemplates]);
+  }, [loadTemplates, currentUser?.id]);
 
   const handleImport = useCallback(async () => {
     if (!importForm.file && !importForm.sourceFile) {
@@ -345,6 +434,11 @@ export const DesignTemplatesPage: React.FC = () => {
         typeId: importForm.typeId.trim() || undefined,
         sizeId: importForm.sizeId.trim() || undefined,
         sortOrder: importForm.sortOrder,
+        author_user_id: importForm.author_user_id.trim()
+          ? parseInt(importForm.author_user_id, 10)
+          : currentUser?.id,
+        usage_fee: importForm.usage_fee.trim() ? parseFloat(importForm.usage_fee) : undefined,
+        author_percent: importForm.author_percent.trim() ? parseFloat(importForm.author_percent) : undefined,
       });
       setImportWarnings(res.data.warnings ?? []);
       await loadTemplates();
@@ -379,9 +473,35 @@ export const DesignTemplatesPage: React.FC = () => {
       {error && <Alert type="error">{error}</Alert>}
 
       <div className="design-templates-page">
+        <div className="design-templates-tabs">
+          <button
+            type="button"
+            className={`design-templates-tab${pageTab === 'catalog' ? ' design-templates-tab--active' : ''}`}
+            onClick={() => setPageTab('catalog')}
+          >
+            <AppIcon name="layers" size="xs" /> Каталог
+          </button>
+          <button
+            type="button"
+            className={`design-templates-tab${pageTab === 'bindings' ? ' design-templates-tab--active' : ''}`}
+            onClick={() => setPageTab('bindings')}
+          >
+            <AppIcon name="link" size="xs" /> Привязки к продуктам
+          </button>
+        </div>
+
+        {pageTab === 'bindings' ? (
+          <DesignTemplateBindingsPanel
+            initialProductId={bindingsProductId ? Number(bindingsProductId) : undefined}
+            initialTypeId={bindingsTypeId ? Number(bindingsTypeId) : undefined}
+            highlightTemplateId={highlightTemplateId ? Number(highlightTemplateId) : undefined}
+          />
+        ) : (
+          <>
         <p className="design-templates-lead">
           Master-шаблоны для сайта и редактора. Основной вход — <strong>Импорт SVG</strong> (конвенция слоёв в{' '}
-          <code>docs/design-template-importer.md</code>). Справка по каталогу: <code>docs/design-templates-catalog.md</code>.
+          <code>docs/design-template-importer.md</code>). Справка: <code>docs/design-templates-catalog.md</code>.
+          Внутренняя плата автора — в <strong>бел. руб.</strong>, не в цене клиента.
         </p>
 
         <div className="design-templates-toolbar">
@@ -413,6 +533,18 @@ export const DesignTemplatesPage: React.FC = () => {
               <option value="">Все</option>
               {categories.map((c) => (
                 <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div className="design-templates-filter">
+            <label>Автор:</label>
+            <select value={authorFilter} onChange={(e) => setAuthorFilter(e.target.value)}>
+              <option value="all">Все</option>
+              {currentUser?.id != null && (
+                <option value="mine">Мои макеты</option>
+              )}
+              {users.map((u) => (
+                <option key={u.id} value={String(u.id)}>{u.name}</option>
               ))}
             </select>
           </div>
@@ -457,6 +589,19 @@ export const DesignTemplatesPage: React.FC = () => {
                     {t.category && <span className="design-template-category">{t.category}</span>}
                     {sizeStr && <span className="design-template-size">{sizeStr}</span>}
                     {binding && <span className="design-template-binding">{binding}</span>}
+                    {(t.author_name || t.author_user_id) && (
+                      <span className="design-template-author">
+                        <AppIcon name="user" size="xs" />
+                        {t.author_name ?? `user #${t.author_user_id}`}
+                      </span>
+                    )}
+                    {formatAuthorRoyaltyLine(t) && (
+                      <span className="design-template-royalty" title="Внутренняя база для ЗП автора, не в цене клиента">
+                        <BynSymbol className="design-template-royalty__sign" />
+                        {formatAuthorRoyaltyLine(t)}
+                        <span className="design-template-royalty-hint"> · не в цене клиента</span>
+                      </span>
+                    )}
                     {parsed.importWarnings.length > 0 && (
                       <span className="design-template-warnings-badge" title={parsed.importWarnings.join('\n')}>
                         {parsed.importWarnings.length} предупр.
@@ -473,6 +618,11 @@ export const DesignTemplatesPage: React.FC = () => {
                     <button type="button" onClick={() => setInfoTemplate(t)} className="btn-meta" title="Импорт и метаданные">
                       <AppIcon name="info" size="xs" />
                     </button>
+                    {(parsed.productId != null || parsed.typeId != null) && (
+                      <button type="button" onClick={() => openBindingsForTemplate(t)} className="btn-meta" title="Привязки к продукту">
+                        <AppIcon name="link" size="xs" />
+                      </button>
+                    )}
                     <button type="button" onClick={() => openEdit(t)} className="btn-edit" title="Карточка">
                       <AppIcon name="edit" size="xs" />
                     </button>
@@ -504,6 +654,8 @@ export const DesignTemplatesPage: React.FC = () => {
               : 'Нет шаблонов по выбранным фильтрам.'}
           </div>
         )}
+          </>
+        )}
       </div>
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Карточка шаблона' : 'Новый шаблон (вручную)'}>
@@ -534,6 +686,48 @@ export const DesignTemplatesPage: React.FC = () => {
               ))}
             </select>
           </div>
+          <div className="form-row form-row-inline">
+            <label>
+              <span><AppIcon name="user" size="xs" /> Автор</span>
+              <select
+                value={form.author_user_id}
+                onChange={(e) => setForm((p) => ({ ...p, author_user_id: e.target.value }))}
+              >
+                <option value="">—</option>
+                {users.map((u) => (
+                  <option key={u.id} value={String(u.id)}>{u.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Плата за макет (бел. руб./ед.)</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.usage_fee}
+                onChange={(e) => setForm((p) => ({ ...p, usage_fee: e.target.value }))}
+              />
+            </label>
+            <label>
+              <span>% автору</span>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={form.author_percent}
+                onChange={(e) => setForm((p) => ({ ...p, author_percent: e.target.value }))}
+              />
+            </label>
+          </div>
+          {royaltyPreview && (
+            <p className="royalty-preview">
+              <BynSymbol />
+              {formatBynAmount(royaltyPreview.fee)} × {royaltyPreview.pct}% → {formatBynAmount(royaltyPreview.payout)}/ед.
+              <span className="design-template-royalty-hint"> (не в цене клиента)</span>
+            </p>
+          )}
           <div className="form-row form-row-inline design-template-product-bind">
             <label>
               <span>Product ID</span>
@@ -634,6 +828,40 @@ export const DesignTemplatesPage: React.FC = () => {
               ))}
             </select>
           </div>
+          <div className="form-row form-row-inline">
+            <label>
+              <span>Автор</span>
+              <select
+                value={importForm.author_user_id}
+                onChange={(e) => setImportForm((p) => ({ ...p, author_user_id: e.target.value }))}
+              >
+                <option value="">Текущий пользователь</option>
+                {users.map((u) => (
+                  <option key={u.id} value={String(u.id)}>{u.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Плата (бел. руб./ед.)</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={importForm.usage_fee}
+                onChange={(e) => setImportForm((p) => ({ ...p, usage_fee: e.target.value }))}
+              />
+            </label>
+            <label>
+              <span>% автору</span>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={importForm.author_percent}
+                onChange={(e) => setImportForm((p) => ({ ...p, author_percent: e.target.value }))}
+              />
+            </label>
+          </div>
           <div className="form-row form-row-inline design-template-product-bind">
             <label><span>Product ID</span><input value={importForm.productId} onChange={(e) => setImportForm((p) => ({ ...p, productId: e.target.value }))} /></label>
             <label><span>Type ID</span><input value={importForm.typeId} onChange={(e) => setImportForm((p) => ({ ...p, typeId: e.target.value }))} /></label>
@@ -664,6 +892,12 @@ export const DesignTemplatesPage: React.FC = () => {
             {infoParsed.importerVersion != null && <p><strong>Importer v:</strong> {infoParsed.importerVersion}</p>}
             {formatTemplateSize(infoParsed) && <p><strong>Размер:</strong> {formatTemplateSize(infoParsed)}</p>}
             {formatProductBinding(infoParsed) && <p><strong>Привязка:</strong> {formatProductBinding(infoParsed)}</p>}
+            {infoTemplate.author_name && (
+              <p><strong>Автор:</strong> {infoTemplate.author_name}</p>
+            )}
+            {formatAuthorRoyaltyLine(infoTemplate) && (
+              <p><strong>ЗП автора:</strong> {formatAuthorRoyaltyLine(infoTemplate)} (внутр., не клиенту)</p>
+            )}
             {infoParsed.importWarnings.length > 0 && (
               <div className="design-template-import-warnings">
                 <strong>Предупреждения импорта:</strong>
@@ -672,6 +906,11 @@ export const DesignTemplatesPage: React.FC = () => {
             )}
             <div className="form-actions">
               <Button variant="secondary" onClick={() => { setInfoTemplate(null); openEdit(infoTemplate); }}>Редактировать карточку</Button>
+              {(infoParsed.productId != null || infoParsed.typeId != null) && (
+                <Button variant="secondary" onClick={() => { setInfoTemplate(null); openBindingsForTemplate(infoTemplate); }}>
+                  Привязки к продукту
+                </Button>
+              )}
               <Button onClick={() => navigate(`${editorPathPrefix}/${infoTemplate.id}`)}>Открыть редактор</Button>
             </div>
           </div>

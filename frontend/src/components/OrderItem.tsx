@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Item } from '../types';
-import { updateOrderItem, deleteOrderItem, getPrinters } from '../api';
+import { updateOrderItem, deleteOrderItem, getPrinters, getDesignTemplate } from '../api';
 import { numberInputFromString, numberInputToNumber, type NumberInputValue } from '../utils/numberInput';
 import { getPaperTypesFromWarehouse } from '../services/calculatorMaterialService';
 import { ConfirmDialog } from './common/ConfirmDialog';
@@ -15,7 +15,8 @@ import { OrderItemSummary } from './order/OrderItemSummary';
 import { OrderItemPositionBreakdown } from './order/OrderItemPositionBreakdown';
 import { OrderItemEditForm } from './order/OrderItemEditForm';
 import { OrderItemActions } from './order/OrderItemActions';
-import { getEditorItemSummary } from './order/editorItemSummary';
+import { getEditorItemSummary, type DesignTemplateRoyaltyInfo } from './order/editorItemSummary';
+import { calcAuthorPayoutPerUnit } from '../pages/admin/designTemplates/designTemplateCatalogUtils';
 import { EditorItemPreviewModal } from './order/EditorItemPreviewModal';
 
 // Кэш отображаемых имён типов бумаги из склада
@@ -228,7 +229,34 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
   const densityFromSummaryNum = densityFromSummary ? Number(densityFromSummary.replace(/[^\d]/g, '')) : null;
   const materialDensity = specsAny?.paperDensity || densityFromSummaryNum || item.params.paperDensity || null;
   const [materialTypeDisplay, setMaterialTypeDisplay] = useState<string | null>(null);
-  const editorSummary = useMemo(() => getEditorItemSummary(item), [item]);
+  const [designRoyalty, setDesignRoyalty] = useState<DesignTemplateRoyaltyInfo | null>(null);
+
+  useEffect(() => {
+    const templateId = Number(item.params?.designTemplateId);
+    if (!Number.isFinite(templateId) || templateId <= 0) {
+      setDesignRoyalty(null);
+      return;
+    }
+    let cancelled = false;
+    getDesignTemplate(templateId)
+      .then((res) => {
+        if (cancelled) return;
+        const t = res.data;
+        setDesignRoyalty({
+          authorName: t.author_name ?? null,
+          authorPayoutPerUnit: calcAuthorPayoutPerUnit(t),
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setDesignRoyalty(null);
+      });
+    return () => { cancelled = true; };
+  }, [item.params?.designTemplateId]);
+
+  const editorSummary = useMemo(
+    () => getEditorItemSummary(item, designRoyalty),
+    [item, designRoyalty],
+  );
 
   const handleSave = async () => {
     try {

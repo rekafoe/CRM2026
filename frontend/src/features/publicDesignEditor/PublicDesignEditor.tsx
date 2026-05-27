@@ -14,8 +14,8 @@ import {
   type PublicDesignDocumentMode,
   useDesignDocumentNavigation,
 } from './useDesignDocumentNavigation';
-import type { PublicDesignTaskTab } from './PublicDesignTaskPanel';
-import { PublicDesignInspector } from './PublicDesignInspector';
+import { PublicDesignTaskPanel, type PublicDesignTaskTab } from './PublicDesignTaskPanel';
+import { PublicDesignInspector, type PublicDesignInspectorPanel } from './PublicDesignInspector';
 import { PublicDesignStageGuide } from './PublicDesignStageGuide';
 import { PublicDesignAdvancedTools } from './PublicDesignAdvancedTools';
 import { PublicDesignEditorAlerts } from './PublicDesignEditorAlerts';
@@ -44,6 +44,9 @@ import { usePublicDesignDraftActions } from './usePublicDesignDraftActions';
 import { usePublicDesignGuidedActions } from './usePublicDesignGuidedActions';
 import { usePublicDesignPageActions } from './usePublicDesignPageActions';
 import { usePublicDesignPhotoLibrary } from './usePublicDesignPhotoLibrary';
+import { rememberPageThumbnail } from '../../pages/admin/designEditor/designPageThumbnailCache';
+import { usePublicDesignThumbnailPrefetch } from './usePublicDesignThumbnailPrefetch';
+import { useSpreadLayoutNormalize } from './useSpreadLayoutNormalize';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import {
   PublicDesignEditorMobileDock,
@@ -113,7 +116,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const [dirtyVersion, setDirtyVersion] = useState(0);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [, setActiveTaskTab] = useState<PublicDesignTaskTab>('photo');
+  const [activeTaskTab, setActiveTaskTab] = useState<PublicDesignTaskTab>('photo');
+  const suppressDirtyRef = useRef(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [selectedLibraryPhotoId, setSelectedLibraryPhotoId] = useState<string | null>(null);
   const [checkoutPreviewOpen, setCheckoutPreviewOpen] = useState(false);
@@ -237,13 +241,77 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   });
 
   const markDirty = useCallback(() => {
+    if (suppressDirtyRef.current) return;
     setSaveState('dirty');
     setDirtyVersion((v) => v + 1);
   }, []);
 
+  useEffect(() => {
+    if (loading) {
+      suppressDirtyRef.current = true;
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      suppressDirtyRef.current = false;
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [loading]);
+
+  const thumbnailCacheScope = useMemo(() => {
+    if (!template) return null;
+    return {
+      templateId,
+      draftToken,
+      pageWidthPx: sceneGeometry.pageWidthPx,
+      pageHeightPx: sceneGeometry.pageHeightPx,
+    };
+  }, [draftToken, sceneGeometry.pageHeightPx, sceneGeometry.pageWidthPx, template, templateId]);
+
   const handlePageThumbReady = useCallback((pageIdx: number, dataUrl: string) => {
+    if (thumbnailCacheScope) {
+      rememberPageThumbnail(thumbnailCacheScope, pageIdx, pages[pageIdx], dataUrl);
+    }
     setThumbnails((prev) => (prev[pageIdx] === dataUrl ? prev : { ...prev, [pageIdx]: dataUrl }));
+  }, [pages, thumbnailCacheScope]);
+
+  const handleHydrateThumbnails = useCallback((cached: Record<number, string>) => {
+    setThumbnails((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      Object.entries(cached).forEach(([rawIndex, url]) => {
+        const index = Number(rawIndex);
+        if (!Number.isFinite(index) || next[index] === url) return;
+        next[index] = url;
+        changed = true;
+      });
+      return changed ? next : prev;
+    });
   }, []);
+
+  useSpreadLayoutNormalize({
+    enabled: !loading && Boolean(template),
+    documentMode,
+    spreadMode,
+    coverPages,
+    pageCount: pageSpec.pageCount,
+    pages,
+    setPages,
+    setPageCount: (count) => setPageSpec((spec) => ({ ...spec, pageCount: count })),
+    suppressDirtyRef,
+  });
+
+  usePublicDesignThumbnailPrefetch({
+    enabled: !loading && Boolean(template),
+    templateId,
+    draftToken,
+    pages,
+    pageCount: pageSpec.pageCount,
+    template,
+    pageWidthPx: sceneGeometry.pageWidthPx,
+    pageHeightPx: sceneGeometry.pageHeightPx,
+    onThumb: handlePageThumbReady,
+    onHydrate: handleHydrateThumbnails,
+  });
 
   useEffect(() => {
     const el = fitScalerRef.current;
@@ -456,6 +524,21 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     handleFieldFocus(field, kind);
   }, [handleFieldFocus, isMobile]);
 
+  const handleCheckoutIssueFocus = useCallback((issue: Parameters<typeof handleIssueFocus>[0]) => {
+    if (isMobile) setMobilePanel('canvas');
+    handleIssueFocus(issue);
+  }, [handleIssueFocus, isMobile]);
+
+  const handleTaskTabChange = useCallback((tab: PublicDesignTaskTab) => {
+    setActiveTaskTab(tab);
+    if (isMobile && tab === 'check') setMobilePanel('check');
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile || activeTaskTab !== 'check') return;
+    setMobilePanel('check');
+  }, [activeTaskTab, isMobile]);
+
   const handleRequestReadyForCart = useCallback(() => {
     if (preflight.hasBlockingIssues) {
       void handleReadyForCart();
@@ -497,6 +580,17 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   }, []);
 
   const missingPhotoCount = Math.max(0, fragmentPreflight.photoTotal - fragmentPreflight.photoReady);
+  const missingTextCount = Math.max(0, fragmentPreflight.textTotal - fragmentPreflight.textReady);
+
+  const inspectorPanel: PublicDesignInspectorPanel = !isMobile
+    ? 'all'
+    : mobilePanel === 'photos'
+      ? 'photos'
+      : mobilePanel === 'text'
+        ? 'text'
+        : 'photos';
+
+  const checkIssueCount = preflight.issues.length;
 
   const handleMobileNextAction = useCallback(() => {
     if (editorNextAction.kind === 'replacePhoto') {
@@ -653,24 +747,82 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           }}
         />
 
-        <PublicDesignInspector
-          fragmentLabel={currentFragment.label}
-          fragmentPreflight={fragmentPreflight}
-          saving={saving}
-          nextAction={editorNextAction}
-          sidebarPhotos={sidebarPhotos}
-          selectedPhotoId={selectedLibraryPhotoId}
-          helpOpen={helpOpen}
-          onFilesSelected={handleMobileFilesSelected}
-          onPhotoClick={handleLibraryPhotoClick}
-          onPhotoSelect={setSelectedLibraryPhotoId}
-          onPhotoRemove={removeSidebarPhoto}
-          onPhotoRetry={retrySidebarPhoto}
-          onNextAction={handleNextAction}
-          onFieldFocus={handleMobileFieldFocus}
-          onPhotoReplace={handlePhotoReplace}
-          onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
-        />
+        {!isMobile ? (
+          <div className="public-design-editor__aside">
+            <PublicDesignInspector
+              fragmentLabel={currentFragment.label}
+              fragmentPreflight={fragmentPreflight}
+              panel={inspectorPanel}
+              saving={saving}
+              nextAction={editorNextAction}
+              sidebarPhotos={sidebarPhotos}
+              selectedPhotoId={selectedLibraryPhotoId}
+              helpOpen={helpOpen}
+              onFilesSelected={handleMobileFilesSelected}
+              onPhotoClick={handleLibraryPhotoClick}
+              onPhotoSelect={setSelectedLibraryPhotoId}
+              onPhotoRemove={removeSidebarPhoto}
+              onPhotoRetry={retrySidebarPhoto}
+              onNextAction={handleNextAction}
+              onFieldFocus={handleFieldFocus}
+              onPhotoReplace={handlePhotoReplace}
+              onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
+            />
+            <PublicDesignTaskPanel
+              activeTab={activeTaskTab}
+              onTabChange={handleTaskTabChange}
+              preflight={fragmentPreflight}
+              checkPreflight={preflight}
+              saving={saving}
+              nextAction={editorNextAction}
+              showNextAction={false}
+              showOrderBar={false}
+              onReadyForCart={handleRequestReadyForCart}
+              onNextAction={handleNextAction}
+              onFieldFocus={handleFieldFocus}
+              onPhotoReplace={handlePhotoReplace}
+              onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
+              onIssueFocus={handleIssueFocus}
+            />
+          </div>
+        ) : mobilePanel === 'check' ? (
+          <PublicDesignTaskPanel
+            activeTab={activeTaskTab}
+            onTabChange={handleTaskTabChange}
+            preflight={fragmentPreflight}
+            checkPreflight={preflight}
+            saving={saving}
+            nextAction={editorNextAction}
+            showNextAction={false}
+            showOrderBar={false}
+            onReadyForCart={handleRequestReadyForCart}
+            onNextAction={handleNextAction}
+            onFieldFocus={handleMobileFieldFocus}
+            onPhotoReplace={handlePhotoReplace}
+            onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
+            onIssueFocus={handleCheckoutIssueFocus}
+          />
+        ) : (
+          <PublicDesignInspector
+            fragmentLabel={currentFragment.label}
+            fragmentPreflight={fragmentPreflight}
+            panel={inspectorPanel}
+            saving={saving}
+            nextAction={editorNextAction}
+            sidebarPhotos={sidebarPhotos}
+            selectedPhotoId={selectedLibraryPhotoId}
+            helpOpen={helpOpen}
+            onFilesSelected={handleMobileFilesSelected}
+            onPhotoClick={handleLibraryPhotoClick}
+            onPhotoSelect={setSelectedLibraryPhotoId}
+            onPhotoRemove={removeSidebarPhoto}
+            onPhotoRetry={retrySidebarPhoto}
+            onNextAction={handleNextAction}
+            onFieldFocus={handleMobileFieldFocus}
+            onPhotoReplace={handlePhotoReplace}
+            onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
+          />
+        )}
       </div>
 
       <footer
@@ -695,7 +847,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           canAddPages={documentMode === 'multipage' || pageSpec.pageCount > 1}
           canAddSpread={documentMode === 'multipage'}
           canDeletePages={(documentMode === 'multipage' || pageSpec.pageCount > 1) && pageSpec.pageCount > minimumPageCount}
-          titleLabel="Страницы макета"
+          titleLabel="Страницы"
+          appearance="client"
+          showInfoLine={false}
           labels={{
             addPage: 'Добавить страницу',
             addSpread: 'Добавить разворот',
@@ -723,6 +877,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             activePanel={mobilePanel}
             photoCount={sidebarPhotos.length}
             missingPhotoCount={missingPhotoCount}
+            textFieldCount={fragmentPreflight.textTotal}
+            missingTextCount={missingTextCount}
+            checkIssueCount={checkIssueCount}
             nextAction={editorNextAction}
             onPanelChange={setMobilePanel}
             onNextAction={handleMobileNextAction}
@@ -747,13 +904,13 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       )}
       <PublicDesignCheckoutPreview
         open={checkoutPreviewOpen}
+        stripItems={navigation.stripItems}
         thumbnails={thumbnails}
-        pageCount={pageSpec.pageCount}
         preflight={preflight}
         saving={saving}
         onClose={() => setCheckoutPreviewOpen(false)}
         onConfirm={handleConfirmReadyForCart}
-        onIssueFocus={handleIssueFocus}
+        onIssueFocus={handleCheckoutIssueFocus}
       />
       <ConfirmDialog
         isOpen={pendingDeletePage != null}

@@ -40,7 +40,12 @@ import type {
   TextEffectsValues,
 } from './designEditor/types';
 
-import { buildStripItems } from './designEditor/spreadUtils';
+import {
+  buildSpreadPageInsert,
+  buildStripItems,
+  ensureEvenInnerSpreadPages,
+  getLastInnerSpreadRange,
+} from './designEditor/spreadUtils';
 import { DesignEditorSidebar } from './designEditor/DesignEditorSidebar';
 import { DesignEditorPanel } from './designEditor/DesignEditorPanel';
 import type { DesignEditorCanvasHandle } from './designEditor/DesignEditorCanvas';
@@ -307,18 +312,18 @@ export const DesignEditorPage: React.FC = () => {
       const sc = Number.isFinite(rawSceneScale) && rawSceneScale > 0 ? rawSceneScale : 1;
       const cp = Math.max(0, Math.min(3, Number(ds?.cover_pages ?? spec.cover_pages ?? 1)));
       const prepress = normalizePrepressConfig(ds?.prepress ?? spec.prepress);
+      const loadedPages = ds?.pages && ds.pages.length > 0
+        ? ds.pages.map((p) => ({
+          fabricJSON: (p.fabricJSON ?? {}) as Record<string, unknown>,
+        }))
+        : Array.from({ length: count }, () => ({ ...EMPTY_PAGE }));
+      const spreadLayout = sm
+        ? ensureEvenInnerSpreadPages(loadedPages, count, cp, () => ({ ...EMPTY_PAGE }))
+        : { pages: loadedPages, pageCount: count };
       setTemplateState((s) => ({ ...s, template: t, loading: false, error: null }));
-      setPageSpec({ pageWidth: w, pageHeight: h, pageCount: count, scale: sc });
+      setPageSpec({ pageWidth: w, pageHeight: h, pageCount: spreadLayout.pageCount, scale: sc });
       setPrepressConfig(prepress);
-      if (ds?.pages && ds.pages.length > 0) {
-        setPages(
-          ds.pages.map((p) => ({
-            fabricJSON: (p.fabricJSON ?? {}) as Record<string, unknown>,
-          })),
-        );
-      } else {
-        setPages(Array.from({ length: count }, () => ({ ...EMPTY_PAGE })));
-      }
+      setPages(spreadLayout.pages);
       setCurrentPage(0);
       setThumbnails({});
       setSpreadMode(sm);
@@ -410,12 +415,19 @@ export const DesignEditorPage: React.FC = () => {
 
   // ── Add / remove pages & spreads ─────────────────────────────────────────────
   const handleAddSpread = useCallback(() => {
-    // Сохраняем миниатюру текущей страницы перед добавлением
     captureCurrentThumb();
-    const addCount = 2;
-    setPages((prev) => [...prev, ...Array.from({ length: addCount }, () => ({ ...EMPTY_PAGE }))]);
+    const { insertAt, addCount } = buildSpreadPageInsert(pageCount, coverPages);
+    setPages((prev) => {
+      const normalized = Array.from({ length: pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
+      return [
+        ...normalized.slice(0, insertAt),
+        ...Array.from({ length: addCount }, () => ({ ...EMPTY_PAGE })),
+        ...normalized.slice(insertAt),
+      ];
+    });
     setPageSpec((s) => ({ ...s, pageCount: s.pageCount + addCount }));
-  }, [captureCurrentThumb]);
+    setCurrentPage(insertAt);
+  }, [captureCurrentThumb, coverPages, pageCount]);
 
   const handleAddPage = useCallback(() => {
     captureCurrentThumb();
@@ -424,26 +436,36 @@ export const DesignEditorPage: React.FC = () => {
   }, [captureCurrentThumb]);
 
   const handleDeleteLast = useCallback(() => {
-    const removeCount = spreadMode ? 2 : 1;
+    const spreadRange = spreadMode ? getLastInnerSpreadRange(pageCount, coverPages) : null;
+    const removeStart = spreadRange?.start ?? pageCount - 1;
+    const removeCount = spreadRange?.length ?? 1;
+    if (pageCount - removeCount < 1) return;
+
     setPages((prev) => {
-      if (prev.length <= 1) return prev;
-      const next = prev.slice(0, prev.length - removeCount);
+      const normalized = Array.from({ length: pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
+      const next = [
+        ...normalized.slice(0, removeStart),
+        ...normalized.slice(removeStart + removeCount),
+      ];
       return next.length ? next : [{ ...EMPTY_PAGE }];
     });
-    setPageSpec((s) => {
-      const newCount = Math.max(1, s.pageCount - removeCount);
-      return { ...s, pageCount: newCount };
-    });
+    setPageSpec((s) => ({ ...s, pageCount: Math.max(1, s.pageCount - removeCount) }));
     setCurrentPage((p) => {
-      const safeMax = Math.max(0, pageCount - 1 - removeCount);
-      return Math.min(p, safeMax);
+      if (p >= removeStart + removeCount) return Math.max(0, p - removeCount);
+      if (p >= removeStart) return Math.max(0, removeStart - 1);
+      return p;
     });
     setThumbnails((prev) => {
-      const next = { ...prev };
-      for (let i = 0; i < removeCount; i++) delete next[pageCount - 1 - i];
+      const next: Record<number, string> = {};
+      Object.entries(prev).forEach(([rawIndex, value]) => {
+        const index = Number(rawIndex);
+        if (!Number.isFinite(index)) return;
+        if (index < removeStart) next[index] = value;
+        else if (index >= removeStart + removeCount) next[index - removeCount] = value;
+      });
       return next;
     });
-  }, [spreadMode, pageCount]);
+  }, [coverPages, pageCount, spreadMode]);
 
   const handleGoToPage = useCallback((pageIndex: number) => {
     captureCurrentThumb();

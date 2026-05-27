@@ -133,6 +133,7 @@ export function buildFilledPhotoFieldGroup(opts: {
   zoom?: number;
   fitMode?: PhotoFieldFitMode;
   fileSize?: number;
+  clientAdded?: boolean;
 }): Group {
   const { left, top, frameW, frameH, image, id } = opts;
   const iw = opts.intrinsicW;
@@ -203,6 +204,7 @@ export function buildFilledPhotoFieldGroup(opts: {
   g.photoFieldIntrinsicH = ih;
   if (Number.isFinite(opts.fileSize)) g.photoFieldFileSize = opts.fileSize;
   if (id) g.id = id;
+  if (opts.clientAdded) g.photoFieldClientAdded = true;
 
   return group;
 }

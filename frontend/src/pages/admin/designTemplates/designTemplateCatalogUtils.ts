@@ -78,3 +78,25 @@ export function formatProductBinding(parsed: ParsedTemplateCatalogSpec): string 
   ].filter(Boolean);
   return parts.join(' · ');
 }
+
+/** Сумма в белорусских рублях для подписей каталога и ЗП автора. */
+export function formatBynAmount(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(Number(value))) return '—';
+  return `${Number(value).toFixed(2)} бел. руб.`;
+}
+
+export function calcAuthorPayoutPerUnit(template: DesignTemplate): number | null {
+  const fee = Number(template.usage_fee) || 0;
+  const pct = Number(template.author_percent) || 0;
+  if (fee <= 0 || pct <= 0) return null;
+  return Math.round((fee * pct / 100) * 100) / 100;
+}
+
+export function formatAuthorRoyaltyLine(template: DesignTemplate): string | null {
+  const fee = Number(template.usage_fee) || 0;
+  const pct = Number(template.author_percent) || 0;
+  if (fee <= 0 && pct <= 0) return null;
+  const payout = calcAuthorPayoutPerUnit(template);
+  if (payout == null) return `${formatBynAmount(fee)} · ${pct}%`;
+  return `${formatBynAmount(fee)} · ${pct}% → ${formatBynAmount(payout)}/ед.`;
+}

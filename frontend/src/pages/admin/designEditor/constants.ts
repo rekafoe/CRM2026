@@ -61,6 +61,7 @@ export const FABRIC_CUSTOM_PROPS = [
   'backgroundFit',
   'backgroundSceneScale',
   'isPhotoField',
+  'photoFieldClientAdded',
   'locked',
   'photoFieldFilled',
   'photoFieldFw',

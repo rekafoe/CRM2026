@@ -1036,6 +1036,10 @@ export interface DesignTemplate {
   spec?: string | null;
   is_active: number;
   sort_order: number;
+  author_user_id?: number | null;
+  usage_fee?: number;
+  author_percent?: number;
+  author_name?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -1048,10 +1052,13 @@ export interface DesignTemplateSpec {
 }
 
 /** Полезная нагрузка для create/update — spec как объект, is_active как boolean */
-export type DesignTemplateInput = Omit<Partial<DesignTemplate>, 'spec' | 'is_active'> & {
+export type DesignTemplateInput = Omit<Partial<DesignTemplate>, 'spec' | 'is_active' | 'author_name'> & {
   name?: string;
   spec?: object | string | null;
   is_active?: boolean | number;
+  author_user_id?: number | null;
+  usage_fee?: number;
+  author_percent?: number;
 };
 
 export interface DesignTemplateImportResult {
@@ -1088,6 +1095,9 @@ export const importDesignTemplateFile = (payload: {
   typeId?: number | string;
   sizeId?: string;
   sortOrder?: number;
+  author_user_id?: number;
+  usage_fee?: number;
+  author_percent?: number;
 }) => {
   const formData = new FormData();
   if (payload.file) formData.append('file', payload.file);
@@ -1099,6 +1109,9 @@ export const importDesignTemplateFile = (payload: {
   if (payload.typeId != null && payload.typeId !== '') formData.append('typeId', String(payload.typeId));
   if (payload.sizeId) formData.append('sizeId', payload.sizeId);
   if (payload.sortOrder != null) formData.append('sortOrder', String(payload.sortOrder));
+  if (payload.author_user_id != null) formData.append('author_user_id', String(payload.author_user_id));
+  if (payload.usage_fee != null) formData.append('usage_fee', String(payload.usage_fee));
+  if (payload.author_percent != null) formData.append('author_percent', String(payload.author_percent));
   return api.post<DesignTemplateImportResult>('/design-templates/import', formData);
 };
 export const getPublicDesignTemplates = (params?: { productId?: number; typeId?: number; sizeId?: string }) =>

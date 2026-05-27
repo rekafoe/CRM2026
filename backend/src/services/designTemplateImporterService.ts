@@ -26,6 +26,9 @@ export interface ImportDesignTemplateInput {
   typeId?: number
   sizeId?: string
   sortOrder?: number
+  authorUserId?: number
+  usageFee?: number
+  authorPercent?: number
 }
 
 export interface ImportDesignTemplateResult {
@@ -84,6 +87,9 @@ export async function importDesignTemplateFromFile(
       preview_url: undefined,
       is_active: false,
       sort_order: input.sortOrder ?? 0,
+      author_user_id: input.authorUserId ?? null,
+      usage_fee: input.usageFee,
+      author_percent: input.authorPercent,
       spec: {
         productId: input.productId,
         typeId: input.typeId,
@@ -132,6 +138,9 @@ export async function importDesignTemplateFromFile(
     preview_url: previewUrl,
     is_active: true,
     sort_order: input.sortOrder ?? 0,
+    author_user_id: input.authorUserId ?? null,
+    usage_fee: input.usageFee,
+    author_percent: input.authorPercent,
     spec: {
       width_mm: importedDocument.pageWidthMm,
       height_mm: importedDocument.pageHeightMm,
