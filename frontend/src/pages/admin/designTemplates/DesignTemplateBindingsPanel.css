@@ -1,0 +1,76 @@
+/* Только то, чего нет в subtype-designs (карточка продукта) */
+.design-bindings-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 16px;
+}
+
+.design-bindings-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.design-bindings-filters select {
+  min-width: 200px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.design-bindings-hint {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.design-bindings-status {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.design-bindings-status strong {
+  color: #0f172a;
+}
+
+.design-bindings-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.design-bindings-error {
+  margin: 0 0 12px;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.design-bindings-modal-search {
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.subtype-designs-item--highlight {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.design-bindings-empty button.subtype-designs-card__matrix-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}

@@ -1,4 +1,15 @@
 import type { DesignTemplate } from '../../../api';
+import {
+  getEffectiveConfig,
+  type ProductTypeId,
+  type SimplifiedConfig,
+} from '../../../features/productTemplate/hooks/useProductTemplate';
+
+export type ProductBindingLabels = {
+  productName?: string;
+  typeName?: string;
+  sizeLabel?: string;
+};
 
 export type TemplateCatalogStatus = 'active' | 'inactive' | 'draft';
 
@@ -69,12 +80,48 @@ export function formatTemplateSize(parsed: ParsedTemplateCatalogSpec): string | 
   return null;
 }
 
-export function formatProductBinding(parsed: ParsedTemplateCatalogSpec): string | null {
+export function lookupProductBindingLabels(
+  parsed: Pick<ParsedTemplateCatalogSpec, 'productId' | 'typeId' | 'sizeId'>,
+  ctx: { productName?: string; simplified?: SimplifiedConfig | null },
+): ProductBindingLabels {
+  const labels: ProductBindingLabels = {};
+  if (parsed.productId != null && ctx.productName) {
+    labels.productName = ctx.productName;
+  }
+  const simplified = ctx.simplified;
+  if (!simplified) return labels;
+
+  if (parsed.typeId != null && Array.isArray(simplified.types) && simplified.types.length > 0) {
+    const type = simplified.types.find((t) => String(t.id) === String(parsed.typeId));
+    if (type?.name) labels.typeName = type.name;
+  }
+
+  const typeId = parsed.typeId != null ? (parsed.typeId as ProductTypeId) : null;
+  const effective = getEffectiveConfig(simplified, simplified.types?.length ? typeId : null);
+  const sizes = effective.sizes ?? simplified.sizes ?? [];
+  if (parsed.sizeId && sizes.length > 0) {
+    const size = sizes.find((s) => String(s.id) === String(parsed.sizeId));
+    if (size?.label) labels.sizeLabel = size.label;
+  }
+
+  return labels;
+}
+
+export function formatProductBinding(
+  parsed: ParsedTemplateCatalogSpec,
+  labels?: ProductBindingLabels,
+): string | null {
   if (!parsed.productId && !parsed.typeId && !parsed.sizeId) return null;
   const parts = [
-    parsed.productId != null ? `product ${parsed.productId}` : null,
-    parsed.typeId != null ? `type ${parsed.typeId}` : null,
-    parsed.sizeId ? `size ${parsed.sizeId}` : null,
+    parsed.productId != null
+      ? (labels?.productName ?? `продукт #${parsed.productId}`)
+      : null,
+    parsed.typeId != null
+      ? (labels?.typeName ?? `подтип #${parsed.typeId}`)
+      : null,
+    parsed.sizeId
+      ? (labels?.sizeLabel ?? `размер ${parsed.sizeId}`)
+      : null,
   ].filter(Boolean);
   return parts.join(' · ');
 }

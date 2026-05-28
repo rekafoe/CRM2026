@@ -1040,6 +1040,7 @@ export interface DesignTemplate {
   usage_fee?: number;
   author_percent?: number;
   author_name?: string | null;
+  subtype_link_count?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -1067,9 +1068,28 @@ export interface DesignTemplateImportResult {
   errors: string[];
 }
 
+export interface DesignTemplateCategory {
+  id: number;
+  name: string;
+  sort_order: number;
+  created_at?: string;
+  template_count?: number;
+}
+
 /** Прокси: скачать изображение по HTTPS (Я.Диск, Google Drive, прямая ссылка) — обход CORS в браузере */
 export const fetchImageFromUrl = (url: string) =>
   api.post<Blob>('/images/from-url', { url }, { responseType: 'blob' });
+
+export const getDesignTemplateCategories = () =>
+  api.get<DesignTemplateCategory[]>('/design-templates/categories');
+export const createDesignTemplateCategory = (name: string) =>
+  api.post<DesignTemplateCategory>('/design-templates/categories', { name });
+export const updateDesignTemplateCategory = (
+  id: number,
+  data: { name?: string; sort_order?: number },
+) => api.put<DesignTemplateCategory>(`/design-templates/categories/${id}`, data);
+export const deleteDesignTemplateCategory = (id: number) =>
+  api.delete(`/design-templates/categories/${id}`);
 
 export const getDesignTemplates = () => api.get<DesignTemplate[]>('/design-templates');
 export const getDesignTemplatesByCategory = (category: string) =>
@@ -1113,6 +1133,17 @@ export const importDesignTemplateFile = (payload: {
   if (payload.usage_fee != null) formData.append('usage_fee', String(payload.usage_fee));
   if (payload.author_percent != null) formData.append('author_percent', String(payload.author_percent));
   return api.post<DesignTemplateImportResult>('/design-templates/import', formData);
+};
+
+/** Заменить designState существующего шаблона из SVG/ZIP (id и привязки к продукту сохраняются). */
+export const reimportDesignTemplateFile = (
+  templateId: number,
+  payload: { file?: File | null; sourceFile?: File | null },
+) => {
+  const formData = new FormData();
+  if (payload.file) formData.append('file', payload.file);
+  if (payload.sourceFile) formData.append('sourceFile', payload.sourceFile);
+  return api.post<DesignTemplateImportResult>(`/design-templates/${templateId}/reimport`, formData);
 };
 export const getPublicDesignTemplates = (params?: { productId?: number; typeId?: number; sizeId?: string }) =>
   api.get<DesignTemplate[]>('/design-templates/public', { params });

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../../components/common';
 import { AppIcon } from '../../../components/ui/AppIcon';
 import {
@@ -25,6 +25,8 @@ import {
 } from '../../../features/productTemplate/utils/designTemplateSpec';
 import { resolveTemplatePreviewUrl } from './designTemplateCatalogUtils';
 import { API_BASE_URL } from '../../../config/constants';
+import '../../../features/productTemplate/components/SimplifiedTemplateSection.css';
+import './DesignTemplateBindingsPanel.css';
 
 type BindingsPanelProps = {
   initialProductId?: number;
@@ -45,6 +47,7 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
   highlightTemplateId,
 }) => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const products = useProductDirectoryStore((s) => s.products);
   const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
 
@@ -56,13 +59,23 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
 
   const [links, setLinks] = useState<SubtypeDesignLink[]>([]);
   const [linksLoading, setLinksLoading] = useState(false);
-  const [linksError, setLinksError] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalSizeId, setModalSizeId] = useState<string | null>(null);
   const [allTemplates, setAllTemplates] = useState<DesignTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [adding, setAdding] = useState<number | null>(null);
+  const [modalSearch, setModalSearch] = useState('');
+
+  const syncUrl = useCallback((pid: number | '', tid: number | '') => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', 'bindings');
+    if (pid !== '') next.set('productId', String(pid));
+    else next.delete('productId');
+    if (tid !== '') next.set('typeId', String(tid));
+    else next.delete('typeId');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     void initializeDirectory();
@@ -84,12 +97,12 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
       const parsed = parseSimplifiedFromConfig(cfg?.config_data as Record<string, unknown> | undefined);
       if (!parsed) {
         setSimplified(null);
-        setConfigError('У продукта нет simplified-шаблона в config.');
+        setConfigError('У продукта нет настроенных размеров (simplified). Откройте карточку продукта.');
       } else {
         setSimplified(parsed);
       }
     } catch {
-      setConfigError('Не удалось загрузить конфиг продукта');
+      setConfigError('Не удалось загрузить продукт.');
       setSimplified(null);
     } finally {
       setConfigLoading(false);
@@ -97,17 +110,17 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
   }, []);
 
   useEffect(() => {
-    if (typeof productId !== 'number' || !Number.isFinite(productId)) {
+    if (typeof productId !== 'number') {
       setSimplified(null);
       return;
     }
     void loadConfig(productId);
   }, [productId, loadConfig]);
 
-  const types: ProductTypeVariant[] = useMemo(() => {
-    if (!simplified?.types?.length) return [];
-    return simplified.types;
-  }, [simplified]);
+  const types: ProductTypeVariant[] = useMemo(
+    () => simplified?.types ?? [],
+    [simplified],
+  );
 
   useEffect(() => {
     if (types.length === 0) return;
@@ -123,22 +136,17 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
     return getEffectiveConfig(simplified, simplified.types?.length ? tid : null);
   }, [simplified, typeId]);
 
-  const subtypeSizes: SimplifiedSizeConfig[] = useMemo(
-    () => effectiveConfig?.sizes ?? [],
-    [effectiveConfig],
-  );
-
+  const subtypeSizes = effectiveConfig?.sizes ?? [];
   const pagesConfig = effectiveConfig?.pages;
 
   const loadLinks = useCallback(async () => {
     if (typeof productId !== 'number' || typeId === '') return;
     setLinksLoading(true);
-    setLinksError(null);
     try {
       const res = await getSubtypeDesigns(productId, Number(typeId));
       setLinks(res.data);
     } catch {
-      setLinksError('Не удалось загрузить привязки');
+      setLinks([]);
     } finally {
       setLinksLoading(false);
     }
@@ -159,25 +167,38 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
     return map;
   }, [links]);
 
-  const sizesMissingDesigns = useMemo(() => {
-    if (subtypeSizes.length === 0) return [];
-    return subtypeSizes.filter((size) => !(linksBySize.get(String(size.id))?.length));
-  }, [subtypeSizes, linksBySize]);
+  const sizesMissingDesigns = useMemo(
+    () => subtypeSizes.filter((size) => !(linksBySize.get(String(size.id))?.length)),
+    [subtypeSizes, linksBySize],
+  );
+
+  const setProduct = (value: string) => {
+    const pid = value ? Number(value) : '';
+    setProductId(pid);
+    setTypeId('');
+    syncUrl(pid, '');
+  };
+
+  const setType = (value: string) => {
+    const tid = value ? Number(value) : '';
+    setTypeId(tid);
+    if (typeof productId === 'number') syncUrl(productId, tid);
+  };
 
   const openModalForSize = useCallback(async (sizeId: string) => {
     setModalSizeId(sizeId);
+    setModalSearch('');
     setModalOpen(true);
-    if (allTemplates.length > 0) return;
     setLoadingTemplates(true);
     try {
       const res = await getDesignTemplates();
       setAllTemplates(res.data.filter((t) => t.is_active === 1));
     } catch {
-      // ignore
+      setAllTemplates([]);
     } finally {
       setLoadingTemplates(false);
     }
-  }, [allTemplates.length]);
+  }, []);
 
   const handleAdd = useCallback(
     async (templateId: number, sizeId: string) => {
@@ -187,16 +208,10 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
       if (t && size) {
         const dim = parseDesignTemplateDimensions(t);
         if (dim && !sizeMatchesTrimFormat(dim.width_mm, dim.height_mm, [size])) {
-          const ok = window.confirm(
-            `Размер макета (${dim.width_mm}×${dim.height_mm} мм) не совпадает с форматом «${size.label}». Прикрепить всё равно?`,
-          );
-          if (!ok) return;
+          if (!window.confirm(`Размер макета не совпадает с форматом. Прикрепить всё равно?`)) return;
         }
         if (dim && pagesConfig?.options?.length && !pageCountAllowedForSubtype(dim.page_count, pagesConfig)) {
-          const ok = window.confirm(
-            `В шаблоне ${dim.page_count} стр., у подтипа допустимы: ${pagesConfig.options.join(', ')}. Прикрепить всё равно?`,
-          );
-          if (!ok) return;
+          if (!window.confirm(`Число страниц в шаблоне не совпадает с подтипом. Прикрепить всё равно?`)) return;
         }
       }
       setAdding(templateId);
@@ -206,7 +221,7 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
         setModalOpen(false);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        alert(msg.includes('409') ? 'Этот дизайн уже привязан к этому размеру' : `Ошибка: ${msg}`);
+        alert(msg.includes('409') ? 'Уже привязан' : msg);
       } finally {
         setAdding(null);
       }
@@ -217,98 +232,99 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
   const handleRemove = useCallback(
     async (linkId: number) => {
       if (typeof productId !== 'number') return;
-      if (!confirm('Убрать этот дизайн с размера?')) return;
+      if (!confirm('Убрать макет с этого размера?')) return;
       try {
         await removeSubtypeDesign(productId, linkId);
         setLinks((prev) => prev.filter((l) => l.id !== linkId));
       } catch {
-        alert('Ошибка при удалении');
+        alert('Ошибка');
       }
     },
     [productId],
   );
 
-  const modalSize = modalSizeId
-    ? subtypeSizes.find((s) => String(s.id) === modalSizeId)
-    : null;
+  const modalSize = modalSizeId ? subtypeSizes.find((s) => String(s.id) === modalSizeId) : null;
   const modalLinks = modalSizeId ? linksBySize.get(modalSizeId) ?? [] : [];
   const linkedIds = new Set(modalLinks.map((l) => l.design_template_id));
 
-  const selectedProduct = typeof productId === 'number'
-    ? products.find((p) => p.id === productId)
-    : undefined;
+  const modalTemplates = useMemo(() => {
+    const q = modalSearch.trim().toLowerCase();
+    if (!q) return allTemplates;
+    return allTemplates.filter((t) => `${t.id} ${t.name}`.toLowerCase().includes(q));
+  }, [allTemplates, modalSearch]);
+
+  const ready = typeof productId === 'number' && !configLoading && !configError && subtypeSizes.length > 0;
 
   return (
-    <div className="design-template-bindings">
-      <p className="design-templates-lead">
-        Матрица привязок master-шаблонов к размерам подтипа. Источник правды для{' '}
-        <code>GET /api/design-templates/public</code> — таблица <code>product_subtype_designs</code>.
+    <div className="subtype-designs-card">
+      <p className="design-bindings-hint">
+        К каждому размеру подтипа — хотя бы один активный шаблон. То же самое, что вкладка «Дизайн» в карточке продукта.
       </p>
 
-      <div className="design-template-bindings__filters">
+      <div className="design-bindings-filters">
         <label>
           Продукт
-          <select
-            value={productId === '' ? '' : String(productId)}
-            onChange={(e) => {
-              const v = e.target.value;
-              setProductId(v ? Number(v) : '');
-              setTypeId('');
-            }}
-          >
-            <option value="">— выберите —</option>
+          <select value={productId === '' ? '' : String(productId)} onChange={(e) => setProduct(e.target.value)}>
+            <option value="">—</option>
             {products.map((p) => (
-              <option key={p.id} value={p.id}>{p.name} (#{p.id})</option>
+              <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
         </label>
-        {types.length > 0 && (
+        {types.length > 0 && productId !== '' && (
           <label>
             Подтип
-            <select
-              value={typeId === '' ? '' : String(typeId)}
-              onChange={(e) => setTypeId(e.target.value ? Number(e.target.value) : '')}
-            >
+            <select value={typeId === '' ? '' : String(typeId)} onChange={(e) => setType(e.target.value)}>
               {types.map((t) => (
-                <option key={t.id} value={t.id}>{t.name} (type {t.id})</option>
+                <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
           </label>
         )}
-        {selectedProduct && (
-          <Button
-            variant="secondary"
-            onClick={() => navigate(`/adminpanel/products/${selectedProduct.id}`)}
-          >
-            <AppIcon name="edit" size="xs" /> Карточка продукта
+        {productId !== '' && (
+          <Button variant="secondary" onClick={() => navigate(`/adminpanel/products/${productId}`)}>
+            Карточка продукта
           </Button>
         )}
       </div>
 
-      {configLoading && <p className="design-templates-loading">Загрузка конфига…</p>}
-      {configError && <p className="design-template-bindings__error">{configError}</p>}
-      {linksError && <p className="design-template-bindings__error">{linksError}</p>}
+      {configLoading && <p className="subtype-designs-card__hint">Загрузка…</p>}
+      {configError && <p className="design-bindings-error">{configError}</p>}
+
+      {productId === '' && !configLoading && (
+        <p className="design-bindings-empty">Выберите продукт.</p>
+      )}
 
       {typeof productId === 'number' && !configLoading && !configError && subtypeSizes.length === 0 && (
-        <p className="design-templates-empty">
-          У выбранного подтипа нет размеров. Добавьте форматы в карточке продукта.
+        <p className="design-bindings-empty">
+          Нет размеров — добавьте в{' '}
+          <button type="button" className="subtype-designs-card__matrix-link" onClick={() => navigate(`/adminpanel/products/${productId}`)}>
+            карточке продукта
+          </button>
+          .
         </p>
       )}
 
-      {sizesMissingDesigns.length > 0 && (
-        <div className="design-template-bindings__alert" role="alert">
-          <AppIcon name="warning" size="xs" />
-          <span>
-            <strong>Нет дизайнов для размеров:</strong>{' '}
-            {sizesMissingDesigns.map((s) => s.label || String(s.id)).join(', ')}
-          </span>
+      {ready && (
+        <p className="design-bindings-status">
+          Размеров: <strong>{subtypeSizes.length}</strong>
+          {sizesMissingDesigns.length > 0 && (
+            <> · без макета: <strong>{sizesMissingDesigns.length}</strong></>
+          )}
+        </p>
+      )}
+
+      {sizesMissingDesigns.length > 0 && ready && (
+        <div className="subtype-designs-coverage-alert" role="alert">
+          <strong>Нет дизайнов:</strong>{' '}
+          {sizesMissingDesigns.map((s) => s.label || String(s.id)).join(', ')}
         </div>
       )}
 
-      {linksLoading && <p className="design-templates-loading">Загрузка привязок…</p>}
+      {linksLoading && ready && <p className="subtype-designs-card__hint">Загрузка привязок…</p>}
 
-      {subtypeSizes.length > 0 && (
-        <div className="design-template-bindings__matrix">
+      {ready && !linksLoading && (
+        <div className="subtype-designs-by-size">
           {subtypeSizes.map((size) => {
             const sizeKey = String(size.id);
             const sizeLinks = linksBySize.get(sizeKey) ?? [];
@@ -316,13 +332,13 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
             return (
               <section
                 key={sizeKey}
-                className={`design-template-bindings__size${missing ? ' design-template-bindings__size--missing' : ''}`}
+                className={`subtype-designs-size-block${missing ? ' subtype-designs-size-block--missing' : ''}`}
               >
-                <div className="design-template-bindings__size-header">
+                <div className="subtype-designs-size-block__header">
                   <div>
-                    <h4>{size.label || sizeKey}</h4>
-                    <span className="design-template-bindings__size-meta">
-                      {size.width_mm}×{size.height_mm} мм · id: <code>{sizeKey}</code>
+                    <h5>{size.label || sizeKey}</h5>
+                    <span className="subtype-designs-size-block__meta">
+                      {size.width_mm}×{size.height_mm} мм · <code>{sizeKey}</code>
                     </span>
                   </div>
                   <Button variant="secondary" onClick={() => void openModalForSize(sizeKey)}>
@@ -330,35 +346,33 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
                   </Button>
                 </div>
                 {missing ? (
-                  <p className="form-hint">Нет привязанных шаблонов.</p>
+                  <p className="subtype-designs-card__hint">Нет макетов для этого размера.</p>
                 ) : (
-                  <div className="design-template-bindings__links">
+                  <div className="subtype-designs-grid">
                     {sizeLinks.map((link) => (
                       <div
                         key={link.id}
-                        className={`design-template-bindings__link${
-                          highlightTemplateId === link.design_template_id
-                            ? ' design-template-bindings__link--highlight'
-                            : ''
+                        className={`subtype-designs-item${
+                          highlightTemplateId === link.design_template_id ? ' subtype-designs-item--highlight' : ''
                         }`}
                       >
-                        <div className="design-template-bindings__link-preview">
+                        <div className="subtype-designs-item__preview">
                           {link.preview_url ? (
                             <img
                               src={resolveTemplatePreviewUrl(link.preview_url, API_BASE_URL) ?? ''}
                               alt={link.name}
+                              className="subtype-designs-item__img"
                             />
                           ) : (
-                            <AppIcon name="image" size="sm" />
+                            <div className="subtype-designs-item__no-preview">
+                              <AppIcon name="image" size="sm" />
+                            </div>
                           )}
                         </div>
-                        <div className="design-template-bindings__link-info">
-                          <span className="design-template-bindings__link-name">{link.name}</span>
-                          <span className="design-template-bindings__link-id">#{link.design_template_id}</span>
-                        </div>
+                        <div className="subtype-designs-item__name">{link.name}</div>
                         <button
                           type="button"
-                          className="design-template-bindings__unlink"
+                          className="subtype-designs-item__remove"
                           onClick={() => void handleRemove(link.id)}
                           title="Отвязать"
                         >
@@ -379,33 +393,39 @@ export const DesignTemplateBindingsPanel: React.FC<BindingsPanelProps> = ({
           <div className="subtype-designs-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="subtype-designs-modal__header">
               <h3 className="subtype-designs-modal__title">
-                Привязать макет — «{modalSize?.label ?? modalSizeId}»
+                {modalSize?.label ?? modalSizeId}
               </h3>
               <button type="button" className="subtype-designs-modal__close" onClick={() => setModalOpen(false)}>
                 <AppIcon name="x" size="sm" />
               </button>
             </div>
+            <input
+              type="search"
+              className="design-bindings-modal-search"
+              placeholder="Поиск шаблона…"
+              value={modalSearch}
+              onChange={(e) => setModalSearch(e.target.value)}
+            />
             {loadingTemplates ? (
-              <p className="subtype-designs-modal__hint">Загрузка каталога…</p>
+              <p className="subtype-designs-modal__hint">Загрузка…</p>
+            ) : modalTemplates.length === 0 ? (
+              <p className="subtype-designs-modal__hint">Нет шаблонов.</p>
             ) : (
               <div className="subtype-designs-modal-grid">
-                {allTemplates.map((t) => {
+                {modalTemplates.map((t) => {
                   const alreadyLinked = linkedIds.has(t.id);
                   return (
                     <div key={t.id} className={`subtype-designs-modal-item${alreadyLinked ? ' is-linked' : ''}`}>
                       <div className="subtype-designs-modal-item__preview">
                         {t.preview_url ? (
-                          <img
-                            src={resolveTemplatePreviewUrl(t.preview_url, API_BASE_URL) ?? ''}
-                            alt={t.name}
-                          />
+                          <img src={resolveTemplatePreviewUrl(t.preview_url, API_BASE_URL) ?? ''} alt={t.name} className="subtype-designs-item__img" />
                         ) : (
                           <div className="subtype-designs-item__no-preview">
                             <AppIcon name="image" size="sm" />
                           </div>
                         )}
                       </div>
-                      <div className="subtype-designs-modal-item__name">#{t.id} {t.name}</div>
+                      <div className="subtype-designs-modal-item__name">{t.name}</div>
                       <Button
                         variant={alreadyLinked ? 'secondary' : 'primary'}
                         onClick={() => !alreadyLinked && void handleAdd(t.id, modalSizeId)}

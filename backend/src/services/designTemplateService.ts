@@ -18,6 +18,8 @@ export interface DesignTemplateRow {
 
 export type DesignTemplateListRow = DesignTemplateRow & {
   author_name?: string | null
+  /** Число строк в product_subtype_designs для этого шаблона */
+  subtype_link_count?: number
 }
 
 export interface DesignTemplateSpec {
@@ -94,6 +96,8 @@ function mapListRow(row: Record<string, unknown>): DesignTemplateListRow {
     created_at: String(row.created_at ?? ''),
     updated_at: String(row.updated_at ?? ''),
     author_name: row.author_name != null ? String(row.author_name) : null,
+    subtype_link_count:
+      row.subtype_link_count != null ? Number(row.subtype_link_count) || 0 : undefined,
   }
 }
 
@@ -113,7 +117,8 @@ export async function getDesignTemplatesByIds(ids: number[]): Promise<Map<number
 export async function getAllDesignTemplates(): Promise<DesignTemplateListRow[]> {
   const db = await getDb()
   const rows = await db.all(
-    `SELECT dt.*, u.name AS author_name
+    `SELECT dt.*, u.name AS author_name,
+      (SELECT COUNT(*) FROM product_subtype_designs psd WHERE psd.design_template_id = dt.id) AS subtype_link_count
      FROM design_templates dt
      LEFT JOIN users u ON u.id = dt.author_user_id
      ORDER BY dt.sort_order ASC, dt.name ASC`,

@@ -12,7 +12,16 @@ import {
   deleteDesignTemplate,
   type DesignTemplateInput,
 } from '../services/designTemplateService'
-import { importDesignTemplateFromFile } from '../services/designTemplateImporterService'
+import {
+  importDesignTemplateFromFile,
+  reimportDesignTemplateFromFile,
+} from '../services/designTemplateImporterService'
+import {
+  createDesignTemplateCategory,
+  deleteDesignTemplateCategory,
+  getDesignTemplateCategories,
+  updateDesignTemplateCategory,
+} from '../services/designTemplateCategoryService'
 
 const router = Router()
 
@@ -81,6 +90,101 @@ router.get('/category/:category', asyncHandler(async (req: Request, res: Respons
   const { category } = req.params
   const templates = await getDesignTemplatesByCategory(decodeURIComponent(category))
   res.json(templates)
+}))
+
+/** GET /api/design-templates/categories — справочник категорий */
+router.get('/categories', asyncHandler(async (_req: Request, res: Response) => {
+  const categories = await getDesignTemplateCategories()
+  res.json(categories)
+}))
+
+/** POST /api/design-templates/categories */
+router.post('/categories', asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as Record<string, unknown>
+  const name = String(body.name ?? '').trim()
+  try {
+    const created = await createDesignTemplateCategory(name)
+    res.status(201).json(created)
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Ошибка создания категории'
+    const status = msg.includes('уже есть') || msg.includes('Укажите') ? 400 : 500
+    res.status(status).json({ message: msg })
+  }
+}))
+
+/** PUT /api/design-templates/categories/:id */
+router.put('/categories/:id', asyncHandler(async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id)
+  if (isNaN(id)) {
+    res.status(400).json({ message: 'Неверный ID' })
+    return
+  }
+  const body = req.body as Record<string, unknown>
+  try {
+    const updated = await updateDesignTemplateCategory(id, {
+      name: body.name != null ? String(body.name) : undefined,
+      sort_order: body.sort_order != null ? Number(body.sort_order) : undefined,
+    })
+    if (!updated) {
+      res.status(404).json({ message: 'Категория не найдена' })
+      return
+    }
+    res.json(updated)
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Ошибка обновления'
+    res.status(400).json({ message: msg })
+  }
+}))
+
+/** DELETE /api/design-templates/categories/:id */
+router.delete('/categories/:id', asyncHandler(async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id)
+  if (isNaN(id)) {
+    res.status(400).json({ message: 'Неверный ID' })
+    return
+  }
+  try {
+    const deleted = await deleteDesignTemplateCategory(id)
+    if (!deleted) {
+      res.status(404).json({ message: 'Категория не найдена' })
+      return
+    }
+    res.status(204).send()
+  } catch (err: unknown) {
+    res.status(400).json({ message: (err as Error).message })
+  }
+}))
+
+/** POST /api/design-templates/:id/reimport — обновить существующий шаблон из SVG/ZIP */
+router.post('/:id/reimport', uploadOrderFilesMemory.fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'sourceFile', maxCount: 1 },
+]), asyncHandler(async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id)
+  if (isNaN(id)) {
+    res.status(400).json({ message: 'Неверный ID', errors: ['Неверный ID'], warnings: [] })
+    return
+  }
+  try {
+    const files = (req as any).files as Record<string, Array<{
+      buffer?: Buffer
+      originalname?: string
+      mimetype?: string
+    }>> | undefined
+    const result = await reimportDesignTemplateFromFile({
+      templateId: id,
+      file: files?.file?.[0],
+      sourceFile: files?.sourceFile?.[0],
+    })
+    res.json(result)
+  } catch (err: unknown) {
+    const details = err as Error & { importErrors?: string[]; importWarnings?: string[] }
+    res.status(400).json({
+      message: details.message || 'Ошибка повторного импорта',
+      errors: details.importErrors ?? [details.message || 'Ошибка повторного импорта'],
+      warnings: details.importWarnings ?? [],
+    })
+  }
 }))
 
 /** GET /api/design-templates/:id — один шаблон */

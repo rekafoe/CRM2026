@@ -3,9 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { AppIcon } from '../../components/ui/AppIcon';
 import { BynSymbol } from '../../components/ui/BynSymbol';
-import { Alert, Button, Modal } from '../../components/common';
+import { Alert, Modal } from '../../components/common';
 import {
   getDesignTemplates,
+  getDesignTemplateCategories,
+  createDesignTemplateCategory,
   createDesignTemplate,
   updateDesignTemplate,
   deleteDesignTemplate,
@@ -13,6 +15,7 @@ import {
   importDesignTemplateFile,
   getUsers,
   type DesignTemplate,
+  type DesignTemplateCategory,
   type DesignTemplateInput,
 } from '../../api';
 import type { UserRef } from '../../types';
@@ -22,7 +25,6 @@ import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
 import {
   formatAuthorRoyaltyLine,
   formatBynAmount,
-  formatProductBinding,
   formatTemplateSize,
   getTemplateCatalogStatus,
   parseTemplateSpec,
@@ -30,10 +32,15 @@ import {
   type TemplateCatalogStatus,
 } from './designTemplates/designTemplateCatalogUtils';
 import { DesignTemplateBindingsPanel } from './designTemplates/DesignTemplateBindingsPanel';
+import { DesignTemplateCategoriesModal } from './designTemplates/DesignTemplateCategoriesModal';
+import { DesignTemplateCategoryField } from './designTemplates/DesignTemplateCategoryField';
+import { DesignTemplateProductBindField } from './designTemplates/DesignTemplateProductBindField';
+import { DesignTemplateReimportModal } from './designTemplates/DesignTemplateReimportModal';
+import { buildCategorySections, UNCATEGORIZED_KEY } from './designTemplates/designTemplateCategoryUtils';
+import { useDesignTemplateBindingLabels } from './designTemplates/useDesignTemplateBindingLabels';
 import '../../styles/admin-page-layout.css';
+import '../../components/admin/ProductManagement.css';
 import './DesignTemplatesPage.css';
-
-const DEFAULT_CATEGORIES = ['Свадьба', 'Дети', 'Love story', 'Выпускной', 'Семья', 'Праздники', 'Разное'];
 
 const STATUS_LABELS: Record<TemplateCatalogStatus, string> = {
   active: 'Активен',
@@ -42,11 +49,31 @@ const STATUS_LABELS: Record<TemplateCatalogStatus, string> = {
 };
 
 type StatusFilter = 'all' | TemplateCatalogStatus;
+type BindingFilter = 'all' | 'linked' | 'unlinked';
 type SortKey = 'sort_order' | 'name' | 'updated';
 type PageTab = 'catalog' | 'bindings';
 
 const DEFAULT_USAGE_FEE = 3;
 const DEFAULT_AUTHOR_PERCENT = 10;
+const CATEGORY_COLLAPSE_STORAGE_KEY = 'design-templates-category-collapsed';
+
+function loadCollapsedSectionKeys(): Set<string> {
+  try {
+    const raw = localStorage.getItem(CATEGORY_COLLAPSE_STORAGE_KEY);
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    /* ignore */
+  }
+  return new Set();
+}
+
+function saveCollapsedSectionKeys(keys: Set<string>) {
+  try {
+    localStorage.setItem(CATEGORY_COLLAPSE_STORAGE_KEY, JSON.stringify([...keys]));
+  } catch {
+    /* ignore */
+  }
+}
 
 function mergeSpecOnSave(
   existingSpec: Record<string, unknown> | null,
@@ -76,6 +103,11 @@ export const DesignTemplatesPage: React.FC = () => {
   const bindingsTypeId = searchParams.get('typeId');
   const highlightTemplateId = searchParams.get('templateId');
   const [templates, setTemplates] = useState<DesignTemplate[]>([]);
+  const [categoryRegistry, setCategoryRegistry] = useState<DesignTemplateCategory[]>([]);
+  const [categoriesModalOpen, setCategoriesModalOpen] = useState(false);
+  const [reimportTemplate, setReimportTemplate] = useState<DesignTemplate | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(loadCollapsedSectionKeys);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [users, setUsers] = useState<UserRef[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +118,7 @@ export const DesignTemplatesPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [bindingFilter, setBindingFilter] = useState<BindingFilter>('all');
   const [authorFilter, setAuthorFilter] = useState<string>('all');
   const [sortKey, setSortKey] = useState<SortKey>('sort_order');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -127,6 +160,15 @@ export const DesignTemplatesPage: React.FC = () => {
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
 
+  const loadCategories = useCallback(async () => {
+    try {
+      const res = await getDesignTemplateCategories();
+      setCategoryRegistry(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setCategoryRegistry([]);
+    }
+  }, []);
+
   const loadTemplates = useCallback(async () => {
     try {
       setLoading(true);
@@ -140,9 +182,13 @@ export const DesignTemplatesPage: React.FC = () => {
     }
   }, []);
 
+  const reloadCatalog = useCallback(async () => {
+    await Promise.all([loadTemplates(), loadCategories()]);
+  }, [loadTemplates, loadCategories]);
+
   useEffect(() => {
-    loadTemplates();
-  }, [loadTemplates]);
+    void reloadCatalog();
+  }, [reloadCatalog]);
 
   useEffect(() => {
     void initializeDirectory();
@@ -171,19 +217,31 @@ export const DesignTemplatesPage: React.FC = () => {
     setSearchParams(next);
   }, [setSearchParams]);
 
-  const categories = useMemo(
-    () => Array.from(new Set([...DEFAULT_CATEGORIES, ...templates.map((t) => t.category).filter(Boolean) as string[]])),
-    [templates],
-  );
+  const handleCreateCategoryInline = useCallback(async (name: string) => {
+    try {
+      const res = await createDesignTemplateCategory(name);
+      await loadCategories();
+      return res.data.name;
+    } catch {
+      return null;
+    }
+  }, [loadCategories]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     let list = templates;
-    if (categoryFilter) {
+    if (categoryFilter === UNCATEGORIZED_KEY) {
+      list = list.filter((t) => !t.category?.trim());
+    } else if (categoryFilter) {
       list = list.filter((t) => (t.category ?? '') === categoryFilter);
     }
     if (statusFilter !== 'all') {
       list = list.filter((t) => getTemplateCatalogStatus(t) === statusFilter);
+    }
+    if (bindingFilter === 'linked') {
+      list = list.filter((t) => (t.subtype_link_count ?? 0) > 0);
+    } else if (bindingFilter === 'unlinked') {
+      list = list.filter((t) => (t.subtype_link_count ?? 0) === 0);
     }
     if (authorFilter === 'mine' && currentUser?.id) {
       list = list.filter((t) => t.author_user_id === currentUser.id);
@@ -216,7 +274,41 @@ export const DesignTemplatesPage: React.FC = () => {
       return (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name, 'ru');
     });
     return sorted;
-  }, [templates, categoryFilter, statusFilter, authorFilter, searchQuery, sortKey, currentUser?.id]);
+  }, [templates, categoryFilter, statusFilter, bindingFilter, authorFilter, searchQuery, sortKey, currentUser?.id]);
+
+  const categorySections = useMemo(() => {
+    const sections = buildCategorySections(filtered, categoryRegistry);
+    if (!categoryFilter) return sections;
+    return sections.filter((s) => s.key === categoryFilter);
+  }, [filtered, categoryRegistry, categoryFilter]);
+
+  const toggleSectionCollapsed = useCallback((sectionKey: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(sectionKey)) next.delete(sectionKey);
+      else next.add(sectionKey);
+      saveCollapsedSectionKeys(next);
+      return next;
+    });
+  }, []);
+
+  const expandAllSections = useCallback(() => {
+    setCollapsedSections(() => {
+      saveCollapsedSectionKeys(new Set());
+      return new Set();
+    });
+  }, []);
+
+  const collapseAllSections = useCallback(() => {
+    const keys = new Set(categorySections.map((s) => s.key));
+    setCollapsedSections(keys);
+    saveCollapsedSectionKeys(keys);
+  }, [categorySections]);
+
+  const filtersActive =
+    Boolean(categoryFilter || searchQuery.trim() || statusFilter !== 'all' || bindingFilter !== 'all' || authorFilter !== 'all');
+
+  const { formatBinding } = useDesignTemplateBindingLabels(templates);
 
   const counts = useMemo(() => {
     const c = { all: templates.length, active: 0, inactive: 0, draft: 0 };
@@ -226,13 +318,25 @@ export const DesignTemplatesPage: React.FC = () => {
     return c;
   }, [templates]);
 
+  const bindingCounts = useMemo(() => {
+    let linked = 0;
+    let unlinked = 0;
+    templates.forEach((t) => {
+      if ((t.subtype_link_count ?? 0) > 0) linked += 1;
+      else unlinked += 1;
+    });
+    return { linked, unlinked };
+  }, [templates]);
+
+  const defaultCategoryName = categoryRegistry[0]?.name ?? '';
+
   const openCreate = () => {
     setEditingId(null);
     setExistingSpec(null);
     setForm({
       name: '',
       description: '',
-      category: '',
+      category: defaultCategoryName,
       preview_url: '',
       width_mm: '',
       height_mm: '',
@@ -254,7 +358,7 @@ export const DesignTemplatesPage: React.FC = () => {
     setImportForm({
       name: '',
       description: '',
-      category: '',
+      category: defaultCategoryName,
       productId: '',
       typeId: '',
       sizeId: '',
@@ -464,15 +568,152 @@ export const DesignTemplatesPage: React.FC = () => {
 
   const infoParsed = infoTemplate ? parseTemplateSpec(infoTemplate) : null;
 
+  const renderTemplateCard = useCallback((t: DesignTemplate) => {
+    const parsed = parseTemplateSpec(t);
+    const status = getTemplateCatalogStatus(t);
+    const sizeStr = formatTemplateSize(parsed);
+    const binding = formatBinding(parsed);
+    const previewSrc = resolveTemplatePreviewUrl(t.preview_url, API_BASE_URL);
+    return (
+      <div key={t.id} className={`design-template-card design-template-card--${status}`}>
+        <div className="design-template-preview">
+          {previewSrc ? (
+            <img src={previewSrc} alt={t.name} />
+          ) : (
+            <div className="design-template-placeholder">
+              <AppIcon name="image" size="lg" />
+            </div>
+          )}
+          <span className={`design-template-status design-template-status--${status}`}>
+            {STATUS_LABELS[status]}
+          </span>
+        </div>
+        <div className="design-template-info">
+          <h4 className="design-template-name">
+            <span className="design-template-id">#{t.id}</span> {t.name}
+          </h4>
+          {(sizeStr || binding || parsed.importWarnings.length > 0) && (
+            <div className="design-template-meta-row">
+              {sizeStr && <span className="design-template-meta design-template-size">{sizeStr}</span>}
+              {binding && <span className="design-template-meta design-template-binding">{binding}</span>}
+              {(t.subtype_link_count ?? 0) === 0 && (
+                <button
+                  type="button"
+                  className="design-template-meta design-template-binding-warn"
+                  title={
+                    parsed.productId != null
+                      ? 'Открыть матрицу привязок для этого продукта'
+                      : 'Сначала укажите продукт в карточке шаблона'
+                  }
+                  onClick={() => {
+                    if (parsed.productId != null) openBindingsForTemplate(t);
+                    else openEdit(t);
+                  }}
+                >
+                  нет привязки · настроить
+                </button>
+              )}
+              {parsed.importWarnings.length > 0 && (
+                <span className="design-template-meta design-template-warnings-badge" title={parsed.importWarnings.join('\n')}>
+                  {parsed.importWarnings.length} предупр.
+                </span>
+              )}
+            </div>
+          )}
+          {(t.author_name || t.author_user_id) && (
+            <span className="design-template-author">
+              <AppIcon name="user" size="xs" />
+              {t.author_name ?? `user #${t.author_user_id}`}
+            </span>
+          )}
+          {formatAuthorRoyaltyLine(t) && (
+            <span className="design-template-royalty" title="Внутренняя база для ЗП автора, не в цене клиента">
+              <BynSymbol className="design-template-royalty__sign" />
+              {formatAuthorRoyaltyLine(t)}
+              <span className="design-template-royalty-hint"> · не в цене клиента</span>
+            </span>
+          )}
+        </div>
+        <div className="design-template-actions">
+          <div className="design-template-actions__primary">
+            <button
+              type="button"
+              className="lg-btn lg-btn--primary"
+              onClick={() => navigate(`${editorPathPrefix}/${t.id}`)}
+              title="Master-редактор"
+            >
+              <AppIcon name="edit" size="xs" /> Шаблон
+            </button>
+            <button
+              type="button"
+              className="lg-btn"
+              onClick={() => navigate(`/adminpanel/public-design-editor-preview/${t.id}`)}
+              title="Клиентский sandbox"
+            >
+              <AppIcon name="image" size="xs" /> Клиент
+            </button>
+          </div>
+          <div className="design-template-actions__secondary">
+            <button
+              type="button"
+              className="lg-btn lg-btn--icon"
+              onClick={() => setReimportTemplate(t)}
+              title="Обновить из SVG (тот же шаблон)"
+              aria-label="Обновить SVG"
+            >
+              <AppIcon name="download" size="xs" />
+            </button>
+            <button type="button" className="lg-btn lg-btn--icon" onClick={() => setInfoTemplate(t)} title="Импорт и метаданные" aria-label="Инфо">
+              <AppIcon name="info" size="xs" />
+            </button>
+            {(parsed.productId != null || parsed.typeId != null) && (
+              <button type="button" className="lg-btn lg-btn--icon" onClick={() => openBindingsForTemplate(t)} title="Привязки к продукту" aria-label="Привязки">
+                <AppIcon name="link" size="xs" />
+              </button>
+            )}
+            <button type="button" className="lg-btn lg-btn--icon" onClick={() => openEdit(t)} title="Карточка" aria-label="Карточка">
+              <AppIcon name="edit" size="xs" />
+            </button>
+            <button type="button" className="lg-btn lg-btn--icon" onClick={() => void handleDuplicate(t)} title="Копия" aria-label="Копия">
+              <AppIcon name="copy" size="xs" />
+            </button>
+            <label className="design-template-active-toggle lg-btn lg-btn--icon" title="Активен на сайте">
+              <input
+                type="checkbox"
+                checked={t.is_active === 1}
+                disabled={!parsed.hasDesignState}
+                onChange={() => void handleToggleActive(t)}
+              />
+            </label>
+            <button type="button" className="lg-btn lg-btn--icon lg-btn--danger" onClick={() => handleDelete(t.id)} title="Удалить" aria-label="Удалить">
+              <AppIcon name="trash" size="xs" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }, [
+    navigate,
+    editorPathPrefix,
+    openBindingsForTemplate,
+    openEdit,
+    setReimportTemplate,
+    handleDuplicate,
+    handleToggleActive,
+    handleDelete,
+    formatBinding,
+  ]);
+
   return (
     <AdminPageLayout
+      className="design-templates-layout"
       title="Каталог шаблонов дизайна"
       icon={<AppIcon name="layers" size="sm" />}
       onBack={() => navigate('/adminpanel')}
     >
       {error && <Alert type="error">{error}</Alert>}
 
-      <div className="design-templates-page">
+      <div className="design-templates-page product-management">
         <div className="design-templates-tabs">
           <button
             type="button"
@@ -480,13 +721,14 @@ export const DesignTemplatesPage: React.FC = () => {
             onClick={() => setPageTab('catalog')}
           >
             <AppIcon name="layers" size="xs" /> Каталог
+            <span className="design-templates-tab__count">{templates.length}</span>
           </button>
           <button
             type="button"
             className={`design-templates-tab${pageTab === 'bindings' ? ' design-templates-tab--active' : ''}`}
             onClick={() => setPageTab('bindings')}
           >
-            <AppIcon name="link" size="xs" /> Привязки к продуктам
+            <AppIcon name="link" size="xs" /> Привязки
           </button>
         </div>
 
@@ -498,19 +740,37 @@ export const DesignTemplatesPage: React.FC = () => {
           />
         ) : (
           <>
-        <p className="design-templates-lead">
-          Master-шаблоны для сайта и редактора. Основной вход — <strong>Импорт SVG</strong> (конвенция слоёв в{' '}
-          <code>docs/design-template-importer.md</code>). Справка: <code>docs/design-templates-catalog.md</code>.
-          Внутренняя плата автора — в <strong>бел. руб.</strong>, не в цене клиента.
-        </p>
+        <div className="design-templates-help">
+          <button
+            type="button"
+            className="design-templates-help__toggle"
+            onClick={() => setHelpOpen((v) => !v)}
+            aria-expanded={helpOpen}
+          >
+            <span className="design-templates-help__chevron" aria-hidden>{helpOpen ? '▾' : '▸'}</span>
+            Справка по каталогу
+          </button>
+          {helpOpen && (
+            <p className="design-templates-help__body">
+              Master-шаблоны для сайта и редактора. Основной вход — <strong>Импорт SVG</strong> (
+              <code>docs/design-template-importer.md</code>). Подробнее:{' '}
+              <code>docs/design-templates-catalog.md</code>. Плата автора — в <strong>бел. руб.</strong>, не в цене
+              клиента.
+            </p>
+          )}
+        </div>
 
+        <div className="design-templates-toolbar-card">
         <div className="design-templates-toolbar">
-          <Button onClick={openImport}>
+          <button type="button" className="lg-btn lg-btn--primary" onClick={openImport}>
             <AppIcon name="download" size="xs" /> Импорт SVG
-          </Button>
-          <Button variant="secondary" onClick={openCreate}>
+          </button>
+          <button type="button" className="lg-btn" onClick={openCreate}>
             <AppIcon name="plus" size="xs" /> Вручную
-          </Button>
+          </button>
+          <button type="button" className="lg-btn" onClick={() => setCategoriesModalOpen(true)}>
+            <AppIcon name="folder" size="xs" /> Категории
+          </button>
           <input
             type="search"
             className="design-templates-search"
@@ -528,11 +788,20 @@ export const DesignTemplatesPage: React.FC = () => {
             </select>
           </div>
           <div className="design-templates-filter">
+            <label>Привязка:</label>
+            <select value={bindingFilter} onChange={(e) => setBindingFilter(e.target.value as BindingFilter)}>
+              <option value="all">Все</option>
+              <option value="linked">В матрице ({bindingCounts.linked})</option>
+              <option value="unlinked">Без привязки ({bindingCounts.unlinked})</option>
+            </select>
+          </div>
+          <div className="design-templates-filter">
             <label>Категория:</label>
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
               <option value="">Все</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
+              <option value={UNCATEGORIZED_KEY}>Без категории</option>
+              {categoryRegistry.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
               ))}
             </select>
           </div>
@@ -557,91 +826,56 @@ export const DesignTemplatesPage: React.FC = () => {
             </select>
           </div>
         </div>
+        </div>
+
+        {!loading && filtersActive && filtered.length > 0 && (
+          <p className="design-templates-shown-count">
+            Показано <strong>{filtered.length}</strong> из {templates.length} шаблонов
+          </p>
+        )}
+
+        {!loading && categorySections.length > 1 && (
+          <div className="design-templates-section-tools">
+            <button type="button" className="lg-btn" onClick={expandAllSections}>
+              Развернуть все
+            </button>
+            <button type="button" className="lg-btn" onClick={collapseAllSections}>
+              Свернуть все
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="design-templates-loading">Загрузка...</div>
         ) : (
-          <div className="design-templates-grid">
-            {filtered.map((t) => {
-              const parsed = parseTemplateSpec(t);
-              const status = getTemplateCatalogStatus(t);
-              const sizeStr = formatTemplateSize(parsed);
-              const binding = formatProductBinding(parsed);
-              const previewSrc = resolveTemplatePreviewUrl(t.preview_url, API_BASE_URL);
+          <div className="design-templates-catalog-sections">
+            {categorySections.map((section) => {
+              const collapsed = collapsedSections.has(section.key);
               return (
-                <div key={t.id} className={`design-template-card design-template-card--${status}`}>
-                  <div className="design-template-preview">
-                    {previewSrc ? (
-                      <img src={previewSrc} alt={t.name} />
-                    ) : (
-                      <div className="design-template-placeholder">
-                        <AppIcon name="image" size="lg" />
-                      </div>
-                    )}
-                    <span className={`design-template-status design-template-status--${status}`}>
-                      {STATUS_LABELS[status]}
+                <section
+                  key={section.key}
+                  className={`design-templates-category-card${collapsed ? ' design-templates-category-card--collapsed' : ''}`}
+                >
+                  <button
+                    type="button"
+                    className="design-templates-category-card__header"
+                    onClick={() => toggleSectionCollapsed(section.key)}
+                    aria-expanded={!collapsed}
+                  >
+                    <span className="design-templates-category-card__chevron" aria-hidden>
+                      {collapsed ? '▸' : '▾'}
                     </span>
-                  </div>
-                  <div className="design-template-info">
-                    <h4>
-                      <span className="design-template-id">#{t.id}</span> {t.name}
-                    </h4>
-                    {t.category && <span className="design-template-category">{t.category}</span>}
-                    {sizeStr && <span className="design-template-size">{sizeStr}</span>}
-                    {binding && <span className="design-template-binding">{binding}</span>}
-                    {(t.author_name || t.author_user_id) && (
-                      <span className="design-template-author">
-                        <AppIcon name="user" size="xs" />
-                        {t.author_name ?? `user #${t.author_user_id}`}
-                      </span>
-                    )}
-                    {formatAuthorRoyaltyLine(t) && (
-                      <span className="design-template-royalty" title="Внутренняя база для ЗП автора, не в цене клиента">
-                        <BynSymbol className="design-template-royalty__sign" />
-                        {formatAuthorRoyaltyLine(t)}
-                        <span className="design-template-royalty-hint"> · не в цене клиента</span>
-                      </span>
-                    )}
-                    {parsed.importWarnings.length > 0 && (
-                      <span className="design-template-warnings-badge" title={parsed.importWarnings.join('\n')}>
-                        {parsed.importWarnings.length} предупр.
-                      </span>
-                    )}
-                  </div>
-                  <div className="design-template-actions">
-                    <button type="button" onClick={() => navigate(`${editorPathPrefix}/${t.id}`)} className="btn-open" title="Master-редактор">
-                      <AppIcon name="edit" size="xs" /> Шаблон
-                    </button>
-                    <button type="button" onClick={() => navigate(`/adminpanel/public-design-editor-preview/${t.id}`)} className="btn-open" title="Клиентский sandbox">
-                      <AppIcon name="image" size="xs" /> Клиент
-                    </button>
-                    <button type="button" onClick={() => setInfoTemplate(t)} className="btn-meta" title="Импорт и метаданные">
-                      <AppIcon name="info" size="xs" />
-                    </button>
-                    {(parsed.productId != null || parsed.typeId != null) && (
-                      <button type="button" onClick={() => openBindingsForTemplate(t)} className="btn-meta" title="Привязки к продукту">
-                        <AppIcon name="link" size="xs" />
-                      </button>
-                    )}
-                    <button type="button" onClick={() => openEdit(t)} className="btn-edit" title="Карточка">
-                      <AppIcon name="edit" size="xs" />
-                    </button>
-                    <button type="button" onClick={() => void handleDuplicate(t)} className="btn-meta" title="Копия">
-                      <AppIcon name="copy" size="xs" />
-                    </button>
-                    <label className="design-template-active-toggle" title="Активен на сайте">
-                      <input
-                        type="checkbox"
-                        checked={t.is_active === 1}
-                        disabled={!parsed.hasDesignState}
-                        onChange={() => void handleToggleActive(t)}
-                      />
-                    </label>
-                    <button type="button" onClick={() => handleDelete(t.id)} className="btn-delete" title="Удалить">
-                      <AppIcon name="trash" size="xs" />
-                    </button>
-                  </div>
-                </div>
+                    <h3 className="design-templates-category-card__title">{section.label}</h3>
+                    <span className="design-templates-category-card__badge">{section.items.length}</span>
+                  </button>
+                  {!collapsed && (
+                    <div className="design-templates-category-card__body">
+                      <div className="design-templates-grid">
+                        {section.items.map((t) => renderTemplateCard(t))}
+                      </div>
+                    </div>
+                  )}
+                </section>
               );
             })}
           </div>
@@ -658,7 +892,12 @@ export const DesignTemplatesPage: React.FC = () => {
         )}
       </div>
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Карточка шаблона' : 'Новый шаблон (вручную)'}>
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingId ? 'Карточка шаблона' : 'Новый шаблон (вручную)'}
+        className="product-management design-templates-modal"
+      >
         <div className="design-template-form">
           <div className="form-row">
             <label>Название *</label>
@@ -679,12 +918,12 @@ export const DesignTemplatesPage: React.FC = () => {
           </div>
           <div className="form-row">
             <label>Категория</label>
-            <select value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}>
-              <option value="">—</option>
-              {DEFAULT_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+            <DesignTemplateCategoryField
+              categories={categoryRegistry}
+              value={form.category}
+              onChange={(category) => setForm((p) => ({ ...p, category }))}
+              onCreateCategory={handleCreateCategoryInline}
+            />
           </div>
           <div className="form-row form-row-inline">
             <label>
@@ -728,23 +967,13 @@ export const DesignTemplatesPage: React.FC = () => {
               <span className="design-template-royalty-hint"> (не в цене клиента)</span>
             </p>
           )}
-          <div className="form-row form-row-inline design-template-product-bind">
-            <label>
-              <span>Product ID</span>
-              <input value={form.productId} onChange={(e) => setForm((p) => ({ ...p, productId: e.target.value }))} placeholder="22" />
-            </label>
-            <label>
-              <span>Type ID</span>
-              <input value={form.typeId} onChange={(e) => setForm((p) => ({ ...p, typeId: e.target.value }))} placeholder="1" />
-            </label>
-            <label>
-              <span>Size ID</span>
-              <input value={form.sizeId} onChange={(e) => setForm((p) => ({ ...p, sizeId: e.target.value }))} placeholder="10x15" />
-            </label>
+          <div className="form-row">
+            <label>Привязка к продукту (опционально)</label>
+            <DesignTemplateProductBindField
+              value={{ productId: form.productId, typeId: form.typeId, sizeId: form.sizeId }}
+              onChange={(bind) => setForm((p) => ({ ...p, ...bind }))}
+            />
           </div>
-          <p className="form-hint">
-            Для public API. Основная привязка — в карточке продукта по каждому размеру подтипа; sizeId должен совпадать с <code>sizes[].id</code>.
-          </p>
           <div className="form-row">
             <label>Превью (фон в редакторе)</label>
             <div className="preview-upload">
@@ -755,7 +984,7 @@ export const DesignTemplatesPage: React.FC = () => {
                 </div>
               ) : null}
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePreviewUpload} className="visually-hidden-file-input" />
-              <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>Загрузить изображение</Button>
+              <button type="button" className="lg-btn" onClick={() => fileInputRef.current?.click()}>Загрузить изображение</button>
             </div>
           </div>
           <div className="form-row form-row-inline">
@@ -783,13 +1012,18 @@ export const DesignTemplatesPage: React.FC = () => {
             </label>
           </div>
           <div className="form-actions">
-            <Button variant="secondary" onClick={() => setModalOpen(false)}>Отмена</Button>
-            <Button onClick={handleSave}>Сохранить</Button>
+            <button type="button" className="lg-btn" onClick={() => setModalOpen(false)}>Отмена</button>
+            <button type="button" className="lg-btn lg-btn--primary" onClick={() => void handleSave()}>Сохранить</button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={importModalOpen} onClose={() => setImportModalOpen(false)} title="Импорт шаблона (SVG)">
+      <Modal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        title="Импорт шаблона (SVG)"
+        className="product-management design-templates-modal"
+      >
         <div className="design-template-form">
           <div className="design-template-import-intro">
             <strong>Основной способ:</strong>
@@ -799,7 +1033,7 @@ export const DesignTemplatesPage: React.FC = () => {
             <label>Исходник для CRM</label>
             <div className="preview-upload">
               <input ref={importSourceFileInputRef} type="file" accept=".ai,.cdr,.indd,.indt,.pdf,.svg" onChange={(e) => setImportForm((p) => ({ ...p, sourceFile: e.target.files?.[0] ?? null }))} className="visually-hidden-file-input" />
-              <Button variant="secondary" onClick={() => importSourceFileInputRef.current?.click()}>Выбрать исходник</Button>
+              <button type="button" className="lg-btn" onClick={() => importSourceFileInputRef.current?.click()}>Выбрать исходник</button>
               <p className="form-hint">{importForm.sourceFile ? importForm.sourceFile.name : 'AI, CDR, PDF…'}</p>
             </div>
           </div>
@@ -807,7 +1041,7 @@ export const DesignTemplatesPage: React.FC = () => {
             <label>SVG/ZIP для редактора *</label>
             <div className="preview-upload">
               <input ref={importFileInputRef} type="file" accept=".svg,.zip" onChange={(e) => setImportForm((p) => ({ ...p, file: e.target.files?.[0] ?? null }))} className="visually-hidden-file-input" />
-              <Button variant="secondary" onClick={() => importFileInputRef.current?.click()}>Выбрать SVG/ZIP</Button>
+              <button type="button" className="lg-btn" onClick={() => importFileInputRef.current?.click()}>Выбрать SVG/ZIP</button>
               <p className="form-hint">{importForm.file ? importForm.file.name : 'photo_*, text_*, trim/bleed/safe'}</p>
             </div>
           </div>
@@ -821,12 +1055,12 @@ export const DesignTemplatesPage: React.FC = () => {
           </div>
           <div className="form-row">
             <label>Категория</label>
-            <select value={importForm.category} onChange={(e) => setImportForm((p) => ({ ...p, category: e.target.value }))}>
-              <option value="">—</option>
-              {DEFAULT_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+            <DesignTemplateCategoryField
+              categories={categoryRegistry}
+              value={importForm.category}
+              onChange={(category) => setImportForm((p) => ({ ...p, category }))}
+              onCreateCategory={handleCreateCategoryInline}
+            />
           </div>
           <div className="form-row form-row-inline">
             <label>
@@ -862,15 +1096,18 @@ export const DesignTemplatesPage: React.FC = () => {
               />
             </label>
           </div>
-          <div className="form-row form-row-inline design-template-product-bind">
-            <label><span>Product ID</span><input value={importForm.productId} onChange={(e) => setImportForm((p) => ({ ...p, productId: e.target.value }))} /></label>
-            <label><span>Type ID</span><input value={importForm.typeId} onChange={(e) => setImportForm((p) => ({ ...p, typeId: e.target.value }))} /></label>
-            <label>
-              <span>Size ID *</span>
-              <input value={importForm.sizeId} onChange={(e) => setImportForm((p) => ({ ...p, sizeId: e.target.value }))} placeholder="id размера в продукте" />
-            </label>
+          <div className="form-row">
+            <label>Привязка к продукту</label>
+            <DesignTemplateProductBindField
+              value={{
+                productId: importForm.productId,
+                typeId: importForm.typeId,
+                sizeId: importForm.sizeId,
+              }}
+              onChange={(bind) => setImportForm((p) => ({ ...p, ...bind }))}
+              requiredSize
+            />
           </div>
-          <p className="form-hint">При product + type без sizeId шаблон не попадёт в привязку размера (только каталог).</p>
           {importWarnings.length > 0 && (
             <div className="design-template-import-warnings">
               <strong>Предупреждения:</strong>
@@ -878,20 +1115,27 @@ export const DesignTemplatesPage: React.FC = () => {
             </div>
           )}
           <div className="form-actions">
-            <Button variant="secondary" onClick={() => setImportModalOpen(false)}>Закрыть</Button>
-            <Button onClick={handleImport} disabled={importing}>{importing ? 'Импорт…' : 'Импортировать'}</Button>
+            <button type="button" className="lg-btn" onClick={() => setImportModalOpen(false)}>Закрыть</button>
+            <button type="button" className="lg-btn lg-btn--primary" onClick={() => void handleImport()} disabled={importing}>
+              {importing ? 'Импорт…' : 'Импортировать'}
+            </button>
           </div>
         </div>
       </Modal>
 
-      <Modal isOpen={infoTemplate !== null} onClose={() => setInfoTemplate(null)} title={infoTemplate ? `Шаблон #${infoTemplate.id}` : ''}>
+      <Modal
+        isOpen={infoTemplate !== null}
+        onClose={() => setInfoTemplate(null)}
+        title={infoTemplate ? `Шаблон #${infoTemplate.id}` : ''}
+        className="product-management design-templates-modal"
+      >
         {infoTemplate && infoParsed && (
           <div className="design-template-info-panel">
             <p><strong>Статус:</strong> {STATUS_LABELS[getTemplateCatalogStatus(infoTemplate)]}</p>
             <p><strong>designState:</strong> {infoParsed.hasDesignState ? 'есть' : 'нет'}</p>
             {infoParsed.importerVersion != null && <p><strong>Importer v:</strong> {infoParsed.importerVersion}</p>}
             {formatTemplateSize(infoParsed) && <p><strong>Размер:</strong> {formatTemplateSize(infoParsed)}</p>}
-            {formatProductBinding(infoParsed) && <p><strong>Привязка:</strong> {formatProductBinding(infoParsed)}</p>}
+            {formatBinding(infoParsed) && <p><strong>Привязка:</strong> {formatBinding(infoParsed)}</p>}
             {infoTemplate.author_name && (
               <p><strong>Автор:</strong> {infoTemplate.author_name}</p>
             )}
@@ -905,17 +1149,33 @@ export const DesignTemplatesPage: React.FC = () => {
               </div>
             )}
             <div className="form-actions">
-              <Button variant="secondary" onClick={() => { setInfoTemplate(null); openEdit(infoTemplate); }}>Редактировать карточку</Button>
+              <button type="button" className="lg-btn" onClick={() => { setInfoTemplate(null); setReimportTemplate(infoTemplate); }}>
+                Обновить из SVG
+              </button>
+              <button type="button" className="lg-btn" onClick={() => { setInfoTemplate(null); openEdit(infoTemplate); }}>Редактировать карточку</button>
               {(infoParsed.productId != null || infoParsed.typeId != null) && (
-                <Button variant="secondary" onClick={() => { setInfoTemplate(null); openBindingsForTemplate(infoTemplate); }}>
+                <button type="button" className="lg-btn" onClick={() => { setInfoTemplate(null); openBindingsForTemplate(infoTemplate); }}>
                   Привязки к продукту
-                </Button>
+                </button>
               )}
-              <Button onClick={() => navigate(`${editorPathPrefix}/${infoTemplate.id}`)}>Открыть редактор</Button>
+              <button type="button" className="lg-btn lg-btn--primary" onClick={() => navigate(`${editorPathPrefix}/${infoTemplate.id}`)}>Открыть редактор</button>
             </div>
           </div>
         )}
       </Modal>
+
+      <DesignTemplateCategoriesModal
+        isOpen={categoriesModalOpen}
+        onClose={() => setCategoriesModalOpen(false)}
+        onChanged={() => void reloadCatalog()}
+      />
+
+      <DesignTemplateReimportModal
+        template={reimportTemplate}
+        isOpen={reimportTemplate !== null}
+        onClose={() => setReimportTemplate(null)}
+        onDone={() => void reloadCatalog()}
+      />
     </AdminPageLayout>
   );
 };
