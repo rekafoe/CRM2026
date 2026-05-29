@@ -16,7 +16,7 @@ import {
 } from './useDesignDocumentNavigation';
 import { PublicDesignTaskPanel, type PublicDesignTaskTab } from './PublicDesignTaskPanel';
 import { PublicDesignInspector, type PublicDesignInspectorPanel } from './PublicDesignInspector';
-import { PublicDesignStageGuide } from './PublicDesignStageGuide';
+import { PublicDesignClientAside } from './PublicDesignClientAside';
 import { PublicDesignAdvancedTools } from './PublicDesignAdvancedTools';
 import { PublicDesignEditorAlerts } from './PublicDesignEditorAlerts';
 import { PublicDesignFinalizeForm } from './PublicDesignFinalizeForm';
@@ -47,6 +47,7 @@ import { usePublicDesignPhotoLibrary } from './usePublicDesignPhotoLibrary';
 import { rememberPageThumbnail } from '../../pages/admin/designEditor/designPageThumbnailCache';
 import { usePublicDesignThumbnailPrefetch } from './usePublicDesignThumbnailPrefetch';
 import { useSpreadLayoutNormalize } from './useSpreadLayoutNormalize';
+import { isEditorSpreadModeActive } from '../../pages/admin/designEditor/editorSpreadMode';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import {
   PublicDesignEditorMobileDock,
@@ -58,6 +59,7 @@ import '../designEditorShell/editorShell.css';
 import './publicDesignEditor.css';
 import './publicDesignClientShell.css';
 import './publicDesignInspector.css';
+import './publicDesignClientAside.css';
 import './publicDesignPageStrip.css';
 
 const DEFAULT_VIEW_OPTIONS: EditorViewOptions = {
@@ -116,6 +118,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const [dirtyVersion, setDirtyVersion] = useState(0);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [textFillHint, setTextFillHint] = useState<string | null>(null);
   const [activeTaskTab, setActiveTaskTab] = useState<PublicDesignTaskTab>('photo');
   const suppressDirtyRef = useRef(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -131,6 +134,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   });
   const [pageSpec, setPageSpec] = useState({ pageWidth: 90, pageHeight: 55, pageCount: 1, scale: 1 });
   const [spreadMode, setSpreadMode] = useState(() => documentMode === 'multipage');
+  /** На телефоне всегда одна страница на канвасе; spread_mode в draft не трогаем. */
+  const editorSpreadMode = isEditorSpreadModeActive(spreadMode, isMobile);
   const [coverPages, setCoverPages] = useState(1);
   const [prepressConfig, setPrepressConfig] = useState<DesignPrepressConfig>(DEFAULT_PUBLIC_DESIGN_PREPRESS_CONFIG);
   const [viewOptions, setViewOptions] = useState<EditorViewOptions>(DEFAULT_VIEW_OPTIONS);
@@ -172,7 +177,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     mode: documentMode,
     pageCount: pageSpec.pageCount,
     currentPage,
-    spreadMode,
+    spreadMode: editorSpreadMode,
     coverPages,
   });
   const preflight = useMemo(() => analyzePublicDesignPages(pages, saveState), [pages, saveState]);
@@ -184,11 +189,11 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       pageCount: pageSpec.pageCount,
       currentPage,
       fragmentPages: currentFragmentPages,
-      spreadMode,
+      spreadMode: editorSpreadMode,
       coverPages,
       preflight,
     }),
-    [coverPages, currentFragmentPages, currentPage, documentMode, pageSpec.pageCount, preflight, spreadMode],
+    [coverPages, currentFragmentPages, currentPage, documentMode, editorSpreadMode, pageSpec.pageCount, preflight],
   );
   const fragmentPreflight = useMemo(
     () => filterPublicDesignPreflightByPages(preflight, currentFragment.pageIndexes),
@@ -291,7 +296,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   useSpreadLayoutNormalize({
     enabled: !loading && Boolean(template),
     documentMode,
-    spreadMode,
+    spreadMode: editorSpreadMode,
     coverPages,
     pageCount: pageSpec.pageCount,
     pages,
@@ -329,19 +334,12 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     el.style.setProperty('--de-content-w', String(layoutWidthPx));
     el.style.setProperty('--de-content-h', String(layoutHeightPx));
 
-    if (isMobile) {
-      const scaledW = Math.max(1, Math.round(layoutWidthPx * fitZoom));
-      const scaledH = Math.max(1, Math.round(layoutHeightPx * fitZoom));
-      el.style.width = `${scaledW}px`;
-      el.style.height = `${scaledH}px`;
-      el.style.setProperty('--de-fit-zoom', String(fitZoom));
-      return;
-    }
-
-    el.style.removeProperty('width');
-    el.style.removeProperty('height');
+    const scaledW = Math.max(1, Math.round(layoutWidthPx * fitZoom));
+    const scaledH = Math.max(1, Math.round(layoutHeightPx * fitZoom));
+    el.style.width = `${scaledW}px`;
+    el.style.height = `${scaledH}px`;
     el.style.setProperty('--de-fit-zoom', String(fitZoom));
-  }, [fitZoom, fitReady, isMobile, layoutWidthPx, layoutHeightPx, currentPage, navigation.pageLoadKey]);
+  }, [fitZoom, fitReady, layoutWidthPx, layoutHeightPx, currentPage, navigation.pageLoadKey]);
 
   useEffect(() => {
     if (!fitReady) return;
@@ -423,6 +421,16 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setError,
   });
 
+  const handleTextFillHint = useCallback((message: string) => {
+    setTextFillHint(message);
+  }, []);
+
+  useEffect(() => {
+    if (!textFillHint) return undefined;
+    const timer = window.setTimeout(() => setTextFillHint(null), 8000);
+    return () => window.clearTimeout(timer);
+  }, [textFillHint]);
+
   const {
     saveCurrentCanvasPage,
     handleGoToPage,
@@ -437,7 +445,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     documentMode,
     navigation,
     pageSpec,
-    spreadMode,
+    spreadMode: editorSpreadMode,
     coverPages,
     minimumPageCount,
     setPages,
@@ -560,7 +568,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       ? 'Двухсторонний макет'
       : 'Одностраничный макет';
   const navigationLabel = isMultipageDocument
-    ? (spreadMode ? 'Развороты' : 'Страницы')
+    ? (editorSpreadMode ? 'Развороты' : 'Страницы')
     : isTwoSidedDocument
       ? 'Стороны'
       : 'Страница';
@@ -582,9 +590,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const missingPhotoCount = Math.max(0, fragmentPreflight.photoTotal - fragmentPreflight.photoReady);
   const missingTextCount = Math.max(0, fragmentPreflight.textTotal - fragmentPreflight.textReady);
 
-  const inspectorPanel: PublicDesignInspectorPanel = !isMobile
-    ? 'all'
-    : mobilePanel === 'photos'
+  const inspectorPanel: PublicDesignInspectorPanel = mobilePanel === 'photos'
       ? 'photos'
       : mobilePanel === 'text'
         ? 'text'
@@ -614,8 +620,169 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
 
   const workspaceClassName = [
     'public-design-editor__workspace',
+    !isMobile ? 'public-design-editor__workspace--desktop' : '',
     isMobile ? `public-design-editor__workspace--panel-${mobilePanel}` : '',
   ].filter(Boolean).join(' ');
+
+  const workspaceLayoutProps = !isMobile
+    ? ({ 'data-pde-layout': 'client-desktop' } as const)
+    : undefined;
+
+  const pageNavigator = (
+    <EditorPageNavigator
+      pageCount={pageSpec.pageCount}
+      navigationLabel={navigationLabel}
+      navigation={navigation}
+      currentPage={currentPage}
+      thumbnails={thumbnails}
+      thumbW={sceneGeometry.pageWidthPx}
+      thumbH={sceneGeometry.pageHeightPx}
+      pageWidth={pageSpec.pageWidth}
+      pageHeight={pageSpec.pageHeight}
+      zoom={zoom}
+      spreadMode={editorSpreadMode}
+      collapsed={isMobile ? false : stripCollapsed}
+      pageStatuses={pageStatuses}
+      showWhenSingle
+      canAddPages={documentMode === 'multipage' || pageSpec.pageCount > 1}
+      canAddSpread={documentMode === 'multipage' && !isMobile}
+      canDeletePages={(documentMode === 'multipage' || pageSpec.pageCount > 1) && pageSpec.pageCount > minimumPageCount}
+      titleLabel="Страницы"
+      appearance="client"
+      showInfoLine={false}
+      labels={{
+        addPage: 'Добавить страницу',
+        addSpread: 'Добавить разворот',
+        deletePage: 'Убрать добавленную',
+        deleteSpread: 'Убрать добавленный разворот',
+        pagesMode: 'Страницы',
+        spreadsMode: 'Развороты',
+        collapse: 'Свернуть страницы',
+        expand: 'Показать страницы',
+      }}
+      onGoTo={(pageIndex) => void handleGoToPage(pageIndex)}
+      onAddPage={() => void handleAddClientPage()}
+      onInsertPage={(pageIndex) => void handleInsertClientPage(pageIndex)}
+      onDeletePage={setPendingDeletePage}
+      onAddSpread={() => void handleAddClientSpread()}
+      onDeleteLast={() => void handleDeleteClientLast()}
+      onSpreadModeToggle={() => {
+        if (documentMode === 'multipage' && !isMobile) setSpreadMode((value) => !value);
+      }}
+      onCollapse={() => setStripCollapsed((value) => !value)}
+      compact={isMobile}
+      mobilePagesOnlyHint={
+        isMobile && spreadMode && documentMode === 'multipage'
+          ? 'На телефоне — по одной странице. Развороты редактируются на компьютере.'
+          : undefined
+      }
+    />
+  );
+
+  const canvasStageColumn = (
+    <div className="public-design-editor__canvas-column">
+      <EditorCanvasStage
+        template={template}
+        editorMode="basic"
+        refs={{
+          canvasHandleRef,
+          scrollAreaRef,
+          viewportRef,
+          fitScalerRef,
+        }}
+        fragment={{
+          fragmentLabel: currentFragment.label,
+          fragmentDetail: currentFragment.detail,
+          issueCount: currentFragment.issueCount,
+        }}
+        navigation={navigation}
+        document={{
+          currentPage,
+          pages,
+          setPages,
+        }}
+        geometry={{
+          pageWidthPx: sceneGeometry.pageWidthPx,
+          pageHeightPx: sceneGeometry.pageHeightPx,
+          canvasWidthPx: navigation.isSpreadView ? sceneGeometry.pageWidthPx * 2 : sceneGeometry.pageWidthPx,
+          safeZonePx: sceneGeometry.safeZonePx,
+          bleedPx: sceneGeometry.bleedPx,
+          pageWidthMm: pageSpec.pageWidth,
+          pageHeightMm: pageSpec.pageHeight,
+          sceneScale: pageSpec.scale,
+        }}
+        view={{
+          showBleed: visibleShowBleed,
+          showTrim: visibleShowTrim,
+          showSafeZone: visibleShowSafeZone,
+          viewOptions,
+          guides,
+          guideLinesPx,
+          fitZoom,
+          rulerOrigin,
+        }}
+        history={{
+          canUndo,
+          canRedo,
+          zoom,
+        }}
+        toolsSlot={(
+          <PublicDesignAdvancedTools
+            canvasHandleRef={canvasHandleRef}
+            selectedObj={selectedObj}
+            pages={pages}
+            setPages={setPages}
+            currentPage={currentPage}
+            leftPageIdx={navigation.leftPageIdx}
+            rightPageIdx={navigation.rightPageIdx}
+            onDirty={markDirty}
+          />
+        )}
+        stageClassName={
+          isMobile && selectedObj?.type === 'IText'
+            ? 'public-design-editor__stage--text-toolbar'
+            : undefined
+        }
+        textToolbarSlot={
+          isMobile && selectedObj?.type === 'IText' ? (
+            <PublicDesignTextMobileToolbar
+              canvasHandleRef={canvasHandleRef}
+              selectedObj={selectedObj}
+            />
+          ) : null
+        }
+        guideSlot={null}
+        assets={{
+          showOrganizationLogo: showOrganizationLogo && !isMobile,
+          organizationLogoUrl,
+          sidebarPhotos,
+        }}
+        handlers={{
+          onOrganizationLogoError: () => setOrganizationLogoError(true),
+          onViewOptionsChange: setViewOptions,
+          onGuidesChange: setGuides,
+          onUndo: () => canvasHandleRef.current?.undo(),
+          onRedo: () => canvasHandleRef.current?.redo(),
+          onZoomOut: handleZoomOut,
+          onZoomIn: handleZoomIn,
+          onZoomReset: handleZoomReset,
+          onSelectionChange: setSelectedObj,
+          onHistoryChange: (u, r) => {
+            setCanUndo(u);
+            setCanRedo(r);
+            if (u || r) markDirty();
+          },
+          onZoomChange: setZoom,
+          onPageThumbReady: handlePageThumbReady,
+          onTextFloatingAnchor: isMobile ? undefined : setTextFloatingAnchor,
+          onTextFillHint: handleTextFillHint,
+          onDropRemoteImageUrl: handleImageUrlSubmit,
+          onSidebarPhotoDropped: removeSidebarPhoto,
+          resolveImageFileUrl,
+        }}
+      />
+    </div>
+  );
 
   return (
     <div className={editorRootClassName}>
@@ -634,181 +801,22 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       <PublicDesignEditorAlerts
         status={status}
         error={error}
+        textHint={textFillHint}
         onStatusClose={() => setStatus(null)}
         onErrorClose={() => setError(null)}
+        onTextHintClose={() => setTextFillHint(null)}
       />
 
-      <div className={workspaceClassName}>
-        <EditorCanvasStage
-          template={template}
-          editorMode="basic"
-          refs={{
-            canvasHandleRef,
-            scrollAreaRef,
-            viewportRef,
-            fitScalerRef,
-          }}
-          fragment={{
-            fragmentLabel: currentFragment.label,
-            fragmentDetail: currentFragment.detail,
-            issueCount: currentFragment.issueCount,
-          }}
-          navigation={navigation}
-          document={{
-            currentPage,
-            pages,
-            setPages,
-          }}
-          geometry={{
-            pageWidthPx: sceneGeometry.pageWidthPx,
-            pageHeightPx: sceneGeometry.pageHeightPx,
-            canvasWidthPx: navigation.isSpreadView ? sceneGeometry.pageWidthPx * 2 : sceneGeometry.pageWidthPx,
-            safeZonePx: sceneGeometry.safeZonePx,
-            bleedPx: sceneGeometry.bleedPx,
-            pageWidthMm: pageSpec.pageWidth,
-            pageHeightMm: pageSpec.pageHeight,
-            sceneScale: pageSpec.scale,
-          }}
-          view={{
-            showBleed: visibleShowBleed,
-            showTrim: visibleShowTrim,
-            showSafeZone: visibleShowSafeZone,
-            viewOptions,
-            guides,
-            guideLinesPx,
-            fitZoom,
-            rulerOrigin,
-          }}
-          history={{
-            canUndo,
-            canRedo,
-            zoom,
-          }}
-          toolsSlot={(
-            <PublicDesignAdvancedTools
-              canvasHandleRef={canvasHandleRef}
-              selectedObj={selectedObj}
-              pages={pages}
-              setPages={setPages}
-              currentPage={currentPage}
-              leftPageIdx={navigation.leftPageIdx}
-              rightPageIdx={navigation.rightPageIdx}
-              onDirty={markDirty}
-            />
-          )}
-          stageClassName={
-            isMobile && selectedObj?.type === 'IText'
-              ? 'public-design-editor__stage--text-toolbar'
-              : undefined
-          }
-          textToolbarSlot={
-            isMobile && selectedObj?.type === 'IText' ? (
-              <PublicDesignTextMobileToolbar
-                canvasHandleRef={canvasHandleRef}
-                selectedObj={selectedObj}
-              />
-            ) : null
-          }
-          guideSlot={isMobile ? null : (
-            <PublicDesignStageGuide
-              fragmentLabel={currentFragment.label}
-              fragmentDetail={currentFragment.detail}
-              issueCount={currentFragment.issueCount}
-              nextAction={editorNextAction}
-              onNextAction={handleNextAction}
-            />
-          )}
-          assets={{
-            showOrganizationLogo: showOrganizationLogo && !isMobile,
-            organizationLogoUrl,
-            sidebarPhotos,
-          }}
-          handlers={{
-            onOrganizationLogoError: () => setOrganizationLogoError(true),
-            onViewOptionsChange: setViewOptions,
-            onGuidesChange: setGuides,
-            onUndo: () => canvasHandleRef.current?.undo(),
-            onRedo: () => canvasHandleRef.current?.redo(),
-            onZoomOut: handleZoomOut,
-            onZoomIn: handleZoomIn,
-            onZoomReset: handleZoomReset,
-            onSelectionChange: setSelectedObj,
-            onHistoryChange: (u, r) => {
-              setCanUndo(u);
-              setCanRedo(r);
-              if (u || r) markDirty();
-            },
-            onZoomChange: setZoom,
-            onPageThumbReady: handlePageThumbReady,
-            onTextFloatingAnchor: isMobile ? undefined : setTextFloatingAnchor,
-            onDropRemoteImageUrl: handleImageUrlSubmit,
-            onSidebarPhotoDropped: removeSidebarPhoto,
-            resolveImageFileUrl,
-          }}
-        />
-
-        {!isMobile ? (
-          <div className="public-design-editor__aside">
-            <PublicDesignInspector
-              fragmentLabel={currentFragment.label}
-              fragmentPreflight={fragmentPreflight}
-              panel={inspectorPanel}
-              saving={saving}
-              nextAction={editorNextAction}
-              sidebarPhotos={sidebarPhotos}
-              selectedPhotoId={selectedLibraryPhotoId}
-              helpOpen={helpOpen}
-              onFilesSelected={handleMobileFilesSelected}
-              onPhotoClick={handleLibraryPhotoClick}
-              onPhotoSelect={setSelectedLibraryPhotoId}
-              onPhotoRemove={removeSidebarPhoto}
-              onPhotoRetry={retrySidebarPhoto}
-              onNextAction={handleNextAction}
-              onFieldFocus={handleFieldFocus}
-              onPhotoReplace={handlePhotoReplace}
-              onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
-            />
-            <PublicDesignTaskPanel
-              activeTab={activeTaskTab}
-              onTabChange={handleTaskTabChange}
-              preflight={fragmentPreflight}
-              checkPreflight={preflight}
-              saving={saving}
-              nextAction={editorNextAction}
-              showNextAction={false}
-              showOrderBar={false}
-              onReadyForCart={handleRequestReadyForCart}
-              onNextAction={handleNextAction}
-              onFieldFocus={handleFieldFocus}
-              onPhotoReplace={handlePhotoReplace}
-              onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
-              onIssueFocus={handleIssueFocus}
-            />
-          </div>
-        ) : mobilePanel === 'check' ? (
-          <PublicDesignTaskPanel
-            activeTab={activeTaskTab}
-            onTabChange={handleTaskTabChange}
-            preflight={fragmentPreflight}
-            checkPreflight={preflight}
-            saving={saving}
-            nextAction={editorNextAction}
-            showNextAction={false}
-            showOrderBar={false}
-            onReadyForCart={handleRequestReadyForCart}
-            onNextAction={handleNextAction}
-            onFieldFocus={handleMobileFieldFocus}
-            onPhotoReplace={handlePhotoReplace}
-            onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
-            onIssueFocus={handleCheckoutIssueFocus}
-          />
-        ) : (
-          <PublicDesignInspector
+      <div className={workspaceClassName} {...workspaceLayoutProps}>
+        {!isMobile && (
+          <PublicDesignClientAside
             fragmentLabel={currentFragment.label}
             fragmentPreflight={fragmentPreflight}
-            panel={inspectorPanel}
+            globalPreflight={preflight}
             saving={saving}
             nextAction={editorNextAction}
+            pageCount={pages.length}
+            pageStatuses={pageStatuses}
             sidebarPhotos={sidebarPhotos}
             selectedPhotoId={selectedLibraryPhotoId}
             helpOpen={helpOpen}
@@ -818,61 +826,68 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             onPhotoRemove={removeSidebarPhoto}
             onPhotoRetry={retrySidebarPhoto}
             onNextAction={handleNextAction}
-            onFieldFocus={handleMobileFieldFocus}
+            onFieldFocus={handleFieldFocus}
             onPhotoReplace={handlePhotoReplace}
             onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
+            onIssueFocus={handleIssueFocus}
           />
+        )}
+
+        {!isMobile ? (
+          <div className="public-design-editor__main-column">
+            {canvasStageColumn}
+            <footer className="public-design-editor__page-chrome" aria-label="Навигация по макету">
+              {pageNavigator}
+            </footer>
+          </div>
+        ) : (
+          <>
+            {canvasStageColumn}
+            {mobilePanel === 'check' ? (
+              <PublicDesignTaskPanel
+                activeTab={activeTaskTab}
+                onTabChange={handleTaskTabChange}
+                preflight={fragmentPreflight}
+                checkPreflight={preflight}
+                saving={saving}
+                nextAction={editorNextAction}
+                showNextAction={false}
+                showOrderBar={false}
+                onReadyForCart={handleRequestReadyForCart}
+                onNextAction={handleNextAction}
+                onFieldFocus={handleMobileFieldFocus}
+                onPhotoReplace={handlePhotoReplace}
+                onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
+                onIssueFocus={handleCheckoutIssueFocus}
+              />
+            ) : (
+              <PublicDesignInspector
+                fragmentLabel={currentFragment.label}
+                fragmentPreflight={fragmentPreflight}
+                panel={inspectorPanel}
+                saving={saving}
+                nextAction={editorNextAction}
+                sidebarPhotos={sidebarPhotos}
+                selectedPhotoId={selectedLibraryPhotoId}
+                helpOpen={helpOpen}
+                onFilesSelected={handleMobileFilesSelected}
+                onPhotoClick={handleLibraryPhotoClick}
+                onPhotoSelect={setSelectedLibraryPhotoId}
+                onPhotoRemove={removeSidebarPhoto}
+                onPhotoRetry={retrySidebarPhoto}
+                onNextAction={handleNextAction}
+                onFieldFocus={handleMobileFieldFocus}
+                onPhotoReplace={handlePhotoReplace}
+                onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
+              />
+            )}
+          </>
         )}
       </div>
 
-      <footer
-        className={isMobile ? 'public-design-editor__mobile-chrome' : 'public-design-editor__page-chrome'}
-        aria-label={isMobile ? 'Навигация по макету' : undefined}
-      >
-        <EditorPageNavigator
-          pageCount={pageSpec.pageCount}
-          navigationLabel={navigationLabel}
-          navigation={navigation}
-          currentPage={currentPage}
-          thumbnails={thumbnails}
-          thumbW={sceneGeometry.pageWidthPx}
-          thumbH={sceneGeometry.pageHeightPx}
-          pageWidth={pageSpec.pageWidth}
-          pageHeight={pageSpec.pageHeight}
-          zoom={zoom}
-          spreadMode={spreadMode}
-          collapsed={isMobile ? false : stripCollapsed}
-          pageStatuses={pageStatuses}
-          showWhenSingle
-          canAddPages={documentMode === 'multipage' || pageSpec.pageCount > 1}
-          canAddSpread={documentMode === 'multipage'}
-          canDeletePages={(documentMode === 'multipage' || pageSpec.pageCount > 1) && pageSpec.pageCount > minimumPageCount}
-          titleLabel="Страницы"
-          appearance="client"
-          showInfoLine={false}
-          labels={{
-            addPage: 'Добавить страницу',
-            addSpread: 'Добавить разворот',
-            deletePage: 'Убрать добавленную',
-            deleteSpread: 'Убрать добавленный разворот',
-            pagesMode: 'Страницы',
-            spreadsMode: 'Развороты',
-            collapse: 'Свернуть страницы',
-            expand: 'Показать страницы',
-          }}
-          onGoTo={(pageIndex) => void handleGoToPage(pageIndex)}
-          onAddPage={() => void handleAddClientPage()}
-          onInsertPage={(pageIndex) => void handleInsertClientPage(pageIndex)}
-          onDeletePage={setPendingDeletePage}
-          onAddSpread={() => void handleAddClientSpread()}
-          onDeleteLast={() => void handleDeleteClientLast()}
-          onSpreadModeToggle={() => {
-            if (documentMode === 'multipage') setSpreadMode((value) => !value);
-          }}
-          onCollapse={() => setStripCollapsed((value) => !value)}
-          compact={isMobile}
-        />
-        {isMobile && (
+      {isMobile && (
+        <footer className="public-design-editor__mobile-chrome" aria-label="Навигация по макету">
+          {pageNavigator}
           <PublicDesignEditorMobileDock
             activePanel={mobilePanel}
             photoCount={sidebarPhotos.length}
@@ -884,8 +899,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             onPanelChange={setMobilePanel}
             onNextAction={handleMobileNextAction}
           />
-        )}
-      </footer>
+        </footer>
+      )}
 
       {showFinalizeButton && (
         <PublicDesignFinalizeForm

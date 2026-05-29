@@ -1,3 +1,9 @@
+.photo-field-fill-overlay--viewport {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+}
+
 .photo-field-fill-overlay {
   position: absolute;
   inset: 0;

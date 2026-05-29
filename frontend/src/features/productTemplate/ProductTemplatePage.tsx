@@ -134,8 +134,18 @@ const ProductTemplatePage: React.FC = () => {
     finishing: state.finishing,
     packaging: state.packaging,
     price_rules: state.price_rules,
-    constraints: state.constraints
-  }), [state.trim_size, state.print_sheet, state.print_run, state.finishing, state.packaging, state.price_rules, state.constraints]);
+    constraints: state.constraints,
+    simplified: state.simplified,
+  }), [
+    state.trim_size,
+    state.print_sheet,
+    state.print_run,
+    state.finishing,
+    state.packaging,
+    state.price_rules,
+    state.constraints,
+    state.simplified,
+  ]);
 
   const {
     autoSaveStatus,

@@ -57,6 +57,8 @@ import {
   type TextEditSheetState,
 } from './EditorInAppFieldSheets';
 import { isRestrictiveInAppBrowser, shouldPreferTextEditSheet } from './inAppBrowser';
+import { applyTextSelectionChrome, isTextLikeFabricObject } from './designEditorTextChrome';
+import { resolveTextFillHintAfterEdit } from './designEditorTextPlaceholder';
 import { findPhotoFieldAtScene, findTextAtScene } from './photoFieldHitTest';
 import {
   clearPhotoFieldDropHighlight,
@@ -129,6 +131,8 @@ export interface DesignEditorCanvasHandle {
   /** После CSS fit-zoom / скролла — синхронизировать hit-test и рамку выделения с экраном */
   syncCanvasOffset: () => void;
   openTextEditSheetForActive: () => boolean;
+  /** Inline-редактирование на холсте (клавиатура на мобилке). */
+  beginTextEditingForActive: () => boolean;
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -182,6 +186,8 @@ interface DesignEditorCanvasProps {
   onTextFloatingAnchor?: (pos: { x: number; y: number } | null) => void;
   /** Optional upload hook: returns stable URL that is persisted in Fabric JSON instead of blob:. */
   resolveImageFileUrl?: ResolveImageFileUrl;
+  /** basic: напоминание, если после правки текст пустой или шаблонный */
+  onTextFillHint?: (message: string) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -214,20 +220,8 @@ function applyBasicModeConstraints(canvas: Canvas): void {
         hasControls: false,
         hasBorders: true,
       });
-    } else if (obj.type === 'i-text' || obj.type === 'textbox') {
-      // текстовое поле: правка текста + перетаскивание (без масштаба/поворота)
-      obj.set({
-        selectable: true,
-        evented: true,
-        editable: true,
-        lockMovementX: false,
-        lockMovementY: false,
-        lockScalingX: true,
-        lockScalingY: true,
-        lockRotation: true,
-        hasControls: false,
-        hasBorders: true,
-      });
+    } else if (isTextLikeFabricObject(obj)) {
+      applyTextSelectionChrome(obj, 'basic');
     } else if (isBasicDecorShape(obj)) {
       obj.set({
         selectable: true,
@@ -296,6 +290,10 @@ function releaseBasicModeConstraints(canvas: Canvas): void {
       });
       return;
     }
+    if (isTextLikeFabricObject(obj)) {
+      applyTextSelectionChrome(obj, 'advanced');
+      return;
+    }
     obj.set({
       selectable: true,
       evented: true,
@@ -308,7 +306,20 @@ function releaseBasicModeConstraints(canvas: Canvas): void {
       hasBorders: true,
     });
   });
+  lockTextInlineEditing(canvas);
   canvas.requestRenderAll();
+}
+
+/** Текст только выделяется по клику; inline-редактирование — по dblclick / листу. */
+function lockTextInlineEditing(canvas: Canvas): void {
+  canvas.getObjects().forEach((obj) => {
+    if (!isTextLikeObject(obj)) return;
+    const text = obj as IText;
+    if ((text as unknown as AnyObj).isEditing) {
+      text.exitEditing();
+    }
+    text.set({ editable: false });
+  });
 }
 
 function asAny(obj: unknown): AnyObj {
@@ -316,7 +327,7 @@ function asAny(obj: unknown): AnyObj {
 }
 
 function isTextLikeObject(obj: FabricObject): boolean {
-  return obj.type === 'i-text' || obj.type === 'textbox';
+  return isTextLikeFabricObject(obj);
 }
 
 function resolvePhotoFieldTarget(target: FabricObject | undefined): FabricObject | undefined {
@@ -401,15 +412,83 @@ function normalizeTextForFabric(text: string): string {
   return normalized.length > 0 ? normalized : '\u200b';
 }
 
-function beginTextEditingOnCanvas(canvas: Canvas, target: FabricObject): void {
+function isMobileTextInputEnvironment(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(pointer: coarse)').matches
+    || window.matchMedia('(max-width: 760px)').matches
+  );
+}
+
+function pinFabricHiddenTextarea(canvas: Canvas, text: IText): void {
+  const hidden = (text as unknown as { hiddenTextarea?: HTMLTextAreaElement }).hiddenTextarea;
+  if (!hidden) return;
+  hidden.classList.add('de-fabric-text-input');
+  hidden.style.margin = '0';
+  hidden.style.transform = 'none';
+  hidden.style.zIndex = '10050';
+  hidden.style.boxSizing = 'border-box';
+
+  if (isMobileTextInputEnvironment()) {
+    /* Над полосой страниц / mobile chrome — фокус открывает клавиатуру без scroll jump */
+    hidden.style.position = 'fixed';
+    hidden.style.left = '12px';
+    hidden.style.right = '12px';
+    hidden.style.top = 'auto';
+    hidden.style.width = 'auto';
+    hidden.style.bottom = 'max(148px, calc(128px + env(safe-area-inset-bottom, 0px)))';
+    hidden.style.minHeight = '44px';
+    hidden.style.maxHeight = '120px';
+    hidden.style.padding = '10px 12px';
+    hidden.style.fontSize = '16px';
+    hidden.style.lineHeight = '1.35';
+    hidden.style.color = '#0f172a';
+    hidden.style.background = '#ffffff';
+    hidden.style.border = '1px solid rgba(15, 23, 42, 0.14)';
+    hidden.style.borderRadius = '12px';
+    hidden.style.boxShadow = '0 8px 24px rgba(15, 23, 42, 0.12)';
+    hidden.style.opacity = '1';
+  } else {
+    const br = text.getBoundingRect();
+    const cx = br.left + br.width / 2;
+    const cy = br.top + Math.min(20, Math.max(8, br.height / 2));
+    const { x, y } = scenePointToClient(canvas, cx, cy);
+    hidden.style.position = 'fixed';
+    hidden.style.left = `${Math.round(Math.max(8, x - 64))}px`;
+    hidden.style.top = `${Math.round(Math.max(8, y - 14))}px`;
+    hidden.style.right = 'auto';
+    hidden.style.bottom = 'auto';
+    hidden.style.width = `${Math.max(96, Math.round(br.width))}px`;
+    hidden.style.minHeight = '28px';
+    hidden.style.opacity = '0.01';
+    hidden.style.background = 'transparent';
+    hidden.style.border = 'none';
+    hidden.style.boxShadow = 'none';
+  }
+
+  try {
+    hidden.focus({ preventScroll: true });
+  } catch {
+    hidden.focus();
+  }
+}
+
+function beginTextEditingOnCanvas(
+  canvas: Canvas,
+  target: FabricObject,
+  inlineEditSession?: React.MutableRefObject<boolean>,
+  captureBaseline?: (target: FabricObject) => void,
+): void {
   if (!isTextLikeObject(target)) return;
   const text = target as IText;
   if ((text as unknown as AnyObj).isEditing) return;
+  captureBaseline?.(target);
+  if (inlineEditSession) inlineEditSession.current = true;
+  text.set({ editable: true });
   canvas.setActiveObject(text);
   if (typeof text.enterEditing === 'function') {
     text.enterEditing();
-    const hidden = (text as unknown as { hiddenTextarea?: HTMLTextAreaElement }).hiddenTextarea;
-    hidden?.focus();
+    pinFabricHiddenTextarea(canvas, text);
   }
   canvas.requestRenderAll();
 }
@@ -717,6 +796,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       onSnapLinesChange,
       onTextFloatingAnchor,
       resolveImageFileUrl,
+      onTextFillHint,
     },
     ref,
   ) => {
@@ -763,7 +843,26 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     resolveImageFileUrlRef.current = resolveImageFileUrl;
     const clipboardObjectsRef = useRef<FabricObject[]>([]);
     const textAnchorRafRef = useRef(0);
+    const inlineTextEditSessionRef = useRef(false);
+    const textEditBaselineRef = useRef<{ fieldId: string; text: string } | null>(null);
+    const onTextFillHintRef = useRef(onTextFillHint);
+    onTextFillHintRef.current = onTextFillHint;
     const scheduleTextAnchorRef = useRef<(() => void) | null>(null);
+
+    const captureTextEditBaseline = useCallback((target: FabricObject) => {
+      const fieldId = String(asAny(target).id ?? '').trim();
+      if (!fieldId) return;
+      textEditBaselineRef.current = {
+        fieldId,
+        text: normalizeTextForDisplay(getObjProps(target).text),
+      };
+    }, []);
+
+    const emitTextFillHintIfNeeded = useCallback((textBefore: string | undefined, textAfter: string | undefined) => {
+      if (modeRef.current !== 'basic') return;
+      const hint = resolveTextFillHintAfterEdit(textBefore, textAfter);
+      if (hint) onTextFillHintRef.current?.(hint);
+    }, []);
 
     const photoPickerTargetIdRef = useRef<string | null>(null);
     const photoFileInputRef = useRef<HTMLInputElement>(null);
@@ -815,6 +914,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       }
       const props = getObjProps(target);
       const rawText = normalizeTextForDisplay(props.text);
+      captureTextEditBaseline(target);
       setTextEditSheet({
         fieldId,
         label: rawText.trim() ? rawText.trim().slice(0, 28) : 'Текст',
@@ -827,7 +927,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       onSelectionChange(getObjProps(target));
       canvas.requestRenderAll();
       return true;
-    }, [onSelectionChange]);
+    }, [captureTextEditBaseline, onSelectionChange]);
 
     const openTextEditSheetRef = useRef(openTextEditSheetForTarget);
     openTextEditSheetRef.current = openTextEditSheetForTarget;
@@ -928,6 +1028,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         height: pageHeightPx,
         backgroundColor: 'white',
         preserveObjectStacking: true,
+        selectionColor: 'rgba(37, 99, 235, 0.08)',
+        selectionBorderColor: '#2563eb',
       });
       fabricRef.current = canvas;
 
@@ -939,6 +1041,19 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         }
       };
       canvas.upperCanvasEl.addEventListener('mousemove', trackPasteScene);
+
+      /** Только внутренние скроллы вокруг холста — не трогаем страницу и полосу миниатюр. */
+      const resetCanvasWrapScroll = () => {
+        const upper = fabricRef.current?.upperCanvasEl;
+        if (!upper) return;
+        for (const sel of ['.design-editor-canvas-wrap', '.design-editor-fit-scaler', '.design-editor-viewport']) {
+          const node = upper.closest(sel);
+          if (node instanceof HTMLElement) {
+            if (node.scrollTop !== 0) node.scrollTop = 0;
+            if (node.scrollLeft !== 0) node.scrollLeft = 0;
+          }
+        }
+      };
 
       const scheduleTextAnchor = () => {
         if (!onTextFloatingAnchorRef.current) return;
@@ -961,14 +1076,53 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           const cx = br.left + br.width / 2;
           const cy = br.top;
           const { x, y } = scenePointToClient(c, cx, cy);
-          cb({ x, y });
+          const margin = 72;
+          const clampedX = Math.min(window.innerWidth - margin, Math.max(margin, x));
+          const clampedY = Math.min(window.innerHeight - margin, Math.max(margin, y));
+          cb({ x: clampedX, y: clampedY });
         });
       };
       scheduleTextAnchorRef.current = scheduleTextAnchor;
 
+      canvas.on('text:editing:entered', () => {
+        resetCanvasWrapScroll();
+        const active = canvas.getActiveObject();
+        if (active && isTextLikeObject(active)) {
+          pinFabricHiddenTextarea(canvas, active as IText);
+        }
+      });
+      canvas.on('text:editing:exited', (opt) => {
+        inlineTextEditSessionRef.current = false;
+        const target = opt.target;
+        const baseline = textEditBaselineRef.current;
+        textEditBaselineRef.current = null;
+        if (target && isTextLikeObject(target)) {
+          const text = target as IText;
+          const fieldId = String(asAny(target).id ?? '').trim();
+          const textBefore = baseline?.fieldId === fieldId ? baseline.text : undefined;
+          const textAfter = normalizeTextForDisplay(text.text);
+          emitTextFillHintIfNeeded(textBefore, textAfter);
+          text.set({ editable: false });
+          const hidden = (text as unknown as { hiddenTextarea?: HTMLTextAreaElement }).hiddenTextarea;
+          hidden?.classList.remove('de-fabric-text-input');
+        }
+        resetCanvasWrapScroll();
+      });
+
       // Selection events
       const updateSel = () => {
         const active = canvas.getActiveObject();
+        if (active && isTextLikeObject(active)) {
+          const text = active as IText;
+          if ((text as unknown as AnyObj).isEditing && !inlineTextEditSessionRef.current) {
+            text.exitEditing();
+            text.set({ editable: false });
+          }
+        }
+        if (active && isTextLikeObject(active)) {
+          applyTextSelectionChrome(active, modeRef.current);
+          canvas.requestRenderAll();
+        }
         if (active) onSelectionChange(getObjProps(active));
         else onSelectionChange(null);
         scheduleTextAnchor();
@@ -988,7 +1142,14 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         saveSnapshot();
       };
       canvas.on('object:modified', handleModified);
-      canvas.on('object:added', () => { if (!isLoadingRef.current) saveSnapshot(); });
+      canvas.on('object:added', (opt) => {
+        const added = opt.target;
+        if (added && isTextLikeObject(added)) {
+          (added as IText).set({ editable: false });
+          applyTextSelectionChrome(added, modeRef.current);
+        }
+        if (!isLoadingRef.current) saveSnapshot();
+      });
       canvas.on('object:removed', () => { if (!isLoadingRef.current) saveSnapshot(); });
 
       // Smart guides: targets are fixed for one drag, hysteresis keeps snapping stable.
@@ -1164,13 +1325,13 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         canvas.setActiveObject(target);
         onSelectionChange(getObjProps(target));
 
-        if (shouldPreferTextEditSheet()) {
+        if (shouldPreferTextEditSheet(modeRef.current)) {
           if (isDoubleTap) openTextEditSheetRef.current(target);
           return true;
         }
 
         if (isDoubleTap) {
-          beginTextEditingOnCanvas(canvas, target);
+          beginTextEditingOnCanvas(canvas, target, inlineTextEditSessionRef, captureTextEditBaseline);
         }
         return true;
       };
@@ -1271,10 +1432,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       canvas.on('mouse:dblclick', (opt) => {
         const raw = opt.target as FabricObject | undefined;
         if (raw && isTextLikeObject(raw)) {
-          if (shouldPreferTextEditSheet()) {
+          if (shouldPreferTextEditSheet(modeRef.current)) {
             openTextEditSheetRef.current(raw);
           } else {
-            beginTextEditingOnCanvas(canvas, raw);
+            beginTextEditingOnCanvas(canvas, raw, inlineTextEditSessionRef, captureTextEditBaseline);
           }
           return;
         }
@@ -1611,6 +1772,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 
           if (pageLoadKeyRef.current !== targetKey) return;
           if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+          else lockTextInlineEditing(canvas);
           const snap = JSON.stringify(canvasToJSON(canvas));
           historyRef.current = { stack: [snap], index: 0 };
 
@@ -1651,7 +1813,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       const canvas = fabricRef.current;
       if (!canvas) return;
       if (mode === 'basic') applyBasicModeConstraints(canvas);
-      else releaseBasicModeConstraints(canvas);
+      else {
+        releaseBasicModeConstraints(canvas);
+        lockTextInlineEditing(canvas);
+      }
     }, [mode]);
 
     // ── Photo field fill from file input ─────────────────────────────────────
@@ -1689,10 +1854,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         const selectableTarget = target.group ?? target;
         canvas.setActiveObject(selectableTarget);
         if (options?.editText && isTextLikeObject(selectableTarget)) {
-          if (shouldPreferTextEditSheet()) {
+          if (shouldPreferTextEditSheet(modeRef.current)) {
             openTextEditSheetForTarget(selectableTarget);
           } else {
-            beginTextEditingOnCanvas(canvas, selectableTarget);
+            beginTextEditingOnCanvas(canvas, selectableTarget, inlineTextEditSessionRef, captureTextEditBaseline);
           }
         }
         canvas.requestRenderAll();
@@ -2171,6 +2336,17 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         if (!active || !isTextLikeObject(active)) return false;
         return openTextEditSheetForTarget(active);
       },
+      beginTextEditingForActive: () => {
+        const canvas = fabricRef.current;
+        if (!canvas) return false;
+        const active = canvas.getActiveObject();
+        if (!active || !isTextLikeObject(active)) return false;
+        if (shouldPreferTextEditSheet(modeRef.current)) {
+          return openTextEditSheetForTarget(active);
+        }
+        beginTextEditingOnCanvas(canvas, active, inlineTextEditSessionRef, captureTextEditBaseline);
+        return true;
+      },
     }));
 
 
@@ -2190,11 +2366,18 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       await applyPhotoFileToTarget(fieldId, file);
     }, [photoPickSheet, applyPhotoFileToTarget]);
 
+    const handleInAppTextClose = useCallback(() => {
+      textEditBaselineRef.current = null;
+      setTextEditSheet(null);
+    }, []);
+
     const handleInAppTextSave = useCallback((text: string) => {
       const canvas = fabricRef.current;
       if (!canvas || !textEditSheet) return;
+      const textBefore = textEditSheet.text;
       const target = findDesignObjectByIdDeep(canvas, textEditSheet.fieldId);
       if (!target || !isTextLikeObject(target)) {
+        textEditBaselineRef.current = null;
         setTextEditSheet(null);
         return;
       }
@@ -2205,8 +2388,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       onSelectionChange(getObjProps(textObj));
       saveSnapshot();
       scheduleTextAnchorRef.current?.();
+      emitTextFillHintIfNeeded(textBefore, normalizeTextForDisplay(text));
+      textEditBaselineRef.current = null;
       setTextEditSheet(null);
-    }, [textEditSheet, onSelectionChange, saveSnapshot]);
+    }, [emitTextFillHintIfNeeded, textEditSheet, onSelectionChange, saveSnapshot]);
 
     // ── Render ───────────────────────────────────────────────────────────────
 
@@ -2313,7 +2498,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           textEdit={textEditSheet}
           onPhotoClose={() => setPhotoPickSheet(null)}
           onPhotoSelected={(file) => void handleInAppPhotoSelected(file)}
-          onTextClose={() => setTextEditSheet(null)}
+          onTextClose={handleInAppTextClose}
           onTextSave={handleInAppTextSave}
         />
       </div>

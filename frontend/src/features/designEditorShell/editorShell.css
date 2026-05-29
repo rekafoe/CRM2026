@@ -12,9 +12,11 @@
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   position: relative;
-  min-height: 760px;
+  min-height: 0;
   height: 100%;
+  max-height: 100%;
   overflow: hidden;
+  box-sizing: border-box;
   color: var(--pc-ink);
   background:
     radial-gradient(circle at 16% 0, rgba(0, 166, 214, 0.12), transparent 30%),
@@ -22,6 +24,17 @@
   border: 1px solid rgba(226, 232, 240, 0.9);
   border-radius: 0;
   box-shadow: 0 30px 90px rgba(2, 8, 23, 0.28);
+}
+
+/* Клиентский десктоп: flex-колонка, page strip только внутри canvas-column */
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile) {
+  display: flex;
+  flex-direction: column;
+}
+
+.public-design-editor--client:not(.public-design-editor--mobile) .public-design-editor__workspace {
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .public-design-editor__topbar,
@@ -279,13 +292,16 @@
   padding: 10px 18px 0;
 }
 
-.public-design-editor__workspace {
+/* Legacy admin / не-client: canvas слева, панель справа */
+.public-design-editor__workspace:not(.public-design-editor__workspace--desktop):not([data-pde-layout='client-desktop']) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 352px;
   gap: 10px;
   min-height: 0;
   padding: 0 12px;
 }
+
+/* Клиентский десктоп: flex в publicDesignClientShell.css ([data-pde-layout='client-desktop']) */
 
 .public-design-editor__stage {
   position: relative;
@@ -392,10 +408,25 @@
 .public-design-editor__scroll .design-editor-viewport {
   position: relative;
   z-index: 1;
-  min-height: 100%;
+  min-height: 0;
+  height: 100%;
 }
 
 .public-design-editor .design-editor-canvas-wrap {
   padding: 40px;
   background: transparent;
+}
+
+.public-design-editor .design-editor-fit-scaler {
+  overflow: hidden;
+}
+
+.public-design-editor .design-editor-fit-scaler .design-editor-canvas-wrap {
+  overflow: hidden;
+}
+
+/* Fabric textarea — позиция задаётся в pinFabricHiddenTextarea (.de-fabric-text-input) */
+.de-fabric-text-input {
+  position: fixed;
+  margin: 0;
 }

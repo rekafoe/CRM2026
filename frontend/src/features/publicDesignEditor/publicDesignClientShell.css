@@ -1,20 +1,187 @@
-.public-design-editor--client .public-design-editor__workspace {
-  grid-template-columns: minmax(0, 1fr) minmax(390px, 440px);
-  gap: 10px;
-  padding: 10px 12px 0;
+/*
+ * Десктоп (wireframe):
+ * ┌──────────┬─────────────────────┐
+ * │ sidebar  │ canvas (stage)      │
+ * │          ├─────────────────────┤
+ * │          │ page strip          │
+ * └──────────┴─────────────────────┘
+ */
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile) {
+  --pde-sidebar-w: clamp(360px, 32vw, 420px);
+  --pde-page-strip-h: min(188px, 26vh);
+
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-.public-design-editor--client .public-design-editor__aside {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) minmax(200px, 38%);
-  gap: 8px;
+.public-design-editor--client:not(.public-design-editor--mobile) .public-design-editor__topbar,
+.public-design-editor--client:not(.public-design-editor--mobile) .public-design-editor__alerts {
+  flex: 0 0 auto;
+}
+
+/*
+ * Десктоп: flex-row — aside слева, main-column (stage + page strip) справа
+ */
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 12px 8px;
+  box-sizing: border-box;
+  grid-template-columns: unset;
+  grid-template-areas: none;
+}
+
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  > .public-design-editor__client-aside {
+  flex: 0 0 var(--pde-sidebar-w);
+  max-width: var(--pde-sidebar-w);
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  > .public-design-editor__main-column {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
-.public-design-editor--client .public-design-editor__aside .public-design-editor__tasks {
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  > .public-design-editor__main-column
+  > .public-design-editor__canvas-column {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
+}
+
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  > .public-design-editor__main-column
+  > .public-design-editor__canvas-column
+  > .public-design-editor__stage {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  > .public-design-editor__main-column
+  > .public-design-editor__page-chrome {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  max-height: var(--pde-page-strip-h);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  > .public-design-editor__main-column
+  > .public-design-editor__page-chrome
+  .public-design-editor__page-strip {
+  width: 100%;
+  max-width: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Legacy: старый правый aside (Inspector + TaskPanel) */
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  > .public-design-editor__aside {
+  display: none;
+}
+
+/* Next action и проверка — в client-aside, не дублировать полосу в stage */
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  .public-design-editor__stage-guide {
+  display: none;
+}
+
+/* Мобильный workspace остаётся grid (панели photos/text/check) */
+.public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding: 10px 12px 0;
+  min-height: 0;
+}
+
+.public-design-editor--client.public-design-editor--mobile .public-design-editor__canvas-column {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Stage: toolbar → scroll (grid-rows — editorShell.css) */
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  .public-design-editor__stage
+  > .public-design-editor__scroll {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  .design-editor-scroll-area,
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  .design-editor-scroll-area.no-rulers {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  .design-editor-scroll-area
+  .design-editor-viewport,
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  .public-design-editor__scroll
+  .design-editor-viewport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 .public-design-editor--client .public-design-editor__sidepanel {
@@ -395,13 +562,15 @@
   background: #111827;
 }
 
-@media (max-width: 1180px) {
-  .public-design-editor--client .public-design-editor__workspace {
-    grid-template-columns: 1fr;
-  }
+/* display: contents ломает flex/grid — page strip уезжает за экран */
+.public-design-editor--client .public-design-editor__page-chrome {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
 }
 
-.public-design-editor__page-chrome {
+.public-design-editor:not(.public-design-editor--client) .public-design-editor__page-chrome {
   display: contents;
 }
 
@@ -625,8 +794,6 @@
     flex-shrink: 0;
     max-width: 100%;
     overflow: hidden;
-    transform: none;
-    transform-origin: top left;
   }
 
   .public-design-editor--client.public-design-editor--mobile .design-editor-fit-scaler[data-ready='true'] {
@@ -637,6 +804,7 @@
     box-sizing: border-box;
     width: calc(var(--de-content-w, 1) * 1px);
     height: calc(var(--de-content-h, 1) * 1px);
+    overflow: hidden;
     transform: scale(var(--de-fit-zoom, 1));
     transform-origin: top left;
   }
@@ -816,4 +984,56 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
+}
+
+/*
+ * Десктоп-клиент: жёсткая раскладка по data-pde-layout (перебивает legacy grid из editorShell)
+ */
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace[data-pde-layout='client-desktop'] {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+  grid-template-columns: unset;
+  grid-template-rows: unset;
+  grid-template-areas: none;
+}
+
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace[data-pde-layout='client-desktop']
+  > .public-design-editor__client-aside {
+  order: 0;
+  flex: 0 0 var(--pde-sidebar-w);
+  max-width: var(--pde-sidebar-w);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace[data-pde-layout='client-desktop']
+  > .public-design-editor__main-column {
+  order: 1;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Legacy Inspector/TaskPanel не должны появляться на десктопе */
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace[data-pde-layout='client-desktop']
+  > .public-design-editor__sidepanel,
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace[data-pde-layout='client-desktop']
+  > .public-design-editor__aside,
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace[data-pde-layout='client-desktop']
+  .public-design-editor__stage-guide {
+  display: none;
 }

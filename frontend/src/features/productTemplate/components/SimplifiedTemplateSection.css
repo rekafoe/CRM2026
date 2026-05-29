@@ -735,6 +735,16 @@
   padding-top: 0;
 }
 
+.subtype-edit-panel__name-field,
+.subtype-edit-panel__url-key-field {
+  margin-bottom: 12px;
+}
+
+.subtype-edit-panel__name-hint,
+.subtype-edit-panel__url-key-field .text-muted {
+  margin-top: 6px;
+}
+
 /* Сетка: изображение + две колонки для краткого/полного описания */
 .subtype-edit-website-layout {
   display: flex;

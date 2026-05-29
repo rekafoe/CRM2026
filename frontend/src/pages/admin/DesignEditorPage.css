@@ -5,8 +5,9 @@
 .admin-page-layout.design-editor-fullbleed,
 .admin-page-layout:has(.design-editor),
 .admin-page:has(.design-editor) {
-  height: 100vh;
-  min-height: unset !important;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0 !important;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -232,14 +233,24 @@
 
 .design-editor-fit-scaler {
   --de-fit-zoom: 1;
-  transform-origin: center center;
-  transform: scale(var(--de-fit-zoom));
+  --de-content-w: 1;
+  --de-content-h: 1;
   flex-shrink: 0;
+  overflow: hidden;
   visibility: hidden;
 }
 
 .design-editor-fit-scaler[data-ready="true"] {
   visibility: visible;
+}
+
+.design-editor-fit-scaler .design-editor-canvas-wrap {
+  box-sizing: border-box;
+  width: calc(var(--de-content-w) * 1px);
+  height: calc(var(--de-content-h) * 1px);
+  overflow: hidden;
+  transform: scale(var(--de-fit-zoom, 1));
+  transform-origin: top left;
 }
 
 .design-editor-contents {
@@ -382,7 +393,8 @@
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
   padding: 0 8px;
   background: #1e1e1e;
 }
@@ -390,14 +402,14 @@
 .ps-strip {
   flex: 1 1 auto;
   display: flex;
-  align-items: center;
-  gap: 3px;
+  align-items: flex-start;
+  gap: 0;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   padding: 8px 4px 10px;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   box-sizing: border-box;
   scrollbar-width: thin;
   scrollbar-color: #363636 transparent;
@@ -564,14 +576,17 @@
 
 /* Label */
 .psitem-label {
-  font-size: 10px;
-  font-weight: 400;
+  display: block;
+  min-height: 14px;
+  font-size: 11px;
+  font-weight: 500;
   color: #5e6370;
   white-space: nowrap;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1;
+  line-height: 1.25;
+  text-align: center;
 }
 .psitem.is-active .psitem-label {
   color: #7db9ff;
@@ -600,107 +615,10 @@
   outline: none;
 }
 
-/* ── Add / delete ── */
-.ps-insert-btn {
-  align-self: center;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  min-width: 30px;
-  height: 82px;
-  padding: 0;
-  color: transparent;
-  background: transparent !important;
-  border: 1.5px dashed transparent;
-  border-radius: 12px;
-  cursor: pointer;
-  flex-shrink: 0;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1;
-  opacity: 1;
-  overflow: hidden;
-  box-shadow: none;
-  transform: scale(0.92);
-  transition:
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    color 0.16s ease,
-    margin 0.16s ease,
-    min-width 0.16s ease,
-    opacity 0.16s ease,
-    background 0.16s ease,
-    transform 0.16s ease,
-    width 0.16s ease;
-}
+/* Вставка между страницами — см. PageStrip.css */
 
-.ps-insert-btn {
-  margin: 0 -8px 0;
-}
-
-.ps-insert-btn::before {
-  content: '';
-  position: absolute;
-  inset: 50% auto auto 50%;
-  width: 30px;
-  height: 30px;
-  background: #2563eb;
-  border: 1px solid rgba(255,255,255,0.22);
-  border-radius: 999px;
-  box-shadow: 0 10px 24px rgba(37,99,235,0.2);
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.75);
-  transition:
-    opacity 0.16s ease,
-    transform 0.16s ease,
-    box-shadow 0.16s ease;
-}
-
-.ps-insert-symbol {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  color: #ffffff;
-  opacity: 0;
-  transform: scale(0.75);
-  transition:
-    opacity 0.16s ease,
-    transform 0.16s ease;
-}
-
-.ps-insert-btn:hover,
-.ps-insert-btn:focus-visible {
-  width: 44px;
-  min-width: 44px;
-  border-color: transparent;
-  color: #ffffff;
-  background: transparent !important;
-  box-shadow: none;
-  outline: none;
-  opacity: 1;
-  transform: scale(1);
-  animation: none;
-}
-
-.ps-insert-btn:hover::before,
-.ps-insert-btn:focus-visible::before {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-  animation: ps-add-breathe-circle 1.2s ease-in-out infinite;
-}
-
-.ps-insert-btn:hover .ps-insert-symbol,
-.ps-insert-btn:focus-visible .ps-insert-symbol {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.ps-insert-btn:active,
+.ps-strip-gap:hover .ps-insert-btn:active,
+.ps-strip-gap:focus-within .ps-insert-btn:active,
 .psitem--add:active {
   transform: translateY(0) scale(0.98);
   animation: none;
@@ -2110,7 +2028,7 @@
   background: #e5e7eb;
   padding: 20px;
   display: inline-flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   box-sizing: border-box;
 }
@@ -2121,6 +2039,17 @@
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
   line-height: 0;
   overflow: visible;
+}
+
+/* Fabric IText: скрытое textarea не должно уводить scroll контейнера вниз */
+.fabric-canvas-inner textarea,
+.canvas-container textarea {
+  scroll-margin: 0;
+}
+
+.fabric-canvas-inner textarea:focus,
+.canvas-container textarea:focus {
+  scroll-margin: 0;
 }
 
 .fabric-guides-overlay {

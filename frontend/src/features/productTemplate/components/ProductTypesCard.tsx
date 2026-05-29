@@ -477,22 +477,24 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
   const [draftCharacteristicsText, setDraftCharacteristicsText] = useState('')
   const [draftAdvantagesText, setDraftAdvantagesText] = useState('')
   const [draftSubtypeKey, setDraftSubtypeKey] = useState('')
+  const [draftTypeName, setDraftTypeName] = useState('')
   const prevTypeIdsRef = useRef<Array<string | number>>((value.types || []).map((t) => t.id))
 
   const editingType = useMemo(
-    () => types.find((t) => t.id === editingTypeId) ?? null,
+    () => types.find((t) => String(t.id) === String(editingTypeId)) ?? null,
     [types, editingTypeId]
   )
 
   useEffect(() => {
     if (!editingType) return
+    setDraftTypeName(editingType.name ?? '')
     setDraftImageUrl(editingType.image_url ?? '')
     setDraftBriefDescription(editingType.briefDescription ?? '')
     setDraftFullDescription(editingType.fullDescription ?? '')
     setDraftCharacteristicsText(arrayToText(editingType.characteristics))
     setDraftAdvantagesText(arrayToText(editingType.advantages))
     setDraftSubtypeKey(editingType.key ?? '')
-  }, [editingType?.id, editingType?.key])
+  }, [editingType?.id, editingType?.key, editingType?.name])
 
   const openEditType = (typeId: ProductTypeId) => {
     onSelectType(typeId)
@@ -505,8 +507,10 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
 
   const applyTypeDraft = () => {
     if (!editingType) return
+    const nameTrim = draftTypeName.trim()
     const keyTrim = draftSubtypeKey.trim().toLowerCase()
     const nextValue = updateType(value, editingType.id, {
+      name: nameTrim || editingType.name,
       image_url: draftImageUrl.trim() ? draftImageUrl : undefined,
       briefDescription: draftBriefDescription.trim() ? draftBriefDescription : undefined,
       fullDescription: draftFullDescription.trim() ? draftFullDescription : undefined,
@@ -515,6 +519,10 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
       key: keyTrim || undefined,
     })
     onChange(nextValue)
+    if (inlineEditingTypeId != null && String(inlineEditingTypeId) === String(editingType.id)) {
+      setInlineEditingTypeId(null)
+      setInlineNameDraft('')
+    }
     closeEditType()
   }
 
@@ -528,10 +536,15 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
     setInlineNameDraft('')
   }
 
-  const saveInlineNameEdit = (typeId: ProductTypeId, fallbackName: string) => {
-    const nextName = inlineNameDraft.trim() || fallbackName
+  const commitInlineNameEdit = (typeId: ProductTypeId, fallbackName: string, draft: string) => {
+    const nextName = draft.trim() || fallbackName
     onChange(updateType(value, typeId, { name: nextName }))
+  }
+
+  const saveInlineNameEdit = (typeId: ProductTypeId, fallbackName: string) => {
+    commitInlineNameEdit(typeId, fallbackName, inlineNameDraft)
     setInlineEditingTypeId(null)
+    setInlineNameDraft('')
   }
 
   useEffect(() => {
@@ -589,7 +602,11 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                       value={inlineNameDraft}
                       autoFocus
                       onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => setInlineNameDraft(e.target.value)}
+                      onChange={(e) => {
+                        const next = e.target.value
+                        setInlineNameDraft(next)
+                        commitInlineNameEdit(t.id, t.name, next)
+                      }}
                       onBlur={() => saveInlineNameEdit(t.id, t.name)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -686,7 +703,21 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                   lede="Изображение, описания и списки для витрины."
                 />
                 <div className="subtype-edit-panel__body">
-                  <div className="simplified-template__type-website-field" style={{ marginBottom: 12 }}>
+                  <div className="simplified-template__type-website-field subtype-edit-panel__name-field">
+                    <label>Название подтипа</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={draftTypeName}
+                      onChange={(e) => setDraftTypeName(e.target.value)}
+                      placeholder="Например: односторонние, с ламинацией"
+                      autoComplete="off"
+                    />
+                    <p className="text-muted text-sm subtype-edit-panel__name-hint">
+                      Отображается в списке типов и на сайте. Можно также переименовать двойным кликом по вкладке.
+                    </p>
+                  </div>
+                  <div className="simplified-template__type-website-field subtype-edit-panel__url-key-field">
                     <label>Ключ URL (подтип)</label>
                     <input
                       type="text"
@@ -696,7 +727,7 @@ export const ProductTypesCard: React.FC<ProductTypesCardProps> = ({
                       placeholder="латиница, цифры, дефис — уникален в системе"
                       autoComplete="off"
                     />
-                    <p className="text-muted text-sm" style={{ marginTop: 6 }}>
+                    <p className="text-muted text-sm">
                       Не должен совпадать с ключом другого продукта или подтипа. Пусто — только числовой id в ссылках.
                     </p>
                   </div>

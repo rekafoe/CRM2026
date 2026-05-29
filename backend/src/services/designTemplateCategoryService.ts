@@ -22,7 +22,7 @@ export async function getDesignTemplateCategories(): Promise<DesignTemplateCateg
       c.created_at,
       COUNT(dt.id) AS template_count
      FROM design_template_categories c
-     LEFT JOIN design_templates dt ON dt.category = c.name
+     LEFT JOIN design_templates dt ON dt.category_id = c.id
      GROUP BY c.id
      ORDER BY c.sort_order ASC, c.name ASC`,
   )
@@ -73,8 +73,8 @@ export async function updateDesignTemplateCategory(
   try {
     if (newName !== existing.name) {
       await db.run(
-        'UPDATE design_templates SET category = ? WHERE category = ?',
-        [newName, existing.name],
+        'UPDATE design_templates SET category = ? WHERE category_id = ?',
+        [newName, id],
       )
     }
     await db.run(
@@ -106,8 +106,8 @@ export async function deleteDesignTemplateCategory(id: number): Promise<boolean>
   await db.run('BEGIN')
   try {
     await db.run(
-      'UPDATE design_templates SET category = NULL WHERE category = ?',
-      [existing.name],
+      'UPDATE design_templates SET category_id = NULL, category = NULL WHERE category_id = ?',
+      [id],
     )
     await db.run('DELETE FROM design_template_categories WHERE id = ?', [id])
     await db.run('COMMIT')
@@ -116,6 +116,27 @@ export async function deleteDesignTemplateCategory(id: number): Promise<boolean>
     await db.run('ROLLBACK')
     throw new Error('Не удалось удалить категорию')
   }
+}
+
+export type PublicDesignTemplateCategory = {
+  id: number
+  name: string
+  sort_order: number
+}
+
+/** Категории для public API сайта (без служебных полей CRM). */
+export async function getPublicDesignTemplateCategories(): Promise<PublicDesignTemplateCategory[]> {
+  const db = await getDb()
+  const rows = await db.all<PublicDesignTemplateCategory[]>(
+    `SELECT id, name, sort_order
+     FROM design_template_categories
+     ORDER BY sort_order ASC, name ASC`,
+  )
+  return rows.map((row) => ({
+    id: Number(row.id),
+    name: String(row.name),
+    sort_order: Number(row.sort_order) || 0,
+  }))
 }
 
 export async function categoryNameExists(name: string, excludeId?: number): Promise<boolean> {

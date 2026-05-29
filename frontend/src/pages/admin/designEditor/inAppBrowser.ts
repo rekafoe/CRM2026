@@ -7,8 +7,16 @@ export function isCoarsePointerEnvironment(): boolean {
   );
 }
 
-export function shouldPreferTextEditSheet(): boolean {
-  return isRestrictiveInAppBrowser() || isCoarsePointerEnvironment();
+export type DesignEditorInteractionMode = 'basic' | 'advanced';
+
+/**
+ * Отдельная модалка текста — только в in-app браузерах (Telegram и т.п.),
+ * где скрытый textarea Fabric часто не работает.
+ */
+export function shouldPreferTextEditSheet(
+  _editorMode?: DesignEditorInteractionMode,
+): boolean {
+  return isRestrictiveInAppBrowser();
 }
 
 export function isRestrictiveInAppBrowser(): boolean {

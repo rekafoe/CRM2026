@@ -17,7 +17,7 @@ export const PublicDesignTextMobileToolbar: React.FC<PublicDesignTextMobileToolb
   const handlers = usePublicDesignTextFormatting(canvasHandleRef, selectedObj);
 
   const handleOpenTextEdit = useCallback(() => {
-    canvasHandleRef.current?.openTextEditSheetForActive();
+    canvasHandleRef.current?.beginTextEditingForActive();
   }, [canvasHandleRef]);
 
   return (

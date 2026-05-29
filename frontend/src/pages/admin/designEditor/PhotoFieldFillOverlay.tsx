@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import './PhotoFieldFillOverlay.css';
 
 interface PhotoFieldFillOverlayProps {
@@ -12,8 +13,8 @@ export const PhotoFieldFillOverlay: React.FC<PhotoFieldFillOverlayProps> = ({ pr
       ? 'Подготовка фото на макете…'
       : 'Загрузка фото…';
 
-  return (
-    <div className="photo-field-fill-overlay" role="status" aria-live="polite" aria-busy="true">
+  const overlay = (
+    <div className="photo-field-fill-overlay photo-field-fill-overlay--viewport" role="status" aria-live="polite" aria-busy="true">
       <div className="photo-field-fill-overlay__card">
         <span className="photo-field-fill-overlay__spinner" aria-hidden />
         <strong className="photo-field-fill-overlay__title">Загрузка фото</strong>
@@ -30,4 +31,7 @@ export const PhotoFieldFillOverlay: React.FC<PhotoFieldFillOverlayProps> = ({ pr
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') return overlay;
+  return createPortal(overlay, document.body);
 };

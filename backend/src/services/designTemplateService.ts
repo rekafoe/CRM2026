@@ -1,9 +1,11 @@
 import { getDb } from '../config/database'
+import { resolveTemplateCategory } from './designTemplateCategoryResolve'
 
 export interface DesignTemplateRow {
   id: number
   name: string
   description: string | null
+  category_id: number | null
   category: string | null
   preview_url: string | null
   spec: string | null
@@ -32,6 +34,9 @@ export interface DesignTemplateSpec {
 export interface DesignTemplateInput {
   name: string
   description?: string
+  /** Предпочтительно: FK на design_template_categories */
+  category_id?: number | null
+  /** Устаревшее: имя категории (разрешается в category_id при записи) */
   category?: string
   preview_url?: string
   spec?: DesignTemplateSpec
@@ -43,9 +48,13 @@ export interface DesignTemplateInput {
 }
 
 const PUBLIC_TEMPLATE_COLUMNS = `
-  dt.id, dt.name, dt.description, dt.category, dt.preview_url, dt.spec,
+  dt.id, dt.name, dt.description, dt.category_id,
+  COALESCE(c.name, dt.category) AS category,
+  dt.preview_url, dt.spec,
   dt.is_active, dt.sort_order, dt.created_at, dt.updated_at
 `.trim()
+
+const PUBLIC_TEMPLATE_JOIN = 'design_templates dt LEFT JOIN design_template_categories c ON c.id = dt.category_id'
 
 function normalizeUsageFee(value: unknown): number {
   const n = Number(value)
@@ -85,6 +94,7 @@ function mapListRow(row: Record<string, unknown>): DesignTemplateListRow {
     id: Number(row.id),
     name: String(row.name),
     description: row.description != null ? String(row.description) : null,
+    category_id: row.category_id != null ? Number(row.category_id) : null,
     category: row.category != null ? String(row.category) : null,
     preview_url: row.preview_url != null ? String(row.preview_url) : null,
     spec: row.spec != null ? String(row.spec) : null,
@@ -118,8 +128,10 @@ export async function getAllDesignTemplates(): Promise<DesignTemplateListRow[]> 
   const db = await getDb()
   const rows = await db.all(
     `SELECT dt.*, u.name AS author_name,
+      COALESCE(c.name, dt.category) AS category,
       (SELECT COUNT(*) FROM product_subtype_designs psd WHERE psd.design_template_id = dt.id) AS subtype_link_count
      FROM design_templates dt
+     LEFT JOIN design_template_categories c ON c.id = dt.category_id
      LEFT JOIN users u ON u.id = dt.author_user_id
      ORDER BY dt.sort_order ASC, dt.name ASC`,
   ) as Record<string, unknown>[]
@@ -128,13 +140,22 @@ export async function getAllDesignTemplates(): Promise<DesignTemplateListRow[]> 
 
 export async function getDesignTemplatesByCategory(category: string): Promise<DesignTemplateListRow[]> {
   const db = await getDb()
+  const byId = Number(category)
   const rows = await db.all(
-    `SELECT dt.*, u.name AS author_name
-     FROM design_templates dt
-     LEFT JOIN users u ON u.id = dt.author_user_id
-     WHERE dt.category = ? AND dt.is_active = 1
-     ORDER BY dt.sort_order ASC, dt.name ASC`,
-    [category],
+    Number.isFinite(byId) && byId > 0
+      ? `SELECT dt.*, u.name AS author_name, COALESCE(c.name, dt.category) AS category
+         FROM design_templates dt
+         LEFT JOIN design_template_categories c ON c.id = dt.category_id
+         LEFT JOIN users u ON u.id = dt.author_user_id
+         WHERE dt.category_id = ? AND dt.is_active = 1
+         ORDER BY dt.sort_order ASC, dt.name ASC`
+      : `SELECT dt.*, u.name AS author_name, COALESCE(c.name, dt.category) AS category
+         FROM design_templates dt
+         LEFT JOIN design_template_categories c ON c.id = dt.category_id
+         LEFT JOIN users u ON u.id = dt.author_user_id
+         WHERE COALESCE(c.name, dt.category) = ? AND dt.is_active = 1
+         ORDER BY dt.sort_order ASC, dt.name ASC`,
+    [Number.isFinite(byId) && byId > 0 ? byId : category],
   ) as Record<string, unknown>[]
   return rows.map(mapListRow)
 }
@@ -142,8 +163,9 @@ export async function getDesignTemplatesByCategory(category: string): Promise<De
 export async function getDesignTemplate(id: number): Promise<DesignTemplateListRow | null> {
   const db = await getDb()
   const row = await db.get(
-    `SELECT dt.*, u.name AS author_name
+    `SELECT dt.*, u.name AS author_name, COALESCE(c.name, dt.category) AS category
      FROM design_templates dt
+     LEFT JOIN design_template_categories c ON c.id = dt.category_id
      LEFT JOIN users u ON u.id = dt.author_user_id
      WHERE dt.id = ?`,
     [id],
@@ -155,7 +177,7 @@ export async function getPublicDesignTemplate(id: number): Promise<DesignTemplat
   const db = await getDb()
   const row = await db.get(
     `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
-     FROM design_templates dt
+     FROM ${PUBLIC_TEMPLATE_JOIN}
      WHERE dt.id = ? AND dt.is_active = 1`,
     [id],
   ) as DesignTemplateRow | undefined
@@ -175,7 +197,7 @@ export async function getPublicDesignTemplates(params: {
       rows = await db.all(
         `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
          FROM product_subtype_designs psd
-         JOIN design_templates dt ON dt.id = psd.design_template_id
+         JOIN ${PUBLIC_TEMPLATE_JOIN} ON dt.id = psd.design_template_id
          WHERE psd.product_id = ? AND psd.type_id = ? AND psd.size_id = ? AND dt.is_active = 1
          ORDER BY psd.sort_order ASC, dt.sort_order ASC, dt.name ASC`,
         [params.productId, params.typeId, sizeId],
@@ -183,7 +205,7 @@ export async function getPublicDesignTemplates(params: {
       const legacy = await db.all(
         `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
          FROM product_subtype_designs psd
-         JOIN design_templates dt ON dt.id = psd.design_template_id
+         JOIN ${PUBLIC_TEMPLATE_JOIN} ON dt.id = psd.design_template_id
          WHERE psd.product_id = ? AND psd.type_id = ? AND (psd.size_id IS NULL OR psd.size_id = '') AND dt.is_active = 1`,
         [params.productId, params.typeId],
       ) as DesignTemplateRow[]
@@ -203,7 +225,7 @@ export async function getPublicDesignTemplates(params: {
       rows = await db.all(
         `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
          FROM product_subtype_designs psd
-         JOIN design_templates dt ON dt.id = psd.design_template_id
+         JOIN ${PUBLIC_TEMPLATE_JOIN} ON dt.id = psd.design_template_id
          WHERE psd.product_id = ? AND psd.type_id = ? AND dt.is_active = 1
          ORDER BY psd.size_id ASC, psd.sort_order ASC, dt.sort_order ASC, dt.name ASC`,
         [params.productId, params.typeId],
@@ -212,7 +234,7 @@ export async function getPublicDesignTemplates(params: {
   } else {
     rows = await db.all(
       `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
-       FROM design_templates dt
+       FROM ${PUBLIC_TEMPLATE_JOIN}
        WHERE dt.is_active = 1
        ORDER BY dt.sort_order ASC, dt.name ASC`,
     ) as DesignTemplateRow[]
@@ -221,18 +243,35 @@ export async function getPublicDesignTemplates(params: {
   return rows.map((row) => stripPrivateImportFields(stripRoyaltyFields(row)))
 }
 
+async function resolveInputCategory(
+  input: Pick<DesignTemplateInput, 'category_id' | 'category'>,
+  createIfNameMissing = false,
+): Promise<{ category_id: number | null; category: string | null }> {
+  if (input.category_id === null && (input.category === undefined || input.category === '')) {
+    return { category_id: null, category: null }
+  }
+  const resolved = await resolveTemplateCategory({
+    category_id: input.category_id,
+    category: input.category,
+    createIfNameMissing,
+  })
+  return { category_id: resolved.category_id, category: resolved.category_name }
+}
+
 export async function createDesignTemplate(input: DesignTemplateInput): Promise<DesignTemplateListRow> {
   const db = await getDb()
   const spec = input.spec ? JSON.stringify(input.spec) : null
+  const cat = await resolveInputCategory(input, true)
   const result = await db.run(
     `INSERT INTO design_templates (
-      name, description, category, preview_url, spec, is_active, sort_order,
+      name, description, category_id, category, preview_url, spec, is_active, sort_order,
       author_user_id, usage_fee, author_percent
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.name,
       input.description ?? null,
-      input.category ?? null,
+      cat.category_id,
+      cat.category,
       input.preview_url ?? null,
       spec,
       input.is_active !== false ? 1 : 0,
@@ -257,7 +296,19 @@ export async function updateDesignTemplate(
 
   const name = input.name ?? existing.name
   const description = input.description !== undefined ? input.description : existing.description
-  const category = input.category !== undefined ? input.category : existing.category
+  let category_id = existing.category_id
+  let category = existing.category
+  if (input.category_id !== undefined || input.category !== undefined) {
+    const cat = await resolveInputCategory(
+      {
+        category_id: input.category_id !== undefined ? input.category_id : existing.category_id,
+        category: input.category !== undefined ? input.category : existing.category,
+      },
+      false,
+    )
+    category_id = cat.category_id
+    category = cat.category
+  }
   const preview_url = input.preview_url !== undefined ? input.preview_url : existing.preview_url
   const spec = input.spec !== undefined
     ? (typeof input.spec === 'string' ? input.spec : JSON.stringify(input.spec))
@@ -277,12 +328,12 @@ export async function updateDesignTemplate(
   const db = await getDb()
   await db.run(
     `UPDATE design_templates SET
-      name = ?, description = ?, category = ?, preview_url = ?, spec = ?,
+      name = ?, description = ?, category_id = ?, category = ?, preview_url = ?, spec = ?,
       is_active = ?, sort_order = ?, author_user_id = ?, usage_fee = ?, author_percent = ?,
       updated_at = datetime('now')
      WHERE id = ?`,
     [
-      name, description, category, preview_url, spec,
+      name, description, category_id, category, preview_url, spec,
       is_active, sort_order, author_user_id, usage_fee, author_percent, id,
     ],
   )

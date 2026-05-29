@@ -34,6 +34,7 @@ export const PublicDesignEditorPreviewPage: React.FC = () => {
   const mode = requestedMode && CLIENT_EDITOR_MODES.includes(requestedMode) ? requestedMode : 'single';
   const draftToken = searchParams.get('draft');
   const isMobile = useMediaQuery('(max-width: 760px)');
+  const [crmChromeOpen, setCrmChromeOpen] = React.useState(false);
 
   const updateSearchParam = React.useCallback((key: string, value: string | null) => {
     const next = new URLSearchParams(searchParams);
@@ -151,15 +152,40 @@ export const PublicDesignEditorPreviewPage: React.FC = () => {
     </div>
   );
 
+  const layoutClassName = [
+    'design-editor-fullbleed',
+    isMobile ? 'design-editor-fullbleed--mobile-preview' : '',
+    crmChromeOpen ? 'design-editor-fullbleed--crm-chrome-open' : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <AdminPageLayout
       title="Предпросмотр клиентского редактора"
       icon={<AppIcon name="image" size="sm" />}
       onBack={() => navigate('/adminpanel/design-templates')}
-      className={`design-editor-fullbleed${isMobile ? ' design-editor-fullbleed--mobile-preview' : ''}`}
+      className={layoutClassName}
       headerExtra={isMobile ? undefined : headerExtra}
     >
       <div className="public-editor-preview-shell">
+        {!isMobile && (
+          <div className="public-editor-preview-floating-chrome" aria-label="Навигация предпросмотра">
+            <button
+              type="button"
+              className="public-editor-preview-floating-chrome__btn"
+              onClick={() => navigate('/adminpanel/design-templates')}
+            >
+              ← Назад
+            </button>
+            <button
+              type="button"
+              className={`public-editor-preview-floating-chrome__btn public-editor-preview-floating-chrome__btn--crm${crmChromeOpen ? ' is-active' : ''}`}
+              aria-expanded={crmChromeOpen}
+              onClick={() => setCrmChromeOpen((open) => !open)}
+            >
+              {crmChromeOpen ? 'Скрыть CRM' : 'CRM'}
+            </button>
+          </div>
+        )}
         {isMobile && (
           <PublicEditorPreviewModeBar
             mode={mode}

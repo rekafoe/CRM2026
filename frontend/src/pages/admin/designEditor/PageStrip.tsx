@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useEffect, useState } from 'react';
 import type { StripItem } from './spreadUtils';
 import { findStripItemForPage } from './spreadUtils';
+import './PageStrip.css';
 
 export interface PageStripStatus {
   tone: 'ready' | 'warning' | 'error';
@@ -51,7 +52,7 @@ interface PageStripProps {
 }
 
 const DEFAULT_STRIP_THUMB_H = 82;
-const CLIENT_STRIP_THUMB_H = 68;
+const CLIENT_STRIP_THUMB_H = 96;
 const COMPACT_STRIP_THUMB_H = 56;
 
 export const PageStrip: React.FC<PageStripProps> = ({
@@ -84,6 +85,8 @@ export const PageStrip: React.FC<PageStripProps> = ({
   const stripRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  /** Перед какой страницей показана кнопка вставки */
+  const [openInsertBefore, setOpenInsertBefore] = useState<number | null>(null);
   const activeIdx = findStripItemForPage(items, currentPage);
   const stripThumbH = compact
     ? COMPACT_STRIP_THUMB_H
@@ -104,11 +107,9 @@ export const PageStrip: React.FC<PageStripProps> = ({
     if (!strip) return;
     const active = strip.querySelector<HTMLElement>('.psitem.is-active');
     if (active) {
-      active.scrollIntoView({
-        behavior: compact ? 'auto' : 'smooth',
-        inline: 'center',
-        block: 'nearest',
-      });
+      // Только горизонтальная прокрутка полосы — scrollIntoView двигает всю страницу и «уносит» топбар.
+      const targetLeft = active.offsetLeft - (strip.clientWidth - active.offsetWidth) / 2;
+      strip.scrollTo({ left: Math.max(0, targetLeft), behavior: 'auto' });
     }
     window.setTimeout(updateScrollState, 180);
   }, [activeIdx, compact, updateScrollState]);
@@ -141,9 +142,15 @@ export const PageStrip: React.FC<PageStripProps> = ({
   const canAddCurrentMode = spreadMode ? allowAddSpread : allowAddPage;
   const lastInsertIndex = items.length > 0 ? Math.max(...items.flatMap((item) => item.pages)) + 1 : 0;
   const handleAddAtEnd = () => {
-    if (onInsertPage && !spreadMode) onInsertPage(lastInsertIndex);
-    else if (spreadMode) onAddSpread();
-    else onAddPage();
+    if (spreadMode) {
+      onAddSpread();
+      return;
+    }
+    if (onAddPage) {
+      onAddPage();
+      return;
+    }
+    if (onInsertPage) onInsertPage(lastInsertIndex);
   };
   const handleStripScroll = (direction: -1 | 1) => {
     const strip = stripRef.current;
@@ -231,7 +238,14 @@ export const PageStrip: React.FC<PageStripProps> = ({
         </button>
 
         {/* Полоса миниатюр */}
-        <div className="ps-strip" ref={stripRef}>
+        <div
+          className="ps-strip"
+          ref={stripRef}
+          style={{
+            ['--ps-thumb-h' as string]: `${stripThumbH}px`,
+            ['--ps-insert-offset-y' as string]: '4px',
+          }}
+        >
           {items.map((item, idx) => {
             const isActive = idx === activeIdx;
             const isSpread = item.pages.length === 2;
@@ -252,77 +266,108 @@ export const PageStrip: React.FC<PageStripProps> = ({
               </button>
             ) : null;
 
+            const showInsert = idx > 0 && typeof onInsertPage === 'function';
+            const pageTile = (
+              <div className={`psitem${isActive ? ' is-active' : ''}`} title={itemTitle}>
+                {deleteAction}
+                <button
+                  type="button"
+                  className="psitem-main"
+                  onClick={() => onGoTo(item.goToPage)}
+                >
+                  <div
+                    className={`psitem-thumbs${isSpread ? ' psitem-thumbs--spread' : ''}`}
+                    style={{ width: thumbsW, height: stripThumbH }}
+                  >
+                    {item.pages.map((pIdx) => (
+                      <div
+                        key={pIdx}
+                        className="psitem-page"
+                        style={{ width: singleW, height: stripThumbH }}
+                      >
+                        {thumbnails[pIdx] ? (
+                          <img
+                            src={thumbnails[pIdx]}
+                            alt=""
+                            className="psitem-img"
+                            draggable={false}
+                          />
+                        ) : (
+                          <div className="psitem-blank">
+                            <svg width="16" height="20" viewBox="0 0 16 20" fill="none" opacity="0.3">
+                              <rect x="1" y="1" width="14" height="18" rx="2" stroke="#888" strokeWidth="1.5"/>
+                              <line x1="4" y1="7" x2="12" y2="7" stroke="#888" strokeWidth="1"/>
+                              <line x1="4" y1="10" x2="12" y2="10" stroke="#888" strokeWidth="1"/>
+                              <line x1="4" y1="13" x2="9" y2="13" stroke="#888" strokeWidth="1"/>
+                            </svg>
+                          </div>
+                        )}
+                        {pageStatuses?.[pIdx] && (
+                          <span
+                            className={`psitem-status psitem-status--${pageStatuses[pIdx].tone}`}
+                            aria-label={pageStatuses[pIdx].label}
+                          />
+                        )}
+                      </div>
+                    ))}
+                    {isSpread && <div className="psitem-spine" aria-hidden="true" />}
+                  </div>
+                  <span className="psitem-label" style={{ maxWidth: thumbsW }} title={item.label}>
+                    {item.label}
+                  </span>
+                  {itemStatus && <span className={`psitem-status-label psitem-status-label--${itemStatus.tone}`}>{itemStatus.label}</span>}
+                </button>
+                {isActive && canDeleteItem && (
+                  <button
+                    type="button"
+                    className="psitem-delete-action"
+                    onClick={() => onDeletePage(item.pages[0])}
+                  >
+                    Удалить
+                  </button>
+                )}
+              </div>
+            );
+
+            if (!showInsert) {
+              return <React.Fragment key={`ps-${idx}`}>{pageTile}</React.Fragment>;
+            }
+
+            const insertOpen = openInsertBefore === insertIndex;
+            const showGapInsert = () => setOpenInsertBefore(insertIndex);
+            const hideGapInsert = (event: React.PointerEvent<HTMLElement>) => {
+              const related = event.relatedTarget;
+              if (related instanceof Node && event.currentTarget.contains(related)) return;
+              setOpenInsertBefore((prev) => (prev === insertIndex ? null : prev));
+            };
+            const handleInsertClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onInsertPage?.(insertIndex);
+              setOpenInsertBefore(null);
+            };
+
             return (
-              <React.Fragment key={`ps-${idx}`}>
-                {idx > 0 && canAddCurrentMode && onInsertPage && !spreadMode && (
+              <div key={`ps-${idx}`} className="ps-strip-pair">
+                <div
+                  className={`ps-strip-gap${insertOpen ? ' is-active' : ''}`}
+                  onPointerEnter={showGapInsert}
+                  onPointerLeave={hideGapInsert}
+                >
                   <button
                     type="button"
                     className="ps-insert-btn"
-                    onClick={() => onInsertPage(insertIndex)}
+                    onMouseDown={handleInsertClick}
                     title={`Вставить страницу перед ${item.label}`}
                     aria-label={`Вставить страницу перед ${item.label}`}
                   >
-                    <span className="ps-insert-symbol">+</span>
+                    <svg className="ps-insert-icon" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                    </svg>
                   </button>
-                )}
-                <div className={`psitem${isActive ? ' is-active' : ''}`} title={itemTitle}>
-                  {deleteAction}
-                  <button
-                    type="button"
-                    className="psitem-main"
-                    onClick={() => onGoTo(item.goToPage)}
-                  >
-                    <div
-                      className={`psitem-thumbs${isSpread ? ' psitem-thumbs--spread' : ''}`}
-                      style={{ width: thumbsW, height: stripThumbH }}
-                    >
-                      {item.pages.map((pIdx) => (
-                        <div
-                          key={pIdx}
-                          className="psitem-page"
-                          style={{ width: singleW, height: stripThumbH }}
-                        >
-                          {thumbnails[pIdx] ? (
-                            <img
-                              src={thumbnails[pIdx]}
-                              alt=""
-                              className="psitem-img"
-                              draggable={false}
-                            />
-                          ) : (
-                            <div className="psitem-blank">
-                              <svg width="16" height="20" viewBox="0 0 16 20" fill="none" opacity="0.3">
-                                <rect x="1" y="1" width="14" height="18" rx="2" stroke="#888" strokeWidth="1.5"/>
-                                <line x1="4" y1="7" x2="12" y2="7" stroke="#888" strokeWidth="1"/>
-                                <line x1="4" y1="10" x2="12" y2="10" stroke="#888" strokeWidth="1"/>
-                                <line x1="4" y1="13" x2="9" y2="13" stroke="#888" strokeWidth="1"/>
-                              </svg>
-                            </div>
-                          )}
-                          {pageStatuses?.[pIdx] && (
-                            <span
-                              className={`psitem-status psitem-status--${pageStatuses[pIdx].tone}`}
-                              aria-label={pageStatuses[pIdx].label}
-                            />
-                          )}
-                        </div>
-                      ))}
-                      {isSpread && <div className="psitem-spine" aria-hidden="true" />}
-                    </div>
-                    <span className="psitem-label">{item.label}</span>
-                    {itemStatus && <span className={`psitem-status-label psitem-status-label--${itemStatus.tone}`}>{itemStatus.label}</span>}
-                  </button>
-                  {isActive && canDeleteItem && (
-                    <button
-                      type="button"
-                      className="psitem-delete-action"
-                      onClick={() => onDeletePage(item.pages[0])}
-                    >
-                      Удалить
-                    </button>
-                  )}
                 </div>
-              </React.Fragment>
+                {pageTile}
+              </div>
             );
           })}
         </div>

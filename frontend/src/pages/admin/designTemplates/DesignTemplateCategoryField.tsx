@@ -4,9 +4,9 @@ import type { DesignTemplateCategory } from '../../../api';
 
 type Props = {
   categories: DesignTemplateCategory[];
-  value: string;
-  onChange: (categoryName: string) => void;
-  onCreateCategory: (name: string) => Promise<string | null>;
+  value: number | null;
+  onChange: (categoryId: number | null) => void;
+  onCreateCategory: (name: string) => Promise<number | null>;
 };
 
 export const DesignTemplateCategoryField: React.FC<Props> = ({
@@ -24,9 +24,9 @@ export const DesignTemplateCategoryField: React.FC<Props> = ({
     if (!name) return;
     setCreating(true);
     try {
-      const created = await onCreateCategory(name);
-      if (created) {
-        onChange(created);
+      const createdId = await onCreateCategory(name);
+      if (createdId != null) {
+        onChange(createdId);
         setNewName('');
         setAdding(false);
       }
@@ -61,10 +61,16 @@ export const DesignTemplateCategoryField: React.FC<Props> = ({
 
   return (
     <div className="design-category-field">
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
+      <select
+        value={value != null ? String(value) : ''}
+        onChange={(e) => {
+          const raw = e.target.value;
+          onChange(raw === '' ? null : Number(raw));
+        }}
+      >
         <option value="">— без категории —</option>
         {categories.map((c) => (
-          <option key={c.id} value={c.name}>{c.name}</option>
+          <option key={c.id} value={String(c.id)}>{c.name}</option>
         ))}
       </select>
       <button type="button" className="design-category-field__add-link" onClick={() => setAdding(true)}>

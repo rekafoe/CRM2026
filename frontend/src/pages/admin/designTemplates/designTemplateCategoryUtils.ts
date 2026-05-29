@@ -10,6 +10,16 @@ export type DesignTemplateCategorySection = {
   categoryId?: number;
 };
 
+export function categorySectionKeyForTemplate(t: DesignTemplate): string {
+  if (t.category_id != null) return String(t.category_id);
+  const name = t.category?.trim() ?? '';
+  return name || UNCATEGORIZED_KEY;
+}
+
+export function categorySectionKeyForRegistry(cat: DesignTemplateCategory): string {
+  return String(cat.id);
+}
+
 export function buildCategorySections(
   templates: DesignTemplate[],
   registry: DesignTemplateCategory[],
@@ -25,18 +35,25 @@ export function buildCategorySections(
   };
 
   for (const t of templates) {
-    const name = t.category?.trim() ?? '';
-    put(name || UNCATEGORIZED_KEY, t);
+    put(categorySectionKeyForTemplate(t), t);
   }
 
   const sections: DesignTemplateCategorySection[] = [];
 
   for (const cat of registry) {
-    const items = buckets.get(cat.name) ?? [];
+    const key = categorySectionKeyForRegistry(cat);
+    const byId = buckets.get(key) ?? [];
+    const byName = buckets.get(cat.name) ?? [];
+    const seen = new Set(byId.map((t) => t.id));
+    const items = [
+      ...byId,
+      ...byName.filter((t) => !seen.has(t.id)),
+    ];
+    buckets.delete(key);
     buckets.delete(cat.name);
     if (items.length > 0 || showEmpty) {
       sections.push({
-        key: cat.name,
+        key,
         label: cat.name,
         items,
         categoryId: cat.id,

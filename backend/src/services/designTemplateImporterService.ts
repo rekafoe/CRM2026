@@ -26,6 +26,7 @@ export interface ImportDesignTemplateInput {
   }
   name: string
   description?: string
+  category_id?: number | null
   category?: string
   productId?: number
   typeId?: number
@@ -255,6 +256,7 @@ export async function importDesignTemplateFromFile(
     const template = await createDesignTemplate({
       name: input.name.trim(),
       description: input.description,
+      category_id: input.category_id,
       category: input.category,
       preview_url: undefined,
       is_active: false,
@@ -306,6 +308,7 @@ export async function importDesignTemplateFromFile(
   const template = await createDesignTemplate({
     name: input.name.trim(),
     description: input.description,
+    category_id: input.category_id,
     category: input.category,
     preview_url: previewUrl,
     is_active: true,

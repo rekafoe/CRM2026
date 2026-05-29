@@ -36,6 +36,7 @@ import { DesignTemplateCategoriesModal } from './designTemplates/DesignTemplateC
 import { DesignTemplateCategoryField } from './designTemplates/DesignTemplateCategoryField';
 import { DesignTemplateProductBindField } from './designTemplates/DesignTemplateProductBindField';
 import { DesignTemplateReimportModal } from './designTemplates/DesignTemplateReimportModal';
+import { DesignTemplateUsagePanel } from './designTemplates/DesignTemplateUsagePanel';
 import { buildCategorySections, UNCATEGORIZED_KEY } from './designTemplates/designTemplateCategoryUtils';
 import { useDesignTemplateBindingLabels } from './designTemplates/useDesignTemplateBindingLabels';
 import '../../styles/admin-page-layout.css';
@@ -51,7 +52,7 @@ const STATUS_LABELS: Record<TemplateCatalogStatus, string> = {
 type StatusFilter = 'all' | TemplateCatalogStatus;
 type BindingFilter = 'all' | 'linked' | 'unlinked';
 type SortKey = 'sort_order' | 'name' | 'updated';
-type PageTab = 'catalog' | 'bindings';
+type PageTab = 'catalog' | 'bindings' | 'analytics';
 
 const DEFAULT_USAGE_FEE = 3;
 const DEFAULT_AUTHOR_PERCENT = 10;
@@ -98,7 +99,9 @@ export const DesignTemplatesPage: React.FC = () => {
   const currentUser = useCurrentUser();
   const initializeDirectory = useProductDirectoryStore((s) => s.initialize);
   const editorPathPrefix = '/adminpanel/design-editor';
-  const pageTab: PageTab = searchParams.get('tab') === 'bindings' ? 'bindings' : 'catalog';
+  const tabParam = searchParams.get('tab');
+  const pageTab: PageTab =
+    tabParam === 'bindings' ? 'bindings' : tabParam === 'analytics' ? 'analytics' : 'catalog';
   const bindingsProductId = searchParams.get('productId');
   const bindingsTypeId = searchParams.get('typeId');
   const highlightTemplateId = searchParams.get('templateId');
@@ -129,7 +132,7 @@ export const DesignTemplatesPage: React.FC = () => {
   const [form, setForm] = useState({
     name: '',
     description: '',
-    category: '',
+    category_id: null as number | null,
     preview_url: '',
     width_mm: '',
     height_mm: '',
@@ -146,7 +149,7 @@ export const DesignTemplatesPage: React.FC = () => {
   const [importForm, setImportForm] = useState({
     name: '',
     description: '',
-    category: '',
+    category_id: null as number | null,
     productId: '',
     typeId: '',
     sizeId: '',
@@ -202,8 +205,8 @@ export const DesignTemplatesPage: React.FC = () => {
 
   const setPageTab = useCallback((tab: PageTab) => {
     const next = new URLSearchParams(searchParams);
-    if (tab === 'bindings') next.set('tab', 'bindings');
-    else next.delete('tab');
+    if (tab === 'catalog') next.delete('tab');
+    else next.set('tab', tab);
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -221,7 +224,7 @@ export const DesignTemplatesPage: React.FC = () => {
     try {
       const res = await createDesignTemplateCategory(name);
       await loadCategories();
-      return res.data.name;
+      return res.data.id;
     } catch {
       return null;
     }
@@ -231,9 +234,14 @@ export const DesignTemplatesPage: React.FC = () => {
     const q = searchQuery.trim().toLowerCase();
     let list = templates;
     if (categoryFilter === UNCATEGORIZED_KEY) {
-      list = list.filter((t) => !t.category?.trim());
+      list = list.filter((t) => t.category_id == null && !t.category?.trim());
     } else if (categoryFilter) {
-      list = list.filter((t) => (t.category ?? '') === categoryFilter);
+      const filterId = Number(categoryFilter);
+      if (Number.isFinite(filterId) && filterId > 0) {
+        list = list.filter((t) => t.category_id === filterId);
+      } else {
+        list = list.filter((t) => (t.category ?? '') === categoryFilter);
+      }
     }
     if (statusFilter !== 'all') {
       list = list.filter((t) => getTemplateCatalogStatus(t) === statusFilter);
@@ -328,7 +336,7 @@ export const DesignTemplatesPage: React.FC = () => {
     return { linked, unlinked };
   }, [templates]);
 
-  const defaultCategoryName = categoryRegistry[0]?.name ?? '';
+  const defaultCategoryId = categoryRegistry[0]?.id ?? null;
 
   const openCreate = () => {
     setEditingId(null);
@@ -336,7 +344,7 @@ export const DesignTemplatesPage: React.FC = () => {
     setForm({
       name: '',
       description: '',
-      category: defaultCategoryName,
+      category_id: defaultCategoryId,
       preview_url: '',
       width_mm: '',
       height_mm: '',
@@ -358,7 +366,7 @@ export const DesignTemplatesPage: React.FC = () => {
     setImportForm({
       name: '',
       description: '',
-      category: defaultCategoryName,
+      category_id: defaultCategoryId,
       productId: '',
       typeId: '',
       sizeId: '',
@@ -385,7 +393,7 @@ export const DesignTemplatesPage: React.FC = () => {
     setForm({
       name: t.name,
       description: t.description ?? '',
-      category: t.category ?? '',
+      category_id: t.category_id ?? null,
       preview_url: t.preview_url ?? '',
       width_mm: parsed.width_mm != null ? String(parsed.width_mm) : '',
       height_mm: parsed.height_mm != null ? String(parsed.height_mm) : '',
@@ -453,7 +461,7 @@ export const DesignTemplatesPage: React.FC = () => {
       const payload: DesignTemplateInput = {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
-        category: form.category.trim() || undefined,
+        category_id: form.category_id,
         preview_url: form.preview_url || undefined,
         spec: Object.keys(spec).length ? spec : undefined,
         is_active: form.is_active,
@@ -500,7 +508,7 @@ export const DesignTemplatesPage: React.FC = () => {
       await createDesignTemplate({
         name: `${t.name} (копия)`,
         description: t.description ?? undefined,
-        category: t.category ?? undefined,
+        category_id: t.category_id ?? undefined,
         preview_url: t.preview_url ?? undefined,
         spec,
         is_active: false,
@@ -533,7 +541,7 @@ export const DesignTemplatesPage: React.FC = () => {
         sourceFile: importForm.sourceFile,
         name: importForm.name.trim(),
         description: importForm.description.trim() || undefined,
-        category: importForm.category.trim() || undefined,
+        category_id: importForm.category_id,
         productId: importForm.productId.trim() || undefined,
         typeId: importForm.typeId.trim() || undefined,
         sizeId: importForm.sizeId.trim() || undefined,
@@ -730,6 +738,13 @@ export const DesignTemplatesPage: React.FC = () => {
           >
             <AppIcon name="link" size="xs" /> Привязки
           </button>
+          <button
+            type="button"
+            className={`design-templates-tab${pageTab === 'analytics' ? ' design-templates-tab--active' : ''}`}
+            onClick={() => setPageTab('analytics')}
+          >
+            <AppIcon name="chart" size="xs" /> Аналитика
+          </button>
         </div>
 
         {pageTab === 'bindings' ? (
@@ -738,6 +753,8 @@ export const DesignTemplatesPage: React.FC = () => {
             initialTypeId={bindingsTypeId ? Number(bindingsTypeId) : undefined}
             highlightTemplateId={highlightTemplateId ? Number(highlightTemplateId) : undefined}
           />
+        ) : pageTab === 'analytics' ? (
+          <DesignTemplateUsagePanel />
         ) : (
           <>
         <div className="design-templates-help">
@@ -801,7 +818,7 @@ export const DesignTemplatesPage: React.FC = () => {
               <option value="">Все</option>
               <option value={UNCATEGORIZED_KEY}>Без категории</option>
               {categoryRegistry.map((c) => (
-                <option key={c.id} value={c.name}>{c.name}</option>
+                <option key={c.id} value={String(c.id)}>{c.name}</option>
               ))}
             </select>
           </div>
@@ -920,8 +937,8 @@ export const DesignTemplatesPage: React.FC = () => {
             <label>Категория</label>
             <DesignTemplateCategoryField
               categories={categoryRegistry}
-              value={form.category}
-              onChange={(category) => setForm((p) => ({ ...p, category }))}
+              value={form.category_id}
+              onChange={(category_id) => setForm((p) => ({ ...p, category_id }))}
               onCreateCategory={handleCreateCategoryInline}
             />
           </div>
@@ -1057,8 +1074,8 @@ export const DesignTemplatesPage: React.FC = () => {
             <label>Категория</label>
             <DesignTemplateCategoryField
               categories={categoryRegistry}
-              value={importForm.category}
-              onChange={(category) => setImportForm((p) => ({ ...p, category }))}
+              value={importForm.category_id}
+              onChange={(category_id) => setImportForm((p) => ({ ...p, category_id }))}
               onCreateCategory={handleCreateCategoryInline}
             />
           </div>

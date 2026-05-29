@@ -20,8 +20,10 @@ import {
   createDesignTemplateCategory,
   deleteDesignTemplateCategory,
   getDesignTemplateCategories,
+  getPublicDesignTemplateCategories,
   updateDesignTemplateCategory,
 } from '../services/designTemplateCategoryService'
+import { getDesignTemplateUsageAnalytics } from '../services/designTemplateUsageService'
 
 const router = Router()
 
@@ -48,6 +50,31 @@ function parseRoyaltyFields(body: Record<string, unknown>) {
   }
   return { usage_fee, author_percent, author_user_id }
 }
+
+function parseCategoryFields(body: Record<string, unknown>): Pick<DesignTemplateInput, 'category_id' | 'category'> {
+  const out: Pick<DesignTemplateInput, 'category_id' | 'category'> = {}
+  if (Object.prototype.hasOwnProperty.call(body, 'category_id')) {
+    if (body.category_id === null || body.category_id === '') {
+      out.category_id = null
+    } else {
+      const id = Number(body.category_id)
+      if (!Number.isFinite(id) || id <= 0) {
+        throw new Error('Некорректный ID категории')
+      }
+      out.category_id = id
+    }
+  }
+  if (body.category != null && String(body.category).trim() !== '') {
+    out.category = String(body.category).trim()
+  }
+  return out
+}
+
+/** Public API: справочник категорий для галереи на сайте. */
+router.get('/public/categories', asyncHandler(async (_req: Request, res: Response) => {
+  const categories = await getPublicDesignTemplateCategories()
+  res.json(categories)
+}))
 
 /** Public API for external website: templates filtered by product/type/size. */
 router.get('/public', asyncHandler(async (req: Request, res: Response) => {
@@ -78,6 +105,12 @@ router.get('/public/:id', asyncHandler(async (req: Request, res: Response) => {
 }))
 
 router.use(authenticate)
+
+/** GET /api/design-templates/analytics/usage — популярность шаблонов в заказах */
+router.get('/analytics/usage', asyncHandler(async (req: Request, res: Response) => {
+  const analytics = await getDesignTemplateUsageAnalytics(req.query as Record<string, string>)
+  res.json(analytics)
+}))
 
 /** GET /api/design-templates — все шаблоны */
 router.get('/', asyncHandler(async (_req: Request, res: Response) => {
@@ -211,10 +244,17 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     res.status(400).json({ message: royalty.error })
     return
   }
+  let categoryFields: Pick<DesignTemplateInput, 'category_id' | 'category'> = {}
+  try {
+    categoryFields = parseCategoryFields(body)
+  } catch (err: unknown) {
+    res.status(400).json({ message: (err as Error).message })
+    return
+  }
   const input: DesignTemplateInput = {
     name: String(body.name || '').trim(),
     description: body.description != null ? String(body.description) : undefined,
-    category: body.category != null ? String(body.category) : undefined,
+    ...categoryFields,
     preview_url: body.preview_url != null ? String(body.preview_url) : undefined,
     spec: body.spec != null
       ? (typeof body.spec === 'string' ? JSON.parse(body.spec) : (body.spec as object))
@@ -261,12 +301,23 @@ router.post('/import', uploadOrderFilesMemory.fields([
       res.status(400).json({ message: royalty.error, errors: [royalty.error], warnings: [] })
       return
     }
+    let categoryFields: Pick<DesignTemplateInput, 'category_id' | 'category'> = {}
+    try {
+      categoryFields = parseCategoryFields(body)
+    } catch (err: unknown) {
+      res.status(400).json({
+        message: (err as Error).message,
+        errors: [(err as Error).message],
+        warnings: [],
+      })
+      return
+    }
     const result = await importDesignTemplateFromFile({
       file: files?.file?.[0],
       sourceFile: files?.sourceFile?.[0],
       name: String(body.name || '').trim(),
       description: body.description != null ? String(body.description) : undefined,
-      category: body.category != null ? String(body.category) : undefined,
+      ...categoryFields,
       productId: body.productId != null && body.productId !== '' ? Number(body.productId) : undefined,
       typeId: body.typeId != null && body.typeId !== '' ? Number(body.typeId) : undefined,
       sizeId: body.sizeId != null && body.sizeId !== '' ? String(body.sizeId) : undefined,
@@ -297,7 +348,14 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const input: Partial<DesignTemplateInput> = {}
   if (body.name != null) input.name = String(body.name).trim()
   if (body.description != null) input.description = String(body.description)
-  if (body.category != null) input.category = String(body.category)
+  try {
+    const categoryFields = parseCategoryFields(body)
+    if (categoryFields.category_id !== undefined) input.category_id = categoryFields.category_id
+    if (categoryFields.category !== undefined) input.category = categoryFields.category
+  } catch (err: unknown) {
+    res.status(400).json({ message: (err as Error).message })
+    return
+  }
   if (body.preview_url != null) input.preview_url = String(body.preview_url)
   if (body.spec != null) input.spec = typeof body.spec === 'string' ? JSON.parse(body.spec) : (body.spec as object)
   if (body.is_active != null) input.is_active = body.is_active === true

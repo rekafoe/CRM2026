@@ -1031,6 +1031,8 @@ export interface DesignTemplate {
   id: number;
   name: string;
   description?: string | null;
+  category_id?: number | null;
+  /** Имя категории (денормализация; в public API — для отображения) */
   category?: string | null;
   preview_url?: string | null;
   spec?: string | null;
@@ -1076,6 +1078,13 @@ export interface DesignTemplateCategory {
   template_count?: number;
 }
 
+/** Категория в public API (без служебных полей CRM). */
+export interface PublicDesignTemplateCategory {
+  id: number;
+  name: string;
+  sort_order: number;
+}
+
 /** Прокси: скачать изображение по HTTPS (Я.Диск, Google Drive, прямая ссылка) — обход CORS в браузере */
 export const fetchImageFromUrl = (url: string) =>
   api.post<Blob>('/images/from-url', { url }, { responseType: 'blob' });
@@ -1110,6 +1119,7 @@ export const importDesignTemplateFile = (payload: {
   sourceFile?: File | null;
   name: string;
   description?: string;
+  category_id?: number | null;
   category?: string;
   productId?: number | string;
   typeId?: number | string;
@@ -1124,7 +1134,8 @@ export const importDesignTemplateFile = (payload: {
   if (payload.sourceFile) formData.append('sourceFile', payload.sourceFile);
   formData.append('name', payload.name);
   if (payload.description) formData.append('description', payload.description);
-  if (payload.category) formData.append('category', payload.category);
+  if (payload.category_id != null) formData.append('category_id', String(payload.category_id));
+  else if (payload.category) formData.append('category', payload.category);
   if (payload.productId != null && payload.productId !== '') formData.append('productId', String(payload.productId));
   if (payload.typeId != null && payload.typeId !== '') formData.append('typeId', String(payload.typeId));
   if (payload.sizeId) formData.append('sizeId', payload.sizeId);
@@ -1145,6 +1156,64 @@ export const reimportDesignTemplateFile = (
   if (payload.sourceFile) formData.append('sourceFile', payload.sourceFile);
   return api.post<DesignTemplateImportResult>(`/design-templates/${templateId}/reimport`, formData);
 };
+export interface DesignTemplateUsageRow {
+  design_template_id: number;
+  name: string;
+  category_id?: number | null;
+  category?: string | null;
+  is_active: number;
+  preview_url?: string | null;
+  line_count: number;
+  order_count: number;
+  total_quantity: number;
+  total_revenue: number;
+  draft_count: number;
+  last_used_at?: string | null;
+  share_percent: number;
+}
+
+export interface DesignTemplateUsageAnalytics {
+  period: {
+    days: number | null;
+    startDate: string;
+    endDate?: string;
+    allTime: boolean;
+  };
+  summary: {
+    total_lines_with_template: number;
+    distinct_templates_used: number;
+    catalog_templates: number;
+    unused_in_period: number;
+    never_used_all_time: number;
+  };
+  by_template: DesignTemplateUsageRow[];
+  by_category: Array<{
+    category_id: number | null;
+    category_name: string;
+    line_count: number;
+    order_count: number;
+    total_quantity: number;
+    share_percent: number;
+  }>;
+  unused_in_period: Array<{
+    id: number;
+    name: string;
+    category_id?: number | null;
+    category?: string | null;
+    is_active: number;
+    ever_used: boolean;
+  }>;
+}
+
+export const getDesignTemplateUsageAnalytics = (params?: {
+  period?: string;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+}) => api.get<DesignTemplateUsageAnalytics>('/design-templates/analytics/usage', { params });
+
+export const getPublicDesignTemplateCategories = () =>
+  api.get<PublicDesignTemplateCategory[]>('/design-templates/public/categories');
 export const getPublicDesignTemplates = (params?: { productId?: number; typeId?: number; sizeId?: string }) =>
   api.get<DesignTemplate[]>('/design-templates/public', { params });
 export const getPublicDesignTemplate = (id: number) =>

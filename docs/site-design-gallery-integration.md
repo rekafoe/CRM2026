@@ -93,6 +93,14 @@ GET /api/design-templates/public?productId=58&typeId=1&sizeId=90x50
 
 **Не использовать** запрос только с `productId` без `typeId`: API вернёт **весь** активный каталог — это не галерея подтипа.
 
+### Справочник рубрик (опционально)
+
+```http
+GET /api/design-templates/public/categories
+```
+
+Ответ: `[{ "id": 1, "name": "Свадьба", "sort_order": 0 }, …]`. Фильтр галереи на клиенте: по `category_id` в элементах списка шаблонов.
+
 ### Сортировка ответа
 
 1. `product_subtype_designs.sort_order`
@@ -106,7 +114,8 @@ GET /api/design-templates/public?productId=58&typeId=1&sizeId=90x50
 | `id` | `designTemplateId`, ссылка на калькулятор/редактор |
 | `name` | подпись карточки |
 | `description` | опционально |
-| `category` | фильтр «Рубрика» (если нужен на сайте) |
+| `category_id` | фильтр «Рубрика» по id (предпочтительно) |
+| `category` | имя рубрики для подписи UI (денормализация) |
 | `preview_url` | `<img src="...">` — статичное превью из импорта |
 | `spec` | JSON-строка; внутри может быть `designState` — **для сетки не обязателен**, тяжёлый |
 
@@ -170,6 +179,7 @@ sequenceDiagram
 
 | Шаг | Endpoint | Ключ API |
 |-----|----------|----------|
+| Рубрики | `GET /api/design-templates/public/categories` | не нужен |
 | Список галереи | `GET /api/design-templates/public` | не нужен (публичный read) |
 | Один шаблон | `GET /api/design-templates/public/:id` | не нужен |
 | Создать draft | `POST /api/public-editor/drafts` | `WEBSITE_ORDER_API_KEY` |

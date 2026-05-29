@@ -30,7 +30,10 @@ export interface PublicEditorPreflightSummary {
 
 type FabricJsonObject = Record<string, unknown>;
 
-const PLACEHOLDER_TEXTS = new Set(['текст', 'ваш текст', 'имя', 'телефон', 'email', 'заголовок', 'описание']);
+import {
+  isPlaceholderTemplateText,
+  normalizeTextForPlaceholderCheck,
+} from '../../pages/admin/designEditor/designEditorTextPlaceholder';
 
 function isRecord(value: unknown): value is FabricJsonObject {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -59,8 +62,7 @@ function isTextObject(obj: FabricJsonObject): boolean {
 }
 
 function isPlaceholderText(text: string): boolean {
-  const normalized = text.trim().toLowerCase();
-  return PLACEHOLDER_TEXTS.has(normalized) || normalized.includes('placeholder');
+  return isPlaceholderTemplateText(text);
 }
 
 export function analyzePublicDesignPages(pages: DesignPage[], saveState: string): PublicEditorPreflightSummary {
@@ -108,7 +110,7 @@ export function analyzePublicDesignPages(pages: DesignPage[], saveState: string)
       }
 
       if (isTextObject(obj)) {
-        const text = String(obj.text ?? '').trim();
+        const text = normalizeTextForPlaceholderCheck(String(obj.text ?? ''));
         const placeholder = isPlaceholderText(text);
         const empty = text.length === 0;
         textFields.push({

@@ -86,6 +86,7 @@ export interface EditorCanvasHandlers {
   onZoomChange: Parameters<typeof DesignEditorCanvas>[0]['onZoomChange'];
   onPageThumbReady: Parameters<typeof DesignEditorCanvas>[0]['onPageThumbReady'];
   onTextFloatingAnchor?: Parameters<typeof DesignEditorCanvas>[0]['onTextFloatingAnchor'];
+  onTextFillHint?: Parameters<typeof DesignEditorCanvas>[0]['onTextFillHint'];
   onSnapLinesChange?: Parameters<typeof DesignEditorCanvas>[0]['onSnapLinesChange'];
   onDropRemoteImageUrl?: (url: string) => Promise<void>;
   onSidebarPhotoDropped?: (id: string) => void;
@@ -202,6 +203,7 @@ export const EditorCanvasStage: React.FC<EditorCanvasStageProps> = ({
         onZoomChange={handlers.onZoomChange}
         onPageThumbReady={handlers.onPageThumbReady}
         onTextFloatingAnchor={handlers.onTextFloatingAnchor}
+        onTextFillHint={handlers.onTextFillHint}
         onSnapLinesChange={handlers.onSnapLinesChange}
         onDropRemoteImageUrl={handlers.onDropRemoteImageUrl}
         onSidebarPhotoDropped={handlers.onSidebarPhotoDropped}

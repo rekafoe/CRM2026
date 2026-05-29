@@ -1,9 +1,101 @@
-.public-editor-preview-shell {
+/* Редактор на весь экран: без прокрутки оболочки CRM */
+html:has(.design-editor-fullbleed),
+body:has(.design-editor-fullbleed) {
+  height: 100%;
+  overflow: hidden;
+}
+
+.admin-panel-page:has(.design-editor-fullbleed) {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* CRM-шапка скрыта по умолчанию — больше места под редактор */
+.admin-page-layout.design-editor-fullbleed:not(.design-editor-fullbleed--crm-chrome-open) .admin-page-header {
+  display: none;
+}
+
+.admin-page-layout.design-editor-fullbleed:not(.design-editor-fullbleed--crm-chrome-open) .admin-page-content {
+  padding-top: 0;
+}
+
+.admin-page-layout.design-editor-fullbleed {
   display: flex;
-  flex: 1;
+  flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
+.admin-page-layout.design-editor-fullbleed .admin-page-content {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0 !important;
+  height: 0;
+  overflow: hidden;
+}
+
+.public-editor-preview-editor .public-design-editor.public-design-editor--client {
+  min-height: 0 !important;
+  height: 100%;
+  max-height: 100%;
+}
+
+.public-editor-preview-floating-chrome {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.public-editor-preview-floating-chrome__btn {
+  pointer-events: auto;
+  min-height: 34px;
+  padding: 7px 12px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+.public-editor-preview-floating-chrome__btn:hover,
+.public-editor-preview-floating-chrome__btn:focus-visible {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  outline: none;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
+}
+
+.public-editor-preview-floating-chrome__btn--crm.is-active {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--pc-cyan, #00a6d6), var(--pc-blue, #2563eb));
+  border-color: transparent;
+}
+
+.public-editor-preview-shell {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 0;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -88,12 +180,19 @@
   box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
 }
 
+.public-editor-preview-editor {
+  display: flex;
+  flex-direction: column;
+}
+
 .public-editor-preview-editor .client-editor,
 .public-editor-preview-editor .client-editor--single,
 .public-editor-preview-editor .client-editor--multipage,
 .public-editor-preview-editor .public-design-editor {
+  flex: 1 1 auto;
   height: 100%;
   min-height: 0;
+  max-height: 100%;
 }
 
 .public-editor-preview-editor .public-design-editor__topbar {
@@ -273,6 +372,10 @@
 
 @media (max-width: 760px) {
   .admin-page-layout.design-editor-fullbleed--mobile-preview .admin-page-header {
+    display: none;
+  }
+
+  .public-editor-preview-floating-chrome {
     display: none;
   }
 

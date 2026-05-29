@@ -1347,7 +1347,7 @@
     justify-content: flex-start;
   }
 
-  .public-design-editor__workspace {
+  .public-design-editor:not(.public-design-editor--client) .public-design-editor__workspace {
     grid-template-columns: 1fr;
   }
 

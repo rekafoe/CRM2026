@@ -135,6 +135,7 @@ export const DesignEditorPage: React.FC = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const fitScalerRef = useRef<HTMLDivElement>(null);
+  const canvasHandleRef = useRef<DesignEditorCanvasHandle | null>(null);
 
   const [viewOptions, setViewOptions] = useState<EditorViewOptions>({
     showRulers: true,
@@ -189,7 +190,7 @@ export const DesignEditorPage: React.FC = () => {
   const stripItems = buildStripItems(pageCount, spreadMode, coverPages);
   const currentStripItem = stripItems.find((item) => item.pages.includes(currentPage));
   const isSpreadView = spreadMode && (currentStripItem?.pages.length ?? 1) === 2;
-  const { fitZoom, viewportReady: fitReady, rulerOrigin } = useDesignEditorViewport({
+  const { fitZoom, viewportReady: fitReady, rulerOrigin, layoutWidthPx, layoutHeightPx } = useDesignEditorViewport({
     viewportRef,
     fallbackRef: scrollAreaRef,
     pageWidthPx: pageW,
@@ -198,13 +199,6 @@ export const DesignEditorPage: React.FC = () => {
     showBleed: prepressConfig.showBleed && viewOptions.showBleed,
     isSpreadView,
   });
-
-  useEffect(() => {
-    const el = fitScalerRef.current;
-    if (!el) return;
-    el.style.setProperty('--de-fit-zoom', String(fitZoom));
-    el.dataset.ready = fitReady ? 'true' : 'false';
-  }, [fitZoom, fitReady]);
 
   useEffect(() => {
     const el = scrollAreaRef.current;
@@ -247,8 +241,33 @@ export const DesignEditorPage: React.FC = () => {
   const spreadPairPages: [number, number] | null =
     isSpreadView && rightPageIdx >= 0 ? [leftPageIdx, rightPageIdx] : null;
 
-  // ── Canvas refs (imperative handles) ────────────────────────────────────────
-  const canvasHandleRef = useRef<DesignEditorCanvasHandle | null>(null);
+  useEffect(() => {
+    const el = fitScalerRef.current;
+    if (!el) return;
+    el.dataset.ready = fitReady ? 'true' : 'false';
+    if (!fitReady) {
+      el.style.removeProperty('width');
+      el.style.removeProperty('height');
+      el.style.setProperty('--de-fit-zoom', '1');
+      return;
+    }
+    el.style.zoom = '';
+    el.style.setProperty('--de-content-w', String(layoutWidthPx));
+    el.style.setProperty('--de-content-h', String(layoutHeightPx));
+    const scaledW = Math.max(1, Math.round(layoutWidthPx * fitZoom));
+    const scaledH = Math.max(1, Math.round(layoutHeightPx * fitZoom));
+    el.style.width = `${scaledW}px`;
+    el.style.height = `${scaledH}px`;
+    el.style.setProperty('--de-fit-zoom', String(fitZoom));
+  }, [fitZoom, fitReady, layoutWidthPx, layoutHeightPx, pageLoadKey]);
+
+  useEffect(() => {
+    if (!fitReady) return;
+    const id = requestAnimationFrame(() => {
+      canvasHandleRef.current?.syncCanvasOffset();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [fitZoom, fitReady, currentPage, pageLoadKey]);
 
   const activeCanvas = useCallback(() => canvasHandleRef.current, []);
 

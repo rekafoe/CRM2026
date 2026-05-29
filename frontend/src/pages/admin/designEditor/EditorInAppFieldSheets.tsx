@@ -74,22 +74,21 @@ export const EditorInAppFieldSheets: React.FC<EditorInAppFieldSheetsProps> = ({
       <Modal
         isOpen={!!textEdit}
         onClose={onTextClose}
-        title={textEdit?.label ? `Текст: ${textEdit.label}` : 'Редактировать текст'}
+        title="Текст на макете"
         size="sm"
         className="de-text-edit-modal"
         overlayClassName="de-text-edit-modal-overlay"
         bodyClassName="de-text-edit-modal__body"
         headerClassName="de-text-edit-modal__header"
       >
-        <p className="de-inapp-field-sheet__hint">
-          Введите или измените текст. Пустое поле на макете останется с пробелом-заглушкой.
-        </p>
         <label className="de-inapp-text-edit__field">
-          <span>Текст на макете</span>
           <textarea
             value={draftText}
-            rows={4}
+            rows={3}
             autoFocus
+            enterKeyHint="done"
+            aria-label="Текст на макете"
+            placeholder="Введите текст"
             onChange={(event) => setDraftText(event.target.value)}
           />
         </label>

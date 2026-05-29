@@ -14,6 +14,8 @@ interface EditorMobilePagePagerProps {
   pageStatuses?: Record<number, PageStripStatus>;
   canAddSpread?: boolean;
   addSpreadLabel?: string;
+  /** Макет с разворотами, но на телефоне показываем постранично */
+  pagesOnlyHint?: string;
   onGoTo: (pageIndex: number) => void;
   onAddSpread?: () => void;
 }
@@ -27,6 +29,7 @@ export const EditorMobilePagePager: React.FC<EditorMobilePagePagerProps> = ({
   pageStatuses,
   canAddSpread = false,
   addSpreadLabel = 'Добавить разворот',
+  pagesOnlyHint,
   onGoTo,
   onAddSpread,
 }) => {
@@ -51,12 +54,13 @@ export const EditorMobilePagePager: React.FC<EditorMobilePagePagerProps> = ({
 
   if (!activeItem || items.length === 0) return null;
 
-  const isSpread = activeItem.pages.length === 2;
-  const thumbsW = isSpread ? singleW * 2 + 2 : singleW;
-  const spreadThumb = thumbnails[activeItem.pages[0]] || thumbnails[activeItem.pages[1]];
+  const thumbsW = singleW;
 
   return (
     <div className="editor-mobile-page-pager" aria-label="Навигация по страницам макета">
+      {pagesOnlyHint ? (
+        <p className="editor-mobile-page-pager__hint">{pagesOnlyHint}</p>
+      ) : null}
       <div className="editor-mobile-page-pager__head">
         <strong className="editor-mobile-page-pager__title">{activeItem.label}</strong>
         <span className="editor-mobile-page-pager__counter">
@@ -83,37 +87,18 @@ export const EditorMobilePagePager: React.FC<EditorMobilePagePagerProps> = ({
         </button>
 
         <div className="editor-mobile-page-pager__preview" aria-hidden>
-          {isSpread ? (
-            <div
-              className="editor-mobile-page-pager__thumbs editor-mobile-page-pager__thumbs--spread"
-              style={{ width: thumbsW, height: PAGER_THUMB_H }}
-            >
-              {spreadThumb ? (
-                <img
-                  src={spreadThumb}
-                  alt=""
-                  className="editor-mobile-page-pager__img editor-mobile-page-pager__img--spread"
-                  draggable={false}
-                />
-              ) : (
-                <div className="editor-mobile-page-pager__blank" />
-              )}
-              <div className="editor-mobile-page-pager__spine" />
-            </div>
-          ) : (
-            <div className="editor-mobile-page-pager__thumbs" style={{ width: singleW, height: PAGER_THUMB_H }}>
-              {thumbnails[activeItem.pages[0]] ? (
-                <img
-                  src={thumbnails[activeItem.pages[0]]}
-                  alt=""
-                  className="editor-mobile-page-pager__img"
-                  draggable={false}
-                />
-              ) : (
-                <div className="editor-mobile-page-pager__blank" />
-              )}
-            </div>
-          )}
+          <div className="editor-mobile-page-pager__thumbs" style={{ width: thumbsW, height: PAGER_THUMB_H }}>
+            {thumbnails[activeItem.pages[0]] ? (
+              <img
+                src={thumbnails[activeItem.pages[0]]}
+                alt=""
+                className="editor-mobile-page-pager__img"
+                draggable={false}
+              />
+            ) : (
+              <div className="editor-mobile-page-pager__blank" />
+            )}
+          </div>
         </div>
 
         <button
