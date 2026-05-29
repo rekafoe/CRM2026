@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vite --port 5173",
+    "dev:clean": "node -e \"const fs=require('fs');const path=require('path');function rm(p){try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p);}catch(e){if(e.code!=='ENOENT')throw e;}}rm('.vite');rm('dist');let n=0;function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const f=path.join(d,e.name);if(e.isDirectory())walk(f);else if(e.name.endsWith('.js')){const base=f.slice(0,-3);if(fs.existsSync(base+'.tsx')||fs.existsSync(base+'.ts')){fs.unlinkSync(f);n++;}}}}walk('src');console.log('removed',n,'stale src/*.js');\"",
+    "dev:fresh": "npm run dev:clean && vite --port 5173 --force",
     "build": "node ./node_modules/typescript/bin/tsc --noEmit && node ./node_modules/vite/bin/vite.js build && node ./node_modules/vite/bin/vite.js build --config vite.miniapp.config.ts",
     "build:miniapp": "node ./node_modules/vite/bin/vite.js build --config vite.miniapp.config.ts",
     "preview": "vite preview --port 5173",

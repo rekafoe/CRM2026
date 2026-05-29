@@ -91,7 +91,7 @@ export const PublicDesignAdvancedTools: React.FC<PublicDesignAdvancedToolsProps>
     [canvasHandleRef, currentPage, leftPageIdx, onDirty, pages, rightPageIdx, selectedObj?.type, setPages],
   );
 
-  const handleAddPhotoField = useCallback((options?: { width?: number; height?: number }) => {
+  const handleAddPhotoField = useCallback((options?: { aspectW?: number; aspectH?: number }) => {
     canvasHandleRef.current?.addPhotoField(options);
     onDirty();
   }, [canvasHandleRef, onDirty]);
@@ -123,8 +123,14 @@ export const PublicDesignAdvancedTools: React.FC<PublicDesignAdvancedToolsProps>
     if (action === 'delete') handle.deleteSelected();
     if (action === 'forward') handle.bringForward();
     if (action === 'backward') handle.sendBackward();
+    if (action === 'clearPhoto' && selectedObj?.id) {
+      handle.clearPhotoField(selectedObj.id);
+    }
+    if (action === 'replacePhoto' && selectedObj?.id) {
+      handle.replacePhotoField(selectedObj.id);
+    }
     onDirty();
-  }, [canvasHandleRef, onDirty]);
+  }, [canvasHandleRef, onDirty, selectedObj?.id]);
 
   const handleAddTextPreset = useCallback((kind: Parameters<NonNullable<DesignEditorCanvasHandle['addTextPreset']>>[0]) => {
     canvasHandleRef.current?.addTextPreset(kind);

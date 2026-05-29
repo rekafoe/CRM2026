@@ -30,10 +30,16 @@ export interface PublicEditorPreflightSummary {
 
 type FabricJsonObject = Record<string, unknown>;
 
+import { isFabricTextObjectType } from '../../pages/admin/designEditor/patchFabricTextObjects';
 import {
   isPlaceholderTemplateText,
   normalizeTextForPlaceholderCheck,
 } from '../../pages/admin/designEditor/designEditorTextPlaceholder';
+import {
+  checkTextSceneBoxOverflow,
+  estimateTextSceneBox,
+  type DesignPageBoundsPx,
+} from '../../pages/admin/designEditor/designEditorTextBounds';
 
 function isRecord(value: unknown): value is FabricJsonObject {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -57,15 +63,18 @@ function hasBlobUrl(value: unknown): boolean {
 }
 
 function isTextObject(obj: FabricJsonObject): boolean {
-  const type = String(obj.type ?? '').toLowerCase();
-  return type === 'i-text' || type === 'textbox' || type === 'text';
+  return isFabricTextObjectType(obj.type);
 }
 
 function isPlaceholderText(text: string): boolean {
   return isPlaceholderTemplateText(text);
 }
 
-export function analyzePublicDesignPages(pages: DesignPage[], saveState: string): PublicEditorPreflightSummary {
+export function analyzePublicDesignPages(
+  pages: DesignPage[],
+  saveState: string,
+  pageBounds?: DesignPageBoundsPx,
+): PublicEditorPreflightSummary {
   const photoFields: PublicEditorPreflightField[] = [];
   const textFields: PublicEditorPreflightField[] = [];
   const issues: PublicEditorPreflightIssue[] = [];
@@ -113,20 +122,58 @@ export function analyzePublicDesignPages(pages: DesignPage[], saveState: string)
         const text = normalizeTextForPlaceholderCheck(String(obj.text ?? ''));
         const placeholder = isPlaceholderText(text);
         const empty = text.length === 0;
+        const unfilled = empty || placeholder;
         textFields.push({
           id: String(obj.id ?? `text-${pageIndex + 1}-${textFields.length + 1}`),
           pageIndex,
           label: text ? text.slice(0, 32) : `Текст ${textFields.length + 1}`,
-          status: empty ? 'missing' : placeholder ? 'warning' : 'ready',
-          detail: empty ? 'Текст пустой' : placeholder ? 'Похоже на плейсхолдер' : 'Текст заполнен',
+          status: unfilled ? 'missing' : 'ready',
+          detail: empty
+            ? 'Текст пустой'
+            : placeholder
+              ? 'Замените шаблонную надпись на свой текст'
+              : 'Текст заполнен',
         });
-        if (empty || placeholder) {
+        if (unfilled) {
           issues.push({
             id: `text-${pageIndex}-${textFields.length}`,
-            level: empty ? 'error' : 'warning',
+            level: 'error',
             pageIndex,
-            message: `Страница ${pageIndex + 1}: ${empty ? 'есть пустой текст' : 'текст похож на плейсхолдер'}`,
+            message: `Страница ${pageIndex + 1}: ${
+              empty ? 'есть пустой текст' : 'текст не изменён (осталась шаблонная надпись)'
+            }`,
           });
+        } else if (pageBounds) {
+          const box = estimateTextSceneBox(obj);
+          if (box) {
+            const overflow = checkTextSceneBoxOverflow(box, pageBounds);
+            const fieldId = String(obj.id ?? `text-${pageIndex}`);
+            if (overflow.outsidePage) {
+              textFields[textFields.length - 1] = {
+                ...textFields[textFields.length - 1]!,
+                status: 'warning',
+                detail: 'Текст выходит за край страницы — уменьшите кегль или сократите надпись',
+              };
+              issues.push({
+                id: `text-overflow-page-${fieldId}`,
+                level: 'warning',
+                pageIndex,
+                message: `Страница ${pageIndex + 1}: текст выходит за край макета`,
+              });
+            } else if (overflow.outsideSafeZone) {
+              textFields[textFields.length - 1] = {
+                ...textFields[textFields.length - 1]!,
+                status: 'warning',
+                detail: 'Текст за пределами безопасной зоны — может обрезаться при печати',
+              };
+              issues.push({
+                id: `text-overflow-safe-${fieldId}`,
+                level: 'warning',
+                pageIndex,
+                message: `Страница ${pageIndex + 1}: текст за пределами безопасной зоны`,
+              });
+            }
+          }
         }
       }
     });

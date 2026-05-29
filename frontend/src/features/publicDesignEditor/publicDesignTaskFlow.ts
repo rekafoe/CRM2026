@@ -24,18 +24,8 @@ export function resolvePublicEditorNextAction(preflight: PublicEditorPreflightSu
     return {
       kind: 'editText',
       label: 'Заполнить следующий текст',
-      description: `Страница ${missingText.pageIndex + 1}: ${missingText.label}`,
+      description: `Страница ${missingText.pageIndex + 1}: ${missingText.detail || missingText.label}`,
       field: missingText,
-    };
-  }
-
-  const warningText = preflight.textFields.find((field) => field.status === 'warning');
-  if (warningText) {
-    return {
-      kind: 'editText',
-      label: 'Проверить текст',
-      description: `Страница ${warningText.pageIndex + 1}: ${warningText.detail}`,
-      field: warningText,
     };
   }
 

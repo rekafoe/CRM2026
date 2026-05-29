@@ -35,6 +35,7 @@ interface EditorCanvasViewportProps {
   onPageThumbReady: Parameters<typeof DesignEditorCanvas>[0]['onPageThumbReady'];
   onTextFloatingAnchor?: Parameters<typeof DesignEditorCanvas>[0]['onTextFloatingAnchor'];
   onTextFillHint?: Parameters<typeof DesignEditorCanvas>[0]['onTextFillHint'];
+  onTextEditCommitted?: Parameters<typeof DesignEditorCanvas>[0]['onTextEditCommitted'];
   onSnapLinesChange?: Parameters<typeof DesignEditorCanvas>[0]['onSnapLinesChange'];
   onDropRemoteImageUrl?: (url: string) => Promise<void>;
   onSidebarPhotoDropped?: (id: string) => void;
@@ -69,6 +70,7 @@ export const EditorCanvasViewport: React.FC<EditorCanvasViewportProps> = ({
   onPageThumbReady,
   onTextFloatingAnchor,
   onTextFillHint,
+  onTextEditCommitted,
   onSnapLinesChange,
   onDropRemoteImageUrl,
   onSidebarPhotoDropped,
@@ -103,6 +105,7 @@ export const EditorCanvasViewport: React.FC<EditorCanvasViewportProps> = ({
           onPageThumbReady={onPageThumbReady}
           onTextFloatingAnchor={onTextFloatingAnchor}
           onTextFillHint={onTextFillHint}
+          onTextEditCommitted={onTextEditCommitted}
           onSnapLinesChange={onSnapLinesChange}
           guideLinesPx={showGuides ? guideLinesPx : []}
           onDropRemoteImageUrl={onDropRemoteImageUrl}

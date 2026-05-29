@@ -1,3 +1,9 @@
+import {
+  checkTextSceneBoxOverflow,
+  designPageBoundsFromDesignState,
+  estimateTextSceneBox,
+} from './editorDesignTextBounds'
+
 export type EditorPreflightIssueLevel = 'error' | 'warning'
 
 export interface EditorPreflightIssue {
@@ -18,7 +24,18 @@ export interface EditorPreflightSummary {
 
 type FabricJsonObject = Record<string, unknown>
 
-const PLACEHOLDER_TEXTS = new Set(['текст', 'ваш текст', 'имя', 'телефон', 'email', 'заголовок', 'описание'])
+const PLACEHOLDER_TEXTS = new Set([
+  'текст',
+  'ваш текст',
+  'your text',
+  'имя',
+  'телефон',
+  'email',
+  'заголовок',
+  'описание',
+  'введите текст',
+  'введите текст...',
+])
 
 function isRecord(value: unknown): value is FabricJsonObject {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -43,7 +60,7 @@ function hasBlobUrl(value: unknown): boolean {
 
 function isTextObject(obj: FabricJsonObject): boolean {
   const type = String(obj.type ?? '').toLowerCase()
-  return type === 'i-text' || type === 'textbox' || type === 'text'
+  return type === 'i-text' || type === 'itext' || type === 'textbox' || type === 'text'
 }
 
 function isPlaceholderText(text: string): boolean {
@@ -54,6 +71,7 @@ function isPlaceholderText(text: string): boolean {
 export function analyzeDesignStatePreflight(designState: unknown): EditorPreflightSummary {
   const state = isRecord(designState) ? designState : {}
   const pages = Array.isArray(state.pages) ? state.pages : []
+  const pageBounds = designPageBoundsFromDesignState(state)
   const issues: EditorPreflightIssue[] = []
   let photoReady = 0
   let photoTotal = 0
@@ -103,10 +121,33 @@ export function analyzeDesignStatePreflight(designState: unknown): EditorPreflig
         if (empty || placeholder) {
           issues.push({
             id: `text-${pageIndex}-${textTotal}`,
-            level: empty ? 'error' : 'warning',
+            level: 'error',
             pageIndex,
-            message: `Страница ${pageIndex + 1}: ${empty ? 'есть пустой текст' : 'текст похож на плейсхолдер'}`,
+            message: `Страница ${pageIndex + 1}: ${
+              empty ? 'есть пустой текст' : 'текст не изменён (осталась шаблонная надпись)'
+            }`,
           })
+        } else if (pageBounds) {
+          const box = estimateTextSceneBox(obj)
+          if (box) {
+            const overflow = checkTextSceneBoxOverflow(box, pageBounds)
+            const fieldId = String(obj.id ?? pageIndex)
+            if (overflow.outsidePage) {
+              issues.push({
+                id: `text-overflow-page-${fieldId}`,
+                level: 'warning',
+                pageIndex,
+                message: `Страница ${pageIndex + 1}: текст выходит за край макета`,
+              })
+            } else if (overflow.outsideSafeZone) {
+              issues.push({
+                id: `text-overflow-safe-${fieldId}`,
+                level: 'warning',
+                pageIndex,
+                message: `Страница ${pageIndex + 1}: текст за пределами безопасной зоны`,
+              })
+            }
+          }
         }
       }
     })

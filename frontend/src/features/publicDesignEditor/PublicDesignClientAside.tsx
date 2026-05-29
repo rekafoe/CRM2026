@@ -73,6 +73,8 @@ interface PublicDesignClientAsideProps {
   onPhotoReplace: (field: PublicEditorPreflightField) => void;
   onPlaceSelectedPhoto?: (field: PublicEditorPreflightField) => void;
   onIssueFocus: (issue: PublicEditorPreflightIssue) => void;
+  /** Перед показом вкладки «Проверка» — подтянуть fabricJSON с холста */
+  onBeforeCheckTab?: () => void | Promise<void>;
 }
 
 export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = ({
@@ -96,10 +98,19 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
   onPhotoReplace,
   onPlaceSelectedPhoto,
   onIssueFocus,
+  onBeforeCheckTab,
 }) => {
   const [activeTab, setActiveTab] = useState<PublicDesignClientAsideTab>('photos');
 
   const missingPhotoCount = Math.max(0, fragmentPreflight.photoTotal - fragmentPreflight.photoReady);
+
+  const selectAsideTab = (tab: PublicDesignClientAsideTab) => {
+    if (tab === 'check') {
+      void Promise.resolve(onBeforeCheckTab?.()).finally(() => setActiveTab(tab));
+      return;
+    }
+    setActiveTab(tab);
+  };
   const missingTextCount = Math.max(0, fragmentPreflight.textTotal - fragmentPreflight.textReady);
   const checkSummary = summarizeCheck(globalPreflight);
 
@@ -114,53 +125,61 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
     summaryLabel: string,
     summaryValue: string,
   ) => (
-    <div className="public-design-editor__task-list public-design-editor__client-aside-check-group">
-      <div className="public-design-editor__task-summary">
+    <section className="public-design-editor__client-aside-check-section" aria-label={summaryLabel}>
+      <header className="public-design-editor__client-aside-check-section-head">
         <span>{summaryLabel}</span>
         <strong>{summaryValue}</strong>
-        {kind === 'text' && fragmentLabel && (
-          <p>{fragmentLabel}</p>
-        )}
-      </div>
+        {kind === 'text' && fragmentLabel ? (
+          <p className="public-design-editor__client-aside-check-section-note">{fragmentLabel}</p>
+        ) : null}
+      </header>
       {fields.length === 0 ? (
-        <p className="public-design-editor__task-empty">
+        <p className="public-design-editor__client-aside-check-empty">
           {kind === 'photo' ? 'В шаблоне нет фото-полей.' : 'В шаблоне нет редактируемых текстов.'}
         </p>
-      ) : fields.map((field) => (
-        <div
-          key={`${kind}-${field.pageIndex}-${field.id}`}
-          className={`public-design-editor__task-item public-design-editor__task-item--${field.status}`}
-        >
-          <button
-            type="button"
-            className="public-design-editor__task-main"
-            onClick={() => onFieldFocus(field, kind)}
-          >
-            <i aria-hidden="true" />
-            <strong>{field.label}</strong>
-            <span>Стр. {field.pageIndex + 1} · {field.detail}</span>
-            <b className="public-design-editor__task-status">{FIELD_STATUS_LABELS[field.status]}</b>
-          </button>
-          <div className="public-design-editor__task-actions">
-            <button type="button" onClick={() => onFieldFocus(field, kind)}>
-              Показать
-            </button>
-            {kind === 'photo' && (
-              <>
-                {onPlaceSelectedPhoto && (
-                  <button type="button" onClick={() => onPlaceSelectedPhoto(field)}>
-                    Поставить выбранное
-                  </button>
-                )}
-                <button type="button" onClick={() => onPhotoReplace(field)}>
-                  {field.status === 'ready' ? 'Заменить' : 'Добавить'}
+      ) : (
+        <ul className="public-design-editor__client-aside-check-items">
+          {fields.map((field) => (
+            <li
+              key={`${kind}-${field.pageIndex}-${field.id}`}
+              className={`public-design-editor__client-aside-check-item public-design-editor__client-aside-check-item--${field.status}`}
+            >
+              <button
+                type="button"
+                className="public-design-editor__client-aside-check-item-main"
+                onClick={() => onFieldFocus(field, kind)}
+              >
+                <i className="public-design-editor__client-aside-check-item-dot" aria-hidden="true" />
+                <span className="public-design-editor__client-aside-check-item-copy">
+                  <strong>{field.label}</strong>
+                  <span>Стр. {field.pageIndex + 1} · {field.detail}</span>
+                </span>
+                <b className="public-design-editor__client-aside-check-item-status">
+                  {FIELD_STATUS_LABELS[field.status]}
+                </b>
+              </button>
+              <div className="public-design-editor__client-aside-check-item-actions">
+                <button type="button" onClick={() => onFieldFocus(field, kind)}>
+                  Показать
                 </button>
-              </>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
+                {kind === 'photo' && (
+                  <>
+                    {onPlaceSelectedPhoto && (
+                      <button type="button" onClick={() => onPlaceSelectedPhoto(field)}>
+                        Поставить выбранное
+                      </button>
+                    )}
+                    <button type="button" onClick={() => onPhotoReplace(field)}>
+                      {field.status === 'ready' ? 'Заменить' : 'Добавить'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 
   return (
@@ -174,7 +193,7 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
               type="button"
               title={tab.title}
               className={`public-design-editor__client-aside-rail-btn${activeTab === tab.id ? ' is-active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => selectAsideTab(tab.id)}
               aria-current={activeTab === tab.id ? 'page' : undefined}
             >
               <span className="public-design-editor__client-aside-rail-icon" aria-hidden="true">
@@ -235,11 +254,16 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
               onNextAction={onNextAction}
             />
 
-            <div className="public-design-editor__task-summary public-design-editor__client-aside-check-overview">
-              <span>Проверка всего макета</span>
-              <strong>{checkSummary.title}</strong>
-              <p>{checkSummary.detail}</p>
-            </div>
+            <section
+              className="public-design-editor__client-aside-check-section public-design-editor__client-aside-check-section--overview"
+              aria-label="Итог проверки макета"
+            >
+              <header className="public-design-editor__client-aside-check-section-head">
+                <span>Проверка всего макета</span>
+                <strong>{checkSummary.title}</strong>
+                <p>{checkSummary.detail}</p>
+              </header>
+            </section>
 
             {renderFieldList(
               'photo',
@@ -255,28 +279,33 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
               `${fragmentPreflight.textReady} из ${fragmentPreflight.textTotal} заполнено`,
             )}
 
-            <div className="public-design-editor__task-list public-design-editor__client-aside-check-group">
-              <div className="public-design-editor__task-summary">
+            <section className="public-design-editor__client-aside-check-section" aria-label="Замечания">
+              <header className="public-design-editor__client-aside-check-section-head">
                 <span>Замечания</span>
                 <strong>
                   {globalPreflight.issues.length > 0
                     ? `${globalPreflight.issues.length} пунктов`
                     : 'Замечаний нет'}
                 </strong>
-              </div>
+              </header>
               {globalPreflight.issues.length === 0 ? (
-                <p className="public-design-editor__task-empty">Можно нажимать «Заказать».</p>
-              ) : globalPreflight.issues.map((issue) => (
-                <button
-                  key={issue.id}
-                  type="button"
-                  className={`public-design-editor__task-issue public-design-editor__task-issue--${issue.level}`}
-                  onClick={() => onIssueFocus(issue)}
-                >
-                  {issue.message}
-                </button>
-              ))}
-            </div>
+                <p className="public-design-editor__client-aside-check-empty">Можно нажимать «Заказать».</p>
+              ) : (
+                <ul className="public-design-editor__client-aside-check-issues">
+                  {globalPreflight.issues.map((issue) => (
+                    <li key={issue.id}>
+                      <button
+                        type="button"
+                        className={`public-design-editor__client-aside-check-issue public-design-editor__client-aside-check-issue--${issue.level}`}
+                        onClick={() => onIssueFocus(issue)}
+                      >
+                        {issue.message}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
         )}
       </div>

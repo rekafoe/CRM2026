@@ -1,7 +1,13 @@
 /** Патч всех текстовых объектов в Fabric JSON (i-text, textbox; рекурсивно в группах) */
 
 /** Fabric 6 сериализует IText как type: "IText" → toLowerCase "itext" */
-const TEXT_TYPES = new Set(['i-text', 'itext', 'textbox', 'text']);
+export const FABRIC_TEXT_OBJECT_TYPES = new Set(['i-text', 'itext', 'textbox', 'text']);
+
+export function isFabricTextObjectType(type: unknown): boolean {
+  return FABRIC_TEXT_OBJECT_TYPES.has(String(type ?? '').toLowerCase());
+}
+
+const TEXT_TYPES = FABRIC_TEXT_OBJECT_TYPES;
 
 function patchTextObjectsRecursive(objects: unknown[], patch: Record<string, unknown>): void {
   for (const obj of objects) {

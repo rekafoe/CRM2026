@@ -142,8 +142,12 @@
 
 .public-design-editor--client .public-design-editor__client-aside-panel-inner--photos .public-design-editor__photo-grid {
   flex: 1 1 auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: start;
+  align-items: start;
   max-height: none;
-  min-height: 120px;
+  min-height: 0;
 }
 
 .public-design-editor__client-aside-help-overlay {
@@ -165,29 +169,20 @@
   pointer-events: auto;
 }
 
+/* —— Вкладка «Проверка макета» —— */
 .public-design-editor__client-aside-panel-inner--check {
-  gap: 10px;
-  padding: 0;
+  gap: 14px;
+  padding: 14px;
 }
 
 .public-design-editor__client-aside-panel-inner--check .public-design-editor__inspector-status {
   flex: 0 0 auto;
-  border-radius: 0;
-}
-
-.public-design-editor__client-aside-check-overview {
-  margin: 0 12px;
-}
-
-.public-design-editor__client-aside-check-group {
-  padding: 0 12px 12px;
-}
-
-.public-design-editor__client-aside-check-group .public-design-editor__task-summary p {
   margin: 0;
-  color: var(--pc-muted);
-  font-size: 12px;
-  line-height: 1.35;
+  padding: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
 .public-design-editor__client-aside .public-design-editor__inspector-metrics {
@@ -198,24 +193,224 @@
   font-size: 13px;
 }
 
-.public-design-editor__client-aside .public-design-editor__task-item strong {
-  overflow: visible;
-  white-space: normal;
-  text-overflow: unset;
+.public-design-editor__client-aside-check-section {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
-.public-design-editor__client-aside .public-design-editor__task-main span {
-  grid-column: 2 / -1;
-  white-space: normal;
-  line-height: 1.35;
+.public-design-editor__client-aside-check-section--overview .public-design-editor__client-aside-check-section-head strong {
+  font-size: 16px;
 }
 
-.public-design-editor__client-aside .public-design-editor__task-status {
-  white-space: normal;
-  text-align: right;
+.public-design-editor__client-aside-check-section-head {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
 }
 
-.public-design-editor__client-aside .public-design-editor__task-issue {
-  white-space: normal;
+.public-design-editor__client-aside-check-section-head span {
+  color: var(--pc-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-design-editor__client-aside-check-section-head strong {
+  color: var(--pc-ink);
+  font-size: 14px;
+  font-weight: 950;
+  line-height: 1.25;
+}
+
+.public-design-editor__client-aside-check-section-head p,
+.public-design-editor__client-aside-check-section-note {
+  margin: 0;
+  color: var(--pc-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.public-design-editor__client-aside-check-empty {
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--pc-muted);
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px dashed rgba(15, 23, 42, 0.1);
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.public-design-editor__client-aside-check-items,
+.public-design-editor__client-aside-check-issues {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.public-design-editor__client-aside-check-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(248, 250, 252, 0.72);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+}
+
+.public-design-editor__client-aside-check-item--ready {
+  border-color: rgba(22, 163, 74, 0.22);
+  background: rgba(240, 253, 244, 0.72);
+}
+
+.public-design-editor__client-aside-check-item--missing {
+  border-color: rgba(239, 68, 68, 0.22);
+  background: rgba(254, 242, 242, 0.72);
+}
+
+.public-design-editor__client-aside-check-item--warning {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(255, 251, 235, 0.82);
+}
+
+.public-design-editor__client-aside-check-item-main {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: start;
+  width: 100%;
+  padding: 0;
+  color: inherit;
   text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.public-design-editor__client-aside-check-item-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: #f59e0b;
+}
+
+.public-design-editor__client-aside-check-item--ready .public-design-editor__client-aside-check-item-dot {
+  background: #16a34a;
+}
+
+.public-design-editor__client-aside-check-item--missing .public-design-editor__client-aside-check-item-dot {
+  background: #ef4444;
+}
+
+.public-design-editor__client-aside-check-item-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.public-design-editor__client-aside-check-item-copy strong {
+  color: var(--pc-ink);
+  font-size: 13px;
+  font-weight: 950;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.public-design-editor__client-aside-check-item-copy > span {
+  color: var(--pc-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.public-design-editor__client-aside-check-item-status {
+  align-self: start;
+  padding: 4px 8px;
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.14);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1.2;
+  white-space: normal;
+  text-align: center;
+}
+
+.public-design-editor__client-aside-check-item--ready .public-design-editor__client-aside-check-item-status {
+  color: #166534;
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.public-design-editor__client-aside-check-item--missing .public-design-editor__client-aside-check-item-status {
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.public-design-editor__client-aside-check-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-left: 20px;
+}
+
+.public-design-editor__client-aside-check-item-actions button {
+  min-height: 30px;
+  padding: 6px 10px;
+  color: var(--pc-ink);
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.public-design-editor__client-aside-check-item-actions button:hover {
+  background: #f8fafc;
+  border-color: rgba(37, 99, 235, 0.24);
+}
+
+.public-design-editor__client-aside-check-issue {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  color: var(--pc-ink);
+  text-align: left;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.public-design-editor__client-aside-check-issue:hover {
+  background: #ffffff;
+  border-color: rgba(37, 99, 235, 0.2);
+}
+
+.public-design-editor__client-aside-check-issue--error {
+  color: #991b1b;
+  background: rgba(254, 242, 242, 0.9);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.public-design-editor__client-aside-check-issue--warning {
+  color: #92400e;
+  background: rgba(255, 251, 235, 0.92);
+  border-color: rgba(245, 158, 11, 0.28);
 }

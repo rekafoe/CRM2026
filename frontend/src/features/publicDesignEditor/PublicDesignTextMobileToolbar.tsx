@@ -3,6 +3,7 @@ import type { RefObject } from 'react';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import { TextMobileToolbar } from '../../pages/admin/designEditor/TextMobileToolbar';
 import type { SelectedObjProps } from '../../pages/admin/designEditor/types';
+import { isRestrictiveInAppBrowser } from '../../pages/admin/designEditor/inAppBrowser';
 import { usePublicDesignTextFormatting } from './usePublicDesignTextFormatting';
 
 interface PublicDesignTextMobileToolbarProps {
@@ -16,6 +17,10 @@ export const PublicDesignTextMobileToolbar: React.FC<PublicDesignTextMobileToolb
 }) => {
   const handlers = usePublicDesignTextFormatting(canvasHandleRef, selectedObj);
 
+  const handleTextChange = useCallback((text: string) => {
+    canvasHandleRef.current?.setTextProp('text', text);
+  }, [canvasHandleRef]);
+
   const handleOpenTextEdit = useCallback(() => {
     canvasHandleRef.current?.beginTextEditingForActive();
   }, [canvasHandleRef]);
@@ -23,7 +28,8 @@ export const PublicDesignTextMobileToolbar: React.FC<PublicDesignTextMobileToolb
   return (
     <TextMobileToolbar
       selectedObj={selectedObj}
-      onOpenTextEdit={handleOpenTextEdit}
+      onTextChange={handleTextChange}
+      onOpenTextEdit={isRestrictiveInAppBrowser() ? handleOpenTextEdit : undefined}
       {...handlers}
     />
   );

@@ -37,7 +37,11 @@ import { splitSpreadCanvasToPagesSync } from './spreadCanvas';
 import { PrepressOverlay } from './PrepressOverlay';
 import {
   applyPhotoFieldPanToGroup,
+  bakeEmptyPhotoFieldScaleInPlace,
+  bakeFilledPhotoFieldScaleInPlace,
   buildFilledPhotoFieldGroup,
+  ensurePhotoFieldStaticLayout,
+  restoreBakedPhotoFieldDimensions,
   getFabricImageIntrinsicSize,
   getFilledPhotoCropContext,
   resolvePhotoFieldFitMode,
@@ -48,6 +52,8 @@ import {
   pickEmptyPhotoFieldFrameRect,
   syncFilledPhotoFieldSceneAnchor,
 } from './photoFieldGeometry';
+import { resolvePhotoFieldSizeForPage } from './photoFieldClientSizing';
+import { createEmptyPhotoField } from './photoFieldEmpty';
 import { PhotoFieldCropModal } from './PhotoFieldCropModal';
 import { PhotoFieldFillOverlay } from './PhotoFieldFillOverlay';
 import { cropSpreadThumbnail } from './cropSpreadThumbnail';
@@ -57,7 +63,17 @@ import {
   type TextEditSheetState,
 } from './EditorInAppFieldSheets';
 import { isRestrictiveInAppBrowser, shouldPreferTextEditSheet } from './inAppBrowser';
-import { applyTextSelectionChrome, isTextLikeFabricObject } from './designEditorTextChrome';
+import {
+  applyTextSelectionChrome,
+  applyPhotoFieldSelectionChrome,
+  isTextLikeFabricObject,
+} from './designEditorTextChrome';
+import {
+  bakeTextObjectScaleInPlace,
+  captureTextScaleDraft,
+  type TextScaleBakeDraft,
+} from './designEditorTextScale';
+import { createClientTextbox } from './designEditorClientText';
 import { resolveTextFillHintAfterEdit } from './designEditorTextPlaceholder';
 import { findPhotoFieldAtScene, findTextAtScene } from './photoFieldHitTest';
 import {
@@ -87,7 +103,10 @@ export interface DesignEditorCanvasHandle {
   redo: () => void;
   focusDesignObject: (id: string, options?: { editText?: boolean }) => boolean;
   replacePhotoField: (id: string) => boolean;
+  clearPhotoField: (id: string) => boolean;
   deleteSelected: () => void;
+  /** Компенсация CSS fit-zoom, чтобы маркеры выделения были читаемы на экране */
+  setSelectionDisplayScale: (scale: number) => void;
   duplicateSelected: () => void;
   addText: () => void;
   /** Текст с пресетом размера (заголовок / подзаголовок / обычный) */
@@ -96,7 +115,12 @@ export interface DesignEditorCanvasHandle {
   addImageFromUrl: (url: string) => Promise<void>;
   fillPhotoFieldFromFile: (id: string, file: File) => Promise<boolean>;
   fillPhotoFieldFromUrl: (id: string, url: string, originalName?: string) => Promise<boolean>;
-  addPhotoField: (options?: { width?: number; height?: number }) => void;
+  addPhotoField: (options?: {
+    width?: number;
+    height?: number;
+    aspectW?: number;
+    aspectH?: number;
+  }) => void;
   /** Создаёт набор пустых полей для фото по шаблону коллажа. */
   applyCollageLayout: (layout: CollageLayout, paddingPercent: number) => void;
   /** Подставляет свободные изображения на макете в пустые поля для фото (по порядку объектов). */
@@ -188,6 +212,8 @@ interface DesignEditorCanvasProps {
   resolveImageFileUrl?: ResolveImageFileUrl;
   /** basic: напоминание, если после правки текст пустой или шаблонный */
   onTextFillHint?: (message: string) => void;
+  /** После завершения inline-правки текста — синхронизировать fabricJSON в pages для preflight */
+  onTextEditCommitted?: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -202,26 +228,58 @@ const KEYBOARD_NUDGE_FAST_MULTIPLIER = 10;
 const CLIPBOARD_PASTE_OFFSET_PX = 16;
 
 /** Применяет ограничения basic-режима к объектам холста */
-function applyBasicModeConstraints(canvas: Canvas): void {
+function applyBasicModeConstraints(canvas: Canvas, displayScale = 1): void {
+  const inv = 1 / Math.max(0.22, Math.min(1, displayScale));
+  const canvasZoom = canvas.getZoom();
   canvas.getObjects().forEach((obj) => {
     const o = obj as unknown as AnyObj;
     if (o.isBackground) {
       obj.set({ selectable: false, evented: false });
     } else if (o.isPhotoField) {
       const clientAdded = isClientAddedPhotoField(o);
+      const filled = o.photoFieldFilled === true;
+      if (obj.type === 'group') {
+        const group = obj as Group;
+        ensurePhotoFieldStaticLayout(group);
+        if (filled) {
+          group.getObjects().forEach((child) => {
+            if (child.type === 'image') {
+              child.set({
+                lockScalingX: true,
+                lockScalingY: true,
+                hasControls: false,
+                hasBorders: false,
+              });
+            }
+          });
+        }
+      }
       obj.set({
         selectable: true,
         evented: true,
         lockMovementX: !clientAdded,
         lockMovementY: !clientAdded,
-        lockScalingX: true,
-        lockScalingY: true,
+        lockScalingX: !clientAdded,
+        lockScalingY: !clientAdded,
         lockRotation: true,
-        hasControls: false,
+        hasControls: clientAdded,
         hasBorders: true,
+        borderColor: '#2563eb',
+        ...(clientAdded
+          ? {}
+          : {
+              borderScaleFactor: 2.75 * inv,
+              padding: Math.round(8 * inv),
+            }),
       });
+      if (clientAdded) {
+        applyPhotoFieldSelectionChrome(obj, displayScale, canvasZoom);
+      }
+      if (filled) {
+        obj.set({ hoverCursor: 'pointer' });
+      }
     } else if (isTextLikeFabricObject(obj)) {
-      applyTextSelectionChrome(obj, 'basic');
+      applyTextSelectionChrome(obj, 'basic', displayScale, canvasZoom);
     } else if (isBasicDecorShape(obj)) {
       obj.set({
         selectable: true,
@@ -233,6 +291,9 @@ function applyBasicModeConstraints(canvas: Canvas): void {
         lockRotation: true,
         hasControls: false,
         hasBorders: true,
+        borderColor: '#2563eb',
+        borderScaleFactor: 2.75 * inv,
+        padding: Math.round(8 * inv),
       });
     } else {
       // прочие объекты (свободные изображения и т.п.) — заблокированы
@@ -259,8 +320,64 @@ function canDeleteObjectInBasicMode(obj: FabricObject): boolean {
   const o = asAny(obj);
   if (o.isBackground) return false;
   if (isTextLikeObject(obj) || isBasicDecorShape(obj)) return true;
-  if (o.isPhotoField && !o.photoFieldFilled) return true;
+  const field = resolvePhotoFieldTarget(obj);
+  if (field) return true;
+  if (o.isPhotoField) return true;
   return false;
+}
+
+/** Delete / Backspace: клиентское поле целиком; шаблонное заполненное — только сброс фото. */
+function deletePhotoFieldTargetInBasicMode(canvas: Canvas, obj: FabricObject): void {
+  const field = resolvePhotoFieldTarget(obj) ?? (asAny(obj).isPhotoField ? obj : undefined);
+  if (!field) {
+    detachFabricObject(canvas, obj);
+    return;
+  }
+  const o = asAny(field);
+  if (o.photoFieldFilled === true && !isClientAddedPhotoField(o)) {
+    clearFilledPhotoField(canvas, field);
+    return;
+  }
+  detachFabricObject(canvas, field);
+}
+
+function clearFilledPhotoField(canvas: Canvas, field: FabricObject): boolean {
+  const o = asAny(field);
+  if (!o.isPhotoField || o.photoFieldFilled !== true) return false;
+  const id = String(o.id ?? '').trim() || `field-${Date.now()}`;
+  const fw = Math.max(1, Number(o.photoFieldFw ?? field.width ?? 1));
+  const fh = Math.max(1, Number(o.photoFieldFh ?? field.height ?? 1));
+  const anchor = resolvePhotoFieldFrameSceneTL(field);
+  const clientAdded = isClientAddedPhotoField(o);
+  const parent = field.group;
+  const stackIndex = parent != null ? parent.getObjects().indexOf(field) : -1;
+
+  detachFabricObject(canvas, field);
+
+  const empty = createEmptyPhotoField({
+    id,
+    left: anchor.x,
+    top: anchor.y,
+    width: fw,
+    height: fh,
+    clientAdded,
+  });
+
+  if (parent != null && stackIndex >= 0) {
+    parent.insertAt(stackIndex, empty);
+    parent.set({ dirty: true });
+    parent.setCoords();
+  } else if (parent != null) {
+    parent.add(empty);
+    parent.set({ dirty: true });
+    parent.setCoords();
+  } else {
+    canvas.add(empty);
+  }
+
+  canvas.setActiveObject(empty);
+  empty.setCoords();
+  return true;
 }
 
 function canDuplicateObjectInBasicMode(obj: FabricObject): boolean {
@@ -620,8 +737,11 @@ function getObjProps(obj: unknown): SelectedObjProps {
   else if (typeName === 'line') type = 'line';
   else if (typeName === 'triangle') type = 'triangle';
 
+  const id = String(o.id ?? '').trim();
   return {
     type,
+    id: id || undefined,
+    photoFieldFilled: type === 'photoField' ? o.photoFieldFilled === true : undefined,
     text: type === 'IText' ? (o.text as string) : undefined,
     fontFamily: o.fontFamily as string | undefined,
     fontSize: o.fontSize as number | undefined,
@@ -656,101 +776,20 @@ function canvasToJSON(canvas: Canvas): Record<string, unknown> {
   return canvas.toObject(CUSTOM_PROPS) as Record<string, unknown>;
 }
 
-function createPhotoFieldGroup(opts: {
-  id: string;
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  clientAdded?: boolean;
-}): Group {
-  const { id, left, top, width, height } = opts;
-  const frame = new Rect({
-    left: 0,
-    top: 0,
-    originX: 'left',
-    originY: 'top',
-    width,
-    height,
-    fill: 'rgba(248, 250, 252, 0.96)',
-    stroke: '#94a3b8',
-    strokeWidth: 1,
-    strokeDashArray: [6, 4],
-    rx: 6,
-    ry: 6,
-  });
-  const minSide = Math.min(width, height);
-  const badgeR = Math.max(12, Math.min(22, minSide * 0.22));
-  const badgeCx = width / 2;
-  const badgeCy = height / 2;
-  const badge = new Circle({
-    left: badgeCx,
-    top: badgeCy,
-    originX: 'center',
-    originY: 'center',
-    radius: badgeR,
-    fill: '#ffffff',
-    stroke: '#e2e8f0',
-    strokeWidth: 1,
-    selectable: false,
-    evented: false,
-  });
-  const camBodyW = badgeR * 0.82;
-  const camBodyH = badgeR * 0.55;
-  const camBody = new Rect({
-    left: badgeCx,
-    top: badgeCy + 1,
-    originX: 'center',
-    originY: 'center',
-    width: camBodyW,
-    height: camBodyH,
-    rx: 2,
-    ry: 2,
-    fill: 'transparent',
-    stroke: '#64748b',
-    strokeWidth: 1.5,
-    selectable: false,
-    evented: false,
-  });
-  const camTop = new Rect({
-    left: badgeCx,
-    top: badgeCy - camBodyH / 2 - 2,
-    originX: 'center',
-    originY: 'center',
-    width: badgeR * 0.42,
-    height: badgeR * 0.18,
-    rx: 1,
-    ry: 1,
-    fill: '#64748b',
-    selectable: false,
-    evented: false,
-  });
-  const camLens = new Circle({
-    left: badgeCx,
-    top: badgeCy + 1,
-    originX: 'center',
-    originY: 'center',
-    radius: Math.max(2, badgeR * 0.15),
-    fill: 'transparent',
-    stroke: '#64748b',
-    strokeWidth: 1.5,
-    selectable: false,
-    evented: false,
-  });
-  const group = new Group([frame, badge, camBody, camTop, camLens], {
-    left,
-    top,
-    originX: 'left',
-    originY: 'top',
-    subTargetCheck: true,
-  });
-  asAny(group).isPhotoField = true;
-  asAny(group).photoFieldFilled = false;
-  asAny(group).photoFieldFw = width;
-  asAny(group).photoFieldFh = height;
-  asAny(group).id = id;
-  if (opts.clientAdded) asAny(group).photoFieldClientAdded = true;
-  return group;
+function bakeClientPhotoFieldIfNeeded(
+  target: FabricObject | undefined,
+  sizeOverride?: { fw: number; fh: number },
+): boolean {
+  const field = resolvePhotoFieldTarget(target) ?? (target && asAny(target).isPhotoField ? target : undefined);
+  if (!field || !isClientAddedPhotoField(asAny(field))) return false;
+  if (asAny(field).photoFieldFilled === true) {
+    return bakeFilledPhotoFieldScaleInPlace(field, sizeOverride);
+  }
+  return bakeEmptyPhotoFieldScaleInPlace(field, sizeOverride);
+}
+
+function resolveClientPhotoFieldId(field: FabricObject): string {
+  return String(asAny(field).id ?? '').trim();
 }
 
 function parsePageLoadKey(
@@ -797,6 +836,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       onTextFloatingAnchor,
       resolveImageFileUrl,
       onTextFillHint,
+      onTextEditCommitted,
     },
     ref,
   ) => {
@@ -804,6 +844,13 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const fabricRef = useRef<Canvas | null>(null);
     const historyRef = useRef<{ stack: string[]; index: number }>({ stack: [], index: -1 });
     const isLoadingRef = useRef(false);
+    const photoFieldBakeLockRef = useRef(false);
+    /** Fabric сбрасывает scale до object:modified — размер с scaling сохраняем здесь. */
+    const photoFieldResizeDraftRef = useRef<{ fieldId: string; fw: number; fh: number } | null>(null);
+    /** true между object:scaling и bake на filled/empty client field (scale сбрасывается до modified). */
+    const photoFieldScaleGestureRef = useRef(false);
+    const textResizeDraftRef = useRef<TextScaleBakeDraft | null>(null);
+    const photoFieldSkipBakeOnceRef = useRef<string | null>(null);
     const prevPageLoadKeyRef = useRef<string | null>(null);
     /** Блокирует синхронный resize по canvasWidthPx во время async split/load при смене pageLoadKey */
     const pageTransitionLockRef = useRef(false);
@@ -847,6 +894,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const textEditBaselineRef = useRef<{ fieldId: string; text: string } | null>(null);
     const onTextFillHintRef = useRef(onTextFillHint);
     onTextFillHintRef.current = onTextFillHint;
+    const onTextEditCommittedRef = useRef(onTextEditCommitted);
+    onTextEditCommittedRef.current = onTextEditCommitted;
     const scheduleTextAnchorRef = useRef<(() => void) | null>(null);
 
     const captureTextEditBaseline = useCallback((target: FabricObject) => {
@@ -872,6 +921,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const snapOverlayKeyRef = useRef('');
     const smartGuideSessionRef = useRef<SmartGuideSession | null>(null);
     const photoFieldDropHighlightRef = useRef(createPhotoFieldDropHighlightState());
+    const selectionDisplayScaleRef = useRef(1);
 
     /** Модалка смещения кадра (cover) в заполненном поле для фото */
     const [cropModal, setCropModal] = useState<{
@@ -968,7 +1018,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             (file, onProgress) =>
               resolveImageFileUrlRef.current?.(file, onProgress) ?? Promise.resolve(null),
             () => {
-              if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+              if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
               else releaseBasicModeConstraints(canvas);
             },
             (value) => reportPhotoFillProgress(value),
@@ -1105,6 +1155,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           text.set({ editable: false });
           const hidden = (text as unknown as { hiddenTextarea?: HTMLTextAreaElement }).hiddenTextarea;
           hidden?.classList.remove('de-fabric-text-input');
+          onTextEditCommittedRef.current?.();
         }
         resetCanvasWrapScroll();
       });
@@ -1119,8 +1170,12 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             text.set({ editable: false });
           }
         }
-        if (active && isTextLikeObject(active)) {
-          applyTextSelectionChrome(active, modeRef.current);
+        if (active && modeRef.current === 'basic' && !photoFieldScaleGestureRef.current) {
+          if (isTextLikeObject(active)) {
+            applyTextSelectionChrome(active, 'basic', selectionDisplayScaleRef.current, canvas.getZoom());
+          } else if (asAny(active).isPhotoField && isClientAddedPhotoField(asAny(active))) {
+            applyPhotoFieldSelectionChrome(active, selectionDisplayScaleRef.current, canvas.getZoom());
+          }
           canvas.requestRenderAll();
         }
         if (active) onSelectionChange(getObjProps(active));
@@ -1130,13 +1185,113 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       canvas.on('selection:created', updateSel);
       canvas.on('selection:updated', updateSel);
       canvas.on('selection:cleared', () => {
+        photoFieldResizeDraftRef.current = null;
+        photoFieldScaleGestureRef.current = false;
+        textResizeDraftRef.current = null;
         onSelectionChange(null);
         scheduleTextAnchor();
       });
       canvas.on('after:render', scheduleTextAnchor);
 
+      canvas.on('object:scaling', (opt) => {
+        const target = opt.target;
+        if (target && modeRef.current === 'basic' && isTextLikeObject(target)) {
+          textResizeDraftRef.current = captureTextScaleDraft(target);
+          return;
+        }
+        const field = resolvePhotoFieldTarget(target);
+        if (!field || !isClientAddedPhotoField(asAny(field))) return;
+        photoFieldScaleGestureRef.current = true;
+        const { fw, fh } = resolvePhotoFieldFrameSize(field);
+        photoFieldResizeDraftRef.current = {
+          fieldId: resolveClientPhotoFieldId(field),
+          fw,
+          fh,
+        };
+      });
+
       // Persist changes & update selection info
-      const handleModified = () => {
+      const handleModified = (opt?: { target?: FabricObject }) => {
+        if (photoFieldBakeLockRef.current) return;
+        const target = opt?.target ?? canvas.getActiveObject() ?? undefined;
+        const field = resolvePhotoFieldTarget(target) ?? (target && asAny(target).isPhotoField ? target : undefined);
+        const fieldId = field ? resolveClientPhotoFieldId(field) : '';
+        if (fieldId && photoFieldSkipBakeOnceRef.current === fieldId) {
+          photoFieldSkipBakeOnceRef.current = null;
+          const active = canvas.getActiveObject();
+          if (active) onSelectionChange(getObjProps(active));
+          saveSnapshot();
+          return;
+        }
+        const draft = photoFieldResizeDraftRef.current;
+        let sizeOverride =
+          field
+          && draft
+          && (!draft.fieldId || draft.fieldId === resolveClientPhotoFieldId(field))
+            ? { fw: draft.fw, fh: draft.fh }
+            : undefined;
+
+        const textTarget =
+          target && modeRef.current === 'basic' && isTextLikeObject(target)
+            ? target
+            : undefined;
+        const textDraft = textResizeDraftRef.current;
+        const textDraftForTarget =
+          textTarget
+          && textDraft
+          && (!textDraft.fieldId || textDraft.fieldId === String(asAny(textTarget).id ?? '').trim())
+            ? textDraft
+            : null;
+        textResizeDraftRef.current = null;
+
+        const clientPhotoField =
+          field && isClientAddedPhotoField(asAny(field)) ? field : undefined;
+        const scaleMag = clientPhotoField
+          ? Math.max(
+              Math.abs(Number(clientPhotoField.scaleX ?? 1)),
+              Math.abs(Number(clientPhotoField.scaleY ?? 1)),
+            )
+          : 1;
+        const textScaleMag = textTarget
+          ? Math.max(
+              Math.abs(Number(textTarget.scaleX ?? 1)),
+              Math.abs(Number(textTarget.scaleY ?? 1)),
+            )
+          : 1;
+        const wasPhotoScaleGesture = photoFieldScaleGestureRef.current;
+        const isTextScaleEnd = !!textDraftForTarget || textScaleMag > 1.004;
+        const isPhotoScaleEnd =
+          !!sizeOverride || scaleMag > 1.004 || wasPhotoScaleGesture;
+        if (
+          clientPhotoField
+          && isPhotoScaleEnd
+          && !sizeOverride
+        ) {
+          const measured = resolvePhotoFieldFrameSize(clientPhotoField);
+          sizeOverride = { fw: measured.fw, fh: measured.fh };
+        }
+
+        let baked = false;
+        photoFieldBakeLockRef.current = true;
+        isLoadingRef.current = true;
+        try {
+          if (textTarget && isTextScaleEnd) {
+            baked = bakeTextObjectScaleInPlace(textTarget, textDraftForTarget);
+          } else if (clientPhotoField && !isPhotoScaleEnd) {
+            baked = restoreBakedPhotoFieldDimensions(clientPhotoField);
+          } else if (clientPhotoField) {
+            baked = bakeClientPhotoFieldIfNeeded(target, sizeOverride);
+          }
+          if (baked && modeRef.current === 'basic') {
+            applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
+          }
+          if (baked) canvas.requestRenderAll();
+        } finally {
+          photoFieldBakeLockRef.current = false;
+          isLoadingRef.current = false;
+          photoFieldResizeDraftRef.current = null;
+          photoFieldScaleGestureRef.current = false;
+        }
         const active = canvas.getActiveObject();
         if (active) onSelectionChange(getObjProps(active));
         saveSnapshot();
@@ -1154,6 +1309,14 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 
       // Smart guides: targets are fixed for one drag, hysteresis keeps snapping stable.
       canvas.on('object:moving', (opt) => {
+        const movingField = resolvePhotoFieldTarget(opt.target);
+        if (movingField && isClientAddedPhotoField(asAny(movingField))) {
+          photoFieldResizeDraftRef.current = null;
+          photoFieldScaleGestureRef.current = false;
+        }
+        if (opt.target && isTextLikeObject(opt.target)) {
+          textResizeDraftRef.current = null;
+        }
         const target = opt.target;
         if (!target) return;
         if (target.lockMovementX && target.lockMovementY) return;
@@ -1330,7 +1493,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           return true;
         }
 
-        if (isDoubleTap) {
+        if (isDoubleTap && !isCoarsePointerEnvironment()) {
           beginTextEditingOnCanvas(canvas, target, inlineTextEditSessionRef, captureTextEditBaseline);
         }
         return true;
@@ -1434,7 +1597,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         if (raw && isTextLikeObject(raw)) {
           if (shouldPreferTextEditSheet(modeRef.current)) {
             openTextEditSheetRef.current(raw);
-          } else {
+          } else if (!isCoarsePointerEnvironment()) {
             beginTextEditingOnCanvas(canvas, raw, inlineTextEditSessionRef, captureTextEditBaseline);
           }
           return;
@@ -1577,7 +1740,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
               if (modeRef.current === 'basic') {
                 pastedClones = clones.filter((clone) => canKeyboardTransformObject(clone, 'basic'));
                 pastedClones.forEach((clone) => canvas.add(clone));
-                applyBasicModeConstraints(canvas);
+                applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
               } else {
                 pastedClones.forEach((clone) => canvas.add(clone));
               }
@@ -1609,13 +1772,26 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 
         if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault();
-          if (modeRef.current !== 'basic') {
-            canvas.getActiveObjects().forEach((o) => {
-              if (!asAny(o).isBackground) canvas.remove(o);
-            });
-            canvas.discardActiveObject();
-            canvas.requestRenderAll();
+          const targets = canvas.getActiveObjects().filter((obj) => (
+            modeRef.current === 'basic'
+              ? canDeleteObjectInBasicMode(obj)
+              : !asAny(obj).isBackground
+          ));
+          if (targets.length === 0) return;
+          targets.forEach((obj) => {
+            if (modeRef.current === 'basic' && (asAny(obj).isPhotoField || resolvePhotoFieldTarget(obj))) {
+              deletePhotoFieldTargetInBasicMode(canvas, obj);
+            } else {
+              detachFabricObject(canvas, obj);
+            }
+          });
+          canvas.discardActiveObject();
+          if (modeRef.current === 'basic') {
+            applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
           }
+          canvas.requestRenderAll();
+          onSelectionChange(null);
+          saveSnapshot();
         }
         if (isModifierShortcut && key === 'z') {
           e.preventDefault();
@@ -1627,7 +1803,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         }
         if (isModifierShortcut && key === 'd') {
           e.preventDefault();
-          duplicateActiveObjects(canvas, modeRef.current, saveSnapshot);
+          duplicateActiveObjects(canvas, modeRef.current, saveSnapshot, selectionDisplayScaleRef.current);
         }
       };
       window.addEventListener('keydown', onKeyDown);
@@ -1771,7 +1947,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           }
 
           if (pageLoadKeyRef.current !== targetKey) return;
-          if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+          if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
           else lockTextInlineEditing(canvas);
           const snap = JSON.stringify(canvasToJSON(canvas));
           historyRef.current = { stack: [snap], index: 0 };
@@ -1812,7 +1988,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     useEffect(() => {
       const canvas = fabricRef.current;
       if (!canvas) return;
-      if (mode === 'basic') applyBasicModeConstraints(canvas);
+      if (mode === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
       else {
         releaseBasicModeConstraints(canvas);
         lockTextInlineEditing(canvas);
@@ -1856,7 +2032,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         if (options?.editText && isTextLikeObject(selectableTarget)) {
           if (shouldPreferTextEditSheet(modeRef.current)) {
             openTextEditSheetForTarget(selectableTarget);
-          } else {
+          } else if (!isCoarsePointerEnvironment()) {
             beginTextEditingOnCanvas(canvas, selectableTarget, inlineTextEditSessionRef, captureTextEditBaseline);
           }
         }
@@ -1891,26 +2067,69 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             : !asAny(obj).isBackground
         ));
         if (targets.length === 0) return;
-        targets.forEach((obj) => detachFabricObject(canvas, obj));
+        targets.forEach((obj) => {
+          if (modeRef.current === 'basic' && (asAny(obj).isPhotoField || resolvePhotoFieldTarget(obj))) {
+            deletePhotoFieldTargetInBasicMode(canvas, obj);
+          } else {
+            detachFabricObject(canvas, obj);
+          }
+        });
         canvas.discardActiveObject();
-        if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+        if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
         canvas.requestRenderAll();
         onSelectionChange(null);
         saveSnapshot();
       },
+      clearPhotoField: (id) => {
+        const canvas = fabricRef.current;
+        if (!canvas) return false;
+        const field = findPhotoFieldByIdDeep(canvas, id);
+        if (!field) return false;
+        const cleared = clearFilledPhotoField(canvas, field);
+        if (!cleared) return false;
+        if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
+        canvas.requestRenderAll();
+        onSelectionChange(getObjProps(canvas.getActiveObject()!));
+        saveSnapshot();
+        return true;
+      },
+      setSelectionDisplayScale: (scale) => {
+        const next = Number.isFinite(scale) && scale > 0 ? scale : 1;
+        if (Math.abs(selectionDisplayScaleRef.current - next) < 0.01) return;
+        selectionDisplayScaleRef.current = next;
+        const canvas = fabricRef.current;
+        if (!canvas || modeRef.current !== 'basic') return;
+        applyBasicModeConstraints(canvas, next);
+        const active = canvas.getActiveObject();
+        if (active) {
+          active.setCoords();
+          canvas.requestRenderAll();
+        }
+      },
       addText: () => {
         const canvas = fabricRef.current;
         if (!canvas) return;
-        const text = new IText('Текст', {
-          left: canvas.width! / 2 - 40,
-          top: canvas.height! / 2 - 15,
-          fontSize: 28,
-          fontFamily: TEXT_FONTS[0].value,
-          fill: '#000000',
-        });
+        const text = modeRef.current === 'basic'
+          ? createClientTextbox({
+              text: 'Текст',
+              pageWidthPx: pageWidthRef.current,
+              pageHeightPx: pageHeightRef.current,
+              safeZonePx,
+              fontSize: 28,
+              fontFamily: TEXT_FONTS[0].value,
+              fill: '#000000',
+              centerInSafeZone: true,
+            })
+          : new IText('Текст', {
+              left: canvas.width! / 2 - 40,
+              top: canvas.height! / 2 - 15,
+              fontSize: 28,
+              fontFamily: TEXT_FONTS[0].value,
+              fill: '#000000',
+            });
         canvas.add(text);
         canvas.setActiveObject(text);
-        if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+        if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
         canvas.requestRenderAll();
         onSelectionChange(getObjProps(text));
         saveSnapshot();
@@ -1919,18 +2138,31 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         const canvas = fabricRef.current;
         if (!canvas) return;
         const p = TEXT_BLOCK_PRESETS[kind];
-        const text = new IText(p.defaultText, {
-          left: canvas.width! / 2 - 120,
-          top: canvas.height! / 2 - Math.round(p.fontSize / 2),
-          fontSize: p.fontSize,
-          fontWeight: p.fontWeight,
-          lineHeight: p.lineHeight,
-          fontFamily: TEXT_FONTS[0].value,
-          fill: '#111827',
-        });
+        const text = modeRef.current === 'basic'
+          ? createClientTextbox({
+              text: p.defaultText,
+              pageWidthPx: pageWidthRef.current,
+              pageHeightPx: pageHeightRef.current,
+              safeZonePx,
+              fontSize: p.fontSize,
+              fontWeight: p.fontWeight,
+              lineHeight: p.lineHeight,
+              fontFamily: TEXT_FONTS[0].value,
+              fill: '#111827',
+              centerInSafeZone: true,
+            })
+          : new IText(p.defaultText, {
+              left: canvas.width! / 2 - 120,
+              top: canvas.height! / 2 - Math.round(p.fontSize / 2),
+              fontSize: p.fontSize,
+              fontWeight: p.fontWeight,
+              lineHeight: p.lineHeight,
+              fontFamily: TEXT_FONTS[0].value,
+              fill: '#111827',
+            });
         canvas.add(text);
         canvas.setActiveObject(text);
-        if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+        if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
         canvas.requestRenderAll();
         onSelectionChange(getObjProps(text));
         saveSnapshot();
@@ -1965,19 +2197,51 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       addPhotoField: (options) => {
         const canvas = fabricRef.current;
         if (!canvas) return;
-        const width = Math.max(32, Number(options?.width) || 140);
-        const height = Math.max(32, Number(options?.height) || width);
-        const field = createPhotoFieldGroup({
-          id: `field-${Date.now()}`,
-          left: canvas.width! / 2 - width / 2,
-          top: canvas.height! / 2 - height / 2,
+        const pair = spreadPairPagesRef.current;
+        const pageSafeLeft = pair && currentPageRef.current === pair[1] ? pageWidthRef.current : 0;
+        const safeLeft = pageSafeLeft + safeZonePx;
+        const safeTop = safeZonePx;
+        const safeWidth = Math.max(1, pageWidthRef.current - safeZonePx * 2);
+        const safeHeight = Math.max(1, canvas.height! - safeZonePx * 2);
+
+        let width: number;
+        let height: number;
+        const aspectW = Number(options?.aspectW);
+        const aspectH = Number(options?.aspectH);
+        if (Number.isFinite(aspectW) && aspectW > 0 && Number.isFinite(aspectH) && aspectH > 0) {
+          ({ width, height } = resolvePhotoFieldSizeForPage({
+            aspectW,
+            aspectH,
+            pageWidthPx: pageWidthRef.current,
+            pageHeightPx: pageHeightRef.current,
+            safeZonePx,
+          }));
+        } else if (options?.width != null && options?.height != null) {
+          width = Math.max(32, Number(options.width) || 32);
+          height = Math.max(32, Number(options.height) || width);
+        } else {
+          ({ width, height } = resolvePhotoFieldSizeForPage({
+            aspectW: 1,
+            aspectH: 1,
+            pageWidthPx: pageWidthRef.current,
+            pageHeightPx: pageHeightRef.current,
+            safeZonePx,
+          }));
+        }
+
+        const fieldId = `field-${Date.now()}`;
+        const field = createEmptyPhotoField({
+          id: fieldId,
+          left: safeLeft + (safeWidth - width) / 2,
+          top: safeTop + (safeHeight - height) / 2,
           width,
           height,
           clientAdded: true,
         });
+        photoFieldSkipBakeOnceRef.current = fieldId;
         canvas.add(field);
         canvas.setActiveObject(field);
-        if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+        if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
         canvas.requestRenderAll();
         onSelectionChange(getObjProps(field));
         saveSnapshot();
@@ -2003,7 +2267,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             const y = Math.max(0, Math.min(1, Number(cell.y) || 0));
             const w = Math.max(0.02, Math.min(1, Number(cell.w) || 0));
             const h = Math.max(0.02, Math.min(1, Number(cell.h) || 0));
-            return createPhotoFieldGroup({
+            return createEmptyPhotoField({
               id: `field-${stamp}-${index}`,
               left: safeLeft + (margin + x * scale) * safeWidth,
               top: safeTop + (margin + y * scale) * safeHeight,
@@ -2030,8 +2294,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         ) as FabricImage[];
         const targets = objects.filter((o) => {
           if (!asAny(o).isPhotoField) return false;
-          /* Пустая рамка (group) или старый макет: одно image с флагом */
-          return o.type === 'group' || o.type === 'image';
+          /* Пустая рамка (rect/group) или старый макет: одно image с флагом */
+          return o.type === 'rect' || o.type === 'group' || o.type === 'image';
         }) as FabricObject[];
         if (sources.length === 0 || targets.length === 0) return;
 
@@ -2086,7 +2350,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         }
         canvas.add(obj);
         canvas.setActiveObject(obj);
-        if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+        if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
         canvas.requestRenderAll();
         onSelectionChange(getObjProps(obj));
         saveSnapshot();
@@ -2122,7 +2386,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             pageH: ph,
             apiBaseUrl,
           });
-          if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+          if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
           canvas.requestRenderAll();
         } finally {
           isLoadingRef.current = false;
@@ -2164,7 +2428,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
               apiBaseUrl,
             });
           }
-          if (modeRef.current === 'basic') applyBasicModeConstraints(canvas);
+          if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
           canvas.requestRenderAll();
           if (pagesOverride) {
             const snap = JSON.stringify(canvasToJSON(canvas));
@@ -2178,7 +2442,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       duplicateSelected: () => {
         const canvas = fabricRef.current;
         if (!canvas) return;
-        duplicateActiveObjects(canvas, modeRef.current, saveSnapshot);
+        duplicateActiveObjects(canvas, modeRef.current, saveSnapshot, selectionDisplayScaleRef.current);
       },
       addImageFromUrl: async (url: string) => {
         const canvas = fabricRef.current;
@@ -2319,6 +2583,9 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         if (!canvas) return;
         canvas.setZoom(Math.min(Math.max(z, 0.1), 10));
         onZoomChange(canvas.getZoom());
+        if (modeRef.current === 'basic') {
+          applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
+        }
       },
       syncTextFloatingAnchor: () => {
         scheduleTextAnchorRef.current?.();
@@ -2343,6 +2610,9 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         if (!active || !isTextLikeObject(active)) return false;
         if (shouldPreferTextEditSheet(modeRef.current)) {
           return openTextEditSheetForTarget(active);
+        }
+        if (isCoarsePointerEnvironment()) {
+          return true;
         }
         beginTextEditingOnCanvas(canvas, active, inlineTextEditSessionRef, captureTextEditBaseline);
         return true;
@@ -2561,7 +2831,12 @@ async function addImageUrlToCanvas(canvas: Canvas, url: string): Promise<void> {
   canvas.requestRenderAll();
 }
 
-function duplicateActiveObjects(canvas: Canvas, mode: EditorMode, afterDone: () => void): void {
+function duplicateActiveObjects(
+  canvas: Canvas,
+  mode: EditorMode,
+  afterDone: () => void,
+  displayScale = 1,
+): void {
   const active = canvas.getActiveObjects().filter((obj) => (
     mode === 'basic' ? canDuplicateObjectInBasicMode(obj) : canKeyboardTransformObject(obj, 'advanced')
   ));
@@ -2571,7 +2846,7 @@ function duplicateActiveObjects(canvas: Canvas, mode: EditorMode, afterDone: () 
     regenerateIds: true,
   }).then((copies) => {
     copies.forEach((copy) => canvas.add(copy));
-    if (mode === 'basic') applyBasicModeConstraints(canvas);
+    if (mode === 'basic') applyBasicModeConstraints(canvas, displayScale);
     activateClonedObjects(canvas, copies);
     canvas.requestRenderAll();
     afterDone();

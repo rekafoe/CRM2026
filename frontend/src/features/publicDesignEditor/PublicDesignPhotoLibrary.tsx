@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Button } from '../../components/common';
+import { AppIcon } from '../../components/ui/AppIcon';
 import { SIDEBAR_PHOTO_DRAG_MIME } from '../../pages/admin/designEditor/constants';
 import type { SidebarPhotoItem } from '../../pages/admin/designEditor/types';
 
@@ -90,63 +91,72 @@ export const PublicDesignPhotoLibrary: React.FC<PublicDesignPhotoLibraryProps> =
               key={photo.id}
               className={`public-design-editor__photo-item${selectedPhotoId === photo.id ? ' public-design-editor__photo-item--selected' : ''}`}
             >
-              <button
-                type="button"
-                className="public-design-editor__photo-thumb"
-                draggable
-                onDragStart={(event) => {
-                  event.dataTransfer.setData(SIDEBAR_PHOTO_DRAG_MIME, JSON.stringify({ id: photo.id }));
-                  event.dataTransfer.effectAllowed = 'copy';
-                }}
-                onClick={() => onPhotoClick(photo.id)}
-                title={`${photo.name} - кликните или перетащите на макет. Фото останется в библиотеке для повторного использования.`}
-              >
-                <img
-                  src={failedPreviewIds.has(photo.id) && photo.fallbackPreviewUrl ? photo.fallbackPreviewUrl : photo.previewUrl}
-                  alt=""
-                  draggable={false}
-                  onError={() => {
-                    if (!photo.fallbackPreviewUrl || failedPreviewIds.has(photo.id)) return;
-                    setFailedPreviewIds((current) => new Set(current).add(photo.id));
+              <div className="public-design-editor__photo-thumb-shell">
+                <button
+                  type="button"
+                  className="public-design-editor__photo-thumb"
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData(SIDEBAR_PHOTO_DRAG_MIME, JSON.stringify({ id: photo.id }));
+                    event.dataTransfer.effectAllowed = 'copy';
                   }}
-                />
-                {photo.uploadStatus && photo.uploadStatus !== 'ready' && (
-                  <span className="public-design-editor__photo-upload-state">
-                    {photo.uploadStatus === 'error' ? 'Ошибка' : `${photo.uploadProgress ?? 0}%`}
-                  </span>
-                )}
-              </button>
-              {photo.uploadStatus === 'ready' && (
-                <span className={`public-design-editor__photo-ready${photo.used ? ' public-design-editor__photo-ready--used' : ''}`}>
-                  {photo.used ? 'Использовано' : 'Готово'}
-                </span>
-              )}
-              {photo.uploadStatus === 'ready' && onPhotoSelect && (
+                  onClick={() => onPhotoClick(photo.id)}
+                  title={`${photo.name} - кликните или перетащите на макет. Фото останется в библиотеке для повторного использования.`}
+                >
+                  <img
+                    src={failedPreviewIds.has(photo.id) && photo.fallbackPreviewUrl ? photo.fallbackPreviewUrl : photo.previewUrl}
+                    alt=""
+                    draggable={false}
+                    onError={() => {
+                      if (!photo.fallbackPreviewUrl || failedPreviewIds.has(photo.id)) return;
+                      setFailedPreviewIds((current) => new Set(current).add(photo.id));
+                    }}
+                  />
+                  {photo.uploadStatus && photo.uploadStatus !== 'ready' && (
+                    <span className="public-design-editor__photo-upload-state">
+                      {photo.uploadStatus === 'error' ? 'Ошибка' : `${photo.uploadProgress ?? 0}%`}
+                    </span>
+                  )}
+                </button>
                 <button
                   type="button"
-                  className="public-design-editor__photo-select"
-                  onClick={() => onPhotoSelect(photo.id)}
+                  className="public-design-editor__photo-remove"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onPhotoRemove(photo.id);
+                  }}
+                  aria-label={`Убрать ${photo.name}`}
                 >
-                  {selectedPhotoId === photo.id ? 'Выбрано' : 'Для поля'}
+                  <AppIcon name="x" size="xs" />
                 </button>
+              </div>
+              {(photo.uploadStatus === 'ready' || photo.uploadStatus === 'error') && (
+                <div className="public-design-editor__photo-item-actions">
+                  {photo.uploadStatus === 'ready' && (
+                    <span className={`public-design-editor__photo-ready${photo.used ? ' public-design-editor__photo-ready--used' : ''}`}>
+                      {photo.used ? 'Использовано' : 'Готово'}
+                    </span>
+                  )}
+                  {photo.uploadStatus === 'ready' && onPhotoSelect && (
+                    <button
+                      type="button"
+                      className={`public-design-editor__photo-select${selectedPhotoId === photo.id ? ' public-design-editor__photo-select--active' : ''}`}
+                      onClick={() => onPhotoSelect(photo.id)}
+                    >
+                      {selectedPhotoId === photo.id ? 'Выбрано' : 'Для поля'}
+                    </button>
+                  )}
+                  {photo.uploadStatus === 'error' && onPhotoRetry && (
+                    <button
+                      type="button"
+                      className="public-design-editor__photo-retry"
+                      onClick={() => onPhotoRetry(photo.id)}
+                    >
+                      Повторить
+                    </button>
+                  )}
+                </div>
               )}
-              {photo.uploadStatus === 'error' && onPhotoRetry && (
-                <button
-                  type="button"
-                  className="public-design-editor__photo-retry"
-                  onClick={() => onPhotoRetry(photo.id)}
-                >
-                  Повторить
-                </button>
-              )}
-              <button
-                type="button"
-                className="public-design-editor__photo-remove"
-                onClick={() => onPhotoRemove(photo.id)}
-                aria-label={`Убрать ${photo.name}`}
-              >
-                ×
-              </button>
             </li>
           ))}
         </ul>

@@ -2,11 +2,14 @@
 const PLACEHOLDER_TEXTS = new Set([
   'текст',
   'ваш текст',
+  'your text',
   'имя',
   'телефон',
   'email',
   'заголовок',
   'описание',
+  'введите текст',
+  'введите текст...',
 ]);
 
 export function normalizeTextForPlaceholderCheck(text: string | undefined): string {

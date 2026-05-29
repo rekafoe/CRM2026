@@ -8,7 +8,20 @@
  */
 .public-design-editor.public-design-editor--client:not(.public-design-editor--mobile) {
   --pde-sidebar-w: clamp(360px, 32vw, 420px);
-  --pde-page-strip-h: min(188px, 26vh);
+  /* шапка + ряд миниатюр (thumb + подпись) + запас под скроллбар и скругление */
+  --pde-page-strip-thumb-h: 96px;
+  --pde-page-strip-header-h: 64px;
+  --pde-page-strip-label-h: 50px;
+  --pde-page-strip-item-pad: 12px;
+  --pde-page-strip-safe-pad: 14px;
+  --pde-page-strip-h: calc(
+    var(--pde-page-strip-header-h)
+    + 22px
+    + var(--pde-page-strip-thumb-h)
+    + var(--pde-page-strip-label-h)
+    + var(--pde-page-strip-item-pad)
+    + var(--pde-page-strip-safe-pad)
+  );
 
   display: flex;
   flex-direction: column;
@@ -36,7 +49,7 @@
   gap: 10px;
   min-height: 0;
   overflow: hidden;
-  padding: 10px 12px 8px;
+  padding: 10px 12px max(16px, env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   grid-template-columns: unset;
   grid-template-areas: none;
@@ -58,6 +71,7 @@
   flex: 1 1 0;
   display: flex;
   flex-direction: column;
+  gap: 8px;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -91,12 +105,18 @@
   > .public-design-editor__main-column
   > .public-design-editor__page-chrome {
   flex: 0 0 auto;
+  flex-shrink: 0;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  max-height: var(--pde-page-strip-h);
-  overflow: hidden;
+  min-height: 0;
+  max-height: min(var(--pde-page-strip-h), 42vh);
+  margin-bottom: 2px;
+  padding: 0 0 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
+  scrollbar-width: thin;
 }
 
 .public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
@@ -104,11 +124,14 @@
   > .public-design-editor__main-column
   > .public-design-editor__page-chrome
   .public-design-editor__page-strip {
+  flex: 0 0 auto;
   width: 100%;
   max-width: 100%;
   min-height: 0;
-  max-height: 100%;
-  overflow: hidden;
+  height: auto;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
   box-sizing: border-box;
 }
 
@@ -568,6 +591,8 @@
   flex-direction: column;
   flex-shrink: 0;
   min-height: 0;
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 .public-design-editor:not(.public-design-editor--client) .public-design-editor__page-chrome {
@@ -628,9 +653,33 @@
   }
 
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-photos .public-design-editor__stage,
-  .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-text .public-design-editor__stage,
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-check .public-design-editor__stage {
     display: none;
+  }
+
+  .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-text .public-design-editor__canvas-column {
+    flex: 0 0 auto;
+    max-height: min(36vh, 240px);
+    min-height: 0;
+  }
+
+  .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-text .public-design-editor__stage {
+    display: grid;
+    max-height: min(36vh, 240px);
+    min-height: 120px;
+  }
+
+  .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-text .public-design-editor__stage--text-toolbar {
+    grid-template-rows: auto minmax(72px, 1fr);
+  }
+
+  .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-text .text-mobile-toolbar {
+    display: none;
+  }
+
+  .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-text .public-design-editor__sidepanel--text {
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-check .public-design-editor__tasks {
@@ -702,16 +751,20 @@
   }
 
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage--text-toolbar {
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(120px, 1fr);
   }
 
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage--text-toolbar > .text-mobile-toolbar {
     grid-row: 2;
+    flex-shrink: 0;
+    max-height: min(42vh, 220px);
     min-width: 0;
+    overflow: auto;
   }
 
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage--text-toolbar > .public-design-editor__scroll {
     grid-row: 3;
+    min-height: 120px;
   }
 
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage-toolbar {

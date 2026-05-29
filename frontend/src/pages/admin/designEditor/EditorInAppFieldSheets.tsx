@@ -81,6 +81,9 @@ export const EditorInAppFieldSheets: React.FC<EditorInAppFieldSheetsProps> = ({
         bodyClassName="de-text-edit-modal__body"
         headerClassName="de-text-edit-modal__header"
       >
+        <p className="de-inapp-field-sheet__hint">
+          После «Готово» текст появится на макете. Закройте окно, чтобы снова увидеть превью целиком.
+        </p>
         <label className="de-inapp-text-edit__field">
           <textarea
             value={draftText}

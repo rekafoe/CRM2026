@@ -16,6 +16,9 @@ export interface DesignPrepressConfig {
 /** Свойства выбранного объекта на холсте (для тулбара / панелей) */
 export interface SelectedObjProps {
   type: 'IText' | 'image' | 'rect' | 'circle' | 'line' | 'triangle' | 'photoField' | 'other';
+  id?: string;
+  /** Заполнено ли фото-поле изображением (только type === 'photoField') */
+  photoFieldFilled?: boolean;
   text?: string;
   fontFamily?: string;
   fontSize?: number;

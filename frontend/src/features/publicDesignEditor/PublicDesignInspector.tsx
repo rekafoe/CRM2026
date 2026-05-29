@@ -141,7 +141,7 @@ export const PublicDesignInspector: React.FC<PublicDesignInspectorProps> = ({
                   ? 'Все текстовые поля заполнены'
                   : 'Нет редактируемого текста'}
             </strong>
-            <p>Нажмите поле — откроется макет, можно править текст и оформление.</p>
+            <p>Нажмите поле — откроется макет с превью; текст правится в поле над макетом.</p>
           </header>
 
           <TextFieldTargets

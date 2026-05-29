@@ -10,12 +10,13 @@ export function isCoarsePointerEnvironment(): boolean {
 export type DesignEditorInteractionMode = 'basic' | 'advanced';
 
 /**
- * Отдельная модалка текста — только в in-app браузерах (Telegram и т.п.),
- * где скрытый textarea Fabric часто не работает.
+ * Bottom-sheet с текстом — in-app браузеры (Telegram и т.п.), где Fabric textarea ненадёжен.
+ * На обычном мобильном Safari/Chrome правка идёт через поле в text-mobile-toolbar.
  */
 export function shouldPreferTextEditSheet(
-  _editorMode?: DesignEditorInteractionMode,
+  editorMode?: DesignEditorInteractionMode,
 ): boolean {
+  if (editorMode === 'advanced') return isRestrictiveInAppBrowser();
   return isRestrictiveInAppBrowser();
 }
 

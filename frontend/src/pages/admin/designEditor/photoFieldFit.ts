@@ -6,6 +6,7 @@ import {
   Group,
   LayoutManager,
   LayoutStrategy,
+  Point,
   classRegistry,
 } from 'fabric';
 import type { Canvas } from 'fabric';
@@ -13,9 +14,14 @@ import type { FabricObject } from 'fabric';
 import type { LayoutStrategyResult, StrictLayoutContext } from 'fabric';
 import {
   clampPhotoFieldPan,
+  computePhotoFieldCropSource,
   computePhotoFieldLayout,
+  normalizePhotoFieldZoom,
+  resolvePanZoomFromPhotoFieldCropSource,
+  type PhotoFieldCropSource,
   type PhotoFieldFitMode,
   type PhotoFitLayout,
+  zoomPhotoFieldLayout,
 } from './photoFieldLayout';
 import { resolvePhotoFieldModalPreviewUrl } from './photoFieldModalPreview';
 
@@ -37,13 +43,37 @@ class PhotoFieldFilledLayoutStrategy extends LayoutStrategy {
   }
 }
 
-classRegistry.setClass(PhotoFieldFilledLayoutStrategy);
-/** Совместимость с ранними сохранениями JSON: не подменять на FitContentLayout — иначе bbox раздувается под полное изображение cover. */
-classRegistry.setClass(PhotoFieldFilledLayoutStrategy, 'photo-field-static');
+/**
+ * Полный noop: Fabric 7 при init группы с LayoutManager(strategy→undefined) схлопывает bbox.
+ * Как NoopLayoutManager в fabric/Group — не вызываем fit-content при создании/resize.
+ */
+class PhotoFieldNoopLayoutManager extends LayoutManager {
+  static readonly type = 'photo-field-noop';
 
-/** Не пересобирает детей через fit-content; рамка и клип совпадают по координатам с плейсхолдером (-fw/2,-fh/2). */
+  performLayout(): void {
+    // координаты и размеры детей задаём вручную (createEmptyPhotoField / legacy group / bake*InPlace)
+  }
+}
+
+classRegistry.setClass(PhotoFieldFilledLayoutStrategy);
+classRegistry.setClass(PhotoFieldNoopLayoutManager);
+/** Совместимость с ранними сохранениями JSON */
+classRegistry.setClass(PhotoFieldFilledLayoutStrategy, 'photo-field-static');
+classRegistry.setClass(PhotoFieldNoopLayoutManager, 'photo-field-noop');
+
+function isPhotoFieldNoopLayoutManager(group: Group): boolean {
+  return group.layoutManager instanceof PhotoFieldNoopLayoutManager;
+}
+
+/** Не пересобирает детей через fit-content. */
 export function createPhotoFieldStaticLayoutManager(): LayoutManager {
-  return new LayoutManager(new PhotoFieldFilledLayoutStrategy());
+  return new PhotoFieldNoopLayoutManager();
+}
+
+/** FitContentLayout Fabric 7 ломает детей при scale/resize группы — фиксируем noop-layout. */
+export function ensurePhotoFieldStaticLayout(group: Group): void {
+  if (isPhotoFieldNoopLayoutManager(group)) return;
+  group.layoutManager = createPhotoFieldStaticLayoutManager();
 }
 
 export {
@@ -55,9 +85,19 @@ export {
   type PhotoFitLayout,
 } from './photoFieldLayout';
 
+import {
+  measureFilledPhotoFieldFrameSize,
+  pickEmptyPhotoFieldFrameRect,
+  relayoutEmptyPhotoFieldChrome,
+  resolvePhotoFieldFrameSize,
+  syncEmptyPhotoFieldSceneAnchor,
+  syncFilledPhotoFieldSceneAnchor,
+} from './photoFieldGeometry';
+
 export {
   resolvePhotoFieldFrameSize,
   pickEmptyPhotoFieldFrameRect,
+  measureFilledPhotoFieldFrameSize,
 } from './photoFieldGeometry';
 
 /** Режим вписывания: без явного свойства — cover (заполнение рамки с обрезкой, без полей). Явно `contain` — вписать целиком. */
@@ -103,21 +143,11 @@ function placeFitImageInPhotoFieldFrame(
   });
 }
 
-function normalizePhotoFieldZoom(value: unknown): number {
-  const zoom = Number(value ?? 1);
-  return Number.isFinite(zoom) ? Math.max(1, Math.min(6, zoom)) : 1;
-}
-
-function zoomPhotoFieldLayout(layout: PhotoFitLayout, zoom: number): PhotoFitLayout {
-  const safeZoom = normalizePhotoFieldZoom(zoom);
-  return {
-    scale: layout.scale * safeZoom,
-    displayW: layout.displayW * safeZoom,
-    displayH: layout.displayH * safeZoom,
-    baseLeft: layout.baseLeft - ((layout.displayW * safeZoom) - layout.displayW) / 2,
-    baseTop: layout.baseTop - ((layout.displayH * safeZoom) - layout.displayH) / 2,
-  };
-}
+export type { PhotoFieldCropSource } from './photoFieldLayout';
+export {
+  computePhotoFieldCropSource,
+  resolvePanZoomFromPhotoFieldCropSource,
+} from './photoFieldLayout';
 
 export function buildFilledPhotoFieldGroup(opts: {
   left: number;
@@ -207,6 +237,257 @@ export function buildFilledPhotoFieldGroup(opts: {
   if (opts.clientAdded) g.photoFieldClientAdded = true;
 
   return group;
+}
+
+import {
+  bakeEmptyPhotoFieldRectScale,
+  isEmptyPhotoFieldRect,
+  restoreEmptyPhotoFieldRectFromProps,
+} from './photoFieldEmpty';
+
+function relayoutFilledPhotoFieldFrame(
+  group: Group,
+  frameW: number,
+  frameH: number,
+  anchorSceneTL: Point,
+): void {
+  const o = ax(group);
+  const inner = group.getObjects('image')[0] as FabricImage | undefined;
+  const fitMode = resolvePhotoFieldFitMode(o);
+  const oldFw = Math.round(Number(o.photoFieldFw ?? frameW));
+  const oldFh = Math.round(Number(o.photoFieldFh ?? frameH));
+  let preservedCrop: PhotoFieldCropSource | null = null;
+  if (
+    inner
+    && fitMode === 'cover'
+    && (Math.abs(oldFw - frameW) > 1 || Math.abs(oldFh - frameH) > 1)
+  ) {
+    const { iw, ih } = getFabricImageIntrinsicSize(inner);
+    const zoom = normalizePhotoFieldZoom(o.photoFieldZoom ?? 1);
+    const baseLayout = computePhotoFieldLayout(fitMode, oldFw, oldFh, iw, ih);
+    const layout = zoomPhotoFieldLayout(baseLayout, zoom);
+    preservedCrop = computePhotoFieldCropSource(
+      oldFw,
+      oldFh,
+      iw,
+      ih,
+      layout,
+      Number(o.photoFieldPanX ?? 0),
+      Number(o.photoFieldPanY ?? 0),
+      fitMode,
+    );
+  }
+
+  const ox = -frameW / 2;
+  const oy = -frameH / 2;
+
+  o.photoFieldFw = frameW;
+  o.photoFieldFh = frameH;
+
+  for (const rect of group.getObjects('rect')) {
+    rect.set({
+      left: ox,
+      top: oy,
+      originX: 'left',
+      originY: 'top',
+      width: frameW,
+      height: frameH,
+      scaleX: 1,
+      scaleY: 1,
+    });
+  }
+  const clip = group.clipPath as FabricObject | undefined;
+  if (clip) {
+    clip.set({
+      left: ox,
+      top: oy,
+      originX: 'left',
+      originY: 'top',
+      width: frameW,
+      height: frameH,
+      scaleX: 1,
+      scaleY: 1,
+    });
+  }
+  ensurePhotoFieldStaticLayout(group);
+  group.set({
+    scaleX: 1,
+    scaleY: 1,
+    width: frameW,
+    height: frameH,
+  });
+  if (preservedCrop && inner) {
+    const { iw, ih } = getFabricImageIntrinsicSize(inner);
+    const next = resolvePanZoomFromPhotoFieldCropSource(
+      frameW,
+      frameH,
+      iw,
+      ih,
+      fitMode,
+      preservedCrop,
+    );
+    applyPhotoFieldPanToGroup(group, next.panX, next.panY, next.zoom);
+  } else {
+    applyPhotoFieldPanToGroup(
+      group,
+      Number(o.photoFieldPanX ?? 0),
+      Number(o.photoFieldPanY ?? 0),
+      Number(o.photoFieldZoom ?? 1),
+    );
+  }
+  syncFilledPhotoFieldSceneAnchor(group, anchorSceneTL);
+  group.setCoords();
+}
+
+function restoreFilledPhotoFieldFromProps(group: Group): boolean {
+  const o = ax(group);
+  const pW = Math.max(32, Math.round(Number(o.photoFieldFw ?? 0)));
+  const pH = Math.max(32, Math.round(Number(o.photoFieldFh ?? 0)));
+  if (pW < 32 || pH < 32) return false;
+  const sx = Math.abs(Number(group.scaleX ?? 1));
+  const sy = Math.abs(Number(group.scaleY ?? 1));
+  if (sx > 1.004 || sy > 1.004) return false;
+
+  const anchorRect = group.getObjects('rect')[0];
+  const frameCoords = anchorRect?.getCoords();
+  const anchorPoint = frameCoords?.[0]
+    ? new Point(frameCoords[0].x, frameCoords[0].y)
+    : new Point(group.left ?? 0, group.top ?? 0);
+
+  const measured = measureFilledPhotoFieldFrameSize(group);
+  const curW = Math.max(1, Math.round(measured?.fw ?? group.getScaledWidth()));
+  const curH = Math.max(1, Math.round(measured?.fh ?? group.getScaledHeight()));
+  if (Math.abs(curW - pW) <= 1 && Math.abs(curH - pH) <= 1) return false;
+
+  relayoutFilledPhotoFieldFrame(group, pW, pH, anchorPoint);
+  return true;
+}
+
+/** Восстанавливает запечённый размер после drag (rect, заполненная или пустая group). */
+export function restoreBakedPhotoFieldDimensions(field: FabricObject): boolean {
+  if (isEmptyPhotoFieldRect(field)) {
+    return restoreEmptyPhotoFieldRectFromProps(field);
+  }
+  const o = ax(field);
+  if (!o.isPhotoField || field.type !== 'group') return false;
+
+  if (o.photoFieldFilled === true) {
+    return restoreFilledPhotoFieldFromProps(field as Group);
+  }
+
+  const pW = Math.max(32, Math.round(Number(o.photoFieldFw ?? 0)));
+  const pH = Math.max(32, Math.round(Number(o.photoFieldFh ?? 0)));
+  if (pW < 32 || pH < 32) return false;
+  const sx = Math.abs(Number(field.scaleX ?? 1));
+  const sy = Math.abs(Number(field.scaleY ?? 1));
+  if (sx > 1.004 || sy > 1.004) return false;
+
+  const measured = resolvePhotoFieldFrameSize(field);
+  if (Math.abs(measured.fw - pW) <= 1 && Math.abs(measured.fh - pH) <= 1) return false;
+
+  const group = field as Group;
+  const frameRect = pickEmptyPhotoFieldFrameRect(group);
+  const frameCoords = frameRect?.getCoords();
+  const anchorPoint = frameCoords?.[0]
+    ? new Point(frameCoords[0].x, frameCoords[0].y)
+    : new Point(group.left ?? 0, group.top ?? 0);
+
+  relayoutEmptyPhotoFieldChrome(group, pW, pH);
+  ensurePhotoFieldStaticLayout(group);
+  group.set({ scaleX: 1, scaleY: 1, width: pW, height: pH });
+  syncEmptyPhotoFieldSceneAnchor(group, anchorPoint);
+  group.setCoords();
+  return true;
+}
+
+/** Запекает scale пустого поля в frameW/frameH без remove/add. */
+export function bakeEmptyPhotoFieldScaleInPlace(
+  field: FabricObject,
+  sizeOverride?: { fw: number; fh: number },
+): boolean {
+  if (isEmptyPhotoFieldRect(field)) {
+    return bakeEmptyPhotoFieldRectScale(field, sizeOverride);
+  }
+  if (field.type !== 'group') return false;
+  const o = ax(field);
+  if (!o.isPhotoField || o.photoFieldFilled === true) return false;
+
+  const measured = sizeOverride ?? resolvePhotoFieldFrameSize(field);
+  const frameW = Math.max(32, Math.round(measured.fw));
+  const frameH = Math.max(32, Math.round(measured.fh));
+  const pW = Number(o.photoFieldFw ?? 0);
+  const pH = Number(o.photoFieldFh ?? 0);
+  const sx = Math.abs(Number(field.scaleX ?? 1));
+  const sy = Math.abs(Number(field.scaleY ?? 1));
+  if (
+    pW >= 32
+    && pH >= 32
+    && Math.abs(pW - frameW) <= 1
+    && Math.abs(pH - frameH) <= 1
+    && Math.abs(sx - 1) < 0.004
+    && Math.abs(sy - 1) < 0.004
+  ) {
+    return false;
+  }
+
+  const group = field as Group;
+  const frameRect = pickEmptyPhotoFieldFrameRect(group);
+  const frameCoords = frameRect?.getCoords();
+  const anchorPoint = frameCoords?.[0]
+    ? new Point(frameCoords[0].x, frameCoords[0].y)
+    : new Point(group.left ?? 0, group.top ?? 0);
+
+  relayoutEmptyPhotoFieldChrome(group, frameW, frameH);
+  ensurePhotoFieldStaticLayout(group);
+  group.set({ scaleX: 1, scaleY: 1, width: frameW, height: frameH });
+  syncEmptyPhotoFieldSceneAnchor(group, anchorPoint);
+  group.setCoords();
+  return true;
+}
+
+/** Запекает scale заполненного поля в frameW/frameH и пересчитывает cover/contain. */
+export function bakeFilledPhotoFieldScaleInPlace(
+  field: FabricObject,
+  sizeOverride?: { fw: number; fh: number },
+): boolean {
+  if (field.type !== 'group') return false;
+  const o = ax(field);
+  if (!o.isPhotoField || o.photoFieldFilled !== true) return false;
+
+  const measured = sizeOverride ?? resolvePhotoFieldFrameSize(field);
+  const frameW = Math.max(32, Math.round(measured.fw));
+  const frameH = Math.max(32, Math.round(measured.fh));
+  const pW = Number(o.photoFieldFw ?? 0);
+  const pH = Number(o.photoFieldFh ?? 0);
+  const sx = Math.abs(Number(field.scaleX ?? 1));
+  const sy = Math.abs(Number(field.scaleY ?? 1));
+  const overrideResize =
+  sizeOverride != null
+  && (
+    Math.abs(pW - frameW) > 1
+    || Math.abs(pH - frameH) > 1
+  );
+  if (
+    !overrideResize
+    && pW >= 32
+    && pH >= 32
+    && Math.abs(pW - frameW) <= 1
+    && Math.abs(pH - frameH) <= 1
+    && Math.abs(sx - 1) < 0.004
+    && Math.abs(sy - 1) < 0.004
+  ) {
+    return false;
+  }
+
+  const group = field as Group;
+  const anchorRect = group.getObjects('rect')[0];
+  const frameCoords = anchorRect?.getCoords();
+  const anchorPoint = frameCoords?.[0]
+    ? new Point(frameCoords[0].x, frameCoords[0].y)
+    : new Point(group.left ?? 0, group.top ?? 0);
+
+  relayoutFilledPhotoFieldFrame(group, frameW, frameH, anchorPoint);
+  return true;
 }
 
 export function applyPhotoFieldPanToGroup(group: Group, panX: number, panY: number, zoom?: number): void {

@@ -1,16 +1,16 @@
 import React from 'react';
 
 interface ClientPhotoFieldsToolPanelProps {
-  onAddPhotoField: (options?: { width?: number; height?: number }) => void;
+  onAddPhotoField: (options?: { aspectW?: number; aspectH?: number }) => void;
   onAutofillPhotos: () => void;
   onClose: () => void;
 }
 
 const PHOTO_FIELD_PRESETS = [
-  { label: 'Квадрат', hint: '1:1', width: 140, height: 140, preview: 'square' },
-  { label: 'Горизонтальное', hint: '4:3', width: 190, height: 140, preview: 'landscape' },
-  { label: 'Вертикальное', hint: '3:4', width: 140, height: 190, preview: 'portrait' },
-  { label: 'Широкое', hint: '16:9', width: 220, height: 124, preview: 'wide' },
+  { label: 'Квадрат', hint: '1:1', aspectW: 1, aspectH: 1, preview: 'square' },
+  { label: 'Горизонтальное', hint: '4:3', aspectW: 4, aspectH: 3, preview: 'landscape' },
+  { label: 'Вертикальное', hint: '3:4', aspectW: 3, aspectH: 4, preview: 'portrait' },
+  { label: 'Широкое', hint: '16:9', aspectW: 16, aspectH: 9, preview: 'wide' },
 ];
 
 export const ClientPhotoFieldsToolPanel: React.FC<ClientPhotoFieldsToolPanelProps> = ({
@@ -19,7 +19,9 @@ export const ClientPhotoFieldsToolPanel: React.FC<ClientPhotoFieldsToolPanelProp
   onClose,
 }) => (
   <div className="public-design-editor__client-tool-card">
-    <p>Выберите форму области, куда клиентское фото можно поставить или перетащить.</p>
+    <p>
+      Выберите форму области. Ширина нового поля — 30% страницы; фото можно перетащить из панели «Фото».
+    </p>
     <div className="public-design-editor__client-photo-preset-grid">
       {PHOTO_FIELD_PRESETS.map((preset) => (
         <button
@@ -27,7 +29,7 @@ export const ClientPhotoFieldsToolPanel: React.FC<ClientPhotoFieldsToolPanelProp
           type="button"
           className="public-design-editor__client-photo-preset"
           onClick={() => {
-            onAddPhotoField({ width: preset.width, height: preset.height });
+            onAddPhotoField({ aspectW: preset.aspectW, aspectH: preset.aspectH });
             onClose();
           }}
         >

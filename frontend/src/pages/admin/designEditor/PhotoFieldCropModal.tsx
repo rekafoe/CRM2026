@@ -1,7 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { Button } from '../../../components/common';
-import { clampPhotoFieldPan, computePhotoFieldLayout } from './photoFieldLayout';
+import {
+  clampPhotoFieldPan,
+  computePhotoFieldCropSource,
+  computePhotoFieldLayout,
+  normalizePhotoFieldZoom,
+  PHOTO_FIELD_ZOOM_MAX,
+  zoomPhotoFieldLayout,
+} from './photoFieldLayout';
 import type { PhotoFieldFitMode } from './photoFieldLayout';
 import './PhotoFieldCropModal.css';
 
@@ -28,7 +35,7 @@ const MOBILE_BREAKPOINT_PX = 720;
 /** Шапка модалки + подзаголовок + кнопки (мобильная колонка). */
 const MOBILE_MODAL_CHROME_PX = 300;
 const MIN_CROP_SOURCE_PX = 80;
-const MAX_ZOOM = 6;
+const MAX_ZOOM = PHOTO_FIELD_ZOOM_MAX;
 
 function useCropEditorViewportBounds(isOpen: boolean) {
   const [bounds, setBounds] = useState({ maxW: EDITOR_MAX_W, maxH: EDITOR_MAX_H });
@@ -110,16 +117,10 @@ export const PhotoFieldCropModal: React.FC<PhotoFieldCropModalProps> = ({
     [fitMode, frameW, frameH, intrinsicW, intrinsicH],
   );
 
-  const layout = useMemo(() => {
-    const safeZoom = Math.max(1, Math.min(MAX_ZOOM, Number(zoom) || 1));
-    return {
-      scale: baseLayout.scale * safeZoom,
-      displayW: baseLayout.displayW * safeZoom,
-      displayH: baseLayout.displayH * safeZoom,
-      baseLeft: baseLayout.baseLeft - ((baseLayout.displayW * safeZoom) - baseLayout.displayW) / 2,
-      baseTop: baseLayout.baseTop - ((baseLayout.displayH * safeZoom) - baseLayout.displayH) / 2,
-    };
-  }, [baseLayout, zoom]);
+  const layout = useMemo(
+    () => zoomPhotoFieldLayout(baseLayout, zoom),
+    [baseLayout, zoom],
+  );
 
   const viewportBounds = useCropEditorViewportBounds(isOpen);
 
@@ -137,14 +138,8 @@ export const PhotoFieldCropModal: React.FC<PhotoFieldCropModalProps> = ({
 
   const clamped = clampPhotoFieldPan(frameW, frameH, layout, panX, panY, fitMode);
   const applySourceCrop = useCallback((sourceX: number, sourceY: number, nextZoom = zoom) => {
-    const safeZoom = Math.max(1, Math.min(MAX_ZOOM, Number(nextZoom) || 1));
-    const nextLayout = {
-      scale: baseLayout.scale * safeZoom,
-      displayW: baseLayout.displayW * safeZoom,
-      displayH: baseLayout.displayH * safeZoom,
-      baseLeft: baseLayout.baseLeft - ((baseLayout.displayW * safeZoom) - baseLayout.displayW) / 2,
-      baseTop: baseLayout.baseTop - ((baseLayout.displayH * safeZoom) - baseLayout.displayH) / 2,
-    };
+    const safeZoom = normalizePhotoFieldZoom(nextZoom);
+    const nextLayout = zoomPhotoFieldLayout(baseLayout, safeZoom);
     const cropW = frameW / nextLayout.scale;
     const cropH = frameH / nextLayout.scale;
     const clampedSourceX = Math.max(0, Math.min(Math.max(0, intrinsicW - cropW), sourceX));
@@ -167,21 +162,19 @@ export const PhotoFieldCropModal: React.FC<PhotoFieldCropModalProps> = ({
     cropResize.current = null;
   }, []);
 
-  const cropSource = useMemo(() => {
-    if (fitMode === 'contain') {
-      return { x: 0, y: 0, w: intrinsicW, h: intrinsicH };
-    }
-    const imageLeft = layout.baseLeft + clamped.panX;
-    const imageTop = layout.baseTop + clamped.panY;
-    const sourceX = Math.max(0, Math.min(intrinsicW, -imageLeft / layout.scale));
-    const sourceY = Math.max(0, Math.min(intrinsicH, -imageTop / layout.scale));
-    return {
-      x: sourceX,
-      y: sourceY,
-      w: Math.max(1, Math.min(intrinsicW - sourceX, frameW / layout.scale)),
-      h: Math.max(1, Math.min(intrinsicH - sourceY, frameH / layout.scale)),
-    };
-  }, [clamped.panX, clamped.panY, fitMode, frameW, frameH, intrinsicW, intrinsicH, layout]);
+  const cropSource = useMemo(
+    () => computePhotoFieldCropSource(
+      frameW,
+      frameH,
+      intrinsicW,
+      intrinsicH,
+      layout,
+      clamped.panX,
+      clamped.panY,
+      fitMode,
+    ),
+    [clamped.panX, clamped.panY, fitMode, frameW, frameH, intrinsicW, intrinsicH, layout],
+  );
 
   const editorVars = useMemo(() => ({
     ['--pf-source-w' as string]: `${editorW}px`,

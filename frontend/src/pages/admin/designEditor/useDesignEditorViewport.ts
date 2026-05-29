@@ -19,6 +19,8 @@ export function useDesignEditorViewport(input: {
   isSpreadView: boolean;
   /** Меньше отступы вокруг холста — лучше вписывается на узком экране */
   compactPadding?: boolean;
+  /** Смена раскладки (моб. панель текста, тулбар) — пересчитать fit */
+  layoutTrigger?: number;
 }): DesignEditorViewportState {
   const [fitZoom, setFitZoom] = useState(1);
   const [viewportReady, setViewportReady] = useState(false);
@@ -58,7 +60,8 @@ export function useDesignEditorViewport(input: {
         if (!alive) return;
         const aw = Math.round(el.clientWidth);
         const ah = Math.round(el.clientHeight);
-        if (aw < 48 || ah < 48) return;
+        const minSide = input.compactPadding === true ? 28 : 48;
+        if (aw < minSide || ah < minSide) return;
         const zRaw = Math.max(0.1, Math.min(aw / cw, ah / ch, 3));
         const z = Math.round(zRaw * 1000) / 1000;
         setFitZoom(z);
@@ -88,6 +91,7 @@ export function useDesignEditorViewport(input: {
     input.pageWidthPx,
     input.showBleed,
     input.compactPadding,
+    input.layoutTrigger,
     input.viewportRef,
   ]);
 

@@ -11,6 +11,7 @@ import { AppIcon } from '../components/ui/AppIcon';
 import '../styles/admin-panel.css';
 import '../components/notifications/NotificationsManager.css';
 import './NotificationsPage.css';
+import { PublicDesignEditorPreviewPage as PublicDesignEditorPreviewPageEager } from '../features/publicDesignEditor/PublicDesignEditorPreviewPage';
 
 const LoadingFallback: React.FC = () => (
   <div className="loading-overlay">Загрузка...</div>
@@ -69,9 +70,16 @@ const DesignTemplatesPage = lazy(() =>
 const DesignEditorPage = lazy(() =>
   import('./admin/DesignEditorPage').then((m) => ({ default: m.DesignEditorPage }))
 );
-const PublicDesignEditorPreviewPage = lazy(() =>
-  import('../features/publicDesignEditor/PublicDesignEditorPreviewPage').then((m) => ({ default: m.PublicDesignEditorPreviewPage }))
+const PublicDesignEditorPreviewPageLazy = lazy(() =>
+  import('../features/publicDesignEditor/PublicDesignEditorPreviewPage').then((m) => ({
+    default: m.PublicDesignEditorPreviewPage,
+  }))
 );
+
+/** В dev lazy-чанк на Windows часто залипает — на проде остаётся code-split. */
+const PublicDesignEditorPreviewPage = import.meta.env.DEV
+  ? PublicDesignEditorPreviewPageEager
+  : PublicDesignEditorPreviewPageLazy;
 
 // Компонент страницы уведомлений (исправлен - убраны инлайн стили)
 const NotificationsPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {

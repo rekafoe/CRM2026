@@ -180,7 +180,24 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     spreadMode: editorSpreadMode,
     coverPages,
   });
-  const preflight = useMemo(() => analyzePublicDesignPages(pages, saveState), [pages, saveState]);
+  const sceneGeometry = useMemo(
+    () => createDesignSceneGeometry({
+      pageWidthMm: pageSpec.pageWidth,
+      pageHeightMm: pageSpec.pageHeight,
+      safeZoneMm: prepressConfig.safeZoneMm,
+      bleedMm: prepressConfig.bleedMm,
+      scale: pageSpec.scale,
+    }),
+    [pageSpec.pageWidth, pageSpec.pageHeight, pageSpec.scale, prepressConfig.safeZoneMm, prepressConfig.bleedMm],
+  );
+  const preflight = useMemo(
+    () => analyzePublicDesignPages(pages, saveState, {
+      pageWidthPx: sceneGeometry.pageWidthPx,
+      pageHeightPx: sceneGeometry.pageHeightPx,
+      safeZonePx: sceneGeometry.safeZonePx,
+    }),
+    [pages, saveState, sceneGeometry.pageWidthPx, sceneGeometry.pageHeightPx, sceneGeometry.safeZonePx],
+  );
   const currentStripItem = navigation.stripItems.find((item) => item.pages.includes(currentPage));
   const currentFragmentPages = currentStripItem?.pages ?? [currentPage];
   const currentFragment = useMemo(
@@ -212,16 +229,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     () => buildPublicDesignPageStatuses(pageSpec.pageCount, preflight),
     [pageSpec.pageCount, preflight],
   );
-  const sceneGeometry = useMemo(
-    () => createDesignSceneGeometry({
-      pageWidthMm: pageSpec.pageWidth,
-      pageHeightMm: pageSpec.pageHeight,
-      safeZoneMm: prepressConfig.safeZoneMm,
-      bleedMm: prepressConfig.bleedMm,
-      scale: pageSpec.scale,
-    }),
-    [pageSpec.pageWidth, pageSpec.pageHeight, pageSpec.scale, prepressConfig.safeZoneMm, prepressConfig.bleedMm],
-  );
 
   const visibleShowBleed = prepressConfig.showBleed && viewOptions.showBleed && viewOptions.showGuides;
   const visibleShowTrim = prepressConfig.showTrim && viewOptions.showTrim && viewOptions.showGuides;
@@ -234,6 +241,11 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     [guides, pageSpec.scale],
   );
 
+  const mobileTextToolbarOpen = isMobile && selectedObj?.type === 'IText';
+  const viewportLayoutTrigger =
+    (mobileTextToolbarOpen ? 1 : 0)
+    + (isMobile ? { canvas: 0, photos: 1, text: 2, check: 3 }[mobilePanel] ?? 0 : 0) * 4;
+
   const { fitZoom, viewportReady: fitReady, rulerOrigin, layoutWidthPx, layoutHeightPx } = useDesignEditorViewport({
     viewportRef,
     fallbackRef: scrollAreaRef,
@@ -243,6 +255,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     showBleed: visibleShowBleed,
     isSpreadView: navigation.isSpreadView,
     compactPadding: isMobile,
+    layoutTrigger: viewportLayoutTrigger,
   });
 
   const markDirty = useCallback(() => {
@@ -345,6 +358,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     if (!fitReady) return;
     const id = requestAnimationFrame(() => {
       canvasHandleRef.current?.syncCanvasOffset();
+      canvasHandleRef.current?.setSelectionDisplayScale(fitZoom);
     });
     return () => cancelAnimationFrame(id);
   }, [fitZoom, fitReady, currentPage, navigation.pageLoadKey]);
@@ -776,6 +790,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           onPageThumbReady: handlePageThumbReady,
           onTextFloatingAnchor: isMobile ? undefined : setTextFloatingAnchor,
           onTextFillHint: handleTextFillHint,
+          onTextEditCommitted: () => {
+            void saveCurrentCanvasPage();
+          },
           onDropRemoteImageUrl: handleImageUrlSubmit,
           onSidebarPhotoDropped: removeSidebarPhoto,
           resolveImageFileUrl,
@@ -784,8 +801,12 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     </div>
   );
 
+  const editorRootDevProps = import.meta.env.DEV
+    ? ({ 'data-pde-build': 'client-desktop-main-column' } as const)
+    : undefined;
+
   return (
-    <div className={editorRootClassName}>
+    <div className={editorRootClassName} {...editorRootDevProps}>
       {!isMobile && (
         <EditorTopBar
           templateName={template.name}
@@ -830,6 +851,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             onPhotoReplace={handlePhotoReplace}
             onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
             onIssueFocus={handleIssueFocus}
+            onBeforeCheckTab={() => {
+              void saveCurrentCanvasPage();
+            }}
           />
         )}
 
