@@ -3,7 +3,7 @@ import {
   computePhotoFieldLayout,
   resolvePanZoomFromPhotoFieldCropSource,
   zoomPhotoFieldLayout,
-} from '../../../frontend/src/pages/admin/designEditor/photoFieldLayout';
+} from '../services/designEditorPhotoFieldLayout';
 
 describe('resolvePanZoomFromPhotoFieldCropSource', () => {
   const iw = 1200;

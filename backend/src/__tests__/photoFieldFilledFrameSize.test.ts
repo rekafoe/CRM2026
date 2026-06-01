@@ -1,7 +1,7 @@
 import {
   measureFilledPhotoFieldFrameSize,
   resolvePhotoFieldFrameSize,
-} from '../../../frontend/src/pages/admin/designEditor/photoFieldGeometry';
+} from '../services/designEditorPhotoFieldGeometry';
 
 function mockFilledPhotoFieldGroup(opts: {
   frameW: number;
@@ -43,7 +43,7 @@ describe('measureFilledPhotoFieldFrameSize', () => {
       unionScaledW: 480,
       unionScaledH: 520,
     });
-    expect(measureFilledPhotoFieldFrameSize(group as never)).toEqual({ fw: 200, fh: 300 });
+    expect(measureFilledPhotoFieldFrameSize(group)).toEqual({ fw: 200, fh: 300 });
   });
 
   it('includes group scale during corner resize', () => {
@@ -55,7 +55,7 @@ describe('measureFilledPhotoFieldFrameSize', () => {
       unionScaledW: 720,
       unionScaledH: 780,
     });
-    expect(measureFilledPhotoFieldFrameSize(group as never)).toEqual({ fw: 300, fh: 450 });
+    expect(measureFilledPhotoFieldFrameSize(group)).toEqual({ fw: 300, fh: 450 });
   });
 });
 
@@ -67,6 +67,6 @@ describe('resolvePhotoFieldFrameSize (filled)', () => {
       unionScaledW: 480,
       unionScaledH: 520,
     });
-    expect(resolvePhotoFieldFrameSize(group as never)).toEqual({ fw: 200, fh: 300 });
+    expect(resolvePhotoFieldFrameSize(group)).toEqual({ fw: 200, fh: 300 });
   });
 });

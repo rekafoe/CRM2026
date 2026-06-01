@@ -1,7 +1,7 @@
 import {
   CLIENT_PHOTO_FIELD_WIDTH_FRACTION,
   resolvePhotoFieldSizeForPage,
-} from '../../../frontend/src/pages/admin/designEditor/photoFieldClientSizing';
+} from '../services/designEditorPhotoFieldClientSizing';
 
 describe('resolvePhotoFieldSizeForPage', () => {
   const base = {
