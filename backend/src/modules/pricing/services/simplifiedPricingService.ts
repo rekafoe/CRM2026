@@ -31,6 +31,7 @@ import type {
 } from '../dtos/plotterCuttingTariff.dto';
 import { PlotterCuttingTariffRepository } from '../repositories/plotterCuttingTariffRepository';
 import {
+  usesMultipageSheetPricing,
   validateBindingPagesLimit,
   validateMultiPageCountForTemplate,
 } from '../../../utils/multipagePagesConsistency';
@@ -604,7 +605,11 @@ export class SimplifiedPricingService {
       );
     }
     const itemsPerSheet = Math.max(1, layoutCheck.itemsPerSheet || 1);
-    const usePagesMultiplier = product.product_type === 'multi_page';
+    const usePagesMultiplier = usesMultipageSheetPricing({
+      productType: product.product_type,
+      multiPageStructure,
+      simplifiedPages: simplifiedConfig.pages,
+    });
 
     // Проверяем, рулонная ли печать (counter_unit=meters) — для неё другая логика
     const centralPriceForRoll = normalizedConfig.print_technology
@@ -625,8 +630,22 @@ export class SimplifiedPricingService {
       selectedSize.min_qty != null &&
       hasManualItemsPerSheet &&
       Number(selectedSize.min_qty) === Number(itemsPerSheetOverride);
+    const minQtyCoupledToItemsPerSheet =
+      usePagesMultiplier &&
+      selectedSize.min_qty != null &&
+      itemsPerSheet > 1 &&
+      Number(selectedSize.min_qty) === itemsPerSheet;
+    const tierMinQty = selectedSize.print_prices?.[0]?.tiers?.[0]?.min_qty;
+    const minQtyLikelyFromLayoutOnly =
+      usePagesMultiplier &&
+      selectedSize.min_qty != null &&
+      selectedSize.min_qty > 1 &&
+      itemsPerSheetOverride == null &&
+      (tierMinQty == null || tierMinQty <= 1);
     const minQtyLimit = usePagesMultiplier
-      ? (minQtyFromLayoutOverride ? 1 : (selectedSize.min_qty ?? 1))
+      ? minQtyFromLayoutOverride || minQtyCoupledToItemsPerSheet || minQtyLikelyFromLayoutOnly
+        ? 1
+        : (selectedSize.min_qty ?? 1)
       : selectedSize.min_qty ?? (
           isOfficePrint || isRollPrint || plotterRollMode || hasManualItemsPerSheet ? 1 : itemsPerSheet
         );

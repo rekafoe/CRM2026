@@ -27,6 +27,7 @@ import { useCalculatorPricingActions, productRequiresPrint } from './hooks/useCa
 import { useAutoCalculate } from './hooks/useAutoCalculate'; // 🆕 Автопересчет
 import { getEnhancedProductTypes } from '../../api';
 import { buildParameterSummary, type BuildSummaryOptions } from './utils/summaryBuilder';
+import { isMultipageLikeProduct } from '../../utils/multipageProduct';
 import { CalculatorSections } from './components/CalculatorSections';
 import { CustomProductForm } from './components/CustomProductForm';
 import { PostprintServicesForm } from './components/PostprintServicesForm';
@@ -208,17 +209,18 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     const pt =
       (selectedProduct as Product & { product_type?: string })?.product_type ??
       backendProductSchema?.product_type;
-    if (pt === 'multi_page') return true;
-    if (simplified?.multiPageStructure) return true;
-    if (Array.isArray(effectivePagesOptions) && effectivePagesOptions.length > 0) return true;
-    if (backendProductSchema?.fields?.some((f: { name?: string }) => f.name === 'pages')) return true;
-    return false;
+    return isMultipageLikeProduct({
+      productType: pt,
+      simplifiedPages: effectiveConfig.pages,
+      multiPageStructure: simplified?.multiPageStructure,
+      schemaFields: backendProductSchema?.fields,
+    });
   }, [
     selectedProduct,
     backendProductSchema?.product_type,
     backendProductSchema?.fields,
     simplified?.multiPageStructure,
-    effectivePagesOptions,
+    effectiveConfig.pages,
   ]);
 
   const bindingVariantLocked = bindingTemplate?.variant_id != null;

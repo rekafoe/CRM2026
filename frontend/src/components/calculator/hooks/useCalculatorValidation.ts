@@ -3,6 +3,7 @@ import {
   type BindingPagesLimits,
   validateBindingPagesForCalculator,
 } from '../../../utils/multipageBinding';
+import { resolveMultipageMinQty } from '../../../utils/multipageProduct';
 
 export interface CalculatorValidationResult {
   errors: Record<string, string>;
@@ -197,16 +198,7 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
     if (!Array.isArray(sizes)) return undefined;
     const selectedSize = sizes.find((s: any) => s.id === sizeId);
     if (!selectedSize) return undefined;
-    const minFromTiers = selectedSize.print_prices?.[0]?.tiers?.[0]?.min_qty;
-    const overrideN = selectedSize.items_per_sheet_override;
-    const minFromSize = selectedSize.min_qty;
-    const minQtyFromLayoutOverride =
-      minFromSize != null &&
-      overrideN != null &&
-      Number(minFromSize) === Number(overrideN);
-    const min = isMultiPageProduct
-      ? (minQtyFromLayoutOverride ? (minFromTiers ?? 1) : (minFromSize ?? minFromTiers ?? 1))
-      : (minFromSize ?? (minFromTiers != null ? minFromTiers : 1));
+    const min = resolveMultipageMinQty(selectedSize, { multipageLike: isMultiPageProduct === true });
     return {
       min,
       max: selectedSize.max_qty ?? undefined,

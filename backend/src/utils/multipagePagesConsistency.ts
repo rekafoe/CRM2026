@@ -234,3 +234,24 @@ export function validateBindingPagesLimit(
     throw err;
   }
 }
+
+/** В шаблоне задан блок pages (пресеты или min/max) — расчёт по листам блока, не по раскладке. */
+export function templateHasPagesPricing(pages: unknown): boolean {
+  if (!pages || typeof pages !== 'object' || Array.isArray(pages)) return false;
+  const p = pages as Record<string, unknown>;
+  const opts = p.options;
+  if (Array.isArray(opts) && opts.length > 0) return true;
+  if (p.min != null || p.max != null) return true;
+  return false;
+}
+
+/** Печать с множителем страниц (тираж × листов на экземпляр), без min тиража по раскладке. */
+export function usesMultipageSheetPricing(params: {
+  productType?: string | null;
+  multiPageStructure?: unknown;
+  simplifiedPages?: unknown;
+}): boolean {
+  if (params.productType === 'multi_page') return true;
+  if (params.multiPageStructure) return true;
+  return templateHasPagesPricing(params.simplifiedPages);
+}

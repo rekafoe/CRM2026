@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { AppIcon } from '../../ui/AppIcon';
 import { formatBindingPagesHint, readBindingPagesLimits } from '../../../utils/multipageBinding';
+import {
+  isMultipageLikeProduct,
+  resolveMultipageMinQty,
+} from '../../../utils/multipageProduct';
 
 export interface ParamsSectionSpecs {
   productType: string;
@@ -95,19 +99,11 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
 
   const selectedSizeId = specs.size_id ?? (simplifiedSizes?.length ? simplifiedSizes[0].id : undefined);
   const selectedSize = simplifiedSizes?.find((s: any) => String(s.id) === String(selectedSizeId));
-  const resolveMinQtyForSize = (size: any) => {
-    const minFromTiers = size?.print_prices?.[0]?.tiers?.[0]?.min_qty;
-    const minFromSize = size?.min_qty;
-    const overrideN = size?.items_per_sheet_override;
-    const minQtyFromLayoutOverride =
-      minFromSize != null &&
-      overrideN != null &&
-      Number(minFromSize) === Number(overrideN);
-    if (isMultiPageProduct) {
-      return minQtyFromLayoutOverride ? (minFromTiers ?? 1) : (minFromSize ?? minFromTiers ?? 1);
-    }
-    return minFromSize ?? minFromTiers ?? 1;
-  };
+  const multipageLike =
+    isMultiPageProduct ||
+    isMultipageLikeProduct({ simplifiedPages: effectivePagesProp });
+  const resolveMinQtyForSize = (size: any) =>
+    resolveMultipageMinQty(size, { multipageLike, itemsPerSheet });
   const minQtyForSize = selectedSize ? resolveMinQtyForSize(selectedSize) : 1;
 
   const [pagesCustomMode, setPagesCustomMode] = useState(false);
@@ -286,7 +282,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
           {isSimplifiedProduct && minQtyForSize > 1 && (
             <p className="param-hint">
               Мин. тираж для размера: {minQtyForSize} шт.
-              {!isMultiPageProduct &&
+              {!multipageLike &&
               itemsPerSheet != null &&
               itemsPerSheet > 1 &&
               (selectedSize as any)?.min_qty == null
@@ -301,7 +297,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
               Рекомендуемое количество для выбранного размера: {minQtyForSize} шт.
             </div>
           )}
-          {!isMultiPageProduct &&
+          {!multipageLike &&
           itemsPerSheet != null &&
           itemsPerSheet > 1 &&
           specs.quantity != null &&

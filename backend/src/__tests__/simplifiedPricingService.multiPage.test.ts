@@ -196,6 +196,27 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     expect(result.finalPrice).toBeGreaterThan(0);
   });
 
+  it('считает по страницам при simplified.pages, даже если product_type не multi_page', async () => {
+    productRow.product_type = 'flyers';
+    templateConfigData.simplified.pages = { min: 4, max: 28, default: 4 };
+    templateConfigData.simplified.sizes[0].min_qty = 2;
+    (LayoutCalculationService.findOptimalSheetSize as jest.Mock).mockReturnValueOnce(layoutMock(2));
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 4 as any,
+      } as any,
+      1,
+    );
+
+    expect(result.finalPrice).toBe(8);
+  });
+
   it('не привязывает мин. тираж к раскладке (itemsPerSheet) для multi_page', async () => {
     const layout = LayoutCalculationService as jest.Mocked<typeof LayoutCalculationService>;
     (layout.calculateLayout as jest.Mock).mockReturnValueOnce(layoutMock(2));

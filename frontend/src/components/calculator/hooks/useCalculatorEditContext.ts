@@ -34,6 +34,10 @@ export function useCalculatorEditContext({
       return null;
     }
 
+    if (product.product_type === 'multi_page') {
+      return 'multi_page';
+    }
+
     const candidates: Array<string | undefined | null> = [
       product.product_type,
       product.calculator_type,
