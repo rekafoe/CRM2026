@@ -152,6 +152,10 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     expect(result.breakdown?.coverPrice).toBe(400);
     expect(result.breakdown?.bindingPrice).toBe(50);
     expect(result.finalPrice).toBe(3650);
+    const bindRow = result.finishingDetails?.find((d) => d.service_id === 77);
+    expect(bindRow).toBeDefined();
+    expect(bindRow?.operation_type).toBe('bind');
+    expect(bindRow?.priceForQuantity).toBe(50);
   });
 
   it('использует fixedPages из innerBlock при pagesSource=fixed', async () => {

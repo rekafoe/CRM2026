@@ -228,6 +228,25 @@ export class UnifiedPricingService {
       ],
       operations: [
         ...(printOperationRow ? [printOperationRow] : []),
+        ...(result.breakdown?.coverPrice != null && result.breakdown.coverPrice > 0
+          ? [{
+              operationId: 0,
+              operationName: 'Обложка (печать и материал)',
+              operationType: 'cover' as const,
+              priceUnit: 'per_item' as const,
+              unitPrice:
+                result.quantity > 0
+                  ? Math.round((result.breakdown.coverPrice / result.quantity) * 10000) / 10000
+                  : result.breakdown.coverPrice,
+              quantity: result.quantity,
+              setupCost: 0,
+              totalCost: result.breakdown.coverPrice,
+              appliedRules: undefined,
+              pricingSource: 'simplified',
+              pricingKey: 'cover',
+              technologyCode: undefined,
+            }]
+          : []),
         ...(result.finishingDetails?.map(f => ({
           operationId: f.service_id,
           operationName: f.service_name,

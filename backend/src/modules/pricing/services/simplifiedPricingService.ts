@@ -1678,6 +1678,21 @@ export class SimplifiedPricingService {
           error: (error as Error).message,
         });
       }
+      if (configuredBindingQuote) {
+        const bindName = configuredBindingQuote.variantName
+          ? `${configuredBindingQuote.serviceName} — ${configuredBindingQuote.variantName}`
+          : configuredBindingQuote.serviceName;
+        finishingDetails.push({
+          service_id: configuredBindingQuote.serviceId,
+          variant_id: configuredBindingQuote.variantId,
+          service_name: bindName,
+          tier: { min_qty: 1, max_qty: undefined, price: configuredBindingQuote.unitPrice },
+          units_needed: configuredBindingQuote.units,
+          priceForQuantity: configuredBindingQuote.total,
+          price_unit: configuredBindingQuote.priceUnit,
+          operation_type: 'bind',
+        });
+      }
     }
 
     const bindFromFinishing = finishingDetails
