@@ -198,11 +198,20 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
     const selectedSize = sizes.find((s: any) => s.id === sizeId);
     if (!selectedSize) return undefined;
     const minFromTiers = selectedSize.print_prices?.[0]?.tiers?.[0]?.min_qty;
+    const overrideN = selectedSize.items_per_sheet_override;
+    const minFromSize = selectedSize.min_qty;
+    const minQtyFromLayoutOverride =
+      minFromSize != null &&
+      overrideN != null &&
+      Number(minFromSize) === Number(overrideN);
+    const min = isMultiPageProduct
+      ? (minQtyFromLayoutOverride ? (minFromTiers ?? 1) : (minFromSize ?? minFromTiers ?? 1))
+      : (minFromSize ?? (minFromTiers != null ? minFromTiers : 1));
     return {
-      min: selectedSize.min_qty ?? (minFromTiers != null ? minFromTiers : 1),
+      min,
       max: selectedSize.max_qty ?? undefined,
     };
-  }, [backendProductSchema, effectiveSizes]);
+  }, [backendProductSchema, effectiveSizes, isMultiPageProduct]);
 
   const getOperationLimits = useCallback((selectedOps?: Array<{ operationId?: number | string }>) => {
     if (!Array.isArray(selectedOps) || selectedOps.length === 0) return undefined;

@@ -1,4 +1,5 @@
 import { SimplifiedPricingService } from '../modules/pricing/services/simplifiedPricingService';
+import { LayoutCalculationService } from '../modules/pricing/services/layoutCalculationService';
 import { getDb } from '../db';
 import { BindingPricingService } from '../modules/pricing/services/bindingPricingService';
 
@@ -6,24 +7,20 @@ jest.mock('../db', () => ({
   getDb: jest.fn(),
 }));
 
+const layoutMock = (itemsPerSheet: number) => ({
+  fitsOnSheet: true,
+  itemsPerSheet,
+  sheetsNeeded: 100,
+  wastePercentage: 0,
+  recommendedSheetSize: { width: 320, height: 450 },
+  layout: { rows: 1, cols: itemsPerSheet, actualItemsPerSheet: itemsPerSheet },
+  cutsPerSheet: 0,
+});
+
 jest.mock('../modules/pricing/services/layoutCalculationService', () => ({
   LayoutCalculationService: {
-    calculateLayout: jest.fn(() => ({
-      fitsOnSheet: true,
-      itemsPerSheet: 1,
-      sheetsNeeded: 100,
-      wastePercentage: 0,
-      recommendedSheetSize: { width: 320, height: 450 },
-      cutsPerSheet: 0,
-    })),
-    findOptimalSheetSize: jest.fn(() => ({
-      fitsOnSheet: true,
-      itemsPerSheet: 1,
-      sheetsNeeded: 100,
-      wastePercentage: 0,
-      recommendedSheetSize: { width: 320, height: 450 },
-      cutsPerSheet: 0,
-    })),
+    calculateLayout: jest.fn(() => layoutMock(1)),
+    findOptimalSheetSize: jest.fn(() => layoutMock(1)),
   },
 }));
 
@@ -197,6 +194,29 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     );
 
     expect(result.finalPrice).toBeGreaterThan(0);
+  });
+
+  it('не привязывает мин. тираж к раскладке (itemsPerSheet) для multi_page', async () => {
+    const layout = LayoutCalculationService as jest.Mocked<typeof LayoutCalculationService>;
+    (layout.calculateLayout as jest.Mock).mockReturnValueOnce(layoutMock(2));
+    (layout.findOptimalSheetSize as jest.Mock).mockReturnValueOnce(layoutMock(2));
+    templateConfigData.simplified.sizes[0].items_per_sheet_override = 2;
+    templateConfigData.simplified.sizes[0].min_qty = 2;
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 4 as any,
+      } as any,
+      1,
+    );
+
+    // 4 стр. × 1 экз. × 2 BYN/лист
+    expect(result.finalPrice).toBe(8);
   });
 
   it('отклоняет pages выше max шаблона для multi_page', async () => {

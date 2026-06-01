@@ -248,6 +248,11 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           updateSpecs={updateSpecs as any}
           backendProductSchema={backendProductSchema}
           subtypeIdForPriceTypes={showTypeSelector ? (selectedTypeId ?? specs.typeId ?? null) : null}
+          hidePagesField={
+            isMultiPageProduct ||
+            Boolean(effectivePages?.options?.length) ||
+            Boolean(backendProductSchema?.fields?.some((f: { name?: string }) => f.name === 'pages'))
+          }
         />
       </div>
     </div>

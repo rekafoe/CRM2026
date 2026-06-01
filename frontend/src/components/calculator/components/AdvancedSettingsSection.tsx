@@ -15,6 +15,8 @@ interface Props {
   backendProductSchema: any | null;
   /** Подтип simplified: ограничение allowed_price_types из typeConfigs */
   subtypeIdForPriceTypes?: number | null;
+  /** Страницы уже в ParamsSection (multi_page / simplified.pages) */
+  hidePagesField?: boolean;
 }
 
 export const AdvancedSettingsSection: React.FC<Props> = ({
@@ -22,6 +24,7 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
   updateSpecs,
   backendProductSchema,
   subtypeIdForPriceTypes = null,
+  hidePagesField = false,
 }) => {
   const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
 
@@ -126,7 +129,8 @@ export const AdvancedSettingsSection: React.FC<Props> = ({
           </select>
         </div>
 
-        {Array.isArray((backendProductSchema?.fields || []).find((f: any) => f.name === 'pages')?.enum) && (
+        {!hidePagesField &&
+          Array.isArray((backendProductSchema?.fields || []).find((f: any) => f.name === 'pages')?.enum) && (
           <div className="param-group">
             <label>Страниц:</label>
             <select

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppIcon } from '../../ui/AppIcon';
 import { formatBindingPagesHint, readBindingPagesLimits } from '../../../utils/multipageBinding';
 
@@ -95,9 +95,26 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
 
   const selectedSizeId = specs.size_id ?? (simplifiedSizes?.length ? simplifiedSizes[0].id : undefined);
   const selectedSize = simplifiedSizes?.find((s: any) => String(s.id) === String(selectedSizeId));
-  const minQtyForSize = selectedSize
-    ? ((selectedSize as any).min_qty ?? (selectedSize as any).print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1)
-    : 1;
+  const resolveMinQtyForSize = (size: any) => {
+    const minFromTiers = size?.print_prices?.[0]?.tiers?.[0]?.min_qty;
+    const minFromSize = size?.min_qty;
+    const overrideN = size?.items_per_sheet_override;
+    const minQtyFromLayoutOverride =
+      minFromSize != null &&
+      overrideN != null &&
+      Number(minFromSize) === Number(overrideN);
+    if (isMultiPageProduct) {
+      return minQtyFromLayoutOverride ? (minFromTiers ?? 1) : (minFromSize ?? minFromTiers ?? 1);
+    }
+    return minFromSize ?? minFromTiers ?? 1;
+  };
+  const minQtyForSize = selectedSize ? resolveMinQtyForSize(selectedSize) : 1;
+
+  const [pagesCustomMode, setPagesCustomMode] = useState(false);
+
+  useEffect(() => {
+    setPagesCustomMode(false);
+  }, [selectedSizeId, isMultiPageProduct, effectivePagesProp?.options?.join(',')]);
 
   // 🆕 Устанавливаем первый размер и мин. количество для упрощённых продуктов
   React.useEffect(() => {
@@ -105,7 +122,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
       const isValidSizeId = specs.size_id != null && simplifiedSizes.some((s: any) => String(s.id) === String(specs.size_id));
       if (!isValidSizeId) {
         const first = simplifiedSizes[0] as any;
-        const minQty = first.min_qty ?? first.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
+        const minQty = resolveMinQtyForSize(first);
         updateSpecs({ 
           size_id: first.id,
           format: `${first.width_mm}×${first.height_mm}`,
@@ -134,7 +151,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                 onChange={(e) => {
                   const id = e.target.value;
                   const size = simplifiedSizes.find((s: any) => String(s.id) === String(id)) as any;
-                  const minQty = size?.min_qty ?? size?.print_prices?.[0]?.tiers?.[0]?.min_qty ?? 1;
+                  const minQty = resolveMinQtyForSize(size);
                   updateSpecs({
                     size_id: id,
                     format: size ? `${size.width_mm}×${size.height_mm}` : specs.format,
@@ -266,12 +283,30 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
           {validationErrors.quantity && (
             <div className="text-sm text-red-600">{validationErrors.quantity}</div>
           )}
+          {isSimplifiedProduct && minQtyForSize > 1 && (
+            <p className="param-hint">
+              Мин. тираж для размера: {minQtyForSize} шт.
+              {!isMultiPageProduct &&
+              itemsPerSheet != null &&
+              itemsPerSheet > 1 &&
+              (selectedSize as any)?.min_qty == null
+                ? ` (на лист помещается ${itemsPerSheet} шт.)`
+                : (selectedSize as any)?.min_qty != null
+                  ? ' (задано в шаблоне)'
+                  : ''}
+            </p>
+          )}
           {isSimplifiedProduct && specs.quantity != null && specs.quantity < minQtyForSize && (
             <div className="text-sm text-warning mt-1">
               Рекомендуемое количество для выбранного размера: {minQtyForSize} шт.
             </div>
           )}
-          {itemsPerSheet != null && itemsPerSheet > 1 && specs.quantity != null && specs.quantity > 0 && (() => {
+          {!isMultiPageProduct &&
+          itemsPerSheet != null &&
+          itemsPerSheet > 1 &&
+          specs.quantity != null &&
+          specs.quantity > 0 &&
+          (() => {
             const q = Number(specs.quantity);
             const currentSheets = Math.ceil(q / itemsPerSheet);
             const nextPriceChangeQty = currentSheets * itemsPerSheet + 1;
@@ -331,7 +366,14 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
           const stepHint = effectivePagesProp?.step;
           const current = Number(specs.pages ?? allowedOptions[0] ?? minBound ?? 4);
           const inPresetList = allowedOptions.includes(current);
-          const selectValue = inPresetList ? String(current) : '__custom__';
+          const showCustomPagesInput =
+            allowCustom && (allowedOptions.length === 0 || pagesCustomMode || !inPresetList);
+          const selectValue =
+            allowedOptions.length > 0
+              ? showCustomPagesInput && (pagesCustomMode || !inPresetList)
+                ? '__custom__'
+                : String(inPresetList ? current : allowedOptions[0])
+              : '__custom__';
 
           if (!isMultiPageProduct && allowedOptions.length === 0 && hasField('pages')) {
             const fe = getEnum('pages') as number[];
@@ -382,7 +424,11 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                   value={selectValue}
                   onChange={(e) => {
                     const v = e.target.value;
-                    if (v === '__custom__') return;
+                    if (v === '__custom__') {
+                      setPagesCustomMode(true);
+                      return;
+                    }
+                    setPagesCustomMode(false);
                     updateSpecs({ pages: parseInt(v, 10) }, true);
                   }}
                   className={`form-control${validationErrors.pages ? ' error' : ''}`}
@@ -394,13 +440,11 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                     </option>
                   ))}
                   {allowCustom && (
-                    <option value="__custom__">
-                      {inPresetList ? 'Другое количество…' : `${current} стр. (вручную)`}
-                    </option>
+                    <option value="__custom__">Другое количество…</option>
                   )}
                 </select>
               )}
-              {allowCustom && (allowedOptions.length === 0 || !inPresetList || selectValue === '__custom__') && (
+              {showCustomPagesInput && (
                 <div className="param-group param-group--pages-custom">
                   <label className="param-group__sublabel">
                     {allowedOptions.length > 0 ? 'Своё число страниц' : 'Число страниц'}

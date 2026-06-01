@@ -604,6 +604,7 @@ export class SimplifiedPricingService {
       );
     }
     const itemsPerSheet = Math.max(1, layoutCheck.itemsPerSheet || 1);
+    const usePagesMultiplier = product.product_type === 'multi_page';
 
     // Проверяем, рулонная ли печать (counter_unit=meters) — для неё другая логика
     const centralPriceForRoll = normalizedConfig.print_technology
@@ -619,13 +620,21 @@ export class SimplifiedPricingService {
     const isOfficePrint = (normalizedConfig.print_technology ?? '').toLowerCase().includes('office');
     const hasManualItemsPerSheet =
       itemsPerSheetOverride != null && itemsPerSheetOverride > 0;
-    const minQtyLimit = selectedSize.min_qty ?? (
-      isOfficePrint || isRollPrint || plotterRollMode || hasManualItemsPerSheet ? 1 : itemsPerSheet
-    );
+    // multi_page: тираж — число альбомов; листы = quantity × sheetsPerItem, не ceil(qty/itemsPerSheet)
+    const minQtyFromLayoutOverride =
+      selectedSize.min_qty != null &&
+      hasManualItemsPerSheet &&
+      Number(selectedSize.min_qty) === Number(itemsPerSheetOverride);
+    const minQtyLimit = usePagesMultiplier
+      ? (minQtyFromLayoutOverride ? 1 : (selectedSize.min_qty ?? 1))
+      : selectedSize.min_qty ?? (
+          isOfficePrint || isRollPrint || plotterRollMode || hasManualItemsPerSheet ? 1 : itemsPerSheet
+        );
     const maxQtyLimit = selectedSize.max_qty;
     if (quantity < minQtyLimit || (maxQtyLimit !== undefined && quantity > maxQtyLimit)) {
       const layoutHint =
         useLayout &&
+        !usePagesMultiplier &&
         !isOfficePrint &&
         !isRollPrint &&
         !plotterRollMode &&
@@ -642,7 +651,6 @@ export class SimplifiedPricingService {
       throw err;
     }
 
-    const usePagesMultiplier = product.product_type === 'multi_page';
     const rawPagesCount = Number((configuration as any).pages);
     const fixedPages = Number(multiPageStructure?.innerBlock?.fixedPages);
     const pagesCount =

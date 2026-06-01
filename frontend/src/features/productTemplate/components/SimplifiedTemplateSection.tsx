@@ -884,13 +884,24 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                           onChange={(e) => updateSize(selected.id, { height_mm: Number(e.target.value) || 0 })}
                         />
                       </FormField>
-                      <FormField label={labelWithHint('Мин. тираж', 'Пусто = мин. по раскладке (1 лист). 1 = любой тираж, стоимость за полный лист.')}>
+                      <FormField
+                        label={labelWithHint(
+                          'Мин. тираж',
+                          showPagesConfig
+                            ? 'Минимум экземпляров (альбомов). По умолчанию 1; раскладка «шт/лист» на многостраничные не влияет.'
+                            : 'Пусто = мин. по раскладке (1 лист). 1 = любой тираж, стоимость за полный лист.',
+                        )}
+                      >
                         <input
                           className="form-input form-input--compact simplified-size-input"
                           type="number"
                           min="1"
-                          placeholder="по раскладке"
-                          title="Пусто = мин. по раскладке (1 лист). 1 = любой тираж, стоимость за полный лист."
+                          placeholder={showPagesConfig ? '1' : 'по раскладке'}
+                          title={
+                            showPagesConfig
+                              ? 'Минимум экземпляров. Для многостраничных не привязывается к раскладке на лист.'
+                              : 'Пусто = мин. по раскладке (1 лист). 1 = любой тираж, стоимость за полный лист.'
+                          }
                           value={selected.min_qty !== undefined ? String(selected.min_qty) : ''}
                           onChange={(e) =>
                             updateSize(selected.id, {
@@ -946,23 +957,25 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                           }
                         />
                       </FormField>
-                      <FormField label={labelWithHint('Норма вместимости на лист', 'Ручной override: сколько изделий помещается на лист. Пусто = считать по отступу и зазору автоматически. Значение также записывается в мин. тираж.')}>
-                        <input
-                          className="form-input form-input--compact simplified-size-input"
-                          type="number"
-                          min="1"
-                          placeholder="авто"
-                          title="Ручной override: сколько изделий помещается на лист. Перекрывает автоматический расчёт по отступам и зазорам."
-                          value={selected.items_per_sheet_override !== undefined ? String(selected.items_per_sheet_override) : ''}
-                          onChange={(e) => {
-                            const val = e.target.value !== '' ? Number(e.target.value) : undefined
-                            updateSize(selected.id, {
-                              items_per_sheet_override: val,
-                              min_qty: val,
-                            })
-                          }}
-                        />
-                      </FormField>
+                      {!showPagesConfig && (
+                        <FormField label={labelWithHint('Норма вместимости на лист', 'Ручной override: сколько изделий помещается на лист. Пусто = считать по отступу и зазору автоматически. Значение также записывается в мин. тираж.')}>
+                          <input
+                            className="form-input form-input--compact simplified-size-input"
+                            type="number"
+                            min="1"
+                            placeholder="авто"
+                            title="Ручной override: сколько изделий помещается на лист. Перекрывает автоматический расчёт по отступам и зазорам."
+                            value={selected.items_per_sheet_override !== undefined ? String(selected.items_per_sheet_override) : ''}
+                            onChange={(e) => {
+                              const val = e.target.value !== '' ? Number(e.target.value) : undefined
+                              updateSize(selected.id, {
+                                items_per_sheet_override: val,
+                                min_qty: val,
+                              })
+                            }}
+                          />
+                        </FormField>
+                      )}
                     </div>
                     {layoutPreview && !layoutPreview.noMat && (
                       <div className={`simplified-layout-preview${layoutPreview.isOverride ? ' simplified-layout-preview--override' : ''}`}>
