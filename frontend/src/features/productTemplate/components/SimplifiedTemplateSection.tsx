@@ -17,7 +17,11 @@ import { computeItemsPerSheet } from './PrintSheetSection'
 import { ImprovedPrintingCalculatorModal } from '../../../components/calculator/ImprovedPrintingCalculatorModal'
 import { MultiPageStructureCard } from './MultiPageStructureCard'
 import { MultiPagePagesTab } from './MultiPagePagesTab'
-import { computeMultipageSheetsPerItem } from '../../../utils/multipageProduct'
+import {
+  computeMultipageSheetsPerItem,
+  resolveBlockPagesForPrint,
+  resolveMultipagePageSplit,
+} from '../../../utils/multipageProduct'
 import './SimplifiedTemplateSection.css'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
@@ -247,20 +251,36 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const multiPageInnerBlock = multiPageStructure.innerBlock || { pagesSource: 'parameter' as const }
 
   const multiPageSheetsHint = useMemo(() => {
-    const pages =
+    const pagesRaw =
       multiPageInnerBlock.pagesSource === 'fixed' && multiPageInnerBlock.fixedPages
         ? Number(multiPageInnerBlock.fixedPages)
         : Number(pagesConfig?.default ?? pagesConfig?.options?.[0])
-    if (!Number.isFinite(pages) || pages < 1) return null
+    if (!Number.isFinite(pagesRaw) || pagesRaw < 1) return null
+    const pagesFromParameter = multiPageInnerBlock.pagesSource !== 'fixed' || !multiPageInnerBlock.fixedPages
+    const split = resolveMultipagePageSplit({
+      pagesCount: pagesRaw,
+      multiPageStructure: multiPageStructure,
+      pagesFromParameter,
+    })
+    const blockPages = resolveBlockPagesForPrint(split)
     const itemsPerSheet =
       layoutPreview?.n != null && layoutPreview.n > 0 && !layoutPreview.noMat ? layoutPreview.n : 1
     return {
-      pages,
+      totalPages: split.totalPages,
+      coverPages: split.coverPages,
+      blockPages,
       itemsPerSheet,
-      singleSheets: computeMultipageSheetsPerItem(pages, itemsPerSheet, false),
-      duplexSheets: computeMultipageSheetsPerItem(pages, itemsPerSheet, true),
+      singleSheets: computeMultipageSheetsPerItem(blockPages, itemsPerSheet, false),
+      duplexSheets: computeMultipageSheetsPerItem(blockPages, itemsPerSheet, true),
     }
-  }, [multiPageInnerBlock, pagesConfig?.default, pagesConfig?.options, layoutPreview?.n, layoutPreview?.noMat])
+  }, [
+    multiPageInnerBlock,
+    multiPageStructure,
+    pagesConfig?.default,
+    pagesConfig?.options,
+    layoutPreview?.n,
+    layoutPreview?.noMat,
+  ])
 
   const updateMultiPageStructure = useCallback((patch: Partial<NonNullable<SimplifiedConfig['multiPageStructure']>>) => {
     onChange({

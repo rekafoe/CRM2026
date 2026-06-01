@@ -5,6 +5,7 @@ import {
   isMultipageLikeProduct,
   resolveMultipageMinQty,
 } from '../../../utils/multipageProduct';
+import { CustomPagesField } from './CustomPagesField';
 
 export interface ParamsSectionSpecs {
   productType: string;
@@ -12,7 +13,7 @@ export interface ParamsSectionSpecs {
   quantity: number;
   sides: 1 | 2;
   size_id?: number | string;
-  pages?: number;
+  pages?: number | null;
 }
 
 interface ParamsSectionProps {
@@ -360,8 +361,13 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
               ? Math.max(...allowedOptions)
               : getMax('pages') ?? (isMultiPageProduct ? 500 : undefined));
           const stepHint = effectivePagesProp?.step;
-          const current = Number(specs.pages ?? allowedOptions[0] ?? minBound ?? 4);
-          const inPresetList = allowedOptions.includes(current);
+          const pagesRaw = specs.pages;
+          const hasPagesValue =
+            pagesRaw != null && Number.isFinite(Number(pagesRaw)) && Number(pagesRaw) > 0;
+          const current = hasPagesValue
+            ? Number(pagesRaw)
+            : Number(allowedOptions[0] ?? minBound ?? 4);
+          const inPresetList = hasPagesValue && allowedOptions.includes(current);
           const showCustomPagesInput =
             allowCustom && (allowedOptions.length === 0 || pagesCustomMode || !inPresetList);
           const selectValue =
@@ -422,6 +428,8 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                     const v = e.target.value;
                     if (v === '__custom__') {
                       setPagesCustomMode(true);
+                      const keepPages = Number.isFinite(current) && current > 0 ? current : allowedOptions[0] ?? minBound ?? 4;
+                      updateSpecs({ pages: keepPages }, true);
                       return;
                     }
                     setPagesCustomMode(false);
@@ -441,26 +449,19 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                 </select>
               )}
               {showCustomPagesInput && (
-                <div className="param-group param-group--pages-custom">
-                  <label className="param-group__sublabel">
-                    {allowedOptions.length > 0 ? 'Своё число страниц' : 'Число страниц'}
-                  </label>
-                  <input
-                    type="number"
-                    className={`form-control${validationErrors.pages ? ' error' : ''}`}
-                    min={minBound}
-                    max={maxBound}
-                    step={stepHint ?? 1}
-                    value={Number.isFinite(current) ? current : ''}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (raw === '') return;
-                      const n = parseInt(raw, 10);
-                      if (!Number.isFinite(n)) return;
-                      updateSpecs({ pages: n }, true);
-                    }}
-                  />
-                </div>
+                <CustomPagesField
+                  specsPages={
+                    hasPagesValue ? current : undefined
+                  }
+                  validationErrors={validationErrors}
+                  minBound={minBound}
+                  maxBound={maxBound}
+                  stepHint={stepHint}
+                  allowedOptions={allowedOptions}
+                  sublabel={allowedOptions.length > 0 ? 'Своё число страниц' : 'Число страниц'}
+                  updateSpecs={updateSpecs}
+                  resetKey={`${selectedSizeId}|${pagesCustomMode}|${allowedOptions.join(',')}`}
+                />
               )}
               {validationErrors.pages && (
                 <p className="param-error">{validationErrors.pages}</p>

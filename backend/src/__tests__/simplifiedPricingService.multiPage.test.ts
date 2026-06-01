@@ -149,9 +149,9 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     );
     expect(result.breakdown).toBeDefined();
     expect(result.breakdown?.innerBlockPrice).toBe(3200);
-    expect(result.breakdown?.coverPrice).toBe(400);
+    expect(result.breakdown?.coverPrice).toBe(0);
     expect(result.breakdown?.bindingPrice).toBe(50);
-    expect(result.finalPrice).toBe(3650);
+    expect(result.finalPrice).toBe(3250);
     const bindRow = result.finishingDetails?.find((d) => d.service_id === 77);
     expect(bindRow).toBeDefined();
     expect(bindRow?.operation_type).toBe('bind');

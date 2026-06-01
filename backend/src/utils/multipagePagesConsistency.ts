@@ -235,6 +235,76 @@ export function validateBindingPagesLimit(
   }
 }
 
+export type MultipageCoverMode = 'none' | 'self' | 'separate';
+
+/** Сколько страниц альбома занимает обложка (входит в общее число страниц в калькуляторе). */
+export function resolveCoverPageCount(multiPageStructure: unknown): number {
+  if (!multiPageStructure || typeof multiPageStructure !== 'object' || Array.isArray(multiPageStructure)) {
+    return 0;
+  }
+  const cover = (multiPageStructure as Record<string, unknown>).cover as Record<string, unknown> | undefined;
+  if (!cover || cover.mode === 'none') return 0;
+  const raw = cover.page_count ?? cover.pageCount ?? cover.pages;
+  if (raw != null && Number.isFinite(Number(raw)) && Number(raw) > 0) {
+    return Math.floor(Number(raw));
+  }
+  return 4;
+}
+
+export function resolveMultipageCoverMode(multiPageStructure: unknown): MultipageCoverMode {
+  if (!multiPageStructure || typeof multiPageStructure !== 'object' || Array.isArray(multiPageStructure)) {
+    return 'none';
+  }
+  const mode = (multiPageStructure as Record<string, unknown>).cover as Record<string, unknown> | undefined;
+  const m = mode?.mode;
+  if (m === 'self' || m === 'separate' || m === 'none') return m;
+  return 'none';
+}
+
+/**
+ * Делит число страниц на обложку и блок.
+ * В калькуляторе `pages` = всего в альбоме (с обложкой), если не задан фиксированный только блок.
+ */
+export function resolveMultipagePageSplit(params: {
+  pagesCount: number;
+  multiPageStructure?: unknown;
+  /** false = innerBlock.pagesSource fixed — pagesCount только блок, без вычитания обложки */
+  pagesFromParameter: boolean;
+}): {
+  totalPages: number;
+  coverPages: number;
+  innerPages: number;
+  coverMode: MultipageCoverMode;
+} {
+  const innerOnly = Math.max(1, Math.floor(Number(params.pagesCount)) || 1);
+  const coverMode = resolveMultipageCoverMode(params.multiPageStructure);
+  if (coverMode === 'none') {
+    return { totalPages: innerOnly, coverPages: 0, innerPages: innerOnly, coverMode };
+  }
+  const coverPages = resolveCoverPageCount(params.multiPageStructure);
+  if (!params.pagesFromParameter) {
+    return {
+      totalPages: innerOnly + coverPages,
+      coverPages,
+      innerPages: innerOnly,
+      coverMode,
+    };
+  }
+  const totalPages = innerOnly;
+  const blockPages = Math.max(1, totalPages - coverPages);
+  return { totalPages, coverPages, innerPages: blockPages, coverMode };
+}
+
+/** Страниц для расчёта печати/материала блока (без двойного учёта обложки). */
+export function resolveBlockPagesForPrint(split: {
+  totalPages: number;
+  innerPages: number;
+  coverMode: MultipageCoverMode;
+}): number {
+  if (split.coverMode === 'separate') return split.innerPages;
+  return split.totalPages;
+}
+
 /** В шаблоне задан блок pages (пресеты или min/max) — расчёт по листам блока, не по раскладке. */
 export function templateHasPagesPricing(pages: unknown): boolean {
   if (!pages || typeof pages !== 'object' || Array.isArray(pages)) return false;

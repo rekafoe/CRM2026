@@ -76,10 +76,7 @@ export function useAutoCalculate({
   const isCalculatingRef = useRef(false);
   const pendingCalculateRef = useRef(false);
   
-  // Обновляем ref при изменении specs
-  useEffect(() => {
-    specsRef.current = specs;
-  }, [specs]);
+  specsRef.current = specs;
   
   // Создаем стабильный ключ из specs, включая кастомный формат
   const specsKey = useMemo(
@@ -98,12 +95,10 @@ export function useAutoCalculate({
   const isValidRef = useRef(isValid);
   const selectedProductIdRef = useRef(selectedProduct?.id);
   
-  useEffect(() => {
-    onCalculateRef.current = onCalculate;
-    enabledRef.current = enabled;
-    isValidRef.current = isValid;
-    selectedProductIdRef.current = selectedProduct?.id;
-  }, [onCalculate, enabled, isValid, selectedProduct?.id]);
+  onCalculateRef.current = onCalculate;
+  enabledRef.current = enabled;
+  isValidRef.current = isValid;
+  selectedProductIdRef.current = selectedProduct?.id;
   
   // Debounced расчет (с задержкой) - используем ref для стабильности
   const debouncedCalculate = useCallback(() => {

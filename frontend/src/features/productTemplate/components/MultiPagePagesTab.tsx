@@ -31,6 +31,10 @@ export const MultiPagePagesTab: React.FC<Props> = ({ pagesConfig, onChange }) =>
           </p>
         </div>
       </div>
+      <p className="param-hint simplified-pages-config__hint">
+        Число страниц в калькуляторе — <strong>всего в альбоме</strong>, включая обложку (если в «Сборке» обложка не «Без»).
+        Сколько страниц занимает обложка, задаётся в блоке «Обложка» на вкладке «Сборка».
+      </p>
       <div className="simplified-card__content simplified-pages-config">
         <FormField label="Привязанные варианты">
           <div className="simplified-pages-list">

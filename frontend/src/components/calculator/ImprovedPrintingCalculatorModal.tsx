@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { AppIcon } from '../ui/AppIcon';
 import { Product } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
@@ -588,6 +588,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     printColorMode,
   });
 
+  /** Пересчёт после setSpecs: дождаться коммита state и актуального isValid (не setTimeout до ре-рендера). */
+  const pendingInstantCalcRef = useRef(false);
+
   // 🆕 При смене продукта сбрасываем завязанные на схему поля упрощенного продукта,
   // чтобы новые allowed_* и размеры/материалы подтянулись корректно
   const prevProductIdRef = useRef<number | null>(null);
@@ -935,13 +938,16 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     setSpecs(prev => ({ ...prev, ...normalizedUpdates }));
     setUserInteracted(true); // Отмечаем, что пользователь взаимодействовал с калькулятором
 
-    // Для select (материал, формат и т.д.) — пересчёт после того как React применит setState,
-    // иначе calculateCost видит старые specs (замыкание). Небольшая задержка даёт время на коммит и ре-рендер.
     if (instant) {
-      setTimeout(() => instantCalculate(), 50);
+      pendingInstantCalcRef.current = true;
     }
-  }, [setSpecs, setUserInteracted, instantCalculate]);
+  }, [setSpecs, setUserInteracted]);
 
+  useLayoutEffect(() => {
+    if (!pendingInstantCalcRef.current) return;
+    pendingInstantCalcRef.current = false;
+    void instantCalculate();
+  }, [specs, instantCalculate]);
 
   // getProductionDays передаётся выше через useCalculatorPricingActions / handleAddToOrder
 

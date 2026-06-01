@@ -12,7 +12,13 @@ type PrintTechRow = { code: string; name: string; supports_duplex?: number | boo
 type Props = {
   structure: MultiPageStructureConfig
   onChange: (patch: Partial<MultiPageStructureConfig>) => void
-  pagesHint?: { pages: number; singleSheets: number; duplexSheets: number } | null
+  pagesHint?: {
+    totalPages: number
+    coverPages: number
+    blockPages: number
+    singleSheets: number
+    duplexSheets: number
+  } | null
   allMaterials: CalculatorMaterial[]
   /** Материалы, разрешённые для текущего типа/размера — приоритет в списке обложки */
   preferredMaterialIds?: number[]
@@ -110,8 +116,10 @@ export const MultiPageStructureCard: React.FC<Props> = ({
     <div className="multipage-structure">
       {pagesHint && (
         <p className="text-muted text-sm multipage-structure__hint">
-          Пример на {pagesHint.pages} стр.: односторонняя — {pagesHint.singleSheets} листов на изделие;
-          двухсторонняя — {pagesHint.duplexSheets} листов.
+          Пример: {pagesHint.totalPages} стр. всего
+          {pagesHint.coverPages > 0 ? ` (${pagesHint.coverPages} обложка + ${pagesHint.blockPages} блок)` : ''}
+          {' — '}
+          листов SRA3 на изделие (блок): односторонняя {pagesHint.singleSheets}, двухсторонняя {pagesHint.duplexSheets}.
         </p>
       )}
 
@@ -172,15 +180,19 @@ export const MultiPageStructureCard: React.FC<Props> = ({
               <option value="separate">Своя бумага и печать</option>
             </select>
           </FormField>
-          <FormField label="Листов обложки на одно изделие">
+          <FormField
+            label="Страниц обложки"
+            help="Входят в общее число страниц в калькуляторе. Пример: 28 стр. всего = 4 обложка + 24 блок."
+          >
             <input
               className="form-input form-input--compact"
               type="number"
               min={1}
-              value={cover.qty_per_item ?? 1}
+              step={2}
+              value={cover.page_count ?? 4}
               onChange={(e) =>
                 patchCover({
-                  qty_per_item: e.target.value ? Number(e.target.value) : 1,
+                  page_count: e.target.value ? Number(e.target.value) : 4,
                 })
               }
             />

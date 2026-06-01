@@ -33,6 +33,8 @@ import { PlotterCuttingTariffRepository } from '../repositories/plotterCuttingTa
 import {
   computeMultipagePrintUnits,
   computeMultipageSheetsPerItem,
+  resolveBlockPagesForPrint,
+  resolveMultipagePageSplit,
   usesMultipageSheetPricing,
   validateBindingPagesLimit,
   validateMultiPageCountForTemplate,
@@ -674,11 +676,29 @@ export class SimplifiedPricingService {
 
     const rawPagesCount = Number((configuration as any).pages);
     const fixedPages = Number(multiPageStructure?.innerBlock?.fixedPages);
-    const pagesCount =
-      multiPageStructure?.innerBlock?.pagesSource === 'fixed' && Number.isFinite(fixedPages) && fixedPages > 0
-        ? fixedPages
-        : rawPagesCount;
-    const effectivePages = usePagesMultiplier && Number.isFinite(pagesCount) && pagesCount > 0 ? pagesCount : 1;
+    const pagesFromParameter =
+      multiPageStructure?.innerBlock?.pagesSource !== 'fixed' ||
+      !(Number.isFinite(fixedPages) && fixedPages > 0);
+    const pagesCountRaw =
+      !pagesFromParameter && Number.isFinite(fixedPages) && fixedPages > 0 ? fixedPages : rawPagesCount;
+    const pageSplit = usePagesMultiplier
+      ? resolveMultipagePageSplit({
+          pagesCount: pagesCountRaw,
+          multiPageStructure,
+          pagesFromParameter,
+        })
+      : {
+          totalPages: Math.max(1, pagesCountRaw || 1),
+          coverPages: 0,
+          innerPages: Math.max(1, pagesCountRaw || 1),
+          coverMode: 'none' as const,
+        };
+    const pagesCount = pageSplit.totalPages;
+    const blockPagesForPrint = usePagesMultiplier ? resolveBlockPagesForPrint(pageSplit) : pagesCount;
+    const effectivePages =
+      usePagesMultiplier && Number.isFinite(blockPagesForPrint) && blockPagesForPrint > 0
+        ? blockPagesForPrint
+        : 1;
     if (usePagesMultiplier && Number.isFinite(pagesCount) && pagesCount > 0) {
       validateMultiPageCountForTemplate(Math.floor(pagesCount), simplifiedConfig.pages, {
         isMultiPage: true,
@@ -1649,7 +1669,7 @@ export class SimplifiedPricingService {
     }
     
     let coverPrice = 0;
-    if (usePagesMultiplier && multiPageStructure?.cover?.mode && multiPageStructure.cover.mode !== 'none') {
+    if (usePagesMultiplier && pageSplit.coverMode === 'separate' && pageSplit.coverPages > 0) {
       coverPrice = await this.calculateMultiPageCoverCost({
         db,
         quantity,
@@ -1658,6 +1678,9 @@ export class SimplifiedPricingService {
         configuration: normalizedConfig as any,
         multiPageStructure,
         selectedTypeConfig: typeConfig ?? undefined,
+        coverPages: pageSplit.coverPages,
+        itemsPerSheet,
+        sidesMode: normalizedConfig.print_sides_mode || 'single',
       });
     }
 
@@ -1823,7 +1846,7 @@ export class SimplifiedPricingService {
       for (const tierRow of tierPricesResult) {
         const qtyForTier = Math.max(1, Number(tierRow.min_qty));
         let tierCoverPrice = 0;
-        if (multiPageStructure.cover?.mode && multiPageStructure.cover.mode !== 'none') {
+        if (pageSplit.coverMode === 'separate' && pageSplit.coverPages > 0) {
           tierCoverPrice = await this.calculateMultiPageCoverCost({
             db,
             quantity: qtyForTier,
@@ -1832,6 +1855,9 @@ export class SimplifiedPricingService {
             configuration: normalizedConfig as any,
             multiPageStructure,
             selectedTypeConfig: typeConfig ?? undefined,
+            coverPages: pageSplit.coverPages,
+            itemsPerSheet,
+            sidesMode: normalizedConfig.print_sides_mode || 'single',
           });
         }
 
@@ -2281,13 +2307,17 @@ export class SimplifiedPricingService {
     };
     multiPageStructure: NonNullable<SimplifiedConfig['multiPageStructure']>;
     selectedTypeConfig?: SimplifiedTypeConfig;
+    coverPages: number;
+    itemsPerSheet: number;
+    sidesMode: string;
   }): Promise<number> {
     const cover = ctx.multiPageStructure.cover;
-    if (!cover || cover.mode === 'none') return 0;
+    if (!cover || cover.mode !== 'separate' || ctx.coverPages < 1) return 0;
 
     const sidesMode =
       ctx.configuration.cover_print_sides_mode ||
       cover.print?.sides_mode ||
+      ctx.sidesMode ||
       'duplex';
     const technologyCode =
       ctx.configuration.cover_print_technology ||
@@ -2304,10 +2334,13 @@ export class SimplifiedPricingService {
         cover.material_id ??
         ctx.configuration.material_id
       ) || 0;
-    const coverUnitsPerItem =
-      cover.qty_per_item != null && Number.isFinite(Number(cover.qty_per_item)) && Number(cover.qty_per_item) > 0
-        ? Number(cover.qty_per_item)
-        : 1;
+    const coverSheetsPerItem = computeMultipageSheetsPerItem(
+      ctx.coverPages,
+      Math.max(1, ctx.itemsPerSheet),
+      sidesMode,
+    );
+    const coverSheetsTotal = Math.max(1, ctx.quantity * coverSheetsPerItem);
+    const coverPrintUnits = computeMultipagePrintUnits(coverSheetsTotal, Math.max(1, ctx.itemsPerSheet));
 
     let printPrice = 0;
     if (technologyCode) {
@@ -2317,10 +2350,11 @@ export class SimplifiedPricingService {
         String(p.sides_mode || '').toLowerCase() === String(sidesMode).toLowerCase()
       );
       if (printPriceConfig?.tiers?.length) {
-        const tier = this.findTierForQuantity(printPriceConfig.tiers, ctx.quantity);
+        const tier = this.findTierForQuantity(printPriceConfig.tiers, coverPrintUnits);
         const tierPrice = tier ? this.getPriceForQuantityTier(tier) : 0;
-        const sidesMultiplier = sidesMode === 'single' ? 2 : 1;
-        printPrice = tierPrice * ctx.quantity * coverUnitsPerItem * sidesMultiplier;
+        if (tierPrice > 0) {
+          printPrice = tierPrice * coverPrintUnits;
+        }
       }
     }
 
@@ -2336,7 +2370,7 @@ export class SimplifiedPricingService {
           [coverMaterialId]
         ) as { sheet_price_single?: number | null } | undefined;
         const sheetPrice = Number(material?.sheet_price_single ?? 0);
-        materialPrice = sheetPrice * ctx.quantity * coverUnitsPerItem;
+        materialPrice = sheetPrice * coverSheetsTotal;
       }
     }
 

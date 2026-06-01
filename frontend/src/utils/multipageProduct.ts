@@ -3,8 +3,82 @@ export type SimplifiedPagesLike = {
   options?: number[];
   min?: number;
   max?: number;
+  step?: number;
   allowCustom?: boolean;
 } | null | undefined;
+
+/** Шаг кратности страниц (шаблон или эвристика «все пресеты кратны 4»). */
+export function inferMultipagePagesStep(step?: number, options?: number[]): number {
+  if (step != null && Number.isFinite(step) && step > 0) return Math.floor(step);
+  const opts = (options ?? []).map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0);
+  if (opts.length > 0 && opts.every((x) => x % 4 === 0)) return 4;
+  return 1;
+}
+
+/** Округление вверх до кратности step с учётом min/max. */
+export function ceilPagesToStep(
+  pages: number,
+  step: number,
+  bounds?: { min?: number; max?: number },
+): { billingPages: number; adjusted: boolean; cappedByMax: boolean } {
+  let p = Math.max(1, Math.floor(Number(pages)) || 1);
+  const min = bounds?.min;
+  const max = bounds?.max;
+  if (min != null && Number.isFinite(min)) p = Math.max(min, p);
+  const beforeStep = p;
+  if (step > 1 && p % step !== 0) {
+    p = Math.ceil(p / step) * step;
+  }
+  let cappedByMax = false;
+  if (max != null && Number.isFinite(max) && p > max) {
+    p = max;
+    cappedByMax = true;
+  }
+  return {
+    billingPages: p,
+    adjusted: p !== beforeStep || cappedByMax,
+    cappedByMax,
+  };
+}
+
+export type MultipageCoverMode = 'none' | 'self' | 'separate';
+
+export function resolveCoverPageCount(structure?: { cover?: { mode?: string; page_count?: number } } | null): number {
+  if (!structure?.cover || structure.cover.mode === 'none') return 0;
+  const raw = structure.cover.page_count;
+  if (raw != null && Number.isFinite(Number(raw)) && Number(raw) > 0) return Math.floor(Number(raw));
+  return 4;
+}
+
+export function resolveMultipagePageSplit(params: {
+  pagesCount: number;
+  multiPageStructure?: { cover?: { mode?: string; page_count?: number } } | null;
+  pagesFromParameter?: boolean;
+}) {
+  const innerOnly = Math.max(1, Math.floor(Number(params.pagesCount)) || 1);
+  const coverMode = (params.multiPageStructure?.cover?.mode ?? 'none') as MultipageCoverMode;
+  if (coverMode === 'none') {
+    return { totalPages: innerOnly, coverPages: 0, innerPages: innerOnly, coverMode };
+  }
+  const coverPages = resolveCoverPageCount(params.multiPageStructure);
+  if (params.pagesFromParameter === false) {
+    return { totalPages: innerOnly + coverPages, coverPages, innerPages: innerOnly, coverMode };
+  }
+  return {
+    totalPages: innerOnly,
+    coverPages,
+    innerPages: Math.max(1, innerOnly - coverPages),
+    coverMode,
+  };
+}
+
+export function resolveBlockPagesForPrint(split: {
+  totalPages: number;
+  innerPages: number;
+  coverMode: MultipageCoverMode;
+}): number {
+  return split.coverMode === 'separate' ? split.innerPages : split.totalPages;
+}
 
 /** Физических печатных листов на одно изделие (с учётом раскладки и duplex). */
 export function computeMultipageSheetsPerItem(
