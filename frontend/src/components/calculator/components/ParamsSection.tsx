@@ -1,5 +1,6 @@
 import React from 'react';
 import { AppIcon } from '../../ui/AppIcon';
+import { formatBindingPagesHint, readBindingPagesLimits } from '../../../utils/multipageBinding';
 
 export interface ParamsSectionSpecs {
   productType: string;
@@ -36,9 +37,17 @@ interface ParamsSectionProps {
     max?: number;
     step?: number;
   };
+  /** multi_page: всегда ручной ввод страниц (пресеты — быстрый выбор) */
+  isMultiPageProduct?: boolean;
   /** Переплёт для multi_page: услуга из шаблона + варианты из API */
   bindingServiceId?: number;
-  bindingVariants?: Array<{ id: number; variantName?: string; variant_name?: string }>;
+  bindingVariants?: Array<{
+    id: number;
+    variantName?: string;
+    variant_name?: string;
+    parameters?: unknown;
+  }>;
+  bindingVariantLocked?: boolean;
   bindingVariantId?: number;
   bindingUnitsPerItem?: number;
   onBindingVariantChange?: (variantId: number | undefined) => void;
@@ -58,13 +67,23 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   effectiveSizes: effectiveSizesProp,
   itemsPerSheet,
   effectivePages: effectivePagesProp,
+  isMultiPageProduct = false,
   bindingServiceId,
   bindingVariants = [],
+  bindingVariantLocked = false,
   bindingVariantId,
   bindingUnitsPerItem,
   onBindingVariantChange,
   onBindingUnitsChange,
 }) => {
+  const selectedBindingVariant =
+    bindingVariantId != null
+      ? bindingVariants.find((v) => v.id === bindingVariantId)
+      : undefined;
+  const bindingPagesHint = selectedBindingVariant
+    ? formatBindingPagesHint(readBindingPagesLimits(selectedBindingVariant.parameters))
+    : null;
+
   const hasField = (name: string) => !!schema?.fields?.some(f => f.name === name);
   const getEnum = (name: string): any[] => schema?.fields?.find(f => f.name === name)?.enum || [];
   const getLabel = (name: string, fallback: string) => schema?.fields?.find(f => f.name === name)?.label || fallback;
@@ -294,25 +313,30 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
           const fromSchema = (getEnum('pages') as number[]) || [];
           const allowedOptions = fromTemplate.length > 0 ? fromTemplate : fromSchema;
           const showPages =
+            isMultiPageProduct ||
             hasField('pages') ||
             allowedOptions.length > 0 ||
             effectivePagesProp?.allowCustom === true;
           if (!showPages) return null;
 
-          const allowCustom = effectivePagesProp?.allowCustom !== false;
+          const allowCustom = isMultiPageProduct || effectivePagesProp?.allowCustom !== false;
           const minBound =
             effectivePagesProp?.min ??
-            (allowedOptions.length > 0 ? Math.min(...allowedOptions) : (getMin('pages') ?? 4));
+            (allowedOptions.length > 0
+              ? Math.min(...allowedOptions)
+              : getMin('pages') ?? (isMultiPageProduct ? 4 : undefined));
           const maxBound =
             effectivePagesProp?.max ??
-            (allowedOptions.length > 0 ? Math.max(...allowedOptions) : (getMax('pages') ?? 500));
+            (allowedOptions.length > 0
+              ? Math.max(...allowedOptions)
+              : getMax('pages') ?? (isMultiPageProduct ? 500 : undefined));
           const stepHint = effectivePagesProp?.step;
           const current = Number(specs.pages ?? allowedOptions[0] ?? minBound ?? 4);
           const selectValue = allowedOptions.includes(current) ? current : '';
 
-          if (allowedOptions.length === 0 && hasField('pages')) {
+          if (!isMultiPageProduct && allowedOptions.length === 0 && hasField('pages')) {
             const fe = getEnum('pages') as number[];
-            if (fe.length > 0) {
+            if (fe.length > 0 && !allowCustom) {
               return (
                 <div className="param-group">
                   <label>
@@ -336,7 +360,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             }
           }
 
-          if (allowedOptions.length === 0 && !allowCustom) {
+          if (allowedOptions.length === 0 && !allowCustom && !isMultiPageProduct) {
             return null;
           }
 
@@ -399,6 +423,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             <label>Переплёт</label>
             <select
               className="form-control"
+              disabled={bindingVariantLocked}
               value={bindingVariantId != null && Number.isFinite(bindingVariantId) ? String(bindingVariantId) : ''}
               onChange={(e) => {
                 const v = e.target.value;
@@ -412,6 +437,12 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                 </option>
               ))}
             </select>
+            {bindingPagesHint && (
+              <p className="param-hint param-hint--binding">{bindingPagesHint}</p>
+            )}
+            {validationErrors.binding && (
+              <p className="param-error">{validationErrors.binding}</p>
+            )}
             {onBindingUnitsChange != null && (
               <div style={{ marginTop: 8 }}>
                 <label style={{ fontSize: 12 }}>Единиц переплёта на изделие</label>

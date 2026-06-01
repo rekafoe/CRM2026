@@ -1,4 +1,8 @@
 import { useCallback, useMemo } from 'react';
+import {
+  type BindingPagesLimits,
+  validateBindingPagesForCalculator,
+} from '../../../utils/multipageBinding';
 
 export interface CalculatorValidationResult {
   errors: Record<string, string>;
@@ -25,6 +29,9 @@ interface UseCalculatorValidationParams {
   pagesMin?: number;
   pagesMax?: number;
   pagesStep?: number;
+  isMultiPageProduct?: boolean;
+  bindingPagesLimits?: BindingPagesLimits | null;
+  bindingLabel?: string;
 }
 
 function computeErrors(params: {
@@ -41,6 +48,9 @@ function computeErrors(params: {
   pagesMin?: number;
   pagesMax?: number;
   pagesStep?: number;
+  isMultiPageProduct?: boolean;
+  bindingPagesLimits?: BindingPagesLimits | null;
+  bindingLabel?: string;
 }): Record<string, string> {
   const {
     specs,
@@ -55,6 +65,9 @@ function computeErrors(params: {
     pagesMin,
     pagesMax,
     pagesStep,
+    isMultiPageProduct,
+    bindingPagesLimits,
+    bindingLabel,
   } = params;
   const errors: Record<string, string> = {};
 
@@ -82,12 +95,14 @@ function computeErrors(params: {
     }
   }
 
-  const needsPages = Array.isArray(schemaPagesEnum) && schemaPagesEnum.length > 0;
+  const hasPagesPresets = Array.isArray(schemaPagesEnum) && schemaPagesEnum.length > 0;
+  const needsPages = isMultiPageProduct === true || hasPagesPresets;
   const p = specs.pages != null ? Number(specs.pages) : NaN;
-  const inPresetList = needsPages && Number.isFinite(p) && schemaPagesEnum!.includes(p);
+  const inPresetList = hasPagesPresets && Number.isFinite(p) && schemaPagesEnum!.includes(p);
   const canCustom =
+    isMultiPageProduct === true ||
     pagesAllowCustom === true ||
-    (pagesAllowCustom !== false && needsPages && (pagesMin != null || pagesMax != null || pagesStep != null));
+    (pagesAllowCustom !== false && hasPagesPresets && (pagesMin != null || pagesMax != null || pagesStep != null));
 
   if (needsPages && (!specs.pages || !Number.isFinite(p) || p < 1)) {
     errors.pages = 'Укажите количество страниц';
@@ -96,9 +111,11 @@ function computeErrors(params: {
       if (!canCustom) {
         errors.pages = 'Выберите количество страниц из списка';
       } else {
-        const opts = schemaPagesEnum!;
-        const inferredMin = pagesMin ?? Math.min(...opts);
-        const inferredMax = pagesMax ?? Math.max(...opts);
+        const opts = hasPagesPresets ? schemaPagesEnum! : [];
+        const inferredMin =
+          pagesMin ?? (opts.length > 0 ? Math.min(...opts) : isMultiPageProduct ? 4 : 1);
+        const inferredMax =
+          pagesMax ?? (opts.length > 0 ? Math.max(...opts) : isMultiPageProduct ? 500 : 9999);
         if (p < inferredMin) {
           errors.pages = `Не менее ${inferredMin} стр.`;
         } else if (p > inferredMax) {
@@ -116,6 +133,13 @@ function computeErrors(params: {
           errors.pages = 'Количество страниц должно быть кратно 4';
         }
       }
+    }
+  }
+
+  if (bindingPagesLimits && Number.isFinite(p) && p >= 1) {
+    const bindErr = validateBindingPagesForCalculator(p, bindingPagesLimits, bindingLabel);
+    if (bindErr) {
+      errors.binding = bindErr;
     }
   }
 
@@ -155,6 +179,9 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
     pagesMin,
     pagesMax,
     pagesStep,
+    isMultiPageProduct,
+    bindingPagesLimits,
+    bindingLabel,
   } = params;
 
   const schemaPagesEnum = useMemo(() => {
@@ -219,6 +246,9 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
         pagesMin,
         pagesMax,
         pagesStep,
+        isMultiPageProduct,
+        bindingPagesLimits,
+        bindingLabel,
       });
       return { errors, isValid: Object.keys(errors).length === 0 };
     },
@@ -234,6 +264,9 @@ export const useCalculatorValidation = (params: UseCalculatorValidationParams = 
       pagesMin,
       pagesMax,
       pagesStep,
+      isMultiPageProduct,
+      bindingPagesLimits,
+      bindingLabel,
     ],
   );
 

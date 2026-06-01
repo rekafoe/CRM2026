@@ -3,6 +3,7 @@ import {
   designPageBoundsFromDesignState,
   estimateTextSceneBox,
 } from './editorDesignTextBounds'
+import { assertMultipagePagesConsistency } from '../utils/multipagePagesConsistency'
 
 export type EditorPreflightIssueLevel = 'error' | 'warning'
 
@@ -68,7 +69,15 @@ function isPlaceholderText(text: string): boolean {
   return PLACEHOLDER_TEXTS.has(normalized) || normalized.includes('placeholder')
 }
 
-export function analyzeDesignStatePreflight(designState: unknown): EditorPreflightSummary {
+export type DesignStatePreflightContext = {
+  editorDraftMode?: string | null;
+  orderPages?: number | null;
+};
+
+export function analyzeDesignStatePreflight(
+  designState: unknown,
+  context?: DesignStatePreflightContext,
+): EditorPreflightSummary {
   const state = isRecord(designState) ? designState : {}
   const pages = Array.isArray(state.pages) ? state.pages : []
   const pageBounds = designPageBoundsFromDesignState(state)
@@ -161,6 +170,21 @@ export function analyzeDesignStatePreflight(designState: unknown): EditorPreflig
       })
     }
   })
+
+  const pagesCheck = assertMultipagePagesConsistency({
+    strict: false,
+    editorDraftMode: context?.editorDraftMode ?? null,
+    orderPages: context?.orderPages ?? null,
+    designState,
+  })
+  if (!pagesCheck.ok && pagesCheck.message) {
+    issues.push({
+      id: 'multipage-pages-mismatch',
+      level: 'warning',
+      pageIndex: 0,
+      message: pagesCheck.message,
+    })
+  }
 
   return {
     issues,

@@ -35,6 +35,7 @@ import { useCustomProduct } from './hooks/useCustomProduct';
 import { useProductSelection } from './hooks/useProductSelection';
 import { buildOrderPayload } from './utils/orderPayloadBuilder';
 import { getServiceVariants } from '../../services/pricing/api';
+import { readBindingPagesLimits } from '../../utils/multipageBinding';
 
 const createInitialSpecs = (initialProductType?: string): ProductSpecs => ({
   productType: initialProductType || 'flyers',
@@ -198,8 +199,29 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const effectivePagesOptions = effectiveConfig.pages?.options;
   const effectivePagesConfig = effectiveConfig.pages;
 
-  const [bindingVariants, setBindingVariants] = useState<Array<{ id: number; variantName?: string }>>([]);
+  const [bindingVariants, setBindingVariants] = useState<
+    Array<{ id: number; variantName?: string; variant_name?: string; parameters?: unknown }>
+  >([]);
   const bindingTemplate = simplified?.multiPageStructure?.binding;
+
+  const isMultiPageProduct = useMemo(() => {
+    const pt =
+      (selectedProduct as Product & { product_type?: string })?.product_type ??
+      backendProductSchema?.product_type;
+    if (pt === 'multi_page') return true;
+    if (simplified?.multiPageStructure) return true;
+    if (Array.isArray(effectivePagesOptions) && effectivePagesOptions.length > 0) return true;
+    if (backendProductSchema?.fields?.some((f: { name?: string }) => f.name === 'pages')) return true;
+    return false;
+  }, [
+    selectedProduct,
+    backendProductSchema?.product_type,
+    backendProductSchema?.fields,
+    simplified?.multiPageStructure,
+    effectivePagesOptions,
+  ]);
+
+  const bindingVariantLocked = bindingTemplate?.variant_id != null;
   useEffect(() => {
     const sid = bindingTemplate?.service_id;
     if (sid == null || isCustomProduct || isPostprintProduct) {
@@ -457,6 +479,23 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   const safeWarehousePaperTypes = Array.isArray(warehousePaperTypes) ? warehousePaperTypes : [];
 
 
+  const activeBindingVariantId =
+    (specs as { binding_variant_id?: number }).binding_variant_id ??
+    (bindingTemplate?.variant_id != null ? Number(bindingTemplate.variant_id) : undefined);
+
+  const activeBindingLimits = useMemo(() => {
+    if (activeBindingVariantId == null) return null;
+    const variant = bindingVariants.find((v) => v.id === activeBindingVariantId);
+    if (!variant) return null;
+    return readBindingPagesLimits(variant.parameters);
+  }, [activeBindingVariantId, bindingVariants]);
+
+  const activeBindingLabel = useMemo(() => {
+    if (activeBindingVariantId == null) return undefined;
+    const variant = bindingVariants.find((v) => v.id === activeBindingVariantId);
+    return variant?.variantName ?? variant?.variant_name;
+  }, [activeBindingVariantId, bindingVariants]);
+
   // Валидация вынесена в хук
   const { validationErrors, isValid } = useCalculatorValidation({
     specs: {
@@ -472,11 +511,17 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     isCustomFormat,
     customFormat,
     effectiveSizes: effectiveSizes?.length ? effectiveSizes : undefined,
-    effectivePagesOptions: Array.isArray(effectivePagesOptions) && effectivePagesOptions.length > 0 ? effectivePagesOptions : undefined,
-    pagesAllowCustom: effectivePagesConfig?.allowCustom !== false,
-    pagesMin: effectivePagesConfig?.min,
-    pagesMax: effectivePagesConfig?.max,
+    effectivePagesOptions:
+      isMultiPageProduct || (Array.isArray(effectivePagesOptions) && effectivePagesOptions.length > 0)
+        ? effectivePagesOptions
+        : undefined,
+    pagesAllowCustom: isMultiPageProduct || effectivePagesConfig?.allowCustom !== false,
+    pagesMin: effectivePagesConfig?.min ?? (isMultiPageProduct ? 4 : undefined),
+    pagesMax: effectivePagesConfig?.max ?? (isMultiPageProduct ? 500 : undefined),
     pagesStep: effectivePagesConfig?.step,
+    isMultiPageProduct,
+    bindingPagesLimits: activeBindingLimits,
+    bindingLabel: activeBindingLabel,
   });
 
   const getProductionTime = useCallback(() => {
@@ -921,6 +966,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         customFormat,
         printTechnology,
         printColorMode,
+        backendProductSchema,
       });
 
       if (customDescription) {
@@ -1102,6 +1148,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                 onBindingUnitsChange={(units) =>
                   setSpecs((s) => ({ ...s, binding_units_per_item: units }))
                 }
+                isMultiPageProduct={isMultiPageProduct}
+                bindingVariantLocked={bindingVariantLocked}
               />
             )}
 

@@ -45,6 +45,8 @@ export interface ServiceVariantsTableProps {
   serviceName: string;
   serviceMinQuantity?: number;
   serviceMaxQuantity?: number;
+  /** bind — показать лимиты min_pages / max_pages на вариантах */
+  operationType?: string;
   /** Список материалов для выбора списания по варианту */
   materials?: Array<{ id: number; name: string }>;
 }

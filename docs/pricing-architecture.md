@@ -10,7 +10,7 @@
 |--------|----------|
 | **Тип калькулятора** | Только **`calculator_type = 'simplified'`** у продукта. Иной тип → **422** из `UnifiedPricingService` до миграции шаблона. |
 | **Точка входа API** | **`POST /api/pricing/calculate`** → `UnifiedPricingService.calculatePrice` → **`SimplifiedPricingService`**. |
-| **Устаревшее** | Отдельные ветки (**`/api/pricing/multipage/*`**, `MultipageProductService`, flexible/прочие старые калькуляторы в репозитории) — **не развиваются**; новые фичи и сайт строятся только на simplified-продукте и едином calculate. |
+| **Удалено (legacy)** | **`/api/pricing/multipage/*`**, `MultipageProductService`, глобальный редактор `/products/multipage` — сняты с поддержки; многостраничка только через продукт `multi_page` + simplified. Flexible и прочие старые калькуляторы в репозитории не развиваются. |
 
 Многостраничные изделия: см. **`docs/multipage-products-review.md`** (секция «Каноническая политика»).
 

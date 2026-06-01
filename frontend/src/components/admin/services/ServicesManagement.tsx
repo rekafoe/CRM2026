@@ -394,6 +394,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ showHeader = tr
           serviceName={service.name}
           serviceMinQuantity={service.minQuantity}
           serviceMaxQuantity={service.maxQuantity}
+          operationType={service.operationType}
           materials={materials}
         />
       );

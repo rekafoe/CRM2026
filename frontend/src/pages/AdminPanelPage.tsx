@@ -51,7 +51,6 @@ const SettingsPage = lazy(() =>
 const UserManagement = lazy(() =>
   import('../features/userManagement').then((m) => ({ default: m.UserManagement }))
 );
-const MultiPageProductEditor = lazy(() => import('./admin/MultiPageProductEditor'));
 const PreflightPage = lazy(() =>
   import('./admin/PreflightPage').then((m) => ({ default: m.PreflightPage }))
 );
@@ -404,7 +403,6 @@ export const AdminPanelPage: React.FC = () => {
           {/* Новые внутренние редакторы */}
           <Route path="/products/:id/template" element={<ProductTemplatePage />} />
           <Route path="/products/:id/tech-process" element={<ProductTechProcessPage />} />
-          <Route path="/products/multipage" element={<MultiPageProductEditor />} />
           <Route path="/products-old" element={<AdminProductManager />} />
           <Route path="/backup" element={<SettingsPage onBack={() => window.history.back()} />} />
           

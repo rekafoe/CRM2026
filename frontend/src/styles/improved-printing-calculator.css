@@ -771,6 +771,22 @@
   letter-spacing: 0.025em;
 }
 
+.param-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #718096;
+}
+
+.param-hint--binding {
+  margin-top: 6px;
+}
+
+.param-error {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--danger, #c53030);
+}
+
 /* Выбор формата */
 .format-selection {
   display: flex;

@@ -9,6 +9,8 @@ export function getPriceTypeMultiplier(priceType: string, multiplierMap?: Record
   return multiplierMap[priceType] ?? 1;
 }
 
+type DesignEditorMode = 'none' | 'single' | 'multipage' | 'photo_batch';
+
 interface BuildOrderPayloadParams {
   result: CalculationResult;
   selectedProduct: { id?: number; name?: string; operator_percent?: number } | null;
@@ -17,6 +19,8 @@ interface BuildOrderPayloadParams {
   customFormat: { width: string; height: string };
   printTechnology: string;
   printColorMode: 'bw' | 'color' | null;
+  /** Схема продукта (GET /products/:id/schema) — design_editor_mode и пр. */
+  backendProductSchema?: { template?: { simplified?: { design_editor_mode?: DesignEditorMode } } } | null;
 }
 
 export function buildOrderPayload({
@@ -27,6 +31,7 @@ export function buildOrderPayload({
   customFormat,
   printTechnology,
   printColorMode,
+  backendProductSchema,
 }: BuildOrderPayloadParams) {
   const layoutSheets = result.layout?.sheetsNeeded ?? undefined;
   const itemsPerSheet = result.layout?.itemsPerSheet ?? undefined;
@@ -121,6 +126,19 @@ export function buildOrderPayload({
 
   // Итог и округление считает бэкенд при добавлении позиции (по полю totalCost). Фронт только передаёт данные.
   const qty = Math.max(1, result.specifications.quantity || 1);
+  const designEditorMode = backendProductSchema?.template?.simplified?.design_editor_mode;
+  const editorDraftMode =
+    designEditorMode && designEditorMode !== 'none' ? designEditorMode : undefined;
+  const orderPages =
+    result.specifications.pages != null ? Number(result.specifications.pages) : undefined;
+  const initialDesignState =
+    editorDraftMode === 'multipage' &&
+    orderPages != null &&
+    Number.isFinite(orderPages) &&
+    orderPages >= 1
+      ? { pageCount: Math.floor(orderPages), pages: [] as unknown[] }
+      : undefined;
+
   const paramsPayload = {
     description,
     specifications: specificationsPayload,
@@ -149,6 +167,9 @@ export function buildOrderPayload({
       : {}),
     layout: result.layout ? JSON.parse(JSON.stringify(result.layout)) : undefined,
     customFormat: isCustomFormat ? customFormat : undefined,
+    ...(editorDraftMode ? { editorDraftMode } : {}),
+    ...(orderPages != null && Number.isFinite(orderPages) ? { pages: Math.floor(orderPages) } : {}),
+    ...(initialDesignState ? { designState: initialDesignState } : {}),
   };
 
   const components =

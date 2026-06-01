@@ -4,6 +4,7 @@ import {
   buildLayoutReviewPath,
 } from './editorDesignPreflight'
 import { getEditorDraft, type EditorDraftRow } from './publicEditorDraftService'
+import { readEditorDraftMode, readOrderItemPagesParam } from '../utils/multipagePagesConsistency'
 
 type FabricPage = { fabricJSON?: unknown }
 
@@ -71,20 +72,27 @@ function enrichParamsWithPreflight(
   designState: unknown,
   orderItemIdPlaceholder?: number,
 ): Record<string, unknown> {
-  const preflight = designState ? analyzeDesignStatePreflight(designState) : null
+  const preflight = designState
+    ? analyzeDesignStatePreflight(designState, {
+      editorDraftMode: readEditorDraftMode(params),
+      orderPages: readOrderItemPagesParam(params),
+    })
+    : null
   if (!preflight) return params
   const reviewPath = orderItemIdPlaceholder != null
     ? buildLayoutReviewPath(orderItemIdPlaceholder)
     : 'order-pool:item:pending'
+  const layoutIssues = [...preflight.issues]
+
   return {
     ...params,
     layoutIncomplete: preflight.hasBlockingIssues,
-    layoutIssues: preflight.issues,
+    layoutIssues,
     layoutPreflight: {
-      photoReady: preflight.photoReady,
-      photoTotal: preflight.photoTotal,
-      textReady: preflight.textReady,
-      textTotal: preflight.textTotal,
+      photoReady: preflight?.photoReady ?? 0,
+      photoTotal: preflight?.photoTotal ?? 0,
+      textReady: preflight?.textReady ?? 0,
+      textTotal: preflight?.textTotal ?? 0,
     },
     layoutReviewPath: reviewPath,
   }

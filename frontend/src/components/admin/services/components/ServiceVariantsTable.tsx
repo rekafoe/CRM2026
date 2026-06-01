@@ -13,6 +13,7 @@ import { ServiceVariantsTableProps } from './ServiceVariantsTable.types';
 import { ServiceVariantsMaterialsSection } from './ServiceVariantsMaterialsSection';
 import { ServiceVariantsToolbar } from './ServiceVariantsToolbar';
 import { ServiceVariantsGrid } from './ServiceVariantsGrid';
+import { BindingPagesLimitsSection } from './BindingPagesLimitsSection';
 import '../../../../features/productTemplate/components/SimplifiedTemplateSection.css';
 import './ServiceVariantsTable.css';
 
@@ -21,8 +22,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
   serviceName,
   serviceMinQuantity,
   serviceMaxQuantity,
+  operationType,
   materials = [],
 }) => {
+  const isBindService = (operationType ?? '').toLowerCase() === 'bind';
   const {
     loading,
     error,
@@ -100,6 +103,10 @@ export const ServiceVariantsTable: React.FC<ServiceVariantsTableProps> = ({
         onCancelDraft={handleToolbarCancel}
         onAddRangeClick={(e) => tierModal.openAddModal(e.currentTarget)}
       />
+
+      {isBindService && variants.length > 0 && (
+        <BindingPagesLimitsSection variants={variants} operations={operations} />
+      )}
 
       {variants.length > 0 && materials.length > 0 && (
         <ServiceVariantsMaterialsSection

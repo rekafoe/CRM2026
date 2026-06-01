@@ -9,6 +9,14 @@ import {
   listEditorDraftAssets,
   type EditorDraftFileRecord,
 } from './publicEditorAssetService'
+import {
+  assertMultipagePagesConsistency,
+  readOrderItemPagesParam,
+} from '../utils/multipagePagesConsistency'
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
 
 export interface EditorDraftRow {
   id: number
@@ -226,6 +234,20 @@ export async function finalizeEditorDraft(
   }
 
   const draftPayload = draft.payloadParsed
+  const draftMode = typeof draft.mode === 'string' ? draft.mode : 'single'
+  if (draftMode === 'multipage' && draftPayload.designState) {
+    const selectedParams = isRecord(draftPayload.selectedParams) ? draftPayload.selectedParams : {}
+    const orderPages =
+      readOrderItemPagesParam({ pages: selectedParams.pages, specifications: selectedParams }) ??
+      readOrderItemPagesParam(draftPayload)
+    assertMultipagePagesConsistency({
+      strict: true,
+      editorDraftMode: 'multipage',
+      orderPages,
+      designState: draftPayload.designState,
+    })
+  }
+
   const items = Array.isArray(input.items) && input.items.length > 0
     ? input.items.map((item, index) => ({
       ...item,

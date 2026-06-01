@@ -237,6 +237,19 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const multiPageInnerBlock = multiPageStructure.innerBlock || { pagesSource: 'parameter' as const }
   const multiPageBinding = multiPageStructure.binding || {}
 
+  const multiPageSheetsHint = useMemo(() => {
+    const pages =
+      multiPageInnerBlock.pagesSource === 'fixed' && multiPageInnerBlock.fixedPages
+        ? Number(multiPageInnerBlock.fixedPages)
+        : Number(pagesConfig?.default ?? pagesConfig?.options?.[0])
+    if (!Number.isFinite(pages) || pages < 1) return null
+    return {
+      pages,
+      singleSheets: pages,
+      duplexSheets: Math.max(1, Math.ceil(pages / 2)),
+    }
+  }, [multiPageInnerBlock, pagesConfig?.default, pagesConfig?.options])
+
   const updateMultiPageStructure = useCallback((patch: Partial<NonNullable<SimplifiedConfig['multiPageStructure']>>) => {
     onChange({
       ...value,
@@ -777,11 +790,17 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
             <div>
               {headerWithHint(
                 'Структура многостраничного изделия',
-                'Настройка обложки, внутреннего блока и переплёта.',
+                'Настройка обложки, внутреннего блока и переплёта. Другой переплёт или набор операций — отдельный продукт в каталоге.',
               )}
             </div>
           </div>
           <div className="simplified-card__content simplified-form-grid">
+            {multiPageSheetsHint && (
+              <p className="text-muted text-sm simplified-template__multipage-hint">
+                Пример на {multiPageSheetsHint.pages} стр.: односторонняя печать — {multiPageSheetsHint.singleSheets} листов
+                на изделие; двухсторонняя — {multiPageSheetsHint.duplexSheets} листов (тираж умножает объём печати и материала).
+              </p>
+            )}
             <FormField label="Источник страниц внутреннего блока">
               <select
                 className="form-select"
@@ -831,19 +850,25 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
             </FormField>
             {multiPageCover.mode === 'separate' && (
               <>
-                <FormField label="Материал обложки (ID)">
-                  <input
-                    className="form-input form-input--compact"
-                    type="number"
-                    min="1"
+                <FormField label="Материал обложки">
+                  <select
+                    className="form-select"
                     value={multiPageCover.material_id ?? ''}
                     onChange={(e) => updateMultiPageStructure({
                       cover: {
                         ...multiPageCover,
                         material_id: e.target.value ? Number(e.target.value) : undefined,
-                      }
+                      },
                     })}
-                  />
+                  >
+                    <option value="">— Не выбран</option>
+                    {allMaterials.map((material) => (
+                      <option key={material.id} value={material.id}>
+                        {material.name}
+                        {material.density ? ` (${material.density} г/м²)` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </FormField>
                 <FormField label="Печать обложки: технология">
                   <input
@@ -877,7 +902,14 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                 })}
               />
             </FormField>
-            <FormField label="Переплёт (service_id)">
+            <FormField
+              label="Переплёт"
+              help={
+                bindingServices.length === 0
+                  ? 'Нет услуг с типом «переплёт» в справочнике послепечатных операций.'
+                  : undefined
+              }
+            >
               <select
                 className="form-select"
                 value={multiPageBinding.service_id ?? ''}
@@ -888,7 +920,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                       ...multiPageBinding,
                       service_id: nextServiceId,
                       variant_id: undefined,
-                    }
+                    },
                   })
                 }}
               >

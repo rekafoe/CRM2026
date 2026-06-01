@@ -31,6 +31,10 @@ import type {
 } from '../dtos/plotterCuttingTariff.dto';
 import { PlotterCuttingTariffRepository } from '../repositories/plotterCuttingTariffRepository';
 import {
+  validateBindingPagesLimit,
+  validateMultiPageCountForTemplate,
+} from '../../../utils/multipagePagesConsistency';
+import {
   PLOTTER_FIN_ROLL,
   PLOTTER_FIN_SHEET,
   PLOTTER_FIN_WEEDING,
@@ -253,6 +257,14 @@ interface SimplifiedConfig {
   prepress?: { bleedMm?: number };
   /** Печать необязательна — только материал/плоттер без print_technology; цена печати 0 */
   print_optional?: boolean;
+  pages?: {
+    options?: number[];
+    default?: number;
+    allow_custom?: boolean;
+    min?: number;
+    max?: number;
+    step?: number;
+  };
   multiPageStructure?: {
     innerBlock?: {
       pagesSource?: 'parameter' | 'fixed';
@@ -638,6 +650,11 @@ export class SimplifiedPricingService {
         ? fixedPages
         : rawPagesCount;
     const effectivePages = usePagesMultiplier && Number.isFinite(pagesCount) && pagesCount > 0 ? pagesCount : 1;
+    if (usePagesMultiplier && Number.isFinite(pagesCount) && pagesCount > 0) {
+      validateMultiPageCountForTemplate(Math.floor(pagesCount), simplifiedConfig.pages, {
+        isMultiPage: true,
+      });
+    }
     const sidesMode = normalizedConfig.print_sides_mode || 'single';
     const sheetsPerItem =
       sidesMode === 'duplex' || sidesMode === 'duplex_bw_back'
@@ -689,11 +706,14 @@ export class SimplifiedPricingService {
       // Раньше при counter_unit=meters ветка рулона шла раньше и полностью игнорировала шаблон.
       let resolvedFromTemplate = false;
       if (printPriceConfig?.tiers?.length) {
-        const tier = this.findTierForQuantity(printPriceConfig.tiers, quantity);
+        const tierQuantity = usePagesMultiplier ? effectivePrintQuantity : quantity;
+        const tier = this.findTierForQuantity(printPriceConfig.tiers, tierQuantity);
         const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (priceForTier > 0) {
           const pricePerSheet = priceForTier * itemsPerSheet;
-          const basePrintPrice = usePagesMultiplier ? priceForTier * quantity : sheetsNeeded * pricePerSheet;
+          const basePrintPrice = usePagesMultiplier
+            ? priceForTier * effectivePrintQuantity
+            : sheetsNeeded * pricePerSheet;
           printPrice = basePrintPrice * billingModeMultiplier;
           printDetails = {
             tier: { min_qty: 1, max_qty: undefined, price: priceForTier },
@@ -948,6 +968,39 @@ export class SimplifiedPricingService {
       effectiveFinishingToUse = effectiveFinishingToUse.filter(
         (item) => Number(item.service_id) !== configuredBindingServiceId
       );
+    }
+
+    if (
+      usePagesMultiplier &&
+      hasConfiguredBinding &&
+      Number.isFinite(pagesCount) &&
+      pagesCount > 0
+    ) {
+      let bindingLabel: string | undefined;
+      let variantParams: unknown = null;
+      if (configuredBindingVariantId != null) {
+        const variantRow = await db.get<{ variant_name: string; parameters: string | null }>(
+          `SELECT variant_name, parameters FROM service_variants WHERE id = ? AND service_id = ? AND is_active = 1`,
+          [configuredBindingVariantId, configuredBindingServiceId],
+        );
+        if (variantRow) {
+          bindingLabel = variantRow.variant_name;
+          if (variantRow.parameters) {
+            try {
+              variantParams = JSON.parse(variantRow.parameters);
+            } catch {
+              variantParams = null;
+            }
+          }
+        }
+      } else {
+        const serviceRow = await db.get<{ name: string }>(
+          `SELECT name FROM post_processing_services WHERE id = ?`,
+          [configuredBindingServiceId],
+        );
+        bindingLabel = serviceRow?.name;
+      }
+      validateBindingPagesLimit(Math.floor(pagesCount), variantParams, bindingLabel);
     }
 
     // При fallback: исключаем операции с min_quantity > quantity (пользователь не выбирал их явно)

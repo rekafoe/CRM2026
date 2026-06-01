@@ -110,7 +110,8 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     );
 
     expect(result.breakdown).toBeUndefined();
-    expect(result.finalPrice).toBe(200);
+    // 16 стр. × 100 шт. × 2 BYN/лист
+    expect(result.finalPrice).toBe(3200);
     expect(mockedQuoteBinding).not.toHaveBeenCalled();
   });
 
@@ -148,10 +149,73 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
       expect.objectContaining({ serviceId: 77, quantity: 100, unitsPerItem: 1 })
     );
     expect(result.breakdown).toBeDefined();
-    expect(result.breakdown?.innerBlockPrice).toBe(200);
+    expect(result.breakdown?.innerBlockPrice).toBe(3200);
     expect(result.breakdown?.coverPrice).toBe(400);
     expect(result.breakdown?.bindingPrice).toBe(50);
-    expect(result.finalPrice).toBe(650);
+    expect(result.finalPrice).toBe(3650);
+  });
+
+  it('использует fixedPages из innerBlock при pagesSource=fixed', async () => {
+    templateConfigData.simplified.pages = { options: [4, 8, 12, 16, 20, 24], default: 24 };
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: {
+        pagesSource: 'fixed',
+        fixedPages: 8,
+      },
+    };
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 24 as any,
+      } as any,
+      10,
+    );
+
+    // 8 стр. × 10 шт. × 2 BYN/лист = 160 (не 24×10×2)
+    expect(result.finalPrice).toBe(160);
+  });
+
+  it('принимает pages вне списка options для multi_page (в пределах max)', async () => {
+    templateConfigData.simplified.pages = { options: [4, 8, 12, 16, 20, 24], default: 24 };
+    delete templateConfigData.simplified.multiPageStructure;
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 10 as any,
+      } as any,
+      10,
+    );
+
+    expect(result.finalPrice).toBeGreaterThan(0);
+  });
+
+  it('отклоняет pages выше max шаблона для multi_page', async () => {
+    templateConfigData.simplified.pages = { options: [24], max: 100 };
+    delete templateConfigData.simplified.multiPageStructure;
+
+    await expect(
+      SimplifiedPricingService.calculatePrice(
+        1,
+        {
+          size_id: 'a4',
+          print_technology: 'laser_prof',
+          print_color_mode: 'color',
+          print_sides_mode: 'single',
+          pages: 150 as any,
+        } as any,
+        10,
+      ),
+    ).rejects.toThrow(/Не более/);
   });
 });
 

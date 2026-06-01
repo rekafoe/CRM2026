@@ -50,11 +50,18 @@ interface CalculatorSectionsProps {
     step?: number;
   };
   bindingServiceId?: number;
-  bindingVariants?: Array<{ id: number; variantName?: string; variant_name?: string }>;
+  bindingVariants?: Array<{
+    id: number;
+    variantName?: string;
+    variant_name?: string;
+    parameters?: unknown;
+  }>;
   bindingVariantId?: number;
   bindingUnitsPerItem?: number;
   onBindingVariantChange?: (variantId: number | undefined) => void;
   onBindingUnitsChange?: (units: number | undefined) => void;
+  isMultiPageProduct?: boolean;
+  bindingVariantLocked?: boolean;
 }
 
 export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(({
@@ -92,6 +99,8 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   bindingUnitsPerItem,
   onBindingVariantChange,
   onBindingUnitsChange,
+  isMultiPageProduct = false,
+  bindingVariantLocked = false,
 }) => {
   const hasEffectiveSizes = Array.isArray(effectiveSizes) && effectiveSizes.length > 0;
   const showTypeSelector = Array.isArray(productTypes) && productTypes.length > 0 && onSelectType != null;
@@ -154,10 +163,12 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           effectiveSizes={effectiveSizes}
           itemsPerSheet={result?.layout?.itemsPerSheet}
           effectivePages={effectivePages}
+          isMultiPageProduct={isMultiPageProduct}
           bindingServiceId={bindingServiceId}
           bindingVariants={bindingVariants}
           bindingVariantId={bindingVariantId}
           bindingUnitsPerItem={bindingUnitsPerItem}
+          bindingVariantLocked={bindingVariantLocked}
           onBindingVariantChange={onBindingVariantChange}
           onBindingUnitsChange={onBindingUnitsChange}
         />
