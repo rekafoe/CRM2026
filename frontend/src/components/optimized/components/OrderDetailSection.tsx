@@ -12,6 +12,7 @@ import { CustomerSelector } from '../../customers/CustomerSelector';
 import { AppIcon } from '../../ui/AppIcon';
 import { OrderMailLogPanel } from '../../orders/OrderMailLogPanel';
 import { OrderSmsPanel } from '../../orders/OrderSmsPanel';
+import { OrderDeliveryBlock } from '../../orders/OrderDeliveryBlock';
 
 interface OrderDetailSectionProps {
   selectedOrder: Order;
@@ -615,6 +616,9 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       />
 
       <div className="detail-body">
+        {selectedOrder.delivery ? (
+          <OrderDeliveryBlock delivery={selectedOrder.delivery} />
+        ) : null}
         {items.length === 0 && (
           <div className="item">Пока нет позиций</div>
         )}

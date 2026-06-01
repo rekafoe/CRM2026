@@ -4,6 +4,14 @@ import { itemRowSelect, mapItemRowToItem, ItemRow } from '../models/mappers/item
 import { Item } from '../models/Item'
 import { Order } from '../models/Order'
 import { PhotoOrderRow } from '../models/mappers/telegramPhotoOrderMapper'
+import { parseWebsiteOrderDeliveryJson } from '../types/websiteOrderDelivery'
+
+function attachDeliveryFromRow<T extends { delivery_json?: string | null }>(order: T): T & { delivery?: ReturnType<typeof parseWebsiteOrderDeliveryJson> } {
+  const delivery = parseWebsiteOrderDeliveryJson(order.delivery_json ?? null)
+  if (!delivery) return order
+  const { delivery_json: _dj, ...rest } = order
+  return { ...rest, delivery } as T & { delivery?: ReturnType<typeof parseWebsiteOrderDeliveryJson> }
+}
 
 type ListAllOrdersOptions = {
   statuses?: number[]
@@ -117,15 +125,18 @@ export const OrderRepository = {
     let hasPaymentChannel = false
     let hasIsInternal = false
     let hasNotes = false
+    let hasDeliveryJson = false
     try {
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
       hasIsInternal = await hasColumn('orders', 'is_internal')
       hasNotes = await hasColumn('orders', 'notes')
+      hasDeliveryJson = await hasColumn('orders', 'delivery_json')
     } catch { /* ignore */ }
     const paymentChannelSel = hasPaymentChannel
       ? (hasIsInternal ? "CASE WHEN COALESCE(o.is_internal,0)=1 THEN 'internal' ELSE COALESCE(o.payment_channel, 'cash') END as payment_channel" : "COALESCE(o.payment_channel, 'cash') as payment_channel")
       : "'cash' as payment_channel"
     const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
+    const deliverySel = hasDeliveryJson ? 'o.delivery_json' : 'NULL as delivery_json'
     const orders = await db.all<any>(
       `SELECT 
         o.id, 
@@ -138,6 +149,7 @@ export const OrderRepository = {
         o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
         ${paymentChannelSel},
         ${notesSel},
+        ${deliverySel},
         c.id as customer__id,
         c.first_name as customer__first_name,
         c.last_name as customer__last_name,
@@ -175,7 +187,7 @@ export const OrderRepository = {
           email: customer__email
         }
       }
-      return order
+      return attachDeliveryFromRow(order)
     }) as unknown as Order[]
   },
 
@@ -357,7 +369,7 @@ export const OrderRepository = {
           email: customer__email
         }
       }
-      return order
+      return attachDeliveryFromRow(order)
     }) as unknown as Order[]
   },
 
@@ -370,6 +382,7 @@ export const OrderRepository = {
     let hasNotes = false
     let hasContactUserId = false
     let hasResponsibleUserId = false
+    let hasDeliveryJson = false
     try {
       hasIsCancelled = await hasColumn('orders', 'is_cancelled')
       hasPaymentChannel = await hasColumn('orders', 'payment_channel')
@@ -377,12 +390,14 @@ export const OrderRepository = {
       hasNotes = await hasColumn('orders', 'notes')
       hasContactUserId = await hasColumn('orders', 'contact_user_id')
       hasResponsibleUserId = await hasColumn('orders', 'responsible_user_id')
+      hasDeliveryJson = await hasColumn('orders', 'delivery_json')
     } catch { /* ignore */ }
     const isCancelledSel = hasIsCancelled ? 'o.is_cancelled' : '0 as is_cancelled'
     const paymentChannelSel = hasPaymentChannel
       ? (hasIsInternal ? "CASE WHEN COALESCE(o.is_internal,0)=1 THEN 'internal' ELSE COALESCE(o.payment_channel, 'cash') END as payment_channel" : "COALESCE(o.payment_channel, 'cash') as payment_channel")
       : "'cash' as payment_channel"
     const notesSel = hasNotes ? 'o.notes' : 'NULL as notes'
+    const deliverySel = hasDeliveryJson ? 'o.delivery_json' : 'NULL as delivery_json'
     const contactUserIdSel = hasContactUserId ? 'o.contact_user_id' : 'NULL as contact_user_id'
     const responsibleUserIdSel = hasResponsibleUserId ? 'o.responsible_user_id' : 'NULL as responsible_user_id'
     const whereParts: string[] = []
@@ -404,6 +419,7 @@ export const OrderRepository = {
         o.source, o.customer_id, COALESCE(o.discount_percent, 0) as discount_percent,
         ${paymentChannelSel},
         ${notesSel},
+        ${deliverySel},
         ${isCancelledSel},
         c.id as customer__id,
         c.first_name as customer__first_name,
@@ -440,7 +456,7 @@ export const OrderRepository = {
           email: customer__email,
         }
       }
-      return order
+      return attachDeliveryFromRow(order)
     }) as unknown as Order[]
   },
 

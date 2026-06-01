@@ -5,6 +5,14 @@ import { api, getOrders, getOrderPoolSync, reassignOrderByNumber, unassignOrderB
 import { useOrderStatuses } from '../hooks/useOrderStatuses';
 
 const ORDER_POOL_LAST_SEEN_KEY = 'orderPoolLastSeenAt';
+
+/** Ответственный в пуле: приоритет responsible_user_id, иначе legacy userId */
+function getEffectiveResponsibleUserId(order: Order): number | null {
+  const raw = order.responsible_user_id ?? order.userId;
+  if (raw == null) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
 import { parseNumberFlexible } from '../utils/numberInput';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { OrderHeader } from '../components/optimized/OrderHeader';
@@ -54,7 +62,7 @@ type FilterAction =
   | { type: 'increaseVisible'; step?: number };
 
 const initialFilters: FilterState = {
-  source: 'all',
+  source: 'website',
   cancelled: 'not_cancelled',
   assigned: 'not_assigned',
   searchInput: '',
@@ -104,9 +112,9 @@ function filtersReducer(state: FilterState, action: FilterAction): FilterState {
     case 'resetFilters':
       return {
         ...state,
-        source: 'all',
-        cancelled: 'not_cancelled',
-        assigned: 'not_assigned',
+        source: initialFilters.source,
+        cancelled: initialFilters.cancelled,
+        assigned: initialFilters.assigned,
         searchInput: '',
         searchTerm: '',
         quickFilter: null,
@@ -143,7 +151,7 @@ const OrderRow = React.memo<{
     getOrderTotal,
   }) => (
     <tr
-      className={`${isSelected ? 'selected' : ''} ${order.userId ? 'assigned' : ''}`}
+      className={`${isSelected ? 'selected' : ''} ${getEffectiveResponsibleUserId(order) ? 'assigned' : ''}`}
       onClick={() => onSelect(order)}
     >
       <td className="sticky-col">
@@ -171,7 +179,7 @@ const OrderRow = React.memo<{
         <div className="order-assignee">{getAssigneeLabel(order)}</div>
       </td>
       <td className="order-status">
-        {order.userId ? (
+        {getEffectiveResponsibleUserId(order) ? (
           <span className="assigned-badge">✓ Назначен</span>
         ) : order.is_cancelled === 1 ? (
           <StatusBadge status="Отменён" color="error" size="sm" />
@@ -278,9 +286,9 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
 
   const getAssigneeLabel = useCallback(
     (order: Order) => {
-      const userId = order.userId ?? null;
+      const userId = getEffectiveResponsibleUserId(order);
       if (!userId) return '—';
-      return userNameById.get(Number(userId)) || `ID ${userId}`;
+      return userNameById.get(userId) || `ID ${userId}`;
     },
     [userNameById]
   );
@@ -497,7 +505,9 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         filtered = filtered.filter((o) => (o.is_cancelled === 1) === (filters.cancelled === 'cancelled'));
       }
       if (filters.assigned !== 'all') {
-        filtered = filtered.filter((o) => (o.userId != null) === (filters.assigned === 'assigned'));
+        filtered = filtered.filter(
+          (o) => (getEffectiveResponsibleUserId(o) != null) === (filters.assigned === 'assigned'),
+        );
       }
       if (filters.quickFilter === 'debt') {
         filtered = filtered.filter((o) => getOrderDebt(o) > 0);
@@ -560,11 +570,15 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         setOrders((prev) => {
           const o = prev.find((x) => x.number === orderNumber);
           if (!o) return prev;
-          return prev.map((x) => (x.id === o.id ? { ...x, userId: currentUserId } : x));
+          return prev.map((x) =>
+            x.id === o.id
+              ? { ...x, userId: currentUserId, responsible_user_id: currentUserId }
+              : x,
+          );
         });
         setSelectedOrder((prev) => {
           if (!prev || prev.number !== orderNumber) return prev;
-          return { ...prev, userId: currentUserId };
+          return { ...prev, userId: currentUserId, responsible_user_id: currentUserId };
         });
       } catch (err) {
         logger.error('Failed to assign order', err);
@@ -586,7 +600,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         const name = allUsers.find((u) => u.id === userId)?.name ?? 'оператору';
         toast.success('Заказ переназначен', `Заказ ${orderNumber} назначен ${name}.`);
         const o = orders.find((x) => x.number === orderNumber);
-        if (o) updateOrderInList(o.id, { userId });
+        if (o) updateOrderInList(o.id, { userId, responsible_user_id: userId });
       } catch (err) {
         logger.error('Failed to reassign order', err);
         toast.error('Ошибка переназначения', (err as Error).message);
@@ -606,7 +620,13 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         await unassignOrderByNumber(orderNumber);
         toast.success('Заказ возвращён в пул', `Заказ ${orderNumber} теперь без ответственного.`);
         const o = orders.find((x) => x.number === orderNumber);
-        if (o) updateOrderInList(o.id, { userId: null as any, is_cancelled: 0 });
+        if (o) {
+          updateOrderInList(o.id, {
+            userId: null as any,
+            responsible_user_id: null as any,
+            is_cancelled: 0,
+          });
+        }
       } catch (err) {
         logger.error('Failed to return order to pool', err);
         toast.error('Ошибка возврата в пул', (err as Error).message);
@@ -702,14 +722,18 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
       if (!selectedOrder) return;
       try {
         const method = paymentMethod === 'telegram' ? 'online' : paymentMethod;
-        await createPrepaymentLink(selectedOrder.id, amount, method, assignToMe);
+        const { data } = await createPrepaymentLink(selectedOrder.id, amount, method, assignToMe);
         toast.success('Успешно', 'Предоплата обновлена');
         const patch: Partial<Order> = {
           prepaymentAmount: amount,
           paymentMethod: method,
           prepaymentStatus: method === 'online' ? 'pending' : 'paid',
+          prepaymentUpdatedAt: (data as Order)?.prepaymentUpdatedAt ?? undefined,
         };
-        if (assignToMe) patch.userId = currentUserId;
+        if (assignToMe) {
+          patch.userId = currentUserId;
+          patch.responsible_user_id = currentUserId;
+        }
         updateOrderInList(selectedOrder.id, patch);
       } catch (err: any) {
         logger.error('Prepayment failed', err);
@@ -832,10 +856,10 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                 </span>
               )}
             </div>
-            <select value={filters.source} onChange={(e) => dispatchFilters({ type: 'setSource', value: e.target.value as any })}>
+            <select value={filters.source} onChange={(e) => dispatchFilters({ type: 'setSource', value: e.target.value as FilterState['source'] })} aria-label="Источник заказа">
+              <option value="website">Онлайн (сайт)</option>
               <option value="all">Все источники</option>
               <option value="crm">CRM</option>
-              <option value="website">Онлайн</option>
               <option value="telegram">Telegram</option>
               <option value="mini_app">Mini App</option>
             </select>
@@ -929,17 +953,18 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               <label>
                 Ответственный:
                 <select
-                  value={selectedOrder.userId ?? ''}
+                  value={getEffectiveResponsibleUserId(selectedOrder) ?? ''}
                   onChange={(e) => {
                     const v = e.target.value;
+                    const current = getEffectiveResponsibleUserId(selectedOrder);
                     if (v === '') {
-                      if (selectedOrder.userId != null) {
+                      if (current != null) {
                         handleReturnToPool(selectedOrder.number!);
                       }
                       return;
                     }
                     const uid = Number(v);
-                    if (uid === selectedOrder.userId) return;
+                    if (uid === current) return;
                     handleReassignTo(selectedOrder.number!, uid);
                   }}
                   disabled={Number(selectedOrder.status) !== 0 && Number(selectedOrder.status) !== 1}
@@ -951,7 +976,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
                   ))}
                 </select>
               </label>
-              {(Number(selectedOrder.status) === 0 || Number(selectedOrder.status) === 1) && selectedOrder.userId !== currentUserId && (
+              {(Number(selectedOrder.status) === 0 || Number(selectedOrder.status) === 1) &&
+                getEffectiveResponsibleUserId(selectedOrder) !== currentUserId && (
                 <button
                   type="button"
                   className="btn-assign-responsible"
@@ -1131,6 +1157,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
           currentPaymentMethod={selectedOrder.paymentMethod}
           currentEmail={selectedOrder.customerEmail || ''}
           totalOrderAmount={getOrderTotal(selectedOrder)}
+          context="pool"
           onPrepaymentCreated={handlePrepaymentCreated}
         />
       )}

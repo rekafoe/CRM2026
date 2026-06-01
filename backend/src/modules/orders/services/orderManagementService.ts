@@ -5,6 +5,7 @@ import { PhotoOrderService } from '../../telegram/services/photoOrderService'
 import { UserOrderPageService } from './userOrderPageService'
 import { NotificationService } from '../../notifications/services/notificationService'
 import { logger } from '../../../utils/logger'
+import { formatWebsiteDeliverySummary, parseWebsiteOrderDeliveryJson } from '../../../types/websiteOrderDelivery'
 
 export interface UnifiedOrder {
   id: number;
@@ -18,6 +19,8 @@ export interface UnifiedOrder {
   assignedToName?: string;
   notes?: string;
   orderNumber?: string; // tg-ord-123 или site-ord-123
+  /** Краткая строка способа получения (заказы с сайта) */
+  deliverySummary?: string;
   // Специфичные поля для разных типов заказов
   photoOrder?: any;
   websiteOrder?: any;
@@ -57,6 +60,13 @@ export class OrderManagementService {
 
       // Получаем заказы с сайта (если есть таблица orders)
       let websiteOrders: any[] = [];
+      let hasDeliveryJson = false;
+      try {
+        hasDeliveryJson = await hasColumn('orders', 'delivery_json');
+      } catch {
+        hasDeliveryJson = false;
+      }
+      const deliveryCol = hasDeliveryJson ? 'delivery_json' : 'NULL as delivery_json';
       try {
         websiteOrders = await db.all(`
           SELECT 
@@ -67,7 +77,8 @@ export class OrderManagementService {
             customerPhone as customer_contact,
             0 as total_amount,
             createdAt as created_at,
-            '' as notes,
+            COALESCE(notes, '') as notes,
+            ${deliveryCol},
             CASE 
               WHEN source = 'website' THEN 'site-ord-' || id
               ELSE number
@@ -108,6 +119,9 @@ export class OrderManagementService {
         const key = `${order.id}_${order.type}`;
         const assignment = assignedMap.get(key);
         
+        const deliveryParsed = order.delivery_json
+          ? parseWebsiteOrderDeliveryJson(String(order.delivery_json))
+          : null;
         const unifiedOrder: UnifiedOrder = {
           id: order.id,
           type: order.type,
@@ -118,6 +132,7 @@ export class OrderManagementService {
           createdAt: order.created_at,
           notes: order.notes,
           orderNumber: order.order_number,
+          deliverySummary: deliveryParsed ? formatWebsiteDeliverySummary(deliveryParsed) : undefined,
           ...assignment
         };
 

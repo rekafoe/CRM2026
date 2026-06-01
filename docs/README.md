@@ -32,6 +32,10 @@ npm run dev  # Запуск на порту 5173
 
 ## 📚 Документация по сервисам
 
+### Интеграция клиентского редактора на сайт
+
+- **[client-editor-site-integration.md](./client-editor-site-integration.md)** — единый гайд: архитектура, встраивание React, BFF-прокси, API, корзина и checkout
+
 - [📋 Order Management](./order-management.md) - Управление заказами
 - [🤖 Telegram Bot](./telegram-bot.md) - Telegram бот для заказов
 - [🧮 Calculator](./calculator.md) - Калькулятор печати

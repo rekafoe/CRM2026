@@ -8,6 +8,10 @@ import {
   orderItemProductGroupKeyExpr,
   orderItemProductLabelExpr,
 } from '../utils/orderItemProductAnalyticsSql'
+import {
+  computeCashForReportDate,
+  sqlDailyOrderDayFilter,
+} from '../utils/reportOrderCash'
 
 const router = Router()
 
@@ -113,6 +117,15 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
      JOIN orders o ON o.id = i.orderId
     WHERE substr(COALESCE(o.createdAt, o.created_at),1,10) = ?`, d
   )
+  let hasPrepayCol = false
+  try {
+    hasPrepayCol = await hasColumn('orders', 'prepaymentUpdatedAt')
+  } catch {
+    hasPrepayCol = false
+  }
+  const prepayDateFilter = hasPrepayCol
+    ? `substr(prepaymentUpdatedAt, 1, 10) = ? AND prepaymentUpdatedAt IS NOT NULL`
+    : `substr(COALESCE(createdAt, created_at), 1, 10) = ?`
   const prepay = await db.get<any>(
     `SELECT 
         COALESCE(SUM(CASE WHEN prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END),0) as paid_amount,
@@ -123,7 +136,8 @@ router.get('/daily/:date/summary', asyncHandler(async (req, res) => {
         COALESCE(SUM(CASE WHEN paymentMethod = 'offline' AND prepaymentStatus IN ('paid','successful') THEN prepaymentAmount ELSE 0 END),0) as offline_paid_amount,
         COALESCE(SUM(CASE WHEN paymentMethod = 'online' THEN 1 ELSE 0 END),0) as online_count,
         COALESCE(SUM(CASE WHEN paymentMethod = 'offline' THEN 1 ELSE 0 END),0) as offline_count
-       FROM orders WHERE substr(COALESCE(createdAt, created_at),1,10) = ?`, d
+       FROM orders WHERE ${prepayDateFilter}`,
+    d,
   )
   const materials = await db.all<any>(
     `SELECT m.id as materialId, m.name as material_name,
@@ -192,9 +206,6 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
   } catch {
     hasPrepaymentUpdatedAt = false
   }
-  const dateExpr = hasPrepaymentUpdatedAt
-    ? "COALESCE(o.prepaymentUpdatedAt, o.created_at, o.createdAt)"
-    : "COALESCE(o.created_at, o.createdAt)"
   const prepaymentUpdatedAtSelect = hasPrepaymentUpdatedAt ? 'o.prepaymentUpdatedAt' : 'NULL as prepaymentUpdatedAt'
   let hasPaymentChannel = false;
   let hasIsInternal = false;
@@ -208,15 +219,16 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
     ? (hasIsInternal ? "CASE WHEN COALESCE(o.is_internal,0)=1 THEN 'internal' ELSE COALESCE(o.payment_channel, 'cash') END as payment_channel" : "COALESCE(o.payment_channel, 'cash') as payment_channel")
     : "'cash' as payment_channel";
   const notesSelect = hasNotes ? 'o.notes' : 'NULL as notes';
-  // Заказы за дату: созданные/обновлённые в этот день ИЛИ выданные в этот день (debt_closed_events.closed_date).
-  // Выдача влияет на кассу дня, но производственные клики считаются по дате создания/работы заказа.
+  // Заказы за дату: день работы (created_at) ИЛИ день оплаты (prepaymentUpdatedAt) ИЛИ день выдачи (debt_closed).
   let hasDebtClosed = false
   try {
     hasDebtClosed = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
   } catch { /* ignore */ }
-  const issuedFilter = hasDebtClosed
-    ? `OR EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ?)`
-    : ''
+  const dayFilter = sqlDailyOrderDayFilter(d, {
+    hasPrepaymentUpdatedAt,
+    hasDebtClosed,
+    tableAlias: 'o',
+  })
   const orders = await db.all<any>(
     `SELECT o.id, o.number, o.status,
             COALESCE(o.created_at, o.createdAt) as created_at,
@@ -226,9 +238,9 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
             ${paymentChannelSelect},
             ${notesSelect}
        FROM orders o
-      WHERE substr(${dateExpr},1,10) = ? ${issuedFilter}
+      WHERE ${dayFilter.whereSql}
       ORDER BY o.id DESC`,
-    hasDebtClosed ? [d, d] : [d]
+    ...dayFilter.params,
   )
 
   const orderIds = orders.map((o: { id: number }) => o.id)
@@ -276,6 +288,10 @@ router.get('/daily/:date/orders', asyncHandler(async (req, res) => {
       order.cash_from_issue_today = null
       order.cash_issued_by_user_id = null
     }
+  }
+
+  for (const order of orders) {
+    order.cash_for_report_date = computeCashForReportDate(order, d)
   }
 
   let issuedOrdersTotal = 0
@@ -333,40 +349,78 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
   } catch {
     hasPrepaymentUpdatedAt = false
   }
-  const dateExpr = hasPrepaymentUpdatedAt
-    ? "COALESCE(o.prepaymentUpdatedAt, o.created_at, o.createdAt)"
-    : "COALESCE(o.created_at, o.createdAt)"
   let hasDebtClosedCash = false
   try {
     hasDebtClosedCash = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
   } catch { /* ignore */ }
-  const cashDayExpr = `substr(${dateExpr},1,10)`
-  const prepaymentSelect = hasDebtClosedCash
-    ? `CASE WHEN EXISTS (SELECT 1 FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ${cashDayExpr})
-            THEN (SELECT COALESCE(SUM(d.amount), 0) FROM debt_closed_events d WHERE d.order_id = o.id AND d.closed_date = ${cashDayExpr})
-            ELSE COALESCE(o.prepaymentAmount, 0) END as prepayment`
-    : `COALESCE(o.prepaymentAmount, 0) as prepayment`
+  const prepayCol = hasPrepaymentUpdatedAt ? 'o.prepaymentUpdatedAt' : 'NULL as prepaymentUpdatedAt'
+  const monthParts = [
+    'substr(COALESCE(o.created_at, o.createdAt), 1, 7) = ?',
+  ]
+  const monthParams: string[] = [month]
+  if (hasPrepaymentUpdatedAt) {
+    monthParts.push('substr(o.prepaymentUpdatedAt, 1, 7) = ?')
+    monthParams.push(month)
+  }
+  if (hasDebtClosedCash) {
+    monthParts.push(
+      `EXISTS (SELECT 1 FROM debt_closed_events dce WHERE dce.order_id = o.id AND substr(dce.closed_date, 1, 7) = ?)`,
+    )
+    monthParams.push(month)
+  }
   const orders = await db.all<any>(
-    `SELECT substr(${dateExpr},1,10) as date,
-            o.userId as user_id,
-            ${prepaymentSelect}
+    `SELECT o.id, o.userId as user_id, o.prepaymentAmount, o.prepaymentStatus,
+            COALESCE(o.created_at, o.createdAt) as created_at,
+            ${prepayCol}
        FROM orders o
-      WHERE substr(${dateExpr},1,7) = ?
+      WHERE (${monthParts.join(' OR ')})
         AND COALESCE(o.prepaymentAmount, 0) > 0
         AND (o.status IS NULL OR o.status != 1)`,
-    month
+    ...monthParams,
   )
+  const issueByOrderDay = new Map<string, number>()
+  if (hasDebtClosedCash) {
+    const debtRows = (await db.all(
+      'SELECT order_id, closed_date, amount FROM debt_closed_events WHERE substr(closed_date, 1, 7) = ?',
+      month,
+    )) as unknown as Array<{ order_id: number; closed_date: string; amount: number }>
+    for (const r of debtRows) {
+      issueByOrderDay.set(`${r.order_id}:${String(r.closed_date).slice(0, 10)}`, Number(r.amount))
+    }
+  }
   const byDate: Record<string, { total: number; contributions: Array<{ user_id: number; amount: number }> }> = {}
-  for (const o of orders) {
-    const d = String(o.date || '').slice(0, 10)
-    if (!d) continue
-    if (!byDate[d]) byDate[d] = { total: 0, contributions: [] }
-    const amt = Number(o.prepayment) || 0
-    byDate[d].total += amt
-    const uid = o.user_id != null ? Number(o.user_id) : 0
-    const existing = byDate[d].contributions.find((c: any) => c.user_id === uid)
+  const addCash = (day: string, userId: number, amt: number) => {
+    if (!day.startsWith(month) || amt <= 0) return
+    if (!byDate[day]) byDate[day] = { total: 0, contributions: [] }
+    byDate[day].total += amt
+    const existing = byDate[day].contributions.find((c) => c.user_id === userId)
     if (existing) existing.amount += amt
-    else byDate[d].contributions.push({ user_id: uid, amount: amt })
+    else byDate[day].contributions.push({ user_id: userId, amount: amt })
+  }
+  for (const o of orders) {
+    const created = String(o.created_at ?? '').slice(0, 10)
+    const prepayDay = hasPrepaymentUpdatedAt ? String(o.prepaymentUpdatedAt ?? '').slice(0, 10) : ''
+    const days = new Set<string>()
+    if (created.length >= 10) days.add(created)
+    if (prepayDay.length >= 10) days.add(prepayDay)
+    if (hasDebtClosedCash) {
+      for (const key of issueByOrderDay.keys()) {
+        const [oid, day] = key.split(':')
+        if (Number(oid) === Number(o.id)) days.add(day)
+      }
+    }
+    for (const day of days) {
+      const issueAmt = issueByOrderDay.get(`${o.id}:${day}`)
+      const cash = computeCashForReportDate(
+        {
+          ...o,
+          cash_from_issue_today: issueAmt !== undefined ? issueAmt : null,
+        },
+        day,
+      )
+      const uid = o.user_id != null ? Number(o.user_id) : 0
+      addCash(day, uid, cash)
+    }
   }
   res.json({ month, byDate })
 }))

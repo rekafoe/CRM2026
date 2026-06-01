@@ -5,6 +5,7 @@ export type OrderStatus = 'new' | 'in_production' | 'ready_to_ship' | 'shipped' 
 
 // Реэкспорт типов калькулятора из shared, чтобы импорты вида "../../types" работали консистентно
 import type { Customer } from '../../shared/types/entities';
+import type { WebsiteOrderDelivery } from './types/websiteOrderDelivery';
 export type {
   Customer,
   CustomerLegalDocument,
@@ -144,6 +145,8 @@ export interface Order {
   // Payment information
   prepaymentAmount?: number;
   prepaymentStatus?: string;
+  /** Дата последнего изменения предоплаты (день кассы при оплате из пула) */
+  prepaymentUpdatedAt?: string | null;
   /** Скидка на заказ (%): 0, 5, 10, 15, 20, 25 */
   discount_percent?: number;
   /** Канал оплаты: cash (касса), invoice (счёт), not_cashed (не пробивался) */
@@ -156,6 +159,8 @@ export interface Order {
   // Additional metadata
   totalAmount?: number;
   notes?: string;
+  /** Способ получения / доставка (заказ с сайта) */
+  delivery?: WebsiteOrderDelivery;
   priority?: 'low' | 'normal' | 'high' | 'urgent';
   estimatedCompletion?: string;
   actualCompletion?: string;

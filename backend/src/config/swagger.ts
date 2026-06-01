@@ -35,6 +35,7 @@ const options: swaggerJsdoc.Options = {
     tags: [
       { name: 'Products', description: 'Продукты и каталог' },
       { name: 'Website Catalog', description: 'API для каталога на сайте (printcore.by)' },
+      { name: 'Client Editor', description: 'Клиентский редактор на сайте: draft макета, файлы, галерея шаблонов' },
     ],
     components: {
       securitySchemes: {
@@ -43,6 +44,13 @@ const options: swaggerJsdoc.Options = {
           scheme: 'bearer',
           bearerFormat: 'JWT',
           description: 'JWT токен авторизации. Получите токен через /api/auth/login',
+        },
+        websiteApiKey: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'X-API-Key',
+          description:
+            'API-ключ сайта ↔ CRM (WEBSITE_ORDER_API_KEY). Альтернатива: Authorization: Bearer <key>. Только на backend сайта (BFF), не в браузере.',
         },
       },
       schemas: {
@@ -196,6 +204,152 @@ const options: swaggerJsdoc.Options = {
             calculator_type: { type: 'string', description: 'Тип калькулятора (product/operation/simplified)' },
             product_type: { type: 'string', description: 'Тип продукта (sheet_single/multi_page/universal)' },
             min_price: { type: 'number', nullable: true, description: 'Мин. цена за ед. (при withMinPrice=1)' },
+          },
+        },
+        PublicDesignTemplateCategory: {
+          type: 'object',
+          description: 'Рубрика шаблонов для галереи на сайте',
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            sort_order: { type: 'integer' },
+          },
+        },
+        PublicDesignTemplate: {
+          type: 'object',
+          description: 'Активный шаблон для сайта (без полей роялти)',
+          properties: {
+            id: { type: 'integer', description: 'designTemplateId' },
+            name: { type: 'string' },
+            description: { type: 'string', nullable: true },
+            category_id: { type: 'integer', nullable: true },
+            category: { type: 'string', nullable: true, description: 'Имя рубрики (денормализация)' },
+            preview_url: { type: 'string', nullable: true, description: 'Превью для карточки галереи' },
+            spec: {
+              type: 'string',
+              description: 'JSON-строка; внутри designState (master для редактора)',
+            },
+            is_active: { type: 'integer' },
+            sort_order: { type: 'integer' },
+            created_at: { type: 'string' },
+            updated_at: { type: 'string' },
+          },
+        },
+        EditorDraftPayload: {
+          type: 'object',
+          description: 'Состояние черновика редактора',
+          properties: {
+            designState: { type: 'object', additionalProperties: true, description: 'Fabric document (pages, pageWidth, …)' },
+            photoBatch: { type: 'object', nullable: true, additionalProperties: true },
+            selectedParams: { type: 'object', additionalProperties: true },
+          },
+        },
+        EditorDraftCreate: {
+          type: 'object',
+          properties: {
+            designTemplateId: { type: 'integer', description: 'ID master-шаблона из галереи' },
+            productId: { type: 'integer' },
+            typeId: { type: 'integer' },
+            sizeId: { type: 'string', example: '90x50' },
+            mode: { type: 'string', enum: ['single', 'multipage', 'photo_batch'], example: 'single' },
+            payload: { $ref: '#/components/schemas/EditorDraftPayload' },
+          },
+        },
+        EditorDraft: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            token: { type: 'string', description: 'Секретный токен для BFF и checkout (editorDraftToken)' },
+            design_template_id: { type: 'integer', nullable: true },
+            product_id: { type: 'integer', nullable: true },
+            type_id: { type: 'integer', nullable: true },
+            size_id: { type: 'string', nullable: true },
+            mode: { type: 'string' },
+            version: { type: 'integer', description: 'Версия для optimistic locking при PATCH' },
+            status: { type: 'string', enum: ['draft', 'finalized'] },
+            payloadParsed: { $ref: '#/components/schemas/EditorDraftPayload' },
+            created_at: { type: 'string' },
+            updated_at: { type: 'string' },
+          },
+        },
+        EditorDraftFile: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            url: { type: 'string', description: 'URL content для Fabric' },
+            thumbUrl: { type: 'string', nullable: true },
+            mime: { type: 'string', nullable: true },
+            originalName: { type: 'string', nullable: true },
+          },
+        },
+        PublicEditorBranding: {
+          type: 'object',
+          properties: {
+            logoUrl: { type: 'string', nullable: true },
+            organizationName: { type: 'string', nullable: true },
+          },
+        },
+        WebsiteOrderDelivery: {
+          type: 'object',
+          description:
+            'Способ получения заказа с сайта. providerId — стабильный id точки/провайдера. kind: pickup, courier_minsk, pickup_point, courier_country, other.',
+          required: ['kind', 'providerId', 'label'],
+          properties: {
+            kind: {
+              type: 'string',
+              enum: ['pickup', 'courier_minsk', 'pickup_point', 'courier_country', 'other'],
+              example: 'pickup',
+            },
+            providerId: {
+              type: 'string',
+              description: 'ID варианта на сайте (например pickup-dzerzhinsky-3b, belpochta)',
+              example: 'pickup-dzerzhinsky-3b',
+            },
+            label: {
+              type: 'string',
+              example: 'Проспект Дзержинского 3б',
+            },
+            description: { type: 'string', nullable: true, example: 'Время согласовывается по телефону' },
+            cost: { type: 'number', nullable: true, example: 0 },
+            costLabel: { type: 'string', nullable: true, example: 'от 10р' },
+            address: { type: 'string', nullable: true },
+            meta: { type: 'object', additionalProperties: true },
+          },
+        },
+        WebsiteOrderItemParams: {
+          type: 'object',
+          description: 'Параметры позиции заказа с сайта (доп. поля сохраняются)',
+          additionalProperties: true,
+          properties: {
+            no_layout: {
+              type: 'boolean',
+              description: 'true — у клиента нет готового макета',
+            },
+            editorDraftToken: {
+              type: 'string',
+              description: 'Токен editor_drafts; CRM переносит designState/photoBatch в позицию',
+            },
+            designTemplateId: {
+              type: 'integer',
+              description: 'ID шаблона из галереи (метаданные позиции)',
+            },
+            editorLayoutGroup: {
+              type: 'object',
+              description: 'Группа открыток: несколько draft в одной позиции',
+              properties: {
+                groupKey: { type: 'string' },
+                slots: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      editorDraftToken: { type: 'string' },
+                      label: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },

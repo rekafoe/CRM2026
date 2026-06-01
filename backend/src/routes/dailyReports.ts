@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware'
 import { getDb } from '../config/database'
 import { AuthenticatedRequest } from '../middleware'
 import { hasColumn } from '../utils/tableSchemaCache'
+import { sqlDailyOrderDayFilter } from '../utils/reportOrderCash'
 
 const router = Router()
 
@@ -292,28 +293,39 @@ router.get('/full/:date', asyncHandler(async (req, res) => {
     return
   }
 
-  // Заказы за дату: созданные в этот день ИЛИ выданные в этот день (владелец). Чтобы заказ не пропадал из отчёта создателя при выдаче коллегой.
   const d = String(req.params.date || '').slice(0, 10)
+  let hasPrepaymentUpdatedAt = false
+  let hasDebtClosed = false
+  try {
+    hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
+  } catch {
+    hasPrepaymentUpdatedAt = false
+  }
+  try {
+    hasDebtClosed = !!(await db.get("SELECT 1 FROM sqlite_master WHERE type='table' AND name='debt_closed_events'"))
+  } catch {
+    hasDebtClosed = false
+  }
+  const dayFilter = sqlDailyOrderDayFilter(d, { hasPrepaymentUpdatedAt, hasDebtClosed, tableAlias: 'o' })
   const orders = isGlobal
     ? await db.all<any>(
-        `SELECT o.id, o.number, o.status, o.createdAt, o.customerName, o.customerPhone, o.customerEmail, o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId
+        `SELECT o.id, o.number, o.status, o.createdAt, o.created_at, o.customerName, o.customerPhone, o.customerEmail,
+                o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId,
+                ${hasPrepaymentUpdatedAt ? 'o.prepaymentUpdatedAt' : 'NULL as prepaymentUpdatedAt'}
          FROM orders o
-         WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
-            OR (o.status = 7 AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?)
+         WHERE ${dayFilter.whereSql}
          ORDER BY o.id DESC`,
-        d,
-        d
+        ...dayFilter.params,
       )
     : await db.all<any>(
-        `SELECT o.id, o.number, o.status, o.createdAt, o.customerName, o.customerPhone, o.customerEmail, o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId
+        `SELECT o.id, o.number, o.status, o.createdAt, o.created_at, o.customerName, o.customerPhone, o.customerEmail,
+                o.prepaymentAmount, o.prepaymentStatus, o.paymentUrl, o.paymentId, o.userId,
+                ${hasPrepaymentUpdatedAt ? 'o.prepaymentUpdatedAt' : 'NULL as prepaymentUpdatedAt'}
          FROM orders o
-         WHERE (substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ? AND o.userId = ?)
-            OR (o.status = 7 AND o.userId = ? AND substr(COALESCE(o.updated_at, o.created_at, o.createdAt), 1, 10) = ?)
+         WHERE (${dayFilter.whereSql}) AND o.userId = ?
          ORDER BY o.id DESC`,
-        d,
+        ...dayFilter.params,
         targetUserId,
-        targetUserId,
-        d
       )
 
   const seen = new Set<number>()

@@ -1,5 +1,6 @@
 import { Item } from './Item'
 import type { MiniappCheckoutState } from '../utils/miniappCheckoutState'
+import type { WebsiteOrderDelivery } from '../types/websiteOrderDelivery'
 
 export interface Order {
   id: number;
@@ -20,5 +21,6 @@ export interface Order {
   payment_channel?: 'cash' | 'invoice' | 'not_cashed' | 'internal';
   miniapp_checkout_state?: MiniappCheckoutState;
   miniapp_design_help_requested?: number;
+  delivery?: WebsiteOrderDelivery;
   items: Item[];
 }

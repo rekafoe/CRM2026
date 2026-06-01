@@ -22,6 +22,11 @@ import { tryNotifyTelegramOrderStatusForMiniappOrder } from '../../../services/m
 import { trySyncWebsiteOrderStatusFromCrm } from '../../../services/websiteOrderStatusSyncService'
 import { logger } from '../../../utils/logger'
 import { MINIAPP_CHECKOUT_STATE_FINALIZED, type MiniappCheckoutState } from '../../../utils/miniappCheckoutState'
+import {
+  parseWebsiteOrderDeliveryJson,
+  serializeWebsiteOrderDelivery,
+  type WebsiteOrderDelivery,
+} from '../../../types/websiteOrderDelivery'
 
 export class OrderService {
   /** Старые инстансы без миграции — добавляем колонку при первом обращении. */
@@ -593,6 +598,28 @@ export class OrderService {
     }
   }
 
+  static async persistOrderDelivery(orderId: number, delivery: WebsiteOrderDelivery | null): Promise<void> {
+    const db = await getDb()
+    let hasCol = false
+    try {
+      hasCol = await hasColumn('orders', 'delivery_json')
+    } catch {
+      hasCol = false
+    }
+    if (!hasCol) {
+      throw new Error('Колонка delivery_json ещё не добавлена. Примените миграции.')
+    }
+    const serialized = delivery ? serializeWebsiteOrderDelivery(delivery) : null
+    await db.run(
+      'UPDATE orders SET delivery_json = ?, updated_at = datetime("now") WHERE id = ?',
+      [serialized, orderId],
+    )
+  }
+
+  static readOrderDeliveryFromRow(row: { delivery_json?: string | null }): WebsiteOrderDelivery | null {
+    return parseWebsiteOrderDeliveryJson(row.delivery_json ?? null)
+  }
+
   private static async createOrderWithItemsTx(
     db: any,
     orderData: {
@@ -606,6 +633,7 @@ export class OrderService {
       telegramChatId?: string;
       miniappCheckoutState?: MiniappCheckoutState;
       miniappDesignHelpRequested?: boolean;
+      delivery?: WebsiteOrderDelivery | null;
       items: Array<{
         type: string;
         params: string | Record<string, unknown>;
@@ -632,6 +660,9 @@ export class OrderService {
       miniappCheckoutState: orderData.miniappCheckoutState,
       miniappDesignHelpRequested: orderData.miniappDesignHelpRequested,
     });
+    if (orderData.delivery) {
+      await this.persistOrderDelivery(createdOrder.id, orderData.delivery)
+    }
     const orderCreatedAt = (createdOrder as any).created_at || (createdOrder as any).createdAt;
     await this.insertItemsForOrder(db, {
       orderId: createdOrder.id,
@@ -645,8 +676,13 @@ export class OrderService {
     )) as Array<{ id: number }>;
     const itemIds = (Array.isArray(itemIdRows) ? itemIdRows : []).map((r) => Number(r.id));
     const rawOrder = await db.get('SELECT * FROM orders WHERE id = ?', [createdOrder.id]);
+    const delivery = OrderService.readOrderDeliveryFromRow(rawOrder as { delivery_json?: string })
     return {
-      order: OrderService.orderForApi({ ...(rawOrder as any), items: [] }) as Order,
+      order: OrderService.orderForApi({
+        ...(rawOrder as any),
+        items: [],
+        delivery: delivery ?? undefined,
+      }) as Order,
       itemIds,
     };
   }
@@ -663,6 +699,7 @@ export class OrderService {
       telegramChatId?: string;
       miniappCheckoutState?: MiniappCheckoutState;
       miniappDesignHelpRequested?: boolean;
+      delivery?: WebsiteOrderDelivery | null;
       items: Array<{
         type: string;
         params: string | Record<string, unknown>;
@@ -731,6 +768,7 @@ export class OrderService {
       source?: 'website' | 'telegram' | 'crm' | 'mini_app';
       /** Для фильтра заказов Mini App (Telegram user id = chat_id в личке) */
       telegramChatId?: string;
+      delivery?: WebsiteOrderDelivery | null;
       items: Array<{
         type: string;
         params: string | Record<string, unknown>;
@@ -803,10 +841,28 @@ export class OrderService {
   /** Допустимые значения payment_channel (internal хранится в is_internal) */
   private static readonly ALLOWED_PAYMENT_CHANNELS = new Set(['cash', 'invoice', 'not_cashed', 'internal']);
 
-  /** payment_channel='internal' когда is_internal=1 (для API) */
-  private static orderForApi<T extends { is_internal?: number; payment_channel?: string }>(o: T | null | undefined): T | null | undefined {
+  /** Строка orders → объект для JSON API. */
+  static toApiOrder(row: Record<string, unknown> & { items?: unknown[] }): Order {
+    return OrderService.orderForApi(row as { delivery_json?: string | null; items?: unknown[] }) as Order
+  }
+
+  /** payment_channel='internal' когда is_internal=1; delivery_json → delivery (для API) */
+  private static orderForApi<T extends {
+    is_internal?: number
+    payment_channel?: string
+    delivery_json?: string | null
+    delivery?: WebsiteOrderDelivery
+  }>(o: T | null | undefined): T | null | undefined {
     if (!o) return o
-    return (o.is_internal ? { ...o, payment_channel: 'internal' } : o) as T
+    const withChannel = (o.is_internal ? { ...o, payment_channel: 'internal' } : { ...o }) as T & {
+      delivery_json?: string | null
+    }
+    const delivery = withChannel.delivery ?? OrderService.readOrderDeliveryFromRow(withChannel)
+    if (!delivery) {
+      return withChannel as T
+    }
+    const { delivery_json: _dj, ...rest } = withChannel
+    return { ...rest, delivery } as T
   }
 
   /**
@@ -849,12 +905,78 @@ export class OrderService {
     return OrderService.orderForApi(updated) as Order;
   }
 
+  /**
+   * Переносит дату оформления заказа на «сейчас» (момент назначения ответственного).
+   * Заказ с сайта от 01.06, взятый в работу 02.06, попадает в отчёты и списки за 02.06.
+   * @returns предыдний календарный день created_at (YYYY-MM-DD) для пересчёта начислений
+   */
+  static async shiftOrderToAssignmentDay(orderId: number): Promise<string | null> {
+    const db = await getDb()
+    const preRow = await db.get<{ d: string }>(
+      `SELECT date(COALESCE(createdAt, created_at)) as d FROM orders WHERE id = ?`,
+      [orderId],
+    )
+    const preDay = preRow?.d ? String(preRow.d).slice(0, 10) : null
+    const currentDate = getCurrentTimestamp()
+
+    let hasCreatedAt = false
+    let hasCreatedAtSnake = false
+    let hasUpdatedAt = false
+    let hasUpdatedAtSnake = false
+    let hasPrepaymentUpdatedAt = false
+    try {
+      hasCreatedAt = await hasColumn('orders', 'createdAt')
+      hasCreatedAtSnake = await hasColumn('orders', 'created_at')
+      hasUpdatedAt = await hasColumn('orders', 'updatedAt')
+      hasUpdatedAtSnake = await hasColumn('orders', 'updated_at')
+      hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
+    } catch { /* ignore */ }
+
+    const dateUpdates: string[] = []
+    const dateParams: unknown[] = []
+    if (hasCreatedAt) {
+      dateUpdates.push('createdAt = ?')
+      dateParams.push(currentDate)
+    }
+    if (hasCreatedAtSnake) {
+      dateUpdates.push('created_at = ?')
+      dateParams.push(currentDate)
+    }
+    if (hasUpdatedAt) dateUpdates.push('updatedAt = datetime("now")')
+    if (hasUpdatedAtSnake) dateUpdates.push('updated_at = datetime("now")')
+    if (dateUpdates.length > 0) {
+      await db.run(`UPDATE orders SET ${dateUpdates.join(', ')} WHERE id = ?`, ...dateParams, orderId)
+    }
+
+    if (hasPrepaymentUpdatedAt) {
+      if (hasUpdatedAt) {
+        await db.run(
+          'UPDATE orders SET prepaymentUpdatedAt = ?, updatedAt = datetime("now") WHERE id = ?',
+          currentDate,
+          orderId,
+        )
+      } else if (hasUpdatedAtSnake) {
+        await db.run(
+          'UPDATE orders SET prepaymentUpdatedAt = ?, updated_at = datetime("now") WHERE id = ?',
+          currentDate,
+          orderId,
+        )
+      } else {
+        await db.run('UPDATE orders SET prepaymentUpdatedAt = ? WHERE id = ?', currentDate, orderId)
+      }
+    }
+
+    return preDay
+  }
+
   /** Обновить контактёра и/или ответственного заказа */
   static async updateOrderAssignees(id: number, contact_user_id?: number | null, responsible_user_id?: number | null, actorUserId?: number): Promise<Order> {
     const db = await getDb();
-    const existing = await db.get<any>('SELECT id, contact_user_id, responsible_user_id FROM orders WHERE id = ?', [id]);
-    const order = existing as Order | undefined;
-    if (!order) {
+    const existing = await db.get<any>(
+      'SELECT id, userId, contact_user_id, responsible_user_id FROM orders WHERE id = ?',
+      [id],
+    );
+    if (!existing) {
       throw new Error('Заказ не найден');
     }
     const updates: string[] = [];
@@ -869,9 +991,17 @@ export class OrderService {
       updates.push('contact_user_id = ?');
       values.push(contact_user_id ?? null);
     }
-    if (hasResponsible && responsible_user_id !== undefined) {
-      updates.push('responsible_user_id = ?');
+    let responsibleAssignmentDayBefore: string | null = null
+    if (responsible_user_id !== undefined) {
+      if (hasResponsible) {
+        updates.push('responsible_user_id = ?');
+        values.push(responsible_user_id ?? null);
+      }
+      updates.push('userId = ?');
       values.push(responsible_user_id ?? null);
+      if (responsible_user_id != null) {
+        responsibleAssignmentDayBefore = await OrderService.shiftOrderToAssignmentDay(id);
+      }
     }
     if (updates.length === 0) {
       return OrderService.orderForApi(await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
@@ -891,18 +1021,34 @@ export class OrderService {
         userId: actorUserId ?? null,
       });
     }
-    if (hasResponsible && responsible_user_id !== undefined && Number(existing.responsible_user_id ?? 0) !== Number(responsible_user_id ?? 0)) {
-      await this.recordOrderActivity(db, {
-        orderId: id,
-        eventType: 'responsible_user_changed',
-        message: 'Изменён ответственный по заказу',
-        oldValue: existing.responsible_user_id != null ? String(existing.responsible_user_id) : null,
-        newValue: responsible_user_id != null ? String(responsible_user_id) : null,
-        userId: actorUserId ?? null,
-      });
+    if (responsible_user_id !== undefined) {
+      const prevEffective = existing.responsible_user_id ?? existing.userId
+      const nextEffective = responsible_user_id
+      if (Number(prevEffective ?? 0) !== Number(nextEffective ?? 0)) {
+        await this.recordOrderActivity(db, {
+          orderId: id,
+          eventType: 'reassign',
+          message: nextEffective == null
+            ? 'Ответственный снят'
+            : prevEffective == null
+              ? 'Заказ взяли в работу'
+              : 'Заказ переназначен',
+          oldValue: prevEffective != null ? String(prevEffective) : null,
+          newValue: nextEffective != null ? String(nextEffective) : null,
+          userId: actorUserId ?? null,
+          meta: {
+            previous_user_id: prevEffective != null ? Number(prevEffective) : null,
+            target_user_id: nextEffective != null ? Number(nextEffective) : null,
+            action: nextEffective == null ? 'unassign' : prevEffective == null ? 'take' : 'reassign',
+          },
+        });
+      }
     }
     const outAssignees = OrderService.orderForApi(await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])) as Order;
-    void EarningsService.recalculateEarningsForOrderDays({ orderId: id }).catch((e) => {
+    void EarningsService.recalculateEarningsForOrderDays({
+      orderId: id,
+      orderCreatedDateBeforeUpdate: responsibleAssignmentDayBefore ?? undefined,
+    }).catch((e) => {
       logger.error('Earnings recalc after assignees failed', { orderId: id, message: (e as Error)?.message });
     });
     return outAssignees;

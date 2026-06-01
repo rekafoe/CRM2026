@@ -26,15 +26,35 @@
 
 - orders.status: number (0..6)
 - orders.createdAt/updatedAt: текстовые таймштампы (camelCase); синхронизированы с created_at/updated_at
-- orders.userId: текущий ответственный
+- orders.userId: ответственный (legacy, синхронизируется с `responsible_user_id`)
+- orders.responsible_user_id: ответственный (приоритет в UI пула: `responsible_user_id ?? userId`)
 - orders.source: NULL | 'website' | 'telegram'
 - orders.is_cancelled: 0/1 — мягко отменен (online)
+
+## Дни работы, оплаты и выдачи
+
+| Поле / событие | Смысл |
+|----------------|--------|
+| `created_at` / `createdAt` | День работы / оформления (клики, сдельная, список в OptimizedApp за выбранную дату) |
+| `prepaymentUpdatedAt` | День оплаты (касса при `POST /orders/:id/prepay` из пула или карточки) |
+| `debt_closed_events.closed_date` | День выдачи и закрытия остатка (`POST /orders/:id/issue`) |
+
+**Пул заказов:** поиск по номеру → «Внести предоплату» (оффлайн) — оплата попадает в **сегодня** (`prepaymentUpdatedAt`), заказ остаётся в отчёте за день работы. Счётчики / `GET /api/reports/daily/:date/orders` учитывают оба дня: в день работы касса 0, в день оплаты — сумма.
+
+**OptimizedApp:** список заказов за дату — только по `created_at`; оплату при выдаче удобнее вносить через пул или счётчики.
+
+## Дата в отчётах при назначении
+
+При **первом взятии заказа из пула** (или смене ответственного через пул / `assignees`) поля `created_at` / `createdAt` и при наличии `prepaymentUpdatedAt` переносятся на **момент назначения**.
+
+Пример: заказ с сайта оформлен **01.06**, оператор взял его **02.06** — в списках и отчётах за день заказ учитывается как **02.06**, а не дата checkout на сайте.
 
 ## API
 
 - GET /api/orders — список заказов текущего пользователя
 - PUT /api/orders/:id/status — смена статуса
-- POST /api/orders/reassign/:number { userId } — переназначение по номеру (только при status=0)
+- POST /api/orders/reassign/:number { userId } — переназначение по номеру (только при status=0 или 1 в пуле)
+- PUT /api/orders/:id/assignees { responsible_user_id } — ответственный; при назначении дублируется в `userId`
 - POST /api/orders/unassign/:number — вернуть заказ в пул без отмены (`is_cancelled=0`)
 - POST /api/orders/:id/cancel-online — мягкая отмена онлайн-заказа (перевод в пул)
 

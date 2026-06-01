@@ -3,6 +3,7 @@ import { Order } from '../../types';
 import AddItemModal from '../AddItemModal';
 import { PrepaymentModal } from '../PrepaymentModal';
 import { FilesModal } from '../FilesModal';
+import { computeOrderTotalFromItems } from '../../utils/orderTotal';
 
 interface OrderModalsProps {
   // Modal states
@@ -60,6 +61,7 @@ export const OrderModals: React.FC<OrderModalsProps> = ({
           currentAmount={selectedOrder.prepaymentAmount}
           currentPaymentMethod={selectedOrder.paymentMethod === 'telegram' ? 'online' : selectedOrder.paymentMethod}
           currentEmail={selectedOrder.customerEmail || ''}
+          totalOrderAmount={computeOrderTotalFromItems(selectedOrder)}
           onPrepaymentCreated={onPrepaymentCreated}
         />
       )}

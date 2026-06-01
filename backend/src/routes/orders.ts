@@ -69,20 +69,17 @@ function orderForApi(order: any): any {
  *   post:
  *     summary: Создать заказ с сайта (публичный API)
  *     description: |
- *       Публичный эндпоинт для приёма заказов с внешнего сайта. Не требует авторизации в CRM.
- *       Авторизация по API-ключу в заголовке X-API-Key или Authorization Bearer.
+ *       Публичный эндпоинт для приёма заказов с внешнего сайта. Не требует JWT CRM.
+ *       Авторизация по websiteApiKey (X-API-Key или Authorization Bearer).
  *       Заказ создаётся с source=website, userId=null и попадает в пул заказов (unassigned).
  *       Переменная окружения WEBSITE_ORDER_API_KEY. Если не задана — эндпоинт возвращает 503.
- *       POST /api/orders/from-website/with-files (multipart/form-data): те же поля (customerName, customerPhone, …, items как JSON-строка или массив); в каждой позиции params — как описано ниже (в т.ч. no_layout).
- *     tags: [Orders]
- *     security: []
- *     parameters:
- *       - in: header
- *         name: X-API-Key
- *         schema:
- *           type: string
- *         description: API-ключ для заказов с сайта (альтернатива — Authorization Bearer <key>)
- *         required: true
+ *       POST /api/orders/from-website/with-files (multipart/form-data): те же поля.
+ *       Позиции из клиентского редактора: params.editorDraftToken (+ designTemplateId).
+ *       Группа открыток: params.editorLayoutGroup.slots[] с разными editorDraftToken.
+ *       delivery — способ получения (самовывоз, курьер, Белпочта и т.д.); см. WebsiteOrderDelivery.
+ *     tags: [Orders, Client Editor]
+ *     security:
+ *       - websiteApiKey: []
  *     requestBody:
  *       required: true
  *       content:
@@ -106,6 +103,8 @@ function orderForApi(order: any): any {
  *               customer_id:
  *                 type: integer
  *                 description: ID клиента в CRM (опционально)
+ *               delivery:
+ *                 $ref: '#/components/schemas/WebsiteOrderDelivery'
  *               items:
  *                 type: array
  *                 description: Позиции заказа. Если передан непустой массив — заказ создаётся с позициями и списанием материалов.
@@ -119,19 +118,27 @@ function orderForApi(order: any): any {
  *                       oneOf:
  *                         - type: string
  *                           description: JSON-строка; парсится в объект (все поля сохраняются в позиции)
- *                         - type: object
- *                           description: Параметры позиции; дополнительные поля не отбрасываются
- *                           additionalProperties: true
- *                           properties:
- *                             no_layout:
- *                               type: boolean
- *                               description: |
- *                                 true — у клиента нет готового макета (метаданные для производства).
- *                                 На расчёт суммы в CRM не влияет: итог по позиции задаётся полями price и quantity.
+ *                         - $ref: '#/components/schemas/WebsiteOrderItemParams'
  *                     price:
  *                       type: number
  *                     quantity:
  *                       type: integer
+ *             example:
+ *               customerName: Иван Иванов
+ *               customerPhone: "+375 29 123 45 67"
+ *               delivery:
+ *                 kind: pickup
+ *                 providerId: pickup-dzerzhinsky-3b
+ *                 label: Проспект Дзержинского 3б
+ *                 cost: 0
+ *               items:
+ *                 - type: "58"
+ *                   description: Визитки
+ *                   quantity: 100
+ *                   price: 25
+ *                   params:
+ *                     editorDraftToken: draft_secret_token_from_bff
+ *                     designTemplateId: 321
  *     responses:
  *       201:
  *         description: Заказ создан
@@ -723,53 +730,11 @@ router.post('/reassign/:number', asyncHandler(async (req, res) => {
     return;
   }
   const db = await getDb();
-  const preRow = await db.get<{ d: string }>(
-    `SELECT date(COALESCE(createdAt, created_at)) as d FROM orders WHERE id = ?`,
-    [result.id]
-  );
-  const preDay = preRow?.d ? String(preRow.d).slice(0, 10) : null;
-  const currentDate = new Date().toISOString();
-  const hasCreatedAt = await hasColumn('orders', 'createdAt').catch(() => false);
-  const hasCreatedAtSnake = await hasColumn('orders', 'created_at').catch(() => false);
-  const hasUpdatedAt = await hasColumn('orders', 'updatedAt').catch(() => false);
-  const hasUpdatedAtSnake = await hasColumn('orders', 'updated_at').catch(() => false);
-  const hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt').catch(() => false);
-
-  // Для видимости в текущем рабочем отчёте переносим "дату оформления" на момент назначения.
-  // Если есть обе timestamp-колонки, обновляем обе: списки заказов читают COALESCE(created_at, createdAt).
-  const dateUpdates: string[] = [];
-  const dateParams: string[] = [];
-  if (hasCreatedAt) {
-    dateUpdates.push('createdAt = ?');
-    dateParams.push(currentDate);
-  }
-  if (hasCreatedAtSnake) {
-    dateUpdates.push('created_at = ?');
-    dateParams.push(currentDate);
-  }
-  if (hasUpdatedAt) {
-    dateUpdates.push('updatedAt = datetime(\'now\')');
-  }
-  if (hasUpdatedAtSnake) {
-    dateUpdates.push('updated_at = datetime(\'now\')');
-  }
-  if (dateUpdates.length > 0) {
-    await db.run(`UPDATE orders SET ${dateUpdates.join(', ')} WHERE id = ?`, ...dateParams, result.id);
-  }
-
-  // Отчёты используют prepaymentUpdatedAt как приоритетную дату (если колонка существует).
-  // При назначении из пула обновляем её тоже, чтобы заказ сразу попадал в текущий отчётный день.
-  if (hasPrepaymentUpdatedAt) {
-    if (hasUpdatedAt) {
-      await db.run('UPDATE orders SET prepaymentUpdatedAt = ?, updatedAt = datetime(\'now\') WHERE id = ?', currentDate, result.id);
-    } else if (hasUpdatedAtSnake) {
-      await db.run('UPDATE orders SET prepaymentUpdatedAt = ?, updated_at = datetime(\'now\') WHERE id = ?', currentDate, result.id);
-    } else {
-      await db.run('UPDATE orders SET prepaymentUpdatedAt = ? WHERE id = ?', currentDate, result.id);
-    }
-  }
+  const preDay = await OrderService.shiftOrderToAssignmentDay(result.id);
 
   const hasResponsible = await hasColumn('orders', 'responsible_user_id').catch(() => false);
+  const hasUpdatedAtSnake = await hasColumn('orders', 'updated_at').catch(() => false);
+  const hasUpdatedAt = await hasColumn('orders', 'updatedAt').catch(() => false);
   if (hasResponsible) {
     if (hasUpdatedAtSnake) {
       await db.run('UPDATE orders SET responsible_user_id = ?, updated_at = datetime(\'now\') WHERE id = ?', targetUserId, result.id);

@@ -70,12 +70,64 @@ function parseCategoryFields(body: Record<string, unknown>): Pick<DesignTemplate
   return out
 }
 
+/**
+ * @swagger
+ * /api/design-templates/public/categories:
+ *   get:
+ *     summary: Рубрики шаблонов для галереи на сайте
+ *     description: Публичный справочник категорий design_templates. API key не требуется.
+ *     tags: [Client Editor, Website Catalog]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Массив рубрик
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/PublicDesignTemplateCategory'
+ */
 /** Public API: справочник категорий для галереи на сайте. */
 router.get('/public/categories', asyncHandler(async (_req: Request, res: Response) => {
   const categories = await getPublicDesignTemplateCategories()
   res.json(categories)
 }))
 
+/**
+ * @swagger
+ * /api/design-templates/public:
+ *   get:
+ *     summary: Список шаблонов для галереи на сайте
+ *     description: |
+ *       Фильтрация по productId и typeId обязательна для галереи подтипа.
+ *       Без typeId вернётся весь активный каталог — не использовать на экране галереи.
+ *       spec — JSON-строка; для сетки достаточно preview_url, designState — в GET /public/{id}.
+ *     tags: [Client Editor, Website Catalog]
+ *     security: []
+ *     parameters:
+ *       - in: query
+ *         name: productId
+ *         schema: { type: integer }
+ *         description: ID продукта CRM
+ *       - in: query
+ *         name: typeId
+ *         schema: { type: integer }
+ *         description: ID подтипа (types[].id в конфиге продукта)
+ *       - in: query
+ *         name: sizeId
+ *         schema: { type: string }
+ *         description: ID размера из калькулятора (например 90x50)
+ *     responses:
+ *       200:
+ *         description: Массив шаблонов
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/PublicDesignTemplate'
+ */
 /** Public API for external website: templates filtered by product/type/size. */
 router.get('/public', asyncHandler(async (req: Request, res: Response) => {
   const productId = req.query.productId != null ? Number(req.query.productId) : undefined
@@ -89,6 +141,34 @@ router.get('/public', asyncHandler(async (req: Request, res: Response) => {
   res.json(templates)
 }))
 
+/**
+ * @swagger
+ * /api/design-templates/public/{id}:
+ *   get:
+ *     summary: Один шаблон с master designState для редактора
+ *     description: |
+ *       Активный шаблон с полем spec (JSON). Внутри spec — designState для копии в editor draft.
+ *       Master в design_templates клиент не перезаписывает.
+ *     tags: [Client Editor, Website Catalog]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: designTemplateId
+ *     responses:
+ *       200:
+ *         description: Шаблон
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PublicDesignTemplate'
+ *       400:
+ *         description: Неверный ID
+ *       404:
+ *         description: Шаблон не найден или неактивен
+ */
 /** Public API for external website: single active template with designState. */
 router.get('/public/:id', asyncHandler(async (req: Request, res: Response) => {
   const id = parseInt(req.params.id)

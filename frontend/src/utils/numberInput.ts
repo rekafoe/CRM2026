@@ -37,43 +37,49 @@ export function calendarDateLocal(value: string | null | undefined): string {
 
 /**
  * Касса за выбранный календарный день по заказу.
- * - Нет события выдачи в debt_closed за день → вся предоплата на дату (prepaymentAmount).
- * - Есть остаток при выдаче (cash_from_issue_today): для заказа, созданного в другой день, чем отчёт — только остаток (предоплата была в другие даты).
- * - Заказ создан в тот же день, что и отчёт: в кассу за день попала и предоплата, и доплата — берём полный prepaymentAmount после выдачи.
+ * Предпочитает cash_for_report_date с API (GET /reports/daily/:date/orders).
  */
 export function cashIncrementForRegisterDay(
   order: {
+    cash_for_report_date?: number | null;
     cash_from_issue_today?: number | null;
     prepaymentAmount?: string | number | null;
     prepayment_amount?: string | number | null;
+    prepaymentStatus?: string | null;
+    prepaymentUpdatedAt?: string | null;
     created_at?: string | null;
     createdAt?: string | null;
   },
   reportDate: string
 ): number {
+  const fromApi = order.cash_for_report_date;
+  if (fromApi !== null && fromApi !== undefined && Number.isFinite(Number(fromApi))) {
+    return Math.max(0, Number(fromApi));
+  }
+
   const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
   const rd = reportDate.slice(0, 10);
+  const status = String(order.prepaymentStatus ?? '').toLowerCase();
+  const isPaid = status === 'paid' || status === 'successful';
+  if (!isPaid || prepayment <= 0) return 0;
+
+  const prepayDay = calendarDateLocal(String(order.prepaymentUpdatedAt ?? ''));
+  const created = calendarDateLocal(String(order.created_at ?? order.createdAt ?? ''));
 
   const v = order.cash_from_issue_today;
   if (v === null || v === undefined) {
-    return prepayment;
+    return prepayDay === rd ? prepayment : 0;
   }
   const debt = Number(v);
   if (!Number.isFinite(debt)) {
-    return prepayment;
+    return prepayDay === rd ? prepayment : 0;
   }
 
-  // created_at с сервера часто в ISO UTC — slice(0,10) даёт «вчера» относительно локального дня отчёта
-  const created = calendarDateLocal(String(order.created_at ?? order.createdAt ?? ''));
   if (created === rd) {
-    if (debt < prepayment) {
-      return prepayment;
-    }
-    if (debt === 0 && prepayment > 0) {
-      return prepayment;
-    }
+    if (debt < prepayment) return prepayment;
+    if (debt === 0 && prepayment > 0) return prepayment;
   }
-  return debt;
+  return Math.max(0, debt);
 }
 
 export function normalizeEmptyStringsToNull<T extends Record<string, any>>(obj: T): T {

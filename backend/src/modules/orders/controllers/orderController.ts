@@ -12,6 +12,24 @@ import {
 } from '../../../services/editorDraftWebsitePrepare'
 import { completeEditorOrderIntake } from '../../../services/editorOrderIntakeService'
 import { mapCrmStatusToWebsiteStatus } from '../../../services/websiteOrderStatusSyncService'
+import { parseWebsiteOrderDelivery } from '../../../types/websiteOrderDelivery'
+
+function readWebsiteDeliveryFromBody(body: Record<string, unknown>) {
+  if (!Object.prototype.hasOwnProperty.call(body, 'delivery')) {
+    return { delivery: null as null, error: null as string | null }
+  }
+  if (body.delivery == null) {
+    return { delivery: null, error: null }
+  }
+  const delivery = parseWebsiteOrderDelivery(body.delivery)
+  if (!delivery) {
+    return {
+      delivery: null,
+      error: 'Поле delivery: обязательны kind, providerId и label',
+    }
+  }
+  return { delivery, error: null }
+}
 
 function getSafeServerErrorMessage(fallback: string, error: any): string {
   return process.env.NODE_ENV === 'production'
@@ -120,10 +138,17 @@ export class OrderController {
     try {
       const body = req.body || {}
       const { customerName, customerPhone, customerEmail, prepaymentAmount, items, customer_id } = body
+      const { delivery, error: deliveryError } = readWebsiteDeliveryFromBody(body)
+      if (deliveryError) {
+        res.status(400).json({ error: deliveryError, message: deliveryError })
+        return
+      }
 
       // Логируем входящие данные с сайта для отладки (без больших полей)
       logger.info('createOrderFromWebsite: входящий запрос', {
         bodyKeys: Object.keys(body),
+        deliveryKind: delivery?.kind ?? null,
+        deliveryProviderId: delivery?.providerId ?? null,
         customerName: customerName ?? null,
         customerPhone: customerPhone ?? null,
         customerEmail: customerEmail ?? null,
@@ -162,6 +187,7 @@ export class OrderController {
           userId: undefined,
           customer_id,
           source: 'website',
+          delivery,
           items: editorDraftPrepared.items
         })
         await attachEditorDraftsToOrderItems(result.order.id, result.itemIds ?? [], editorDraftPrepared.editorDraftItems)
@@ -191,8 +217,16 @@ export class OrderController {
         'website',
         customer_id
       )
+      if (delivery) {
+        await OrderService.persistOrderDelivery(order.id, delivery)
+      }
+      const db = await getDb()
+      const rawOrder = await db.get('SELECT * FROM orders WHERE id = ?', order.id)
       setLastWebsiteOrderAt(Date.now())
-      res.status(201).json({ order, message: 'Заказ с сайта создан' })
+      res.status(201).json({
+        order: OrderService.toApiOrder({ ...(rawOrder as Record<string, unknown>), items: [] }),
+        message: 'Заказ с сайта создан',
+      })
     } catch (error: any) {
       logger.error('createOrderFromWebsite error', { error: error?.message, stack: error?.stack })
       if (isEditorDraftOrderError(error)) {
@@ -305,6 +339,11 @@ export class OrderController {
       const customerEmail = body.customerEmail != null ? String(body.customerEmail) : undefined
       const prepaymentAmount = body.prepaymentAmount != null ? Number(body.prepaymentAmount) : undefined
       const customer_id = body.customer_id != null ? Number(body.customer_id) : undefined
+      const { delivery, error: deliveryError } = readWebsiteDeliveryFromBody(body)
+      if (deliveryError) {
+        res.status(400).json({ error: deliveryError, message: deliveryError })
+        return
+      }
 
       if (!customerName && !customerPhone) {
         res.status(400).json({
@@ -328,6 +367,7 @@ export class OrderController {
           userId: undefined,
           customer_id,
           source: 'website',
+          delivery,
           items: editorDraftPrepared.items
         })
         order = result.order as any
@@ -350,6 +390,10 @@ export class OrderController {
           'website',
           customer_id
         ) as any
+        if (delivery) {
+          await OrderService.persistOrderDelivery(order.id, delivery)
+          order = OrderService.toApiOrder({ ...(order as Record<string, unknown>), delivery, items: [] })
+        }
       }
       setLastWebsiteOrderAt(Date.now())
 

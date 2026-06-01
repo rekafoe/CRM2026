@@ -17,6 +17,7 @@ interface UnifiedOrder {
   assignedTo?: number;
   assignedToName?: string;
   notes?: string;
+  deliverySummary?: string;
   orderNumber?: string; // tg-ord-123 или site-ord-123
 }
 
@@ -356,6 +357,11 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
                       <div className="text-sm text-gray-600 mb-1">
                         <strong>Контакты:</strong> {order.customerContact || 'Не указаны'}
                       </div>
+                      {order.deliverySummary ? (
+                        <div className="text-sm text-gray-600 mb-1">
+                          <strong>Получение:</strong> {order.deliverySummary}
+                        </div>
+                      ) : null}
                       <div className="text-sm text-gray-600 mb-1">
                         <strong>Сумма:</strong> <MoneyAmount value={normalizeAmount(order.totalAmount, order.type)} />
                       </div>
@@ -413,6 +419,11 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
                       <div className="text-sm text-gray-600 mb-1">
                         <strong>Ответственный:</strong> {order.assignedToName || 'Не назначен'}
                       </div>
+                      {order.deliverySummary ? (
+                        <div className="text-sm text-gray-600 mb-1">
+                          <strong>Получение:</strong> {order.deliverySummary}
+                        </div>
+                      ) : null}
                       <div className="text-sm text-gray-600 mb-1">
                         <strong>Сумма:</strong> <MoneyAmount value={normalizeAmount(order.totalAmount, order.type)} />
                       </div>

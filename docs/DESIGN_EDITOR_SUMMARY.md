@@ -1,5 +1,7 @@
 # Редактор макетов
 
+> **Интеграция на отдельный сайт:** полный гайд для команд сайта — [client-editor-site-integration.md](./client-editor-site-integration.md) (BFF, `ClientEditorRouter`, checkout с `editorDraftToken`). Ниже — обзор редактора в CRM (админ + public API).
+
 ## Назначение
 
 Редактор работает с печатными макетами на базе `designState`. Важно разделять три сущности:

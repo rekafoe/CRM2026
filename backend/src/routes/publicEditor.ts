@@ -92,10 +92,68 @@ async function sendDraftFileThumb(req: Request, res: Response): Promise<void> {
   res.sendFile(filePath)
 }
 
+/**
+ * @swagger
+ * /api/public-editor/drafts/{token}/files/{fileId}/content:
+ *   get:
+ *     summary: Содержимое файла draft (для img в редакторе)
+ *     description: Доступ по секретному token draft. JWT и API key не требуются.
+ *     tags: [Client Editor]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: fileId
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Бинарное содержимое файла
+ *       404:
+ *         description: Файл не найден
+ * /api/public-editor/drafts/{token}/files/{fileId}/thumb:
+ *   get:
+ *     summary: Миниатюра файла draft
+ *     tags: [Client Editor]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: fileId
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: JPEG миниатюра
+ *       404:
+ *         description: Миниатюра не найдена
+ */
 /** Stable draft file URL for browser image rendering; token scopes file access. */
 router.get('/drafts/:token/files/:fileId/content', asyncHandler(sendDraftFileContent))
 router.get('/drafts/:token/files/:fileId/thumb', asyncHandler(sendDraftFileThumb))
 
+/**
+ * @swagger
+ * /api/public-editor/branding:
+ *   get:
+ *     summary: Брендинг для оболочки редактора на сайте
+ *     description: Логотип и название организации. Реквизиты не отдаются. API key не требуется.
+ *     tags: [Client Editor]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Брендинг
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PublicEditorBranding'
+ */
 /** Public branding for website/client editor shell. Does not expose requisites. */
 router.get('/branding', asyncHandler(async (_req: Request, res: Response) => {
   res.json(await getPublicBranding())
@@ -170,6 +228,36 @@ router.post('/admin-preview/drafts/:token/finalize', authenticate, asyncHandler(
 
 router.use(requireWebsiteOrderApiKey)
 
+/**
+ * @swagger
+ * /api/public-editor/drafts:
+ *   post:
+ *     summary: Создать черновик редактора
+ *     description: |
+ *       Создаёт editor_drafts для клиента на сайте. Ответ содержит token — сохраните как editorDraftToken в корзине.
+ *       Master designState обычно копируется клиентом из GET /api/design-templates/public/:id в payload при создании или первом PATCH.
+ *       WEBSITE_ORDER_API_KEY на CRM; вызывать через BFF сайта.
+ *     tags: [Client Editor]
+ *     security:
+ *       - websiteApiKey: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/EditorDraftCreate'
+ *     responses:
+ *       201:
+ *         description: Draft создан
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/EditorDraft'
+ *       401:
+ *         description: Неверный API key
+ *       503:
+ *         description: WEBSITE_ORDER_API_KEY не настроен
+ */
 /** POST /api/public-editor/drafts — создать editor draft для отдельного сайта */
 router.post('/drafts', asyncHandler(async (req: Request, res: Response) => {
   const body = req.body ?? {}
@@ -177,6 +265,69 @@ router.post('/drafts', asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json(draft)
 }))
 
+/**
+ * @swagger
+ * /api/public-editor/drafts/{token}:
+ *   get:
+ *     summary: Получить черновик редактора
+ *     tags: [Client Editor]
+ *     security:
+ *       - websiteApiKey: []
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Draft
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/EditorDraft'
+ *       404:
+ *         description: Draft не найден
+ *       401:
+ *         description: Неверный API key
+ *       503:
+ *         description: WEBSITE_ORDER_API_KEY не настроен
+ *   patch:
+ *     summary: Autosave состояния редактора
+ *     description: |
+ *       Тело — поля payload (designState, photoBatch, selectedParams).
+ *       Опционально expectedVersion для защиты от конфликта (409 при несовпадении).
+ *     tags: [Client Editor]
+ *     security:
+ *       - websiteApiKey: []
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             allOf:
+ *               - $ref: '#/components/schemas/EditorDraftPayload'
+ *               - type: object
+ *                 properties:
+ *                   expectedVersion:
+ *                     type: integer
+ *                     description: Ожидаемая версия draft
+ *     responses:
+ *       200:
+ *         description: Draft обновлён
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/EditorDraft'
+ *       409:
+ *         description: Конфликт версии или draft финализирован
+ *       404:
+ *         description: Draft не найден
+ */
 /** GET /api/public-editor/drafts/:token — получить draft */
 router.get('/drafts/:token', asyncHandler(async (req: Request, res: Response) => {
   const draft = await getEditorDraft(req.params.token)
@@ -187,6 +338,60 @@ router.get('/drafts/:token', asyncHandler(async (req: Request, res: Response) =>
   res.json(draft)
 }))
 
+/**
+ * @swagger
+ * /api/public-editor/drafts/{token}/files:
+ *   get:
+ *     summary: Список файлов черновика
+ *     description: Каждый элемент содержит url и thumbUrl для Fabric JSON.
+ *     tags: [Client Editor]
+ *     security:
+ *       - websiteApiKey: []
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Массив файлов
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/EditorDraftFile'
+ *   post:
+ *     summary: Загрузить файл в черновик
+ *     tags: [Client Editor]
+ *     security:
+ *       - websiteApiKey: []
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       201:
+ *         description: Файл загружен
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/EditorDraftFile'
+ *       400:
+ *         description: Ошибка загрузки
+ */
 router.get('/drafts/:token/files', asyncHandler(async (req: Request, res: Response) => {
   const files = await listEditorDraftFiles(req.params.token)
   res.json(files.map((file) => withDraftFileUrl(req, req.params.token, file)))
@@ -202,7 +407,6 @@ router.patch('/drafts/:token', asyncHandler(async (req: Request, res: Response) 
   }
 }))
 
-/** POST /api/public-editor/drafts/:token/files — загрузить файл клиента в draft */
 router.post(
   '/drafts/:token/files',
   uploadOrderFilesMemory.single('file'),
@@ -216,6 +420,26 @@ router.post(
   }),
 )
 
+/**
+ * @swagger
+ * /api/public-editor/projects/{id}/clone-draft:
+ *   post:
+ *     summary: Новый draft из проекта клиента
+ *     description: Клонирует customer_projects в новый editor draft (личный кабинет / повтор заказа).
+ *     tags: [Client Editor]
+ *     security:
+ *       - websiteApiKey: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       201:
+ *         description: Draft создан
+ *       400:
+ *         description: Ошибка клонирования
+ */
 /** POST /api/public-editor/projects/:id/clone-draft — новый draft из проекта клиента (сайт) */
 router.post('/projects/:id/clone-draft', asyncHandler(async (req: Request, res: Response) => {
   try {
@@ -231,6 +455,37 @@ router.post('/projects/:id/clone-draft', asyncHandler(async (req: Request, res: 
   }
 }))
 
+/**
+ * @swagger
+ * /api/public-editor/drafts/{token}/finalize:
+ *   post:
+ *     summary: Финализировать draft в заказ (sandbox)
+ *     description: |
+ *       Создаёт заказ source=website из одного draft. Для отладки и CRM preview.
+ *       **Не использовать** вместо checkout сайта с корзиной и POST /api/orders/from-website.
+ *     tags: [Client Editor]
+ *     security:
+ *       - websiteApiKey: []
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               customerName: { type: string }
+ *               customerPhone: { type: string }
+ *               customerEmail: { type: string, format: email }
+ *     responses:
+ *       201:
+ *         description: Заказ создан из draft
+ *       400:
+ *         description: Ошибка финализации
+ */
 /** POST /api/public-editor/drafts/:token/finalize — создать заказ source=website */
 router.post('/drafts/:token/finalize', asyncHandler(async (req: Request, res: Response) => {
   try {
