@@ -2180,3 +2180,21 @@
   margin-bottom: 8px;
 }
 
+.simplified-template__multipage-panel {
+  margin-top: 4px;
+}
+
+.simplified-card__title-inline {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.multipage-tab__intro {
+  margin: 6px 0 0;
+}
+
+.multipage-tab__bounds {
+  margin-top: 12px;
+}
+

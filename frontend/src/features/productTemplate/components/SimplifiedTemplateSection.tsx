@@ -16,6 +16,7 @@ import { clonePrintBlockFromSize } from '../utils/clonePrintConfig'
 import { computeItemsPerSheet } from './PrintSheetSection'
 import { ImprovedPrintingCalculatorModal } from '../../../components/calculator/ImprovedPrintingCalculatorModal'
 import { MultiPageStructureCard } from './MultiPageStructureCard'
+import { MultiPagePagesTab } from './MultiPagePagesTab'
 import './SimplifiedTemplateSection.css'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
@@ -38,7 +39,14 @@ export type BindingServiceRow = {
   variants?: Array<{ id: number; variantName?: string; variant_name?: string }>;
 }
 
-export type SimplifiedEditorTab = 'print' | 'materials' | 'finishing' | 'design' | 'check'
+export type SimplifiedEditorTab =
+  | 'pages'
+  | 'assembly'
+  | 'print'
+  | 'materials'
+  | 'finishing'
+  | 'design'
+  | 'check'
 export type SimplifiedChecklistState = {
   size: boolean
   print: boolean
@@ -230,8 +238,9 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const [copySelectedSizeIds, setCopySelectedSizeIds] = useState<(number | string)[]>([])
   const [selectedPaperTypeId, setSelectedPaperTypeId] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
-  const [newPageToAdd, setNewPageToAdd] = useState('')
-  const [editorTab, setEditorTab] = useState<SimplifiedEditorTab>('print')
+  const [editorTab, setEditorTab] = useState<SimplifiedEditorTab>(() =>
+    showPagesConfig ? 'pages' : 'print',
+  )
 
   const multiPageStructure = value.multiPageStructure || {}
   const multiPageInnerBlock = multiPageStructure.innerBlock || { pagesSource: 'parameter' as const }
@@ -425,11 +434,17 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
     }
   }, [selected])
 
+  const isMultipageEditorTab =
+    showPagesConfig && (editorTab === 'pages' || editorTab === 'assembly')
+
   useEffect(() => {
     if (editorTab === 'design' && !(productId && selectedTypeId != null)) {
       setEditorTab('print')
     }
-  }, [editorTab, productId, selectedTypeId])
+    if (!showPagesConfig && (editorTab === 'pages' || editorTab === 'assembly')) {
+      setEditorTab('print')
+    }
+  }, [editorTab, productId, selectedTypeId, showPagesConfig])
 
   useEffect(() => {
     onEditorTabChange?.(editorTab)
@@ -678,137 +693,25 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         </div>
       </div>
 
-      {showPagesConfig && (
-        <div className="simplified-card">
-          <div className="simplified-card__header">
-            <div>
-              {headerWithHint(
-                'Страницы (для многостраничных изделий)',
-                'Привяжите к продукту варианты количества страниц — они появятся в калькуляторе.',
-              )}
-            </div>
-          </div>
-          <div className="simplified-card__content simplified-pages-config">
-            <FormField label="Привязанные варианты">
-              <div className="simplified-pages-list">
-                {(pagesConfig.options || []).length === 0 ? (
-                  <span className="text-muted text-sm">Нет привязанных вариантов.</span>
-                ) : (
-                  (pagesConfig.options || [])
-                    .slice()
-                    .sort((a, b) => a - b)
-                    .map((num) => (
-                      <span key={num} className="simplified-pages-chip">
-                        <span>{num} стр.</span>
-                        <button
-                          type="button"
-                          className="simplified-pages-chip__remove"
-                          onClick={() => {
-                            const nextOptions = (pagesConfig.options || []).filter((n) => n !== num);
-                            const nextDefault =
-                              pagesConfig.default === num
-                                ? (nextOptions[0] ?? undefined)
-                                : pagesConfig.default && nextOptions.includes(pagesConfig.default)
-                                  ? pagesConfig.default
-                                  : nextOptions[0];
-                            updatePagesConfig({ options: nextOptions, default: nextDefault });
-                          }}
-                          title="Отвязать"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))
-                )}
-              </div>
-              <div className="simplified-pages-add">
-                <input
-                  className="form-input simplified-pages-add__input"
-                  type="number"
-                  min={4}
-                  max={500}
-                  step={4}
-                  value={newPageToAdd}
-                  onChange={(e) => setNewPageToAdd(e.target.value)}
-                  placeholder="Напр. 16"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      const num = parseInt(newPageToAdd.trim(), 10);
-                      if (Number.isFinite(num) && num >= 4 && num <= 500) {
-                        const options = pagesConfig.options || [];
-                        if (!options.includes(num)) {
-                          const nextOptions = [...options, num].sort((a, b) => a - b);
-                          const nextDefault = options.length === 0 ? num : pagesConfig.default;
-                          updatePagesConfig({ options: nextOptions, default: nextDefault ?? num });
-                          setNewPageToAdd('');
-                        }
-                      }
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    const num = parseInt(newPageToAdd.trim(), 10);
-                    if (!Number.isFinite(num) || num < 4 || num > 500) return;
-                    const options = pagesConfig.options || [];
-                    if (options.includes(num)) return;
-                    const nextOptions = [...options, num].sort((a, b) => a - b);
-                    const nextDefault = options.length === 0 ? num : pagesConfig.default;
-                    updatePagesConfig({ options: nextOptions, default: nextDefault ?? num });
-                    setNewPageToAdd('');
-                  }}
-                >
-                  Добавить
-                </Button>
-              </div>
-            </FormField>
-            <FormField label="По умолчанию в калькуляторе">
-              <select
-                className="form-select"
-                value={pagesConfig.default ?? ''}
-                onChange={(e) => updatePagesConfig({ default: e.target.value === '' ? undefined : Number(e.target.value) })}
-                disabled={!pagesConfig.options || pagesConfig.options.length === 0}
-              >
-                <option value="">—</option>
-                {(pagesConfig.options || []).slice().sort((a, b) => a - b).map((pages) => (
-                  <option key={pages} value={pages}>{pages} стр.</option>
-                ))}
-              </select>
-            </FormField>
-          </div>
-        </div>
-      )}
-
-      {showPagesConfig && (
-        <div className="simplified-card">
-          <div className="simplified-card__header">
-            <div>
-              {headerWithHint(
-                'Структура многостраничного изделия',
-                'Настройка обложки, внутреннего блока и переплёта. Другой переплёт или набор операций — отдельный продукт в каталоге.',
-              )}
-            </div>
-          </div>
-          <div className="simplified-card__content">
-            <MultiPageStructureCard
-              structure={multiPageStructure}
-              onChange={updateMultiPageStructure}
-              pagesHint={multiPageSheetsHint}
-              allMaterials={allMaterials}
-              preferredMaterialIds={effectiveAllowedMaterialIds}
-              printTechs={printTechs}
-              bindingServices={bindingServices}
-              selectedSize={selected ?? null}
-            />
-          </div>
-        </div>
-      )}
-
       <div className="product-tabs simplified-template__editor-tabs">
+        {showPagesConfig && (
+          <>
+            <button
+              type="button"
+              className={`product-tab ${editorTab === 'pages' ? 'product-tab--active' : ''}`}
+              onClick={() => setEditorTab('pages')}
+            >
+              Страницы
+            </button>
+            <button
+              type="button"
+              className={`product-tab ${editorTab === 'assembly' ? 'product-tab--active' : ''}`}
+              onClick={() => setEditorTab('assembly')}
+            >
+              Сборка
+            </button>
+          </>
+        )}
         <button
           type="button"
           className={`product-tab ${editorTab === 'print' ? 'product-tab--active' : ''}`}
@@ -848,6 +751,39 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         </button>
       </div>
 
+      {isMultipageEditorTab && (
+        <div className="simplified-template__multipage-panel">
+          {editorTab === 'pages' && (
+            <MultiPagePagesTab pagesConfig={pagesConfig} onChange={updatePagesConfig} />
+          )}
+          {editorTab === 'assembly' && (
+            <div className="simplified-card">
+              <div className="simplified-card__header">
+                <div>
+                  {headerWithHint(
+                    'Сборка изделия',
+                    'Внутренний блок, обложка и переплёт. Другой переплёт — отдельный продукт в каталоге.',
+                  )}
+                </div>
+              </div>
+              <div className="simplified-card__content">
+                <MultiPageStructureCard
+                  structure={multiPageStructure}
+                  onChange={updateMultiPageStructure}
+                  pagesHint={multiPageSheetsHint}
+                  allMaterials={allMaterials}
+                  preferredMaterialIds={effectiveAllowedMaterialIds}
+                  printTechs={printTechs}
+                  bindingServices={bindingServices}
+                  selectedSize={selected ?? null}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isMultipageEditorTab && (
       <div className="simplified-template__grid">
         <div className="simplified-template__sizes">
           <div className="simplified-template__sizes-header">
@@ -1152,6 +1088,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
             )}
           </div>
         </div>
+      )}
 
       <AddSizeModal
         isOpen={showAddSize}
