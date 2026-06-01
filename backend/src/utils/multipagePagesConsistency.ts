@@ -249,6 +249,16 @@ export function templateHasPagesPricing(pages: unknown): boolean {
  * Физических печатных листов на одно изделие (блок): страницы / (вместимость на сторону × стороны).
  * Пример: 28 стр., A4 на SRA3 (2 на сторону), duplex → ceil(28/4) = 7 листов.
  */
+/** Позиций печати (полей на листе) для биллинга: физические листы × вместимость раскладки. */
+export function computeMultipagePrintUnits(
+  physicalSheets: number,
+  itemsPerSheet: number,
+): number {
+  const sheets = Math.max(1, Math.floor(Number(physicalSheets)) || 1);
+  const perSide = Math.max(1, Math.floor(Number(itemsPerSheet)) || 1);
+  return sheets * perSide;
+}
+
 export function computeMultipageSheetsPerItem(
   pages: number,
   itemsPerSheet: number,

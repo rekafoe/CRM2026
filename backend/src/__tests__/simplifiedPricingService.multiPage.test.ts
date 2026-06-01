@@ -216,8 +216,8 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
       1,
     );
 
-    // 4 стр., 2 на сторону листа → 2 печатных листа × 2 BYN
-    expect(result.finalPrice).toBe(4);
+    // 2 листа × 2 поля × 2 BYN
+    expect(result.finalPrice).toBe(8);
   });
 
   it('28 стр. duplex на SRA3 (2 A4 на сторону) → 7 печатных листов на изделие', async () => {
@@ -242,8 +242,8 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
       1,
     );
 
-    // 7 листов × 1 экз. × 2 BYN/лист
-    expect(result.finalPrice).toBe(14);
+    // 7 листов × 2 поля A4 × 2 BYN/поле = 28
+    expect(result.finalPrice).toBe(28);
     expect(result.layout?.sheetsNeeded).toBe(7);
   });
 
@@ -266,8 +266,8 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
       1,
     );
 
-    // 4 стр., 2 на сторону → 2 листа × 2 BYN
-    expect(result.finalPrice).toBe(4);
+    // 2 листа × 2 поля × 2 BYN
+    expect(result.finalPrice).toBe(8);
   });
 
   it('отклоняет pages выше max шаблона для multi_page', async () => {

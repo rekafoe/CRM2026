@@ -31,6 +31,7 @@ import type {
 } from '../dtos/plotterCuttingTariff.dto';
 import { PlotterCuttingTariffRepository } from '../repositories/plotterCuttingTariffRepository';
 import {
+  computeMultipagePrintUnits,
   computeMultipageSheetsPerItem,
   usesMultipageSheetPricing,
   validateBindingPagesLimit,
@@ -698,6 +699,10 @@ export class SimplifiedPricingService {
     const metersPerItem = isRollMeterage ? Math.min(layoutTrim.width, layoutTrim.height) / 1000 : 0;
     const metersNeeded = isRollMeterage ? metersPerItem * quantity : 0;
     const effectivePrintQuantity = isRollMeterage ? metersNeeded : sheetsNeeded;
+    /** В шаблоне unit_price — за одно поле раскладки (A4 на SRA3); за физический лист = unit × itemsPerSheet */
+    const multipagePrintUnits = usePagesMultiplier
+      ? computeMultipagePrintUnits(effectivePrintQuantity, itemsPerSheet)
+      : quantity;
 
     const isDuplexModeSelected =
       normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back';
@@ -735,13 +740,13 @@ export class SimplifiedPricingService {
       // Раньше при counter_unit=meters ветка рулона шла раньше и полностью игнорировала шаблон.
       let resolvedFromTemplate = false;
       if (printPriceConfig?.tiers?.length) {
-        const tierQuantity = usePagesMultiplier ? effectivePrintQuantity : quantity;
+        const tierQuantity = usePagesMultiplier ? multipagePrintUnits : quantity;
         const tier = this.findTierForQuantity(printPriceConfig.tiers, tierQuantity);
         const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (priceForTier > 0) {
           const pricePerSheet = priceForTier * itemsPerSheet;
           const basePrintPrice = usePagesMultiplier
-            ? priceForTier * effectivePrintQuantity
+            ? priceForTier * multipagePrintUnits
             : sheetsNeeded * pricePerSheet;
           printPrice = basePrintPrice * billingModeMultiplier;
           printDetails = {
@@ -757,6 +762,7 @@ export class SimplifiedPricingService {
             pages: effectivePages,
             sheetsPerItem,
             effectivePrintQuantity,
+            multipagePrintUnits,
             basePrintPrice,
             billingModeMultiplier,
             printPrice,
@@ -2093,9 +2099,20 @@ export class SimplifiedPricingService {
         const tier = this.findTierForQuantity(ctx.printPriceConfig.tiers, q);
         const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (priceForTier > 0) {
-          const sheetsNeeded = ctx.usePagesMultiplier ? Math.max(1, q * ctx.sheetsPerItem) : Math.ceil(q / ctx.itemsPerSheet);
-          const pricePerSheet = priceForTier * ctx.itemsPerSheet;
-          const basePrintPrice = ctx.usePagesMultiplier ? priceForTier * q : sheetsNeeded * pricePerSheet;
+          const physicalSheets = ctx.usePagesMultiplier
+            ? Math.max(1, q * ctx.sheetsPerItem)
+            : Math.ceil(q / ctx.itemsPerSheet);
+          const printUnits = ctx.usePagesMultiplier
+            ? computeMultipagePrintUnits(physicalSheets, ctx.itemsPerSheet)
+            : q;
+          const tierForPrint = ctx.usePagesMultiplier
+            ? this.findTierForQuantity(ctx.printPriceConfig.tiers, printUnits)
+            : tier;
+          const unitPrice = tierForPrint ? this.getPriceForQuantityTier(tierForPrint) : priceForTier;
+          const pricePerSheet = unitPrice * ctx.itemsPerSheet;
+          const basePrintPrice = ctx.usePagesMultiplier
+            ? unitPrice * printUnits
+            : physicalSheets * pricePerSheet;
           printPrice = basePrintPrice * ctx.billingModeMultiplier;
         }
       }

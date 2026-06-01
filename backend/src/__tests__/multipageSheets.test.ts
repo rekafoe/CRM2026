@@ -1,4 +1,13 @@
-import { computeMultipageSheetsPerItem } from '../utils/multipagePagesConsistency';
+import {
+  computeMultipagePrintUnits,
+  computeMultipageSheetsPerItem,
+} from '../utils/multipagePagesConsistency';
+
+describe('computeMultipagePrintUnits', () => {
+  it('7 физических листов × 2 на сторону → 14 позиций печати', () => {
+    expect(computeMultipagePrintUnits(7, 2)).toBe(14);
+  });
+});
 
 describe('computeMultipageSheetsPerItem', () => {
   it('28 стр., 2 на сторону, duplex → 7 листов', () => {
