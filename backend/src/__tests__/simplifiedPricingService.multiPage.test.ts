@@ -39,6 +39,8 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (LayoutCalculationService.calculateLayout as jest.Mock).mockReturnValue(layoutMock(1));
+    (LayoutCalculationService.findOptimalSheetSize as jest.Mock).mockReturnValue(layoutMock(1));
 
     productRow = {
       id: 1,
@@ -214,7 +216,35 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
       1,
     );
 
-    expect(result.finalPrice).toBe(8);
+    // 4 стр., 2 на сторону листа → 2 печатных листа × 2 BYN
+    expect(result.finalPrice).toBe(4);
+  });
+
+  it('28 стр. duplex на SRA3 (2 A4 на сторону) → 7 печатных листов на изделие', async () => {
+    (LayoutCalculationService.calculateLayout as jest.Mock).mockReturnValue(layoutMock(2));
+    (LayoutCalculationService.findOptimalSheetSize as jest.Mock).mockReturnValue(layoutMock(2));
+    templateConfigData.simplified.sizes[0].print_prices.push({
+      technology_code: 'laser_prof',
+      color_mode: 'color',
+      sides_mode: 'duplex',
+      tiers: [{ min_qty: 1, unit_price: 2 }],
+    });
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'duplex',
+        pages: 28 as any,
+      } as any,
+      1,
+    );
+
+    // 7 листов × 1 экз. × 2 BYN/лист
+    expect(result.finalPrice).toBe(14);
+    expect(result.layout?.sheetsNeeded).toBe(7);
   });
 
   it('не привязывает мин. тираж к раскладке (itemsPerSheet) для multi_page', async () => {
@@ -236,8 +266,8 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
       1,
     );
 
-    // 4 стр. × 1 экз. × 2 BYN/лист
-    expect(result.finalPrice).toBe(8);
+    // 4 стр., 2 на сторону → 2 листа × 2 BYN
+    expect(result.finalPrice).toBe(4);
   });
 
   it('отклоняет pages выше max шаблона для multi_page', async () => {

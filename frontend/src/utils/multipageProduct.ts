@@ -6,6 +6,18 @@ export type SimplifiedPagesLike = {
   allowCustom?: boolean;
 } | null | undefined;
 
+/** Физических печатных листов на одно изделие (с учётом раскладки и duplex). */
+export function computeMultipageSheetsPerItem(
+  pages: number,
+  itemsPerSheet: number,
+  duplex: boolean,
+): number {
+  const p = Math.max(1, Math.floor(Number(pages)) || 1);
+  const perSide = Math.max(1, Math.floor(Number(itemsPerSheet)) || 1);
+  const pagesPerPhysicalSheet = perSide * (duplex ? 2 : 1);
+  return Math.max(1, Math.ceil(p / pagesPerPhysicalSheet));
+}
+
 /** Продукт с расчётом по страницам (альбомы, брошюры), а не «N шт на лист». */
 export function isMultipageLikeProduct(params: {
   productType?: string | null;

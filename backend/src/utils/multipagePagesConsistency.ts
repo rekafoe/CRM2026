@@ -245,6 +245,22 @@ export function templateHasPagesPricing(pages: unknown): boolean {
   return false;
 }
 
+/**
+ * Физических печатных листов на одно изделие (блок): страницы / (вместимость на сторону × стороны).
+ * Пример: 28 стр., A4 на SRA3 (2 на сторону), duplex → ceil(28/4) = 7 листов.
+ */
+export function computeMultipageSheetsPerItem(
+  pages: number,
+  itemsPerSheet: number,
+  sidesMode?: string | null,
+): number {
+  const p = Math.max(1, Math.floor(Number(pages)) || 1);
+  const perSide = Math.max(1, Math.floor(Number(itemsPerSheet)) || 1);
+  const duplex = sidesMode === 'duplex' || sidesMode === 'duplex_bw_back';
+  const pagesPerPhysicalSheet = perSide * (duplex ? 2 : 1);
+  return Math.max(1, Math.ceil(p / pagesPerPhysicalSheet));
+}
+
 /** Печать с множителем страниц (тираж × листов на экземпляр), без min тиража по раскладке. */
 export function usesMultipageSheetPricing(params: {
   productType?: string | null;

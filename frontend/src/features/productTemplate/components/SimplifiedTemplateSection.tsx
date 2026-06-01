@@ -17,6 +17,7 @@ import { computeItemsPerSheet } from './PrintSheetSection'
 import { ImprovedPrintingCalculatorModal } from '../../../components/calculator/ImprovedPrintingCalculatorModal'
 import { MultiPageStructureCard } from './MultiPageStructureCard'
 import { MultiPagePagesTab } from './MultiPagePagesTab'
+import { computeMultipageSheetsPerItem } from '../../../utils/multipageProduct'
 import './SimplifiedTemplateSection.css'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
@@ -251,12 +252,15 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
         ? Number(multiPageInnerBlock.fixedPages)
         : Number(pagesConfig?.default ?? pagesConfig?.options?.[0])
     if (!Number.isFinite(pages) || pages < 1) return null
+    const itemsPerSheet =
+      layoutPreview?.n != null && layoutPreview.n > 0 && !layoutPreview.noMat ? layoutPreview.n : 1
     return {
       pages,
-      singleSheets: pages,
-      duplexSheets: Math.max(1, Math.ceil(pages / 2)),
+      itemsPerSheet,
+      singleSheets: computeMultipageSheetsPerItem(pages, itemsPerSheet, false),
+      duplexSheets: computeMultipageSheetsPerItem(pages, itemsPerSheet, true),
     }
-  }, [multiPageInnerBlock, pagesConfig?.default, pagesConfig?.options])
+  }, [multiPageInnerBlock, pagesConfig?.default, pagesConfig?.options, layoutPreview?.n, layoutPreview?.noMat])
 
   const updateMultiPageStructure = useCallback((patch: Partial<NonNullable<SimplifiedConfig['multiPageStructure']>>) => {
     onChange({

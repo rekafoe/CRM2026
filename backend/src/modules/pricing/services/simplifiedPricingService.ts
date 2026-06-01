@@ -31,6 +31,7 @@ import type {
 } from '../dtos/plotterCuttingTariff.dto';
 import { PlotterCuttingTariffRepository } from '../repositories/plotterCuttingTariffRepository';
 import {
+  computeMultipageSheetsPerItem,
   usesMultipageSheetPricing,
   validateBindingPagesLimit,
   validateMultiPageCountForTemplate,
@@ -683,8 +684,9 @@ export class SimplifiedPricingService {
       });
     }
     const sidesMode = normalizedConfig.print_sides_mode || 'single';
-    const sheetsPerItem =
-      sidesMode === 'duplex' || sidesMode === 'duplex_bw_back'
+    const sheetsPerItem = usePagesMultiplier
+      ? computeMultipageSheetsPerItem(effectivePages, itemsPerSheet, sidesMode)
+      : sidesMode === 'duplex' || sidesMode === 'duplex_bw_back'
         ? Math.max(1, Math.ceil(effectivePages / 2))
         : Math.max(1, effectivePages);
     // Листов к списанию: многостраничные — quantity * листов_на_экземпляр; листовые — ceil(quantity / вместимость_на_лист)
