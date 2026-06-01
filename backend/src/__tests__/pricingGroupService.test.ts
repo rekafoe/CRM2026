@@ -53,6 +53,7 @@ describe('pricingGroupService', () => {
           quantity: 100,
           configuration: config,
           sheetsNeeded: 10,
+          tierVolume: 10,
         },
         {
           lineId: 'b',
@@ -60,11 +61,13 @@ describe('pricingGroupService', () => {
           quantity: 200,
           configuration: config,
           sheetsNeeded: 20,
+          tierVolume: 20,
         },
       ]);
       expect(groups.size).toBe(1);
       const g = groups.get('1|laser_prof|color|single');
       expect(g?.totalSheets).toBe(30);
+      expect(g?.totalTierVolume).toBe(30);
       expect(g?.lineIds).toEqual(['a', 'b']);
     });
 
@@ -81,6 +84,7 @@ describe('pricingGroupService', () => {
           quantity: 50,
           configuration: { ...base, material_id: 1 },
           sheetsNeeded: 5,
+          tierVolume: 5,
         },
         {
           lineId: 2,
@@ -88,6 +92,7 @@ describe('pricingGroupService', () => {
           quantity: 50,
           configuration: { ...base, material_id: 2 },
           sheetsNeeded: 5,
+          tierVolume: 5,
         },
       ]);
       expect(groups.size).toBe(2);

@@ -107,6 +107,12 @@ export interface SimplifiedPricingResult {
   subtotal: number;
   finalPrice: number;
   pricePerUnit: number;
+
+  /**
+   * Объём для tier при группировке позиций заказа/корзины.
+   * Многостраничные — print units (блок+обложка); листовые — физические листы.
+   */
+  tierVolumeForGrouping?: number;
   
   // Детализация
   printDetails?: {
@@ -2110,6 +2116,11 @@ export class SimplifiedPricingService {
           }
         : {}),
       ...(operationMaterials.length > 0 ? { operationMaterials } : {}),
+      tierVolumeForGrouping: usePagesMultiplier
+        ? multipageTierPrintUnits
+        : isRollMeterage
+          ? Math.max(1, Math.floor(metersNeeded))
+          : sheetsNeeded,
     };
   }
   

@@ -24,10 +24,12 @@ export interface QuotedLineResult {
   sheetsNeeded: number;
   groupKey: string | null;
   groupTotalSheets: number | null;
+  groupTotalTierVolume?: number | null;
   tierMinQty: number | null;
   pricingMeta: {
     groupKey: string | null;
     groupTotalSheets: number | null;
+    groupTotalTierVolume?: number | null;
     tierMinQty: number | null;
     sheetsNeeded: number;
   };
@@ -38,6 +40,7 @@ export interface QuotedLineResult {
 export interface PricingGroupSummary {
   groupKey: string;
   totalSheets: number;
+  totalTierVolume: number;
   tierMinQty: number | null;
   lineIds: Array<string | number>;
 }
@@ -119,28 +122,37 @@ export function isGroupableLine(line: PricingLineInput): boolean {
 }
 
 export function buildPricingGroups(
-  lines: Array<PricingLineInput & { sheetsNeeded: number }>
-): Map<string, { lineIds: Array<string | number>; totalSheets: number }> {
-  const groups = new Map<string, { lineIds: Array<string | number>; totalSheets: number }>();
+  lines: Array<PricingLineInput & { sheetsNeeded: number; tierVolume: number }>
+): Map<string, { lineIds: Array<string | number>; totalSheets: number; totalTierVolume: number }> {
+  const groups = new Map<
+    string,
+    { lineIds: Array<string | number>; totalSheets: number; totalTierVolume: number }
+  >();
   for (const line of lines) {
     const key = buildGroupKey(line.configuration);
     if (!key) continue;
     const sheets = Math.max(1, Math.floor(line.sheetsNeeded));
+    const tierVol = Math.max(1, Math.floor(line.tierVolume));
     const existing = groups.get(key);
     if (existing) {
       existing.lineIds.push(line.lineId);
       existing.totalSheets += sheets;
+      existing.totalTierVolume += tierVol;
     } else {
-      groups.set(key, { lineIds: [line.lineId], totalSheets: sheets });
+      groups.set(key, {
+        lineIds: [line.lineId],
+        totalSheets: sheets,
+        totalTierVolume: tierVol,
+      });
     }
   }
   return groups;
 }
 
-async function resolveSheetsForLine(line: PricingLineInput): Promise<number> {
-  if (line.sheetsNeeded != null && line.sheetsNeeded > 0) {
-    return Math.floor(line.sheetsNeeded);
-  }
+/** Физические листы и объём tier (для группировки) — всегда из актуального расчёта, не из устаревших params. */
+async function resolveLinePricingVolumes(
+  line: PricingLineInput
+): Promise<{ sheetsNeeded: number; tierVolume: number }> {
   try {
     const result = await UnifiedPricingService.calculatePrice(
       line.productId,
@@ -148,17 +160,28 @@ async function resolveSheetsForLine(line: PricingLineInput): Promise<number> {
       line.quantity
     );
     const sheets = result.sheetsNeeded ?? result.layout?.sheetsNeeded;
-    if (sheets != null && Number.isFinite(Number(sheets)) && Number(sheets) > 0) {
-      return Math.max(1, Math.floor(Number(sheets)));
-    }
+    const sheetsNeeded =
+      sheets != null && Number.isFinite(Number(sheets)) && Number(sheets) > 0
+        ? Math.max(1, Math.floor(Number(sheets)))
+        : 1;
+    const tierRaw = result.tierVolumeForGrouping ?? sheetsNeeded;
+    const tierVolume =
+      Number.isFinite(Number(tierRaw)) && Number(tierRaw) > 0
+        ? Math.max(1, Math.floor(Number(tierRaw)))
+        : sheetsNeeded;
+    return { sheetsNeeded, tierVolume };
   } catch (error) {
-    logger.warn('[PricingGroupService] не удалось получить sheetsNeeded', {
+    logger.warn('[PricingGroupService] не удалось получить объёмы для группировки', {
       lineId: line.lineId,
       productId: line.productId,
       error: (error as Error).message,
     });
+    const fallback =
+      line.sheetsNeeded != null && line.sheetsNeeded > 0
+        ? Math.floor(line.sheetsNeeded)
+        : 1;
+    return { sheetsNeeded: fallback, tierVolume: fallback };
   }
-  return 1;
 }
 
 export async function quoteLines(
@@ -167,11 +190,13 @@ export async function quoteLines(
 ): Promise<QuoteLinesResult> {
   const skipNonGroupable = options?.skipNonGroupable !== false;
 
-  const enriched: Array<PricingLineInput & { sheetsNeeded: number; groupKey: string | null }> = [];
+  const enriched: Array<
+    PricingLineInput & { sheetsNeeded: number; tierVolume: number; groupKey: string | null }
+  > = [];
   for (const line of lines) {
     const groupKey = buildGroupKey(line.configuration);
-    const sheetsNeeded = await resolveSheetsForLine(line);
-    enriched.push({ ...line, sheetsNeeded, groupKey });
+    const volumes = await resolveLinePricingVolumes(line);
+    enriched.push({ ...line, ...volumes, groupKey });
   }
 
   const groupable = enriched.filter((l) => l.groupKey != null);
@@ -182,6 +207,7 @@ export async function quoteLines(
       quantity: l.quantity,
       configuration: l.configuration,
       sheetsNeeded: l.sheetsNeeded,
+      tierVolume: l.tierVolume,
     }))
   );
 
@@ -189,7 +215,7 @@ export async function quoteLines(
   const lineGroupKey = new Map<string | number, string>();
   for (const [groupKey, group] of groupsMap) {
     for (const lid of group.lineIds) {
-      lineOverride.set(lid, group.totalSheets);
+      lineOverride.set(lid, group.totalTierVolume);
       lineGroupKey.set(lid, groupKey);
     }
   }
@@ -199,7 +225,11 @@ export async function quoteLines(
 
   for (const line of enriched) {
     const groupKey = line.groupKey;
-    const groupTotalSheets = groupKey != null ? lineOverride.get(line.lineId) ?? null : null;
+    const groupTotalTierVolume = groupKey != null ? lineOverride.get(line.lineId) ?? null : null;
+    const groupTotalSheets =
+      groupKey != null
+        ? groupsMap.get(groupKey)?.totalSheets ?? line.sheetsNeeded
+        : null;
 
     if (groupKey == null && skipNonGroupable) {
       quotedLines.push({
@@ -226,8 +256,8 @@ export async function quoteLines(
     try {
       const configWithContext = {
         ...line.configuration,
-        ...(groupTotalSheets != null
-          ? { orderPricingContext: { tierSheetsOverride: groupTotalSheets } }
+        ...(groupTotalTierVolume != null
+          ? { orderPricingContext: { tierSheetsOverride: groupTotalTierVolume } }
           : {}),
       };
       const result = await UnifiedPricingService.calculatePrice(
@@ -243,6 +273,7 @@ export async function quoteLines(
       const pricingMeta = {
         groupKey: groupKey ?? lineGroupKey.get(line.lineId) ?? null,
         groupTotalSheets,
+        groupTotalTierVolume: groupTotalTierVolume,
         tierMinQty: null as number | null,
         sheetsNeeded: Math.max(1, Math.floor(Number(sheetsNeeded) || line.sheetsNeeded)),
       };
@@ -256,6 +287,7 @@ export async function quoteLines(
         sheetsNeeded: pricingMeta.sheetsNeeded,
         groupKey: pricingMeta.groupKey,
         groupTotalSheets,
+        groupTotalTierVolume: groupTotalTierVolume,
         tierMinQty: null,
         pricingMeta,
       });
@@ -275,10 +307,12 @@ export async function quoteLines(
         sheetsNeeded: line.sheetsNeeded,
         groupKey,
         groupTotalSheets,
+        groupTotalTierVolume,
         tierMinQty: null,
         pricingMeta: {
           groupKey,
           groupTotalSheets,
+          groupTotalTierVolume,
           tierMinQty: null,
           sheetsNeeded: line.sheetsNeeded,
         },
@@ -292,6 +326,7 @@ export async function quoteLines(
     groups.push({
       groupKey,
       totalSheets: group.totalSheets,
+      totalTierVolume: group.totalTierVolume,
       tierMinQty: null,
       lineIds: group.lineIds,
     });

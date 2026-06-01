@@ -16,6 +16,7 @@ import {
 export interface OrderPricingGroupView {
   groupKey: string;
   totalSheets: number;
+  totalTierVolume: number;
   lineIds: number[];
   tierMinQty: number | null;
 }
@@ -72,6 +73,7 @@ export class OrderPricingService {
     return quoted.groups.map((g: PricingGroupSummary) => ({
       groupKey: g.groupKey,
       totalSheets: g.totalSheets,
+      totalTierVolume: g.totalTierVolume,
       lineIds: g.lineIds.map((id) => Number(id)),
       tierMinQty: g.tierMinQty,
     }));

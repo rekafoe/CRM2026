@@ -19,6 +19,8 @@ export interface UnifiedPricingResult {
   productSize: ProductSize;
   layout: any;
   sheetsNeeded?: number; // 📄 Количество листов для печати
+  /** Объём для tier при группировке (print units / листы) */
+  tierVolumeForGrouping?: number;
   metersNeeded?: number; // 📏 Погонные метры для рулонной печати
   itemsPerSheet?: number; // 📐 Укладка: сколько изделий на лист
   cutsPerSheet?: number; // 🔪 Количество резов на лист
@@ -195,6 +197,7 @@ export class UnifiedPricingService {
         bleedMm: result.layoutBleedMm ?? result.layout.bleedMm,
       } : {},
       sheetsNeeded: result.layout?.sheetsNeeded,
+      tierVolumeForGrouping: result.tierVolumeForGrouping,
       metersNeeded: result.layout?.metersNeeded,
       itemsPerSheet: result.layout?.itemsPerSheet,
       cutsPerSheet: result.layout?.cutsPerSheet,
