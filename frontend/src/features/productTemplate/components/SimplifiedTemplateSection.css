@@ -2142,3 +2142,41 @@
   border-radius: 12px !important;
 }
 
+.multipage-structure {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.multipage-structure__hint {
+  margin: 0 0 4px;
+}
+
+.multipage-structure__section {
+  padding: 14px 16px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  background: var(--bg-secondary, #f9fafb);
+}
+
+.multipage-structure__title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.multipage-structure__subsection {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-color, #e5e7eb);
+}
+
+.multipage-structure__copy-btn {
+  margin-bottom: 10px;
+}
+
+.multipage-structure__search {
+  margin-bottom: 8px;
+}
+

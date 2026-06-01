@@ -15,6 +15,7 @@ import { type Tier, defaultTiers, normalizeTiers } from '../utils/tierManagement
 import { clonePrintBlockFromSize } from '../utils/clonePrintConfig'
 import { computeItemsPerSheet } from './PrintSheetSection'
 import { ImprovedPrintingCalculatorModal } from '../../../components/calculator/ImprovedPrintingCalculatorModal'
+import { MultiPageStructureCard } from './MultiPageStructureCard'
 import './SimplifiedTemplateSection.css'
 
 type PrintTechRow = { code: string; name: string; is_active?: number | boolean; supports_duplex?: number | boolean }
@@ -233,9 +234,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
   const [editorTab, setEditorTab] = useState<SimplifiedEditorTab>('print')
 
   const multiPageStructure = value.multiPageStructure || {}
-  const multiPageCover = multiPageStructure.cover || { mode: 'none' }
   const multiPageInnerBlock = multiPageStructure.innerBlock || { pagesSource: 'parameter' as const }
-  const multiPageBinding = multiPageStructure.binding || {}
 
   const multiPageSheetsHint = useMemo(() => {
     const pages =
@@ -794,176 +793,17 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
               )}
             </div>
           </div>
-          <div className="simplified-card__content simplified-form-grid">
-            {multiPageSheetsHint && (
-              <p className="text-muted text-sm simplified-template__multipage-hint">
-                Пример на {multiPageSheetsHint.pages} стр.: односторонняя печать — {multiPageSheetsHint.singleSheets} листов
-                на изделие; двухсторонняя — {multiPageSheetsHint.duplexSheets} листов (тираж умножает объём печати и материала).
-              </p>
-            )}
-            <FormField label="Источник страниц внутреннего блока">
-              <select
-                className="form-select"
-                value={multiPageInnerBlock.pagesSource || 'parameter'}
-                onChange={(e) => updateMultiPageStructure({
-                  innerBlock: {
-                    ...multiPageInnerBlock,
-                    pagesSource: e.target.value as 'parameter' | 'fixed',
-                  }
-                })}
-              >
-                <option value="parameter">Из параметра pages</option>
-                <option value="fixed">Фиксированное значение</option>
-              </select>
-            </FormField>
-            {multiPageInnerBlock.pagesSource === 'fixed' && (
-              <FormField label="Фиксированное число страниц">
-                <input
-                  className="form-input form-input--compact"
-                  type="number"
-                  min="1"
-                  value={multiPageInnerBlock.fixedPages ?? ''}
-                  onChange={(e) => updateMultiPageStructure({
-                    innerBlock: {
-                      ...multiPageInnerBlock,
-                      fixedPages: e.target.value ? Number(e.target.value) : undefined,
-                    }
-                  })}
-                />
-              </FormField>
-            )}
-            <FormField label="Обложка">
-              <select
-                className="form-select"
-                value={multiPageCover.mode || 'none'}
-                onChange={(e) => updateMultiPageStructure({
-                  cover: {
-                    ...multiPageCover,
-                    mode: e.target.value as 'none' | 'self' | 'separate',
-                  }
-                })}
-              >
-                <option value="none">Без отдельной обложки</option>
-                <option value="self">Та же бумага/печать, что блок</option>
-                <option value="separate">Отдельные настройки обложки</option>
-              </select>
-            </FormField>
-            {multiPageCover.mode === 'separate' && (
-              <>
-                <FormField label="Материал обложки">
-                  <select
-                    className="form-select"
-                    value={multiPageCover.material_id ?? ''}
-                    onChange={(e) => updateMultiPageStructure({
-                      cover: {
-                        ...multiPageCover,
-                        material_id: e.target.value ? Number(e.target.value) : undefined,
-                      },
-                    })}
-                  >
-                    <option value="">— Не выбран</option>
-                    {allMaterials.map((material) => (
-                      <option key={material.id} value={material.id}>
-                        {material.name}
-                        {material.density ? ` (${material.density} г/м²)` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </FormField>
-                <FormField label="Печать обложки: технология">
-                  <input
-                    className="form-input"
-                    value={multiPageCover.print?.technology_code || ''}
-                    onChange={(e) => updateMultiPageStructure({
-                      cover: {
-                        ...multiPageCover,
-                        print: {
-                          ...(multiPageCover.print || {}),
-                          technology_code: e.target.value || undefined,
-                        }
-                      }
-                    })}
-                    placeholder="Например: laser_prof"
-                  />
-                </FormField>
-              </>
-            )}
-            <FormField label="Экземпляров обложки на изделие">
-              <input
-                className="form-input form-input--compact"
-                type="number"
-                min="1"
-                value={multiPageCover.qty_per_item ?? 1}
-                onChange={(e) => updateMultiPageStructure({
-                  cover: {
-                    ...multiPageCover,
-                    qty_per_item: e.target.value ? Number(e.target.value) : 1,
-                  }
-                })}
-              />
-            </FormField>
-            <FormField
-              label="Переплёт"
-              help={
-                bindingServices.length === 0
-                  ? 'Нет услуг с типом «переплёт» в справочнике послепечатных операций.'
-                  : undefined
-              }
-            >
-              <select
-                className="form-select"
-                value={multiPageBinding.service_id ?? ''}
-                onChange={(e) => {
-                  const nextServiceId = e.target.value ? Number(e.target.value) : undefined
-                  updateMultiPageStructure({
-                    binding: {
-                      ...multiPageBinding,
-                      service_id: nextServiceId,
-                      variant_id: undefined,
-                    },
-                  })
-                }}
-              >
-                <option value="">— Не выбран</option>
-                {bindingServices.map((binding) => (
-                  <option key={binding.id} value={binding.id}>{binding.name}</option>
-                ))}
-              </select>
-            </FormField>
-            {multiPageBinding.service_id && (
-              <FormField label="Вариант переплёта">
-                <select
-                  className="form-select"
-                  value={multiPageBinding.variant_id ?? ''}
-                  onChange={(e) => updateMultiPageStructure({
-                    binding: {
-                      ...multiPageBinding,
-                      variant_id: e.target.value ? Number(e.target.value) : undefined,
-                    }
-                  })}
-                >
-                  <option value="">— Базовый тариф услуги</option>
-                  {(bindingServices.find((b) => b.id === multiPageBinding.service_id)?.variants || []).map((variant) => {
-                    const label = variant.variantName || variant.variant_name || `Вариант #${variant.id}`
-                    return <option key={variant.id} value={variant.id}>{label}</option>
-                  })}
-                </select>
-              </FormField>
-            )}
-            <FormField label="Норма переплёта на изделие">
-              <input
-                className="form-input form-input--compact"
-                type="number"
-                min="1"
-                value={multiPageBinding.units_per_item ?? 1}
-                onChange={(e) => updateMultiPageStructure({
-                  binding: {
-                    ...multiPageBinding,
-                    units_per_item: e.target.value ? Number(e.target.value) : 1,
-                  }
-                })}
-              />
-            </FormField>
+          <div className="simplified-card__content">
+            <MultiPageStructureCard
+              structure={multiPageStructure}
+              onChange={updateMultiPageStructure}
+              pagesHint={multiPageSheetsHint}
+              allMaterials={allMaterials}
+              preferredMaterialIds={effectiveAllowedMaterialIds}
+              printTechs={printTechs}
+              bindingServices={bindingServices}
+              selectedSize={selected ?? null}
+            />
           </div>
         </div>
       )}
