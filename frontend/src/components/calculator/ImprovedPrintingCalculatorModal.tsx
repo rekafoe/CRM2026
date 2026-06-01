@@ -1141,12 +1141,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                 }
                 bindingVariants={bindingVariants}
                 bindingVariantId={(specs as any).binding_variant_id}
-                bindingUnitsPerItem={(specs as any).binding_units_per_item}
                 onBindingVariantChange={(variantId) =>
                   setSpecs((s) => ({ ...s, binding_variant_id: variantId }))
-                }
-                onBindingUnitsChange={(units) =>
-                  setSpecs((s) => ({ ...s, binding_units_per_item: units }))
                 }
                 isMultiPageProduct={isMultiPageProduct}
                 bindingVariantLocked={bindingVariantLocked}

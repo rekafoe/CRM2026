@@ -356,19 +356,6 @@ export const MultiPageStructureCard: React.FC<Props> = ({
               </FormField>
             )}
 
-            <FormField label="Операций переплёта на изделие">
-              <input
-                className="form-input form-input--compact"
-                type="number"
-                min={1}
-                value={binding.units_per_item ?? 1}
-                onChange={(e) =>
-                  patchBinding({
-                    units_per_item: e.target.value ? Number(e.target.value) : 1,
-                  })
-                }
-              />
-            </FormField>
           </div>
         )}
       </section>

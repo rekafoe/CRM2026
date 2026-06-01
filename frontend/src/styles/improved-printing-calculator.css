@@ -787,6 +787,24 @@
   color: var(--danger, #c53030);
 }
 
+.param-group--pages-custom {
+  margin-top: 8px;
+}
+
+.param-group__sublabel {
+  font-size: 12px;
+  color: #718096;
+  font-weight: 500;
+}
+
+.param-group--binding-units {
+  margin-top: 8px;
+}
+
+.param-required-mark {
+  color: var(--danger, #c53030);
+}
+
 /* Выбор формата */
 .format-selection {
   display: flex;
@@ -2785,10 +2803,42 @@
 .calculator-section-unified .section-group-content .materials-grid,
 .calculator-section-unified .section-group-content .advanced-grid {
   display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 200px)) !important;
-  gap: 8px 12px !important;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+  gap: 10px 14px !important;
   align-content: start;
   align-items: start;
+}
+
+.calculator-section-unified .params-grid.params-grid--multipage {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+}
+
+.calculator-section-unified .param-group--quantity {
+  min-width: 0;
+}
+
+.calculator-section-unified .param-group--quantity .quantity-controls {
+  max-width: 100%;
+}
+
+.calculator-section-unified .param-group--quantity .quantity-btn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  font-size: 15px;
+}
+
+.calculator-section-unified .param-group--quantity .quantity-input {
+  min-width: 0;
+  flex: 1 1 52px;
+  max-width: 80px;
+  padding: 6px 8px;
+}
+
+.calculator-section-unified .param-group--pages,
+.calculator-section-unified .param-group--binding {
+  min-width: 0;
 }
 
 /* Чекбоксы (магнитные, резка и т.д.) — на всю ширину строки */

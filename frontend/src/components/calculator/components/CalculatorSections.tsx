@@ -57,9 +57,7 @@ interface CalculatorSectionsProps {
     parameters?: unknown;
   }>;
   bindingVariantId?: number;
-  bindingUnitsPerItem?: number;
   onBindingVariantChange?: (variantId: number | undefined) => void;
-  onBindingUnitsChange?: (units: number | undefined) => void;
   isMultiPageProduct?: boolean;
   bindingVariantLocked?: boolean;
 }
@@ -96,9 +94,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
   bindingServiceId,
   bindingVariants,
   bindingVariantId,
-  bindingUnitsPerItem,
   onBindingVariantChange,
-  onBindingUnitsChange,
   isMultiPageProduct = false,
   bindingVariantLocked = false,
 }) => {
@@ -167,10 +163,8 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           bindingServiceId={bindingServiceId}
           bindingVariants={bindingVariants}
           bindingVariantId={bindingVariantId}
-          bindingUnitsPerItem={bindingUnitsPerItem}
           bindingVariantLocked={bindingVariantLocked}
           onBindingVariantChange={onBindingVariantChange}
-          onBindingUnitsChange={onBindingUnitsChange}
         />
 
         <div className="unified-params-row">

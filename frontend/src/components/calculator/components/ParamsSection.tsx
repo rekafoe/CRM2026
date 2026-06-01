@@ -49,9 +49,7 @@ interface ParamsSectionProps {
   }>;
   bindingVariantLocked?: boolean;
   bindingVariantId?: number;
-  bindingUnitsPerItem?: number;
   onBindingVariantChange?: (variantId: number | undefined) => void;
-  onBindingUnitsChange?: (units: number | undefined) => void;
 }
 
 export const ParamsSection: React.FC<ParamsSectionProps> = ({
@@ -72,9 +70,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   bindingVariants = [],
   bindingVariantLocked = false,
   bindingVariantId,
-  bindingUnitsPerItem,
   onBindingVariantChange,
-  onBindingUnitsChange,
 }) => {
   const selectedBindingVariant =
     bindingVariantId != null
@@ -122,7 +118,9 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   return (
     <div className="form-section compact">
       <h3><AppIcon name="settings" size="xs" /> Параметры</h3>
-      <div className="params-grid compact">
+      <div
+        className={`params-grid compact${isMultiPageProduct ? ' params-grid--multipage' : ''}`}
+      >
         {/* 🆕 Размер изделия для упрощённых продуктов (длинные названия — подсказка + обрезка) */}
         {isSimplifiedProduct && (() => {
           const sizeOptionLabel = selectedSize ? `${selectedSize.label} (${selectedSize.width_mm}×${selectedSize.height_mm} мм)` : '';
@@ -225,7 +223,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
         )}
 
         {/* Количество */}
-        <div className="param-group">
+        <div className="param-group param-group--quantity">
           <label>
             {getLabel('quantity', 'Количество')}
           </label>
@@ -332,7 +330,8 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
               : getMax('pages') ?? (isMultiPageProduct ? 500 : undefined));
           const stepHint = effectivePagesProp?.step;
           const current = Number(specs.pages ?? allowedOptions[0] ?? minBound ?? 4);
-          const selectValue = allowedOptions.includes(current) ? current : '';
+          const inPresetList = allowedOptions.includes(current);
+          const selectValue = inPresetList ? String(current) : '__custom__';
 
           if (!isMultiPageProduct && allowedOptions.length === 0 && hasField('pages')) {
             const fe = getEnum('pages') as number[];
@@ -364,20 +363,29 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             return null;
           }
 
+          const pagesBoundsHint =
+            minBound != null && maxBound != null
+              ? `от ${minBound} до ${maxBound} стр.${stepHint != null ? `, кратно ${stepHint}` : ''}`
+              : stepHint != null
+                ? `кратно ${stepHint}`
+                : null;
+
           return (
             <div className="param-group param-group--pages">
               <label>
                 {getLabel('pages', 'Страницы')}
-                {isRequired('pages') && <span style={{ color: 'var(--danger, #c53030)' }}> *</span>}
+                {isRequired('pages') && <span className="param-required-mark"> *</span>}
               </label>
+              {pagesBoundsHint && <p className="param-hint">{pagesBoundsHint}</p>}
               {allowedOptions.length > 0 && (
                 <select
-                  value={selectValue === '' ? String(allowedOptions[0]) : String(selectValue)}
+                  value={selectValue}
                   onChange={(e) => {
                     const v = e.target.value;
+                    if (v === '__custom__') return;
                     updateSpecs({ pages: parseInt(v, 10) }, true);
                   }}
-                  className="form-control"
+                  className={`form-control${validationErrors.pages ? ' error' : ''}`}
                   required={isRequired('pages') && !allowCustom}
                 >
                   {allowedOptions.map((p: number) => (
@@ -385,21 +393,21 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                       {p} стр.
                     </option>
                   ))}
-                  {allowCustom && !allowedOptions.includes(current) && (
-                    <option value={String(current)}>{current} стр. (вручную)</option>
+                  {allowCustom && (
+                    <option value="__custom__">
+                      {inPresetList ? 'Другое количество…' : `${current} стр. (вручную)`}
+                    </option>
                   )}
                 </select>
               )}
-              {allowCustom && (
-                <div className="param-group param-group--inline" style={{ marginTop: 8 }}>
-                  <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    Другое количество (стр.)
-                    {stepHint != null ? `, кратно ${stepHint}` : ''}
-                    {allowedOptions.length > 0 ? `: от ${minBound} до ${maxBound}` : ''}
+              {allowCustom && (allowedOptions.length === 0 || !inPresetList || selectValue === '__custom__') && (
+                <div className="param-group param-group--pages-custom">
+                  <label className="param-group__sublabel">
+                    {allowedOptions.length > 0 ? 'Своё число страниц' : 'Число страниц'}
                   </label>
                   <input
                     type="number"
-                    className="form-control"
+                    className={`form-control${validationErrors.pages ? ' error' : ''}`}
                     min={minBound}
                     max={maxBound}
                     step={stepHint ?? 1}
@@ -413,6 +421,9 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
                     }}
                   />
                 </div>
+              )}
+              {validationErrors.pages && (
+                <p className="param-error">{validationErrors.pages}</p>
               )}
             </div>
           );
@@ -442,21 +453,6 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             )}
             {validationErrors.binding && (
               <p className="param-error">{validationErrors.binding}</p>
-            )}
-            {onBindingUnitsChange != null && (
-              <div style={{ marginTop: 8 }}>
-                <label style={{ fontSize: 12 }}>Единиц переплёта на изделие</label>
-                <input
-                  type="number"
-                  min={1}
-                  className="form-control"
-                  value={bindingUnitsPerItem ?? 1}
-                  onChange={(e) => {
-                    const n = parseInt(e.target.value, 10);
-                    onBindingUnitsChange(Number.isFinite(n) && n > 0 ? n : 1);
-                  }}
-                />
-              </div>
             )}
           </div>
         )}
