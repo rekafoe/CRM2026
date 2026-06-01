@@ -3,6 +3,7 @@ import { AppIcon } from '../../ui/AppIcon';
 import { formatBindingPagesHint, readBindingPagesLimits } from '../../../utils/multipageBinding';
 import {
   isMultipageLikeProduct,
+  resolveCalculatorPagesBounds,
   resolveMultipageMinQty,
 } from '../../../utils/multipageProduct';
 import { CustomPagesField } from './CustomPagesField';
@@ -350,16 +351,12 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
           if (!showPages) return null;
 
           const allowCustom = isMultiPageProduct || effectivePagesProp?.allowCustom !== false;
-          const minBound =
-            effectivePagesProp?.min ??
-            (allowedOptions.length > 0
-              ? Math.min(...allowedOptions)
-              : getMin('pages') ?? (isMultiPageProduct ? 4 : undefined));
-          const maxBound =
-            effectivePagesProp?.max ??
-            (allowedOptions.length > 0
-              ? Math.max(...allowedOptions)
-              : getMax('pages') ?? (isMultiPageProduct ? 500 : undefined));
+          const { min: minBound, max: maxBound } = resolveCalculatorPagesBounds({
+            pagesConfig: effectivePagesProp,
+            allowedOptions,
+            allowCustom,
+            isMultipageLike: multipageLike,
+          });
           const stepHint = effectivePagesProp?.step;
           const pagesRaw = specs.pages;
           const hasPagesValue =

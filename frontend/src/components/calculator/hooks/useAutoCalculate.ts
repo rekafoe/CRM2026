@@ -19,7 +19,7 @@ function getSpecsKey(specs: any, customFormat?: { width: string; height: string 
     sides: specs.sides,
     lamination: specs.lamination,
     priceType: specs.priceType,
-    pages: specs.pages, // ✅ Страницы тоже важны
+    pages: specs.pages ?? null,
     material_id: specs.material_id, // ✅ ID материала тоже важен
     materialType: specs.materialType, // ✅ Тип материала (при смене типа пересчитываем)
     // 🆕 Для упрощённых продуктов размер влияет на расчет

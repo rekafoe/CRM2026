@@ -274,6 +274,39 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     expect(result.finalPrice).toBe(8);
   });
 
+  it('tier печати обложки: суммарный объём блок+обложка (не только листы обложки)', async () => {
+    templateConfigData.simplified.sizes[0].print_prices[0].tiers = [
+      { min_qty: 1, unit_price: 2 },
+      { min_qty: 100, unit_price: 1 },
+    ];
+    templateConfigData.simplified.multiPageStructure = {
+      innerBlock: { pagesSource: 'parameter' },
+      cover: {
+        mode: 'separate',
+        page_count: 4,
+        material_id: 99,
+        print: { sides_mode: 'single' },
+      },
+    };
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 10 as any,
+      } as any,
+      10,
+    );
+
+    // 10 стр. всего − 4 обл. = 6 блок → 6 листов × 10 = 60 units; обложка 4×10 = 40; tier по 100 → 1 BYN/ед.
+    expect(result.breakdown?.innerBlockPrice).toBe(60);
+    expect(result.breakdown?.coverPrice).toBe(40);
+    expect(result.finalPrice).toBe(100);
+  });
+
   it('отклоняет pages выше max шаблона для multi_page', async () => {
     templateConfigData.simplified.pages = { options: [24], max: 100 };
     delete templateConfigData.simplified.multiPageStructure;

@@ -15,7 +15,6 @@ import {
   mapPhotoOrderToVirtualItem,
   photoOrderRowToPoolOrder,
 } from '../../../models/mappers/telegramPhotoOrderMapper'
-import { PriceTypeService } from '../../pricing/services/priceTypeService'
 import { tryEnqueueOrderStatusEmail } from '../../../services/orderStatusEmailService'
 import { tryScheduleOrderStatusSms } from '../../../services/orderStatusSmsService'
 import { tryNotifyTelegramOrderStatusForMiniappOrder } from '../../../services/miniappOrderStatusTelegramService'
@@ -581,14 +580,7 @@ export class OrderService {
       if (effectiveTotal != null) {
         paramsObj.storedTotalCost = effectiveTotal;
       }
-      if (isWebsiteLike && effectiveTotal == null && priceType && typeof priceType === 'string') {
-        const key = priceType.toLowerCase().trim();
-        const mult = await PriceTypeService.getMultiplier(key);
-        if (mult !== 1) {
-          finalPrice = Math.round(finalPrice * mult * 100) / 100;
-        }
-        paramsObj.priceType = key;
-      } else if (priceType && typeof priceType === 'string') {
+      if (priceType && typeof priceType === 'string') {
         paramsObj.priceType = priceType.toLowerCase().trim();
       }
       await db.run(
@@ -795,6 +787,15 @@ export class OrderService {
         throw err;
       }
       await db.run('COMMIT');
+      const { OrderPricingService } = await import('./orderPricingService');
+      try {
+        await OrderPricingService.recalculateOrderPrices(order.id);
+      } catch (recalcErr) {
+        logger.warn('[createOrderWithAutoDeduction] пересчёт цен по группам не выполнен', {
+          orderId: order.id,
+          error: (recalcErr as Error).message,
+        });
+      }
       return {
         order,
         deductionResult,

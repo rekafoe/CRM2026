@@ -704,6 +704,28 @@ router.get('/:id/commodity-receipt-pdf', asyncHandler(async (req, res) => {
   }
 }))
 
+router.get('/:id/pricing-groups', authenticate, asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  if (!Number.isFinite(orderId) || orderId <= 0) {
+    res.status(400).json({ error: 'Некорректный ID заказа' })
+    return
+  }
+  const { OrderPricingService } = await import('../modules/orders/services/orderPricingService')
+  const groups = await OrderPricingService.getPricingGroupsForOrder(orderId)
+  res.json({ success: true, groups })
+}))
+
+router.post('/:id/recalculate-prices', authenticate, asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.id)
+  if (!Number.isFinite(orderId) || orderId <= 0) {
+    res.status(400).json({ error: 'Некорректный ID заказа' })
+    return
+  }
+  const { OrderPricingService } = await import('../modules/orders/services/orderPricingService')
+  const result = await OrderPricingService.recalculateOrderPrices(orderId)
+  res.json({ success: true, ...result })
+}))
+
 // Order items routes
 router.post('/:id/items', asyncHandler(OrderItemController.addItem))
 router.delete('/:orderId/items/:itemId', asyncHandler(OrderItemController.deleteItem))

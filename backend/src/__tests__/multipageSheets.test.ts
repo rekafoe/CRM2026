@@ -1,4 +1,5 @@
 import {
+  computeMultipageCoverPrintUnits,
   computeMultipagePrintUnits,
   computeMultipageSheetsPerItem,
 } from '../utils/multipagePagesConsistency';
@@ -6,6 +7,19 @@ import {
 describe('computeMultipagePrintUnits', () => {
   it('7 физических листов × 2 на сторону → 14 позиций печати', () => {
     expect(computeMultipagePrintUnits(7, 2)).toBe(14);
+  });
+});
+
+describe('computeMultipageCoverPrintUnits', () => {
+  it('10 изделий × 4 стр. обложки, 1 на лист → 40 позиций печати', () => {
+    expect(
+      computeMultipageCoverPrintUnits({
+        quantity: 10,
+        coverPages: 4,
+        itemsPerSheet: 1,
+        sidesMode: 'single',
+      }),
+    ).toBe(40);
   });
 });
 

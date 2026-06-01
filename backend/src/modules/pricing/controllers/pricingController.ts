@@ -10,6 +10,7 @@ import { getTemplateConfig, applyPriceRulesBySheets, getPrintSheetSizeFromConfig
 import { CompatibilityService } from '../../../services/compatibilityService'
 import { logger } from '../../../utils/logger'
 import { PrintPriceService } from '../services/printPriceService'
+import { quoteLines, type PricingLineInput } from '../services/pricingGroupService'
 
 const toServiceResponse = (service: PricingServiceDTO) => ({
   id: service.id,
@@ -731,5 +732,68 @@ export class PricingController {
     const { id } = req.params
     await QuantityDiscountsService.delete(Number(id))
     res.status(204).end()
+  }
+
+  /** POST /api/pricing/quote-cart — расчёт корзины с тиражной скидкой по группам (сайт, WEBSITE_ORDER_API_KEY). */
+  static async quoteCart(req: Request, res: Response) {
+    const rawLines = req.body?.lines
+    if (!Array.isArray(rawLines) || rawLines.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'lines обязателен — массив позиций корзины',
+      })
+      return
+    }
+
+    const inputs: PricingLineInput[] = []
+    for (let i = 0; i < rawLines.length; i++) {
+      const row = rawLines[i] as Record<string, unknown>
+      const productId = Number(row.productId ?? row.product_id)
+      const quantity = Number(row.quantity ?? row.qty ?? 1)
+      const configuration = (row.configuration ?? row.specifications ?? {}) as Record<string, unknown>
+      const lineId = row.lineId ?? row.line_id ?? `line-${i}`
+
+      if (!Number.isFinite(productId) || productId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: `Строка ${i}: productId обязателен`,
+        })
+        return
+      }
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        res.status(400).json({
+          success: false,
+          message: `Строка ${i}: quantity должен быть > 0`,
+        })
+        return
+      }
+
+      inputs.push({
+        lineId: String(lineId),
+        productId,
+        quantity,
+        configuration,
+        sheetsNeeded:
+          row.sheetsNeeded != null && Number.isFinite(Number(row.sheetsNeeded))
+            ? Math.floor(Number(row.sheetsNeeded))
+            : undefined,
+      })
+    }
+
+    try {
+      const result = await quoteLines(inputs)
+      res.json({
+        success: true,
+        lines: result.lines,
+        groups: result.groups,
+        cartTotal: result.cartTotal,
+      })
+    } catch (error) {
+      logger.error('quoteCart error', { error })
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Ошибка расчёта корзины',
+      })
+    }
   }
 }

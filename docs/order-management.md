@@ -95,6 +95,24 @@ CREATE TABLE user_order_page_orders (
 - ✅ OrderPool компонент (готов)
 - 🔄 UserOrderPage компонент (в разработке)
 
+## Тиражная скидка на уровне заказа
+
+Для simplified-продуктов с `productId` в `params` цены позиций **пересчитываются автоматически** при добавлении, изменении (params/quantity) и удалении позиции, а также при создании заказа с сайта (`POST /api/orders/from-website`).
+
+**Группировка:** одинаковые `material_id` + `print_technology` + `print_color_mode` + `print_sides_mode` (без `priceType`).
+
+**Объём tier:** сумма физических листов (`sheetsNeeded`) по группе. Ставка tier одна на группу; стоимость каждой позиции — по её листам.
+
+**`priceType`** (`online`, `urgent`, …) применяется **после** tier отдельно на каждую строку (в `SimplifiedPricingService`).
+
+**API CRM:**
+- `GET /api/orders/:id/pricing-groups` — сводка групп для подсказки в калькуляторе
+- `POST /api/orders/:id/recalculate-prices` — ручной пересчёт
+
+**Корзина сайта:** `POST /api/pricing/quote-cart` (ключ `WEBSITE_ORDER_API_KEY`) — см. [website-orders-integration.md](./website-orders-integration.md).
+
+Код: `pricingGroupService.ts`, `orderPricingService.ts`.
+
 ## 📝 TODO
 
 1. ✅ Реализовать OrderPool компонент

@@ -15,6 +15,49 @@ export function inferMultipagePagesStep(step?: number, options?: number[]): numb
   return 1;
 }
 
+const DEFAULT_CUSTOM_PAGES_MAX = 500;
+const DEFAULT_CUSTOM_PAGES_MIN = 4;
+
+/** Границы для произвольного ввода страниц в калькуляторе (не сужать до max пресета). */
+export function resolveCalculatorPagesBounds(params: {
+  pagesConfig?: SimplifiedPagesLike;
+  allowedOptions?: number[];
+  allowCustom?: boolean;
+  isMultipageLike?: boolean;
+}): { min?: number; max?: number } {
+  const opts = (params.allowedOptions ?? [])
+    .map((n) => Number(n))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const allowCustom = params.allowCustom !== false;
+  const multipage = params.isMultipageLike === true;
+
+  const min =
+    params.pagesConfig?.min ??
+    (allowCustom
+      ? multipage
+        ? DEFAULT_CUSTOM_PAGES_MIN
+        : opts.length > 0
+          ? Math.min(...opts)
+          : DEFAULT_CUSTOM_PAGES_MIN
+      : opts.length > 0
+        ? Math.min(...opts)
+        : multipage
+          ? DEFAULT_CUSTOM_PAGES_MIN
+          : undefined);
+
+  const max =
+    params.pagesConfig?.max ??
+    (allowCustom
+      ? DEFAULT_CUSTOM_PAGES_MAX
+      : opts.length > 0
+        ? Math.max(...opts)
+        : multipage
+          ? DEFAULT_CUSTOM_PAGES_MAX
+          : undefined);
+
+  return { min, max };
+}
+
 /** Округление вверх до кратности step с учётом min/max. */
 export function ceilPagesToStep(
   pages: number,

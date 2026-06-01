@@ -53,6 +53,7 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'POST', path: /^\/api\/products\/[0-9]+\/calculate$/ },
   { method: 'POST', path: /^\/api\/products\/[0-9]+\/validate-size$/ },
   { method: 'POST', path: /^\/api\/pricing\/calculate$/ },
+  { method: 'POST', path: /^\/api\/pricing\/quote-cart$/ },
   { method: 'GET', path: /^\/api\/public-editor\/branding\/?$/ },
   { method: 'GET', path: /^\/api\/materials$/ },
   { method: 'GET', path: /^\/api\/paper-types(?:\/.*)?$/ },

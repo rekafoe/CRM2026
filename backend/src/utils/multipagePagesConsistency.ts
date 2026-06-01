@@ -329,6 +329,21 @@ export function computeMultipagePrintUnits(
   return sheets * perSide;
 }
 
+/** Позиций печати обложки на весь тираж (для tier вместе с блоком на одном станке). */
+export function computeMultipageCoverPrintUnits(params: {
+  quantity: number;
+  coverPages: number;
+  itemsPerSheet: number;
+  sidesMode?: string | null;
+}): number {
+  const qty = Math.max(1, Math.floor(Number(params.quantity)) || 1);
+  const coverPages = Math.max(1, Math.floor(Number(params.coverPages)) || 1);
+  const ips = Math.max(1, Math.floor(Number(params.itemsPerSheet)) || 1);
+  const coverSheetsPerItem = computeMultipageSheetsPerItem(coverPages, ips, params.sidesMode);
+  const coverSheetsTotal = Math.max(1, qty * coverSheetsPerItem);
+  return computeMultipagePrintUnits(coverSheetsTotal, ips);
+}
+
 export function computeMultipageSheetsPerItem(
   pages: number,
   itemsPerSheet: number,

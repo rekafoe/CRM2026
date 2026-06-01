@@ -74,12 +74,8 @@
   - Обязательно: **`customerName`** или **`customerPhone`**.
   - Опционально: **`delivery`** — способ получения заказа (самовывоз, курьер, почта). Сохраняется в `orders.delivery_json`, в API ответа — объект **`order.delivery`**. Обязательные поля: `kind`, `providerId`, `label`. См. [раздел «Доставка и самовывоз»](#доставка-и-самовывоз-с-сайта).
   - Опционально: **`items`** — массив позиций заказа (как в `POST /api/orders/with-auto-deduction`). Если передан непустой массив — заказ создаётся с позициями и автоматическим списанием материалов; иначе создаётся пустой заказ.
-  - Для каждой позиции в **`items`** можно указать **`priceType`** (только для заказов с сайта): тип цены применяется к полю **`price`** (базовая цена продукта) перед сохранением:
-    - **`urgent`** (срочно): +50% — итоговая цена = price × 1.5
-    - **`online`** (онлайн): −15% — итоговая цена = price × 0.85
-    - **`promo`** (промо): −30% — итоговая цена = price × 0.7
-    - **`special`** (спец.предложение): −45% — итоговая цена = price × 0.55  
-    Значение сохраняется в `params.priceType` для отображения в CRM.
+  - Для каждой позиции в **`items`** укажите **`priceType`** в `params` или на уровне позиции (`online`, `urgent`, `promo`, …). После создания заказа CRM **пересчитывает** цены с тиражной скидкой по корзине/заказу и применяет множитель `priceType` в калькуляторе — **не умножайте цену на сайте повторно**, если уже использовали `quote-cart`.
+  - Рекомендуемый поток: **`POST /api/pricing/quote-cart`** → показать цены в UI → **`POST /api/orders/from-website`** с теми же `configuration` / `params`. CRM при сохранении ещё раз прогоняет ту же группировку.
 - Заказ создаётся с **`source = 'website'`**, **`userId = null`** и попадает в пул заказов (unassigned).
 - **Номер заказа:** в ответе API возвращается **`order.number`** в формате **`ORD-XXXX`** (порядковый номер по id, например ORD-0897). Сайт **обязан показывать пользователю именно этот номер** из ответа, а не генерировать свой (например `ORD-` + Date.now()) — иначе в CRM заказ будет под другим номером и возникнет путаница.
 
@@ -764,3 +760,35 @@ Payload содержит `crmOrderId`, `crmOrderNumber`, исходные `crmSt
 **Pull для ЛК (Nest):** `GET /api/orders/from-website/:orderId/status` с тем же `X-API-Key`.
 Эндпоинт должен быть в whitelist `PUBLIC_ROUTE_RULES` (`auth.ts`), иначе глобальный JWT middleware
 вернёт `401 {"message":"Unauthorized"}` до проверки API-ключа.
+
+---
+
+## Расчёт корзины с тиражной скидкой (`POST /api/pricing/quote-cart`)
+
+Stateless-расчёт всей корзины одним запросом (без `orderId`). Авторизация: **`WEBSITE_ORDER_API_KEY`** (`X-API-Key` или `Authorization: Bearer`).
+
+**Body:**
+
+```json
+{
+  "lines": [
+    {
+      "lineId": "cart-1",
+      "productId": 58,
+      "quantity": 100,
+      "configuration": {
+        "size_id": "90x50",
+        "material_id": 12,
+        "print_technology": "laser_prof",
+        "print_color_mode": "color",
+        "print_sides_mode": "single",
+        "priceType": "online"
+      }
+    }
+  ]
+}
+```
+
+**Ответ:** `lines[]` (цена по строке, `sheetsNeeded`, `pricingMeta`), `groups[]` (сумма листов по группе), `cartTotal`.
+
+**Когда вызывать:** при изменении корзины и обязательно перед checkout. `priceType` не дробит группы — tier общий, множитель `online`/`urgent` на строку после tier.

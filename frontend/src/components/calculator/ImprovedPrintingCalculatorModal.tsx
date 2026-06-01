@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AppIcon } from '../ui/AppIcon';
 import { Product } from '../../services/products';
 import { useProductDirectoryStore } from '../../stores/productDirectoryStore';
@@ -102,6 +102,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   // Состояние калькулятора
   const [specs, setSpecs] = useState<ProductSpecs>(() => createInitialSpecs(initialProductType));
+  const specsLiveRef = useRef(specs);
+  specsLiveRef.current = specs;
   
   // Состояние для типа печати и режима цвета
   const [printTechnology, setPrintTechnology] = useState<string>('');
@@ -499,7 +501,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   }, [activeBindingVariantId, bindingVariants]);
 
   // Валидация вынесена в хук
-  const { validationErrors, isValid } = useCalculatorValidation({
+  const { validationErrors, isValid, validateSpecs } = useCalculatorValidation({
     specs: {
       productType: specs.productType,
       quantity: specs.quantity,
@@ -552,6 +554,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     specs,
     isValid,
     validationErrors,
+    getActiveSpecs: () => specsLiveRef.current,
+    validateActiveSpecs: (s) => validateSpecs(s),
     currentConfig,
     backendProductSchema,
     isCustomFormat,
@@ -588,8 +592,8 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     printColorMode,
   });
 
-  /** Пересчёт после setSpecs: дождаться коммита state и актуального isValid (не setTimeout до ре-рендера). */
-  const pendingInstantCalcRef = useRef(false);
+  const instantCalculateRef = useRef(instantCalculate);
+  instantCalculateRef.current = instantCalculate;
 
   // 🆕 При смене продукта сбрасываем завязанные на схему поля упрощенного продукта,
   // чтобы новые allowed_* и размеры/материалы подтянулись корректно
@@ -935,19 +939,22 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       return;
     }
 
-    setSpecs(prev => ({ ...prev, ...normalizedUpdates }));
-    setUserInteracted(true); // Отмечаем, что пользователь взаимодействовал с калькулятором
+    setSpecs((prev) => {
+      const next = { ...prev, ...normalizedUpdates } as ProductSpecs;
+      if ('pages' in normalizedUpdates && normalizedUpdates.pages === undefined) {
+        delete (next as { pages?: number }).pages;
+      }
+      specsLiveRef.current = next;
+      return next;
+    });
+    setUserInteracted(true);
 
     if (instant) {
-      pendingInstantCalcRef.current = true;
+      queueMicrotask(() => {
+        void instantCalculateRef.current();
+      });
     }
   }, [setSpecs, setUserInteracted]);
-
-  useLayoutEffect(() => {
-    if (!pendingInstantCalcRef.current) return;
-    pendingInstantCalcRef.current = false;
-    void instantCalculate();
-  }, [specs, instantCalculate]);
 
   // getProductionDays передаётся выше через useCalculatorPricingActions / handleAddToOrder
 

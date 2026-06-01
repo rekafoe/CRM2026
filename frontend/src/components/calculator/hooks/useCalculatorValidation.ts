@@ -114,18 +114,37 @@ function computeErrors(params: {
       } else {
         const opts = hasPagesPresets ? schemaPagesEnum! : [];
         const inferredMin =
-          pagesMin ?? (opts.length > 0 ? Math.min(...opts) : isMultiPageProduct ? 4 : 1);
+          pagesMin ??
+          (canCustom
+            ? isMultiPageProduct
+              ? 4
+              : opts.length > 0
+                ? Math.min(...opts)
+                : 4
+            : opts.length > 0
+              ? Math.min(...opts)
+              : isMultiPageProduct
+                ? 4
+                : 1);
         const inferredMax =
-          pagesMax ?? (opts.length > 0 ? Math.max(...opts) : isMultiPageProduct ? 500 : 9999);
+          pagesMax ??
+          (canCustom
+            ? 500
+            : opts.length > 0
+              ? Math.max(...opts)
+              : isMultiPageProduct
+                ? 500
+                : 9999);
         if (p < inferredMin) {
           errors.pages = `Не менее ${inferredMin} стр.`;
         } else if (p > inferredMax) {
           errors.pages = `Не более ${inferredMax} стр.`;
         }
         const step = pagesStep;
-        if (step != null && step > 0 && p % step !== 0) {
+        if (!canCustom && step != null && step > 0 && p % step !== 0) {
           errors.pages = `Количество страниц должно быть кратно ${step}`;
         } else if (
+          !canCustom &&
           step == null &&
           opts.length > 0 &&
           opts.every((x) => x % 4 === 0) &&

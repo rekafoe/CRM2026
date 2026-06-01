@@ -12,10 +12,15 @@ interface BuildSummaryOptions {
   productTypeLabels?: Record<string, string>;
 }
 
+type SpecsValidationResult = { isValid: boolean; errors: Record<string, string> };
+
 interface UseCalculatorPricingActionsParams {
   specs: ProductSpecs;
   isValid: boolean;
   validationErrors: Record<string, string>;
+  /** Актуальные specs сразу после updateSpecs (до коммита React). */
+  getActiveSpecs?: () => ProductSpecs;
+  validateActiveSpecs?: (specs: ProductSpecs) => SpecsValidationResult;
   currentConfig: any;
   backendProductSchema: any;
   isCustomFormat: boolean;
@@ -87,9 +92,11 @@ function sameMaterialId(a: unknown, b: unknown): boolean {
 }
 
 export function useCalculatorPricingActions({
-  specs,
+  specs: specsProp,
   isValid,
   validationErrors,
+  getActiveSpecs,
+  validateActiveSpecs,
   currentConfig,
   backendProductSchema,
   isCustomFormat,
@@ -134,7 +141,11 @@ export function useCalculatorPricingActions({
 
   const calculateCost = useCallback(
     async (showToast: boolean = false) => {
-      if (!isValid || Object.keys(validationErrors).length > 0) {
+      const specs = getActiveSpecs?.() ?? specsProp;
+      const liveValidation = validateActiveSpecs?.(specs);
+      const validNow = liveValidation?.isValid ?? isValid;
+      const errorsNow = liveValidation?.errors ?? validationErrors;
+      if (!validNow || Object.keys(errorsNow).length > 0) {
         if (showToast) {
           toast.error('Проверьте правильность заполнения полей');
         }
@@ -1102,7 +1113,9 @@ export function useCalculatorPricingActions({
       resolveProductType,
       selectedProduct,
       setSpecsFromParent,
-      specs,
+      specsProp,
+      getActiveSpecs,
+      validateActiveSpecs,
       toast,
       validationErrors,
     ],

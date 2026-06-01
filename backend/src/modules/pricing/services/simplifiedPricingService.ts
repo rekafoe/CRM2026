@@ -31,6 +31,7 @@ import type {
 } from '../dtos/plotterCuttingTariff.dto';
 import { PlotterCuttingTariffRepository } from '../repositories/plotterCuttingTariffRepository';
 import {
+  computeMultipageCoverPrintUnits,
   computeMultipagePrintUnits,
   computeMultipageSheetsPerItem,
   resolveBlockPagesForPrint,
@@ -397,8 +398,21 @@ export class SimplifiedPricingService {
       throw err;
     }
     
+    const orderPricingContext = (configuration as {
+      orderPricingContext?: { tierSheetsOverride?: number };
+    }).orderPricingContext;
+    const tierSheetsOverride =
+      orderPricingContext?.tierSheetsOverride != null &&
+      Number.isFinite(Number(orderPricingContext.tierSheetsOverride)) &&
+      Number(orderPricingContext.tierSheetsOverride) > 0
+        ? Math.floor(Number(orderPricingContext.tierSheetsOverride))
+        : undefined;
+
     // 2.5. Нормализуем конфигурацию: преобразуем sides в print_sides_mode и находим material_id
     let normalizedConfig = { ...configuration };
+    if ('orderPricingContext' in normalizedConfig) {
+      delete (normalizedConfig as { orderPricingContext?: unknown }).orderPricingContext;
+    }
     
     // Преобразуем sides (1 или 2) в print_sides_mode
     if (!normalizedConfig.print_sides_mode && (configuration as any).sides) {
@@ -724,6 +738,29 @@ export class SimplifiedPricingService {
       ? computeMultipagePrintUnits(effectivePrintQuantity, itemsPerSheet)
       : quantity;
 
+    const separateCoverForTier =
+      usePagesMultiplier &&
+      pageSplit.coverMode === 'separate' &&
+      pageSplit.coverPages > 0 &&
+      Boolean(multiPageStructure?.cover);
+    const coverSidesForTier =
+      (normalizedConfig as { cover_print_sides_mode?: string }).cover_print_sides_mode ||
+      multiPageStructure?.cover?.print?.sides_mode ||
+      sidesMode;
+    const coverPrintUnits = separateCoverForTier
+      ? computeMultipageCoverPrintUnits({
+          quantity,
+          coverPages: pageSplit.coverPages,
+          itemsPerSheet,
+          sidesMode: coverSidesForTier,
+        })
+      : 0;
+    /** Суммарный объём печати на одном прогоне (блок + обложка) — для выбора tier. */
+    const multipageTierPrintUnits =
+      usePagesMultiplier && coverPrintUnits > 0
+        ? multipagePrintUnits + coverPrintUnits
+        : multipagePrintUnits;
+
     const isDuplexModeSelected =
       normalizedConfig.print_sides_mode === 'duplex' || normalizedConfig.print_sides_mode === 'duplex_bw_back';
     const duplexAsSingleX2 = simplifiedConfig.duplex_as_single_x2 === true;
@@ -760,7 +797,12 @@ export class SimplifiedPricingService {
       // Раньше при counter_unit=meters ветка рулона шла раньше и полностью игнорировала шаблон.
       let resolvedFromTemplate = false;
       if (printPriceConfig?.tiers?.length) {
-        const tierQuantity = usePagesMultiplier ? multipagePrintUnits : quantity;
+        const tierQuantity =
+          tierSheetsOverride != null
+            ? tierSheetsOverride
+            : usePagesMultiplier
+              ? multipageTierPrintUnits
+              : quantity;
         const tier = this.findTierForQuantity(printPriceConfig.tiers, tierQuantity);
         const priceForTier = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (priceForTier > 0) {
@@ -783,6 +825,8 @@ export class SimplifiedPricingService {
             sheetsPerItem,
             effectivePrintQuantity,
             multipagePrintUnits,
+            coverPrintUnits,
+            multipageTierPrintUnits,
             basePrintPrice,
             billingModeMultiplier,
             printPrice,
@@ -1681,6 +1725,7 @@ export class SimplifiedPricingService {
         coverPages: pageSplit.coverPages,
         itemsPerSheet,
         sidesMode: normalizedConfig.print_sides_mode || 'single',
+        tierPrintUnits: tierSheetsOverride ?? multipageTierPrintUnits,
       });
     }
 
@@ -1841,12 +1886,29 @@ export class SimplifiedPricingService {
       knifePathByQty,
       rollPlotterCutLevelMultiplier,
       plotterTierVolumeCtx,
+      coverPages: separateCoverForTier ? pageSplit.coverPages : 0,
+      coverSidesMode: separateCoverForTier ? coverSidesForTier : undefined,
     });
     if (usePagesMultiplier && multiPageStructure && tierPricesResult.length > 0) {
       for (const tierRow of tierPricesResult) {
         const qtyForTier = Math.max(1, Number(tierRow.min_qty));
         let tierCoverPrice = 0;
         if (pageSplit.coverMode === 'separate' && pageSplit.coverPages > 0) {
+          const tierCoverSides =
+            (normalizedConfig as { cover_print_sides_mode?: string }).cover_print_sides_mode ||
+            multiPageStructure?.cover?.print?.sides_mode ||
+            normalizedConfig.print_sides_mode ||
+            'single';
+          const tierBlockUnits = computeMultipagePrintUnits(
+            Math.max(1, qtyForTier * sheetsPerItem),
+            itemsPerSheet,
+          );
+          const tierCoverUnitsOnly = computeMultipageCoverPrintUnits({
+            quantity: qtyForTier,
+            coverPages: pageSplit.coverPages,
+            itemsPerSheet,
+            sidesMode: tierCoverSides,
+          });
           tierCoverPrice = await this.calculateMultiPageCoverCost({
             db,
             quantity: qtyForTier,
@@ -1858,6 +1920,7 @@ export class SimplifiedPricingService {
             coverPages: pageSplit.coverPages,
             itemsPerSheet,
             sidesMode: normalizedConfig.print_sides_mode || 'single',
+            tierPrintUnits: tierBlockUnits + tierCoverUnitsOnly,
           });
         }
 
@@ -2088,6 +2151,9 @@ export class SimplifiedPricingService {
       sheet: { volumeTierBasis: PlotterVolumeTierBasis | null; meterBasis: 'knife_path' | 'feed' };
       pieceCutAreaTrimM2: number;
     };
+    /** Отдельная обложка: страниц обложки на изделие (tier печати = блок + обложка). */
+    coverPages?: number;
+    coverSidesMode?: string;
   }): Array<{ min_qty: number; max_qty?: number; unit_price: number; total_price: number }> {
     // Диапазоны ТОЛЬКО по раскладке листа: 1 лист, 2 листа, 3 листа... (itemsPerSheet, 2*itemsPerSheet, ...)
     const ips = Math.max(1, ctx.itemsPerSheet || 1);
@@ -2146,8 +2212,18 @@ export class SimplifiedPricingService {
           const printUnits = ctx.usePagesMultiplier
             ? computeMultipagePrintUnits(physicalSheets, ctx.itemsPerSheet)
             : q;
+          let tierPrintUnits = printUnits;
+          if (ctx.usePagesMultiplier && (ctx.coverPages ?? 0) > 0) {
+            tierPrintUnits +=
+              computeMultipageCoverPrintUnits({
+                quantity: q,
+                coverPages: ctx.coverPages!,
+                itemsPerSheet: ctx.itemsPerSheet,
+                sidesMode: ctx.coverSidesMode,
+              });
+          }
           const tierForPrint = ctx.usePagesMultiplier
-            ? this.findTierForQuantity(ctx.printPriceConfig.tiers, printUnits)
+            ? this.findTierForQuantity(ctx.printPriceConfig.tiers, tierPrintUnits)
             : tier;
           const unitPrice = tierForPrint ? this.getPriceForQuantityTier(tierForPrint) : priceForTier;
           const pricePerSheet = unitPrice * ctx.itemsPerSheet;
@@ -2310,6 +2386,8 @@ export class SimplifiedPricingService {
     coverPages: number;
     itemsPerSheet: number;
     sidesMode: string;
+    /** Объём для tier (блок + обложка); биллинг — по coverPrintUnits. */
+    tierPrintUnits?: number;
   }): Promise<number> {
     const cover = ctx.multiPageStructure.cover;
     if (!cover || cover.mode !== 'separate' || ctx.coverPages < 1) return 0;
@@ -2350,7 +2428,11 @@ export class SimplifiedPricingService {
         String(p.sides_mode || '').toLowerCase() === String(sidesMode).toLowerCase()
       );
       if (printPriceConfig?.tiers?.length) {
-        const tier = this.findTierForQuantity(printPriceConfig.tiers, coverPrintUnits);
+        const tierQty =
+          ctx.tierPrintUnits != null && ctx.tierPrintUnits > 0
+            ? ctx.tierPrintUnits
+            : coverPrintUnits;
+        const tier = this.findTierForQuantity(printPriceConfig.tiers, tierQty);
         const tierPrice = tier ? this.getPriceForQuantityTier(tier) : 0;
         if (tierPrice > 0) {
           printPrice = tierPrice * coverPrintUnits;

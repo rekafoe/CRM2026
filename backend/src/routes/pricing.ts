@@ -6,6 +6,7 @@ import { ServiceManagementService } from '../modules/pricing/services/serviceMan
 import { PriceTypeService } from '../modules/pricing/services/priceTypeService'
 import { PricingServiceRepository } from '../modules/pricing/repositories/serviceRepository'
 import { PlotterCuttingTariffRepository } from '../modules/pricing/repositories/plotterCuttingTariffRepository'
+import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
 
 console.log('Loading pricing routes...')
 
@@ -1939,6 +1940,11 @@ router.post('/calculate', asyncHandler(async (req, res) => {
   // Перенаправляем на существующий calculateProductPrice из модуля pricing
   const { PricingController } = await import('../modules/pricing/controllers/pricingController')
   await PricingController.calculateProductPrice(req, res)
+}))
+
+router.post('/quote-cart', requireWebsiteOrderApiKey, asyncHandler(async (req, res) => {
+  const { PricingController } = await import('../modules/pricing/controllers/pricingController')
+  await PricingController.quoteCart(req, res)
 }))
 
 export default router

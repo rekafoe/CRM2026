@@ -9,6 +9,7 @@ import { UnifiedWarehouseService } from '../../warehouse/services/unifiedWarehou
 import { MaterialTransactionService } from '../../warehouse/services/materialTransactionService'
 import { computeClicks, ceilRequiredQuantity } from '../../../utils/printing'
 import { logger } from '../../../utils/logger'
+import { OrderPricingService } from '../services/orderPricingService'
 
 export class OrderItemController {
   static async addItem(req: Request, res: Response) {
@@ -351,6 +352,15 @@ export class OrderItemController {
         
         logger.info('✅ [addItem] Транзакция завершена успешно', { itemId, orderId })
 
+        try {
+          await OrderPricingService.recalculateOrderPrices(orderId)
+        } catch (recalcErr) {
+          logger.warn('⚠️ [addItem] пересчёт цен по группам не выполнен', {
+            orderId,
+            error: (recalcErr as Error).message,
+          })
+        }
+
         const orderRow = await db.get<{ created_date?: string }>(
           'SELECT COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
           [orderId]
@@ -366,7 +376,11 @@ export class OrderItemController {
           })
         }
 
-        const item = mapItemRowToItem(rawItem as any)
+        const refreshedRaw = await db.get(
+          `SELECT ${itemRowSelect} FROM items WHERE id = ?`,
+          itemId
+        )
+        const item = mapItemRowToItem((refreshedRaw ?? rawItem) as any)
         res.status(201).json(item)
         return
       } catch (e) {
@@ -526,6 +540,14 @@ export class OrderItemController {
         }
         
         await db.run('COMMIT')
+        try {
+          await OrderPricingService.recalculateOrderPrices(orderId)
+        } catch (recalcErr) {
+          logger.warn('⚠️ [deleteItem] пересчёт цен по группам не выполнен', {
+            orderId,
+            error: (recalcErr as Error).message,
+          })
+        }
         const orderRow = await db.get<{ created_date?: string }>(
           'SELECT COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
           [orderId]
@@ -788,6 +810,18 @@ export class OrderItemController {
         }
 
         await db.run('COMMIT')
+        const pricingFieldsChanged =
+          body.params != null || body.quantity != null || body.price != null
+        if (pricingFieldsChanged) {
+          try {
+            await OrderPricingService.recalculateOrderPrices(orderId)
+          } catch (recalcErr) {
+            logger.warn('⚠️ [updateItem] пересчёт цен по группам не выполнен', {
+              orderId,
+              error: (recalcErr as Error).message,
+            })
+          }
+        }
         const orderRow = await db.get<{ created_date?: string }>(
           'SELECT COALESCE(createdAt, created_at) as created_date FROM orders WHERE id = ?',
           [orderId]
