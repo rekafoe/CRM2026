@@ -55,6 +55,8 @@ export type MultiPageStructureConfig = {
     /** Сколько страниц входит в общий тираж альбома (калькулятор «Страницы»). По умолчанию 4. */
     page_count?: number;
     print?: MultiPageBlockPrintConfig;
+    /** Разрешённые материалы обложки (отдельная обложка) */
+    allowed_material_ids?: number[];
     material_id?: number;
     /** @deprecated для ценообразования — используйте page_count; листов на изделие (legacy) */
     qty_per_item?: number;

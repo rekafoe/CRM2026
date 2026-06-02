@@ -8,6 +8,7 @@ import { OrderDates } from '../../order/OrderDates';
 import { useToast } from '../../Toast';
 import { generateOrderBlankPdf, generateCommodityReceiptPdf, generateCommodityReceiptBlankPdf, updateOrderDiscount, updateOrderPaymentChannel, updateOrderNotes } from '../../../api';
 import { parseNumberFlexible } from '../../../utils/numberInput';
+import { getOrderAmounts } from '../../../utils/orderTotal';
 import { CustomerSelector } from '../../customers/CustomerSelector';
 import { AppIcon } from '../../ui/AppIcon';
 import { OrderMailLogPanel } from '../../orders/OrderMailLogPanel';
@@ -77,21 +78,10 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
   const paymentChannelMenuRef = useRef<HTMLDivElement>(null);
 
   const items = selectedOrder.items ?? [];
-  const subtotal = React.useMemo(() => {
-    return items.reduce((sum, it) => {
-      const stored = (it.params as { storedTotalCost?: number })?.storedTotalCost;
-      const itemTotal = typeof stored === 'number' && Number.isFinite(stored)
-        ? stored
-        : parseNumberFlexible(it.price) * parseNumberFlexible(it.quantity ?? 1);
-      const s = parseNumberFlexible((it as any).serviceCost);
-      return sum + itemTotal + s;
-    }, 0);
-  }, [items]);
-  const discountPercent = selectedOrder.discount_percent ?? 0;
-  const discountAmount = Math.round(subtotal * (discountPercent / 100) * 100) / 100;
-  const total = Math.round((subtotal - discountAmount) * 100) / 100;
-  const prepay = parseNumberFlexible(selectedOrder.prepaymentAmount ?? 0);
-  const debt = Math.max(0, Math.round((total - prepay) * 100) / 100);
+  const orderAmounts = React.useMemo(
+    () => getOrderAmounts(selectedOrder),
+    [selectedOrder],
+  );
 
   useEffect(() => {
     if (!receiptMenuOpen) return;
@@ -291,7 +281,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
               >
                 <AppIcon name="card" size="xs" /> Внести предоплату
               </button>
-              {prepay > 0 && onRemovePrepayment && (
+              {orderAmounts.prepayment > 0 && onRemovePrepayment && (
                 <button 
                   onClick={() => onRemovePrepayment(selectedOrder.id)}
                   className="order-detail-action-btn order-detail-action-btn--danger"
@@ -300,7 +290,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
                   <AppIcon name="trash" size="xs" /> Удалить предоплату
                 </button>
               )}
-              {onIssueOrder && (debt > 0 || (debt === 0 && total > 0)) && Number(selectedOrder.status) !== 7 && (
+              {onIssueOrder && (orderAmounts.debt > 0 || (orderAmounts.debt === 0 && orderAmounts.total > 0)) && Number(selectedOrder.status) !== 7 && (
                 <button 
                   onClick={() => onIssueOrder(selectedOrder.id)}
                   className="order-detail-action-btn order-detail-action-btn--info"
@@ -641,14 +631,10 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
       </div>
 
       <OrderTotal
-        items={items.map((it) => ({
-          id: it.id,
-          type: it.type,
-          price: it.price,
-          quantity: it.quantity ?? 1,
-          params: it.params,
-        }))}
-        discount={discountAmount}
+        subtotal={orderAmounts.subtotal}
+        discountAmount={orderAmounts.discountAmount}
+        total={orderAmounts.total}
+        debt={orderAmounts.debt}
         taxRate={0}
         prepaymentAmount={selectedOrder.prepaymentAmount}
         prepaymentStatus={selectedOrder.prepaymentStatus}

@@ -3,6 +3,7 @@ import { formatReceiptPaperCaptionFromItemParams } from './commodityReceiptLabel
 import { MaterialService } from './materialService';
 import { getDb } from '../config/database';
 import { buildOrderNumberFromSourceAndId } from '../utils/orderNumberGenerator';
+import { computeItemLineTotal } from '../utils/orderAmounts';
 import * as fs from 'fs';
 import * as path from 'path';
 import puppeteer, { Browser } from 'puppeteer';
@@ -1480,8 +1481,12 @@ export class PDFReportService {
     for (const it of items) {
       const discountPct = getDiscountPercent(it.orderId);
       const qty = Math.max(1, Number(it.quantity) || 1);
-      const rawPrice = Number(it.price) || 0;
-      const itemAmount = Math.round(rawPrice * qty * (1 - discountPct / 100) * 100) / 100;
+      const lineSubtotal = computeItemLineTotal({
+        price: it.price,
+        quantity: qty,
+        params: it.params,
+      });
+      const itemAmount = Math.round(lineSubtotal * (1 - discountPct / 100) * 100) / 100;
       const lines = this.getOrderItemProductionRows(it);
       const rowAmounts = this.distributeItemSumToRows(itemAmount, lines);
       lines.forEach((line, idx) => {

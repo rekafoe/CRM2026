@@ -47,6 +47,8 @@ export interface ProductSpecs {
   name?: string;
   size_id?: number | string; // 🆕 Для упрощённых продуктов (number для новых, string для обратной совместимости)
   material_id?: number; // 🆕 ID материала (для упрощённых и обычных продуктов)
+  /** Бумага обложки (multiPageStructure.cover.mode = separate) */
+  cover_material_id?: number;
   /** Материал-основа (заготовка): футболка, кружка — 1 шт на изделие */
   base_material_id?: number;
   /** Дозаливка мм (с каждой стороны) — переопределяет шаблон; иначе см. resolveBleedMmForCalculateRequest */

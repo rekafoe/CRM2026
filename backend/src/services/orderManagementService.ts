@@ -4,6 +4,8 @@ import { PhotoOrderService } from './photoOrderService';
 import { UserOrderPageService } from './userOrderPageService';
 import { NotificationService } from './notificationService';
 import { trySyncWebsiteOrderStatusFromCrm } from './websiteOrderStatusSyncService';
+import { sqlOrderSubtotalSubquery } from '../utils/orderAmountsSql';
+import { OrderService } from '../modules/orders/services/orderService';
 
 export interface UnifiedOrder {
   id: number;
@@ -70,7 +72,7 @@ export class OrderManagementService {
             status,
             customerName as customer_name,
             customerPhone as customer_contact,
-            COALESCE((SELECT SUM(price * quantity) FROM items WHERE orderId = orders.id), 0) as total_amount,
+            COALESCE(${sqlOrderSubtotalSubquery('orders.id')}, 0) as total_amount,
             prepaymentAmount as prepayment_amount,
             prepaymentStatus as prepayment_status,
             paymentMethod as payment_method,
@@ -296,7 +298,7 @@ export class OrderManagementService {
             status,
             customerName as customer_name,
             customerPhone as customer_contact,
-            COALESCE((SELECT SUM(price * quantity) FROM items WHERE orderId = orders.id), 0) as total_amount,
+            COALESCE(${sqlOrderSubtotalSubquery('orders.id')}, 0) as total_amount,
             prepaymentAmount as prepayment_amount,
             prepaymentStatus as prepayment_status,
             paymentMethod as payment_method,
@@ -329,7 +331,7 @@ export class OrderManagementService {
             status,
             customerName as customer_name,
             customerPhone as customer_contact,
-            COALESCE((SELECT SUM(price * quantity) FROM items WHERE orderId = orders.id), 0) as total_amount,
+            COALESCE(${sqlOrderSubtotalSubquery('orders.id')}, 0) as total_amount,
             prepaymentAmount as prepayment_amount,
             prepaymentStatus as prepayment_status,
             paymentMethod as payment_method,
@@ -393,7 +395,7 @@ export class OrderManagementService {
               status,
               customerName as customer_name,
               customerPhone as customer_contact,
-              COALESCE((SELECT SUM(price * quantity) FROM items WHERE orderId = orders.id), 0) as total_amount,
+              COALESCE(${sqlOrderSubtotalSubquery('orders.id')}, 0) as total_amount,
               prepaymentAmount as prepayment_amount,
               prepaymentStatus as prepayment_status,
               paymentMethod as payment_method,
@@ -476,12 +478,10 @@ export class OrderManagementService {
             return null;
           }
 
-          const items = await db.all<any>('SELECT price, quantity FROM items WHERE orderId = ?', [orderId]);
-          const subtotal = items.reduce((s: number, i: any) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
-          const discount = Number(order.discount_percent) || 0;
-          const totalAmount = Math.round((1 - discount / 100) * subtotal * 100) / 100;
+          const amounts = await OrderService.getOrderAmountsById(orderId);
+          const totalAmount = amounts.totalAmount;
+          const remainder = amounts.debt;
           const prepaymentAmount = Number(order.prepaymentAmount || 0);
-          const remainder = Math.round((totalAmount - prepaymentAmount) * 100) / 100;
 
           let hasPrepaymentUpdatedAt = false;
           try { hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt'); } catch { /* ignore */ }

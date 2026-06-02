@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto'
 import { getDb } from '../../../config/database'
+import { sqlOrderTotalAfterDiscount } from '../../../utils/orderAmountsSql'
 
 const CUSTOMER_SOURCE_VALUES = new Set(['crm', 'website', 'telegram', 'mini_app'])
 
@@ -111,17 +112,14 @@ export class CustomerService {
     const db = await getDb();
     const ids = customers.map((c) => c.id);
     const ph = ids.map(() => '?').join(',');
+    const lastOrderAmountSql = sqlOrderTotalAfterDiscount('o.id', 'COALESCE(o.discount_percent, 0)');
     const sql = `
       SELECT customer_id, last_order_at, last_order_amount
       FROM (
         SELECT
           o.customer_id,
           COALESCE(o.created_at, o.createdAt) AS last_order_at,
-          ROUND(
-            COALESCE((SELECT SUM(i.price * i.quantity) FROM items i WHERE i.orderId = o.id), 0) *
-            (1.0 - COALESCE(o.discount_percent, 0) / 100.0),
-            2
-          ) AS last_order_amount,
+          ${lastOrderAmountSql} AS last_order_amount,
           ROW_NUMBER() OVER (
             PARTITION BY o.customer_id
             ORDER BY datetime(COALESCE(o.created_at, o.createdAt)) DESC, o.id DESC

@@ -5,6 +5,7 @@ import { useToastNotifications } from '../Toast';
 import { LoadingSpinner } from '../LoadingSpinner';
 import { useOrderStatuses } from '../../hooks/useOrderStatuses';
 import { BynSymbol, MoneyAmount } from '../ui';
+import { getOrderAmounts } from '../../utils/orderTotal';
 import './OrderEditModal.css';
 
 interface OrderEditModalProps {
@@ -84,7 +85,7 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
     
     // Проверяем, что предоплата не больше общей суммы заказа
     if (order && prepaymentAmount > 0) {
-      const totalOrderAmount = (order.items ?? []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const totalOrderAmount = getOrderAmounts(order).total;
       if (prepaymentAmount > totalOrderAmount) {
         newErrors.prepaymentAmount = `Предоплата не может быть больше общей суммы заказа (${totalOrderAmount.toLocaleString('ru-RU')} бел. руб.)`;
       }
@@ -318,7 +319,7 @@ export const OrderEditModal: React.FC<OrderEditModalProps> = ({
                     <label>Общая сумма:</label>
                     <span className="amount">
                       <MoneyAmount
-                        value={(order.items ?? []).reduce((sum, item) => sum + (item.price * item.quantity), 0)}
+                        value={getOrderAmounts(order).total}
                         decimals={0}
                       />
                     </span>

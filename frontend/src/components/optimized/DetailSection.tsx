@@ -6,6 +6,7 @@ import { OrderHeader } from './OrderHeader';
 import { OrderMeta } from './OrderMeta';
 import { OrderActions } from './OrderActions';
 import { OrderContent } from './OrderContent';
+import { getOrderAmounts } from '../../utils/orderTotal';
 
 interface DetailSectionProps {
   selectedOrder: Order | null;
@@ -64,7 +65,7 @@ export const DetailSection: React.FC<DetailSectionProps> = ({
       </section>
     );
   }
-  const items = selectedOrder.items ?? [];
+  const amounts = getOrderAmounts(selectedOrder);
 
   return (
     <section className="detail">
@@ -106,13 +107,10 @@ export const DetailSection: React.FC<DetailSectionProps> = ({
       />
 
       <OrderTotal
-        items={items.map((item) => ({
-          id: item.id,
-          type: item.type,
-          price: item.price,
-          quantity: item.quantity ?? 1,
-        }))}
-        discount={0}
+        subtotal={amounts.subtotal}
+        discountAmount={amounts.discountAmount}
+        total={amounts.total}
+        debt={amounts.debt}
         taxRate={0}
         prepaymentAmount={selectedOrder.prepaymentAmount}
         prepaymentStatus={selectedOrder.prepaymentStatus}

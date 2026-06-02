@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useMemo } from 'react';
 import { Order } from '../../types';
 import { parseNumberFlexible } from '../../utils/numberInput';
+import { getOrderAmounts } from '../../utils/orderTotal';
 import { MoneyAmount } from '../ui';
 import { useOrderStatusClasses } from './hooks/useOrderStatusClasses';
 import type { OrdersListTab } from './hooks/useOptimizedAppData';
@@ -86,18 +87,11 @@ const OrderItem = memo<{
   }, [order.customer, order.customerName]);
 
   const totalAmount = useMemo(() => {
-    const stored = parseNumberFlexible(
-      (order as any).totalAmount ?? (order as any).total_amount ?? 0
-    );
-    if (stored > 0) {
-      return stored;
+    const fromApi = (order as { totalAmount?: number }).totalAmount;
+    if (typeof fromApi === 'number' && Number.isFinite(fromApi)) {
+      return fromApi;
     }
-    const items = Array.isArray(order.items) ? order.items : [];
-    return items.reduce((sum, item) => {
-      const price = parseNumberFlexible(item.price ?? 0);
-      const qty = parseNumberFlexible(item.quantity ?? 1);
-      return sum + price * qty;
-    }, 0);
+    return getOrderAmounts(order).total;
   }, [order]);
 
   return (
@@ -174,17 +168,10 @@ export const OrderList = memo<OrderListProps>(({
         0,
         Math.min(100, Math.round(((statusValue - 1) / Math.max(1, maxSort - 1)) * 100))
       );
-      const items = Array.isArray(order.items) ? order.items : [];
-      const subtotal = items.reduce((s, i) => {
-        const stored = (i.params as { storedTotalCost?: number })?.storedTotalCost;
-        return s + (typeof stored === 'number' && Number.isFinite(stored)
-          ? stored
-          : parseNumberFlexible(i.price ?? 0) * parseNumberFlexible(i.quantity ?? 1));
-      }, 0);
-      const discount = parseNumberFlexible((order as any).discount_percent ?? 0);
-      const total = Math.round((1 - discount / 100) * subtotal * 100) / 100;
-      const prepay = parseNumberFlexible((order as any).prepaymentAmount ?? 0);
-      const debt = Math.max(0, Math.round((total - prepay) * 100) / 100);
+      const debt =
+        typeof order.debt === 'number' && Number.isFinite(order.debt)
+          ? order.debt
+          : 0;
       return {
         order,
         statusInfo,

@@ -122,6 +122,9 @@ export interface Item {
   formatInfo?: string;
   created_at?: string;
   updated_at?: string;
+  /** Итог позиции с API (storedTotalCost ?? price×qty + serviceCost) */
+  lineTotal?: number;
+  serviceCost?: number;
 }
 
 export interface Order {
@@ -157,7 +160,14 @@ export interface Order {
   // Order items
   items: Item[];
   // Additional metadata
+  /** Подытог по позициям (до скидки), с API */
+  subtotal?: number;
+  /** Сумма скидки в BYN, с API */
+  discountAmount?: number;
+  /** Итог после скидки, с API */
   totalAmount?: number;
+  /** Долг клиента (totalAmount − prepayment), с API */
+  debt?: number;
   notes?: string;
   /** Способ получения / доставка (заказ с сайта) */
   delivery?: WebsiteOrderDelivery;

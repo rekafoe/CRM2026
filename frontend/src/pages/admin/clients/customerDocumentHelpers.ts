@@ -1,5 +1,6 @@
 import type { Customer, Order } from '../../../types';
 import { formatReceiptPaperCaptionFromParams } from '../../../components/order/orderItemBreakdownUtils';
+import { getOrderAmounts } from '../../../utils/orderTotal';
 
 export const getCustomerDisplayName = (customer: Customer) => {
   if (customer.type === 'legal') {
@@ -23,17 +24,8 @@ export const getCustomerSourceLabel = (source?: string | null) => {
   return CUSTOMER_SOURCE_LABELS[key] ?? 'CRM';
 };
 
-/** Итог заказа с учётом скидки (для отображения и документов). */
-export const getOrderTotal = (order: Order) => {
-  const anyOrder = order as any;
-  const subtotal = Number(order.totalAmount ?? anyOrder.total_amount ?? 0) ||
-    (Array.isArray(anyOrder.items) ? anyOrder.items.reduce(
-      (s: number, i: any) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
-      0
-    ) : 0);
-  const pct = Number(anyOrder.discount_percent) || 0;
-  return Math.round(subtotal * (1 - pct / 100) * 100) / 100;
-};
+/** Итог заказа после скидки (с API). */
+export const getOrderTotal = (order: Order) => getOrderAmounts(order).total;
 
 export const formatDateValue = (value?: string) => {
   if (!value) return '—';

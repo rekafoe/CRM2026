@@ -4,6 +4,7 @@ import { Product } from '../../../services/products';
 import { AppIcon } from '../../ui/AppIcon';
 import { ParamsSection, type ParamsSectionSpecs } from './ParamsSection';
 import { MaterialsSection } from './MaterialsSection';
+import { CoverMaterialsSection } from './CoverMaterialsSection';
 import { PrintingSettingsSection } from './PrintingSettingsSection';
 import { DynamicFieldsSection } from './DynamicFieldsSection';
 import { AdvancedSettingsSection } from './AdvancedSettingsSection';
@@ -228,6 +229,20 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
         />
           ) : null}
         </div>
+
+        {isMultiPageProduct && (
+          <CoverMaterialsSection
+            coverConfig={
+              (backendProductSchema?.template?.simplified as { multiPageStructure?: { cover?: unknown } } | undefined)
+                ?.multiPageStructure?.cover as { mode?: string; allowed_material_ids?: number[]; material_id?: number } | undefined
+            }
+            coverMaterialId={(specs as { cover_material_id?: number }).cover_material_id}
+            updateSpecs={updateSpecs as (u: Record<string, unknown>, instant?: boolean) => void}
+            warehousePaperTypes={warehousePaperTypes}
+            schemaMaterials={backendProductSchema?.materials}
+            validationError={validationErrors.cover_material_id}
+          />
+        )}
 
         <DynamicFieldsSection
           schema={backendProductSchema}

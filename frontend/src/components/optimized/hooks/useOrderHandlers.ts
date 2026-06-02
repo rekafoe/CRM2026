@@ -91,8 +91,7 @@ export const useOrderHandlers = ({
           // Обновляем существующий заказ
           const updatedOrder = { ...prevOrders[orderIndex] };
           updatedOrder.items = [...(updatedOrder.items || []), addedItem.data];
-          updatedOrder.totalAmount = (updatedOrder.totalAmount || 0) + (item.price || 0) * (item.quantity || 1);
-          
+
           const newOrders = [...prevOrders];
           newOrders[orderIndex] = updatedOrder;
           return newOrders;

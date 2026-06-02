@@ -62,6 +62,7 @@ export function useProductSelection({
           format: getDefaultFormat(),
           size_id: undefined,
           material_id: undefined,
+          cover_material_id: undefined,
           paperType: undefined,
           paperDensity: 0,
           materialType: undefined,

@@ -501,7 +501,14 @@ router.get('/analytics/products/popularity', asyncHandler(async (req, res) => {
     ), 0) as total_revenue
     FROM orders o
     LEFT JOIN (
-      SELECT orderId, SUM(price * quantity) as raw_total FROM items GROUP BY orderId
+      SELECT orderId, COALESCE(SUM(
+        CASE
+          WHEN json_valid(params) = 1
+            AND json_type(json_extract(params, '$.storedTotalCost')) IN ('integer', 'real')
+          THEN CAST(json_extract(params, '$.storedTotalCost') AS REAL)
+          ELSE CAST(price AS REAL) * CAST(MAX(1, COALESCE(quantity, 1)) AS REAL)
+        END
+      ), 0) as raw_total FROM items GROUP BY orderId
     ) i_totals ON i_totals.orderId = o.id
     WHERE ${dateFilter('o')}
       AND o.status != 1

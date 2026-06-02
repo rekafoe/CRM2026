@@ -44,6 +44,7 @@ import { usePoolNewBadge } from './hooks/usePoolNewBadge';
 import { useOrderHandlers } from './hooks/useOrderHandlers';
 import { OrderDetailSection } from './components/OrderDetailSection';
 import { useReasonPrompt } from '../common/useReasonPrompt';
+import { getOrderAmounts } from '../../utils/orderTotal';
 
 interface OptimizedAppProps {
   onClose?: () => void;
@@ -513,12 +514,7 @@ export const OptimizedApp: React.FC<OptimizedAppProps> = ({ onClose }) => {
           currentAmount={selectedOrder.prepaymentAmount}
           currentPaymentMethod={selectedOrder.paymentMethod === 'telegram' ? 'online' : selectedOrder.paymentMethod}
           currentEmail={selectedOrder.customerEmail || ''}
-          totalOrderAmount={(() => {
-            const items = selectedOrder.items ?? [];
-            const st = items.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
-            const pct = Number((selectedOrder as any).discount_percent) || 0;
-            return Math.round((1 - pct / 100) * st * 100) / 100;
-          })()}
+          totalOrderAmount={getOrderAmounts(selectedOrder).total}
           onPrepaymentCreated={async (amount, email, paymentMethod, assignToMe) => {
             try {
               const normalizedMethod = paymentMethod === 'telegram' ? 'online' : paymentMethod;

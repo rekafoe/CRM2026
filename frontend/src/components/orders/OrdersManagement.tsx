@@ -323,12 +323,17 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
   // Мемоизированные значения
   const selectedOrdersCount = selectedOrders.length;
   const hasSelectedOrders = selectedOrdersCount > 0;
-  const totalAmount = useMemo(() => 
-    orders.reduce((sum, order) => 
-      sum + order.items.reduce((itemSum, item) => 
-        itemSum + (item.price * item.quantity), 0
-      ), 0
-    ), [orders]
+  const totalAmount = useMemo(
+    () =>
+      orders.reduce(
+        (sum, order) =>
+          sum +
+          (typeof order.totalAmount === 'number' && Number.isFinite(order.totalAmount)
+            ? order.totalAmount
+            : 0),
+        0,
+      ),
+    [orders],
   );
 
   if (loading && orders.length === 0) {
@@ -592,7 +597,10 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
             {/* Строки заказов */}
             {orders.map(order => {
               const status = orderStatuses.find(s => s.id === order.status);
-              const orderTotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+              const orderTotal =
+                typeof order.totalAmount === 'number' && Number.isFinite(order.totalAmount)
+                  ? order.totalAmount
+                  : 0;
               const isSelected = selectedOrders.includes(order.id);
               const isActive = selectedOrderId === order.id;
               

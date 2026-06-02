@@ -282,3 +282,11 @@ console.log('📦 JSON для заказа:', JSON.stringify(apiItem, null, 2));
 - `clicks` → поле `clicks`
 
 Компоненты (`components`) сохраняются в `params.components` и используются для резервирования материалов.
+
+## Суммы в ответе API
+
+При чтении заказа бэкенд добавляет:
+
+- **`params.storedTotalCost`** — итог позиции при сохранении (калькулятор / `recalculate-prices`).
+- **`lineTotal`** — то же для UI: `storedTotalCost` ?? `price × quantity` (см. `orderAmounts.ts`).
+- На заказе: **`subtotal`**, **`discountAmount`**, **`totalAmount`**, **`debt`** — см. [order-management.md](./order-management.md).

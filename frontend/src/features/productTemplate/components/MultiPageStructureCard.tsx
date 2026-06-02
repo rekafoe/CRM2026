@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { FormField } from '../../../components/common'
+import { CoverMaterialsAllowedEditor } from '../../../components/multipage/CoverMaterialsAllowedEditor'
 import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
 import type {
   MultiPageStructureConfig,
@@ -20,19 +21,18 @@ type Props = {
     duplexSheets: number
   } | null
   allMaterials: CalculatorMaterial[]
-  /** Материалы, разрешённые для текущего типа/размера — приоритет в списке обложки */
+  /** Материалы блока для текущего размера — подсказка при первом включении отдельной обложки */
   preferredMaterialIds?: number[]
+  paperTypes: Array<{
+    id: number | string
+    name: string
+    display_name?: string
+    densities?: Array<{ material_id?: number; value?: number; price?: number }>
+  }>
   printTechs: PrintTechRow[]
   bindingServices: BindingServiceRow[]
   /** Текущий размер — для кнопки «как у блока» */
   selectedSize?: SimplifiedSizeConfig | null
-}
-
-function materialLabel(m: CalculatorMaterial): string {
-  const density = (m as { density?: number | string }).density
-  const extra = density != null && density !== '' ? ` · ${density} г/м²` : ''
-  const cat = m.category_name ? `${m.category_name} · ` : ''
-  return `${cat}${m.name}${extra}`
 }
 
 export const MultiPageStructureCard: React.FC<Props> = ({
@@ -41,6 +41,7 @@ export const MultiPageStructureCard: React.FC<Props> = ({
   pagesHint,
   allMaterials,
   preferredMaterialIds = [],
+  paperTypes,
   printTechs,
   bindingServices,
   selectedSize,
@@ -50,31 +51,10 @@ export const MultiPageStructureCard: React.FC<Props> = ({
   const binding = structure.binding || {}
   const coverPrint = cover.print || {}
 
-  const [materialFilter, setMaterialFilter] = useState('')
-
-  const coverMaterialOptions = useMemo(() => {
-    const preferred = new Set(preferredMaterialIds.map(Number).filter(Number.isFinite))
-    const list =
-      preferred.size > 0
-        ? allMaterials.filter((m) => preferred.has(Number(m.id)))
-        : allMaterials
-    const selectedId = cover.material_id != null ? Number(cover.material_id) : null
-    if (selectedId != null && !list.some((m) => Number(m.id) === selectedId)) {
-      const extra = allMaterials.find((m) => Number(m.id) === selectedId)
-      if (extra) return [extra, ...list]
-    }
-    return list
-  }, [allMaterials, preferredMaterialIds, cover.material_id])
-
-  const filteredCoverMaterials = useMemo(() => {
-    const q = materialFilter.trim().toLowerCase()
-    if (!q) return coverMaterialOptions
-    return coverMaterialOptions.filter(
-      (m) =>
-        materialLabel(m).toLowerCase().includes(q) ||
-        String(m.id).includes(q),
-    )
-  }, [coverMaterialOptions, materialFilter])
+  const coverAllowedIds = useMemo(
+    () => (cover.allowed_material_ids ?? []).map(Number).filter((n) => Number.isFinite(n) && n > 0),
+    [cover.allowed_material_ids],
+  )
 
   const selectedTech = printTechs.find(
     (t) => t.code === coverPrint.technology_code,
@@ -99,7 +79,18 @@ export const MultiPageStructureCard: React.FC<Props> = ({
   }
 
   const patchCover = (patch: Partial<typeof cover>) => {
-    onChange({ cover: { ...cover, ...patch } })
+    const next = { ...cover, ...patch }
+    if (patch.mode === 'separate' && !(next.allowed_material_ids?.length)) {
+      const pref = preferredMaterialIds
+        .map(Number)
+        .filter((n) => Number.isFinite(n) && n > 0)
+      if (pref.length > 0) {
+        next.allowed_material_ids = [...pref]
+      } else if (next.material_id != null) {
+        next.allowed_material_ids = [Number(next.material_id)]
+      }
+    }
+    onChange({ cover: next })
   }
 
   const patchCoverPrint = (patch: Partial<typeof coverPrint>) => {
@@ -210,42 +201,26 @@ export const MultiPageStructureCard: React.FC<Props> = ({
                 Скопировать печать с текущего размера
               </button>
             )}
-            <div className="simplified-form-grid">
-              <FormField
-                label="Бумага обложки"
-                help={
-                  preferredMaterialIds.length > 0
-                    ? 'Список из материалов, разрешённых для выбранного размера.'
-                    : 'Сначала настройте материалы для размера — или выберите из всего справочника.'
-                }
-              >
-                {coverMaterialOptions.length > 12 && (
-                  <input
-                    type="search"
-                    className="form-input form-input--compact multipage-structure__search"
-                    placeholder="Поиск по названию…"
-                    value={materialFilter}
-                    onChange={(e) => setMaterialFilter(e.target.value)}
-                  />
-                )}
-                <select
-                  className="form-select"
-                  value={cover.material_id ?? ''}
-                  onChange={(e) =>
-                    patchCover({
-                      material_id: e.target.value ? Number(e.target.value) : undefined,
-                    })
-                  }
-                >
-                  <option value="">— Выберите бумагу —</option>
-                  {filteredCoverMaterials.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {materialLabel(m)}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
+            <CoverMaterialsAllowedEditor
+              allowedIds={coverAllowedIds}
+              onAllowedChange={(ids) =>
+                patchCover({
+                  allowed_material_ids: ids,
+                  material_id:
+                    cover.material_id != null &&
+                    ids.includes(Number(cover.material_id))
+                      ? cover.material_id
+                      : ids[0],
+                })
+              }
+              allMaterials={allMaterials}
+              paperTypes={paperTypes}
+              defaultMaterialId={cover.material_id}
+              onDefaultMaterialChange={(id) => patchCover({ material_id: id })}
+              allowEditAllowedList
+            />
 
+            <div className="simplified-form-grid">
               <FormField label="Технология печати обложки">
                 <select
                   className="form-select"

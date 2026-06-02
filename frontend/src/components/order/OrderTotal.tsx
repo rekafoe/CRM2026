@@ -1,68 +1,46 @@
 import React from 'react';
-import { parseNumberFlexible } from '../../utils/numberInput';
 import { AppIcon } from '../ui/AppIcon';
 import { BynSymbol } from '../ui/BynSymbol';
 
-export interface OrderItem {
-  id: number;
-  type: string;
-  price: number | string;
-  quantity?: number | string;
-  serviceCost?: number | string;
-  params?: { storedTotalCost?: number };
-}
-
-interface OrderTotalProps {
-  items: OrderItem[];
-  discount?: number | string;
-  taxRate?: number | string;
+export interface OrderAmountsDisplayProps {
+  subtotal: number;
+  discountAmount?: number;
+  total: number;
   prepaymentAmount?: number;
   prepaymentStatus?: string;
   paymentMethod?: 'online' | 'offline' | 'telegram';
+  taxRate?: number;
+  /** С API; если не задан — total − prepayment */
+  debt?: number;
 }
 
-const bynAmount = (n: number) => new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+const bynAmount = (n: number) =>
+  new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 const BynValue: React.FC<{ children: number }> = ({ children }) => (
   <>
     {bynAmount(children)} <BynSymbol />
   </>
 );
 
-export const OrderTotal: React.FC<OrderTotalProps> = ({
-  items,
-  discount = 0,
-  taxRate = 0,
+/** Блок итогов заказа — только отображение сумм с API. */
+export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
+  subtotal,
+  discountAmount = 0,
+  total,
   prepaymentAmount = 0,
   prepaymentStatus,
   paymentMethod,
+  taxRate = 0,
+  debt: debtFromApi,
 }) => {
-  // Приоритет storedTotalCost (итог от калькулятора) — источник истины; иначе price × qty
-  const subtotal = React.useMemo(() => {
-    return items.reduce((sum, item) => {
-      const stored = item.params?.storedTotalCost;
-      const itemTotal = typeof stored === 'number' && Number.isFinite(stored)
-        ? stored
-        : parseNumberFlexible(item.price) * parseNumberFlexible(item.quantity ?? 1);
-      const service = parseNumberFlexible(item.serviceCost);
-      return sum + itemTotal + service;
-    }, 0);
-  }, [items]);
-
-  // ⚠️ ВНИМАНИЕ: discount и taxRate применяются на фронте!
-  // В текущей реализации всегда передается 0, но если понадобится применять скидки/налоги,
-  // они должны рассчитываться на БЭКЕНДЕ и сохраняться в БД (order.discount, order.tax)
-  const disc = parseNumberFlexible(discount);
-  const rate = parseNumberFlexible(taxRate);
-
-  const tax = React.useMemo(() => (subtotal - disc) * rate, [
-    subtotal,
-    disc,
-    rate,
-  ]);
-
-  const total = subtotal - disc + tax;
-  const prepayment = parseNumberFlexible(prepaymentAmount);
-  const debt = total - prepayment;
+  const disc = discountAmount;
+  const rate = Number(taxRate) || 0;
+  const tax = rate > 0 ? (subtotal - disc) * rate : 0;
+  const prepayment = Number(prepaymentAmount) || 0;
+  const debt =
+    typeof debtFromApi === 'number' && Number.isFinite(debtFromApi)
+      ? debtFromApi
+      : Math.max(0, Math.round((total - prepayment) * 100) / 100);
   const isPaid = prepaymentStatus === 'paid';
 
   return (
@@ -96,8 +74,7 @@ export const OrderTotal: React.FC<OrderTotalProps> = ({
           <BynValue>{total}</BynValue>
         </span>
       </div>
-      
-      {/* Предоплата */}
+
       {prepayment > 0 && (
         <>
           <hr />
@@ -106,9 +83,13 @@ export const OrderTotal: React.FC<OrderTotalProps> = ({
               <AppIcon name="card" size="xs" />
               Предоплата (
               {paymentMethod === 'online' ? (
-                <><AppIcon name="wallet" size="xs" /> Онлайн</>
+                <>
+                  <AppIcon name="wallet" size="xs" /> Онлайн
+                </>
               ) : (
-                <><AppIcon name="building" size="xs" /> Оффлайн</>
+                <>
+                  <AppIcon name="building" size="xs" /> Оффлайн
+                </>
               )}
               ):
             </span>

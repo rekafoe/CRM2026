@@ -117,9 +117,10 @@ export const useOrderStore = create<OrderState>()(
       getOrderById: (id) => get().orders.find(order => order.id === id),
       
       getOrderTotal: (orderId) => {
-        const order = get().orders.find(order => order.id === orderId);
-        if (!order?.items) return 0;
-        return order.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+        const order = get().orders.find((o) => o.id === orderId);
+        return typeof order?.totalAmount === 'number' && Number.isFinite(order.totalAmount)
+          ? order.totalAmount
+          : 0;
       },
       
       getOrdersByStatus: (status) => get().orders.filter(order => String(order.status) === String(status))

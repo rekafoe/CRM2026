@@ -41,6 +41,10 @@ import {
   validateMultiPageCountForTemplate,
 } from '../../../utils/multipagePagesConsistency';
 import {
+  getCoverAllowedMaterialIds,
+  resolveCoverMaterialIdForPricing,
+} from '../../../utils/multipageCoverMaterials';
+import {
   PLOTTER_FIN_ROLL,
   PLOTTER_FIN_SHEET,
   PLOTTER_FIN_WEEDING,
@@ -295,6 +299,8 @@ interface SimplifiedConfig {
         color_mode?: 'color' | 'bw';
         sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
       };
+      /** Разрешённые материалы обложки (калькулятор / заказ: cover_material_id) */
+      allowed_material_ids?: number[];
       material_id?: number;
       qty_per_item?: number;
     };
@@ -2417,12 +2423,7 @@ export class SimplifiedPricingService {
       cover.print?.color_mode ||
       ctx.configuration.print_color_mode ||
       'color';
-    const coverMaterialId =
-      Number(
-        ctx.configuration.cover_material_id ??
-        cover.material_id ??
-        ctx.configuration.material_id
-      ) || 0;
+    const coverMaterialId = resolveCoverMaterialIdForPricing(cover, ctx.configuration);
     const coverSheetsPerItem = computeMultipageSheetsPerItem(
       ctx.coverPages,
       Math.max(1, ctx.itemsPerSheet),
@@ -2453,9 +2454,12 @@ export class SimplifiedPricingService {
 
     let materialPrice = 0;
     if (ctx.includeMaterialCost && coverMaterialId > 0) {
-      const allowed = ctx.selectedTypeConfig
+      const coverAllowed = getCoverAllowedMaterialIds(cover);
+      const blockAllowed = ctx.selectedTypeConfig
         ? getEffectiveAllowedMaterialIds(ctx.selectedTypeConfig, ctx.selectedSize)
         : (ctx.selectedSize.allowed_material_ids ?? []);
+      const allowed =
+        coverAllowed.length > 0 ? coverAllowed : blockAllowed;
       const materialAllowed = allowed.length === 0 || allowed.includes(coverMaterialId);
       if (materialAllowed) {
         const material = await ctx.db.get(

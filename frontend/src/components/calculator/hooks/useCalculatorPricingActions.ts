@@ -355,6 +355,7 @@ export function useCalculatorPricingActions({
           // 🆕 Для упрощённых продуктов передаем size_id, material_id и base_material_id
           ...(specs.size_id ? { size_id: specs.size_id } : {}),
           ...(specs.material_id ? { material_id: specs.material_id } : {}),
+          ...(specs.cover_material_id ? { cover_material_id: specs.cover_material_id } : {}),
           ...(specs.base_material_id ? { base_material_id: specs.base_material_id } : {}),
           // 🆕 Резка: явно передаём в заказ для simplified (бэкенд учтёт в цене и вернёт в operations)
           ...(specs.cutting === true || (backendProductSchema?.template?.simplified as any)?.cutting === true

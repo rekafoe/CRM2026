@@ -199,12 +199,10 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     }
   };
   
-  // Вычисляем общую стоимость: приоритет — storedTotalCost из калькулятора (источник истины), иначе price × qty
-  const computedTotal = numberInputToNumber(qty, 0) * numberInputToNumber(price, 0);
-  const storedTotal = (item.params as { storedTotalCost?: number })?.storedTotalCost;
-  const total = typeof storedTotal === 'number' && Number.isFinite(storedTotal)
-    ? Math.round(storedTotal * 100) / 100
-    : Math.round(computedTotal * 100) / 100;
+  const total =
+    typeof item.lineTotal === 'number' && Number.isFinite(item.lineTotal)
+      ? Math.round(item.lineTotal * 100) / 100
+      : Math.round(numberInputToNumber(qty, 0) * numberInputToNumber(price, 0) * 100) / 100;
   
   // Получаем название товара
   const name = (item as any).name || (item as any).params?.productName || (item as any).params?.name || (item as any).type || 'Товар без названия';

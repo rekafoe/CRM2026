@@ -14,6 +14,7 @@ function getEffectiveResponsibleUserId(order: Order): number | null {
   return Number.isFinite(n) ? n : null;
 }
 import { parseNumberFlexible } from '../utils/numberInput';
+import { getOrderAmounts } from '../utils/orderTotal';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { OrderHeader } from '../components/optimized/OrderHeader';
 import { OrderContent } from '../components/optimized/OrderContent';
@@ -253,36 +254,21 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
     return map;
   }, [allUsers]);
 
-  const orderMetrics = useMemo(() => {
-    const map = new Map<number, { total: number; prepayment: number; debt: number }>();
-    orders.forEach((order) => {
-      const items = Array.isArray(order.items) ? order.items : [];
-      const subtotal = items.reduce((sum, item) => {
-        const stored = (item.params as { storedTotalCost?: number })?.storedTotalCost;
-        return sum + (typeof stored === 'number' && Number.isFinite(stored)
-          ? stored
-          : parseNumberFlexible(item.price ?? 0) * parseNumberFlexible(item.quantity ?? 1));
-      }, 0);
-      const pct = (order as any).discount_percent ?? 0;
-      const total = Math.round(subtotal * (1 - pct / 100) * 100) / 100;
-      const prepayment = parseNumberFlexible(order.prepaymentAmount ?? 0);
-      const debt = Math.max(0, total - prepayment);
-      map.set(order.id, { total, prepayment, debt });
-    });
-    return map;
-  }, [orders]);
-
   const getOrderTotal = useCallback((order: Order) => {
-    return orderMetrics.get(order.id)?.total ?? 0;
-  }, [orderMetrics]);
+    return typeof order.totalAmount === 'number' && Number.isFinite(order.totalAmount)
+      ? order.totalAmount
+      : 0;
+  }, []);
 
   const getOrderPrepayment = useCallback((order: Order) => {
-    return orderMetrics.get(order.id)?.prepayment ?? 0;
-  }, [orderMetrics]);
+    return parseNumberFlexible(order.prepaymentAmount ?? 0);
+  }, []);
 
   const getOrderDebt = useCallback((order: Order) => {
-    return orderMetrics.get(order.id)?.debt ?? 0;
-  }, [orderMetrics]);
+    return typeof order.debt === 'number' && Number.isFinite(order.debt)
+      ? order.debt
+      : Math.max(0, getOrderTotal(order) - getOrderPrepayment(order));
+  }, [getOrderTotal, getOrderPrepayment]);
 
   const getAssigneeLabel = useCallback(
     (order: Order) => {
@@ -647,7 +633,8 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         await issueOrder(orderId, today);
         toast.success('Заказ выдан', 'Долг закрыт, заказ переведён в «Выдан»');
-        const total = orderMetrics.get(orderId)?.total ?? 0;
+        const order = orders.find((o) => o.id === orderId);
+        const total = order ? getOrderAmounts(order).total : 0;
         updateOrderInList(orderId, {
           status: 7 as any,
           prepaymentAmount: total,
@@ -662,7 +649,7 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
         setIssuingOrderId(null);
       }
     },
-    [orderMetrics, toast, logger, updateOrderInList]
+    [orders, toast, logger, updateOrderInList]
   );
 
   const handleCancelOnline = useCallback(
@@ -1066,16 +1053,14 @@ export const OrderPoolPage: React.FC<OrderPoolPageProps> = ({ currentUserId, cur
               onExecutorChange={handleExecutorChange}
             />
             <OrderTotal
-              items={selectedItems.map(item => ({
-                id: item.id,
-                type: item.type,
-                price: item.price,
-                quantity: item.quantity ?? 1,
-              }))}
-              discount={(() => {
-                const st = selectedItems.reduce((s, it) => s + parseNumberFlexible(it.price) * parseNumberFlexible(it.quantity ?? 1), 0);
-                const pct = selectedOrder.discount_percent ?? 0;
-                return Math.round(st * (pct / 100) * 100) / 100;
+              {...(() => {
+                const a = getOrderAmounts(selectedOrder);
+                return {
+                  subtotal: a.subtotal,
+                  discountAmount: a.discountAmount,
+                  total: a.total,
+                  debt: a.debt,
+                };
               })()}
               taxRate={0}
               prepaymentAmount={selectedOrder.prepaymentAmount}

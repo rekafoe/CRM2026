@@ -113,6 +113,28 @@ CREATE TABLE user_order_page_orders (
 
 Код: `pricingGroupService.ts`, `orderPricingService.ts`.
 
+## Суммы заказа (источник истины — бэкенд)
+
+Расчёт в [`backend/src/utils/orderAmounts.ts`](../backend/src/utils/orderAmounts.ts):
+
+| Поле | Смысл |
+|------|--------|
+| `lineTotal` (позиция) | `params.storedTotalCost` ?? `price × quantity` (+ `serviceCost`) |
+| `subtotal` | Σ `lineTotal` |
+| `discountAmount` | `subtotal × discount_percent / 100` |
+| `totalAmount` | `subtotal − discountAmount` |
+| `debt` | `max(0, totalAmount − prepaymentAmount)` |
+
+После загрузки позиций заказы обогащаются в `OrderService.attachItemsToOrders` и в ответе дневного отчёта (`GET /api/daily-reports/...`).
+
+**Фронт CRM** только отображает поля с API (`getOrderAmounts` в `frontend/src/utils/orderTotal.ts`), не пересчитывает позиции.
+
+Скидка и синхронизация предоплаты (offline) используют ту же утилиту, не `SUM(price * quantity)` в SQL.
+
+**SQL-фрагменты** (отчёты, клиенты, пул назначений, фильтр по сумме): [`orderAmountsSql.ts`](../backend/src/utils/orderAmountsSql.ts) — `json_extract(params, '$.storedTotalCost')` с fallback на `price×qty`.
+
+Также переведены: `POST /api/orders/:id/issue`, экспорт CSV, `customerService` (последний заказ), `orderManagementService`, аналитика `reports`, `orderRepository` (фильтр по сумме).
+
 ## 📝 TODO
 
 1. ✅ Реализовать OrderPool компонент

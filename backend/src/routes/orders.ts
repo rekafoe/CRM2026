@@ -1106,12 +1106,9 @@ router.post('/:id/issue', asyncHandler(async (req, res) => {
     res.json(orderForApi(updated))
     return
   }
-  const items = await db.all<any>('SELECT price, quantity FROM items WHERE orderId = ?', id)
-  const subtotal = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0)
-  const discount = Number(order.discount_percent) || 0
-  const total = Math.round((1 - discount / 100) * subtotal * 100) / 100
-  const prepay = Number(order.prepaymentAmount ?? 0)
-  const remainder = Math.round((total - prepay) * 100) / 100
+  const amounts = await OrderService.getOrderAmountsById(id)
+  const total = amounts.totalAmount
+  const remainder = amounts.debt
 
   // Дата выдачи: из body.issued_on (дата, выбранная пользователем) или date('now','localtime').
   const bodyDate = (req.body as any)?.issued_on

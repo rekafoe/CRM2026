@@ -26,6 +26,7 @@ import {
   serializeWebsiteOrderDelivery,
   type WebsiteOrderDelivery,
 } from '../../../types/websiteOrderDelivery'
+import { attachAmountsToOrder, computeOrderAmounts } from '../../../utils/orderAmounts'
 
 export class OrderService {
   /** Старые инстансы без миграции — добавляем колонку при первом обращении. */
@@ -208,24 +209,7 @@ export class OrderService {
       // user_order_page_orders / user_order_pages могут отсутствовать
     }
     const allOrders = [...orders, ...assignedOrders] as Order[]
-
-    // Batch loading items/photo-orders для устранения N+1.
-    const telegramIds = allOrders.filter((o) => o.paymentMethod === 'telegram').map((o) => o.id)
-    const websiteIds = allOrders.filter((o) => o.paymentMethod !== 'telegram').map((o) => o.id)
-    const [itemsByOrderId, photoOrdersById] = await Promise.all([
-      OrderRepository.getItemsByOrderIds(websiteIds),
-      OrderRepository.getPhotoOrdersByIds(telegramIds),
-    ])
-    for (const order of allOrders) {
-      if (order.paymentMethod === 'telegram') {
-        const photo = photoOrdersById.get(order.id)
-        order.items = photo ? [mapPhotoOrderToVirtualItem(photo)] : []
-      } else {
-        order.items = itemsByOrderId.get(order.id) ?? []
-      }
-    }
-
-    return allOrders
+    return OrderService.attachItemsToOrders(allOrders)
   }
 
   /** Заказы: владельческие + выданные этим юзером в дату (вкладка «Выданные заказы»). issued_by_me — флаг. */
@@ -255,7 +239,30 @@ export class OrderService {
         order.items = itemsByOrderId.get(order.id) ?? []
       }
     }
-    return orders
+    return orders.map((o) => attachAmountsToOrder(o as Parameters<typeof attachAmountsToOrder>[0]) as unknown as Order)
+  }
+
+  /** Подытог заказа по позициям (storedTotalCost ?? price×qty). */
+  static async getOrderSubtotal(orderId: number): Promise<number> {
+    return (await OrderService.getOrderAmountsById(orderId)).subtotal
+  }
+
+  /** Суммы заказа по id (единая логика orderAmounts). */
+  static async getOrderAmountsById(orderId: number) {
+    const db = await getDb()
+    const orderRow = await db.get<{
+      discount_percent?: number | null
+      prepaymentAmount?: number | null
+    }>(
+      'SELECT COALESCE(discount_percent, 0) as discount_percent, prepaymentAmount FROM orders WHERE id = ?',
+      orderId
+    )
+    const items = await OrderRepository.getItemsByOrderId(orderId)
+    return computeOrderAmounts({
+      items: items as Parameters<typeof computeOrderAmounts>[0]['items'],
+      discount_percent: orderRow?.discount_percent ?? 0,
+      prepaymentAmount: orderRow?.prepaymentAmount,
+    })
   }
 
   /** Все заказы без фильтра по пользователю (для пула заказов). Batch loading — устранение N+1. */
@@ -277,21 +284,7 @@ export class OrderService {
       const tb = new Date(b.created_at).getTime()
       return tb - ta
     })
-    const telegramIds = orders.filter((o) => o.paymentMethod === 'telegram').map((o) => o.id)
-    const websiteIds = orders.filter((o) => o.paymentMethod !== 'telegram').map((o) => o.id)
-    const [itemsByOrderId, photoOrdersById] = await Promise.all([
-      OrderRepository.getItemsByOrderIds(websiteIds),
-      OrderRepository.getPhotoOrdersByIds(telegramIds),
-    ])
-    for (const order of orders) {
-      if (order.paymentMethod === 'telegram') {
-        const photo = photoOrdersById.get(order.id)
-        order.items = photo ? [mapPhotoOrderToVirtualItem(photo)] : order.items ?? []
-      } else {
-        order.items = itemsByOrderId.get(order.id) ?? []
-      }
-    }
-    return orders
+    return OrderService.attachItemsToOrders(orders)
   }
 
   static async createOrder(customerName?: string, customerPhone?: string, customerEmail?: string, prepaymentAmount?: number, userId?: number, date?: string, source?: 'website' | 'telegram' | 'crm' | 'mini_app', customerId?: number, paymentChannel?: 'cash' | 'invoice' | 'not_cashed' | 'internal') {
@@ -1231,15 +1224,15 @@ export class OrderService {
     if (!Number.isFinite(p) || !OrderService.ALLOWED_DISCOUNT_PERCENTS.has(p)) {
       throw new Error('Скидка должна быть 0, 5, 10, 15, 20 или 25%')
     }
-    const oldPct = Number(order.discount_percent || 0) / 100
-    const newPct = p / 100
-    const tot = await db.get<{ total_amount: number }>(
-      'SELECT COALESCE(SUM(price * quantity), 0) as total_amount FROM items WHERE orderId = ?',
-      [id]
-    )
-    const subtotal = Number(tot?.total_amount || 0)
-    const oldTotal = Math.round(subtotal * (1 - oldPct) * 100) / 100
-    const newTotal = Math.round(subtotal * (1 - newPct) * 100) / 100
+    const items = await OrderRepository.getItemsByOrderId(id)
+    const oldAmounts = computeOrderAmounts({
+      items: items as Parameters<typeof computeOrderAmounts>[0]['items'],
+      discount_percent: order.discount_percent ?? 0,
+      prepaymentAmount: order.prepaymentAmount,
+    })
+    const subtotal = oldAmounts.subtotal
+    const oldTotal = oldAmounts.totalAmount
+    const newTotal = Math.round(subtotal * (1 - p / 100) * 100) / 100
     const prepaymentAmount = Number(order.prepaymentAmount || 0)
     const eps = 0.005
     const inSync = Math.abs(prepaymentAmount - oldTotal) < eps
@@ -1263,7 +1256,10 @@ export class OrderService {
     }
 
     const updated = await db.get<any>('SELECT * FROM orders WHERE id = ?', [id])
-    return OrderService.orderForApi({ ...(updated as any), items: [] }) as Order
+    const withItems = await OrderRepository.getItemsByOrderId(id)
+    return OrderService.orderForApi(
+      attachAmountsToOrder({ ...(updated as any), items: withItems }) as Order
+    ) as Order
   }
 
   static async updateOrderStatus(id: number, status: number, userId?: number, cancelReason?: string) {
@@ -1974,7 +1970,13 @@ export class OrderService {
       order.prepaymentAmount || 0,
       order.paymentMethod || '',
       order.items.length,
-      order.items.reduce((sum: any, item: any) => sum + (item.price * item.quantity), 0)
+      typeof order.totalAmount === 'number' && Number.isFinite(order.totalAmount)
+        ? order.totalAmount
+        : computeOrderAmounts({
+            items: order.items as Parameters<typeof computeOrderAmounts>[0]['items'],
+            discount_percent: (order as Order & { discount_percent?: number }).discount_percent,
+            prepaymentAmount: order.prepaymentAmount,
+          }).totalAmount,
     ])
     
     const csvContent = [headers, ...rows]

@@ -5,6 +5,7 @@ import { Item } from '../models/Item'
 import { Order } from '../models/Order'
 import { PhotoOrderRow } from '../models/mappers/telegramPhotoOrderMapper'
 import { parseWebsiteOrderDeliveryJson } from '../types/websiteOrderDelivery'
+import { SQL_ITEMS_SUBTOTAL_BY_ORDER } from '../utils/orderAmountsSql'
 
 function attachDeliveryFromRow<T extends { delivery_json?: string | null }>(order: T): T & { delivery?: ReturnType<typeof parseWebsiteOrderDeliveryJson> } {
   const delivery = parseWebsiteOrderDeliveryJson(order.delivery_json ?? null)
@@ -749,9 +750,7 @@ export const OrderRepository = {
           COALESCE(agg.totalAmount, 0) as totalAmount
         FROM orders o
         LEFT JOIN (
-          SELECT orderId, SUM(price * quantity) as totalAmount
-          FROM items
-          GROUP BY orderId
+          ${SQL_ITEMS_SUBTOTAL_BY_ORDER}
         ) agg ON agg.orderId = o.id
         WHERE ${whereClause}
       `
@@ -833,9 +832,7 @@ export const OrderRepository = {
           COALESCE(agg.totalAmount, 0) as totalAmount
         FROM orders o
         LEFT JOIN (
-          SELECT orderId, SUM(price * quantity) as totalAmount
-          FROM items
-          GROUP BY orderId
+          ${SQL_ITEMS_SUBTOTAL_BY_ORDER}
         ) agg ON agg.orderId = o.id
         WHERE ${whereClause}
       ) base

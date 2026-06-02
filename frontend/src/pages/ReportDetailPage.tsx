@@ -7,6 +7,7 @@ import { OrderItem } from '../components/OrderItem';
 import { useReasonPrompt } from '../components/common/useReasonPrompt';
 import { useReasonPresets } from '../components/common/useReasonPresets';
 import { MoneyAmount } from '../components/ui';
+import { getOrderAmounts } from '../utils/orderTotal';
 
 interface ReportDetailPageProps {
   reportDate: string;
@@ -102,12 +103,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
 
   const getTotalRevenue = () => {
     if (!report?.orders) return 0;
-    return report.orders.reduce((sum, order) => {
-      const orderTotal = order.items.reduce((itemSum, item) => 
-        itemSum + (item.price * (item.quantity || 1)), 0
-      );
-      return sum + orderTotal;
-    }, 0);
+    return report.orders.reduce((sum, order) => sum + getOrderAmounts(order).total, 0);
   };
 
   const getOrdersByStatus = (statusId: number) => {
@@ -194,9 +190,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
         {statuses.map(status => {
           const statusOrders = getOrdersByStatus(status.id);
           const statusRevenue = statusOrders.reduce((sum, order) => {
-            const orderTotal = order.items.reduce((itemSum, item) => 
-              itemSum + (item.price * (item.quantity || 1)), 0
-            );
+      const orderTotal = getOrderAmounts(order).total;
             return sum + orderTotal;
           }, 0);
 
@@ -254,9 +248,7 @@ export const ReportDetailPage: React.FC<ReportDetailPageProps> = ({
           <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
             {report.orders.map(order => {
               const orderStatus = statuses.find(s => s.id === order.status);
-              const orderTotal = order.items.reduce((sum, item) => 
-                sum + (item.price * (item.quantity || 1)), 0
-              );
+              const orderTotal = getOrderAmounts(order).total;
 
               return (
                 <div

@@ -797,6 +797,7 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                   pagesHint={multiPageSheetsHint}
                   allMaterials={allMaterials}
                   preferredMaterialIds={effectiveAllowedMaterialIds}
+                  paperTypes={paperTypes}
                   printTechs={printTechs}
                   bindingServices={bindingServices}
                   selectedSize={selected ?? null}

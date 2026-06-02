@@ -4,6 +4,7 @@ import { getDb } from '../config/database'
 import { AuthenticatedRequest } from '../middleware'
 import { hasColumn } from '../utils/tableSchemaCache'
 import { sqlDailyOrderDayFilter } from '../utils/reportOrderCash'
+import { attachAmountsToOrder } from '../utils/orderAmounts'
 
 const router = Router()
 
@@ -344,6 +345,7 @@ router.get('/full/:date', asyncHandler(async (req, res) => {
       ...item,
       params: JSON.parse(item.params || '{}')
     }))
+    Object.assign(order, attachAmountsToOrder(order))
   }
 
   row.orders = uniqueOrders

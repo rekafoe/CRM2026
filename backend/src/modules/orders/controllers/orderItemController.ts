@@ -10,6 +10,8 @@ import { MaterialTransactionService } from '../../warehouse/services/materialTra
 import { computeClicks, ceilRequiredQuantity } from '../../../utils/printing'
 import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
+import { OrderRepository } from '../../../repositories/orderRepository'
+import { computeItemLineTotal, computeOrderAmounts } from '../../../utils/orderAmounts'
 
 export class OrderItemController {
   static async addItem(req: Request, res: Response) {
@@ -277,22 +279,30 @@ export class OrderItemController {
 
         // 🆕 Пересчёт предоплаты при изменении итога: первая позиция или синк при offline
         const qty = Math.max(1, Number(quantity) || 1)
-        const itemSum = (Number(priceToStore) || 0) * qty
         const paymentRow = await db.get<{
           prepaymentAmount?: number | null
           prepaymentStatus?: string | null
           paymentMethod?: string | null
           discount_percent?: number | null
         }>('SELECT prepaymentAmount, prepaymentStatus, paymentMethod, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id = ?', [orderId])
-        const totalsRow = await db.get<{ total_amount: number }>(
-          'SELECT COALESCE(SUM(price * quantity), 0) as total_amount FROM items WHERE orderId = ?',
-          [orderId]
-        )
-        const newSubtotal = Number(totalsRow?.total_amount || 0)
-        const oldSubtotal = Math.max(0, newSubtotal - itemSum)
+        const itemsAfterAdd = await OrderRepository.getItemsByOrderId(orderId)
+        const newAmounts = computeOrderAmounts({
+          items: itemsAfterAdd,
+          discount_percent: paymentRow?.discount_percent ?? 0,
+          prepaymentAmount: paymentRow?.prepaymentAmount,
+        })
+        const addedLine = computeItemLineTotal({
+          price: priceToStore,
+          quantity: qty,
+          params:
+            effectiveTotal != null
+              ? { storedTotalCost: effectiveTotal }
+              : (params as { storedTotalCost?: number } | undefined),
+        })
+        const oldSubtotal = Math.max(0, newAmounts.subtotal - addedLine)
         const pct = Number(paymentRow?.discount_percent || 0) / 100
         const oldTotal = Math.round(oldSubtotal * (1 - pct) * 100) / 100
-        const newTotal = Math.round(newSubtotal * (1 - pct) * 100) / 100
+        const newTotal = newAmounts.totalAmount
         const prepaymentAmount = Number(paymentRow?.prepaymentAmount || 0)
         const prepaymentStatus = paymentRow?.prepaymentStatus
         const paymentMethod = paymentRow?.paymentMethod
@@ -512,13 +522,12 @@ export class OrderItemController {
           paymentMethod?: string | null
           discount_percent?: number | null
         }>('SELECT prepaymentAmount, prepaymentStatus, paymentMethod, COALESCE(discount_percent, 0) as discount_percent FROM orders WHERE id = ?', [orderId])
-        const totalsRow = await db.get<{ total_amount: number }>(
-          'SELECT COALESCE(SUM(price * quantity), 0) as total_amount FROM items WHERE orderId = ?',
-          [orderId]
-        )
-        const newSubtotal = Number(totalsRow?.total_amount || 0)
-        const pct = Number(paymentRow?.discount_percent || 0) / 100
-        const newTotal = Math.round(newSubtotal * (1 - pct) * 100) / 100
+        const itemsAfterDelete = await OrderRepository.getItemsByOrderId(orderId)
+        const newAmounts = computeOrderAmounts({
+          items: itemsAfterDelete,
+          discount_percent: paymentRow?.discount_percent ?? 0,
+        })
+        const newTotal = newAmounts.totalAmount
         const currentPrepayment = Number(paymentRow?.prepaymentAmount || 0)
         const paymentMethod = paymentRow?.paymentMethod
         if (paymentMethod === 'offline' && currentPrepayment > newTotal) {
@@ -710,11 +719,8 @@ export class OrderItemController {
         let oldSubtotal = 0
         let paymentRow: { prepaymentAmount?: number | null; paymentMethod?: string | null; discount_percent?: number | null } | null = null
         if (priceOrQtyChanged) {
-          const tot = await db.get<{ total_amount: number }>(
-            'SELECT COALESCE(SUM(price * quantity), 0) as total_amount FROM items WHERE orderId = ?',
-            [orderId]
-          )
-          oldSubtotal = Number(tot?.total_amount || 0)
+          const itemsBefore = await OrderRepository.getItemsByOrderId(orderId)
+          oldSubtotal = computeOrderAmounts({ items: itemsBefore }).subtotal
           paymentRow = await db.get<{
             prepaymentAmount?: number | null
             paymentMethod?: string | null
@@ -790,12 +796,11 @@ export class OrderItemController {
           const prepaymentAmount = Number(paymentRow?.prepaymentAmount || 0)
           const eps = 0.005
           if (Math.abs(prepaymentAmount - oldTotal) < eps) {
-            const tot2 = await db.get<{ total_amount: number }>(
-              'SELECT COALESCE(SUM(price * quantity), 0) as total_amount FROM items WHERE orderId = ?',
-              [orderId]
-            )
-            const newSubtotal = Number(tot2?.total_amount || 0)
-            const newTotal = Math.round(newSubtotal * (1 - pct) * 100) / 100
+            const itemsAfter = await OrderRepository.getItemsByOrderId(orderId)
+            const newTotal = computeOrderAmounts({
+              items: itemsAfter,
+              discount_percent: paymentRow?.discount_percent ?? 0,
+            }).totalAmount
             let hasPrepaymentUpdatedAt = false
             try {
               hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')

@@ -4,6 +4,10 @@ import {
   validateBindingPagesForCalculator,
 } from '../../../utils/multipageBinding';
 import { resolveMultipageMinQty } from '../../../utils/multipageProduct';
+import {
+  getCoverAllowedMaterialIds,
+  isSeparateCoverMode,
+} from '../../../utils/multipageCoverMaterials';
 
 export interface CalculatorValidationResult {
   errors: Record<string, string>;
@@ -92,6 +96,21 @@ function computeErrors(params: {
       const mid = specs.material_id;
       if (mid == null || mid === '' || Number.isNaN(Number(mid))) {
         errors.material_id = 'Выберите тип и плотность материала';
+      }
+    }
+    const coverCfg = simplified?.multiPageStructure?.cover;
+    if (isSeparateCoverMode(coverCfg)) {
+      const coverAllowed = getCoverAllowedMaterialIds(coverCfg);
+      if (coverAllowed.length > 0) {
+        const cid = (specs as { cover_material_id?: number }).cover_material_id;
+        if (
+          cid == null ||
+          cid === '' ||
+          Number.isNaN(Number(cid)) ||
+          !coverAllowed.includes(Number(cid))
+        ) {
+          errors.cover_material_id = 'Выберите бумагу обложки';
+        }
       }
     }
   }
