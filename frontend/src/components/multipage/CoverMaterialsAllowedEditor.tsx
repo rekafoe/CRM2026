@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { FormField, Alert } from '../common'
 import { MoneyAmount } from '../ui'
 import type { CoverMaterialOption } from '../../services/calculatorMaterialService'
+import { resolveCoverMaterialsForAllowed } from '../../utils/multipageCoverMaterials'
 
 function materialLabel(m: CoverMaterialOption): string {
   const density = (m as { density?: number | string }).density
@@ -49,10 +50,15 @@ export const CoverMaterialsAllowedEditor: React.FC<Props> = ({
     return allMaterials.filter((m) => ids.has(Number(m.id)))
   }, [allMaterials, paperTypes, selectedPaperTypeId])
 
-  const allowedMaterials = useMemo(() => {
-    const set = new Set(allowedIds.map(Number))
-    return allMaterials.filter((m) => set.has(Number(m.id)))
-  }, [allMaterials, allowedIds])
+  const allowedMaterials = useMemo(
+    () => resolveCoverMaterialsForAllowed(allowedIds, allMaterials, paperTypes),
+    [allowedIds, allMaterials, paperTypes],
+  )
+
+  const selectValue =
+    defaultMaterialId != null && Number.isFinite(Number(defaultMaterialId))
+      ? String(defaultMaterialId)
+      : ''
 
   const toggleAllowed = (materialId: number, checked: boolean) => {
     const id = Number(materialId)
@@ -79,16 +85,20 @@ export const CoverMaterialsAllowedEditor: React.FC<Props> = ({
       <FormField label="Бумага обложки" help="Выбор из списка, заданного в шаблоне продукта.">
         <select
           className="form-select"
-          value={defaultMaterialId ?? ''}
-          onChange={(e) =>
-            onDefaultMaterialChange?.(
-              e.target.value ? Number(e.target.value) : undefined
-            )
-          }
+          value={selectValue}
+          onChange={(e) => {
+            const raw = e.target.value
+            if (!raw) {
+              onDefaultMaterialChange?.(undefined)
+              return
+            }
+            const id = Number(raw)
+            if (Number.isFinite(id) && id > 0) onDefaultMaterialChange?.(id)
+          }}
         >
           <option value="">— Выберите бумагу обложки —</option>
           {allowedMaterials.map((m) => (
-            <option key={m.id} value={m.id}>
+            <option key={m.id} value={String(m.id)}>
               {materialLabel(m)}
             </option>
           ))}

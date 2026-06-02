@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { getMaterials } from '../../../api'
 import { CoverMaterialsAllowedEditor } from '../../multipage/CoverMaterialsAllowedEditor'
 import {
   getCoverAllowedMaterialIds,
   isSeparateCoverMode,
   pickDefaultCoverMaterialId,
+  resolveCoverMaterialsForAllowed,
 } from '../../../utils/multipageCoverMaterials'
 import type { CoverMaterialOption } from '../../../services/calculatorMaterialService'
 
@@ -37,31 +38,46 @@ export const CoverMaterialsSection: React.FC<Props> = ({
   validationError,
 }) => {
   const [allMaterials, setAllMaterials] = useState<CoverMaterialOption[]>([])
+  const schemaMaterialsRef = useRef(schemaMaterials)
+  schemaMaterialsRef.current = schemaMaterials
 
   useEffect(() => {
     if (!isSeparateCoverMode(coverConfig)) return
     let cancelled = false
     getMaterials()
-      .then((list) => {
-        if (!cancelled && Array.isArray(list)) {
-          setAllMaterials(list as CoverMaterialOption[])
+      .then((response) => {
+        if (cancelled) return
+        const fromApi = Array.isArray(response.data)
+          ? response.data.filter((m: { id?: number }) => m?.id != null)
+          : []
+        const fromSchema = Array.isArray(schemaMaterialsRef.current)
+          ? schemaMaterialsRef.current
+          : []
+        const byId = new Map<number, CoverMaterialOption>()
+        for (const m of fromApi) {
+          const id = Number(m.id)
+          if (Number.isFinite(id) && id > 0) {
+            byId.set(id, m as CoverMaterialOption)
+          }
         }
+        for (const sm of fromSchema) {
+          const id = Number(sm.id)
+          if (!Number.isFinite(id) || id <= 0) continue
+          if (!byId.has(id)) {
+            byId.set(id, {
+              id,
+              name: sm.name,
+              density: sm.density,
+            } as CoverMaterialOption)
+          }
+        }
+        setAllMaterials(Array.from(byId.values()))
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [coverConfig?.mode])
-
-  const materialsList = useMemo(() => {
-    if (allMaterials.length > 0) return allMaterials
-    if (!schemaMaterials?.length) return []
-    return schemaMaterials.map((m) => ({
-      id: m.id,
-      name: m.name,
-      density: m.density,
-    }))
-  }, [allMaterials, schemaMaterials])
 
   const paperTypesForEditor = useMemo(
     () =>
@@ -76,7 +92,17 @@ export const CoverMaterialsSection: React.FC<Props> = ({
   const show = isSeparateCoverMode(coverConfig)
   const allowedIds = useMemo(
     () => getCoverAllowedMaterialIds(coverConfig),
-    [coverConfig]
+    [coverConfig],
+  )
+
+  const allowedOptions = useMemo(
+    () =>
+      resolveCoverMaterialsForAllowed(
+        allowedIds,
+        allMaterials,
+        paperTypesForEditor,
+      ),
+    [allowedIds, allMaterials, paperTypesForEditor],
   )
 
   useEffect(() => {
@@ -92,8 +118,13 @@ export const CoverMaterialsSection: React.FC<Props> = ({
   useEffect(() => {
     if (!show) return
     if (coverMaterialId == null) return
-    if (allowedIds.length > 0 && !allowedIds.includes(Number(coverMaterialId))) {
-      updateSpecs({ cover_material_id: pickDefaultCoverMaterialId(coverConfig) }, true)
+    const id = Number(coverMaterialId)
+    if (!Number.isFinite(id)) return
+    if (allowedIds.length > 0 && !allowedIds.includes(id)) {
+      const next = pickDefaultCoverMaterialId(coverConfig)
+      if (next != null) {
+        updateSpecs({ cover_material_id: next }, true)
+      }
     }
   }, [show, allowedIds.join(','), coverMaterialId, coverConfig, updateSpecs])
 
@@ -107,10 +138,15 @@ export const CoverMaterialsSection: React.FC<Props> = ({
           {validationError}
         </div>
       )}
+      {allowedIds.length > 0 && allowedOptions.length === 0 && (
+        <p className="text-muted text-sm" style={{ marginBottom: 8 }}>
+          Загрузка списка материалов обложки…
+        </p>
+      )}
       <CoverMaterialsAllowedEditor
         allowedIds={allowedIds}
         onAllowedChange={() => {}}
-        allMaterials={materialsList}
+        allMaterials={allMaterials}
         paperTypes={paperTypesForEditor}
         defaultMaterialId={coverMaterialId}
         onDefaultMaterialChange={(id) =>
