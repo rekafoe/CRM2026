@@ -13,6 +13,7 @@ import {
 import { completeEditorOrderIntake } from '../../../services/editorOrderIntakeService'
 import { mapCrmStatusToWebsiteStatus } from '../../../services/websiteOrderStatusSyncService'
 import { parseWebsiteOrderDelivery } from '../../../types/websiteOrderDelivery'
+import { hasColumn } from '../../../utils/tableSchemaCache'
 
 function readWebsiteDeliveryFromBody(body: Record<string, unknown>) {
   if (!Object.prototype.hasOwnProperty.call(body, 'delivery')) {
@@ -283,6 +284,79 @@ export class OrderController {
       crmStatusName: row.statusName ?? null,
       websiteStatus: mapCrmStatusToWebsiteStatus(crmStatusId, row.statusName),
     })
+  }
+
+  /**
+   * POST /api/orders/from-website/:orderId/confirm-prepayment
+   * Webhook BePaid на сайте: зафиксировать оплату только после successful.
+   */
+  static async confirmWebsiteOrderPrepayment(req: Request, res: Response) {
+    const orderId = Number(req.params.orderId)
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      res.status(400).json({ error: 'Некорректный ID заказа' })
+      return
+    }
+
+    const rawAmount = Number((req.body as { amount?: unknown })?.amount ?? 0)
+    const paymentStatus = String((req.body as { paymentStatus?: unknown })?.paymentStatus ?? '')
+      .trim()
+      .toLowerCase()
+    const paymentId =
+      typeof (req.body as { paymentId?: unknown })?.paymentId === 'string'
+        ? String((req.body as { paymentId: string }).paymentId).trim()
+        : null
+
+    const db = await getDb()
+    const row = await db.get<{ id: number; source?: string | null }>(
+      'SELECT id, source FROM orders WHERE id = ?',
+      orderId
+    )
+    if (!row) {
+      res.status(404).json({ error: 'Заказ не найден' })
+      return
+    }
+    if (row.source !== 'website') {
+      res.status(403).json({ error: 'Доступно только для заказов с сайта' })
+      return
+    }
+
+    let hasPrepaymentUpdatedAt = false
+    try {
+      hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
+    } catch {
+      hasPrepaymentUpdatedAt = false
+    }
+
+    if (paymentStatus === 'successful') {
+      const amount = rawAmount > 0 ? rawAmount : 0
+      if (amount <= 0) {
+        res.status(400).json({ error: 'amount обязателен при successful' })
+        return
+      }
+      const updateSql = hasPrepaymentUpdatedAt
+        ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'successful', paymentMethod = 'online',
+           paymentUrl = NULL, paymentId = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime')
+           WHERE id = ?`
+        : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'successful', paymentMethod = 'online',
+           paymentUrl = NULL, paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
+      await db.run(updateSql, amount, paymentId, orderId)
+      const updated = await db.get('SELECT * FROM orders WHERE id = ?', orderId)
+      res.json({ ok: true, order: OrderService.toApiOrder({ ...(updated as Record<string, unknown>), items: [] }) })
+      return
+    }
+
+    if (paymentStatus === 'failed') {
+      const updateSql = hasPrepaymentUpdatedAt
+        ? `UPDATE orders SET prepaymentAmount = 0, prepaymentStatus = 'failed', paymentMethod = 'online',
+           paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
+        : `UPDATE orders SET prepaymentAmount = 0, prepaymentStatus = 'failed', paymentMethod = 'online',
+           paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
+      await db.run(updateSql, paymentId, orderId)
+      res.json({ ok: true, skipped: false, paymentStatus: 'failed' })
+      return
+    }
+
+    res.json({ ok: true, skipped: true, paymentStatus })
   }
 
   /**

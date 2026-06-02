@@ -170,6 +170,11 @@ router.post('/from-website/with-files', requireWebsiteOrderApiKey, uploadOrderFi
 
 /** Актуальный статус website-заказа для личного кабинета (pull-синхронизация на localhost). */
 router.get('/from-website/:orderId/status', requireWebsiteOrderApiKey, asyncHandler(OrderController.getWebsiteOrderStatus))
+router.post(
+  '/from-website/:orderId/confirm-prepayment',
+  requireWebsiteOrderApiKey,
+  asyncHandler(OrderController.confirmWebsiteOrderPrepayment)
+)
 
 // Загрузка файлов к заказу с сайта (тот же API-ключ; только заказы с source=website)
 router.post('/from-website/:orderId/files', requireWebsiteOrderApiKey, uploadOrderFilesMemory.single('file'), asyncHandler(async (req, res) => {
