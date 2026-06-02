@@ -1,4 +1,8 @@
-import { computeCashForReportDate } from '../utils/reportOrderCash'
+import {
+  computeCashForReportDate,
+  countsAsPaidForCashReport,
+  isOrderExcludedFromCashRegister,
+} from '../utils/reportOrderCash'
 
 describe('computeCashForReportDate', () => {
   it('returns 0 on work day when payment is on another day', () => {
@@ -41,5 +45,31 @@ describe('computeCashForReportDate', () => {
       '2025-06-01',
     )
     expect(cash).toBe(38)
+  })
+
+  it('counts offline prepayment without prepaymentStatus on payment day', () => {
+    expect(
+      countsAsPaidForCashReport({
+        prepaymentAmount: 50,
+        prepaymentStatus: null,
+        paymentMethod: 'offline',
+      }),
+    ).toBe(true)
+    const cash = computeCashForReportDate(
+      {
+        prepaymentAmount: 50,
+        prepaymentStatus: null,
+        paymentMethod: 'offline',
+        created_at: '2025-05-30',
+        prepaymentUpdatedAt: '2025-06-01',
+      },
+      '2025-06-01',
+    )
+    expect(cash).toBe(50)
+  })
+
+  it('excludes pool waiting status 0, not status 1 (оформлен)', () => {
+    expect(isOrderExcludedFromCashRegister(0)).toBe(true)
+    expect(isOrderExcludedFromCashRegister(1)).toBe(false)
   })
 })

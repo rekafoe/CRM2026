@@ -35,6 +35,27 @@ export function calendarDateLocal(value: string | null | undefined): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Заказ в пуле «Ожидает» (status=0) — не в выручку счётчиков. status=1 — «Оформлен», учитывается. */
+export function isOrderExcludedFromCashCounter(order: { status?: number | string | null }): boolean {
+  return Number(order.status) === 0;
+}
+
+function countsAsPaidForCashCounter(order: {
+  prepaymentStatus?: string | null;
+  prepaymentAmount?: string | number | null;
+  prepayment_amount?: string | number | null;
+  paymentMethod?: string | null;
+}): boolean {
+  const status = String(order.prepaymentStatus ?? '').toLowerCase();
+  if (status === 'paid' || status === 'successful') return true;
+  const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
+  if (prepayment <= 0) return false;
+  const method = String(order.paymentMethod ?? '').toLowerCase();
+  if (method === 'offline') return true;
+  if (!order.prepaymentStatus && method !== 'online' && method !== 'telegram') return true;
+  return false;
+}
+
 /**
  * Касса за выбранный календарный день по заказу.
  * Предпочитает cash_for_report_date с API (GET /reports/daily/:date/orders).
@@ -46,6 +67,7 @@ export function cashIncrementForRegisterDay(
     prepaymentAmount?: string | number | null;
     prepayment_amount?: string | number | null;
     prepaymentStatus?: string | null;
+    paymentMethod?: string | null;
     prepaymentUpdatedAt?: string | null;
     created_at?: string | null;
     createdAt?: string | null;
@@ -59,9 +81,7 @@ export function cashIncrementForRegisterDay(
 
   const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
   const rd = reportDate.slice(0, 10);
-  const status = String(order.prepaymentStatus ?? '').toLowerCase();
-  const isPaid = status === 'paid' || status === 'successful';
-  if (!isPaid || prepayment <= 0) return 0;
+  if (!countsAsPaidForCashCounter(order) || prepayment <= 0) return 0;
 
   const prepayDay = calendarDateLocal(String(order.prepaymentUpdatedAt ?? ''));
   const created = calendarDateLocal(String(order.created_at ?? order.createdAt ?? ''));

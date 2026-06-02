@@ -375,7 +375,7 @@ router.get('/daily-cash-by-month', asyncHandler(async (req, res) => {
        FROM orders o
       WHERE (${monthParts.join(' OR ')})
         AND COALESCE(o.prepaymentAmount, 0) > 0
-        AND (o.status IS NULL OR o.status != 1)`,
+        AND (o.status IS NULL OR o.status != 0)`,
     ...monthParams,
   )
   const issueByOrderDay = new Map<string, number>()

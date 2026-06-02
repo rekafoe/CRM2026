@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { getCurrentUser, getUsers } from '../api';
-import { calendarDateLocal, cashIncrementForRegisterDay } from '../utils/numberInput';
+import {
+  calendarDateLocal,
+  cashIncrementForRegisterDay,
+  isOrderExcludedFromCashCounter,
+} from '../utils/numberInput';
 import { AppIcon, MoneyAmount, BynSymbol } from '../components/ui';
 import './CountersPage.css';
 
@@ -187,7 +191,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
       // В кассу учитываем только заказы с payment_channel === 'cash' (касса)
       // Счёт (invoice) и не пробивавшиеся (not_cashed) — не в кассу
       const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
-        if (Number(order.status) === 1) return sum; // Ожидающий — не в кассу
+        if (isOrderExcludedFromCashCounter(order)) return sum; // Пул «Ожидает» (status=0)
         const channel = (order.payment_channel || 'cash').toLowerCase();
         if (channel !== 'cash') return sum;
         const orderAmount = cashIncrementForRegisterDay(order, selectedDate);

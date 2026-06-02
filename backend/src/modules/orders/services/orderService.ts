@@ -346,6 +346,9 @@ export class OrderService {
       ['customerEmail', customerEmail || null],
       ['prepaymentAmount', initialPrepay],
     ]
+    if (initialPrepay > 0) {
+      insertFields.push(['prepaymentStatus', 'paid'], ['paymentMethod', 'offline'])
+    }
     if (hasPrepaymentUpdatedAt) {
       insertFields.push(['prepaymentUpdatedAt', initialPrepay > 0 ? createdAt : null])
     }

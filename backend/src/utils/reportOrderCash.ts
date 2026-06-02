@@ -9,13 +9,30 @@ export function isPaidPrepaymentStatus(status: string | null | undefined): boole
   return s === 'paid' || s === 'successful'
 }
 
+/** Заказ в пуле «Ожидает» (id=0) — не в выручку кассы. id=1 — «Оформлен», учитывается. */
+export function isOrderExcludedFromCashRegister(status: number | string | null | undefined): boolean {
+  return Number(status) === 0
+}
+
 export type OrderCashInput = {
   prepaymentAmount?: number | string | null
   prepaymentStatus?: string | null
+  paymentMethod?: string | null
   created_at?: string | null
   createdAt?: string | null
   prepaymentUpdatedAt?: string | null
   cash_from_issue_today?: number | null
+}
+
+/** Оплата для кассы: paid/successful, офлайн с суммой, или CRM без статуса (не online/telegram). */
+export function countsAsPaidForCashReport(order: OrderCashInput): boolean {
+  if (isPaidPrepaymentStatus(order.prepaymentStatus)) return true
+  const prepayment = Number(order.prepaymentAmount ?? 0)
+  if (!Number.isFinite(prepayment) || prepayment <= 0) return false
+  const method = String(order.paymentMethod ?? '').toLowerCase()
+  if (method === 'offline') return true
+  if (!order.prepaymentStatus && method !== 'online' && method !== 'telegram') return true
+  return false
 }
 
 /**
@@ -28,7 +45,7 @@ export function computeCashForReportDate(order: OrderCashInput, reportDate: stri
   const rd = reportDate.slice(0, 10)
   const prepayment = Number(order.prepaymentAmount ?? 0)
   if (!Number.isFinite(prepayment) || prepayment <= 0) return 0
-  if (!isPaidPrepaymentStatus(order.prepaymentStatus)) return 0
+  if (!countsAsPaidForCashReport(order)) return 0
 
   const created = sliceReportDate(order.created_at ?? order.createdAt)
   const prepayDay = sliceReportDate(order.prepaymentUpdatedAt)

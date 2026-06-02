@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common';
 import { AppIcon, MoneyAmount, BynSymbol } from '../../components/ui';
 import { api, getUsers, getPrinterCountersByMonth, getDailyCashByMonth } from '../../api';
-import { cashIncrementForRegisterDay } from '../../utils/numberInput';
+import { cashIncrementForRegisterDay, isOrderExcludedFromCashCounter } from '../../utils/numberInput';
 import './CountersServicePage.css';
 
 type Mode = 'day' | 'month';
@@ -87,7 +87,7 @@ export const CountersServicePage: React.FC = () => {
       );
       const contributionsByUser = new Map<number, number>();
       const total = ordersForDate.reduce((sum: number, order: any) => {
-        if (Number(order.status) === 1) return sum; // Ожидающий — не в кассу
+        if (isOrderExcludedFromCashCounter(order)) return sum;
         const orderAmount = cashIncrementForRegisterDay(order, selectedDate);
         const rawUserId = order.userId ?? order.user_id ?? null;
         const userId = rawUserId != null ? Number(rawUserId) : null;

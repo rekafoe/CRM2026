@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
+import { isOrderExcludedFromCashCounter } from '../../utils/numberInput';
 import { BynSymbol, MoneyAmount } from '../ui';
 
 interface PrinterCounter {
@@ -77,7 +78,7 @@ export const CountersWidget: React.FC<CountersWidgetProps> = ({
         return orderDate === date && (order.userId === userId || order.userId === null);
       });
       const calculatedCash = ordersForDate.reduce((sum: number, order: any) => {
-        if (Number(order.status) === 1) return sum; // Ожидающий — не в кассу
+        if (isOrderExcludedFromCashCounter(order)) return sum;
         return sum + (order.prepaymentAmount || 0);
       }, 0);
 
