@@ -129,6 +129,10 @@ export function buildOrderPayload({
 
   // Итог и округление считает бэкенд при добавлении позиции (по полю totalCost). Фронт только передаёт данные.
   const qty = Math.max(1, result.specifications.quantity || 1);
+  const roundedTotalCost =
+    typeof result.totalCost === 'number' && Number.isFinite(result.totalCost)
+      ? Math.round(result.totalCost * 100) / 100
+      : undefined;
   const designEditorMode = backendProductSchema?.template?.simplified?.design_editor_mode;
   const editorDraftMode =
     designEditorMode && designEditorMode !== 'none' ? designEditorMode : undefined;
@@ -173,6 +177,9 @@ export function buildOrderPayload({
     ...(editorDraftMode ? { editorDraftMode } : {}),
     ...(orderPages != null && Number.isFinite(orderPages) ? { pages: Math.floor(orderPages) } : {}),
     ...(initialDesignState ? { designState: initialDesignState } : {}),
+    ...(roundedTotalCost != null
+      ? { storedTotalCost: roundedTotalCost, priceLockedByCalculator: true }
+      : {}),
   };
 
   const components =
@@ -200,11 +207,10 @@ export function buildOrderPayload({
     clicks,
     components,
     /** Итог от калькулятора — бэкенд по нему округлит и сохранит price и storedTotalCost */
-    totalCost: typeof result.totalCost === 'number' ? result.totalCost : undefined,
+    totalCost: roundedTotalCost,
   };
 
-  const effectivePricePerItem = qty > 0 && typeof result.totalCost === 'number'
-    ? Math.round(result.totalCost * 100) / 100 / qty
-    : result.pricePerItem;
+  const effectivePricePerItem =
+    qty > 0 && roundedTotalCost != null ? roundedTotalCost / qty : result.pricePerItem;
   return { apiItem, effectivePricePerItem, description };
 }

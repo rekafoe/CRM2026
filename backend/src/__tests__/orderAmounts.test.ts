@@ -2,6 +2,7 @@ import {
   attachAmountsToOrder,
   computeItemLineTotal,
   computeOrderAmounts,
+  parseMoneyInput,
 } from '../utils/orderAmounts';
 
 describe('orderAmounts', () => {
@@ -19,6 +20,11 @@ describe('orderAmounts', () => {
     expect(
       computeItemLineTotal({ price: 32.8, quantity: 10, params: {} })
     ).toBe(328);
+  });
+
+  it('parseMoneyInput accepts strings with comma', () => {
+    expect(parseMoneyInput('92,95')).toBe(92.95);
+    expect(parseMoneyInput(110.5)).toBe(110.5);
   });
 
   it('computeItemLineTotal accepts storedTotalCost as numeric string', () => {

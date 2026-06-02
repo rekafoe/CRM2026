@@ -97,7 +97,9 @@ CREATE TABLE user_order_page_orders (
 
 ## Тиражная скидка на уровне заказа
 
-Для simplified-продуктов с `productId` в `params` цены позиций **пересчитываются автоматически** при добавлении, изменении (params/quantity) и удалении позиции, а также при создании заказа с сайта (`POST /api/orders/from-website`).
+Для simplified-продуктов с `productId` в `params` цены позиций **пересчитываются автоматически** при добавлении без явного `totalCost`, при изменении (params/quantity) и удалении позиции, а также при создании заказа с сайта (`POST /api/orders/from-website`).
+
+Если позиция добавлена из калькулятора с полем **`totalCost`** (и в `params` — `storedTotalCost`, `priceLockedByCalculator`), tier-пересчёт **не перезаписывает** итог (иначе подытог мог бы стать `price×qty` без скидки, например 110,50 вместо 92,95).
 
 **Группировка:** одинаковые `material_id` + `print_technology` + `print_color_mode` + `print_sides_mode` (без `priceType`).
 

@@ -36,6 +36,17 @@ function parseNum(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Число из API/формы: number или строка «92,95». */
+export function parseMoneyInput(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return round2(v);
+  if (typeof v === 'string') {
+    const n = Number(v.trim().replace(',', '.'));
+    if (Number.isFinite(n)) return round2(n);
+  }
+  return null;
+}
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -53,13 +64,7 @@ function readStoredTotalCost(params: ItemLike['params']): number | null {
     obj = params as { storedTotalCost?: unknown };
   }
   if (!obj) return null;
-  const stored = obj.storedTotalCost;
-  if (typeof stored === 'number' && Number.isFinite(stored)) return stored;
-  if (typeof stored === 'string' && stored.trim() !== '') {
-    const n = Number(stored.replace(',', '.'));
-    if (Number.isFinite(n)) return n;
-  }
-  return null;
+  return parseMoneyInput(obj.storedTotalCost);
 }
 
 /** Сумма одной позиции (без скидки на заказ). */

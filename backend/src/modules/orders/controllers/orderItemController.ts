@@ -11,7 +11,7 @@ import { computeClicks, ceilRequiredQuantity } from '../../../utils/printing'
 import { logger } from '../../../utils/logger'
 import { OrderPricingService } from '../services/orderPricingService'
 import { OrderRepository } from '../../../repositories/orderRepository'
-import { computeItemLineTotal, computeOrderAmounts } from '../../../utils/orderAmounts'
+import { computeItemLineTotal, computeOrderAmounts, parseMoneyInput } from '../../../utils/orderAmounts'
 
 export class OrderItemController {
   static async addItem(req: Request, res: Response) {
@@ -19,7 +19,13 @@ export class OrderItemController {
       const orderId = Number(req.params.id)
       const rawAddBody = req.body as Record<string, unknown>
       const printerIdAdd = rawAddBody?.printerId ?? rawAddBody?.printer_id
-      const totalCostFromClient = typeof rawAddBody?.totalCost === 'number' ? rawAddBody.totalCost : undefined
+      const paramsRaw = rawAddBody?.params
+      const paramsObjForTotal =
+        paramsRaw != null && typeof paramsRaw === 'object' && !Array.isArray(paramsRaw)
+          ? (paramsRaw as Record<string, unknown>)
+          : null
+      const totalCostFromClient = parseMoneyInput(rawAddBody?.totalCost)
+        ?? (paramsObjForTotal ? parseMoneyInput(paramsObjForTotal.storedTotalCost) : null)
       const { type, params, price, quantity = 1, sides = 1, sheets = 0, waste = 0, components } = rawAddBody as {
         type: string
         params: { description: string }
@@ -34,9 +40,7 @@ export class OrderItemController {
       }
       // Итог и цена считаются на бэкенде: при переданном totalCost округляем и выводим price и storedTotalCost
       const qtyForPrice = Math.max(1, Number(quantity) || 1)
-      const effectiveTotal = totalCostFromClient != null && Number.isFinite(totalCostFromClient)
-        ? Math.round(Number(totalCostFromClient) * 100) / 100
-        : null
+      const effectiveTotal = totalCostFromClient
       const priceToStore = effectiveTotal != null ? effectiveTotal / qtyForPrice : Number(price)
       const printerId = printerIdAdd !== undefined && printerIdAdd !== null && printerIdAdd !== ''
         ? Number(printerIdAdd)
@@ -194,7 +198,9 @@ export class OrderItemController {
           
           const paramsToSave = {
             ...cleanParams,
-            ...(effectiveTotal != null ? { storedTotalCost: effectiveTotal } : {}),
+            ...(effectiveTotal != null
+              ? { storedTotalCost: effectiveTotal, priceLockedByCalculator: true }
+              : {}),
             components: Array.isArray(components)
               ? components.map((c) => {
                   const r = reservations.find((rr) => rr.material_id === Number(c.materialId))
@@ -236,7 +242,9 @@ export class OrderItemController {
           // Fallback: сохраняем только базовые поля
           paramsJson = JSON.stringify({
             description: params?.description || type,
-            ...(effectiveTotal != null ? { storedTotalCost: effectiveTotal } : {}),
+            ...(effectiveTotal != null
+              ? { storedTotalCost: effectiveTotal, priceLockedByCalculator: true }
+              : {}),
             components: Array.isArray(components)
               ? components.map((c) => {
                   const r = reservations.find((rr) => rr.material_id === Number(c.materialId))
@@ -362,12 +370,20 @@ export class OrderItemController {
         
         logger.info('✅ [addItem] Транзакция завершена успешно', { itemId, orderId })
 
-        try {
-          await OrderPricingService.recalculateOrderPrices(orderId)
-        } catch (recalcErr) {
-          logger.warn('⚠️ [addItem] пересчёт цен по группам не выполнен', {
+        // Итог с калькулятора (totalCost) не перезаписываем tier-пересчётом — иначе 92,95 → 110,50
+        if (effectiveTotal == null) {
+          try {
+            await OrderPricingService.recalculateOrderPrices(orderId)
+          } catch (recalcErr) {
+            logger.warn('⚠️ [addItem] пересчёт цен по группам не выполнен', {
+              orderId,
+              error: (recalcErr as Error).message,
+            })
+          }
+        } else {
+          logger.info('✅ [addItem] tier-пересчёт пропущен: итог задан калькулятором (totalCost)', {
             orderId,
-            error: (recalcErr as Error).message,
+            effectiveTotal,
           })
         }
 
@@ -586,10 +602,6 @@ export class OrderItemController {
       const orderId = Number(req.params.orderId)
       const itemId = Number(req.params.itemId)
       const rawBody = req.body as Record<string, unknown>
-      const totalCostFromClient =
-        typeof rawBody?.totalCost === 'number' && Number.isFinite(rawBody.totalCost)
-          ? Math.round(Number(rawBody.totalCost) * 100) / 100
-          : null
       // Нормализуем printerId: поддерживаем и camelCase, и snake_case (printer_id)
       const printerIdRaw = rawBody?.printerId ?? rawBody?.printer_id
       const body = {
@@ -605,6 +617,10 @@ export class OrderItemController {
         executor_user_id: number | null
         params: Record<string, unknown>
       }>
+      const totalCostFromClient = parseMoneyInput(rawBody?.totalCost)
+        ?? (body.params != null && typeof body.params === 'object'
+          ? parseMoneyInput((body.params as Record<string, unknown>).storedTotalCost)
+          : null)
       if (body.printerId !== undefined) {
         logger.info('🖨️ [updateItem] Обновление принтера позиции', { orderId, itemId, printerId: body.printerId })
       }
@@ -762,6 +778,7 @@ export class OrderItemController {
               : {}
         if (totalCostFromClient != null) {
           paramsPatch.storedTotalCost = totalCostFromClient
+          paramsPatch.priceLockedByCalculator = true
         }
         if (Object.keys(paramsPatch).length > 0) {
           paramsJson = JSON.stringify({ ...existingParams, ...paramsPatch })

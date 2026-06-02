@@ -140,6 +140,10 @@ export class OrderPricingService {
         paramsObj = {};
       }
 
+      if (paramsObj.priceLockedByCalculator === true) {
+        continue;
+      }
+
       paramsObj.pricingMeta = q.pricingMeta;
       paramsObj.sheetsNeeded = q.sheetsNeeded;
       if (paramsObj.specifications && typeof paramsObj.specifications === 'object') {
