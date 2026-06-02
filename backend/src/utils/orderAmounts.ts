@@ -55,6 +55,10 @@ function readStoredTotalCost(params: ItemLike['params']): number | null {
   if (!obj) return null;
   const stored = obj.storedTotalCost;
   if (typeof stored === 'number' && Number.isFinite(stored)) return stored;
+  if (typeof stored === 'string' && stored.trim() !== '') {
+    const n = Number(stored.replace(',', '.'));
+    if (Number.isFinite(n)) return n;
+  }
   return null;
 }
 

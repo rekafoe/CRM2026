@@ -1,4 +1,41 @@
-import type { Order } from '../types';
+import type { Item, Order } from '../types';
+
+/** Итог позиции из params.storedTotalCost (как на бэкенде). */
+export function readItemStoredTotalCost(
+  params: Item['params'] | string | null | undefined,
+): number | null {
+  if (params == null) return null;
+  let obj: { storedTotalCost?: unknown } | null = null;
+  if (typeof params === 'string') {
+    try {
+      obj = JSON.parse(params) as { storedTotalCost?: unknown };
+    } catch {
+      return null;
+    }
+  } else if (typeof params === 'object') {
+    obj = params as { storedTotalCost?: unknown };
+  }
+  if (!obj) return null;
+  const stored = obj.storedTotalCost;
+  if (typeof stored === 'number' && Number.isFinite(stored)) return stored;
+  if (typeof stored === 'string' && stored.trim() !== '') {
+    const n = Number(stored.replace(',', '.'));
+    if (Number.isFinite(n)) return Math.round(n * 100) / 100;
+  }
+  return null;
+}
+
+export function getItemLineTotal(item: Pick<Item, 'price' | 'quantity' | 'params' | 'lineTotal' | 'serviceCost'>): number {
+  if (typeof item.lineTotal === 'number' && Number.isFinite(item.lineTotal)) {
+    return Math.round(item.lineTotal * 100) / 100;
+  }
+  const stored = readItemStoredTotalCost(item.params);
+  if (stored != null) return stored;
+  const qty = Math.max(1, Number(item.quantity) || 1);
+  const price = Number(item.price) || 0;
+  const service = Number(item.serviceCost) || 0;
+  return Math.round((price * qty + service) * 100) / 100;
+}
 
 export type OrderAmountsView = {
   subtotal: number;

@@ -16,6 +16,7 @@ import { OrderItemPositionBreakdown } from './order/OrderItemPositionBreakdown';
 import { OrderItemEditForm } from './order/OrderItemEditForm';
 import { OrderItemActions } from './order/OrderItemActions';
 import { getEditorItemSummary, type DesignTemplateRoyaltyInfo } from './order/editorItemSummary';
+import { getItemLineTotal } from '../utils/orderTotal';
 import { calcAuthorPayoutPerUnit } from '../pages/admin/designTemplates/designTemplateCatalogUtils';
 import { EditorItemPreviewModal } from './order/EditorItemPreviewModal';
 
@@ -199,10 +200,10 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
     }
   };
   
-  const total =
-    typeof item.lineTotal === 'number' && Number.isFinite(item.lineTotal)
-      ? Math.round(item.lineTotal * 100) / 100
-      : Math.round(numberInputToNumber(qty, 0) * numberInputToNumber(price, 0) * 100) / 100;
+  const total = getItemLineTotal(item);
+  const qtyNum = Math.max(1, numberInputToNumber(qty, 1));
+  const unitPriceFromTotal =
+    qtyNum > 0 ? Math.round((total / qtyNum) * 100) / 100 : numberInputToNumber(price, 0);
   
   // Получаем название товара
   const name = (item as any).name || (item as any).params?.productName || (item as any).params?.name || (item as any).type || 'Товар без названия';
@@ -507,7 +508,7 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
                     ) : undefined
                   }
                   footer={{
-                    unitPrice: Number(numberInputToNumber(price, 0)),
+                    unitPrice: unitPriceFromTotal,
                     total,
                     sides: typeof sides === 'number' ? sides : Number(numberInputToNumber(sides, 0)),
                     waste: typeof waste === 'number' ? waste : Number(numberInputToNumber(waste, 0)),

@@ -131,7 +131,16 @@ export const useOrderHandlers = ({
     async ({ orderId, itemId, item }: { orderId: number; itemId: number; item: any }) => {
       try {
         await deleteOrderItem(orderId, itemId);
-        const addedItem = await addOrderItem(orderId, item);
+        const payload = {
+          ...item,
+          totalCost:
+            typeof item.totalCost === 'number' && Number.isFinite(item.totalCost)
+              ? item.totalCost
+              : typeof item.params?.storedTotalCost === 'number'
+                ? item.params.storedTotalCost
+                : undefined,
+        };
+        const addedItem = await addOrderItem(orderId, payload);
         
         // Оптимистично обновляем локальное состояние заказа
         setOrders((prevOrders: Order[]) => {

@@ -586,6 +586,10 @@ export class OrderItemController {
       const orderId = Number(req.params.orderId)
       const itemId = Number(req.params.itemId)
       const rawBody = req.body as Record<string, unknown>
+      const totalCostFromClient =
+        typeof rawBody?.totalCost === 'number' && Number.isFinite(rawBody.totalCost)
+          ? Math.round(Number(rawBody.totalCost) * 100) / 100
+          : null
       // Нормализуем printerId: поддерживаем и camelCase, и snake_case (printer_id)
       const printerIdRaw = rawBody?.printerId ?? rawBody?.printer_id
       const body = {
@@ -634,6 +638,9 @@ export class OrderItemController {
       if (!existing) { res.status(404).json({ message: 'Позиция не найдена' }); return }
 
       const newQuantity = body.quantity != null ? Math.max(1, Number(body.quantity) || 1) : existing.quantity
+      if (totalCostFromClient != null) {
+        body.price = Math.round((totalCostFromClient / newQuantity) * 100) / 100
+      }
       const deltaQty = newQuantity - (existing.quantity ?? 1)
 
       await db.run('BEGIN')
@@ -747,11 +754,17 @@ export class OrderItemController {
           }
         })()
         let paramsJson: string | undefined
-        if (body.params != null && typeof body.params === 'object') {
-          paramsJson = JSON.stringify({ ...existingParams, ...body.params })
-        } else if (body.printerId !== undefined) {
-          // Всегда дублируем printerId в params — на проде колонка может не сохраняться (SQLite/драйвер)
-          paramsJson = JSON.stringify({ ...existingParams, printerId: body.printerId ?? null })
+        const paramsPatch: Record<string, unknown> =
+          body.params != null && typeof body.params === 'object'
+            ? { ...body.params }
+            : body.printerId !== undefined
+              ? { printerId: body.printerId ?? null }
+              : {}
+        if (totalCostFromClient != null) {
+          paramsPatch.storedTotalCost = totalCostFromClient
+        }
+        if (Object.keys(paramsPatch).length > 0) {
+          paramsJson = JSON.stringify({ ...existingParams, ...paramsPatch })
         }
 
         const updateSql = `UPDATE items SET 
@@ -816,8 +829,8 @@ export class OrderItemController {
 
         await db.run('COMMIT')
         const pricingFieldsChanged =
-          body.params != null || body.quantity != null || body.price != null
-        if (pricingFieldsChanged) {
+          body.params != null || body.quantity != null || body.price != null || totalCostFromClient != null
+        if (pricingFieldsChanged && totalCostFromClient == null) {
           try {
             await OrderPricingService.recalculateOrderPrices(orderId)
           } catch (recalcErr) {

@@ -21,6 +21,16 @@ describe('orderAmounts', () => {
     ).toBe(328);
   });
 
+  it('computeItemLineTotal accepts storedTotalCost as numeric string', () => {
+    expect(
+      computeItemLineTotal({
+        price: 1.7,
+        quantity: 65,
+        params: { storedTotalCost: '92.95' as unknown as number },
+      })
+    ).toBe(92.95);
+  });
+
   it('computeItemLineTotal adds serviceCost', () => {
     expect(
       computeItemLineTotal({
