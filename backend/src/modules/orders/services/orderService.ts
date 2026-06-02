@@ -1973,8 +1973,8 @@ export class OrderService {
       typeof order.totalAmount === 'number' && Number.isFinite(order.totalAmount)
         ? order.totalAmount
         : computeOrderAmounts({
-            items: order.items as Parameters<typeof computeOrderAmounts>[0]['items'],
-            discount_percent: (order as Order & { discount_percent?: number }).discount_percent,
+            items: order.items,
+            discount_percent: order.discount_percent,
             prepaymentAmount: order.prepaymentAmount,
           }).totalAmount,
     ])

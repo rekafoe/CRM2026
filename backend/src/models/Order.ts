@@ -22,5 +22,12 @@ export interface Order {
   miniapp_checkout_state?: MiniappCheckoutState;
   miniapp_design_help_requested?: number;
   delivery?: WebsiteOrderDelivery;
+  /** Скидка на заказ, % */
+  discount_percent?: number;
+  /** Суммы с attachAmountsToOrder / computeOrderAmounts */
+  subtotal?: number;
+  discountAmount?: number;
+  totalAmount?: number;
+  debt?: number;
   items: Item[];
 }

@@ -12,4 +12,6 @@ export interface Item {
   clicks?: number; // computed clicks for printers
   /** Исполнитель — оператор, выполняющий эту позицию */
   executor_user_id?: number | null;
+  /** Сумма позиции (computeItemLineTotal) */
+  lineTotal?: number;
 }
