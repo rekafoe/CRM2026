@@ -6,7 +6,7 @@ import {
   isSeparateCoverMode,
   pickDefaultCoverMaterialId,
 } from '../../../utils/multipageCoverMaterials'
-import type { CalculatorMaterial } from '../../../services/calculatorMaterialService'
+import type { CoverMaterialOption } from '../../../services/calculatorMaterialService'
 
 type CoverConfig = {
   mode?: string
@@ -36,7 +36,7 @@ export const CoverMaterialsSection: React.FC<Props> = ({
   schemaMaterials,
   validationError,
 }) => {
-  const [allMaterials, setAllMaterials] = useState<CalculatorMaterial[]>([])
+  const [allMaterials, setAllMaterials] = useState<CoverMaterialOption[]>([])
 
   useEffect(() => {
     if (!isSeparateCoverMode(coverConfig)) return
@@ -44,7 +44,7 @@ export const CoverMaterialsSection: React.FC<Props> = ({
     getMaterials()
       .then((list) => {
         if (!cancelled && Array.isArray(list)) {
-          setAllMaterials(list as CalculatorMaterial[])
+          setAllMaterials(list as CoverMaterialOption[])
         }
       })
       .catch(() => {})
@@ -60,7 +60,7 @@ export const CoverMaterialsSection: React.FC<Props> = ({
       id: m.id,
       name: m.name,
       density: m.density,
-    })) as CalculatorMaterial[]
+    }))
   }, [allMaterials, schemaMaterials])
 
   const paperTypesForEditor = useMemo(

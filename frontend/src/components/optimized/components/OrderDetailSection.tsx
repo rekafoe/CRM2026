@@ -82,6 +82,7 @@ export const OrderDetailSection: React.FC<OrderDetailSectionProps> = React.memo(
     () => getOrderAmounts(selectedOrder),
     [selectedOrder],
   );
+  const discountPercent = orderAmounts.discountPercent;
 
   useEffect(() => {
     if (!receiptMenuOpen) return;

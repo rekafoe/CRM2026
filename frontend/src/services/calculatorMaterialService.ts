@@ -20,6 +20,12 @@ export interface CalculatorMaterial extends Material {
   category_name?: string;
 }
 
+/** Минимальные поля для выбора бумаги обложки (калькулятор / шаблон). */
+export type CoverMaterialOption = Pick<CalculatorMaterial, 'id' | 'name'> & {
+  density?: number | string;
+  category_name?: string;
+};
+
 export interface PaperTypeForCalculator {
   id: string;
   name: string;

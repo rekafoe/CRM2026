@@ -102,7 +102,7 @@ function computeErrors(params: {
     if (isSeparateCoverMode(coverCfg)) {
       const coverAllowed = getCoverAllowedMaterialIds(coverCfg);
       if (coverAllowed.length > 0) {
-        const cid = (specs as { cover_material_id?: number }).cover_material_id;
+        const cid = (specs as { cover_material_id?: number | string }).cover_material_id;
         if (
           cid == null ||
           cid === '' ||

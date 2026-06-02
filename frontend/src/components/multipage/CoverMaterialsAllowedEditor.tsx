@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react'
 import { FormField, Alert } from '../common'
 import { MoneyAmount } from '../ui'
-import type { CalculatorMaterial } from '../../services/calculatorMaterialService'
+import type { CoverMaterialOption } from '../../services/calculatorMaterialService'
 
-function materialLabel(m: CalculatorMaterial): string {
+function materialLabel(m: CoverMaterialOption): string {
   const density = (m as { density?: number | string }).density
   const extra = density != null && density !== '' ? ` · ${density} г/м²` : ''
   const cat = m.category_name ? `${m.category_name} · ` : ''
@@ -13,7 +13,7 @@ function materialLabel(m: CalculatorMaterial): string {
 type Props = {
   allowedIds: number[]
   onAllowedChange: (ids: number[]) => void
-  allMaterials: CalculatorMaterial[]
+  allMaterials: CoverMaterialOption[]
   paperTypes: Array<{
     id: number | string
     name: string
