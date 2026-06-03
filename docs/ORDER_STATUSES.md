@@ -43,7 +43,9 @@
 
 **OptimizedApp:** список заказов за дату — только по `created_at`; оплату при выдаче удобнее вносить через пул или счётчики.
 
-**Счётчики / выручка за день:** в кассу не попадают заказы со `status=0` (пул «Ожидает») и `payment_channel=internal`. Предоплата в день `prepaymentUpdatedAt` (офлайн или без online/telegram). Остаток при выдаче — в день `debt_closed_events` (даже если раньше был `pending`). Счёт/«не пробит» (`invoice`, `not_cashed`) в выручку только при ненулевом `cash_for_report_date` (обычно выдача). `POST /orders/:id/prepay` без `paymentMethod` по умолчанию `offline` + `paid`.
+**Счётчики кассы (источник истины):** `GET /api/reports/daily/:date/cash-register` — поле `cash_in_today` (предоплаты в день `prepaymentUpdatedAt` + остатки при выдаче). Пересчёт с backfill метаданных оплаты: `POST /api/reports/daily/:date/cash-register/recalculate`. В кассу не попадают заказы со `status=0` и `payment_channel=internal`. Счёт/«не пробит» — только при ненулевом движении в кассу (обычно выдача). Справочно: `order_volume_work_day` — оборот заказов за день работы (`storedTotalCost`).
+
+**Админ-отчёты за месяц** (`/adminpanel/reports`) — другая метрика: оборот оплаченных/завершённых заказов по дате работы за период, не дублирует «в кассу за день».
 
 ## Дата в отчётах при назначении
 

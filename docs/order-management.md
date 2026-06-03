@@ -137,6 +137,16 @@ CREATE TABLE user_order_page_orders (
 
 Также переведены: `POST /api/orders/:id/issue`, экспорт CSV, `customerService` (последний заказ), `orderManagementService`, аналитика `reports`, `orderRepository` (фильтр по сумме).
 
+## Счётчики кассы vs отчёты за период
+
+| | Счётчики (топбар → Касса) | Админ → Отчёты (месяц) |
+|--|--|--|
+| API | `GET /reports/daily/:date/cash-register` | `GET /reports/analytics/products` и др. |
+| Смысл | Деньги **в кассу** в выбранный календарный день | Оборот **заказов за период** (дата работы, paid/выдан) |
+| Накопление | Факт вчера + в кассу сегодня = расчётный счётчик | Сумма за месяц в KPI |
+
+Код: [`cashRegisterDayService.ts`](../backend/src/services/cashRegisterDayService.ts), [`loadDailyOrdersForCashReport.ts`](../backend/src/services/loadDailyOrdersForCashReport.ts). UI: [`CountersPage.tsx`](../frontend/src/pages/CountersPage.tsx).
+
 ## 📝 TODO
 
 1. ✅ Реализовать OrderPool компонент

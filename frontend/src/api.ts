@@ -719,6 +719,32 @@ export const getPrinterCountersByMonth = (month: string) => api.get(`/printers/c
 export const getDailyCashByMonth = (month: string) => api.get(`/reports/daily-cash-by-month`, { params: { month } });
 export const getDailySummary = (date: string) => api.get(`/reports/daily/${date}/summary`);
 
+export type CashRegisterDayPayload = {
+  date: string;
+  cash_in_today: number;
+  issued_today: number;
+  issued_by_operators: Array<{ user_id: number; user_name: string; amount: number }>;
+  contributions_by_user: Array<{ user_id: number; amount: number }>;
+  order_volume_work_day: number;
+  orders_included_count: number;
+  orders_zero_cash: Array<{
+    id: number;
+    number?: string;
+    cash_for_report_date: number;
+    prepaymentAmount?: number | null;
+    prepaymentUpdatedAt?: string | null;
+    prepaymentStatus?: string | null;
+    payment_channel?: string | null;
+  }>;
+  backfill_updated?: number;
+};
+
+export const getCashRegisterDay = (date: string) =>
+  api.get<CashRegisterDayPayload>(`/reports/daily/${date}/cash-register`);
+
+export const recalculateCashRegisterDay = (date: string) =>
+  api.post<CashRegisterDayPayload>(`/reports/daily/${date}/cash-register/recalculate`);
+
 // Calculators (MVP)
 export const getFlyersSchema = () => api.get('/calculators/flyers-color');
 export const calcFlyersPrice = (payload: { format: 'A6'|'A5'|'A4'; qty: number; sides: 1|2; paperDensity?: 130|150; lamination?: 'none'|'matte'|'glossy' }) =>

@@ -2,11 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common';
 import { AppIcon, MoneyAmount, BynSymbol } from '../../components/ui';
-import { api, getUsers, getPrinterCountersByMonth, getDailyCashByMonth } from '../../api';
-import {
-  cashIncrementForRegisterDay,
-  shouldIncludeOrderInCashRegister,
-} from '../../utils/numberInput';
+import { api, getUsers, getPrinterCountersByMonth, getDailyCashByMonth, getCashRegisterDay } from '../../api';
 import './CountersServicePage.css';
 
 type Mode = 'day' | 'month';
@@ -78,43 +74,22 @@ export const CountersServicePage: React.FC = () => {
         : [];
       setPrinterCounters(counters);
 
-      const ordersResponse = await api.get(`/reports/daily/${selectedDate}/orders`);
-      const ordersForDate = Array.isArray(ordersResponse.data?.orders)
-        ? ordersResponse.data.orders
-        : [];
       const userNameById = new Map<number, string>(
         users.map((u) => [Number(u.id), u.name])
       );
       const idNameById = new Map<number, string>(
         users.map((u) => [Number(u.id), `ID ${u.id}`])
       );
-      const contributionsByUser = new Map<number, number>();
-      const total = ordersForDate.reduce((sum: number, order: any) => {
-        const orderAmount = cashIncrementForRegisterDay(order, selectedDate);
-        if (!shouldIncludeOrderInCashRegister(order, selectedDate, orderAmount)) return sum;
-        const issuedAmount = Number(order.cash_from_issue_today ?? 0);
-        const nonIssueAmount = Number.isFinite(issuedAmount)
-          ? Math.max(0, orderAmount - issuedAmount)
-          : orderAmount;
-        const rawUserId = order.userId ?? order.user_id ?? null;
-        const userId = rawUserId != null ? Number(rawUserId) : null;
-        if (userId && !Number.isNaN(userId) && nonIssueAmount > 0) {
-          contributionsByUser.set(userId, (contributionsByUser.get(userId) || 0) + nonIssueAmount);
-        }
-        const issuerId = Number(order.cash_issued_by_user_id);
-        if (issuerId > 0 && Number.isFinite(issuedAmount) && issuedAmount > 0) {
-          contributionsByUser.set(issuerId, (contributionsByUser.get(issuerId) || 0) + issuedAmount);
-        }
-        return sum + orderAmount;
-      }, 0);
 
-      const contributions = Array.from(contributionsByUser.entries()).map(([user_id, amount]) => ({
-        user_id,
-        user_name: userNameById.get(user_id) || idNameById.get(user_id),
-        amount,
+      const cashRegisterRes = await getCashRegisterDay(selectedDate);
+      const reg = cashRegisterRes.data;
+      const contributions = (reg.contributions_by_user ?? []).map((c) => ({
+        user_id: c.user_id,
+        user_name: userNameById.get(c.user_id) || idNameById.get(c.user_id),
+        amount: c.amount,
       }));
       setCashContributions(contributions);
-      setCashTotal(total);
+      setCashTotal(Number(reg.cash_in_today ?? 0));
     } catch (err: any) {
       setError(err?.message || 'Ошибка загрузки данных');
       setPrinterCounters([]);

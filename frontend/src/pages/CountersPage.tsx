@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
-import { getCurrentUser, getUsers } from '../api';
-import {
-  calendarDateLocal,
-  cashIncrementForRegisterDay,
-  shouldIncludeOrderInCashRegister,
-} from '../utils/numberInput';
+import { api, getCurrentUser, getUsers, getCashRegisterDay, recalculateCashRegisterDay } from '../api';
+import { calendarDateLocal } from '../utils/numberInput';
 import { AppIcon, MoneyAmount, BynSymbol } from '../components/ui';
 import './CountersPage.css';
 
@@ -35,6 +30,8 @@ interface CashData {
   issuedOrdersTotal?: number;
   /** Выдано по операторам: user_id, user_name, amount */
   issuedByOperators?: Array<{ user_id: number; user_name: string; amount: number }>;
+  /** Оборот заказов за день работы (справочно) */
+  orderVolumeWorkDay?: number;
 }
 
 interface CashContribution {
@@ -70,6 +67,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
   const [newCounterValue, setNewCounterValue] = useState<string>('');
   const [cashActualValue, setCashActualValue] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [recalculatingCash, setRecalculatingCash] = useState(false);
   const [printerExpectedClicks, setPrinterExpectedClicks] = useState<Record<number, number>>({});
   const [cashContributions, setCashContributions] = useState<CashContribution[]>([]);
   const [cashContributionsTotal, setCashContributionsTotal] = useState<number>(0);
@@ -178,85 +176,25 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
       const previousDateKey = previousDate.toISOString().split('T')[0];
       const previousActualCash = await getCashActualForDate(previousDateKey);
 
-      // Заказы за дату (для расчётов и вкладов)
+      const cashRegisterRes = await getCashRegisterDay(selectedDate);
+      const reg = cashRegisterRes.data;
+      const dailyRevenue = Number(reg.cash_in_today ?? 0);
+      const issuedOrdersTotal = Number(reg.issued_today ?? 0);
+      const issuedByOperators = Array.isArray(reg.issued_by_operators) ? reg.issued_by_operators : [];
+
+      const contributionsToShow: CashContribution[] = (reg.contributions_by_user ?? []).map((c) => ({
+        user_id: c.user_id,
+        user_name: userNameById.get(c.user_id) || `ID ${c.user_id}`,
+        cash_actual: c.amount,
+      }));
+      const total = contributionsToShow.reduce((sum, report) => sum + Number(report.cash_actual || 0), 0);
+      setCashContributions(contributionsToShow);
+      setCashContributionsTotal(total);
+
       const ordersResponse = await api.get(`/reports/daily/${selectedDate}/orders`);
       const ordersForDate = Array.isArray(ordersResponse.data?.orders)
         ? ordersResponse.data.orders
         : [];
-      const issuedOrdersTotal = Number(ordersResponse.data?.issued_orders_total ?? 0);
-      const issuedByOperators = Array.isArray(ordersResponse.data?.issued_by_operators)
-        ? ordersResponse.data.issued_by_operators
-        : [];
-      const contributionsByUser = new Map<number, number>();
-      const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
-        const orderAmount = cashIncrementForRegisterDay(order, selectedDate);
-        if (!shouldIncludeOrderInCashRegister(order, selectedDate, orderAmount)) return sum;
-        const issuedAmount = Number(order.cash_from_issue_today ?? 0);
-        const nonIssueAmount = Number.isFinite(issuedAmount)
-          ? Math.max(0, orderAmount - issuedAmount)
-          : orderAmount;
-        const rawUserId = order.userId ?? order.user_id ?? null;
-        const userId = rawUserId != null ? Number(rawUserId) : null;
-        if (userId && !Number.isNaN(userId) && nonIssueAmount > 0) {
-          contributionsByUser.set(userId, (contributionsByUser.get(userId) || 0) + nonIssueAmount);
-        }
-        const issuerId = Number(order.cash_issued_by_user_id);
-        if (issuerId > 0 && Number.isFinite(issuedAmount) && issuedAmount > 0) {
-          contributionsByUser.set(issuerId, (contributionsByUser.get(issuerId) || 0) + issuedAmount);
-        }
-        return sum + orderAmount;
-      }, 0);
-      const computedContributions: CashContribution[] = Array.from(contributionsByUser.entries())
-        .map(([user_id, amount]) => ({
-          user_id,
-          user_name: userNameById.get(user_id) || `ID ${user_id}`,
-          cash_actual: amount
-        }));
-
-      // Вклады по пользователям за дату (если доступны)
-      let contributionsToShow = computedContributions;
-      try {
-        const userReportsResponse = await api.get('/daily-reports', {
-          params: {
-            from: selectedDate,
-            to: selectedDate,
-            show_all: true
-          }
-        });
-        const reports = Array.isArray(userReportsResponse.data) ? userReportsResponse.data : [];
-        const userReports = reports.filter((report: any) => report.user_id);
-        const normalized: CashContribution[] = userReports.map((report: any) => {
-          const uid = Number(report.user_id);
-          const name = report.user_name || userNameById.get(uid) || `Пользователь #${uid}`;
-          return {
-            user_id: uid,
-            user_name: name,
-            cash_actual: report.cash_actual ?? null
-          };
-        });
-        const computedTotal = computedContributions.reduce(
-          (s, c) => s + Number(c.cash_actual || 0),
-          0,
-        );
-        const hasActuals = normalized.some((r) => Number(r.cash_actual || 0) > 0);
-        if (computedTotal > 0) {
-          contributionsToShow = computedContributions;
-        } else if (hasActuals) {
-          contributionsToShow = normalized;
-        } else {
-          contributionsToShow = normalized.length > 0 ? normalized : computedContributions;
-        }
-      } catch (userReportsError: any) {
-        if (userReportsError?.response?.status !== 403) {
-          throw userReportsError;
-        }
-      }
-
-      const total = contributionsToShow.reduce((sum, report) => {
-        return sum + Number(report.cash_actual || 0);
-      }, 0);
-      setCashContributions(contributionsToShow);
-      setCashContributionsTotal(total);
 
       const calculatedCash = Number(previousActualCash || 0) + dailyRevenue;
 
@@ -288,7 +226,8 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         dailyRevenue,
         previousActual: previousActualCash,
         issuedOrdersTotal,
-        issuedByOperators
+        issuedByOperators,
+        orderVolumeWorkDay: Number(reg.order_volume_work_day ?? 0),
       });
 
     } catch (error: any) {
@@ -304,6 +243,20 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
       });
       setCashContributions([]);
       setCashContributionsTotal(0);
+    }
+  };
+
+  const handleRecalculateCash = async () => {
+    try {
+      setRecalculatingCash(true);
+      setError(null);
+      await recalculateCashRegisterDay(selectedDate);
+      await loadCashData();
+    } catch (err: unknown) {
+      console.error('Recalculate cash register failed', err);
+      setError('Не удалось пересчитать кассу из CRM');
+    } finally {
+      setRecalculatingCash(false);
     }
   };
 
@@ -529,7 +482,22 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         <div className="counters-section">
           <div className="section-header">
             <h2><AppIcon name="wallet" size="sm" /> Касса</h2>
-            <p>Сверка фактической и расчетной суммы</p>
+            <p>Сверка фактической и расчётной суммы. В кассу — оплаты и выдачи за выбранную дату (не месячный оборот из админ-отчётов).</p>
+          </div>
+
+          <div className="cash-recalculate-row">
+            <button
+              type="button"
+              className="save-btn"
+              onClick={handleRecalculateCash}
+              disabled={recalculatingCash || saving}
+            >
+              {recalculatingCash ? (
+                <><AppIcon name="refresh" size="xs" /> Пересчёт...</>
+              ) : (
+                <><AppIcon name="refresh" size="xs" /> Пересчитать из CRM</>
+              )}
+            </button>
           </div>
           
           <div className="cash-card">
@@ -563,9 +531,18 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
             </div>
 
             <div className="cash-row">
-              <div className="cash-label">Выручка за день (CRM):</div>
+              <div className="cash-label">В кассу за день (CRM):</div>
               <div className="cash-value"><MoneyAmount value={cashData.dailyRevenue ?? 0} /></div>
             </div>
+
+            {(cashData.orderVolumeWorkDay ?? 0) > 0 && (
+              <div className="cash-row cash-row--hint">
+                <div className="cash-label">Оборот заказов за день работы (справочно):</div>
+                <div className="cash-value cash-value--muted">
+                  <MoneyAmount value={cashData.orderVolumeWorkDay ?? 0} />
+                </div>
+              </div>
+            )}
 
             <div className="cash-row">
               <div className="cash-label">Выдано за день (общая сумма):</div>
