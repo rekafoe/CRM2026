@@ -13,6 +13,7 @@ import {
   getCashRegisterDay,
   recalculateCashRegisterDay,
 } from '../services/cashRegisterDayService'
+import { computeCashForReportDate } from '../utils/reportOrderCash'
 
 const router = Router()
 
