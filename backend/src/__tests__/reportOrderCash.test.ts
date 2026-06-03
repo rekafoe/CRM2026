@@ -72,4 +72,45 @@ describe('computeCashForReportDate', () => {
     expect(isOrderExcludedFromCashRegister(0)).toBe(true)
     expect(isOrderExcludedFromCashRegister(1)).toBe(false)
   })
+
+  it('counts issue remainder even when prepayment was pending (before issue)', () => {
+    const cash = computeCashForReportDate(
+      {
+        prepaymentAmount: 138,
+        prepaymentStatus: 'pending',
+        paymentMethod: 'online',
+        created_at: '2025-05-30',
+        prepaymentUpdatedAt: '2025-05-30',
+        cash_from_issue_today: 66,
+      },
+      '2025-06-01',
+    )
+    expect(cash).toBe(66)
+  })
+
+  it('counts prepayment on payment day when status pending but updated today (CRM)', () => {
+    expect(
+      countsAsPaidForCashReport(
+        {
+          prepaymentAmount: 40,
+          prepaymentStatus: 'pending',
+          paymentMethod: null,
+          prepaymentUpdatedAt: '2025-06-03 12:00:00',
+        },
+        '2025-06-03',
+      ),
+    ).toBe(true)
+    const cash = computeCashForReportDate(
+      {
+        prepaymentAmount: 40,
+        prepaymentStatus: 'pending',
+        paymentMethod: null,
+        created_at: '2025-06-01',
+        prepaymentUpdatedAt: '2025-06-03 12:00:00',
+        cash_from_issue_today: null,
+      },
+      '2025-06-03',
+    )
+    expect(cash).toBe(40)
+  })
 })

@@ -1211,7 +1211,7 @@ router.post('/:id/prepay', asyncHandler(async (req, res) => {
   }
 
   const amount = Number(rawAmount ?? order.prepaymentAmount ?? 0)
-  const paymentMethod = (req.body as any)?.paymentMethod ?? 'online'
+  const paymentMethod = (req.body as any)?.paymentMethod ?? 'offline'
   if (!amount || amount <= 0) { res.status(400).json({ message: 'Сумма предоплаты не задана' }); return }
 
   // BePaid integration stub: normally create payment via API and get redirect url

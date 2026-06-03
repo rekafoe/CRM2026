@@ -4,6 +4,19 @@ export function sliceReportDate(value: string | null | undefined): string {
   return String(value).trim().slice(0, 10)
 }
 
+/** Календарная дата в локальной зоне (для сопоставления с днём отчёта в UI). */
+export function sliceReportDateLocal(value: string | null | undefined): string {
+  if (value == null || value === '') return ''
+  const s = String(value).trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const d = new Date(s)
+  if (Number.isNaN(d.getTime())) return s.slice(0, 10)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function isPaidPrepaymentStatus(status: string | null | undefined): boolean {
   const s = String(status ?? '').toLowerCase()
   return s === 'paid' || s === 'successful'
@@ -18,49 +31,64 @@ export type OrderCashInput = {
   prepaymentAmount?: number | string | null
   prepaymentStatus?: string | null
   paymentMethod?: string | null
+  payment_channel?: string | null
   created_at?: string | null
   createdAt?: string | null
   prepaymentUpdatedAt?: string | null
   cash_from_issue_today?: number | null
 }
 
-/** Оплата для кассы: paid/successful, офлайн с суммой, или CRM без статуса (не online/telegram). */
-export function countsAsPaidForCashReport(order: OrderCashInput): boolean {
+/** Оплата для кассы: paid/successful, офлайн, предоплата в день отчёта (CRM), без online/telegram. */
+export function countsAsPaidForCashReport(order: OrderCashInput, reportDate?: string): boolean {
   if (isPaidPrepaymentStatus(order.prepaymentStatus)) return true
   const prepayment = Number(order.prepaymentAmount ?? 0)
   if (!Number.isFinite(prepayment) || prepayment <= 0) return false
   const method = String(order.paymentMethod ?? '').toLowerCase()
   if (method === 'offline') return true
+  const rd = reportDate?.slice(0, 10)
+  if (rd) {
+    const prepayDay = sliceReportDateLocal(order.prepaymentUpdatedAt)
+    if (prepayDay === rd && method !== 'online' && method !== 'telegram') return true
+  }
   if (!order.prepaymentStatus && method !== 'online' && method !== 'telegram') return true
   return false
+}
+
+/** Внутренние заказы и «счёт» без движения в кассу за день — не в выручку. */
+export function shouldIncludeOrderInCashRegister(order: OrderCashInput, reportDate: string, cashIncrement: number): boolean {
+  const channel = String(order.payment_channel ?? 'cash').toLowerCase()
+  if (channel === 'internal') return false
+  if (cashIncrement > 0) return true
+  return channel === 'cash'
 }
 
 /**
  * Сумма в кассу за конкретный календарный день отчёта.
  * День работы (created_at) без оплаты в этот день → 0.
  * День оплаты (prepaymentUpdatedAt) → prepaymentAmount.
- * День выдачи (cash_from_issue_today) → остаток или полная сумма по правилам выдачи.
+ * День выдачи (cash_from_issue_today) → остаток (всегда, если debt_closed > 0).
  */
 export function computeCashForReportDate(order: OrderCashInput, reportDate: string): number {
   const rd = reportDate.slice(0, 10)
-  const prepayment = Number(order.prepaymentAmount ?? 0)
-  if (!Number.isFinite(prepayment) || prepayment <= 0) return 0
-  if (!countsAsPaidForCashReport(order)) return 0
-
-  const created = sliceReportDate(order.created_at ?? order.createdAt)
-  const prepayDay = sliceReportDate(order.prepaymentUpdatedAt)
   const issueRaw = order.cash_from_issue_today
   const hasIssue = issueRaw !== null && issueRaw !== undefined
   const issueAmt = hasIssue ? Number(issueRaw) : NaN
 
-  if (hasIssue && Number.isFinite(issueAmt)) {
-    if (created === rd) {
+  if (hasIssue && Number.isFinite(issueAmt) && issueAmt > 0) {
+    const prepayment = Number(order.prepaymentAmount ?? 0)
+    const created = sliceReportDateLocal(order.created_at ?? order.createdAt)
+    if (created === rd && Number.isFinite(prepayment) && prepayment > 0) {
       if (issueAmt < prepayment) return prepayment
       if (issueAmt === 0 && prepayment > 0) return prepayment
     }
     return Math.max(0, issueAmt)
   }
 
+  const prepayment = Number(order.prepaymentAmount ?? 0)
+  if (!Number.isFinite(prepayment) || prepayment <= 0) return 0
+  if (!countsAsPaidForCashReport(order, rd)) return 0
+
+  const prepayDay = sliceReportDateLocal(order.prepaymentUpdatedAt)
   if (prepayDay === rd) return prepayment
   return 0
 }

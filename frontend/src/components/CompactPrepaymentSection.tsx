@@ -25,7 +25,7 @@ export const CompactPrepaymentSection: React.FC<CompactPrepaymentSectionProps> =
 
     setIsGenerating(true);
     try {
-      await createPrepaymentLink(order.id, order.prepaymentAmount);
+      await createPrepaymentLink(order.id, order.prepaymentAmount, 'online');
       onPrepaymentUpdate();
     } catch (error) {
       alert('Не удалось создать ссылку для оплаты');

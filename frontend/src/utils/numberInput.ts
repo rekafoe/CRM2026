@@ -40,20 +40,43 @@ export function isOrderExcludedFromCashCounter(order: { status?: number | string
   return Number(order.status) === 0;
 }
 
-function countsAsPaidForCashCounter(order: {
-  prepaymentStatus?: string | null;
-  prepaymentAmount?: string | number | null;
-  prepayment_amount?: string | number | null;
-  paymentMethod?: string | null;
-}): boolean {
+function countsAsPaidForCashCounter(
+  order: {
+    prepaymentStatus?: string | null;
+    prepaymentAmount?: string | number | null;
+    prepayment_amount?: string | number | null;
+    paymentMethod?: string | null;
+    prepaymentUpdatedAt?: string | null;
+  },
+  reportDate: string,
+): boolean {
   const status = String(order.prepaymentStatus ?? '').toLowerCase();
   if (status === 'paid' || status === 'successful') return true;
   const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
   if (prepayment <= 0) return false;
   const method = String(order.paymentMethod ?? '').toLowerCase();
   if (method === 'offline') return true;
+  const rd = reportDate.slice(0, 10);
+  const prepayDay = calendarDateLocal(String(order.prepaymentUpdatedAt ?? ''));
+  if (prepayDay === rd && method !== 'online' && method !== 'telegram') return true;
   if (!order.prepaymentStatus && method !== 'online' && method !== 'telegram') return true;
   return false;
+}
+
+/** Учитывать заказ в выручке кассы (канал + ненулевой приход за день). */
+export function shouldIncludeOrderInCashRegister(
+  order: {
+    payment_channel?: string | null;
+    status?: number | string | null;
+  },
+  reportDate: string,
+  cashIncrement: number,
+): boolean {
+  if (isOrderExcludedFromCashCounter(order)) return false;
+  const channel = String(order.payment_channel ?? 'cash').toLowerCase();
+  if (channel === 'internal') return false;
+  if (cashIncrement > 0) return true;
+  return channel === 'cash';
 }
 
 /**
@@ -79,27 +102,25 @@ export function cashIncrementForRegisterDay(
     return Math.max(0, Number(fromApi));
   }
 
-  const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
   const rd = reportDate.slice(0, 10);
-  if (!countsAsPaidForCashCounter(order) || prepayment <= 0) return 0;
+  const issueRaw = order.cash_from_issue_today;
+  const hasIssue = issueRaw !== null && issueRaw !== undefined;
+  const issueAmt = hasIssue ? Number(issueRaw) : NaN;
 
+  if (hasIssue && Number.isFinite(issueAmt) && issueAmt > 0) {
+    const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
+    const created = calendarDateLocal(String(order.created_at ?? order.createdAt ?? ''));
+    if (created === rd && prepayment > 0) {
+      if (issueAmt < prepayment) return prepayment;
+      if (issueAmt === 0) return prepayment;
+    }
+    return Math.max(0, issueAmt);
+  }
+
+  const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
+  if (prepayment <= 0 || !countsAsPaidForCashCounter(order, rd)) return 0;
   const prepayDay = calendarDateLocal(String(order.prepaymentUpdatedAt ?? ''));
-  const created = calendarDateLocal(String(order.created_at ?? order.createdAt ?? ''));
-
-  const v = order.cash_from_issue_today;
-  if (v === null || v === undefined) {
-    return prepayDay === rd ? prepayment : 0;
-  }
-  const debt = Number(v);
-  if (!Number.isFinite(debt)) {
-    return prepayDay === rd ? prepayment : 0;
-  }
-
-  if (created === rd) {
-    if (debt < prepayment) return prepayment;
-    if (debt === 0 && prepayment > 0) return prepayment;
-  }
-  return Math.max(0, debt);
+  return prepayDay === rd ? prepayment : 0;
 }
 
 export function normalizeEmptyStringsToNull<T extends Record<string, any>>(obj: T): T {

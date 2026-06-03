@@ -5,7 +5,7 @@ import { getCurrentUser, getUsers } from '../api';
 import {
   calendarDateLocal,
   cashIncrementForRegisterDay,
-  isOrderExcludedFromCashCounter,
+  shouldIncludeOrderInCashRegister,
 } from '../utils/numberInput';
 import { AppIcon, MoneyAmount, BynSymbol } from '../components/ui';
 import './CountersPage.css';
@@ -188,13 +188,9 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
         ? ordersResponse.data.issued_by_operators
         : [];
       const contributionsByUser = new Map<number, number>();
-      // В кассу учитываем только заказы с payment_channel === 'cash' (касса)
-      // Счёт (invoice) и не пробивавшиеся (not_cashed) — не в кассу
       const dailyRevenue = ordersForDate.reduce((sum: number, order: any) => {
-        if (isOrderExcludedFromCashCounter(order)) return sum; // Пул «Ожидает» (status=0)
-        const channel = (order.payment_channel || 'cash').toLowerCase();
-        if (channel !== 'cash') return sum;
         const orderAmount = cashIncrementForRegisterDay(order, selectedDate);
+        if (!shouldIncludeOrderInCashRegister(order, selectedDate, orderAmount)) return sum;
         const issuedAmount = Number(order.cash_from_issue_today ?? 0);
         const nonIssueAmount = Number.isFinite(issuedAmount)
           ? Math.max(0, orderAmount - issuedAmount)
@@ -238,9 +234,17 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
             cash_actual: report.cash_actual ?? null
           };
         });
+        const computedTotal = computedContributions.reduce(
+          (s, c) => s + Number(c.cash_actual || 0),
+          0,
+        );
         const hasActuals = normalized.some((r) => Number(r.cash_actual || 0) > 0);
-        if (hasActuals || computedContributions.length === 0) {
+        if (computedTotal > 0) {
+          contributionsToShow = computedContributions;
+        } else if (hasActuals) {
           contributionsToShow = normalized;
+        } else {
+          contributionsToShow = normalized.length > 0 ? normalized : computedContributions;
         }
       } catch (userReportsError: any) {
         if (userReportsError?.response?.status !== 403) {

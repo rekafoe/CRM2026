@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common';
 import { AppIcon, MoneyAmount, BynSymbol } from '../../components/ui';
 import { api, getUsers, getPrinterCountersByMonth, getDailyCashByMonth } from '../../api';
-import { cashIncrementForRegisterDay, isOrderExcludedFromCashCounter } from '../../utils/numberInput';
+import {
+  cashIncrementForRegisterDay,
+  shouldIncludeOrderInCashRegister,
+} from '../../utils/numberInput';
 import './CountersServicePage.css';
 
 type Mode = 'day' | 'month';
@@ -87,12 +90,20 @@ export const CountersServicePage: React.FC = () => {
       );
       const contributionsByUser = new Map<number, number>();
       const total = ordersForDate.reduce((sum: number, order: any) => {
-        if (isOrderExcludedFromCashCounter(order)) return sum;
         const orderAmount = cashIncrementForRegisterDay(order, selectedDate);
+        if (!shouldIncludeOrderInCashRegister(order, selectedDate, orderAmount)) return sum;
+        const issuedAmount = Number(order.cash_from_issue_today ?? 0);
+        const nonIssueAmount = Number.isFinite(issuedAmount)
+          ? Math.max(0, orderAmount - issuedAmount)
+          : orderAmount;
         const rawUserId = order.userId ?? order.user_id ?? null;
         const userId = rawUserId != null ? Number(rawUserId) : null;
-        if (userId && !Number.isNaN(userId) && orderAmount > 0) {
-          contributionsByUser.set(userId, (contributionsByUser.get(userId) || 0) + orderAmount);
+        if (userId && !Number.isNaN(userId) && nonIssueAmount > 0) {
+          contributionsByUser.set(userId, (contributionsByUser.get(userId) || 0) + nonIssueAmount);
+        }
+        const issuerId = Number(order.cash_issued_by_user_id);
+        if (issuerId > 0 && Number.isFinite(issuedAmount) && issuedAmount > 0) {
+          contributionsByUser.set(issuerId, (contributionsByUser.get(issuerId) || 0) + issuedAmount);
         }
         return sum + orderAmount;
       }, 0);
