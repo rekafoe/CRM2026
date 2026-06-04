@@ -22,6 +22,26 @@ export function parseNumberFlexible(value: number | string | null | undefined, f
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/** Сегодня YYYY-MM-DD в локальной зоне браузера (не UTC из toISOString). */
+export function todayCalendarLocal(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Сдвиг календарной даты YYYY-MM-DD на deltaDays в локальной зоне. */
+export function addCalendarDaysLocal(ymd: string, deltaDays: number): string {
+  const base = new Date(`${ymd}T12:00:00`);
+  if (Number.isNaN(base.getTime())) return ymd;
+  base.setDate(base.getDate() + deltaDays);
+  const y = base.getFullYear();
+  const m = String(base.getMonth() + 1).padStart(2, '0');
+  const day = String(base.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 /** Календарная дата YYYY-MM-DD в локальной зоне браузера (для сопоставления с датой отчёта). */
 export function calendarDateLocal(value: string | null | undefined): string {
   if (value == null || value === '') return '';

@@ -142,6 +142,7 @@ async function loadOrderVolumeWorkDay(reportDate: string): Promise<number> {
 }
 
 export async function getCashRegisterDay(reportDate: string): Promise<CashRegisterDayPayload> {
+  await backfillPaymentMetadataForCashDay(reportDate)
   const loaded = await loadDailyOrdersForCashReport(reportDate)
   const agg = aggregateCashFromOrders(loaded.orders, loaded.date)
   const order_volume_work_day = await loadOrderVolumeWorkDay(loaded.date)
@@ -174,6 +175,20 @@ export async function backfillPaymentMetadataForCashDay(reportDate: string): Pro
     return 0
   }
 
+  type BackfillRow = {
+    id: number
+    created_at: string | null
+    prepaymentAmount: number | null
+    prepaymentStatus: string | null
+    paymentMethod: string | null
+    updated_ts?: string | null
+  }
+
+  const paidFilter = `COALESCE(o.prepaymentAmount, 0) > 0
+        AND o.prepaymentUpdatedAt IS NULL
+        AND COALESCE(o.prepaymentStatus, '') NOT IN ('pending')
+        AND LOWER(COALESCE(o.paymentMethod, '')) NOT IN ('online', 'telegram')`
+
   const candidates = (await db.all(
     `SELECT o.id,
             COALESCE(o.created_at, o.createdAt) as created_at,
@@ -182,32 +197,59 @@ export async function backfillPaymentMetadataForCashDay(reportDate: string): Pro
             o.paymentMethod
        FROM orders o
       WHERE substr(COALESCE(o.created_at, o.createdAt), 1, 10) = ?
-        AND COALESCE(o.prepaymentAmount, 0) > 0
-        AND o.prepaymentUpdatedAt IS NULL
-        AND COALESCE(o.prepaymentStatus, '') NOT IN ('pending')
-        AND LOWER(COALESCE(o.paymentMethod, '')) NOT IN ('online', 'telegram')`,
+        AND ${paidFilter}`,
     d,
-  )) as Array<{
-    id: number
-    created_at: string | null
-    prepaymentAmount: number | null
-    prepaymentStatus: string | null
-    paymentMethod: string | null
-  }>
+  )) as BackfillRow[]
 
+  let hasUpdatedAt = false
+  let hasUpdatedAtCamel = false
+  try {
+    hasUpdatedAt = await hasColumn('orders', 'updated_at')
+    hasUpdatedAtCamel = await hasColumn('orders', 'updatedAt')
+  } catch {
+    /* ignore */
+  }
+  const updatedAtExpr =
+    hasUpdatedAt && hasUpdatedAtCamel
+      ? 'COALESCE(o.updated_at, o.updatedAt)'
+      : hasUpdatedAt
+        ? 'o.updated_at'
+        : hasUpdatedAtCamel
+          ? 'o.updatedAt'
+          : null
+
+  let paymentDayCandidates: BackfillRow[] = []
+  if (updatedAtExpr) {
+    paymentDayCandidates = (await db.all(
+      `SELECT o.id,
+              COALESCE(o.created_at, o.createdAt) as created_at,
+              o.prepaymentAmount,
+              o.prepaymentStatus,
+              o.paymentMethod,
+              ${updatedAtExpr} as updated_ts
+         FROM orders o
+        WHERE substr(${updatedAtExpr}, 1, 10) = ?
+          AND substr(COALESCE(o.created_at, o.createdAt), 1, 10) != ?
+          AND ${paidFilter}`,
+      d,
+      d,
+    )) as BackfillRow[]
+  }
+
+  const seen = new Set<number>()
   let updated = 0
-  for (const row of candidates) {
+
+  const applyBackfill = async (row: BackfillRow, stamp: string) => {
+    if (seen.has(row.id)) return
     const method = String(row.paymentMethod ?? '').toLowerCase()
-    if (method === 'online' || method === 'telegram') continue
+    if (method === 'online' || method === 'telegram') return
     const status = String(row.prepaymentStatus ?? '').toLowerCase()
-    if (status === 'pending') continue
+    if (status === 'pending') return
 
-    const created = String(row.created_at ?? '').trim()
-    const stamp = created.length >= 10 ? `${created.slice(0, 10)} 12:00:00` : `${d} 12:00:00`
-
+    seen.add(row.id)
     await db.run(
       `UPDATE orders
-          SET prepaymentStatus = 'paid',
+          SET prepaymentStatus = COALESCE(NULLIF(prepaymentStatus, ''), 'paid'),
               paymentMethod = COALESCE(NULLIF(paymentMethod, ''), 'offline'),
               prepaymentUpdatedAt = ?,
               updated_at = datetime('now','localtime')
@@ -216,6 +258,19 @@ export async function backfillPaymentMetadataForCashDay(reportDate: string): Pro
       row.id,
     )
     updated += 1
+  }
+
+  for (const row of candidates) {
+    const created = String(row.created_at ?? '').trim()
+    const stamp = created.length >= 10 ? `${created.slice(0, 10)} 12:00:00` : `${d} 12:00:00`
+    await applyBackfill(row, stamp)
+  }
+
+  for (const row of paymentDayCandidates) {
+    const updatedTs = String(row.updated_ts ?? '').trim()
+    const stamp =
+      updatedTs.length >= 10 ? `${updatedTs.slice(0, 19).replace('T', ' ')}` : `${d} 12:00:00`
+    await applyBackfill(row, stamp.length >= 10 ? stamp : `${d} 12:00:00`)
   }
 
   if (updated > 0) {

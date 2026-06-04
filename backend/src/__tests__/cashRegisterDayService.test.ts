@@ -60,8 +60,8 @@ describe('cashRegisterDayService', () => {
       `${workDay} 12:00:00`,
     )
 
-    const updated = await backfillPaymentMetadataForCashDay(workDay)
-    expect(updated).toBeGreaterThanOrEqual(1)
+    const payload = await getCashRegisterDay(workDay)
+    expect(payload.cash_in_today).toBeGreaterThanOrEqual(55)
 
     const row = await db.get<{ prepaymentUpdatedAt: string; prepaymentStatus: string }>(
       'SELECT prepaymentUpdatedAt, prepaymentStatus FROM orders WHERE number = ?',
@@ -69,8 +69,5 @@ describe('cashRegisterDayService', () => {
     )
     expect(String(row?.prepaymentStatus)).toBe('paid')
     expect(String(row?.prepaymentUpdatedAt ?? '').slice(0, 10)).toBe(workDay)
-
-    const payload = await getCashRegisterDay(workDay)
-    expect(payload.cash_in_today).toBeGreaterThanOrEqual(55)
   })
 })

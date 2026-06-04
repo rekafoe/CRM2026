@@ -88,6 +88,21 @@ describe('computeCashForReportDate', () => {
     expect(cash).toBe(66)
   })
 
+  it('counts prepayment on work day without prepaymentUpdatedAt (legacy CRM)', () => {
+    const cash = computeCashForReportDate(
+      {
+        prepaymentAmount: 80,
+        prepaymentStatus: 'paid',
+        paymentMethod: 'offline',
+        created_at: '2025-06-02 10:00:00',
+        prepaymentUpdatedAt: null,
+        cash_from_issue_today: null,
+      },
+      '2025-06-02',
+    )
+    expect(cash).toBe(80)
+  })
+
   it('counts prepayment on payment day when status pending but updated today (CRM)', () => {
     expect(
       countsAsPaidForCashReport(

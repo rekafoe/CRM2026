@@ -90,6 +90,11 @@ export function computeCashForReportDate(order: OrderCashInput, reportDate: stri
 
   const prepayDay = sliceReportDateLocal(order.prepaymentUpdatedAt)
   if (prepayDay === rd) return prepayment
+
+  const created = sliceReportDateLocal(order.created_at ?? order.createdAt)
+  // Legacy CRM: оплата в день оформления без prepaymentUpdatedAt
+  if (!prepayDay && created === rd) return prepayment
+
   return 0
 }
 

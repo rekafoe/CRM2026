@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, getCurrentUser, getUsers, getCashRegisterDay, recalculateCashRegisterDay } from '../api';
-import { calendarDateLocal } from '../utils/numberInput';
+import { addCalendarDaysLocal, calendarDateLocal, todayCalendarLocal } from '../utils/numberInput';
 import { AppIcon, MoneyAmount, BynSymbol } from '../components/ui';
 import './CountersPage.css';
 
@@ -62,7 +62,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
   const [printers, setPrinters] = useState<Printer[]>([]);
   
   // Состояние формы
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(todayCalendarLocal);
   const [editingPrinter, setEditingPrinter] = useState<number | null>(null);
   const [newCounterValue, setNewCounterValue] = useState<string>('');
   const [cashActualValue, setCashActualValue] = useState<string>('');
@@ -73,12 +73,10 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
   const [cashContributionsTotal, setCashContributionsTotal] = useState<number>(0);
   const [allUsers, setAllUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [activeTab, setActiveTab] = useState<'cash' | 'printers'>('cash');
-  const previousDateLabel = React.useMemo(() => {
-    const base = new Date(selectedDate);
-    if (Number.isNaN(base.getTime())) return 'вчера';
-    base.setDate(base.getDate() - 1);
-    return base.toISOString().split('T')[0];
-  }, [selectedDate]);
+  const previousDateLabel = React.useMemo(
+    () => addCalendarDaysLocal(selectedDate, -1),
+    [selectedDate],
+  );
 
   useEffect(() => {
     loadUser();
@@ -171,9 +169,7 @@ export const CountersPage: React.FC<CountersPageProps> = ({ isModal = false }) =
       const actualCash = await getCashActualForDate(selectedDate);
       setCashActualValue(actualCash ? actualCash.toString() : '');
 
-      const previousDate = new Date(selectedDate);
-      previousDate.setDate(previousDate.getDate() - 1);
-      const previousDateKey = previousDate.toISOString().split('T')[0];
+      const previousDateKey = addCalendarDaysLocal(selectedDate, -1);
       const previousActualCash = await getCashActualForDate(previousDateKey);
 
       const cashRegisterRes = await getCashRegisterDay(selectedDate);

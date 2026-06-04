@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common';
 import { AppIcon, MoneyAmount, BynSymbol } from '../../components/ui';
 import { api, getUsers, getPrinterCountersByMonth, getDailyCashByMonth, getCashRegisterDay } from '../../api';
+import { addCalendarDaysLocal, todayCalendarLocal } from '../../utils/numberInput';
 import './CountersServicePage.css';
 
 type Mode = 'day' | 'month';
@@ -31,7 +32,7 @@ interface DayCardData {
 export const CountersServicePage: React.FC = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>('day');
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(todayCalendarLocal);
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -44,12 +45,10 @@ export const CountersServicePage: React.FC = () => {
   const [users, setUsers] = useState<Array<{ id: number; name: string }>>([]);
   const [monthData, setMonthData] = useState<DayCardData[]>([]);
 
-  const previousDateLabel = useMemo(() => {
-    const base = new Date(selectedDate);
-    if (Number.isNaN(base.getTime())) return 'вчера';
-    base.setDate(base.getDate() - 1);
-    return base.toISOString().split('T')[0];
-  }, [selectedDate]);
+  const previousDateLabel = useMemo(
+    () => addCalendarDaysLocal(selectedDate, -1),
+    [selectedDate],
+  );
 
   useEffect(() => {
     getUsers()
