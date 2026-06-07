@@ -307,6 +307,9 @@ export const OrderItem: React.FC<OrderItemProps> = ({ item, orderId, order, onUp
   const filteredParameterChips = useMemo(() => {
     return parameterSummary.filter((param) => {
       const label = param.label.toLowerCase();
+      if (label === 'layouthumanlabel' || param.value === '[object Object]') {
+        return false;
+      }
       if (
         showPositionBreakdown &&
         (label === 'формат печати' || label === 'формат' || label === 'размер')

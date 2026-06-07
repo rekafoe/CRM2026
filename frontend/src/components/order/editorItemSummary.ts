@@ -72,11 +72,20 @@ export function getEditorItemSummary(
     };
   }
 
-  if ((params as { no_layout?: unknown }).no_layout === true) {
+  const noLayoutDeclared =
+    (params as { no_layout?: unknown }).no_layout === true ||
+    (params as { crmNoLayoutDeclared?: unknown }).crmNoLayoutDeclared === true ||
+    (params as { specifications?: { artwork_provided?: unknown } }).specifications?.artwork_provided === false;
+
+  if (noLayoutDeclared) {
+    const layoutLabel =
+      typeof (params as { layoutHumanLabel?: unknown }).layoutHumanLabel === 'string'
+        ? String((params as { layoutHumanLabel: string }).layoutHumanLabel).trim()
+        : '';
     return {
       kind: 'noLayout',
       label: 'Без макета',
-      detail: 'Нужна разработка или согласование макета',
+      detail: layoutLabel || 'Нужна разработка или согласование макета',
     };
   }
 

@@ -1,12 +1,29 @@
 import type { Item } from '../../types';
 
-/** Метка с сайта: нет макета (не влияет на цену в CRM). Допустимы no_layout или layout_missing. */
+/** Метка с сайта: нет макета (не влияет на цену в CRM). */
 export const itemParamsHasNoLayout = (params: Item['params'] | Record<string, unknown> | null | undefined): boolean => {
   const p = params as Record<string, unknown> | null | undefined;
   if (!p || typeof p !== 'object') return false;
   if (p.no_layout === true) return true;
   if (p.layout_missing === true) return true;
+  if (p.crmNoLayoutDeclared === true) return true;
+  const specs = p.specifications;
+  if (specs && typeof specs === 'object' && !Array.isArray(specs)) {
+    if ((specs as Record<string, unknown>).artwork_provided === false) return true;
+  }
   return false;
+};
+
+/** Убирает артефакты website checkout из описания позиции. */
+export const sanitizeWebsiteOrderItemDescription = (desc: string): string => {
+  if (!desc) return desc;
+  return desc
+    .replace(/;?\s*layoutHumanLabel:\s*[^;]+/gi, '')
+    .replace(/;?\s*Дополнительная отделка:\s*\[object Object\]/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/;\s*;/g, ';')
+    .replace(/\s*;\s*$/g, '')
+    .trim();
 };
 
 // Определяем, что описание сгенерировано автоматически калькулятором
@@ -25,7 +42,7 @@ export const isAutoDescription = (desc: string | undefined | null): boolean => {
 
 export const sanitizeOrderItemDescription = (desc: string, itemType?: string) => {
   // Чистим дубли из сохранённого описания позиции
-  const cleaned = desc
+  const cleaned = sanitizeWebsiteOrderItemDescription(desc)
     .replace(/\s*•\s*Печать:\s*[^•]+/g, '')
     .replace(/\s*Печать:\s*[^•]+/g, '')
     .replace(/\s{2,}/g, ' ')
