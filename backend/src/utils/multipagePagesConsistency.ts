@@ -82,12 +82,22 @@ export function assertMultipagePagesConsistency(
 
 export type SimplifiedPagesConfigLike = {
   options?: number[];
+  default?: number;
   allow_custom?: boolean;
   allowCustom?: boolean;
   min?: number;
   max?: number;
   step?: number;
 };
+
+/** Эффективный blocks pages: подтип поверх корня (как getEffectiveSimplifiedConfig на фронте). */
+export function resolveEffectiveSimplifiedPages(
+  rootPages: SimplifiedPagesConfigLike | undefined | null,
+  typePages: SimplifiedPagesConfigLike | undefined | null,
+): SimplifiedPagesConfigLike | undefined {
+  if (!rootPages && !typePages) return undefined;
+  return { ...(rootPages ?? {}), ...(typePages ?? {}) };
+}
 
 const DEFAULT_MULTI_PAGE_MIN = 4;
 const DEFAULT_MULTI_PAGE_MAX = 500;

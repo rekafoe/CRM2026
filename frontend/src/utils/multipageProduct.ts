@@ -18,7 +18,11 @@ export function inferMultipagePagesStep(step?: number, options?: number[]): numb
 const DEFAULT_CUSTOM_PAGES_MAX = 500;
 const DEFAULT_CUSTOM_PAGES_MIN = 4;
 
-/** Границы для произвольного ввода страниц в калькуляторе (не сужать до max пресета). */
+/**
+ * Границы для произвольного ввода страниц в калькуляторе.
+ * Согласовано с backend resolvePagesBounds (multipagePagesConsistency.ts):
+ * без явного max в шаблоне верхняя граница — максимум из presets, не 500.
+ */
 export function resolveCalculatorPagesBounds(params: {
   pagesConfig?: SimplifiedPagesLike;
   allowedOptions?: number[];
@@ -30,30 +34,23 @@ export function resolveCalculatorPagesBounds(params: {
     .filter((n) => Number.isFinite(n) && n > 0);
   const allowCustom = params.allowCustom !== false;
   const multipage = params.isMultipageLike === true;
+  const openCustomRange = allowCustom || multipage;
 
   const min =
     params.pagesConfig?.min ??
-    (allowCustom
-      ? multipage
+    (opts.length > 0
+      ? Math.min(...opts)
+      : openCustomRange
         ? DEFAULT_CUSTOM_PAGES_MIN
-        : opts.length > 0
-          ? Math.min(...opts)
-          : DEFAULT_CUSTOM_PAGES_MIN
-      : opts.length > 0
-        ? Math.min(...opts)
-        : multipage
-          ? DEFAULT_CUSTOM_PAGES_MIN
-          : undefined);
+        : undefined);
 
   const max =
     params.pagesConfig?.max ??
-    (allowCustom
-      ? DEFAULT_CUSTOM_PAGES_MAX
-      : opts.length > 0
-        ? Math.max(...opts)
-        : multipage
-          ? DEFAULT_CUSTOM_PAGES_MAX
-          : undefined);
+    (opts.length > 0
+      ? Math.max(...opts)
+      : openCustomRange
+        ? DEFAULT_CUSTOM_PAGES_MAX
+        : undefined);
 
   return { min, max };
 }

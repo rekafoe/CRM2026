@@ -3,7 +3,7 @@ import {
   type BindingPagesLimits,
   validateBindingPagesForCalculator,
 } from '../../../utils/multipageBinding';
-import { resolveMultipageMinQty } from '../../../utils/multipageProduct';
+import { resolveCalculatorPagesBounds, resolveMultipageMinQty } from '../../../utils/multipageProduct';
 import {
   getCoverAllowedMaterialIds,
   isSeparateCoverMode,
@@ -133,31 +133,15 @@ function computeErrors(params: {
         errors.pages = 'Выберите количество страниц из списка';
       } else {
         const opts = hasPagesPresets ? schemaPagesEnum! : [];
-        const inferredMin =
-          pagesMin ??
-          (canCustom
-            ? isMultiPageProduct
-              ? 4
-              : opts.length > 0
-                ? Math.min(...opts)
-                : 4
-            : opts.length > 0
-              ? Math.min(...opts)
-              : isMultiPageProduct
-                ? 4
-                : 1);
-        const inferredMax =
-          pagesMax ??
-          (canCustom
-            ? 500
-            : opts.length > 0
-              ? Math.max(...opts)
-              : isMultiPageProduct
-                ? 500
-                : 9999);
-        if (p < inferredMin) {
+        const { min: inferredMin, max: inferredMax } = resolveCalculatorPagesBounds({
+          pagesConfig: { min: pagesMin, max: pagesMax, step: pagesStep },
+          allowedOptions: opts,
+          allowCustom: canCustom,
+          isMultipageLike: isMultiPageProduct,
+        });
+        if (inferredMin != null && p < inferredMin) {
           errors.pages = `Не менее ${inferredMin} стр.`;
-        } else if (p > inferredMax) {
+        } else if (inferredMax != null && p > inferredMax) {
           errors.pages = `Не более ${inferredMax} стр.`;
         }
         const step = pagesStep;

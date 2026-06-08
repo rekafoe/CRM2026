@@ -27,7 +27,7 @@ import { useCalculatorPricingActions, productRequiresPrint } from './hooks/useCa
 import { useAutoCalculate } from './hooks/useAutoCalculate'; // 🆕 Автопересчет
 import { getEnhancedProductTypes } from '../../api';
 import { buildParameterSummary, type BuildSummaryOptions } from './utils/summaryBuilder';
-import { isMultipageLikeProduct } from '../../utils/multipageProduct';
+import { isMultipageLikeProduct, resolveCalculatorPagesBounds } from '../../utils/multipageProduct';
 import { CalculatorSections } from './components/CalculatorSections';
 import { CustomProductForm } from './components/CustomProductForm';
 import { PostprintServicesForm } from './components/PostprintServicesForm';
@@ -519,6 +519,18 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
     return variant?.variantName ?? variant?.variant_name;
   }, [activeBindingVariantId, bindingVariants]);
 
+  const pagesAllowCustom = isMultiPageProduct || effectivePagesConfig?.allowCustom !== false;
+  const calculatorPagesBounds = useMemo(
+    () =>
+      resolveCalculatorPagesBounds({
+        pagesConfig: effectivePagesConfig,
+        allowedOptions: effectivePagesOptions,
+        allowCustom: pagesAllowCustom,
+        isMultipageLike: isMultiPageProduct,
+      }),
+    [effectivePagesConfig, effectivePagesOptions, pagesAllowCustom, isMultiPageProduct],
+  );
+
   // Валидация вынесена в хук
   const { validationErrors, isValid, validateSpecs } = useCalculatorValidation({
     specs,
@@ -530,9 +542,9 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       isMultiPageProduct || (Array.isArray(effectivePagesOptions) && effectivePagesOptions.length > 0)
         ? effectivePagesOptions
         : undefined,
-    pagesAllowCustom: isMultiPageProduct || effectivePagesConfig?.allowCustom !== false,
-    pagesMin: effectivePagesConfig?.min ?? (isMultiPageProduct ? 4 : undefined),
-    pagesMax: effectivePagesConfig?.max ?? (isMultiPageProduct ? 500 : undefined),
+    pagesAllowCustom,
+    pagesMin: calculatorPagesBounds.min,
+    pagesMax: calculatorPagesBounds.max,
     pagesStep: effectivePagesConfig?.step,
     isMultiPageProduct,
     bindingPagesLimits: activeBindingLimits,

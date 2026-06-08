@@ -136,6 +136,14 @@ export function getHiddenPlotterRollFinFieldNamesForCalculator(
   return new Set(PLOTTER_ROLL_FIN_CALC_FIELD_NAMES);
 }
 
+function mergeSimplifiedPagesConfig(
+  root?: EffectiveSimplifiedConfig['pages'],
+  typePages?: EffectiveSimplifiedConfig['pages'],
+): EffectiveSimplifiedConfig['pages'] | undefined {
+  if (!root && !typePages) return undefined;
+  return { ...(root ?? {}), ...(typePages ?? {}) };
+}
+
 export function getEffectiveSimplifiedConfig(
   simplified: {
     sizes?: EffectiveSimplifiedConfig['sizes'];
@@ -157,7 +165,7 @@ export function getEffectiveSimplifiedConfig(
     }));
     return {
       sizes: sizesWithEffectiveMaterials,
-      pages: typeConfig?.pages ?? simplified.pages,
+      pages: mergeSimplifiedPagesConfig(simplified.pages, typeConfig?.pages),
     };
   }
   return {

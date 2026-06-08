@@ -44,6 +44,8 @@ import {
   usesMultipageSheetPricing,
   validateBindingPagesLimit,
   validateMultiPageCountForTemplate,
+  resolveEffectiveSimplifiedPages,
+  type SimplifiedPagesConfigLike,
 } from '../../../utils/multipagePagesConsistency';
 import {
   getCoverAllowedMaterialIds,
@@ -406,6 +408,10 @@ export class SimplifiedPricingService {
     let sizesToUse: SimplifiedSizeConfig[] = simplifiedConfig.sizes ?? [];
     
     const typeConfig: SimplifiedTypeConfig | null = typeId && typeConfigs?.[typeId] ? typeConfigs[typeId] : null;
+    const effectivePagesConfig = resolveEffectiveSimplifiedPages(
+      simplifiedConfig.pages,
+      (typeConfig as { pages?: SimplifiedPagesConfigLike } | null)?.pages,
+    );
     const uvTemplateConfig =
       (typeConfig as SimplifiedConfig | null)?.uv_print ?? simplifiedConfig.uv_print;
     const isUvFlatbedMode = uvTemplateConfig?.mode === 'flatbed_m2';
@@ -656,7 +662,7 @@ export class SimplifiedPricingService {
     const usePagesMultiplier = usesMultipageSheetPricing({
       productType: product.product_type,
       multiPageStructure,
-      simplifiedPages: simplifiedConfig.pages,
+      simplifiedPages: effectivePagesConfig,
     });
 
     // Проверяем, рулонная ли печать (counter_unit=meters) — для неё другая логика
@@ -749,7 +755,7 @@ export class SimplifiedPricingService {
         ? blockPagesForPrint
         : 1;
     if (usePagesMultiplier && Number.isFinite(pagesCount) && pagesCount > 0) {
-      validateMultiPageCountForTemplate(Math.floor(pagesCount), simplifiedConfig.pages, {
+      validateMultiPageCountForTemplate(Math.floor(pagesCount), effectivePagesConfig, {
         isMultiPage: true,
       });
     }

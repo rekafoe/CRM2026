@@ -307,6 +307,35 @@ describe('SimplifiedPricingService multi_page cover/innerBlock', () => {
     expect(result.finalPrice).toBe(100);
   });
 
+  it('использует max страниц из typeConfigs при type_id', async () => {
+    templateConfigData.simplified.pages = {
+      options: [4, 8, 12, 16, 20, 24, 28],
+      default: 28,
+    };
+    templateConfigData.simplified.types = [{ id: 1, name: 'Основной', default: true }];
+    templateConfigData.simplified.typeConfigs = {
+      '1': {
+        sizes: templateConfigData.simplified.sizes,
+        pages: { options: [4, 8, 12, 16, 20, 24, 28], default: 28, min: 4, max: 130, step: 4 },
+      },
+    };
+
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'a4',
+        type_id: 1,
+        print_technology: 'laser_prof',
+        print_color_mode: 'color',
+        print_sides_mode: 'single',
+        pages: 40 as any,
+      } as any,
+      1,
+    );
+
+    expect(result.finalPrice).toBe(80);
+  });
+
   it('отклоняет pages выше max шаблона для multi_page', async () => {
     templateConfigData.simplified.pages = { options: [24], max: 100 };
     delete templateConfigData.simplified.multiPageStructure;
