@@ -125,6 +125,10 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     return undefined;
   }, [specs.size_id, uvFlatbed, simplifiedSizesSource]);
 
+  const isSimplifiedProduct = Boolean(
+    simplifiedSizesSource && simplifiedSizesSource.length > 0,
+  );
+
   /** Стабильный ключ: перезагрузка /materials только при смене подтипа/размеров/списков id, не при каждом рендере schema */
   const materialsReloadKey = useMemo(() => {
     if (!Array.isArray(simplifiedSizesSource) || simplifiedSizesSource.length === 0) return '';
@@ -437,9 +441,6 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     );
   }, [filteredPaperTypes, specs.paperType, specs.paperDensity, updateSpecs, getDefaultPaperDensity]);
 
-  // 🆕 Проверяем, является ли продукт упрощённым
-  const isSimplifiedProduct = simplifiedSizesSource && simplifiedSizesSource.length > 0;
-  
   // 🆕 Получаем разрешённые материалы для выбранного размера
   // Важно: порядок как в шаблоне (allowed_material_ids), а не порядок строк в ответе /materials —
   // иначе дефолт «первый тип / первая плотность» уезжает на чужой тип (например DTF), если он раньше в API.
