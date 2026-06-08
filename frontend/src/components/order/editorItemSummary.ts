@@ -78,10 +78,8 @@ export function getEditorItemSummary(
     (params as { specifications?: { artwork_provided?: unknown } }).specifications?.artwork_provided === false;
 
   if (noLayoutDeclared) {
-    const layoutLabel =
-      typeof (params as { layoutHumanLabel?: unknown }).layoutHumanLabel === 'string'
-        ? String((params as { layoutHumanLabel: string }).layoutHumanLabel).trim()
-        : '';
+    const layoutHumanLabel = (params as unknown as { layoutHumanLabel?: unknown }).layoutHumanLabel;
+    const layoutLabel = typeof layoutHumanLabel === 'string' ? layoutHumanLabel.trim() : '';
     return {
       kind: 'noLayout',
       label: 'Без макета',

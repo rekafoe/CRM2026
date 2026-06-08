@@ -194,7 +194,12 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
             onCustomHeightChange={(v) => setCustomFormat((prev) => ({ ...prev, height: v }))}
             showPresetSizes={showUvPresets}
             presetSizeId={(specs as any).size_id}
-            presetSizes={effectiveSizes}
+            presetSizes={effectiveSizes?.map((s) => ({
+              id: s.id,
+              label: s.label?.trim() ? s.label : `${s.width_mm}×${s.height_mm} мм`,
+              width_mm: s.width_mm,
+              height_mm: s.height_mm,
+            }))}
             useCustomDimensions={uvUseCustom}
             onUseCustomDimensionsChange={(custom) =>
               updateSpecs({ uv_use_custom_dimensions: custom } as Partial<ProductSpecs>)

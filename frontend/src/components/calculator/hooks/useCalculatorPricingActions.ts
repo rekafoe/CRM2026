@@ -469,7 +469,7 @@ export function useCalculatorPricingActions({
             isCustomFormat,
             customFormat,
             print_technology: configuration.print_technology,
-            print_color_mode: configuration.print_color_mode,
+            print_color_mode: (configuration as { print_color_mode?: string | null }).print_color_mode,
             sides: configuration.sides,
             bleed_mm: (configuration as { bleed_mm?: number }).bleed_mm,
             // 🆕 Явно логируем finishing для отладки
@@ -487,15 +487,19 @@ export function useCalculatorPricingActions({
         });
         
         // ✅ Для продуктов с печатью параметры должны быть переданы; для продуктов без печати — нормально, что их нет
-        if (!uvFlatbed && requiresPrint && (!configuration.print_technology || !configuration.print_color_mode)) {
+        const configPrint = configuration as {
+          print_technology?: string;
+          print_color_mode?: string | null;
+        };
+        if (!uvFlatbed && requiresPrint && (!configPrint.print_technology || !configPrint.print_color_mode)) {
           logger.info('⚠️ Параметры печати не переданы в конфигурацию!', {
-            print_technology: configuration.print_technology,
-            print_color_mode: configuration.print_color_mode
+            print_technology: configPrint.print_technology,
+            print_color_mode: configPrint.print_color_mode,
           });
         } else if (requiresPrint) {
           logger.info('✅ Параметры печати переданы в конфигурацию', {
-            print_technology: configuration.print_technology,
-            print_color_mode: configuration.print_color_mode
+            print_technology: configPrint.print_technology,
+            print_color_mode: configPrint.print_color_mode,
           });
         } else {
           logger.info('ℹ️ Продукт без печати — расчёт без параметров печати', { productId: selectedProduct.id });
