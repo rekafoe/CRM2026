@@ -225,7 +225,13 @@ export class UnifiedPricingService {
         ...(result.selectedMaterial ? [{
           materialId: result.selectedMaterial.material_id,
           materialName: result.selectedMaterial.material_name,
-          quantity: result.layout?.metersNeeded ?? result.layout?.sheetsNeeded ?? result.quantity,
+          quantity: (() => {
+            const meters = result.layout?.metersNeeded;
+            if (meters != null && Number(meters) > 0) return Number(meters);
+            const sheets = result.layout?.sheetsNeeded;
+            if (sheets != null && Number(sheets) > 0) return Number(sheets);
+            return result.quantity;
+          })(),
           unitPrice: result.materialDetails?.tier.price || 0,
           totalCost: result.materialDetails?.priceForQuantity ?? result.materialPrice,
           density: result.selectedMaterial.density,

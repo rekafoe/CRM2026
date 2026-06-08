@@ -663,9 +663,14 @@ export class SimplifiedPricingService {
     const centralPriceForRoll = normalizedConfig.print_technology
       ? await PrintPriceService.getByTechnology(normalizedConfig.print_technology)
       : undefined;
-    const isRollPrint = centralPriceForRoll?.counter_unit === 'meters';
+    // УФ-планшет (flatbed_m2) считает печать по м² отдельно; рулонная логика (пог. м) к материалам не применяется,
+    // даже если в центре цен для uv осталась запись counter_unit=meters.
+    const isRollPrint =
+      !isUvFlatbedMode && centralPriceForRoll?.counter_unit === 'meters';
     const plotterRollMode =
-      typeConfig?.plotter?.enabled === true && typeConfig?.plotter?.mode === 'roll';
+      !isUvFlatbedMode &&
+      typeConfig?.plotter?.enabled === true &&
+      typeConfig?.plotter?.mode === 'roll';
     const isRollMeterage = isRollPrint || plotterRollMode;
 
     // Офисный принтер, рулон или ручная норма вместимости (items_per_sheet_override): не привязываем

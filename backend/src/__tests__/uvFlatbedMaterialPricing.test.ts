@@ -85,6 +85,9 @@ describe('UV flatbed material quantity', () => {
         if (query.includes('FROM price_types')) {
           return null;
         }
+        if (query.includes('FROM print_prices') && query.includes('technology_code')) {
+          return { id: 9, counter_unit: 'meters', technology_code: 'uv' };
+        }
         return null;
       }),
       all: jest.fn(async () => []),
@@ -110,6 +113,25 @@ describe('UV flatbed material quantity', () => {
     expect(result.materialPrice).toBe(85 * sheetPrice);
     expect(result.materialDetails?.priceForQuantity).toBe(85 * sheetPrice);
     expect(result.finalPrice).toBe(100 + 85 * sheetPrice);
+  });
+
+  it('ignores counter_unit=meters for uv flatbed (no roll material qty 4.675)', async () => {
+    const result = await SimplifiedPricingService.calculatePrice(
+      1,
+      {
+        size_id: 'anchor',
+        material_id: materialId,
+        print_technology: 'uv',
+        trim_size: { width: 55, height: 85 },
+        uv_print: { color: { enabled: true, passes: 1 } },
+      },
+      85,
+    );
+
+    expect(result.layout?.sheetsNeeded).toBe(85);
+    expect(result.layout?.metersNeeded).toBeUndefined();
+    expect(result.materialPrice).toBe(85 * sheetPrice);
+    expect(result.materialPrice).not.toBeCloseTo(4.675 * sheetPrice, 2);
   });
 
   it('use_layout true + trim matches material sheet: sheetsNeeded equals quantity', async () => {
