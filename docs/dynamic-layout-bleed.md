@@ -28,3 +28,5 @@
 | `pricing_size_id` | ID строки размера в шаблоне для тарифов при `allow_custom_trim` |
 
 См. также [api-calculate-request-example.md](./api-calculate-request-example.md).
+
+**УФ-планшет:** при `uv_print.mode === 'flatbed_m2'` раскладка на лист не используется (`use_layout: false`); площадь считается по `trim_size`. См. [uv-flatbed-pricing.md](./uv-flatbed-pricing.md).

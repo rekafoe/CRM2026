@@ -40,6 +40,8 @@ function getSpecsKey(specs: any, customFormat?: { width: string; height: string 
     folding: specs.folding,
     roundCorners: specs.roundCorners,
     magnetic: specs.magnetic,
+    uv_print: specs.uv_print,
+    uv_use_custom_dimensions: specs.uv_use_custom_dimensions,
   });
 }
 

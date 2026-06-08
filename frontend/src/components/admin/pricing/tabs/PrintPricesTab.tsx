@@ -66,7 +66,9 @@ const PrintPricesTabComponent: React.FC<PrintPricesTabProps> = ({
               <div className="card-header">
                 <div className="card-title">
                   <h4>{item.technology_code}</h4>
-                  <span className="badge badge-secondary">{item.counter_unit === 'meters' ? 'Пог. метры' : 'Листы'}</span>
+                  <span className="badge badge-secondary">
+                    {item.counter_unit === 'meters' ? 'Пог. метры' : item.counter_unit === 'm2' ? 'Кв. метры (УФ)' : 'Листы'}
+                  </span>
                 </div>
                 <Button variant="primary" size="sm" onClick={() => onNavigateToEdit(item.id)}>
                   Изменить
@@ -93,10 +95,24 @@ const PrintPricesTabComponent: React.FC<PrintPricesTabProps> = ({
                       <div>Цвет/метр: {item.price_color_per_meter ?? '—'}</div>
                     </>
                   )}
+                  {item.counter_unit === 'm2' && (
+                    <>
+                      <div>Цвет/м²: {item.price_color_per_m2 ?? '—'}</div>
+                      <div>Белый/м²: {item.price_white_per_m2 ?? '—'}</div>
+                      <div>Лак/м²: {item.price_varnish_per_m2 ?? '—'}</div>
+                      <div>Мин. заказ: {item.min_charge ?? '—'} руб</div>
+                      <div>Стол: {item.max_width_mm ?? 600}×{item.max_height_mm ?? 900} мм</div>
+                    </>
+                  )}
                 </div>
                 {(item as any).tiers?.length > 0 && (
                   <div className="text-muted text-sm mt-2">
-                    Диапазонов: {(item as any).tiers.length}
+                    Диапазонов (листы): {(item as any).tiers.length}
+                  </div>
+                )}
+                {(item as any).m2_tiers?.length > 0 && (
+                  <div className="text-muted text-sm mt-2">
+                    Ступеней м²: {(item as any).m2_tiers.length}
                   </div>
                 )}
               </div>

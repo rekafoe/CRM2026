@@ -56,6 +56,7 @@ interface ParamsSectionProps {
   bindingVariantLocked?: boolean;
   bindingVariantId?: number;
   onBindingVariantChange?: (variantId: number | undefined) => void;
+  hideSimplifiedSizeSelect?: boolean;
 }
 
 export const ParamsSection: React.FC<ParamsSectionProps> = ({
@@ -77,6 +78,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
   bindingVariantLocked = false,
   bindingVariantId,
   onBindingVariantChange,
+  hideSimplifiedSizeSelect = false,
 }) => {
   const selectedBindingVariant =
     bindingVariantId != null
@@ -137,7 +139,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
         className={`params-grid compact${isMultiPageProduct ? ' params-grid--multipage' : ''}`}
       >
         {/* 🆕 Размер изделия для упрощённых продуктов (длинные названия — подсказка + обрезка) */}
-        {isSimplifiedProduct && (() => {
+        {isSimplifiedProduct && !hideSimplifiedSizeSelect && (() => {
           const sizeOptionLabel = selectedSize ? `${selectedSize.label} (${selectedSize.width_mm}×${selectedSize.height_mm} мм)` : '';
           return (
             <div className="param-group param-group--narrow param-group--size-block">

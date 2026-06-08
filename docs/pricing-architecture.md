@@ -88,6 +88,8 @@ console.log(result.calculationMethod);
 - `product_operations_link` - связь продукт→операции
 - `operation_pricing_rules` - правила ценообразования
 
+**УФ-планшет (м²):** отдельная ветка при `uv_print.mode === 'flatbed_m2'` в шаблоне — `UvFlatbedPricingService`, центральные ставки `print_prices.counter_unit = m2`. Подробно: **[uv-flatbed-pricing.md](./uv-flatbed-pricing.md)**. Настройка в интерфейсе: **[uv-flatbed-setup-guide.md](./uv-flatbed-setup-guide.md)**.
+
 ### 3. DynamicPricingService (Настройки)
 
 **Файл:** `backend/src/modules/pricing/services/dynamicPricingService.ts`

@@ -7,10 +7,17 @@ export interface PrintPriceTier {
   price_per_sheet: number
 }
 
+export interface PrintPriceM2Tier {
+  layer: 'color' | 'white' | 'varnish' | string
+  min_m2: number
+  max_m2?: number | null
+  price_per_m2: number
+}
+
 export interface PrintPrice {
   id: number
   technology_code: string
-  counter_unit: 'sheets' | 'meters'
+  counter_unit: 'sheets' | 'meters' | 'm2'
   sheet_width_mm?: number | null
   sheet_height_mm?: number | null
   price_bw_single: number | null
@@ -19,8 +26,15 @@ export interface PrintPrice {
   price_color_duplex: number | null
   price_bw_per_meter: number | null
   price_color_per_meter: number | null
+  price_color_per_m2?: number | null
+  price_white_per_m2?: number | null
+  price_varnish_per_m2?: number | null
+  min_charge?: number | null
+  max_width_mm?: number | null
+  max_height_mm?: number | null
   is_active: number
   tiers?: PrintPriceTier[]
+  m2_tiers?: PrintPriceM2Tier[]
 }
 
 export interface ServicePrice {

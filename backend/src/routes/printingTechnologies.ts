@@ -6,7 +6,7 @@ import { AuthenticatedRequest } from '../middleware'
 
 const router = Router()
 
-const validatePricingMode = (mode: string) => ['per_sheet', 'per_meter'].includes(mode)
+const validatePricingMode = (mode: string) => ['per_sheet', 'per_meter', 'per_m2'].includes(mode)
 
 async function tableExists(tableName: string) {
   const db = await getDb()

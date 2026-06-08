@@ -11,6 +11,11 @@ import { logger } from '../../../utils/logger';
 import { PricingServiceRepository } from '../repositories/serviceRepository';
 import { LayoutCalculationService } from './layoutCalculationService';
 import { PrintPriceService } from './printPriceService';
+import {
+  UvFlatbedPricingService,
+  type UvFlatbedPricingResult,
+  type UvPrintConfiguration,
+} from './uvFlatbedPricingService';
 import { PriceTypeService } from './priceTypeService';
 import { BindingPricingService, BindingQuoteResult } from './bindingPricingService';
 import {
@@ -123,6 +128,8 @@ export interface SimplifiedPricingResult {
     tier: { min_qty: number; max_qty?: number; price: number };
     priceForQuantity: number;
   };
+  /** УФ-планшет: разбивка по слоям */
+  uvPrintDetails?: UvFlatbedPricingResult;
   materialDetails?: {
     tier: { min_qty: number; max_qty?: number; price: number };
     priceForQuantity: number;
@@ -273,6 +280,13 @@ interface SimplifiedConfig {
   prepress?: { bleedMm?: number };
   /** Печать необязательна — только материал/плоттер без print_technology; цена печати 0 */
   print_optional?: boolean;
+  /** УФ-планшет: печать по м² (слои color/white/varnish) */
+  uv_print?: {
+    mode?: 'flatbed_m2';
+    layers?: Array<'color' | 'white' | 'varnish'>;
+    default_passes?: { color?: number; white?: number; varnish?: number };
+    dimensions_mode?: 'custom_only' | 'presets_and_custom';
+  };
   pages?: {
     options?: number[];
     default?: number;
@@ -345,6 +359,7 @@ export class SimplifiedPricingService {
       pricing_size_id?: number | string;
       plotter_weeding?: boolean;
       plotter_mounting?: boolean;
+      uv_print?: UvPrintConfiguration;
     },
     quantity: number
   ): Promise<SimplifiedPricingResult> {
@@ -391,6 +406,9 @@ export class SimplifiedPricingService {
     let sizesToUse: SimplifiedSizeConfig[] = simplifiedConfig.sizes ?? [];
     
     const typeConfig: SimplifiedTypeConfig | null = typeId && typeConfigs?.[typeId] ? typeConfigs[typeId] : null;
+    const uvTemplateConfig =
+      (typeConfig as SimplifiedConfig | null)?.uv_print ?? simplifiedConfig.uv_print;
+    const isUvFlatbedMode = uvTemplateConfig?.mode === 'flatbed_m2';
     if (typeId && typeConfigs?.[typeId]?.sizes?.length) {
       sizesToUse = typeConfigs[typeId].sizes;
       logger.info('Используем размеры из typeConfigs', { typeId, sizesCount: sizesToUse.length });
@@ -784,8 +802,35 @@ export class SimplifiedPricingService {
     // 4. Рассчитываем цену печати
     let printPrice = 0;
     let printDetails: SimplifiedPricingResult['printDetails'] | undefined;
-    
-    if (normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode) {
+    let uvPrintDetails: UvFlatbedPricingResult | undefined;
+
+    if (isUvFlatbedMode) {
+      const techCode = String(normalizedConfig.print_technology || 'uv').trim().toLowerCase() || 'uv';
+      normalizedConfig.print_technology = techCode;
+      const uvInput = (normalizedConfig as { uv_print?: UvPrintConfiguration }).uv_print;
+      uvPrintDetails = await UvFlatbedPricingService.calculate({
+        technologyCode: techCode,
+        trimWidthMm: layoutTrim.width,
+        trimHeightMm: layoutTrim.height,
+        quantity,
+        uvPrint: uvInput ?? {},
+      });
+      printPrice = uvPrintDetails.printPrice;
+      printDetails = {
+        tier: {
+          min_qty: 1,
+          max_qty: undefined,
+          price: quantity > 0 ? printPrice / quantity : printPrice,
+        },
+        priceForQuantity: printPrice,
+      };
+      logger.info('Цена УФ-печати (м²)', {
+        printPrice,
+        pieceAreaM2: uvPrintDetails.pieceAreaM2,
+        totalM2: uvPrintDetails.totalM2,
+        layers: uvPrintDetails.layers.length,
+      });
+    } else if (normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode) {
       const techNorm = (s: string) => (s ?? '').trim().toLowerCase();
       const printPriceConfig = selectedSize.print_prices.find(p =>
         techNorm(p.technology_code) === techNorm(normalizedConfig.print_technology!) &&
@@ -1996,7 +2041,12 @@ export class SimplifiedPricingService {
       bleedMm: resolvedBleedMm,
     };
     const warnings: string[] = [...pricingWarnings];
-    if (!isRollMeterage && !layoutCheck.fitsOnSheet) {
+    if (uvPrintDetails?.minChargeApplied) {
+      warnings.push(
+        `Применён минимальный заказ на печать УФ: ${uvPrintDetails.printPrice.toFixed(2)} BYN`,
+      );
+    }
+    if (!isUvFlatbedMode && !isRollMeterage && !layoutCheck.fitsOnSheet) {
       warnings.push(
         `Формат ${layoutTrim.width}×${layoutTrim.height} мм (обрез) не помещается на печатный лист. Проверьте размер, материал или дозаливку.`
       );
@@ -2065,11 +2115,19 @@ export class SimplifiedPricingService {
       },
       actualTrimMm: { width: layoutTrim.width, height: layoutTrim.height },
       layoutBleedMm: resolvedBleedMm,
-      selectedPrint: normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode ? {
-        technology_code: normalizedConfig.print_technology,
-        color_mode: normalizedConfig.print_color_mode,
-        sides_mode: normalizedConfig.print_sides_mode,
-      } : undefined,
+      selectedPrint: isUvFlatbedMode && normalizedConfig.print_technology
+        ? {
+            technology_code: normalizedConfig.print_technology,
+            color_mode: 'color' as const,
+            sides_mode: 'single' as const,
+          }
+        : normalizedConfig.print_technology && normalizedConfig.print_color_mode && normalizedConfig.print_sides_mode
+          ? {
+              technology_code: normalizedConfig.print_technology,
+              color_mode: normalizedConfig.print_color_mode,
+              sides_mode: normalizedConfig.print_sides_mode,
+            }
+          : undefined,
       selectedMaterial: normalizedConfig.material_id ? {
         material_id: normalizedConfig.material_id,
         material_name: materialName,
@@ -2103,6 +2161,7 @@ export class SimplifiedPricingService {
       finalPrice,
       pricePerUnit,
       printDetails,
+      ...(uvPrintDetails ? { uvPrintDetails } : {}),
       materialDetails,
       baseMaterialDetails,
       finishingDetails: finishingDetails.length > 0 ? finishingDetails : undefined,

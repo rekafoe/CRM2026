@@ -97,6 +97,10 @@ export function buildOrderPayload({
       : {}),
     ...(result.specifications.base_material_id ? { base_material_id: result.specifications.base_material_id } : {}),
     ...(result.specifications.size_id ? { size_id: result.specifications.size_id } : {}),
+    ...(result.specifications.uv_print ? { uv_print: result.specifications.uv_print } : {}),
+    ...(result.specifications.uv_use_custom_dimensions != null
+      ? { uv_use_custom_dimensions: result.specifications.uv_use_custom_dimensions }
+      : {}),
     ...(materialTypeFromSelected ? { materialType: materialTypeFromSelected, paperType: materialTypeFromSelected } : {}),
   };
 

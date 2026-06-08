@@ -136,45 +136,63 @@ export class UnifiedPricingService {
       quantity
     );
     
+    const uvPrintOperationRows =
+      result.uvPrintDetails?.layers.map((layer) => ({
+        operationId: 0,
+        operationName: layer.label,
+        operationType: 'print' as const,
+        priceUnit: 'per_m2' as const,
+        unitPrice: layer.ratePerM2 * layer.passes,
+        quantity: Math.round(layer.areaM2PerPiece * layer.quantity * 10000) / 10000,
+        setupCost: 0,
+        totalCost: layer.totalCost,
+        appliedRules: layer.passes > 1 ? [`проходов: ${layer.passes}`] : undefined,
+        pricingSource: 'simplified' as const,
+        pricingKey: `uv:${layer.layer}`,
+        technologyCode: result.selectedPrint?.technology_code ?? 'uv',
+      })) ?? [];
+
     const printOperationRow =
-      result.printDetails &&
-      (() => {
-        const layout = result.layout;
-        const meters =
-          layout?.metersNeeded != null && Number.isFinite(Number(layout.metersNeeded))
-            ? Number(layout.metersNeeded)
-            : 0;
-        const sheets =
-          layout?.sheetsNeeded != null && Number.isFinite(Number(layout.sheetsNeeded))
-            ? Number(layout.sheetsNeeded)
-            : 0;
-        /** Фактический расход листов / п.м., как у строки материала — не тираж экземпляров */
-        let priceUnit: 'per_meter' | 'per_sheet' | 'per_item' = 'per_item';
-        let physQty = result.quantity;
-        if (meters > 0) {
-          priceUnit = 'per_meter';
-          physQty = meters;
-        } else if (sheets > 0) {
-          priceUnit = 'per_sheet';
-          physQty = sheets;
-        }
-        const q = physQty > 0 ? physQty : result.quantity;
-        const unitPrice = q > 0 ? result.printPrice / q : result.printDetails!.tier.price;
-        return {
-          operationId: 0,
-          operationName: 'Печать',
-          operationType: 'print',
-          priceUnit,
-          unitPrice,
-          quantity: q,
-          setupCost: 0,
-          totalCost: result.printPrice,
-          appliedRules: undefined,
-          pricingSource: 'simplified',
-          pricingKey: 'print',
-          technologyCode: result.selectedPrint?.technology_code,
-        };
-      })();
+      uvPrintOperationRows.length > 0
+        ? null
+        : result.printDetails &&
+          (() => {
+            const layout = result.layout;
+            const meters =
+              layout?.metersNeeded != null && Number.isFinite(Number(layout.metersNeeded))
+                ? Number(layout.metersNeeded)
+                : 0;
+            const sheets =
+              layout?.sheetsNeeded != null && Number.isFinite(Number(layout.sheetsNeeded))
+                ? Number(layout.sheetsNeeded)
+                : 0;
+            /** Фактический расход листов / п.м., как у строки материала — не тираж экземпляров */
+            let priceUnit: 'per_meter' | 'per_sheet' | 'per_item' = 'per_item';
+            let physQty = result.quantity;
+            if (meters > 0) {
+              priceUnit = 'per_meter';
+              physQty = meters;
+            } else if (sheets > 0) {
+              priceUnit = 'per_sheet';
+              physQty = sheets;
+            }
+            const q = physQty > 0 ? physQty : result.quantity;
+            const unitPrice = q > 0 ? result.printPrice / q : result.printDetails!.tier.price;
+            return {
+              operationId: 0,
+              operationName: 'Печать',
+              operationType: 'print',
+              priceUnit,
+              unitPrice,
+              quantity: q,
+              setupCost: 0,
+              totalCost: result.printPrice,
+              appliedRules: undefined,
+              pricingSource: 'simplified',
+              pricingKey: 'print',
+              technologyCode: result.selectedPrint?.technology_code,
+            };
+          })();
 
     // Преобразуем SimplifiedPricingResult в UnifiedPricingResult
     return {
@@ -230,6 +248,7 @@ export class UnifiedPricingService {
         })) ?? []),
       ],
       operations: [
+        ...uvPrintOperationRows,
         ...(printOperationRow ? [printOperationRow] : []),
         ...(result.breakdown?.coverPrice != null && result.breakdown.coverPrice > 0
           ? [{

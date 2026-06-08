@@ -37,6 +37,12 @@ import { useProductSelection } from './hooks/useProductSelection';
 import { buildOrderPayload } from './utils/orderPayloadBuilder';
 import { getServiceVariants } from '../../services/pricing/api';
 import { readBindingPagesLimits } from '../../utils/multipageBinding';
+import {
+  defaultUvPrintState,
+  getEffectiveUvPrintConfig,
+  hasEnabledUvLayer,
+  isUvFlatbedProduct,
+} from './utils/uvPrintConfig';
 
 const createInitialSpecs = (initialProductType?: string): ProductSpecs => ({
   productType: initialProductType || 'flyers',
@@ -577,7 +583,13 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
   // 🆕 Автоматический пересчет при изменении параметров
   // Не запускаем, если продукт требует печать, но параметры печати ещё не выбраны (избегаем лишних вызовов и логов)
   const requiresPrint = productRequiresPrint(backendProductSchema, effectiveSizes?.length ? effectiveSizes : undefined);
-  const hasPrintParams = Boolean(printTechnology && printColorMode);
+  const isUvFlatbed = isUvFlatbedProduct(
+    backendProductSchema,
+    hasProductTypes ? selectedTypeId : specs.typeId,
+  );
+  const hasPrintParams = isUvFlatbed
+    ? hasEnabledUvLayer((specs as { uv_print?: Record<string, unknown> }).uv_print as any)
+    : Boolean(printTechnology && printColorMode);
   const { instantCalculate } = useAutoCalculate({
     specs,
     selectedProduct,
@@ -641,8 +653,21 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         if (bind.variant_id != null) next.binding_variant_id = Number(bind.variant_id);
         if (bind.units_per_item != null) next.binding_units_per_item = Number(bind.units_per_item);
       }
+      const uvCfg = getEffectiveUvPrintConfig(backendProductSchema, null);
+      if (uvCfg?.mode === 'flatbed_m2') {
+        next.uv_print = defaultUvPrintState(uvCfg);
+        next.uv_use_custom_dimensions = uvCfg.dimensions_mode !== 'presets_and_custom';
+      } else {
+        delete next.uv_print;
+        delete next.uv_use_custom_dimensions;
+      }
       return next;
     });
+
+    const uvCfg = getEffectiveUvPrintConfig(backendProductSchema, null);
+    if (uvCfg?.mode === 'flatbed_m2' && uvCfg.dimensions_mode === 'custom_only') {
+      setIsCustomFormat(true);
+    }
 
     // Сбрасываем флаг взаимодействия, чтобы автопересчет не дергался лишний раз
     setUserInteracted(false);

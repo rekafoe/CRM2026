@@ -11,6 +11,12 @@ import { AdvancedSettingsSection } from './AdvancedSettingsSection';
 import { OperationsSection } from './OperationsSection';
 import { SelectedProductCard } from './SelectedProductCard';
 import { getHiddenPlotterRollFinFieldNamesForCalculator } from '../utils/simplifiedConfig';
+import { UvPrintSection } from './UvPrintSection';
+import {
+  getEffectiveUvPrintConfig,
+  isUvFlatbedProduct,
+  type UvPrintState,
+} from '../utils/uvPrintConfig';
 
 interface CalculatorSectionsProps {
   specs: ProductSpecs;
@@ -106,6 +112,14 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
     backendProductSchema?.template?.simplified,
     typeIdForPlotterFields ?? null
   );
+  const uvFlatbed = isUvFlatbedProduct(backendProductSchema, typeIdForPlotterFields);
+  const uvTemplateConfig = getEffectiveUvPrintConfig(backendProductSchema, typeIdForPlotterFields);
+  const uvPrint = ((specs as { uv_print?: UvPrintState }).uv_print ?? {}) as UvPrintState;
+  const uvUseCustom = (specs as { uv_use_custom_dimensions?: boolean }).uv_use_custom_dimensions !== false;
+  const showUvPresets =
+    uvTemplateConfig?.dimensions_mode === 'presets_and_custom' &&
+    Array.isArray(effectiveSizes) &&
+    effectiveSizes.length > 0;
 
   return (
     <div className="calculator-section-group calculator-section-unified">
@@ -157,7 +171,8 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           setCustomFormat={setCustomFormat}
           updateSpecs={updateSpecs}
           schema={backendProductSchema}
-          effectiveSizes={effectiveSizes}
+          effectiveSizes={uvFlatbed ? undefined : effectiveSizes}
+          hideSimplifiedSizeSelect={uvFlatbed}
           itemsPerSheet={result?.layout?.itemsPerSheet}
           effectivePages={effectivePages}
           isMultiPageProduct={isMultiPageProduct}
@@ -168,7 +183,35 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           onBindingVariantChange={onBindingVariantChange}
         />
 
+        {uvFlatbed ? (
+          <UvPrintSection
+            templateConfig={uvTemplateConfig}
+            uvPrint={uvPrint}
+            onUvPrintChange={(next) => updateSpecs({ uv_print: next } as Partial<ProductSpecs>)}
+            customWidth={customFormat.width}
+            customHeight={customFormat.height}
+            onCustomWidthChange={(v) => setCustomFormat((prev) => ({ ...prev, width: v }))}
+            onCustomHeightChange={(v) => setCustomFormat((prev) => ({ ...prev, height: v }))}
+            showPresetSizes={showUvPresets}
+            presetSizeId={(specs as any).size_id}
+            presetSizes={effectiveSizes}
+            useCustomDimensions={uvUseCustom}
+            onUseCustomDimensionsChange={(custom) =>
+              updateSpecs({ uv_use_custom_dimensions: custom } as Partial<ProductSpecs>)
+            }
+            onPresetSizeChange={(id) => {
+              const size = effectiveSizes?.find((s) => String(s.id) === String(id));
+              updateSpecs({
+                size_id: id,
+                format: size ? `${size.width_mm}×${size.height_mm}` : specs.format,
+              } as Partial<ProductSpecs>);
+            }}
+            validationErrors={validationErrors}
+          />
+        ) : null}
+
         <div className="unified-params-row">
+          {!uvFlatbed && (
           <PrintingSettingsSection
             printTechnology={printTechnology}
             printColorMode={printColorMode}
@@ -207,7 +250,8 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
                 : undefined
             }
           />
-          {!hasEffectiveSizes ? (
+          )}
+          {!hasEffectiveSizes || uvFlatbed ? (
           <MaterialsSection
           specs={{ 
             paperType: specs.paperType, 

@@ -4,6 +4,12 @@ import { calculatePrice as unifiedCalculatePrice } from '../../../services/prici
 import { parseFormatToTrimSize } from '../../../utils/formatUtils';
 import { resolveBleedMmForCalculateRequest } from '../utils/templateBleed';
 import { CalculationResult, ProductSpecs } from '../types/calculator.types';
+import {
+  hasEnabledUvLayer,
+  isUvFlatbedProduct,
+  serializeUvPrintForApi,
+  type UvPrintState,
+} from '../utils/uvPrintConfig';
 
 interface BuildSummaryOptions {
   isCustomFormat: boolean;
@@ -59,6 +65,14 @@ interface UseCalculatorPricingActionsReturn {
 /** Продукт «требует печать», только если в схеме явно заданы технологии/цены печати (иначе — продукт без печати: секция «Печать» не показывается, расчёт идёт без выбора типа/режима). */
 export function productRequiresPrint(schema: any, effectiveSizes?: any[]): boolean {
   if (!schema) return false;
+  const simp = schema.template?.simplified;
+  if (simp?.uv_print?.mode === 'flatbed_m2') return true;
+  const typeConfigs = simp?.typeConfigs;
+  if (typeConfigs && typeof typeConfigs === 'object') {
+    for (const tc of Object.values(typeConfigs) as Array<{ uv_print?: { mode?: string } }>) {
+      if (tc?.uv_print?.mode === 'flatbed_m2') return true;
+    }
+  }
   const constraints = schema.constraints;
   if (constraints?.allowed_print_technologies && Array.isArray(constraints.allowed_print_technologies) && constraints.allowed_print_technologies.length > 0) {
     return true;
@@ -176,10 +190,30 @@ export function useCalculatorPricingActions({
           resolveProductType(selectedProduct) ??
           specs.productType;
 
+        const uvFlatbed = isUvFlatbedProduct(
+          backendProductSchema,
+          specs.typeId ?? (specs as { type_id?: number }).type_id,
+        );
+        const uvPrintRaw = (specs as { uv_print?: UvPrintState }).uv_print;
+        const uvUseCustom = (specs as { uv_use_custom_dimensions?: boolean }).uv_use_custom_dimensions !== false;
+
         // Преобразуем format в trim_size для унификации
         let trimSize: { width: number; height: number } | undefined;
-        
-        if (isCustomFormat && customFormat.width && customFormat.height) {
+
+        if (uvFlatbed) {
+          if (uvUseCustom && customFormat.width && customFormat.height) {
+            const width = parseFloat(customFormat.width);
+            const height = parseFloat(customFormat.height);
+            if (!isNaN(width) && !isNaN(height) && width > 0 && height > 0) {
+              trimSize = { width, height };
+            }
+          } else if (!uvUseCustom && specs.size_id != null && effectiveSizes?.length) {
+            const size = effectiveSizes.find((s: any) => String(s.id) === String(specs.size_id));
+            if (size?.width_mm && size?.height_mm) {
+              trimSize = { width: Number(size.width_mm), height: Number(size.height_mm) };
+            }
+          }
+        } else if (isCustomFormat && customFormat.width && customFormat.height) {
           // Используем кастомный формат
           const width = parseFloat(customFormat.width);
           const height = parseFloat(customFormat.height);
@@ -207,7 +241,16 @@ export function useCalculatorPricingActions({
 
         // ✅ Параметры печати обязательны только для продуктов с печатью. Продукты без печати считаем без них.
         const requiresPrint = productRequiresPrint(backendProductSchema, effectiveSizes);
-        if (requiresPrint && (!printTechnology || !printColorMode)) {
+        if (uvFlatbed) {
+          if (!trimSize) {
+            if (!showToast) return;
+            throw new Error('Укажите размер изделия (ширина и высота в мм) для расчёта УФ-печати.');
+          }
+          if (!hasEnabledUvLayer(uvPrintRaw)) {
+            if (!showToast) return;
+            throw new Error('Включите хотя бы один слой УФ-печати с числом проходов ≥ 1.');
+          }
+        } else if (requiresPrint && (!printTechnology || !printColorMode)) {
           const missingParams = [];
           if (!printTechnology) missingParams.push('технология печати');
           if (!printColorMode) missingParams.push('режим цвета (чб/цвет)');
@@ -348,10 +391,18 @@ export function useCalculatorPricingActions({
           // Бэкенд должен использовать trim_size вместо размера из шаблона, если он указан
           ...(trimSize ? { trim_size: trimSize } : {}),
           // ✅ Добавляем параметры печати (обязательные для операций печати)
-          print_technology: printTechnology,
-          printTechnology,
-          print_color_mode: printColorMode,
-          printColorMode,
+          ...(uvFlatbed
+            ? {
+                print_technology: 'uv',
+                printTechnology: 'uv',
+                uv_print: serializeUvPrintForApi(uvPrintRaw),
+              }
+            : {
+                print_technology: printTechnology,
+                printTechnology,
+                print_color_mode: printColorMode,
+                printColorMode,
+              }),
           // 🆕 Для упрощённых продуктов передаем size_id, material_id и base_material_id
           ...(specs.size_id ? { size_id: specs.size_id } : {}),
           ...(specs.material_id ? { material_id: specs.material_id } : {}),
@@ -368,6 +419,9 @@ export function useCalculatorPricingActions({
           // Для allow_custom_trim: якорь тарифов при кастомном trim (оба поля читает бэкенд)
           ...((): Record<string, unknown> => {
             const simp = backendProductSchema?.template?.simplified as { allow_custom_trim?: boolean } | undefined;
+            if (uvFlatbed && trimSize && specs.size_id != null) {
+              return { pricing_size_id: specs.size_id };
+            }
             if (simp?.allow_custom_trim === true && isCustomFormat && trimSize && specs.size_id != null) {
               return { pricing_size_id: specs.size_id };
             }
@@ -433,7 +487,7 @@ export function useCalculatorPricingActions({
         });
         
         // ✅ Для продуктов с печатью параметры должны быть переданы; для продуктов без печати — нормально, что их нет
-        if (requiresPrint && (!configuration.print_technology || !configuration.print_color_mode)) {
+        if (!uvFlatbed && requiresPrint && (!configuration.print_technology || !configuration.print_color_mode)) {
           logger.info('⚠️ Параметры печати не переданы в конфигурацию!', {
             print_technology: configuration.print_technology,
             print_color_mode: configuration.print_color_mode

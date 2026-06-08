@@ -2198,3 +2198,36 @@
   margin-top: 12px;
 }
 
+.uv-template-layers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.uv-template-default-passes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.uv-template-pass-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.uv-template-pass-row .form-input--compact {
+  width: 72px;
+}
+
+.uv-template-actions {
+  margin-top: 8px;
+}
+
+.uv-template-preview {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--surface-muted, #f3f4f6);
+}
+

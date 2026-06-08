@@ -137,12 +137,19 @@ export const PrintPriceEditPage: React.FC = () => {
 
   const [form, setForm] = useState({
     technology_code: '',
-    counter_unit: 'sheets' as 'sheets' | 'meters',
+    counter_unit: 'sheets' as 'sheets' | 'meters' | 'm2',
     sheet_width_mm: 320,
     sheet_height_mm: 450,
     price_bw_per_meter: null as number | null,
     price_color_per_meter: null as number | null,
+    price_color_per_m2: null as number | null,
+    price_white_per_m2: null as number | null,
+    price_varnish_per_m2: null as number | null,
+    min_charge: 0,
+    max_width_mm: 600,
+    max_height_mm: 900,
     tiers: [] as PrintPriceTier[],
+    m2_tiers: [] as Array<{ layer: string; min_m2: number; max_m2?: number | null; price_per_m2: number }>,
   });
 
   const loadData = useCallback(async () => {
@@ -151,21 +158,28 @@ export const PrintPriceEditPage: React.FC = () => {
       setError(null);
       const [techRes, priceRes] = await Promise.all([
         api.get<{ code: string; name: string }[]>('/printing-technologies'),
-        isNew ? null : api.get<PrintPrice & { tiers?: PrintPriceTier[] }>(`/pricing/print-prices/${id}`),
+        isNew ? null : api.get<PrintPrice & { tiers?: PrintPriceTier[]; m2_tiers?: typeof form.m2_tiers }>(`/pricing/print-prices/${id}`),
       ]);
       setPrintTechnologies(Array.isArray(techRes.data) ? techRes.data : []);
 
       if (!isNew && priceRes?.data) {
-        const item = priceRes.data as PrintPrice & { tiers?: PrintPriceTier[] };
+        const item = priceRes.data as PrintPrice & { tiers?: PrintPriceTier[]; m2_tiers?: typeof form.m2_tiers };
         const loadedTiers = (item.tiers ?? []) as PrintPriceTier[];
         setForm({
           technology_code: item.technology_code || '',
-          counter_unit: (item.counter_unit as 'sheets' | 'meters') || 'sheets',
+          counter_unit: (item.counter_unit as 'sheets' | 'meters' | 'm2') || 'sheets',
           sheet_width_mm: (item as any).sheet_width_mm ?? 320,
           sheet_height_mm: (item as any).sheet_height_mm ?? 450,
           price_bw_per_meter: item.price_bw_per_meter ?? null,
           price_color_per_meter: item.price_color_per_meter ?? null,
+          price_color_per_m2: (item as any).price_color_per_m2 ?? null,
+          price_white_per_m2: (item as any).price_white_per_m2 ?? null,
+          price_varnish_per_m2: (item as any).price_varnish_per_m2 ?? null,
+          min_charge: (item as any).min_charge ?? 0,
+          max_width_mm: (item as any).max_width_mm ?? 600,
+          max_height_mm: (item as any).max_height_mm ?? 900,
           tiers: loadedTiers.length > 0 ? loadedTiers : PRICE_MODES.flatMap((m) => buildDefaultTiers(m.key)),
+          m2_tiers: Array.isArray((item as any).m2_tiers) ? (item as any).m2_tiers : [],
         });
       } else if (isNew) {
         setForm((prev) => ({
@@ -307,6 +321,7 @@ export const PrintPriceEditPage: React.FC = () => {
         sheet_width_mm: form.counter_unit === 'sheets' ? form.sheet_width_mm : undefined,
         sheet_height_mm: form.counter_unit === 'sheets' ? form.sheet_height_mm : undefined,
         tiers: form.counter_unit === 'sheets' ? form.tiers : undefined,
+        m2_tiers: form.counter_unit === 'm2' ? form.m2_tiers : undefined,
       };
       if (isNew) {
         await api.post('/pricing/print-prices', payload);
@@ -371,10 +386,11 @@ export const PrintPriceEditPage: React.FC = () => {
                 <select
                   className="form-control"
                   value={form.counter_unit}
-                  onChange={(e) => updateForm({ counter_unit: e.target.value as 'sheets' | 'meters' })}
+                  onChange={(e) => updateForm({ counter_unit: e.target.value as 'sheets' | 'meters' | 'm2' })}
                 >
                   <option value="sheets">Листы</option>
                   <option value="meters">Пог. метры</option>
+                  <option value="m2">Кв. метры (УФ-планшет)</option>
                 </select>
               </FormField>
             </div>
@@ -398,6 +414,31 @@ export const PrintPriceEditPage: React.FC = () => {
                   <span className="text-muted">SRA3 = 320×450</span>
                 </div>
               </FormField>
+            )}
+
+            {form.counter_unit === 'm2' && (
+              <>
+                <div className="form-grid mt-3">
+                  <FormField label="Цвет, руб/м² (база)">
+                    <input type="number" step="0.01" className="form-control" value={form.price_color_per_m2 ?? ''} onChange={(e) => updateForm({ price_color_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
+                  </FormField>
+                  <FormField label="Белый, руб/м² (база)">
+                    <input type="number" step="0.01" className="form-control" value={form.price_white_per_m2 ?? ''} onChange={(e) => updateForm({ price_white_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
+                  </FormField>
+                  <FormField label="Лак, руб/м² (база)">
+                    <input type="number" step="0.01" className="form-control" value={form.price_varnish_per_m2 ?? ''} onChange={(e) => updateForm({ price_varnish_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
+                  </FormField>
+                  <FormField label="Мин. заказ на печать (руб)">
+                    <input type="number" step="0.01" className="form-control" value={form.min_charge} onChange={(e) => updateForm({ min_charge: parseFloat(e.target.value) || 0 })} />
+                  </FormField>
+                  <FormField label="Макс. ширина стола (мм)">
+                    <input type="number" className="form-control" value={form.max_width_mm} onChange={(e) => updateForm({ max_width_mm: Number(e.target.value) || 600 })} />
+                  </FormField>
+                  <FormField label="Макс. высота стола (мм)">
+                    <input type="number" className="form-control" value={form.max_height_mm} onChange={(e) => updateForm({ max_height_mm: Number(e.target.value) || 900 })} />
+                  </FormField>
+                </div>
+              </>
             )}
 
             {form.counter_unit === 'meters' && (
@@ -803,6 +844,118 @@ export const PrintPriceEditPage: React.FC = () => {
                   </div>
                 )
               })()}
+            </div>
+          </div>
+        )}
+
+        {form.counter_unit === 'm2' && (
+          <div className="data-card mt-4">
+            <div className="card-header">
+              <h4>Ступени по объёму (м² тиража)</h4>
+              <p className="text-muted text-sm">
+                Ось: total_m² = площадь изделия × тираж. Для каждого слоя — своя шкала; если ступеней нет — базовые ставки выше.
+              </p>
+            </div>
+            <div className="card-content">
+              <table className="simplified-table simplified-table--compact">
+                <thead>
+                  <tr>
+                    <th>Слой</th>
+                    <th>От м²</th>
+                    <th>До м²</th>
+                    <th>Руб/м²</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {form.m2_tiers.map((tier, idx) => (
+                    <tr key={idx}>
+                      <td>
+                        <select
+                          className="form-control"
+                          value={tier.layer}
+                          onChange={(e) => {
+                            const next = [...form.m2_tiers]
+                            next[idx] = { ...next[idx], layer: e.target.value }
+                            updateForm({ m2_tiers: next })
+                          }}
+                        >
+                          <option value="color">Цвет</option>
+                          <option value="white">Белый</option>
+                          <option value="varnish">Лак</option>
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          step="0.001"
+                          className="form-control"
+                          value={tier.min_m2}
+                          onChange={(e) => {
+                            const next = [...form.m2_tiers]
+                            next[idx] = { ...next[idx], min_m2: parseFloat(e.target.value) || 0 }
+                            updateForm({ m2_tiers: next })
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          step="0.001"
+                          className="form-control"
+                          placeholder="∞"
+                          value={tier.max_m2 ?? ''}
+                          onChange={(e) => {
+                            const next = [...form.m2_tiers]
+                            next[idx] = {
+                              ...next[idx],
+                              max_m2: e.target.value ? parseFloat(e.target.value) : null,
+                            }
+                            updateForm({ m2_tiers: next })
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="form-control"
+                          value={tier.price_per_m2}
+                          onChange={(e) => {
+                            const next = [...form.m2_tiers]
+                            next[idx] = { ...next[idx], price_per_m2: parseFloat(e.target.value) || 0 }
+                            updateForm({ m2_tiers: next })
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => updateForm({ m2_tiers: form.m2_tiers.filter((_, i) => i !== idx) })}
+                        >
+                          Удалить
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-3"
+                onClick={() =>
+                  updateForm({
+                    m2_tiers: [
+                      ...form.m2_tiers,
+                      { layer: 'color', min_m2: 0, max_m2: null, price_per_m2: 0 },
+                    ],
+                  })
+                }
+              >
+                + Добавить ступень
+              </Button>
             </div>
           </div>
         )}

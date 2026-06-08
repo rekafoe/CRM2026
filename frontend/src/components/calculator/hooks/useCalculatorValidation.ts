@@ -8,6 +8,7 @@ import {
   getCoverAllowedMaterialIds,
   isSeparateCoverMode,
 } from '../../../utils/multipageCoverMaterials';
+import { hasEnabledUvLayer, isUvFlatbedProduct } from '../utils/uvPrintConfig';
 
 export interface CalculatorValidationResult {
   errors: Record<string, string>;
@@ -200,6 +201,20 @@ function computeErrors(params: {
     const height = parseFloat(customFormat.height);
     if (!width || !height || width <= 0 || height <= 0) {
       errors.format = 'Введите корректные размеры формата';
+    }
+  }
+
+  if (isUvFlatbedProduct(backendProductSchema, specs.typeId)) {
+    if (!hasEnabledUvLayer(specs.uv_print)) {
+      errors.uv_print = 'Включите хотя бы один слой УФ-печати';
+    }
+    const useCustom = specs.uv_use_custom_dimensions !== false;
+    if (useCustom) {
+      const width = parseFloat(customFormat.width);
+      const height = parseFloat(customFormat.height);
+      if (!width || !height || width <= 0 || height <= 0) {
+        errors.trim_size = 'Укажите ширину и высоту изделия (мм)';
+      }
     }
   }
 

@@ -43,6 +43,15 @@ export type MultiPageBlockPrintConfig = {
   sides_mode?: 'single' | 'duplex' | 'duplex_bw_back';
 }
 
+export type UvPrintLayerKey = 'color' | 'white' | 'varnish'
+
+export type SimplifiedUvPrintConfig = {
+  mode: 'flatbed_m2'
+  layers?: UvPrintLayerKey[]
+  default_passes?: Partial<Record<UvPrintLayerKey, number>>
+  dimensions_mode?: 'custom_only' | 'presets_and_custom'
+}
+
 export type MultiPageStructureConfig = {
   innerBlock?: {
     pagesSource?: 'parameter' | 'fixed';
@@ -177,6 +186,8 @@ export type SimplifiedTypeConfig = {
    * Не задано или пусто — для подтипа действуют все типы цен, разрешённые для продукта.
    */
   allowed_price_types?: string[];
+  /** УФ-планшет: расчёт по м², слои и дефолты проходов */
+  uv_print?: SimplifiedUvPrintConfig;
 }
 
 /**
@@ -216,6 +227,8 @@ export type SimplifiedConfig = {
   allow_optimal_sheet_fallback?: boolean;
   /** Печать необязательна — только материал / плоттер без технологии печати */
   print_optional?: boolean;
+  /** УФ-планшет (legacy без типов продукта) */
+  uv_print?: SimplifiedUvPrintConfig;
 }
 
 function toTypeConfigKey(id: ProductTypeId): string {

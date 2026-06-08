@@ -1,18 +1,36 @@
 import { getDb } from '../../../db';
 
+export type PrintPriceCounterUnit = 'sheets' | 'meters' | 'm2';
+
+export interface PrintPriceM2TierDTO {
+  layer: 'color' | 'white' | 'varnish';
+  min_m2: number;
+  max_m2?: number | null;
+  price_per_m2: number;
+}
+
 export interface PrintPriceDTO {
   id: number;
   technology_code: string;
-  counter_unit: 'sheets' | 'meters';
+  counter_unit: PrintPriceCounterUnit;
   price_bw_single: number | null;
   price_bw_duplex: number | null;
   price_color_single: number | null;
   price_color_duplex: number | null;
   price_bw_per_meter: number | null;
   price_color_per_meter: number | null;
+  price_color_per_m2?: number | null;
+  price_white_per_m2?: number | null;
+  price_varnish_per_m2?: number | null;
+  min_charge?: number | null;
+  max_width_mm?: number | null;
+  max_height_mm?: number | null;
+  sheet_width_mm?: number | null;
+  sheet_height_mm?: number | null;
   is_active: number;
   created_at?: string;
   updated_at?: string;
+  m2_tiers?: PrintPriceM2TierDTO[];
 }
 
 export type CreatePrintPriceDTO = Omit<PrintPriceDTO, 'id' | 'created_at' | 'updated_at'>;

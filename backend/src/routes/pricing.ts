@@ -7,6 +7,12 @@ import { PriceTypeService } from '../modules/pricing/services/priceTypeService'
 import { PricingServiceRepository } from '../modules/pricing/repositories/serviceRepository'
 import { PlotterCuttingTariffRepository } from '../modules/pricing/repositories/plotterCuttingTariffRepository'
 import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
+import {
+  UvFlatbedPricingService,
+  calculateUvFlatbedPrice,
+  normalizeUvPrintConfig,
+  type UvPrintConfiguration,
+} from '../modules/pricing/services/uvFlatbedPricingService'
 
 console.log('Loading pricing routes...')
 
@@ -45,6 +51,29 @@ const toTierResponse = (tier: any) => ({
   isActive: tier.isActive,
   is_active: tier.isActive,
 })
+
+/** Сохранить ступени УФ по м² (по слоям) */
+async function upsertPrintPriceM2Tiers(
+  db: any,
+  printPriceId: number,
+  m2Tiers: Array<{ layer: string; min_m2: number; max_m2?: number | null; price_per_m2: number }> | undefined,
+) {
+  if (!m2Tiers || !Array.isArray(m2Tiers) || m2Tiers.length === 0) return
+  try {
+    await db.run('DELETE FROM print_price_m2_tiers WHERE print_price_id = ?', [printPriceId])
+    for (const t of m2Tiers) {
+      const layer = String(t.layer || '').toLowerCase()
+      if (!['color', 'white', 'varnish'].includes(layer) || t.min_m2 == null) continue
+      await db.run(
+        `INSERT INTO print_price_m2_tiers (print_price_id, layer, min_m2, max_m2, price_per_m2)
+         VALUES (?, ?, ?, ?, ?)`,
+        [printPriceId, layer, t.min_m2, t.max_m2 ?? null, t.price_per_m2 ?? 0],
+      )
+    }
+  } catch (e) {
+    console.warn('print_price_m2_tiers not available:', e)
+  }
+}
 
 /** Сохранить диапазоны цен печати (по листам) */
 async function upsertPrintPriceTiers(db: any, printPriceId: number, tiers: Array<{ price_mode: string; min_sheets: number; max_sheets?: number; price_per_sheet: number }> | undefined) {
@@ -321,6 +350,12 @@ router.get('/print-prices', asyncHandler(async (req, res) => {
         pp.price_color_duplex,
         pp.price_bw_per_meter,
         pp.price_color_per_meter,
+        pp.price_color_per_m2,
+        pp.price_white_per_m2,
+        pp.price_varnish_per_m2,
+        pp.min_charge,
+        pp.max_width_mm,
+        pp.max_height_mm,
         pp.is_active,
         pp.created_at,
         pp.updated_at
@@ -346,6 +381,24 @@ router.get('/print-prices', asyncHandler(async (req, res) => {
       })
     } catch {
       printPrices.forEach((pp: any) => { pp.tiers = [] })
+    }
+    try {
+      const m2Tiers = await db.all<any>(`
+        SELECT print_price_id, layer, min_m2, max_m2, price_per_m2
+        FROM print_price_m2_tiers
+        ORDER BY print_price_id, layer, min_m2
+      `)
+      const m2ByPp = m2Tiers.reduce((acc: Record<number, any[]>, t: any) => {
+        const id = t.print_price_id
+        if (!acc[id]) acc[id] = []
+        acc[id].push({ layer: t.layer, min_m2: t.min_m2, max_m2: t.max_m2, price_per_m2: t.price_per_m2 })
+        return acc
+      }, {})
+      printPrices.forEach((pp: any) => {
+        pp.m2_tiers = m2ByPp[pp.id] || []
+      })
+    } catch {
+      printPrices.forEach((pp: any) => { pp.m2_tiers = [] })
     }
     res.json(printPrices)
   } catch (error) {
@@ -486,6 +539,69 @@ router.get('/print-prices/derive', asyncHandler(async (req, res) => {
   }
 }))
 
+// GET /api/pricing/print-prices/derive-m2 — превью цены УФ по м²
+router.get('/print-prices/derive-m2', asyncHandler(async (req, res) => {
+  const {
+    technology_code = 'uv',
+    width_mm,
+    height_mm,
+    quantity = '1',
+    uv_print: uvPrintRaw,
+  } = req.query as Record<string, string | undefined>
+
+  const w = Number(width_mm)
+  const h = Number(height_mm)
+  const qty = Math.max(1, Math.floor(Number(quantity) || 1))
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+    res.status(400).json({ error: 'width_mm и height_mm обязательны и должны быть > 0' })
+    return
+  }
+
+  let uvPrint: UvPrintConfiguration = { color: { enabled: true, passes: 1 } }
+  if (uvPrintRaw) {
+    try {
+      uvPrint = typeof uvPrintRaw === 'string' ? JSON.parse(uvPrintRaw) : (uvPrintRaw as unknown as UvPrintConfiguration)
+    } catch {
+      res.status(400).json({ error: 'uv_print должен быть валидным JSON' })
+      return
+    }
+  }
+
+  try {
+    const rates = await UvFlatbedPricingService.loadRatesByTechnology(String(technology_code))
+    if (!rates) {
+      res.status(404).json({ error: `Цены м² для технологии ${technology_code} не найдены` })
+      return
+    }
+    const result = calculateUvFlatbedPrice({
+      trimWidthMm: w,
+      trimHeightMm: h,
+      quantity: qty,
+      uvPrint: normalizeUvPrintConfig(uvPrint),
+      rates,
+    })
+    const unitPrice = qty > 0 ? Math.round((result.printPrice / qty) * 100) / 100 : result.printPrice
+    res.json({
+      counter_unit: 'm2',
+      piece_area_m2: result.pieceAreaM2,
+      total_m2: result.totalM2,
+      quantity: qty,
+      unit_price: unitPrice,
+      total_price: result.printPrice,
+      min_charge_applied: result.minChargeApplied,
+      layers: result.layers,
+      rates: {
+        min_charge: rates.min_charge,
+        max_width_mm: rates.max_width_mm,
+        max_height_mm: rates.max_height_mm,
+      },
+    })
+  } catch (e: unknown) {
+    const err = e as { status?: number; message?: string }
+    res.status(err.status ?? 500).json({ error: err.message ?? 'Ошибка расчёта УФ' })
+  }
+}))
+
 function calcItemsPerSheet(itemW: number, itemH: number, sheetW: number, sheetH: number, customMarginMm?: number, customGapMm?: number): number {
   const MARGIN = customMarginMm ?? 5
   const GAP = customGapMm ?? 2
@@ -532,6 +648,15 @@ router.get('/print-prices/:id', asyncHandler(async (req, res) => {
       pp.tiers = tiers
     } catch {
       pp.tiers = []
+    }
+    try {
+      const m2Tiers = await db.all<any>(`
+        SELECT layer, min_m2, max_m2, price_per_m2
+        FROM print_price_m2_tiers WHERE print_price_id = ? ORDER BY layer, min_m2
+      `, [id])
+      pp.m2_tiers = m2Tiers
+    } catch {
+      pp.m2_tiers = []
     }
     res.json(pp)
   } catch (e) {
@@ -936,7 +1061,14 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
     price_color_duplex,
     price_bw_per_meter,
     price_color_per_meter,
-    tiers
+    price_color_per_m2,
+    price_white_per_m2,
+    price_varnish_per_m2,
+    min_charge,
+    max_width_mm,
+    max_height_mm,
+    tiers,
+    m2_tiers,
   } = req.body
 
   try {
@@ -955,10 +1087,16 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
         price_color_duplex,
         price_bw_per_meter,
         price_color_per_meter,
+        price_color_per_m2,
+        price_white_per_m2,
+        price_varnish_per_m2,
+        min_charge,
+        max_width_mm,
+        max_height_mm,
         is_active,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
     `, [
       technology_code,
       counter_unit || 'sheets',
@@ -969,11 +1107,18 @@ router.post('/print-prices', asyncHandler(async (req, res) => {
       price_color_single || 0,
       price_color_duplex || 0,
       price_bw_per_meter || null,
-      price_color_per_meter || null
+      price_color_per_meter || null,
+      price_color_per_m2 ?? null,
+      price_white_per_m2 ?? null,
+      price_varnish_per_m2 ?? null,
+      min_charge ?? 0,
+      max_width_mm ?? 600,
+      max_height_mm ?? 900,
     ])
 
     const id = result.lastID
     await upsertPrintPriceTiers(db, id, tiers)
+    await upsertPrintPriceM2Tiers(db, id, m2_tiers)
 
     res.json({
       id,
@@ -1574,8 +1719,15 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
     price_color_duplex,
     price_bw_per_meter,
     price_color_per_meter,
+    price_color_per_m2,
+    price_white_per_m2,
+    price_varnish_per_m2,
+    min_charge,
+    max_width_mm,
+    max_height_mm,
     is_active,
-    tiers
+    tiers,
+    m2_tiers,
   } = req.body
 
   try {
@@ -1594,6 +1746,12 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
         price_color_duplex = ?,
         price_bw_per_meter = ?,
         price_color_per_meter = ?,
+        price_color_per_m2 = ?,
+        price_white_per_m2 = ?,
+        price_varnish_per_m2 = ?,
+        min_charge = ?,
+        max_width_mm = ?,
+        max_height_mm = ?,
         is_active = ?,
         updated_at = datetime('now')
       WHERE id = ?
@@ -1608,11 +1766,18 @@ router.put('/print-prices/:id', asyncHandler(async (req, res) => {
       price_color_duplex || 0,
       price_bw_per_meter || null,
       price_color_per_meter || null,
+      price_color_per_m2 ?? null,
+      price_white_per_m2 ?? null,
+      price_varnish_per_m2 ?? null,
+      min_charge ?? 0,
+      max_width_mm ?? 600,
+      max_height_mm ?? 900,
       is_active !== undefined ? is_active : 1,
       id
     ])
 
     await upsertPrintPriceTiers(db, parseInt(id), tiers)
+    await upsertPrintPriceM2Tiers(db, parseInt(id), m2_tiers)
 
     res.json({
       id: parseInt(id),

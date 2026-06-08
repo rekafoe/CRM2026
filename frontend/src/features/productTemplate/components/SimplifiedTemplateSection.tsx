@@ -7,6 +7,8 @@ import type { SimplifiedConfig, SimplifiedSizeConfig, ProductTypeId } from '../h
 import { sortSizesByArea, getEffectiveAllowedMaterialIds } from '../hooks/useProductTemplate'
 import type { UseSimplifiedTypesResult } from '../hooks/useSimplifiedTypes'
 import { PrintPricesCard } from './PrintPricesCard'
+import { UvPrintCard } from './UvPrintCard'
+import type { SimplifiedUvPrintConfig } from '../hooks/useProductTemplate'
 import { MaterialsCard } from './MaterialsCard'
 import { FinishingCard } from './FinishingCard'
 import { SubtypeDesignsCard } from './SubtypeDesignsCard'
@@ -218,6 +220,28 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
       }
     },
     [selected, useOwnMaterials, updateSize, applyToCurrentConfig],
+  )
+
+  const effectiveUvPrint = useMemo((): SimplifiedUvPrintConfig | undefined => {
+    if (hasTypes && selectedTypeId != null) {
+      return effectiveConfig.uv_print
+    }
+    return value.uv_print
+  }, [hasTypes, selectedTypeId, effectiveConfig.uv_print, value.uv_print])
+
+  const updateUvPrint = useCallback(
+    (next: SimplifiedUvPrintConfig | undefined) => {
+      if (hasTypes && selectedTypeId != null) {
+        applyToCurrentConfig((prev) => {
+          const { uv_print: _removed, ...rest } = prev
+          return next ? { ...rest, uv_print: next } : rest
+        })
+      } else {
+        const { uv_print: _removed, ...rest } = value
+        onChange(next ? { ...rest, uv_print: next } : rest)
+      }
+    },
+    [hasTypes, selectedTypeId, applyToCurrentConfig, value, onChange],
   )
 
   const setUseOwnMaterials = useCallback(
@@ -1065,6 +1089,10 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
                 )}
 
                 {editorTab === 'print' && (
+                  <UvPrintCard config={effectiveUvPrint} onChange={updateUvPrint} />
+                )}
+
+                {editorTab === 'print' && effectiveUvPrint?.mode !== 'flatbed_m2' && (
                   <PrintPricesCard
                     selected={selected}
                     printTechs={printTechs}

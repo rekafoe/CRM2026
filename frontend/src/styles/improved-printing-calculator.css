@@ -2875,3 +2875,32 @@
   grid-column: 1 !important;
   min-width: 0;
 }
+
+/* УФ-планшет: слои и проходы */
+.uv-print-section .uv-print-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.uv-print-section .uv-print-layer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background: var(--surface-muted, #f9fafb);
+}
+
+.uv-print-section .uv-print-layer-passes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.uv-print-section .uv-print-layer-passes .form-control--compact {
+  width: 64px;
+}
