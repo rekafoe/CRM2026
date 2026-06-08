@@ -231,14 +231,20 @@ export const SimplifiedTemplateSection: React.FC<Props> = ({
 
   const updateUvPrint = useCallback(
     (next: SimplifiedUvPrintConfig | undefined) => {
+      const withLayoutFlag = (rest: SimplifiedConfig): SimplifiedConfig => {
+        if (next?.mode === 'flatbed_m2') {
+          return { ...rest, uv_print: next, use_layout: false }
+        }
+        return next ? { ...rest, uv_print: next } : rest
+      }
       if (hasTypes && selectedTypeId != null) {
         applyToCurrentConfig((prev) => {
           const { uv_print: _removed, ...rest } = prev
-          return next ? { ...rest, uv_print: next } : rest
+          return withLayoutFlag(rest)
         })
       } else {
         const { uv_print: _removed, ...rest } = value
-        onChange(next ? { ...rest, uv_print: next } : rest)
+        onChange(withLayoutFlag(rest))
       }
     },
     [hasTypes, selectedTypeId, applyToCurrentConfig, value, onChange],

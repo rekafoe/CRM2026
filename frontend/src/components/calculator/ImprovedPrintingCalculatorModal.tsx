@@ -611,6 +611,44 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   const instantCalculateRef = useRef(instantCalculate);
   instantCalculateRef.current = instantCalculate;
+  const prevCalcTriggerKeyRef = useRef('');
+
+  const setCustomFormatWithInteraction = useCallback(
+    (value: React.SetStateAction<{ width: string; height: string }>) => {
+      setUserInteracted(true);
+      setCustomFormat(value);
+    },
+    [setUserInteracted],
+  );
+
+  // УФ-планшет: после загрузки схемы/подтипа синхронизируем uv_print (UI показывал color по fallback, specs — пустые)
+  useEffect(() => {
+    if (!selectedProduct?.id || editContext?.item) return;
+    const typeId = hasProductTypes ? (selectedTypeId ?? specs.typeId ?? null) : (specs.typeId ?? null);
+    const uvCfg = getEffectiveUvPrintConfig(backendProductSchema, typeId);
+    if (uvCfg?.mode !== 'flatbed_m2') return;
+
+    setSpecs((prev) => {
+      if (hasEnabledUvLayer((prev as { uv_print?: Record<string, unknown> }).uv_print as any)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        uv_print: defaultUvPrintState(uvCfg),
+        uv_use_custom_dimensions:
+          (prev as { uv_use_custom_dimensions?: boolean }).uv_use_custom_dimensions ??
+          uvCfg.dimensions_mode !== 'presets_and_custom',
+      } as ProductSpecs;
+    });
+  }, [
+    selectedProduct?.id,
+    backendProductSchema,
+    hasProductTypes,
+    selectedTypeId,
+    specs.typeId,
+    editContext?.item,
+    setSpecs,
+  ]);
 
   // 🆕 При смене продукта сбрасываем завязанные на схему поля упрощенного продукта,
   // чтобы новые allowed_* и размеры/материалы подтянулись корректно
@@ -626,6 +664,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
       return;
     }
     prevProductIdRef.current = selectedProduct.id;
+    prevCalcTriggerKeyRef.current = '';
     setSelectedTypeId(null);
 
     setSpecs(prev => {
@@ -691,32 +730,69 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   // Параметры печати учтены в ключе useAutoCalculate (printTechnology / printColorMode) — отдельный эффект не нужен
 
-  // Автопересчёт при установке/смене material_id или при смене подтипа (typeId).
-  // material_id выставляется асинхронно MaterialsSection после загрузки материалов,
-  // поэтому стоимость материала не учитывалась при первом рендере. Вызываем calculateCost напрямую,
-  // т.к. instantCalculate требует userInteracted, а при первом открытии он может быть ещё false.
-  const prevCalcTriggerRef = useRef<{ materialId?: number; typeId?: number; productId?: number | null }>({});
+  // Автопересчёт при готовности параметров без userInteracted (материал, УФ-слои, trim).
   useEffect(() => {
-    if (!selectedProduct?.id || !specs.size_id || isCustomProduct || isPostprintProduct) return;
-    const current = { materialId: specs.material_id, typeId: specs.typeId, productId: selectedProduct.id };
-    const prev = prevCalcTriggerRef.current;
+    if (!selectedProduct?.id || isCustomProduct || isPostprintProduct || !isValid) return;
+    if (editContext?.item) return;
 
-    if (prev.productId !== current.productId) {
-      prevCalcTriggerRef.current = current;
+    const uvPrint = (specs as { uv_print?: Record<string, unknown> }).uv_print;
+    const uvUseCustom = (specs as { uv_use_custom_dimensions?: boolean }).uv_use_custom_dimensions !== false;
+
+    if (isUvFlatbed) {
+      if (!hasEnabledUvLayer(uvPrint as any)) return;
+      const trimReady = uvUseCustom
+        ? parseFloat(customFormat.width) > 0 && parseFloat(customFormat.height) > 0
+        : Boolean(specs.size_id);
+      if (!trimReady) return;
+
+      const key = `uv:${JSON.stringify({
+        productId: selectedProduct.id,
+        materialId: specs.material_id,
+        typeId: specs.typeId,
+        uv_print: uvPrint,
+        size_id: specs.size_id,
+        trim: uvUseCustom ? `${customFormat.width}x${customFormat.height}` : null,
+        quantity: specs.quantity,
+      })}`;
+      if (prevCalcTriggerKeyRef.current === key) return;
+      prevCalcTriggerKeyRef.current = key;
+      if (!userInteracted) {
+        void calculateCost(false);
+      }
       return;
     }
 
-    const materialChanged = current.materialId !== prev.materialId;
-    // Смена типа: либо явно другой typeId, либо первая установка типа (prev.typeId пустой)
-    const typeChanged = current.typeId !== prev.typeId;
+    if (!specs.size_id) return;
 
-    prevCalcTriggerRef.current = current;
-
-    // При userInteracted или редактировании пересчёт уже даёт useAutoCalculate по изменению specs
-    if ((materialChanged || typeChanged) && isValid && !userInteracted && !editContext?.item) {
+    const key = `std:${JSON.stringify({
+      productId: selectedProduct.id,
+      materialId: specs.material_id,
+      typeId: specs.typeId,
+    })}`;
+    if (prevCalcTriggerKeyRef.current === key) return;
+    const hadStdKey = prevCalcTriggerKeyRef.current.startsWith('std:');
+    prevCalcTriggerKeyRef.current = key;
+    if (!userInteracted && hadStdKey) {
       void calculateCost(false);
     }
-  }, [specs.material_id, specs.typeId, specs.size_id, selectedProduct?.id, isValid, calculateCost, isCustomProduct, isPostprintProduct, userInteracted, editContext?.item]);
+  }, [
+    selectedProduct?.id,
+    specs.material_id,
+    specs.typeId,
+    specs.size_id,
+    specs.quantity,
+    (specs as { uv_print?: unknown }).uv_print,
+    (specs as { uv_use_custom_dimensions?: boolean }).uv_use_custom_dimensions,
+    customFormat.width,
+    customFormat.height,
+    isUvFlatbed,
+    isValid,
+    calculateCost,
+    isCustomProduct,
+    isPostprintProduct,
+    userInteracted,
+    editContext?.item,
+  ]);
 
   const editModeCalculatedRef = useRef(false);
   useEffect(() => {
@@ -1153,7 +1229,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
                 isCustomFormat={isCustomFormat}
                 customFormat={customFormat}
                 setIsCustomFormat={setIsCustomFormat}
-                setCustomFormat={setCustomFormat}
+                setCustomFormat={setCustomFormatWithInteraction}
                 updateSpecs={updateSpecs}
                 backendProductSchema={backendProductSchema}
                 warehousePaperTypes={warehousePaperTypes}

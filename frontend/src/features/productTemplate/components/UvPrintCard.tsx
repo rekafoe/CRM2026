@@ -90,6 +90,7 @@ export const UvPrintCard: React.FC<UvPrintCardProps> = ({ config, onChange }) =>
           <strong>УФ-планшет (цена за м²)</strong>
           <p className="text-muted text-sm">
             Произвольный размер, слои цвет / белый / лак. Ставки — из центра цен, не дублируются в шаблоне.
+            При включении режима «Раскладка на лист» в шаблоне отключается автоматически (1 заготовка = 1 изделие).
           </p>
         </div>
       </div>

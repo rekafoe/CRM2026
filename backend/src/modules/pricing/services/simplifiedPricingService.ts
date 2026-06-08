@@ -2051,6 +2051,17 @@ export class SimplifiedPricingService {
         `Формат ${layoutTrim.width}×${layoutTrim.height} мм (обрез) не помещается на печатный лист. Проверьте размер, материал или дозаливку.`
       );
     }
+    if (
+      isUvFlatbedMode &&
+      useLayout &&
+      normalizedConfig.material_id &&
+      itemsPerSheet > 1
+    ) {
+      warnings.push(
+        `Материал считается по раскладке на лист склада (${itemsPerSheet} шт/лист), а не по числу изделий. ` +
+          'Для заготовок «1 изделие = 1 лист» отключите раскладку в шаблоне (флаг «Раскладка на лист» / use_layout: false).'
+      );
+    }
 
     // 9. Множитель типа цены (priceType): standard, online, urgent, promo, special
     const priceTypeKey = String(

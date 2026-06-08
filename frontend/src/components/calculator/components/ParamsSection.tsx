@@ -253,7 +253,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             <button 
               type="button"
               className="quantity-btn quantity-btn-minus"
-                  onClick={() => updateSpecs({ quantity: Math.max(minQty, safeQty - 1) })}
+                  onClick={() => updateSpecs({ quantity: Math.max(minQty, safeQty - 1) }, true)}
             >
               −
             </button>
@@ -272,7 +272,7 @@ export const ParamsSection: React.FC<ParamsSectionProps> = ({
             <button 
               type="button"
               className="quantity-btn quantity-btn-plus"
-                  onClick={() => updateSpecs({ quantity: Math.max(minQty, safeQty) + 1 })}
+                  onClick={() => updateSpecs({ quantity: Math.max(minQty, safeQty) + 1 }, true)}
             >
               +
             </button>

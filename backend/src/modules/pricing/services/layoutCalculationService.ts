@@ -37,6 +37,18 @@ export class LayoutCalculationService {
     layoutGap: 2        // 2мм между элементами при раскладке
   };
 
+  /** Обрез совпадает с листом материала (с допуском), с учётом поворота */
+  static trimMatchesSheetSize(trimSize: ProductSize, sheetSize: SheetSize, toleranceMm = 1): boolean {
+    const tw = trimSize.width;
+    const th = trimSize.height;
+    const sw = sheetSize.width;
+    const sh = sheetSize.height;
+    return (
+      (Math.abs(tw - sw) <= toleranceMm && Math.abs(th - sh) <= toleranceMm) ||
+      (Math.abs(tw - sh) <= toleranceMm && Math.abs(th - sw) <= toleranceMm)
+    );
+  }
+
   /**
    * Проверяет, помещается ли продукт на лист
    * @param trimSize — обрезной формат изделия (мм)
@@ -54,6 +66,19 @@ export class LayoutCalculationService {
     const margin = (customMarginMm != null && customMarginMm > 0) ? customMarginMm : this.MARGINS.printerMargins;
     const gap = (customGapMm != null && customGapMm >= 0) ? customGapMm : this.MARGINS.layoutGap;
     const bleed = Math.max(0, Number(bleedMm) || 0);
+
+    // Готовая заготовка = лист материала: одно изделие на лист, без nesting с полями принтера
+    if (this.trimMatchesSheetSize(trimSize, sheetSize)) {
+      return {
+        fitsOnSheet: true,
+        itemsPerSheet: 1,
+        wastePercentage: 0,
+        recommendedSheetSize: sheetSize,
+        layout: { rows: 1, cols: 1, actualItemsPerSheet: 1 },
+        cutsPerSheet: 4,
+      };
+    }
+
     const cellW = trimSize.width + 2 * bleed;
     const cellH = trimSize.height + 2 * bleed;
     const availableWidth = sheetSize.width - (margin * 2);

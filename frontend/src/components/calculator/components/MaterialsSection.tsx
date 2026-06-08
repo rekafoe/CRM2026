@@ -8,6 +8,20 @@ import { getMaterials } from '../../../api';
    * Плотность только из явных полей (без парсинга названия).
    * Поддерживаем варианты имён с бэкенда/форм.
    */
+function sameMaterialId(a: unknown, b: unknown): boolean {
+  if (a == null || b == null || a === '' || b === '') return false;
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na === nb;
+  return String(a) === String(b);
+}
+
+function materialRowTotal(m: { total?: number; totalCost?: number } | undefined): number {
+  if (!m) return 0;
+  const v = m.totalCost ?? m.total;
+  return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+}
+
 function getMaterialDensity(m: any): number | null {
   const raw =
     m?.density ??
@@ -140,6 +154,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     material_cost: number;
     sheets_needed: number;
     price_per_sheet: number;
+    base_material_cost?: number;
   } | null>(null);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   const [allMaterials, setAllMaterials] = useState<Array<{ id: number; name: string; unit?: string; price?: number; paper_type_id?: number; paper_type_name?: string; density?: number }>>([]);
@@ -236,39 +251,77 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
 
   // Стабильный «отпечаток» результата расчёта — НЕ кладём весь result в deps (новый объект каждый рендер → цикл: effect → calculateCost → родитель → result → effect).
   const resultMaterialFingerprint = useMemo(() => {
-    const m = result?.materials?.[0] as { total?: number; unitPrice?: number; price?: number } | undefined;
+    const materials = result?.materials ?? [];
+    const sheetMat =
+      specs.material_id != null
+        ? materials.find((m) => sameMaterialId((m as any).materialId ?? (m as any).material_id, specs.material_id))
+        : materials[0];
+    const baseMat =
+      specs.base_material_id != null
+        ? materials.find((m) =>
+            sameMaterialId((m as any).materialId ?? (m as any).material_id, specs.base_material_id),
+          )
+        : undefined;
     const layout = result?.layout as { sheetsNeeded?: number; metersNeeded?: number } | undefined;
-    if (!m || layout == null) return '';
+    if (!sheetMat || layout == null) return '';
     const sn = layout.sheetsNeeded;
     const mn = layout.metersNeeded;
     if (sn == null && mn == null) return '';
+    const sm = sheetMat as { total?: number; totalCost?: number; unitPrice?: number; price?: number };
+    const bm = baseMat as { total?: number; totalCost?: number } | undefined;
     return [
-      m.total ?? '',
-      m.unitPrice ?? m.price ?? '',
+      materialRowTotal(sm),
+      sm.unitPrice ?? sm.price ?? '',
+      materialRowTotal(bm),
       sn ?? '',
       mn ?? '',
     ].join('|');
   }, [
-    result?.materials?.[0]?.total,
-    (result?.materials?.[0] as any)?.unitPrice,
-    (result?.materials?.[0] as any)?.price,
+    result?.materials,
+    specs.material_id,
+    specs.base_material_id,
     result?.layout?.sheetsNeeded,
     (result?.layout as any)?.metersNeeded,
   ]);
 
   // Проверяем доступность и fallback-стоимость при смене параметров (без зависимости от result)
   useEffect(() => {
+    if (isSimplifiedProduct) {
+      if (specs.material_id && specs.quantity > 0) {
+        void calculateCost();
+      }
+      return;
+    }
     if (specs.paperType && specs.paperDensity && specs.quantity > 0) {
       checkAvailability();
       void calculateCost();
     }
-  }, [specs.paperType, specs.paperDensity, specs.quantity, specs.sides]);
+  }, [
+    isSimplifiedProduct,
+    specs.material_id,
+    specs.paperType,
+    specs.paperDensity,
+    specs.quantity,
+    specs.sides,
+  ]);
 
   // Когда с бэкенда пришёл новый расчёт — обновляем блок стоимости из result без повторного цикла по ссылке result
   useEffect(() => {
-    if (!resultMaterialFingerprint || !specs.paperType || !specs.paperDensity || specs.quantity <= 0) return;
+    if (!resultMaterialFingerprint || specs.quantity <= 0) return;
+    if (isSimplifiedProduct) {
+      if (!specs.material_id) return;
+    } else if (!specs.paperType || !specs.paperDensity) {
+      return;
+    }
     void calculateCost();
-  }, [resultMaterialFingerprint, specs.paperType, specs.paperDensity, specs.quantity]);
+  }, [
+    resultMaterialFingerprint,
+    isSimplifiedProduct,
+    specs.material_id,
+    specs.paperType,
+    specs.paperDensity,
+    specs.quantity,
+  ]);
 
   const checkAvailability = async () => {
     setIsCheckingAvailability(true);
@@ -290,17 +343,39 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     try {
       // ⚠️ ВАЖНО: Используем реальные данные из результата бэкенда, если они есть
       if (result?.materials && result.materials.length > 0 && result.layout?.sheetsNeeded) {
-        const material = result.materials[0]; // Берем первый материал
+        const sheetMaterial =
+          specs.material_id != null
+            ? result.materials.find((m) =>
+                sameMaterialId((m as any).materialId ?? (m as any).material_id, specs.material_id),
+              )
+            : result.materials[0];
+        const baseMaterial =
+          specs.base_material_id != null
+            ? result.materials.find((m) =>
+                sameMaterialId((m as any).materialId ?? (m as any).material_id, specs.base_material_id),
+              )
+            : undefined;
+
+        if (!sheetMaterial) return;
+
         const sheetsNeeded = result.layout.sheetsNeeded;
-        const pricePerSheet = (material.unitPrice ?? material.price ?? 0) as number;
-        const materialCost = (material.total ?? 0) as number;
-        
-        // Проверяем, что все значения валидны
-        if (typeof materialCost === 'number' && typeof pricePerSheet === 'number' && typeof sheetsNeeded === 'number') {
+        const pricePerSheet = Number(
+          (sheetMaterial as any).unitPrice ?? (sheetMaterial as any).price ?? 0,
+        );
+        const sheetCost = materialRowTotal(sheetMaterial as { total?: number; totalCost?: number });
+        const baseCost = materialRowTotal(baseMaterial as { total?: number; totalCost?: number } | undefined);
+        const totalMaterialCost = sheetCost + baseCost;
+
+        if (
+          Number.isFinite(pricePerSheet) &&
+          Number.isFinite(sheetsNeeded) &&
+          Number.isFinite(totalMaterialCost)
+        ) {
           setMaterialCost({
-            material_cost: materialCost,
+            material_cost: totalMaterialCost,
             sheets_needed: sheetsNeeded,
             price_per_sheet: pricePerSheet,
+            ...(baseCost > 0 ? { base_material_cost: baseCost } : {}),
           });
           return;
         }
@@ -962,6 +1037,36 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
           );
         })()}
       </div>
+
+      {/* Упрощённые / УФ: списание листов из последнего расчёта */}
+      {isSimplifiedProduct && specs.material_id && specs.quantity > 0 && materialCost && (
+        <div className="material-info-section material-info-section--simplified">
+          <div className="material-cost-info">
+            <div className="cost-breakdown">
+              <div className="cost-item">
+                <span className="cost-label">{uvFlatbed ? 'Цена за заготовку:' : 'Цена за лист:'}</span>
+                <span className="cost-value"><MoneyAmount value={materialCost.price_per_sheet} /></span>
+              </div>
+              <div className="cost-item">
+                <span className="cost-label">
+                  {uvFlatbed ? 'Списание (заготовок):' : 'Списание (листов материала):'}
+                </span>
+                <span className="cost-value">{materialCost.sheets_needed ?? 0} шт</span>
+              </div>
+              {materialCost.base_material_cost != null && materialCost.base_material_cost > 0 && (
+                <div className="cost-item">
+                  <span className="cost-label">Заготовка (основа):</span>
+                  <span className="cost-value"><MoneyAmount value={materialCost.base_material_cost} /></span>
+                </div>
+              )}
+              <div className="cost-item total">
+                <span className="cost-label">Стоимость материала:</span>
+                <span className="cost-value"><MoneyAmount value={materialCost.material_cost} /></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Информация о доступности и стоимости материалов (только для обычных продуктов) */}
       {!isSimplifiedProduct && specs.paperType && specs.paperDensity && specs.quantity > 0 && (

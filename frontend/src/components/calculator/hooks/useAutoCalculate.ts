@@ -32,9 +32,10 @@ function getSpecsKey(specs: any, customFormat?: { width: string; height: string 
     selectedOperations: specs.selectedOperations && Array.isArray(specs.selectedOperations) && specs.selectedOperations.length > 0
       ? JSON.stringify([...specs.selectedOperations].sort((a: any, b: any) => (a.operationId || 0) - (b.operationId || 0)))
       : undefined,
-    // ✅ Кастомный формат тоже важен для расчета
-    customFormat: isCustomFormat ? customFormat : undefined,
-    isCustomFormat: isCustomFormat || false,
+    // ✅ Кастомный формат и произвольный trim УФ-планшета влияют на расчёт
+    customFormat:
+      isCustomFormat || specs.uv_use_custom_dimensions !== false ? customFormat : undefined,
+    isCustomFormat: Boolean(isCustomFormat) || specs.uv_use_custom_dimensions !== false,
     // 🆕 Резка, фальцовка и др. влияют на цену
     cutting: specs.cutting,
     folding: specs.folding,
