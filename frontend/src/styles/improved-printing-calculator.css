@@ -2803,6 +2803,29 @@
   display: none;
 }
 
+/* УФ-планшет: без колонок «печати» — материалы на всю ширину, без горизонтального скролла */
+.unified-params-row.unified-params-row--uv-materials {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.unified-params-row.unified-params-row--uv-materials .form-section.compact,
+.unified-params-row.unified-params-row--uv-materials .materials-grid {
+  display: block;
+}
+
+.unified-params-row.unified-params-row--uv-materials .material-type-density-row {
+  flex-wrap: wrap;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.unified-params-row.unified-params-row--uv-materials .material-type-density-row > .param-group {
+  flex: 1 1 160px;
+  min-width: 0;
+  max-width: none;
+}
+
 /* Плотная сетка: узкие поля по ~200px, без пустого места */
 .calculator-section-unified .section-group-content .params-grid,
 .calculator-section-unified .section-group-content .materials-grid,
@@ -2898,9 +2921,26 @@
 .uv-print-section .uv-print-layer-passes {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
-.uv-print-section .uv-print-layer-passes .form-control--compact {
-  width: 64px;
+.uv-print-section .uv-print-layer-passes__label {
+  font-size: 13px;
+  color: #718096;
+  white-space: nowrap;
+}
+
+.uv-print-section .uv-print-passes-controls {
+  flex-shrink: 0;
+}
+
+.uv-print-section .uv-print-passes-input {
+  width: 48px;
+  min-width: 48px;
+}
+
+.uv-print-section .quantity-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

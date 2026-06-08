@@ -215,7 +215,7 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           />
         ) : null}
 
-        <div className="unified-params-row">
+        <div className={`unified-params-row${uvFlatbed ? ' unified-params-row--uv-materials' : ''}`}>
           {!uvFlatbed && (
           <PrintingSettingsSection
             printTechnology={printTechnology}
@@ -275,6 +275,8 @@ export const CalculatorSections: React.FC<CalculatorSectionsProps> = React.memo(
           result={result}
           effectiveSizes={effectiveSizes}
           materialSelectionResetKey={materialSelectionResetKey}
+          renderMaterialOnly={uvFlatbed}
+          uvFlatbed={uvFlatbed}
         />
           ) : null}
         </div>

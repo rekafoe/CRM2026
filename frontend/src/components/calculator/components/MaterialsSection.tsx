@@ -81,6 +81,8 @@ interface MaterialsSectionProps {
    * Сбрасывает локальный выбор типа бумаги/плотности — иначе после смены таба остаётся paper_type от прошлого подтипа и список материалов пустой/не тот.
    */
   materialSelectionResetKey?: string;
+  /** УФ-планшет: размер изделия задаётся в UvPrintSection, материалы берём по первому размеру шаблона */
+  uvFlatbed?: boolean;
 }
 
 export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
@@ -95,10 +97,19 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   renderMaterialOnly = false,
   effectiveSizes: effectiveSizesProp,
   materialSelectionResetKey,
+  uvFlatbed = false,
 }) => {
   const simplifiedSizesSource = Array.isArray(effectiveSizesProp) && effectiveSizesProp.length > 0
     ? effectiveSizesProp
     : schema?.template?.simplified?.sizes;
+
+  const sizeIdForMaterials = useMemo(() => {
+    if (specs.size_id != null && specs.size_id !== '') return specs.size_id;
+    if (uvFlatbed && Array.isArray(simplifiedSizesSource) && simplifiedSizesSource.length > 0) {
+      return simplifiedSizesSource[0].id;
+    }
+    return undefined;
+  }, [specs.size_id, uvFlatbed, simplifiedSizesSource]);
 
   /** Стабильный ключ: перезагрузка /materials только при смене подтипа/размеров/списков id, не при каждом рендере schema */
   const materialsReloadKey = useMemo(() => {
@@ -358,9 +369,9 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   // Важно: порядок как в шаблоне (allowed_material_ids), а не порядок строк в ответе /materials —
   // иначе дефолт «первый тип / первая плотность» уезжает на чужой тип (например DTF), если он раньше в API.
   const allowedMaterialsForSize = useMemo(() => {
-    if (!isSimplifiedProduct || !specs.size_id) return [];
+    if (!isSimplifiedProduct || !sizeIdForMaterials) return [];
 
-    const selectedSize = simplifiedSizesSource?.find((s: any) => String(s.id) === String(specs.size_id));
+    const selectedSize = simplifiedSizesSource?.find((s: any) => String(s.id) === String(sizeIdForMaterials));
     const ids = selectedSize?.allowed_material_ids;
     if (!selectedSize || !Array.isArray(ids) || ids.length === 0) return [];
 
@@ -378,12 +389,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       if (row) ordered.push(row);
     }
     return ordered;
-  }, [isSimplifiedProduct, specs.size_id, simplifiedSizesSource, allMaterials]);
+  }, [isSimplifiedProduct, sizeIdForMaterials, simplifiedSizesSource, allMaterials]);
 
   // 🆕 Разрешённые материалы-основы (заготовки) для выбранного размера — порядок как в шаблоне
   const allowedBaseMaterialsForSize = useMemo(() => {
-    if (!isSimplifiedProduct || !specs.size_id) return [];
-    const selectedSize = simplifiedSizesSource?.find((s: any) => String(s.id) === String(specs.size_id)) as { allowed_base_material_ids?: number[] } | undefined;
+    if (!isSimplifiedProduct || !sizeIdForMaterials) return [];
+    const selectedSize = simplifiedSizesSource?.find((s: any) => String(s.id) === String(sizeIdForMaterials)) as { allowed_base_material_ids?: number[] } | undefined;
     const ids = selectedSize?.allowed_base_material_ids;
     if (!Array.isArray(ids) || ids.length === 0) return [];
 
@@ -401,7 +412,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       if (row) ordered.push(row);
     }
     return ordered;
-  }, [isSimplifiedProduct, specs.size_id, simplifiedSizesSource, allMaterials]);
+  }, [isSimplifiedProduct, sizeIdForMaterials, simplifiedSizesSource, allMaterials]);
 
   // Нормализация для сравнения (без учёта регистра и пробелов)
   const normalizeForCompare = (s: string | null | undefined) =>
@@ -467,29 +478,29 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
 
   // Сбрасываем material_id, если он не входит в разрешённые для выбранного размера
   useEffect(() => {
-    if (isSimplifiedProduct && specs.size_id && specs.material_id) {
+    if (isSimplifiedProduct && sizeIdForMaterials && specs.material_id) {
       const isMaterialAllowed = allowedMaterialsForSize.some(m => Number(m.id) === specs.material_id);
       if (!isMaterialAllowed && allowedMaterialsForSize.length > 0) {
         // Материал больше не разрешён - сбрасываем
         updateSpecs({ material_id: undefined }, true);
       }
     }
-  }, [isSimplifiedProduct, specs.size_id, specs.material_id, allowedMaterialsForSize, updateSpecs]);
+  }, [isSimplifiedProduct, sizeIdForMaterials, specs.material_id, allowedMaterialsForSize, updateSpecs]);
 
   // Сбрасываем base_material_id, если он не входит в разрешённые для выбранного размера
   useEffect(() => {
-    if (isSimplifiedProduct && specs.size_id && specs.base_material_id && allowedBaseMaterialsForSize.length > 0) {
+    if (isSimplifiedProduct && sizeIdForMaterials && specs.base_material_id && allowedBaseMaterialsForSize.length > 0) {
       const isAllowed = allowedBaseMaterialsForSize.some(m => Number(m.id) === specs.base_material_id);
       if (!isAllowed) {
         updateSpecs({ base_material_id: undefined }, true);
       }
     }
-  }, [isSimplifiedProduct, specs.size_id, specs.base_material_id, allowedBaseMaterialsForSize, updateSpecs]);
+  }, [isSimplifiedProduct, sizeIdForMaterials, specs.base_material_id, allowedBaseMaterialsForSize, updateSpecs]);
 
   // Инициализация типа и плотности по текущему материалу (из разрешённых для продукта)
   // Не перезаписываем, если пользователь выбрал тип без плотностей — иначе «не даёт выбрать»
   useEffect(() => {
-    if (!isSimplifiedProduct || !specs.size_id || materialTypesFromMaterials.length === 0) return;
+    if (!isSimplifiedProduct || !sizeIdForMaterials || materialTypesFromMaterials.length === 0) return;
     // Если пользователь вручную выбрал тип, у которого нет плотностей — не перезаписывать из specs
     if (selectedMaterialType && densitiesForSelectedType.length === 0) {
       userChoseTypeRef.current = false;
@@ -511,12 +522,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
     } else if (materialTypesFromMaterials.length > 0 && !selectedMaterialType) {
       setSelectedMaterialType(materialTypesFromMaterials[0]);
     }
-  }, [isSimplifiedProduct, specs.size_id, materialTypesFromMaterials, specs.material_id, allowedMaterialsForSize, selectedMaterialType, densitiesForSelectedType]);
+  }, [isSimplifiedProduct, sizeIdForMaterials, materialTypesFromMaterials, specs.material_id, allowedMaterialsForSize, selectedMaterialType, densitiesForSelectedType]);
 
   // При смене типа — ставим первую плотность этого типа (или сбрасываем, если у типа нет плотностей).
   // Если плотность та же и подходит для нового типа — сразу синхронизируем material_id (пересчёт при смене типа при той же плотности).
   useEffect(() => {
-    if (!isSimplifiedProduct || !specs.size_id) return;
+    if (!isSimplifiedProduct || !sizeIdForMaterials) return;
     if (densitiesForSelectedType.length === 0) {
       setSelectedDensity('');
       if (specs.material_id != null && allowedMaterialsForSize.length > 0) {
@@ -554,12 +565,12 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         }, true);
       }
     }
-  }, [selectedMaterialType, densitiesForSelectedType, selectedDensity, isSimplifiedProduct, specs.size_id, specs.material_id, allowedMaterialsForSize.length, allowedMaterialsByType, warehousePaperTypes, updateSpecs]);
+  }, [selectedMaterialType, densitiesForSelectedType, selectedDensity, isSimplifiedProduct, sizeIdForMaterials, specs.material_id, allowedMaterialsForSize.length, allowedMaterialsByType, warehousePaperTypes, updateSpecs]);
 
   // По выбранным типу и плотности выставляем material_id и materialType (только при изменении — иначе рекурсия)
   // Не перезаписываем material_id, если он задан из initial и материал в разрешённых — ждём синхронизацию selectedMaterialType/selectedDensity из effect выше
   useEffect(() => {
-    if (!isSimplifiedProduct || !specs.size_id) return;
+    if (!isSimplifiedProduct || !sizeIdForMaterials) return;
     const material = materialByTypeAndDensity;
     if (!material) return;
     const paperType = warehousePaperTypes.length > 0 && (material as any).paper_type_name
@@ -576,7 +587,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
       material_id: material.id,
       ...(nextMaterialType ? { materialType: nextMaterialType as any } : {}),
     }, true);
-  }, [materialByTypeAndDensity, isSimplifiedProduct, specs.size_id, specs.material_id, specs.materialType, allowedMaterialsForSize, warehousePaperTypes, updateSpecs]);
+  }, [materialByTypeAndDensity, isSimplifiedProduct, sizeIdForMaterials, specs.material_id, specs.materialType, allowedMaterialsForSize, warehousePaperTypes, updateSpecs]);
 
 
   // Продукт без материалов (нет paperType в схеме и не упрощённый с размерами/материалами) — не показываем секцию
@@ -587,7 +598,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
 
   // Блок «Материал-основа» (заготовка) — показываем, если у размера есть allowed_base_material_ids
   const hasBaseMaterials = allowedBaseMaterialsForSize.length > 0;
-  const baseMaterialBlock = isSimplifiedProduct && specs.size_id && hasBaseMaterials ? (
+  const baseMaterialBlock = isSimplifiedProduct && sizeIdForMaterials && hasBaseMaterials ? (
     <div className="param-group param-group--narrow">
       <label>Материал-основа (заготовка)</label>
       <select
@@ -604,7 +615,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
   ) : null;
 
   // Блок «Тип материала» + «Плотность» + «Имя материала» в одну строку
-  const materialBlock = isSimplifiedProduct && specs.size_id ? (
+  const materialBlock = isSimplifiedProduct && sizeIdForMaterials ? (
     <div className="material-type-density-row">
       <div className="param-group param-group--narrow">
         <label>Тип материала <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>
@@ -678,9 +689,14 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
           <small><AppIcon name="info" size="xs" /> Для этого продукта доступны только выбранные типы бумаги: {allowedPaperTypes.join(', ')}</small>
         </div>
       )}
-      {isSimplifiedProduct && !specs.size_id && (
+      {isSimplifiedProduct && !sizeIdForMaterials && (
         <div className="alert alert-warning" style={{ fontSize: '0.85em', marginBottom: '1rem' }}>
-          <small><AppIcon name="warning" size="xs" /> Сначала выберите размер изделия в разделе "Параметры"</small>
+          <small>
+            <AppIcon name="warning" size="xs" />{' '}
+            {uvFlatbed
+              ? 'Для выбора материала настройте разрешённые материалы в шаблоне продукта'
+              : 'Сначала выберите размер изделия в разделе "Параметры"'}
+          </small>
         </div>
       )}
       <div className="materials-grid compact">
@@ -778,7 +794,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         )}
 
         {/* Материал-основа (заготовка) — для продуктов с allowed_base_material_ids */}
-        {hasBaseMaterials && isSimplifiedProduct && specs.size_id && (
+        {hasBaseMaterials && isSimplifiedProduct && sizeIdForMaterials && (
           <div className="param-group param-group--narrow">
             <label>Материал-основа (заготовка)</label>
             <select
@@ -795,7 +811,7 @@ export const MaterialsSection: React.FC<MaterialsSectionProps> = ({
         )}
 
         {/* Тип материала + Плотность + Имя материала в одну строку (из разрешённых для продукта материалов) */}
-        {isSimplifiedProduct && specs.size_id && (
+        {isSimplifiedProduct && sizeIdForMaterials && (
           <div className="material-type-density-row" style={{ gridColumn: '1 / -1' }}>
             <div className="param-group param-group--narrow">
               <label>Тип материала <span style={{ color: 'var(--danger, #c53030)' }}>*</span></label>

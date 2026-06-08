@@ -345,7 +345,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
             ? pageOptions[0]
             : prev.pages ?? 4;
 
-      return {
+      const next: ProductSpecs = {
         ...prev,
         typeId: typeId ?? undefined,
         typeName: typeVariant?.name ?? undefined,
@@ -364,8 +364,21 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
         ...(initial?.folding !== undefined ? { folding: initial.folding } : {}),
         ...(initial?.roundCorners !== undefined ? { roundCorners: initial.roundCorners } : {}),
       };
+
+      if (isNewType) {
+        const uvCfg = getEffectiveUvPrintConfig(backendProductSchema, typeId);
+        if (uvCfg?.mode === 'flatbed_m2') {
+          next.uv_print = defaultUvPrintState(uvCfg);
+          next.uv_use_custom_dimensions = uvCfg.dimensions_mode !== 'presets_and_custom';
+        } else {
+          delete (next as { uv_print?: unknown }).uv_print;
+          delete (next as { uv_use_custom_dimensions?: unknown }).uv_use_custom_dimensions;
+        }
+      }
+
+      return next;
     });
-  }, [simplified?.types, simplified?.typeConfigs, simplified?.pages, backendProductSchema?.operations, setSpecs]);
+  }, [simplified?.types, simplified?.typeConfigs, simplified?.pages, backendProductSchema, setSpecs]);
 
   // Выбор начального подтипа (тип материала): только при невалидном selectedTypeId, и не применяем один и тот же nextId повторно — иначе цикл смены типа.
   const lastAppliedTypeIdRef = useRef<number | null>(null);
@@ -508,15 +521,7 @@ export const ImprovedPrintingCalculatorModal: React.FC<ImprovedPrintingCalculato
 
   // Валидация вынесена в хук
   const { validationErrors, isValid, validateSpecs } = useCalculatorValidation({
-    specs: {
-      productType: specs.productType,
-      quantity: specs.quantity,
-      pages: specs.pages,
-      size_id: specs.size_id,
-      material_id: specs.material_id,
-      typeId: specs.typeId,
-      selectedOperations: specs.selectedOperations,
-    },
+    specs,
     backendProductSchema,
     isCustomFormat,
     customFormat,

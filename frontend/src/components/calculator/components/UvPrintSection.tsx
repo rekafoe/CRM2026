@@ -25,6 +25,12 @@ interface UvPrintSectionProps {
 }
 
 const ALL_LAYERS: UvPrintLayerKey[] = ['color', 'white', 'varnish'];
+const MIN_PASSES = 1;
+const MAX_PASSES = 5;
+
+function clampPasses(value: number): number {
+  return Math.max(MIN_PASSES, Math.min(MAX_PASSES, Math.floor(value) || MIN_PASSES));
+}
 
 export const UvPrintSection: React.FC<UvPrintSectionProps> = ({
   templateConfig,
@@ -129,19 +135,44 @@ export const UvPrintSection: React.FC<UvPrintSectionProps> = ({
               </label>
               {row.enabled && (
                 <div className="uv-print-layer-passes">
-                  <span className="text-sm text-muted">Проходов</span>
-                  <input
-                    type="number"
-                    className="form-control form-control--compact"
-                    min={1}
-                    max={5}
-                    value={row.passes}
-                    onChange={(e) =>
-                      updateLayer(layer, {
-                        passes: Math.max(1, Math.min(5, Number(e.target.value) || 1)),
-                      })
-                    }
-                  />
+                  <span className="uv-print-layer-passes__label">Проходов</span>
+                  <div className="quantity-controls uv-print-passes-controls">
+                    <button
+                      type="button"
+                      className="quantity-btn quantity-btn-minus"
+                      aria-label={`Меньше проходов: ${getLayerLabel(layer)}`}
+                      disabled={row.passes <= MIN_PASSES}
+                      onClick={() =>
+                        updateLayer(layer, { passes: clampPasses(row.passes - 1) })
+                      }
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      className="quantity-input uv-print-passes-input"
+                      min={MIN_PASSES}
+                      max={MAX_PASSES}
+                      value={row.passes}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        updateLayer(layer, {
+                          passes: raw === '' ? MIN_PASSES : clampPasses(Number(raw)),
+                        });
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="quantity-btn quantity-btn-plus"
+                      aria-label={`Больше проходов: ${getLayerLabel(layer)}`}
+                      disabled={row.passes >= MAX_PASSES}
+                      onClick={() =>
+                        updateLayer(layer, { passes: clampPasses(row.passes + 1) })
+                      }
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
