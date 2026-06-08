@@ -2,12 +2,39 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
-import { Button, FormField, Alert } from '../../components/common';
+import { Button, FormField, Alert, LoadingState } from '../../components/common';
+import { AppIcon } from '../../components/ui';
 import { api } from '../../api';
 import type { PrintPrice, PrintPriceTier } from '../../components/admin/hooks/usePricingManagementState';
 import '../../components/admin/PricingManagement.css';
 import { useTierRangeFloating, TIER_RANGE_POPOVER_Z_INDEX, tierModalFloatingRef } from '../../features/productTemplate/hooks/useTierRangeFloating';
 import { PriceCell } from '../../features/productTemplate/components/PriceCell';
+import { MoneyAmount } from '../../components/ui';
+import {
+  formatCounterUnit,
+  PRINTERS_PRINT_TAB_URL,
+  resolveTechnologyName,
+} from '../../components/admin/pricing/printPriceDisplay';
+
+const M2_LAYER_KEYS = ['color', 'white', 'varnish'] as const;
+type M2LayerKey = (typeof M2_LAYER_KEYS)[number];
+const M2_LAYER_LABELS: Record<M2LayerKey, string> = {
+  color: 'Цвет',
+  white: 'Белый',
+  varnish: 'Лак',
+};
+
+const PrintPriceModeLabel: React.FC<{ children: string; muted?: boolean; child?: boolean }> = ({
+  children,
+  muted,
+  child,
+}) => (
+  <span
+    className={`print-price-mode-label${muted ? ' print-price-mode-label--muted' : ''}${child ? ' print-price-mode-label--child' : ''}`}
+  >
+    {children}
+  </span>
+);
 
 const PRICE_MODES = [
   { key: 'color_single', label: 'Цвет, односторонняя' },
@@ -134,6 +161,13 @@ export const PrintPriceEditPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [printTechnologies, setPrintTechnologies] = useState<{ code: string; name: string }[]>([]);
+  const [m2LayerTab, setM2LayerTab] = useState<M2LayerKey>('color');
+  const [m2PreviewLoading, setM2PreviewLoading] = useState(false);
+  const [m2Preview, setM2Preview] = useState<{
+    unit_price: number;
+    total_price: number;
+    min_charge_applied: boolean;
+  } | null>(null);
 
   const [form, setForm] = useState({
     technology_code: '',
@@ -244,6 +278,26 @@ export const PrintPriceEditPage: React.FC = () => {
   );
 
   useEffect(() => {
+    const el = tierModalRef.current;
+    if (!el || !tierModal.isOpen) return;
+
+    el.style.zIndex = String(TIER_RANGE_POPOVER_Z_INDEX);
+
+    if (tierModal.anchorElement && tierRangeFloating.floatingStyles) {
+      const fs = tierRangeFloating.floatingStyles;
+      el.style.position = (fs.position as string) ?? 'fixed';
+      el.style.top = fs.top != null ? String(fs.top) : '';
+      el.style.left = fs.left != null ? String(fs.left) : '';
+      el.style.transform = fs.transform != null ? String(fs.transform) : '';
+    } else {
+      el.style.position = 'fixed';
+      el.style.top = '50%';
+      el.style.left = '50%';
+      el.style.transform = 'translate(-50%, -50%)';
+    }
+  }, [tierModal.isOpen, tierModal.anchorElement, tierRangeFloating.floatingStyles]);
+
+  useEffect(() => {
     if (!tierModal.isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
@@ -308,6 +362,53 @@ export const PrintPriceEditPage: React.FC = () => {
     })
   }, [])
 
+  const techDisplayName = form.technology_code
+    ? resolveTechnologyName(form.technology_code, printTechnologies)
+    : '';
+
+  const fetchM2Preview = async () => {
+    if (form.counter_unit !== 'm2' || !form.technology_code) return;
+    setM2PreviewLoading(true);
+    setError(null);
+    try {
+      const res = await api.get('/pricing/print-prices/derive-m2', {
+        params: {
+          technology_code: form.technology_code,
+          width_mm: 100,
+          height_mm: 100,
+          quantity: 1,
+          uv_print: JSON.stringify({ color: { enabled: true, passes: 1 } }),
+        },
+      });
+      setM2Preview({
+        unit_price: res.data.unit_price,
+        total_price: res.data.total_price,
+        min_charge_applied: res.data.min_charge_applied,
+      });
+    } catch {
+      setM2Preview(null);
+      setError('Превью недоступно: проверьте сохранённые центральные ставки для этой технологии.');
+    } finally {
+      setM2PreviewLoading(false);
+    }
+  };
+
+  const addM2TierForLayer = (layer: M2LayerKey) => {
+    const layerTiers = form.m2_tiers.filter((t) => t.layer === layer);
+    const maxMin = layerTiers.reduce((m, t) => Math.max(m, t.min_m2), -1);
+    const nextMin = maxMin >= 0 ? maxMin + 0.001 : 0;
+    updateForm({
+      m2_tiers: [
+        ...form.m2_tiers,
+        { layer, min_m2: nextMin, max_m2: null, price_per_m2: 0 },
+      ],
+    });
+  };
+
+  const m2TiersForActiveLayer = form.m2_tiers
+    .map((tier, idx) => ({ tier, idx }))
+    .filter(({ tier }) => tier.layer === m2LayerTab);
+
   const handleSave = async () => {
     if (!form.technology_code) {
       setError('Выберите технологию печати');
@@ -328,7 +429,7 @@ export const PrintPriceEditPage: React.FC = () => {
       } else {
         await api.put(`/pricing/print-prices/${id}`, payload);
       }
-      navigate('/adminpanel/printers');
+      navigate(PRINTERS_PRINT_TAB_URL);
     } catch (e) {
       setError('Ошибка сохранения');
       console.error(e);
@@ -339,8 +440,13 @@ export const PrintPriceEditPage: React.FC = () => {
 
   if (loading) {
     return (
-      <AdminPageLayout title="Загрузка..." icon="📄" onBack={() => navigate('/adminpanel/printers')}>
-        <div className="p-4">Загрузка...</div>
+      <AdminPageLayout
+        title="Загрузка..."
+        icon={<AppIcon name="document" size="md" />}
+        onBack={() => navigate(PRINTERS_PRINT_TAB_URL)}
+        className="pricing-page"
+      >
+        <LoadingState message="Загрузка цены печати..." />
       </AdminPageLayout>
     );
   }
@@ -348,24 +454,42 @@ export const PrintPriceEditPage: React.FC = () => {
   return (
     <AdminPageLayout
       title={isNew ? 'Новая цена печати' : `Редактирование: ${form.technology_code}`}
-      icon="📄"
-      onBack={() => navigate('/adminpanel/printers')}
+      icon={<AppIcon name="document" size="md" />}
+      onBack={() => navigate(PRINTERS_PRINT_TAB_URL)}
+      className="pricing-page"
       headerExtra={
         <Button variant="primary" onClick={handleSave} loading={saving}>
           Сохранить
         </Button>
       }
     >
-      <div className="print-price-edit-page">
+      <div className="print-price-edit-page pricing-glass">
         {error && (
           <Alert type="error" onClose={() => setError(null)} className="mb-4">
             {error}
           </Alert>
         )}
 
+        <div className="print-price-edit-page__breadcrumb">
+          Принтеры → Цены печати
+          {form.technology_code ? ` → ${techDisplayName}` : ''}
+        </div>
+
+        {form.technology_code && (
+          <div className="print-price-edit-page__chips">
+            <span className="pricing-chip">{form.technology_code}</span>
+            <span className="pricing-chip">{formatCounterUnit(form.counter_unit)}</span>
+            {form.counter_unit === 'm2' && (
+              <span className="pricing-chip">
+                стол {form.max_width_mm}×{form.max_height_mm} мм
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="data-card mb-4">
           <div className="card-header">
-            <h4>Основные параметры</h4>
+            <h4>Основное</h4>
           </div>
           <div className="card-content">
             <div className="form-grid">
@@ -397,7 +521,7 @@ export const PrintPriceEditPage: React.FC = () => {
 
             {form.counter_unit === 'sheets' && (
               <FormField label="Размер печатного листа (мм)" className="mt-3">
-                <div className="flex gap-2 align-center">
+                <div className="flex gap-2 items-center">
                   <input
                     type="number"
                     className="form-control"
@@ -416,55 +540,97 @@ export const PrintPriceEditPage: React.FC = () => {
               </FormField>
             )}
 
-            {form.counter_unit === 'm2' && (
-              <>
-                <div className="form-grid mt-3">
-                  <FormField label="Цвет, руб/м² (база)">
-                    <input type="number" step="0.01" className="form-control" value={form.price_color_per_m2 ?? ''} onChange={(e) => updateForm({ price_color_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
-                  </FormField>
-                  <FormField label="Белый, руб/м² (база)">
-                    <input type="number" step="0.01" className="form-control" value={form.price_white_per_m2 ?? ''} onChange={(e) => updateForm({ price_white_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
-                  </FormField>
-                  <FormField label="Лак, руб/м² (база)">
-                    <input type="number" step="0.01" className="form-control" value={form.price_varnish_per_m2 ?? ''} onChange={(e) => updateForm({ price_varnish_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
-                  </FormField>
-                  <FormField label="Мин. заказ на печать (руб)">
-                    <input type="number" step="0.01" className="form-control" value={form.min_charge} onChange={(e) => updateForm({ min_charge: parseFloat(e.target.value) || 0 })} />
-                  </FormField>
-                  <FormField label="Макс. ширина стола (мм)">
-                    <input type="number" className="form-control" value={form.max_width_mm} onChange={(e) => updateForm({ max_width_mm: Number(e.target.value) || 600 })} />
-                  </FormField>
-                  <FormField label="Макс. высота стола (мм)">
-                    <input type="number" className="form-control" value={form.max_height_mm} onChange={(e) => updateForm({ max_height_mm: Number(e.target.value) || 900 })} />
-                  </FormField>
-                </div>
-              </>
-            )}
-
-            {form.counter_unit === 'meters' && (
-              <div className="form-grid mt-3">
-                <FormField label="ЧБ, пог. метр">
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    value={form.price_bw_per_meter ?? ''}
-                    onChange={(e) => updateForm({ price_bw_per_meter: e.target.value ? parseFloat(e.target.value) : null })}
-                  />
-                </FormField>
-                <FormField label="Цвет, пог. метр">
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    value={form.price_color_per_meter ?? ''}
-                    onChange={(e) => updateForm({ price_color_per_meter: e.target.value ? parseFloat(e.target.value) : null })}
-                  />
-                </FormField>
-              </div>
-            )}
           </div>
         </div>
+
+        {(form.counter_unit === 'm2' || form.counter_unit === 'meters') && (
+          <div className="data-card mb-4">
+            <div className="card-header">
+              <h4>Ставки</h4>
+              <p className="text-muted text-sm">
+                {form.counter_unit === 'm2'
+                  ? 'Базовые руб/м² по слоям и минимум на позицию заказа.'
+                  : 'Плоские ставки за погонный метр.'}
+              </p>
+            </div>
+            <div className="card-content">
+              {form.counter_unit === 'm2' && (
+                <>
+                  <div className="form-grid">
+                    <FormField label="Цвет, руб/м² (база)">
+                      <input type="number" step="0.01" className="form-control" value={form.price_color_per_m2 ?? ''} onChange={(e) => updateForm({ price_color_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
+                    </FormField>
+                    <FormField label="Белый, руб/м² (база)">
+                      <input type="number" step="0.01" className="form-control" value={form.price_white_per_m2 ?? ''} onChange={(e) => updateForm({ price_white_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
+                    </FormField>
+                    <FormField label="Лак, руб/м² (база)">
+                      <input type="number" step="0.01" className="form-control" value={form.price_varnish_per_m2 ?? ''} onChange={(e) => updateForm({ price_varnish_per_m2: e.target.value ? parseFloat(e.target.value) : null })} />
+                    </FormField>
+                    <FormField label="Мин. заказ на печать">
+                      <input type="number" step="0.01" className="form-control" value={form.min_charge} onChange={(e) => updateForm({ min_charge: parseFloat(e.target.value) || 0 })} />
+                    </FormField>
+                    <FormField label="Макс. ширина стола (мм)">
+                      <input type="number" className="form-control" value={form.max_width_mm} onChange={(e) => updateForm({ max_width_mm: Number(e.target.value) || 600 })} />
+                    </FormField>
+                    <FormField label="Макс. высота стола (мм)">
+                      <input type="number" className="form-control" value={form.max_height_mm} onChange={(e) => updateForm({ max_height_mm: Number(e.target.value) || 900 })} />
+                    </FormField>
+                  </div>
+                  <div className="mt-3">
+                    <Button variant="secondary" size="sm" onClick={fetchM2Preview} loading={m2PreviewLoading}>
+                      Превью расчёта (100×100 мм, цвет 1 проход)
+                    </Button>
+                  </div>
+                  {m2Preview && (
+                    <div className="print-price-m2-preview">
+                      <div>
+                        За 1 шт.: <MoneyAmount value={m2Preview.unit_price} />
+                        {' · '}
+                        Позиция: <MoneyAmount value={m2Preview.total_price} />
+                      </div>
+                      {m2Preview.min_charge_applied && (
+                        <div className="text-muted text-sm">Применён минимальный заказ на печать</div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+              {form.counter_unit === 'meters' && (
+                <div className="form-grid">
+                  <FormField label="ЧБ, пог. метр">
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      value={form.price_bw_per_meter ?? ''}
+                      onChange={(e) => updateForm({ price_bw_per_meter: e.target.value ? parseFloat(e.target.value) : null })}
+                    />
+                  </FormField>
+                  <FormField label="Цвет, пог. метр">
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      value={form.price_color_per_meter ?? ''}
+                      onChange={(e) => updateForm({ price_color_per_meter: e.target.value ? parseFloat(e.target.value) : null })}
+                    />
+                  </FormField>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {form.counter_unit === 'meters' && (
+          <div className="data-card mb-4">
+            <div className="card-header">
+              <h4>Ступени</h4>
+            </div>
+            <div className="card-content text-muted text-sm">
+              Для погонного метра ступени по тиражу не настраиваются — используются плоские ставки выше.
+            </div>
+          </div>
+        )}
 
         {form.counter_unit === 'sheets' && (
           <div className="data-card">
@@ -507,7 +673,7 @@ export const PrintPriceEditPage: React.FC = () => {
                               <th key={ti} className="simplified-table__range-cell">
                                 <div className="cell">
                                   <span
-                                    style={{ cursor: 'pointer' }}
+                                    className="simplified-table__range-cell--clickable"
                                     onClick={(e) => {
                                       setTierModal({
                                         type: 'edit',
@@ -523,12 +689,12 @@ export const PrintPriceEditPage: React.FC = () => {
                                   <span>
                                     <button
                                       type="button"
-                                      className="el-button remove-range el-button--text el-button--mini"
-                                      style={{ color: 'red', marginRight: '-15px' }}
+                                      className="simplified-table__remove-range"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         updateAllModesRanges(removeRange(commonRanges, ti));
                                       }}
+                                      aria-label="Удалить диапазон"
                                     >
                                       ×
                                     </button>
@@ -540,11 +706,13 @@ export const PrintPriceEditPage: React.FC = () => {
                           <th>
                             <div className="cell">
                               <div className="simplified-row__add-range-wrapper">
-                                <button
+                                <Button
                                   type="button"
-                                  className="el-button el-button--info el-button--mini is-plain"
-                                  style={{ width: '100%', marginLeft: '0px' }}
+                                  variant="secondary"
+                                  size="sm"
+                                  className="simplified-row__add-range-btn"
                                   onClick={(e) => {
+                                    if (!e) return;
                                     e.stopPropagation();
                                     setTierModal({
                                       type: 'add',
@@ -555,7 +723,7 @@ export const PrintPriceEditPage: React.FC = () => {
                                   }}
                                 >
                                   + Диапазон
-                                </button>
+                                </Button>
                               </div>
                             </div>
                           </th>
@@ -565,47 +733,17 @@ export const PrintPriceEditPage: React.FC = () => {
                         {/* Полноцветная - родительская строка */}
                         <tr className="simplified-table__parent-row">
                           <td className="simplified-table__parent-cell">
-                            <div className="el-select el-select--small" style={{ width: '100%' }}>
-                              <div className="el-input el-input--small el-input--suffix">
-                                <input
-                                  type="text"
-                                  readOnly
-                                  className="el-input__inner"
-                                  value="полноцветная"
-                                  style={{ cursor: 'default', backgroundColor: '#f5f7fa' }}
-                                />
-                                <span className="el-input__suffix">
-                                  <span className="el-input__suffix-inner">
-                                    <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                  </span>
-                                </span>
-                              </div>
-                            </div>
+                            <PrintPriceModeLabel muted>полноцветная</PrintPriceModeLabel>
                           </td>
                           {commonRanges.map((_, ti) => (
-                            <td key={`color-empty-${ti}`} style={{ backgroundColor: '#f5f7fa' }}></td>
+                            <td key={`color-empty-${ti}`} className="simplified-table__parent-fill"></td>
                           ))}
-                          <td style={{ backgroundColor: '#f5f7fa' }}></td>
+                          <td className="simplified-table__parent-fill"></td>
                         </tr>
                         {/* Цвет, односторонняя */}
                         <tr className="simplified-table__child-row">
                           <td className="simplified-table__child-cell">
-                            <div className="el-select el-select--small" style={{ width: '100%' }}>
-                              <div className="el-input el-input--small el-input--suffix">
-                                <input
-                                  type="text"
-                                  readOnly
-                                  className="el-input__inner"
-                                  value="односторонняя"
-                                  style={{ cursor: 'default' }}
-                                />
-                                <span className="el-input__suffix">
-                                  <span className="el-input__suffix-inner">
-                                    <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                  </span>
-                                </span>
-                              </div>
-                            </div>
+                            <PrintPriceModeLabel child>односторонняя</PrintPriceModeLabel>
                           </td>
                           {commonRanges.map((t, ti) => {
                             const priceTier = form.tiers.find((rt) => rt.price_mode === 'color_single' && rt.min_sheets === t.min_sheets)
@@ -624,22 +762,7 @@ export const PrintPriceEditPage: React.FC = () => {
                         {/* Цвет, двусторонняя */}
                         <tr className="simplified-table__child-row">
                           <td className="simplified-table__child-cell">
-                            <div className="el-select el-select--small" style={{ width: '100%' }}>
-                              <div className="el-input el-input--small el-input--suffix">
-                                <input
-                                  type="text"
-                                  readOnly
-                                  className="el-input__inner"
-                                  value="двухсторонняя"
-                                  style={{ cursor: 'default' }}
-                                />
-                                <span className="el-input__suffix">
-                                  <span className="el-input__suffix-inner">
-                                    <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                  </span>
-                                </span>
-                              </div>
-                            </div>
+                            <PrintPriceModeLabel child>двухсторонняя</PrintPriceModeLabel>
                           </td>
                           {commonRanges.map((t, ti) => {
                             const priceTier = form.tiers.find((rt) => rt.price_mode === 'color_duplex' && rt.min_sheets === t.min_sheets)
@@ -658,47 +781,17 @@ export const PrintPriceEditPage: React.FC = () => {
                         {/* Черно-белая - родительская строка */}
                         <tr className="simplified-table__parent-row">
                           <td className="simplified-table__parent-cell">
-                            <div className="el-select el-select--small" style={{ width: '100%' }}>
-                              <div className="el-input el-input--small el-input--suffix">
-                                <input
-                                  type="text"
-                                  readOnly
-                                  className="el-input__inner"
-                                  value="черно-белая"
-                                  style={{ cursor: 'default', backgroundColor: '#f5f7fa' }}
-                                />
-                                <span className="el-input__suffix">
-                                  <span className="el-input__suffix-inner">
-                                    <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                  </span>
-                                </span>
-                              </div>
-                            </div>
+                            <PrintPriceModeLabel muted>черно-белая</PrintPriceModeLabel>
                           </td>
                           {commonRanges.map((_, ti) => (
-                            <td key={`bw-empty-${ti}`} style={{ backgroundColor: '#f5f7fa' }}></td>
+                            <td key={`bw-empty-${ti}`} className="simplified-table__parent-fill"></td>
                           ))}
-                          <td style={{ backgroundColor: '#f5f7fa' }}></td>
+                          <td className="simplified-table__parent-fill"></td>
                         </tr>
                         {/* ЧБ, односторонняя */}
                         <tr className="simplified-table__child-row">
                           <td className="simplified-table__child-cell">
-                            <div className="el-select el-select--small" style={{ width: '100%' }}>
-                              <div className="el-input el-input--small el-input--suffix">
-                                <input
-                                  type="text"
-                                  readOnly
-                                  className="el-input__inner"
-                                  value="односторонняя"
-                                  style={{ cursor: 'default' }}
-                                />
-                                <span className="el-input__suffix">
-                                  <span className="el-input__suffix-inner">
-                                    <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                  </span>
-                                </span>
-                              </div>
-                            </div>
+                            <PrintPriceModeLabel child>односторонняя</PrintPriceModeLabel>
                           </td>
                           {commonRanges.map((t, ti) => {
                             const priceTier = form.tiers.find((rt) => rt.price_mode === 'bw_single' && rt.min_sheets === t.min_sheets)
@@ -717,22 +810,7 @@ export const PrintPriceEditPage: React.FC = () => {
                         {/* ЧБ, двусторонняя */}
                         <tr className="simplified-table__child-row">
                           <td className="simplified-table__child-cell">
-                            <div className="el-select el-select--small" style={{ width: '100%' }}>
-                              <div className="el-input el-input--small el-input--suffix">
-                                <input
-                                  type="text"
-                                  readOnly
-                                  className="el-input__inner"
-                                  value="двухсторонняя"
-                                  style={{ cursor: 'default' }}
-                                />
-                                <span className="el-input__suffix">
-                                  <span className="el-input__suffix-inner">
-                                    <i className="el-select__caret el-input__icon el-icon-arrow-up"></i>
-                                  </span>
-                                </span>
-                              </div>
-                            </div>
+                            <PrintPriceModeLabel child>двухсторонняя</PrintPriceModeLabel>
                           </td>
                           {commonRanges.map((t, ti) => {
                             const priceTier = form.tiers.find((rt) => rt.price_mode === 'bw_duplex' && rt.min_sheets === t.min_sheets)
@@ -755,18 +833,7 @@ export const PrintPriceEditPage: React.FC = () => {
                     {tierModal.isOpen && createPortal(
                       <div
                         ref={tierModalFloatingRef(tierModalRef, tierRangeFloating.setFloating, Boolean(tierModal.anchorElement))}
-                        className="simplified-tier-modal"
-                        style={
-                          tierModal.anchorElement
-                            ? (tierRangeFloating.floatingStyles ?? { position: 'fixed' as const, zIndex: TIER_RANGE_POPOVER_Z_INDEX })
-                            : {
-                                position: 'fixed',
-                                top: '50%',
-                                left: '50%',
-                                transform: 'translate(-50%, -50%)',
-                                zIndex: TIER_RANGE_POPOVER_Z_INDEX,
-                              }
-                        }
+                        className="simplified-tier-modal pricing-glass"
                         onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -853,108 +920,110 @@ export const PrintPriceEditPage: React.FC = () => {
             <div className="card-header">
               <h4>Ступени по объёму (м² тиража)</h4>
               <p className="text-muted text-sm">
-                Ось: total_m² = площадь изделия × тираж. Для каждого слоя — своя шкала; если ступеней нет — базовые ставки выше.
+                Ось: total_m² = площадь изделия × тираж. Для каждого слоя — своя шкала; если ступеней нет — базовые
+                ставки из блока «Ставки».
               </p>
             </div>
             <div className="card-content">
+              <div className="print-price-m2-layer-tabs">
+                {M2_LAYER_KEYS.map((layer) => (
+                  <button
+                    key={layer}
+                    type="button"
+                    className={`print-price-m2-layer-tab ${m2LayerTab === layer ? 'print-price-m2-layer-tab--active' : ''}`}
+                    onClick={() => setM2LayerTab(layer)}
+                  >
+                    {M2_LAYER_LABELS[layer]}
+                    {' '}
+                    ({form.m2_tiers.filter((t) => t.layer === layer).length})
+                  </button>
+                ))}
+              </div>
               <table className="simplified-table simplified-table--compact">
                 <thead>
                   <tr>
-                    <th>Слой</th>
                     <th>От м²</th>
                     <th>До м²</th>
                     <th>Руб/м²</th>
-                    <th></th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {form.m2_tiers.map((tier, idx) => (
-                    <tr key={idx}>
-                      <td>
-                        <select
-                          className="form-control"
-                          value={tier.layer}
-                          onChange={(e) => {
-                            const next = [...form.m2_tiers]
-                            next[idx] = { ...next[idx], layer: e.target.value }
-                            updateForm({ m2_tiers: next })
-                          }}
-                        >
-                          <option value="color">Цвет</option>
-                          <option value="white">Белый</option>
-                          <option value="varnish">Лак</option>
-                        </select>
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          step="0.001"
-                          className="form-control"
-                          value={tier.min_m2}
-                          onChange={(e) => {
-                            const next = [...form.m2_tiers]
-                            next[idx] = { ...next[idx], min_m2: parseFloat(e.target.value) || 0 }
-                            updateForm({ m2_tiers: next })
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          step="0.001"
-                          className="form-control"
-                          placeholder="∞"
-                          value={tier.max_m2 ?? ''}
-                          onChange={(e) => {
-                            const next = [...form.m2_tiers]
-                            next[idx] = {
-                              ...next[idx],
-                              max_m2: e.target.value ? parseFloat(e.target.value) : null,
-                            }
-                            updateForm({ m2_tiers: next })
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="form-control"
-                          value={tier.price_per_m2}
-                          onChange={(e) => {
-                            const next = [...form.m2_tiers]
-                            next[idx] = { ...next[idx], price_per_m2: parseFloat(e.target.value) || 0 }
-                            updateForm({ m2_tiers: next })
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => updateForm({ m2_tiers: form.m2_tiers.filter((_, i) => i !== idx) })}
-                        >
-                          Удалить
-                        </Button>
+                  {m2TiersForActiveLayer.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="text-muted text-sm">
+                        Нет ступеней для слоя «{M2_LAYER_LABELS[m2LayerTab]}» — используется базовая ставка.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    m2TiersForActiveLayer.map(({ tier, idx }) => (
+                      <tr key={idx}>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.001"
+                            min={0}
+                            className="form-control"
+                            value={tier.min_m2}
+                            onChange={(e) => {
+                              const next = [...form.m2_tiers];
+                              next[idx] = { ...next[idx], min_m2: parseFloat(e.target.value) || 0 };
+                              updateForm({ m2_tiers: next });
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.001"
+                            className="form-control"
+                            placeholder="∞"
+                            value={tier.max_m2 ?? ''}
+                            onChange={(e) => {
+                              const next = [...form.m2_tiers];
+                              next[idx] = {
+                                ...next[idx],
+                                max_m2: e.target.value ? parseFloat(e.target.value) : null,
+                              };
+                              updateForm({ m2_tiers: next });
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            className="form-control"
+                            value={tier.price_per_m2}
+                            onChange={(e) => {
+                              const next = [...form.m2_tiers];
+                              next[idx] = { ...next[idx], price_per_m2: parseFloat(e.target.value) || 0 };
+                              updateForm({ m2_tiers: next });
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => updateForm({ m2_tiers: form.m2_tiers.filter((_, i) => i !== idx) })}
+                          >
+                            Удалить
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
               <Button
                 variant="secondary"
                 size="sm"
                 className="mt-3"
-                onClick={() =>
-                  updateForm({
-                    m2_tiers: [
-                      ...form.m2_tiers,
-                      { layer: 'color', min_m2: 0, max_m2: null, price_per_m2: 0 },
-                    ],
-                  })
-                }
+                onClick={() => addM2TierForLayer(m2LayerTab)}
               >
-                + Добавить ступень
+                + Добавить ступень ({M2_LAYER_LABELS[m2LayerTab]})
               </Button>
             </div>
           </div>

@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useState, Suspense, lazy, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button, Alert, FormField, LoadingState, Modal } from '../common';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  parsePricingTab,
+  searchPlaceholderForTab,
+  type PricingTabKey,
+} from './pricing/printPriceDisplay';
+import { Button, Alert, LoadingState, Modal } from '../common';
+import { AppIcon } from '../ui';
 import './PricingManagement.css';
 import { api } from '../../api';
 import { numberInputFromString, numberInputToNullable, type NumberInputValue } from '../../utils/numberInput';
@@ -25,7 +31,7 @@ const MarkupTab = lazy(() => import('./pricing/tabs/MarkupTab').then(m => ({ def
 const DiscountsTab = lazy(() => import('./pricing/tabs/DiscountsTab').then(m => ({ default: m.DiscountsTab })));
 const PriceTypesTab = lazy(() => import('./pricing/tabs/PriceTypesTab').then(m => ({ default: m.PriceTypesTab })));
 
-type PricingMode = 'per_sheet' | 'per_meter';
+type PricingMode = 'per_sheet' | 'per_meter' | 'per_m2';
 
 interface PrintTechnology {
   code: string;
@@ -61,12 +67,19 @@ interface PrinterRow {
 }
 
 interface PricingManagementProps {
-  initialTab?: 'tech' | 'printers' | 'print' | 'services' | 'markup' | 'discounts' | 'price-types';
+  initialTab?: PricingTabKey;
   mode?: 'full' | 'printing';
+  variant?: 'standalone' | 'embedded';
 }
 
-const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tech', mode = 'full' }) => {
+const PricingManagement: React.FC<PricingManagementProps> = ({
+  initialTab = 'tech',
+  mode = 'full',
+  variant = 'standalone',
+}) => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = parsePricingTab(searchParams.get('tab'), initialTab);
   const {
     state,
     setPrintPrices,
@@ -80,7 +93,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
     setEditingItem,
     setEditingValues,
     setSearchTerm,
-  } = usePricingManagementState(initialTab);
+  } = usePricingManagementState(tabFromUrl);
 
   const {
     printPrices,
@@ -278,46 +291,25 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
     setEditingValues({ ...item });
   }, []);
 
-  const handleAddPrintPrice = useCallback(() => {
-    const defaultTiers = [
-      { price_mode: 'color_single', min_sheets: 1, max_sheets: 4, price_per_sheet: 8 },
-      { price_mode: 'color_single', min_sheets: 5, max_sheets: 9, price_per_sheet: 6 },
-      { price_mode: 'color_single', min_sheets: 10, max_sheets: 49, price_per_sheet: 4 },
-      { price_mode: 'color_single', min_sheets: 50, max_sheets: 99, price_per_sheet: 2.5 },
-      { price_mode: 'color_single', min_sheets: 100, max_sheets: 499, price_per_sheet: 1.5 },
-      { price_mode: 'color_single', min_sheets: 500, max_sheets: 999, price_per_sheet: 1 },
-      { price_mode: 'color_single', min_sheets: 1000, max_sheets: undefined, price_per_sheet: 0.85 },
-    ];
-    setEditingItem({
-      id: -1,
-      technology_code: '',
-      counter_unit: 'sheets',
-      sheet_width_mm: 320,
-      sheet_height_mm: 450,
-      price_bw_single: null,
-      price_bw_duplex: null,
-      price_color_single: null,
-      price_color_duplex: null,
-      price_bw_per_meter: null,
-      price_color_per_meter: null,
-      is_active: 1,
-      type: 'print-prices',
-    } as any);
-    setEditingValues({
-      technology_code: '',
-      counter_unit: 'sheets',
-      sheet_width_mm: 320,
-      sheet_height_mm: 450,
-      price_bw_single: '',
-      price_bw_duplex: '',
-      price_color_single: '',
-      price_color_duplex: '',
-      price_bw_per_meter: '',
-      price_color_per_meter: '',
-      is_active: 1,
-      tiers: defaultTiers,
-    });
-  }, []);
+  const switchTab = useCallback(
+    (tab: PricingTabKey) => {
+      setActiveTab(tab);
+      setSearchParams({ tab }, { replace: true });
+    },
+    [setActiveTab, setSearchParams],
+  );
+
+  useEffect(() => {
+    const next = parsePricingTab(searchParams.get('tab'), initialTab);
+    if (next !== activeTab) {
+      setActiveTab(next);
+    }
+  }, [searchParams, initialTab, activeTab, setActiveTab]);
+
+  const searchPlaceholder = useMemo(
+    () => searchPlaceholderForTab(activeTab),
+    [activeTab],
+  );
 
   const handleAddQuantityDiscount = useCallback(() => {
     setEditingItem({
@@ -402,11 +394,13 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
   // renderQuantityDiscounts вынесен в компонент DiscountsTab
 
   return (
-    <div className="pricing-management">
-      <div className="pricing-header">
-        <h2>💰 Управление ценами</h2>
-        <p>Настройте цены печати, услуг и наценки для различных категорий продуктов</p>
-      </div>
+    <div className={`pricing-management pricing-glass${variant === 'embedded' ? ' pricing-management--embedded' : ''}`}>
+      {variant === 'standalone' && (
+        <div className="pricing-header">
+          <h2>💰 Управление ценами</h2>
+          <p>Настройте цены печати, услуг и наценки для различных категорий продуктов</p>
+        </div>
+      )}
 
       {error && (
         <Alert type="error" onClose={() => setError(null)} className="mb-4">
@@ -420,69 +414,86 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ initialTab = 'tec
         </Alert>
       )}
 
-      {/* Поиск */}
-      <div className="search-section">
-        <FormField label="Поиск">
+      <div className="pricing-management__toolbar">
+        <div className="pricing-management__search">
+          <span className="pricing-management__search-icon" aria-hidden="true">
+            <AppIcon name="search" size="xs" />
+          </span>
           <input
             type="text"
-            placeholder="Поиск по названию, типу, описанию..."
+            className="pricing-management__search-input"
+            placeholder={searchPlaceholder}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="form-control"
           />
-        </FormField>
+        </div>
       </div>
 
       <div className="pricing-tabs">
-        <button
-          className={`tab ${activeTab === 'tech' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tech')}
-        >
-          🖨️ Типы печати
-        </button>
-        <button
-          className={`tab ${activeTab === 'printers' ? 'active' : ''}`}
-          onClick={() => setActiveTab('printers')}
-        >
-          🖨️ Принтеры
-        </button>
-        <button 
-          className={`tab ${activeTab === 'print' ? 'active' : ''}`}
-          onClick={() => setActiveTab('print')}
-        >
-          📄 Цены печати
-        </button>
+        <div className="pricing-tabs__group">
+          <div className="pricing-tabs__group-label">Печать</div>
+          <div className="pricing-tabs__group-row">
+            <button
+              type="button"
+              className={`orders-list-tab ${activeTab === 'tech' ? 'active' : ''}`}
+              onClick={() => switchTab('tech')}
+            >
+              Типы печати
+            </button>
+            <button
+              type="button"
+              className={`orders-list-tab ${activeTab === 'printers' ? 'active' : ''}`}
+              onClick={() => switchTab('printers')}
+            >
+              Принтеры
+            </button>
+            <button
+              type="button"
+              className={`orders-list-tab ${activeTab === 'print' ? 'active' : ''}`}
+              onClick={() => switchTab('print')}
+            >
+              Цены печати
+            </button>
+          </div>
+        </div>
         {mode === 'full' && (
-          <>
-        <button 
-          className={`tab ${activeTab === 'services' ? 'active' : ''}`}
-          onClick={() => setActiveTab('services')}
-        >
-          🔧 Услуги
-        </button>
-        <button 
-          className={`tab ${activeTab === 'markup' ? 'active' : ''}`}
-          onClick={() => setActiveTab('markup')}
-        >
-          📈 Наценки
-        </button>
-        <button 
-          className={`tab ${activeTab === 'discounts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('discounts')}
-        >
-          🎯 Скидки за объем печати
-        </button>
-        <button 
-          className={`tab ${activeTab === 'price-types' ? 'active' : ''}`}
-          onClick={() => setActiveTab('price-types')}
-        >
-          💰 Типы цен
-        </button>
-          </>
+          <div className="pricing-tabs__group">
+            <div className="pricing-tabs__group-label">Ценообразование</div>
+            <div className="pricing-tabs__group-row">
+              <button
+                type="button"
+                className={`orders-list-tab ${activeTab === 'services' ? 'active' : ''}`}
+                onClick={() => switchTab('services')}
+              >
+                Услуги
+              </button>
+              <button
+                type="button"
+                className={`orders-list-tab ${activeTab === 'markup' ? 'active' : ''}`}
+                onClick={() => switchTab('markup')}
+              >
+                Наценки
+              </button>
+              <button
+                type="button"
+                className={`orders-list-tab ${activeTab === 'discounts' ? 'active' : ''}`}
+                onClick={() => switchTab('discounts')}
+              >
+                Скидки за объём
+              </button>
+              <button
+                type="button"
+                className={`orders-list-tab ${activeTab === 'price-types' ? 'active' : ''}`}
+                onClick={() => switchTab('price-types')}
+              >
+                Типы цен
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
-      <div className="pricing-content">
+      <div className="pricing-management__panel">
         {loading ? (
           <LoadingState message="Загрузка данных ценообразования..." />
         ) : (

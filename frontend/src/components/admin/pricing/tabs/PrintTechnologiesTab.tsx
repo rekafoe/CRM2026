@@ -3,6 +3,7 @@ import { Button, FormField, StatusBadge, Modal } from '../../../common';
 import { api } from '../../../../api';
 import { numberInputFromString, type NumberInputValue } from '../../../../utils/numberInput';
 import type { PrintTechnology, PricingMode } from '../types';
+import { formatPricingMode } from '../printPriceDisplay';
 
 interface PrintTechnologiesTabProps {
   printTechnologies: PrintTechnology[];
@@ -150,7 +151,11 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
               >
                 <option value="per_sheet">Цена за лист</option>
                 <option value="per_meter">Цена за погонный метр</option>
+                <option value="per_m2">Цена за кв. метр (УФ-планшет)</option>
               </select>
+              <p className="pricing-hint">
+                Для УФ-планшета выберите «кв. метр» и настройте ставки на вкладке «Цены печати».
+              </p>
             </FormField>
             <FormField label="Двусторонняя поддержка">
               <select
@@ -226,7 +231,11 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
                     >
                       <option value="per_sheet">Цена за лист</option>
                       <option value="per_meter">Цена за пог. метр</option>
+                      <option value="per_m2">Цена за кв. метр (УФ)</option>
                     </select>
+                    <p className="pricing-hint">
+                      Для УФ-планшета — per_m2 и вкладка «Цены печати».
+                    </p>
                   </FormField>
                   <FormField label="Двусторонняя поддержка">
                     <select
@@ -256,7 +265,7 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
                 <div className="field-group">
                   <FormField label="Режим">
                     <span className="field-value">
-                      {tech.pricing_mode === 'per_sheet' ? 'Цена за лист' : 'Цена за пог. метр'}
+                      {formatPricingMode(tech.pricing_mode)}
                     </span>
                   </FormField>
                   <FormField label="Двусторонняя поддержка">
@@ -277,6 +286,7 @@ const PrintTechnologiesTabComponent: React.FC<PrintTechnologiesTabProps> = ({
         onClose={() => setDeleteTechCode(null)}
         title="Удалить тип печати?"
         size="sm"
+        className="pricing-glass"
       >
         <div className="space-y-4">
           <div className="text-secondary">

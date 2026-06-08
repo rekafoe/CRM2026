@@ -12,6 +12,8 @@ interface AdminPageLayoutProps {
   className?: string;
   /** Контент в шапке справа (например, фильтр по месяцу) */
   headerExtra?: React.ReactNode;
+  /** Подзаголовок под h1 */
+  description?: string;
 }
 
 export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
@@ -21,7 +23,8 @@ export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
   onBack,
   children,
   className = '',
-  headerExtra
+  headerExtra,
+  description,
 }) => {
   return (
     <div className={`admin-page-layout ${className}`}>
@@ -29,6 +32,7 @@ export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
         <button onClick={onBack} className="back-btn">
           ← Назад
         </button>
+        <div className="admin-page-header__title-block">
         <h1>
           {icon != null && <span className="admin-page-header__title-icon">{icon}</span>}
           <span className="admin-page-header__title-main">{title}</span>
@@ -41,6 +45,10 @@ export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
             </>
           )}
         </h1>
+        {description ? (
+          <p className="admin-page-header__description">{description}</p>
+        ) : null}
+        </div>
         {headerExtra != null && (
           <div className="admin-page-header__extra">
             {headerExtra}

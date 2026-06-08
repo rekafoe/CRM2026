@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Button, FormField, StatusBadge } from '../../../common';
 import { MoneyAmount } from '../../../ui';
 import { api } from '../../../../api';
 import { numberInputFromString, numberInputToNullable, type NumberInputValue } from '../../../../utils/numberInput';
 import type { PrinterRow, PrintTechnology, PricingMode } from '../types';
+import { PRINTERS_PRINT_TAB_URL } from '../printPriceDisplay';
 
 interface PrintersTabProps {
   printers: PrinterRow[];
@@ -40,6 +42,15 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
   const techOptions = useMemo(
     () => printTechnologies.filter((t) => t.is_active !== 0),
     [printTechnologies]
+  );
+
+  const isUvPrinterTech = useCallback(
+    (techCode?: string | null) => {
+      if (!techCode) return false;
+      if (techCode === 'uv') return true;
+      return getPricingModeForTech(techCode) === 'per_m2';
+    },
+    [getPricingModeForTech],
   );
 
   const startEditPrinter = useCallback((printer: PrinterRow) => {
@@ -258,28 +269,40 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
                       ))}
                     </select>
                   </FormField>
-                {/* Цены печати задаются в отдельной вкладке "Цены печати" (print_prices) */}
-                  <FormField label="Ед. счётчика">
-                    <select
-                      className="form-control"
-                      value={printerForm.counter_unit || 'sheets'}
-                      onChange={(e) => setPrinterForm({ ...printerForm, counter_unit: e.target.value as 'sheets' | 'meters' })}
-                    >
-                      <option value="sheets">Листы</option>
-                      <option value="meters">Погонные метры</option>
-                    </select>
-                  </FormField>
-                  <FormField label="Цветность">
-                    <select
-                      className="form-control"
-                      value={printerForm.color_mode || 'both'}
-                      onChange={(e) => setPrinterForm({ ...printerForm, color_mode: e.target.value as any })}
-                    >
-                      <option value="both">Цвет+Ч/Б</option>
-                      <option value="color">Только цвет</option>
-                      <option value="bw">Только Ч/Б</option>
-                    </select>
-                  </FormField>
+                  {isUvPrinterTech(printerForm.technology_code) && (
+                    <div className="printer-uv-hint">
+                      Ставки УФ задаются в{' '}
+                      <Link to={PRINTERS_PRINT_TAB_URL}>Ценах печати (м²)</Link>. Цветность и единица счётчика для
+                      УФ-планшета не используются.
+                    </div>
+                  )}
+                  {!isUvPrinterTech(printerForm.technology_code) && (
+                    <>
+                      <FormField label="Ед. счётчика">
+                        <select
+                          className="form-control"
+                          value={printerForm.counter_unit || 'sheets'}
+                          onChange={(e) =>
+                            setPrinterForm({ ...printerForm, counter_unit: e.target.value as 'sheets' | 'meters' })
+                          }
+                        >
+                          <option value="sheets">Листы</option>
+                          <option value="meters">Погонные метры</option>
+                        </select>
+                      </FormField>
+                      <FormField label="Цветность">
+                        <select
+                          className="form-control"
+                          value={printerForm.color_mode || 'both'}
+                          onChange={(e) => setPrinterForm({ ...printerForm, color_mode: e.target.value as any })}
+                        >
+                          <option value="both">Цвет+Ч/Б</option>
+                          <option value="color">Только цвет</option>
+                          <option value="bw">Только Ч/Б</option>
+                        </select>
+                      </FormField>
+                    </>
+                  )}
                   <FormField label="Класс">
                     <select
                       className="form-control"
@@ -318,11 +341,17 @@ const PrintersTabComponent: React.FC<PrintersTabProps> = ({
                         : '—'}
                     </span>
                   </FormField>
-                  <FormField label="Цветность">
-                    <span className="field-value">
-                      {printer.color_mode === 'bw' ? 'Ч/Б' : printer.color_mode === 'color' ? 'Цветной' : 'Цвет+Ч/Б'}
-                    </span>
-                  </FormField>
+                  {isUvPrinterTech(printer.technology_code) ? (
+                    <FormField label="УФ-печать">
+                      <span className="field-value">Ставки в Ценах печати (м²)</span>
+                    </FormField>
+                  ) : (
+                    <FormField label="Цветность">
+                      <span className="field-value">
+                        {printer.color_mode === 'bw' ? 'Ч/Б' : printer.color_mode === 'color' ? 'Цветной' : 'Цвет+Ч/Б'}
+                      </span>
+                    </FormField>
+                  )}
                   <FormField label="Класс">
                     <span className="field-value">
                       {printer.printer_class === 'pro' ? 'Профессиональный' : 'Офисный'}

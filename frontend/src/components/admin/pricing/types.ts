@@ -1,5 +1,5 @@
 // Общие типы для компонентов ценообразования
-export type PricingMode = 'per_sheet' | 'per_meter';
+export type PricingMode = 'per_sheet' | 'per_meter' | 'per_m2';
 
 export interface PrintTechnology {
   code: string;
@@ -35,7 +35,8 @@ export interface PrinterRow {
 }
 
 export interface PricingManagementProps {
-  initialTab?: 'tech' | 'printers' | 'print' | 'services' | 'markup' | 'discounts';
+  initialTab?: 'tech' | 'printers' | 'print' | 'services' | 'markup' | 'discounts' | 'price-types';
   mode?: 'full' | 'printing';
+  variant?: 'standalone' | 'embedded';
 }
 
