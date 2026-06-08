@@ -175,8 +175,13 @@ export function calculateUvFlatbedPrice(params: {
   };
 }
 
+function normalizeTechnologyCode(technologyCode: string): string {
+  return String(technologyCode || 'uv').trim().toLowerCase() || 'uv';
+}
+
 export class UvFlatbedPricingService {
   static async loadRatesByTechnology(technologyCode: string): Promise<UvFlatbedRates | null> {
+    const code = normalizeTechnologyCode(technologyCode);
     const db = await getDb();
     const pp = await db.get<{
       id: number;
@@ -191,11 +196,11 @@ export class UvFlatbedPricingService {
       `SELECT id, counter_unit, price_color_per_m2, price_white_per_m2, price_varnish_per_m2,
               min_charge, max_width_mm, max_height_mm
        FROM print_prices
-       WHERE technology_code = ? AND is_active = 1
+       WHERE LOWER(technology_code) = LOWER(?) AND is_active = 1 AND counter_unit = 'm2'
        ORDER BY id DESC LIMIT 1`,
-      technologyCode,
+      code,
     );
-    if (!pp || pp.counter_unit !== 'm2') return null;
+    if (!pp) return null;
 
     let m2Tiers: UvM2TierRow[] = [];
     try {
@@ -222,6 +227,31 @@ export class UvFlatbedPricingService {
     };
   }
 
+  static async buildMissingRatesError(technologyCode: string): Promise<Error & { status?: number }> {
+    const code = normalizeTechnologyCode(technologyCode);
+    const db = await getDb();
+    const existing = await db.get<{ counter_unit: string }>(
+      `SELECT counter_unit FROM print_prices
+       WHERE LOWER(technology_code) = LOWER(?) AND is_active = 1
+       ORDER BY id DESC LIMIT 1`,
+      code,
+    );
+    const err: Error & { status?: number } = new Error('');
+    if (existing && existing.counter_unit !== 'm2') {
+      err.message =
+        `Для УФ-планшета нужна цена печати с единицей учёта «м²» (технология «${code}»). ` +
+        `Сейчас в центре цен активна запись с единицей «${existing.counter_unit}». ` +
+        'Откройте Админ-панель → Принтеры → Цены печати и создайте запись с единицей «Кв. метры (УФ-планшет)».';
+      err.status = 422;
+    } else {
+      err.message =
+        `Цены УФ (м²) для технологии «${code}» не найдены в центре цен. ` +
+        'Создайте запись в Админ-панель → Принтеры → Цены печати (единица учёта: м²).';
+      err.status = 404;
+    }
+    return err;
+  }
+
   static async calculate(params: {
     technologyCode: string;
     trimWidthMm: number;
@@ -231,11 +261,7 @@ export class UvFlatbedPricingService {
   }): Promise<UvFlatbedPricingResult> {
     const rates = await this.loadRatesByTechnology(params.technologyCode);
     if (!rates) {
-      const err: Error & { status?: number } = new Error(
-        `Цены УФ (м²) для технологии «${params.technologyCode}» не найдены в центре цен`,
-      );
-      err.status = 404;
-      throw err;
+      throw await this.buildMissingRatesError(params.technologyCode);
     }
     if (!validateTrimFitsBed(params.trimWidthMm, params.trimHeightMm, rates.max_width_mm, rates.max_height_mm)) {
       const err: Error & { status?: number } = new Error(

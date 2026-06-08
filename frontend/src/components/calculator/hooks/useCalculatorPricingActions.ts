@@ -1103,18 +1103,19 @@ export function useCalculatorPricingActions({
         }
         // Извлекаем сообщение об ошибке из ответа бэкенда
         let errorMessage = 'Неизвестная ошибка расчета';
-        
-        if (err?.response?.data?.error) {
-          // Ошибка из бэкенда (500 с error в response.data)
-          errorMessage = err.response.data.error;
-        } else if (err?.response?.data?.message) {
-          // Ошибка из бэкенда (400/500 с message в response.data)
-          errorMessage = err.response.data.message;
-        } else if (err instanceof Error) {
-          // Обычная ошибка JavaScript
+        const responseData = err?.response?.data;
+
+        if (responseData?.message && typeof responseData.message === 'string') {
+          errorMessage = responseData.message;
+        } else if (responseData?.error && typeof responseData.error === 'string') {
+          errorMessage = responseData.error;
+        } else if (err instanceof Error && err.message && err.message !== 'Network Error') {
           errorMessage = err.message;
         } else if (typeof err === 'string') {
           errorMessage = err;
+        } else if (err?.response?.status === 404) {
+          errorMessage =
+            'Сервер не нашёл цены УФ (м²). Проверьте центр цен: Админ-панель → Принтеры → Цены печати, единица «Кв. метры (УФ-планшет)».';
         }
         
         if (
