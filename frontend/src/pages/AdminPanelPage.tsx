@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useAdminBack } from '../hooks/useAdminBack';
 import { NotificationsManager } from '../components/notifications/NotificationsManager';
 import AdminDashboard from '../components/admin/AdminDashboard';
 import { DailyActivityOverview } from '../components/admin/DailyActivityOverview';
@@ -81,15 +82,17 @@ const PublicDesignEditorPreviewPage = import.meta.env.DEV
   : PublicDesignEditorPreviewPageLazy;
 
 // Компонент страницы уведомлений (исправлен - убраны инлайн стили)
-const NotificationsPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+const NotificationsPage: React.FC = () => {
+  const goBack = useAdminBack();
+
   return (
     <div className="notifications-page">
       <div className="page-header">
-        <button onClick={onBack} className="back-btn">← Назад</button>
+        <button type="button" onClick={goBack} className="back-btn">← Назад</button>
         <h1><AppIcon name="bell" size="sm" /> Управление уведомлениями</h1>
       </div>
       <div className="page-content">
-        <NotificationsManager onClose={onBack} />
+        <NotificationsManager onClose={goBack} />
       </div>
     </div>
   );
@@ -357,27 +360,27 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/" element={<AdminPanelHome />} />
           
           {/* Оригинальные админ страницы */}
-          <Route path="/reports" element={<AdminReportsPage onBack={() => window.history.back()} />} />
-          <Route path="/daily-reports" element={<AdminReportsPage onBack={() => window.history.back()} />} />
-          <Route path="/analytics" element={<ReportsPage onBack={() => window.history.back()} />} />
+          <Route path="/reports" element={<AdminReportsPage />} />
+          <Route path="/daily-reports" element={<AdminReportsPage />} />
+          <Route path="/analytics" element={<ReportsPage />} />
           
           {/* Материалы */}
-          <Route path="/materials" element={<WarehousePage onBack={() => window.history.back()} />} />
-          <Route path="/inventory" element={<WarehousePage onBack={() => window.history.back()} />} />
-          <Route path="/suppliers" element={<WarehousePage onBack={() => window.history.back()} />} />
-          <Route path="/categories" element={<WarehousePage onBack={() => window.history.back()} />} />
+          <Route path="/materials" element={<WarehousePage />} />
+          <Route path="/inventory" element={<WarehousePage />} />
+          <Route path="/suppliers" element={<WarehousePage />} />
+          <Route path="/categories" element={<WarehousePage />} />
           
           {/* Склад */}
-          <Route path="/warehouse" element={<WarehousePage onBack={() => window.history.back()} />} />
-          <Route path="/warehouse-reports" element={<ReportsPage onBack={() => window.history.back()} />} />
-          <Route path="/low-stock-alerts" element={<WarehousePage onBack={() => window.history.back()} />} />
+          <Route path="/warehouse" element={<WarehousePage />} />
+          <Route path="/warehouse-reports" element={<ReportsPage />} />
+          <Route path="/low-stock-alerts" element={<WarehousePage />} />
           
           {/* Ценообразование */}
-          <Route path="/pricing" element={<PricingPage onBack={() => window.history.back()} />} />
+          <Route path="/pricing" element={<PricingPage />} />
           <Route path="/cost-calculation" element={<Navigate to="/adminpanel/pricing" replace />} />
           <Route path="/services-management" element={<ServicesManagementPage />} />
           <Route path="/plotter-cutting" element={<PlotterCuttingSettingsPage />} />
-          <Route path="/discounts" element={<PricingPage onBack={() => window.history.back()} />} />
+          <Route path="/discounts" element={<PricingPage />} />
           <Route path="/earnings" element={<EarningsAdminPage />} />
           <Route path="/printers" element={<PrintersPage />} />
           <Route path="/print-prices/new" element={<PrintPriceEditPage />} />
@@ -393,8 +396,8 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/organizations" element={<OrganizationsPage />} />
           
           {/* Настройки */}
-          <Route path="/settings" element={<SettingsPage onBack={() => window.history.back()} />} />
-          <Route path="/users" element={<UserManagement onBack={() => window.history.back()} />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/users" element={<UserManagement />} />
           {/* Устаревший маршрут настроек калькулятора → редирект на продукты */}
           <Route path="/calculator-settings" element={<Navigate to="/adminpanel/products" replace />} />
           {/* Переключаем продукты на новую страницу управления продуктами */}
@@ -404,16 +407,15 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/products/:id/template" element={<ProductTemplatePage />} />
           <Route path="/products/:id/tech-process" element={<ProductTechProcessPage />} />
           <Route path="/products-old" element={<AdminProductManager />} />
-          <Route path="/backup" element={<SettingsPage onBack={() => window.history.back()} />} />
+          <Route path="/backup" element={<SettingsPage />} />
           
           {/* Пользователи и заказы */}
-          <Route path="/users" element={<UserManagement onBack={() => window.history.back()} />} />
-          <Route path="/roles" element={<UserManagement onBack={() => window.history.back()} />} />
-          <Route path="/all-orders" element={<ReportsPage onBack={() => window.history.back()} />} />
-          <Route path="/order-templates" element={<SettingsPage onBack={() => window.history.back()} />} />
+          <Route path="/roles" element={<UserManagement />} />
+          <Route path="/all-orders" element={<ReportsPage />} />
+          <Route path="/order-templates" element={<SettingsPage />} />
           
           {/* Уведомления */}
-          <Route path="/notifications" element={<NotificationsPage onBack={() => window.history.back()} />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route
             path="/mail-notifications"
             element={<Navigate to="/adminpanel/notifications?tab=client" replace />}

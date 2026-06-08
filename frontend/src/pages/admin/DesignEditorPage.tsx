@@ -803,7 +803,7 @@ export const DesignEditorPage: React.FC = () => {
       <AdminPageLayout
         title="Редактор макета"
         icon={<AppIcon name="image" size="sm" />}
-        onBack={() => navigate(-1)}
+        onBack={() => navigate(catalogPath)}
         className="design-editor-fullbleed"
       >
         <div className="design-editor-loading">Загрузка шаблона...</div>
@@ -816,7 +816,7 @@ export const DesignEditorPage: React.FC = () => {
       <AdminPageLayout
         title="Редактор макета"
         icon={<AppIcon name="image" size="sm" />}
-        onBack={() => navigate(-1)}
+        onBack={() => navigate(catalogPath)}
         className="design-editor-fullbleed"
       >
         {error && <Alert type="error">{error}</Alert>}
@@ -842,7 +842,7 @@ export const DesignEditorPage: React.FC = () => {
     <AdminPageLayout
       title={`Редактор: ${template.name}`}
       icon={<AppIcon name="image" size="sm" />}
-      onBack={() => navigate(-1)}
+      onBack={() => navigate(catalogPath)}
       className="design-editor-fullbleed"
     >
       <div className="public-design-editor public-design-editor--admin">

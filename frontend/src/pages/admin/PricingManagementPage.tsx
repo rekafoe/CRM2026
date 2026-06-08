@@ -8,11 +8,12 @@ interface PricingManagementPageProps {
 }
 
 const PricingManagementPage: React.FC<PricingManagementPageProps> = ({ onBack }) => {
-  return (
+    return (
     <AdminPageLayout
       title="Управление ценами"
       icon={<AppIcon name="receipt" size="md" />}
-      onBack={onBack ?? (() => window.history.back())}
+      onBack={onBack}
+      backTo="/adminpanel/pricing"
       className="pricing-page"
     >
       <PricingManagement />

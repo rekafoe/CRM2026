@@ -1,16 +1,11 @@
 import React from 'react';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 
-interface ReportsPageProps {
-  onBack: () => void;
-}
-
-export const ReportsPage: React.FC<ReportsPageProps> = ({ onBack }) => {
+export const ReportsPage: React.FC = () => {
   return (
     <AdminPageLayout
       title="Отчеты и аналитика"
       icon="📊"
-      onBack={onBack}
       className="reports-page"
     >
       <div className="reports-content">

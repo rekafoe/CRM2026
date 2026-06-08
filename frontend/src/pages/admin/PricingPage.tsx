@@ -7,11 +7,7 @@ import { listOperationNorms } from '../../api/pricing';
 import '../../styles/admin-cards.css';
 import './PricingPage.css';
 
-interface PricingPageProps {
-  onBack: () => void;
-}
-
-export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
+export const PricingPage: React.FC = () => {
   const navigate = useNavigate();
   const [showInstructions, setShowInstructions] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -63,7 +59,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     <AdminPageLayout
       title="Ценообразование"
       icon="💰"
-      onBack={onBack}
       className="pricing-page"
     >
       <div className="pricing-content">

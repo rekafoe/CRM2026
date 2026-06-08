@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
+import { useAdminBack } from '../../hooks/useAdminBack';
 import { Alert } from '../../components/common';
 import { AppIcon } from '../../components/ui/AppIcon';
 import { getProductSchemaById, updateOrderItem, uploadOrderFile } from '../../api';
@@ -100,7 +101,7 @@ function buildSavedGroups(
 }
 
 export const PhotoBatchEditorPage: React.FC = () => {
-  const navigate = useNavigate();
+  const goBack = useAdminBack('/');
   const [searchParams] = useSearchParams();
   const orderId = Number(searchParams.get('orderId') ?? 0);
   const orderItemId = Number(searchParams.get('orderItemId') ?? 0);
@@ -224,7 +225,7 @@ export const PhotoBatchEditorPage: React.FC = () => {
     <AdminPageLayout
       title="Пакетная фотопечать"
       icon={<AppIcon name="image" size="sm" />}
-      onBack={() => navigate(-1)}
+      onBack={goBack}
     >
       <div className="photo-batch">
         {error && <Alert type="error" onClose={() => setError(null)}>{error}</Alert>}

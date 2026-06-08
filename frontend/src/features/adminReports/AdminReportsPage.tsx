@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useAdminBack } from '../../hooks/useAdminBack';
 import { useAnalytics } from './hooks/useAnalytics';
 import { ProductAnalytics } from './components/ProductAnalytics';
 import { FinancialAnalytics } from './components/FinancialAnalytics';
@@ -18,6 +18,7 @@ import './AdminReportsPage.css';
 interface AdminReportsPageProps {
   onBack?: () => void;
 }
+
 
 type MarkupSetting = {
   id: number;
@@ -42,7 +43,8 @@ const getScopedSettingName = (baseName: keyof typeof DASHBOARD_SETTING_META, dep
   deptId ? `${baseName}__dept_${deptId}` : baseName;
 
 export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) => {
-  const navigate = useNavigate();
+  const goBack = useAdminBack();
+  const handleBack = onBack ?? goBack;
   const {
     productData,
     financialData,
@@ -652,7 +654,7 @@ export const AdminReportsPage: React.FC<AdminReportsPageProps> = ({ onBack }) =>
       <div className="reports-header">
         <div className="reports-header-top">
         <div className="reports-header-left">
-          <Button variant="secondary" size="sm" onClick={onBack || (() => navigate('/adminpanel'))}>
+          <Button variant="secondary" size="sm" onClick={handleBack}>
             ← Назад
           </Button>
           <div className="reports-title-row">

@@ -7,7 +7,6 @@ const AdminDashboard: React.FC = () => {
     <AdminPageLayout
       title="Настройка операций"
       icon="🔧"
-      onBack={() => window.history.back()}
     >
       <ServicesManagement showHeader={false} />
     </AdminPageLayout>

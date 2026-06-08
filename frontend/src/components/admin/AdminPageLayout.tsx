@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAdminBack } from '../../hooks/useAdminBack';
 import '../../styles/admin-page-layout.css';
 
 interface AdminPageLayoutProps {
@@ -7,7 +8,10 @@ interface AdminPageLayoutProps {
   icon?: string | React.ReactNode | null;
   /** Вторая часть заголовка (например, имя клиента) — визуально мягче основного title */
   titleSuffix?: string | null;
-  onBack: () => void;
+  /** Явный callback «Назад» (приоритет над backTo и авто-иерархией) */
+  onBack?: () => void;
+  /** Родительский маршрут, если не задан onBack */
+  backTo?: string;
   children: React.ReactNode;
   className?: string;
   /** Контент в шапке справа (например, фильтр по месяцу) */
@@ -21,15 +25,18 @@ export const AdminPageLayout: React.FC<AdminPageLayoutProps> = ({
   icon,
   titleSuffix,
   onBack,
+  backTo,
   children,
   className = '',
   headerExtra,
   description,
 }) => {
+  const goBack = useAdminBack(backTo);
+
   return (
     <div className={`admin-page-layout ${className}`}>
       <div className="admin-page-header">
-        <button onClick={onBack} className="back-btn">
+        <button type="button" onClick={onBack ?? goBack} className="back-btn">
           ← Назад
         </button>
         <div className="admin-page-header__title-block">

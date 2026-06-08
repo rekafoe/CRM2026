@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { OrderFile, Item } from '../types';
 import {
   listOrderFiles,
@@ -66,6 +66,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   items = []
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -461,7 +462,9 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               }
               const typeId = (selectedOrderItem.params as { typeId?: number | string }).typeId;
               if (typeId != null) q.set('typeId', String(typeId));
-              navigate(`/photo-batch-editor?${q.toString()}`);
+              navigate(`/photo-batch-editor?${q.toString()}`, {
+                state: { backTo: location.pathname + location.search },
+              });
             }}
             title={selectedOrderItem ? 'Открыть пакетную фотопечать для позиции' : 'Сначала выберите позицию заказа'}
           >

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Department, getAllUsers, getDepartments, createUser, updateUser, deleteUser, resetUserToken, getCurrentUser, setAuthToken } from '../../api';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { Alert } from '../../components/common';
+import { useAdminBack } from '../../hooks/useAdminBack';
 import './UserManagement.css';
 
 interface UserManagementProps {
@@ -11,6 +12,8 @@ interface UserManagementProps {
 }
 
 export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
+  const goBack = useAdminBack();
+  const handleBack = onBack ?? goBack;
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [departmentFilter, setDepartmentFilter] = useState<number | ''>('');
@@ -139,14 +142,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       {/* Заголовок */}
       <div className="user-management-header">
         <div className="user-management-header-left">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="user-management-back-btn"
-            >
-              ← Назад
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleBack}
+            className="user-management-back-btn"
+          >
+            ← Назад
+          </button>
           <div>
             <h1 className="user-management-title">
               👥 Управление пользователями

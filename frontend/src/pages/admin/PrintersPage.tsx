@@ -10,7 +10,6 @@ export const PrintersPage: React.FC = () => {
       title="Принтеры и типы печати"
       icon={<AppIcon name="printer" size="md" />}
       description="Печать: типы, оборудование и центральные ставки. Ценообразование: услуги, наценки, скидки и типы цен."
-      onBack={() => window.history.back()}
       className="pricing-page"
     >
       <div className="printers-page__inner">

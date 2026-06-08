@@ -1,22 +1,26 @@
 import React from 'react';
 import { AppIcon } from '../../components/ui/AppIcon';
 import { WarehouseDashboard } from '../../components/warehouse/WarehouseDashboard';
+import { useAdminBack } from '../../hooks/useAdminBack';
 import '../../components/admin/ProductManagement.css';
 import '../../styles/warehouse-embedded.css';
 
 interface WarehousePageProps {
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 /**
  * Склад / материалы — тот же визуальный каркас, что /adminpanel/products.
  */
 export const WarehousePage: React.FC<WarehousePageProps> = ({ onBack }) => {
+  const goBack = useAdminBack();
+  const handleBack = onBack ?? goBack;
+
   return (
     <div className="product-management">
       <div className="product-management__header">
         <div className="product-management__header-left">
-          <button type="button" className="lg-btn" onClick={onBack}>
+          <button type="button" className="lg-btn" onClick={handleBack}>
             ← Назад
           </button>
           <div className="product-management__title-row">

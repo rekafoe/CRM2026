@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { AdminPageLayout } from '../../components/admin/AdminPageLayout';
 import { UserManagement, DepartmentManagement } from '../../features/userManagement';
+import { useAdminBack } from '../../hooks/useAdminBack';
 
 interface SettingsPageProps {
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
+  const goBack = useAdminBack();
   const [showUserManagement, setShowUserManagement] = useState(false);
   const [showDepartmentManagement, setShowDepartmentManagement] = useState(false);
 
@@ -26,7 +28,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
     <AdminPageLayout
       title="Общие настройки"
       icon="⚙️"
-      onBack={onBack}
+      onBack={onBack ?? goBack}
       className="settings-page"
     >
       <div className="settings-content">
