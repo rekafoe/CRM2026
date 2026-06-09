@@ -440,6 +440,14 @@
   word-break: break-word;
 }
 
+.design-fonts-card__aliases {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #94a3b8;
+}
+
 .design-fonts-card__badges {
   display: flex;
   flex-wrap: wrap;
@@ -476,14 +484,20 @@
 
 .design-fonts-card__preview {
   margin: 0 0 8px;
-  font-size: 1.35rem;
+  font-size: 1rem;
   line-height: 1.35;
-  color: #0f172a;
+  color: #475569;
 }
 
-.design-fonts-card__preview--latin {
-  font-size: 1rem;
-  color: #475569;
+.design-fonts-card__preview--title {
+  font-size: 1.5rem;
+  color: #0f172a;
+  margin-bottom: 10px;
+}
+
+.design-fonts-card__preview--cyrillic {
+  font-size: 0.9rem;
+  color: #64748b;
   margin-bottom: 0;
 }
 

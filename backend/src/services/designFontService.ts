@@ -11,9 +11,15 @@ import {
   buildRequiredFontEntries,
   extractUsedFontFamiliesFromDesignState,
   hasMissingRequiredFonts,
+  normalizeDesignStateFontFamilies,
   type BundledTemplateFont,
+  type GlobalFontRef,
   type RequiredFontEntry,
 } from '../utils/extractDesignStateFonts'
+import {
+  collectFontNameAliases,
+  readFontMetadataFromBuffer,
+} from '../utils/fontFileMetadata'
 import {
   fontFamilyCompactKey,
   fontFamilyNamesMatch,
@@ -31,8 +37,37 @@ export interface DesignFontRow {
   style: string
   sort_order: number
   is_active: number
+  name_aliases?: string
   created_at: string
   updated_at: string
+}
+
+function parseNameAliases(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((item): item is string => typeof item === 'string')
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+function resolveFontUploadNames(
+  file: { buffer: Buffer; originalname?: string },
+  requestedFamily?: string,
+): { family_name: string; name_aliases: string[] } {
+  const meta = readFontMetadataFromBuffer(file.buffer)
+  const aliases = collectFontNameAliases(meta)
+  const fromFile = normalizeFontFamilyName(meta?.preferredFamily ?? meta?.family)
+  const fromFilename = guessFontFamilyFromFilename(file.originalname || '')
+  const fromInput = normalizeFontFamilyName(requestedFamily)
+  const family_name = fromInput || fromFile || fromFilename
+  if (!family_name) throw new Error('Не удалось определить family_name шрифта')
+  const name_aliases = aliases.filter((alias) => !fontFamilyNamesMatch(alias, family_name))
+  return { family_name, name_aliases }
 }
 
 export type DesignFontInput = {
@@ -42,6 +77,7 @@ export type DesignFontInput = {
   style?: string
   sort_order?: number
   is_active?: boolean
+  name_aliases?: string[]
 }
 
 function publicFontUrl(id: number): string {
@@ -52,6 +88,7 @@ function mapRow(row: DesignFontRow) {
   return {
     ...row,
     is_active: row.is_active === 1,
+    name_aliases: parseNameAliases(row.name_aliases),
     url: publicFontUrl(row.id),
   }
 }
@@ -82,7 +119,10 @@ export async function getDesignFontByFamily(familyName: string): Promise<ReturnT
   if (!normalized) return null
   const db = await getDb()
   const rows = await db.all('SELECT * FROM design_fonts') as DesignFontRow[]
-  const row = rows?.find((r) => fontFamilyNamesMatch(r.family_name, normalized))
+  const row = rows?.find((r) => {
+    if (fontFamilyNamesMatch(r.family_name, normalized)) return true
+    return parseNameAliases(r.name_aliases).some((alias) => fontFamilyNamesMatch(alias, normalized))
+  })
   return row ? mapRow(row) : null
 }
 
@@ -104,8 +144,11 @@ export async function createDesignFontsBatch(
 
   for (const file of files) {
     const filename = file.originalname || 'font'
-    const family_name = guessFontFamilyFromFilename(filename)
-    if (!family_name) {
+    let family_name = ''
+    let name_aliases: string[] = []
+    try {
+      ({ family_name, name_aliases } = resolveFontUploadNames(file))
+    } catch {
       results.push({ status: 'error', filename, error: 'Не удалось определить имя из файла' })
       failed += 1
       continue
@@ -128,7 +171,7 @@ export async function createDesignFontsBatch(
       try {
         const font = await updateDesignFont(
           existing.id,
-          { family_name, is_active: true },
+          { family_name, name_aliases, is_active: true },
           file,
         )
         if (!font) throw new Error('Не удалось обновить шрифт')
@@ -147,7 +190,7 @@ export async function createDesignFontsBatch(
     }
 
     try {
-      const font = await createDesignFont({ family_name }, file)
+      const font = await createDesignFont({ family_name, name_aliases }, file)
       results.push({ status: 'created', filename, family_name, font })
       created += 1
     } catch (err) {
@@ -168,8 +211,11 @@ export async function createDesignFont(
   input: DesignFontInput,
   file: { buffer: Buffer; originalname?: string },
 ): Promise<ReturnType<typeof mapRow>> {
-  const family_name = normalizeFontFamilyName(input.family_name)
-  if (!family_name) throw new Error('Укажите family_name шрифта')
+  const resolved = resolveFontUploadNames(file, input.family_name)
+  const family_name = resolved.family_name
+  const name_aliases = input.name_aliases?.length
+    ? input.name_aliases.filter((alias) => !fontFamilyNamesMatch(alias, family_name))
+    : resolved.name_aliases
 
   const existing = await getDesignFontByFamily(family_name)
   if (existing) {
@@ -177,6 +223,7 @@ export async function createDesignFont(
       existing.id,
       {
         family_name,
+        name_aliases,
         label: input.label,
         weight: input.weight,
         style: input.style,
@@ -195,8 +242,8 @@ export async function createDesignFont(
   const db = await getDb()
   const result = await db.run(
     `INSERT INTO design_fonts (
-      family_name, label, filename, format, weight, style, sort_order, is_active, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      family_name, label, filename, format, weight, style, sort_order, is_active, name_aliases, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     [
       family_name,
       input.label?.trim() || family_name,
@@ -206,6 +253,7 @@ export async function createDesignFont(
       input.style?.trim() || 'normal',
       Number.isFinite(input.sort_order) ? input.sort_order! : 0,
       input.is_active === false ? 0 : 1,
+      JSON.stringify(name_aliases),
     ],
   )
   const created = await getDesignFontById(Number(result.lastID))
@@ -223,8 +271,16 @@ export async function updateDesignFont(
 
   let filename = existing.filename
   let format = existing.format
+  let name_aliases = input.name_aliases ?? existing.name_aliases
   if (file?.buffer?.length) {
-    const stored = saveBufferToDesignFonts(file.buffer, file.originalname, input.family_name ?? existing.family_name)
+    const resolved = resolveFontUploadNames(
+      file,
+      input.family_name != null ? input.family_name : existing.family_name,
+    )
+    if (!input.family_name) {
+      name_aliases = resolved.name_aliases
+    }
+    const stored = saveBufferToDesignFonts(file.buffer, file.originalname, resolved.family_name)
     if (!stored) throw new Error('Не удалось сохранить файл шрифта')
     const oldPath = resolveSafeExistingPath([designFontsDir], existing.filename)
     if (oldPath) {
@@ -245,6 +301,7 @@ export async function updateDesignFont(
       style = ?,
       sort_order = ?,
       is_active = ?,
+      name_aliases = ?,
       updated_at = datetime('now')
      WHERE id = ?`,
     [
@@ -256,6 +313,7 @@ export async function updateDesignFont(
       input.style?.trim() || existing.style,
       input.sort_order != null ? input.sort_order : existing.sort_order,
       input.is_active === false ? 0 : input.is_active === true ? 1 : (existing.is_active ? 1 : 0),
+      JSON.stringify(name_aliases),
       id,
     ],
   )
@@ -284,15 +342,22 @@ export function contentTypeForFontFormat(format: string): string {
   }
 }
 
-async function buildGlobalFontMap(): Promise<Map<string, { id: number; url: string; format: string }>> {
+async function buildGlobalFontMap(): Promise<Map<string, GlobalFontRef>> {
   const fonts = await listDesignFonts(true)
-  const map = new Map<string, { id: number; url: string; format: string }>()
+  const map = new Map<string, GlobalFontRef>()
   for (const font of fonts) {
-    map.set(normalizeFontFamilyName(font.family_name).toLowerCase(), {
+    const ref: GlobalFontRef = {
       id: font.id,
       url: font.url,
       format: font.format,
-    })
+      family: font.family_name,
+      name_aliases: font.name_aliases,
+    }
+    const names = [font.family_name, ...font.name_aliases]
+    for (const name of names) {
+      const key = fontFamilyCompactKey(name)
+      if (key) map.set(key, ref)
+    }
   }
   return map
 }
@@ -309,9 +374,10 @@ export async function buildRequiredFontsForDesignState(
 export async function enrichSpecWithRequiredFonts(
   spec: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const designState = spec.designState
+  const libraryFonts = await listDesignFonts(true)
+  const normalizedDesignState = normalizeDesignStateFontFamilies(spec.designState, libraryFonts)
   const bundled = Array.isArray(spec.fonts) ? spec.fonts as BundledTemplateFont[] : []
-  const requiredFonts = await buildRequiredFontsForDesignState(designState, bundled)
+  const requiredFonts = await buildRequiredFontsForDesignState(normalizedDesignState, bundled)
   const fontWarnings = requiredFonts
     .filter((f) => f.source === 'missing')
     .map((f) => `Шрифт «${f.family}» не найден в библиотеке CRM и не приложен к шаблону.`)
@@ -323,6 +389,7 @@ export async function enrichSpecWithRequiredFonts(
   }
   return {
     ...spec,
+    designState: normalizedDesignState,
     requiredFonts,
     fontsResolved: !hasMissingRequiredFonts(requiredFonts),
     import: {

@@ -31,6 +31,7 @@ import {
 } from './constants';
 import type { TextBlockPresetKind } from './constants';
 import { isLikelyImageFile, looksLikeHttpUrl } from '../../../utils/imageFile';
+import { reloadFabricCanvasFonts } from '../../../utils/fabricFontReload';
 import { createSmartGuideSession, resolveSmartGuideSnapAtPointer } from './smartGuides/snapSession';
 import type { SmartGuidePointer, SmartGuideSession } from './smartGuides/types';
 import { splitSpreadCanvasToPagesSync } from './spreadCanvas';
@@ -132,6 +133,8 @@ export interface DesignEditorCanvasHandle {
   loadPageForExport: (pageData: DesignPage, pageIndex?: number) => Promise<void>;
   /** Восстановить ширину холста и контент после export (разворот или одна страница). */
   applyEditorViewState: (pagesOverride?: DesignPage[]) => Promise<void>;
+  /** Пересчитать текст после document.fonts (кастомные шрифты CRM). */
+  reloadTextFonts: () => Promise<void>;
   setTextProp: (key: string, value: unknown) => void;
   /** За один раз обновить начертание текста (без гонок тогглов) */
   setTextStyle: (props: { fontWeight?: string; fontStyle?: string }) => void;
@@ -2391,6 +2394,11 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         } finally {
           isLoadingRef.current = false;
         }
+      },
+      reloadTextFonts: async () => {
+        const canvas = fabricRef.current;
+        if (!canvas) return;
+        await reloadFabricCanvasFonts(canvas);
       },
       applyEditorViewState: async (pagesOverride?: DesignPage[]) => {
         const canvas = fabricRef.current;

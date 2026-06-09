@@ -1136,6 +1136,7 @@ export interface DesignFont {
   style: string;
   sort_order: number;
   is_active: boolean;
+  name_aliases?: string[];
   url: string;
   created_at?: string;
   updated_at?: string;

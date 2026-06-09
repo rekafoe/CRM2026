@@ -45,6 +45,7 @@ import { usePublicDesignGuidedActions } from './usePublicDesignGuidedActions';
 import { usePublicDesignPageActions } from './usePublicDesignPageActions';
 import { usePublicDesignPhotoLibrary } from './usePublicDesignPhotoLibrary';
 import { rememberPageThumbnail } from '../../pages/admin/designEditor/designPageThumbnailCache';
+import { onDesignFontsReady } from '../../utils/loadDesignFonts';
 import { usePublicDesignThumbnailPrefetch } from './usePublicDesignThumbnailPrefetch';
 import { useSpreadLayoutNormalize } from './useSpreadLayoutNormalize';
 import { isEditorSpreadModeActive } from '../../pages/admin/designEditor/editorSpreadMode';
@@ -390,9 +391,18 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   useEffect(() => {
     if (!fontsLoadedTick) return;
     requestAnimationFrame(() => {
-      void canvasHandleRef.current?.applyEditorViewState();
+      void canvasHandleRef.current?.reloadTextFonts();
     });
   }, [fontsLoadedTick]);
+
+  useEffect(() => {
+    const reload = () => {
+      requestAnimationFrame(() => {
+        void canvasHandleRef.current?.reloadTextFonts();
+      });
+    };
+    return onDesignFontsReady(reload);
+  }, []);
 
   useEffect(() => {
     setDraftToken(bootstrapDraftToken);

@@ -95,6 +95,27 @@ router.post(
   }),
 )
 
+router.get('/:id/content', authenticate, asyncHandler(async (req: Request, res: Response) => {
+  const id = Number(req.params.id)
+  if (!Number.isFinite(id) || id <= 0) {
+    res.status(400).json({ error: 'Некорректный ID' })
+    return
+  }
+  const font = await getDesignFontById(id)
+  if (!font) {
+    res.status(404).json({ error: 'Шрифт не найден' })
+    return
+  }
+  const filePath = resolveDesignFontFilePath(font.filename)
+  if (!filePath) {
+    res.status(404).json({ error: 'Файл шрифта не найден' })
+    return
+  }
+  res.setHeader('Content-Type', contentTypeForFontFormat(font.format))
+  res.setHeader('Cache-Control', 'private, max-age=60')
+  res.sendFile(filePath)
+}))
+
 router.put(
   '/:id',
   authenticate,

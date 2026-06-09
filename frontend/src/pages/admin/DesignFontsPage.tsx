@@ -12,7 +12,7 @@ import {
   type DesignFont,
   type DesignFontBatchItemResult,
 } from '../../api';
-import { loadDesignFontFromLibrary } from '../../utils/loadDesignFonts';
+import { loadDesignFontForPreview } from '../../utils/loadDesignFonts';
 import { guessFontFamilyFromFilename } from '../../utils/fontFamilyNormalize';
 import '../../styles/admin-page-layout.css';
 import '../../components/admin/ProductManagement.css';
@@ -32,24 +32,14 @@ function pickFontFiles(fileList: FileList | null): File[] {
   return Array.from(fileList).filter(isFontFile);
 }
 
-function escapeCssString(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
-function syncFontPreviewStyles(fonts: DesignFont[], loadedIds: Set<number>): void {
+function syncFontPreviewStyles(cssRules: string[]): void {
   let el = document.getElementById(PREVIEW_STYLE_ID) as HTMLStyleElement | null;
   if (!el) {
     el = document.createElement('style');
     el.id = PREVIEW_STYLE_ID;
     document.head.appendChild(el);
   }
-  const rules = fonts
-    .filter((font) => loadedIds.has(font.id))
-    .map((font) => (
-      `.design-fonts-card--id-${font.id} .design-fonts-card__preview `
-      + `{ font-family: "${escapeCssString(font.family_name)}", sans-serif; }`
-    ));
-  el.textContent = rules.join('\n');
+  el.textContent = cssRules.join('\n');
 }
 
 export const DesignFontsPage: React.FC = () => {
@@ -94,19 +84,24 @@ export const DesignFontsPage: React.FC = () => {
   useEffect(() => {
     if (!fonts.length) {
       setLoadedPreviewIds(new Set());
-      syncFontPreviewStyles([], new Set());
+      syncFontPreviewStyles([]);
       return;
     }
     let cancelled = false;
     void (async () => {
       const loaded = new Set<number>();
+      const cssRules: string[] = [];
       for (const font of fonts) {
-        const ok = await loadDesignFontFromLibrary(font);
-        if (ok && !cancelled) loaded.add(font.id);
+        const result = await loadDesignFontForPreview(font);
+        if (cancelled) return;
+        if (result.ok && result.css) {
+          loaded.add(font.id);
+          cssRules.push(result.css);
+        }
       }
       if (!cancelled) {
+        syncFontPreviewStyles(cssRules);
         setLoadedPreviewIds(loaded);
-        syncFontPreviewStyles(fonts, loaded);
       }
     })();
     return () => {
@@ -472,6 +467,12 @@ export const DesignFontsPage: React.FC = () => {
                   <div className="design-fonts-card__titles">
                     <h3 className="design-fonts-card__label">{font.label}</h3>
                     <code className="design-fonts-card__family">{font.family_name}</code>
+                    {font.name_aliases && font.name_aliases.length > 0 && (
+                      <span className="design-fonts-card__aliases" title="Имена внутри файла шрифта / SVG">
+                        также: {font.name_aliases.slice(0, 3).join(', ')}
+                        {font.name_aliases.length > 3 ? '…' : ''}
+                      </span>
+                    )}
                   </div>
                   <div className="design-fonts-card__badges">
                     <span className="design-fonts-badge design-fonts-badge--format">{font.format}</span>
@@ -482,8 +483,11 @@ export const DesignFontsPage: React.FC = () => {
                 </header>
 
                 <div className="design-fonts-card__preview-wrap">
-                  <p className="design-fonts-card__preview">{FONT_PREVIEW}</p>
-                  <p className="design-fonts-card__preview design-fonts-card__preview--latin">{FONT_PREVIEW_LATIN}</p>
+                  <p className="design-fonts-card__preview design-fonts-card__preview--title">
+                    {font.label || font.family_name}
+                  </p>
+                  <p className="design-fonts-card__preview">{FONT_PREVIEW_LATIN}</p>
+                  <p className="design-fonts-card__preview design-fonts-card__preview--cyrillic">{FONT_PREVIEW}</p>
                   {!loadedPreviewIds.has(font.id) && (
                     <span className="design-fonts-card__preview-fallback">Превью недоступно</span>
                   )}

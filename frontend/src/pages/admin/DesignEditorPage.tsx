@@ -53,7 +53,8 @@ import type { GuideLine } from './designEditor/CanvasRulers';
 import { ImagePickerModal } from '../../components/ImagePickerModal';
 import { TextFloatingToolbar } from './designEditor/TextFloatingToolbar';
 import { useDesignEditorViewport } from './designEditor/useDesignEditorViewport';
-import { loadDesignFontsFromSpec } from '../../utils/loadDesignFonts';
+import { ensureDesignFontLoaded, loadDesignFontsFromSpec, onDesignFontsReady } from '../../utils/loadDesignFonts';
+import { useCrmDesignFonts } from '../../hooks/useCrmDesignFonts';
 import { createDesignSceneGeometry } from './designEditor/designGeometry';
 import { EditorCanvasStage } from '../../features/designEditorShell/EditorCanvasStage';
 import { EditorPageNavigator } from '../../features/designEditorShell/EditorPageNavigator';
@@ -309,6 +310,17 @@ export const DesignEditorPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { template, loading, error, fontWarning } = templateState;
+  const { fonts: crmFonts } = useCrmDesignFonts();
+
+  useEffect(() => {
+    const reload = () => {
+      requestAnimationFrame(() => {
+        void canvasHandleRef.current?.reloadTextFonts();
+      });
+    };
+    const unsub = onDesignFontsReady(reload);
+    return unsub;
+  }, []);
 
   // ── Load template ────────────────────────────────────────────────────────────
   const loadTemplate = useCallback(async () => {
@@ -358,7 +370,7 @@ export const DesignEditorPage: React.FC = () => {
       void loadDesignFontsFromSpec(spec).then((fontResult) => {
         if (fontResult.loaded.length > 0) {
           requestAnimationFrame(() => {
-            void canvasHandleRef.current?.applyEditorViewState();
+            void canvasHandleRef.current?.reloadTextFonts();
           });
         }
         if (fontResult.missing.length === 0) return;
@@ -591,9 +603,11 @@ export const DesignEditorPage: React.FC = () => {
     activeCanvas()?.setTextProp('text', text);
   }, [activeCanvas]);
 
-  const handleFontChange = useCallback((fontFamily: string) => {
+  const handleFontChange = useCallback(async (fontFamily: string) => {
+    await ensureDesignFontLoaded(fontFamily, crmFonts);
     activeCanvas()?.setTextProp('fontFamily', fontFamily);
-  }, [activeCanvas]);
+    await activeCanvas()?.reloadTextFonts();
+  }, [activeCanvas, crmFonts]);
 
   const handleFontSizeChange = useCallback((fontSize: number) => {
     activeCanvas()?.setTextProp('fontSize', fontSize);
@@ -637,8 +651,10 @@ export const DesignEditorPage: React.FC = () => {
     async (fontFamily: string) => {
       const handle = canvasHandleRef.current;
       if (!handle) return;
+      await ensureDesignFontLoaded(fontFamily, crmFonts);
       if (selectedObj?.type === 'IText') {
         handle.applyTextPropsToSelection({ fontFamily });
+        await handle.reloadTextFonts();
         return;
       }
       const saved = await handle.saveCurrentPage();
@@ -648,8 +664,9 @@ export const DesignEditorPage: React.FC = () => {
       }));
       setPages(nextPages);
       await handle.applyEditorViewState(nextPages);
+      await handle.reloadTextFonts();
     },
-    [selectedObj?.type, currentPage, leftPageIdx, rightPageIdx, pages],
+    [selectedObj?.type, currentPage, leftPageIdx, rightPageIdx, pages, crmFonts],
   );
 
   const handleSidebarApplyTextColor = useCallback(

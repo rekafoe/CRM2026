@@ -1,4 +1,4 @@
-import { fontFamilyNamesMatch, normalizeFontFamilyName } from './fontFamilyNormalize'
+import { fontFamilyCompactKey, fontFamilyNamesMatch, normalizeFontFamilyName } from './fontFamilyNormalize'
 
 type FabricObj = Record<string, unknown>
 
@@ -46,23 +46,34 @@ export type RequiredFontEntry = {
   fontId?: number
   url?: string
   format?: string
+  name_aliases?: string[]
+}
+
+export type GlobalFontRef = {
+  id: number
+  url: string
+  format: string
+  /** Каноническое имя в библиотеке CRM (family_name). */
+  family: string
+  name_aliases?: string[]
 }
 
 export function buildRequiredFontEntries(input: {
   families: string[]
-  globalByFamily: Map<string, { id: number; url: string; format: string }>
+  globalByFamily: Map<string, GlobalFontRef>
   bundledFonts?: BundledTemplateFont[]
 }): RequiredFontEntry[] {
   const bundled = input.bundledFonts ?? []
   return input.families.map((family) => {
-    const global = [...input.globalByFamily.entries()].find(([key]) => fontFamilyNamesMatch(key, family))?.[1]
+    const global = input.globalByFamily.get(fontFamilyCompactKey(family))
     if (global) {
       return {
-        family,
+        family: global.family,
         source: 'global' as const,
         fontId: global.id,
         url: global.url,
         format: global.format,
+        name_aliases: global.name_aliases,
       }
     }
     const bundledMatch = bundled.find((b) => fontFamilyNamesMatch(b.family, family))
@@ -80,4 +91,47 @@ export function buildRequiredFontEntries(input: {
 
 export function hasMissingRequiredFonts(entries: RequiredFontEntry[]): boolean {
   return entries.some((e) => e.source === 'missing')
+}
+
+/** Приводит fontFamily в fabricJSON к family_name из библиотеки по алиасам (имя в SVG ≠ имя в файле). */
+export function normalizeDesignStateFontFamilies(
+  designState: unknown,
+  libraryFonts: Array<{ family_name: string; name_aliases?: string[] }>,
+): unknown {
+  if (!designState || typeof designState !== 'object' || Array.isArray(designState)) return designState
+  const pages = (designState as Record<string, unknown>).pages
+  if (!Array.isArray(pages)) return designState
+
+  const aliasToCanonical = new Map<string, string>()
+  for (const font of libraryFonts) {
+    const canonical = normalizeFontFamilyName(font.family_name)
+    if (!canonical) continue
+    const names = [canonical, ...(font.name_aliases ?? [])]
+    for (const name of names) {
+      const key = fontFamilyCompactKey(name)
+      if (key) aliasToCanonical.set(key, canonical)
+    }
+  }
+
+  const normalizeFabric = (value: unknown): void => {
+    walkFabric(value, (obj) => {
+      const current = normalizeFontFamilyName(String(obj.fontFamily ?? ''))
+      if (!current) return
+      const canonical = aliasToCanonical.get(fontFamilyCompactKey(current))
+      if (canonical) {
+        obj.fontFamily = canonical
+      }
+    })
+  }
+
+  const nextPages = pages.map((page) => {
+    if (!page || typeof page !== 'object') return page
+    const fabricJSON = (page as Record<string, unknown>).fabricJSON
+    if (!fabricJSON || typeof fabricJSON !== 'object') return page
+    const cloned = JSON.parse(JSON.stringify(fabricJSON)) as Record<string, unknown>
+    normalizeFabric(cloned)
+    return { ...(page as Record<string, unknown>), fabricJSON: cloned }
+  })
+
+  return { ...(designState as Record<string, unknown>), pages: nextPages }
 }
