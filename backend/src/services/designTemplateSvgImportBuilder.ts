@@ -1,7 +1,7 @@
 import path from 'path'
 import PizZip from 'pizzip'
 import { detectFontFormat, isFontUploadExtension, saveBufferToUploads } from '../config/upload'
-import { guessFontFamilyFromFilename } from '../utils/fontFamilyNormalize'
+import { fontFamilyCompactKey, guessFontFamilyFromFilename } from '../utils/fontFamilyNormalize'
 import type { BundledTemplateFont } from '../utils/extractDesignStateFonts'
 import {
   parseImportedSvgLayers,
@@ -246,14 +246,76 @@ function samePageSize(a: number, b: number): boolean {
   return Math.abs(a - b) <= 0.2
 }
 
+const GENERIC_FONT_KEYS = new Set([
+  'arial', 'helvetica', 'sans-serif', 'serif', 'times', 'timesnewroman',
+  'courier', 'couriernew', 'symbol', 'default',
+])
+
+function isGenericFontFamily(family: string | undefined): boolean {
+  if (!family?.trim()) return true
+  return GENERIC_FONT_KEYS.has(fontFamilyCompactKey(family))
+}
+
+function matchBundledFontToTextLayer(
+  textName: string,
+  bundled: BundledTemplateFont[],
+): BundledTemplateFont | undefined {
+  const suffixKey = fontFamilyCompactKey(textName.replace(/^text_/i, ''))
+  if (!suffixKey) return undefined
+  return bundled.find((font) => {
+    const familyKey = fontFamilyCompactKey(font.family)
+    const fileKey = fontFamilyCompactKey(guessFontFamilyFromFilename(font.filename))
+    return familyKey.includes(suffixKey) || suffixKey.includes(familyKey)
+      || fileKey.includes(suffixKey) || suffixKey.includes(fileKey)
+  })
+}
+
+function applyBundledFontFallbacks(
+  parsed: ReturnType<typeof parseImportedSvgLayers>,
+  bundledFonts: BundledTemplateFont[],
+  warnings: string[],
+  pageIndex: number,
+): void {
+  if (bundledFonts.length === 0) return
+
+  for (const layer of parsed.interactiveLayers) {
+    if (layer.kind !== 'text') continue
+    const text = layer.data
+    if (!isGenericFontFamily(text.fontFamily)) continue
+
+    const matched = matchBundledFontToTextLayer(text.name, bundledFonts)
+    if (matched) {
+      text.fontFamily = matched.family
+      continue
+    }
+    if (bundledFonts.length === 1) {
+      text.fontFamily = bundledFonts[0].family
+      warnings.push(
+        `Страница ${pageIndex + 1}: для ${text.name} применён единственный шрифт из ZIP (${bundledFonts[0].family}).`,
+      )
+    }
+  }
+
+  const unresolved = parsed.textItems.filter((item) => isGenericFontFamily(item.fontFamily))
+  if (unresolved.length > 0) {
+    warnings.push(
+      `Страница ${pageIndex + 1}: для ${unresolved.map((t) => t.name).join(', ')} не найден font-family в SVG. `
+      + `В ZIP: ${bundledFonts.map((f) => f.family).join(', ')}. `
+      + 'Проверьте экспорт (font-family на слое) или имя text_<шрифт>.',
+    )
+  }
+}
+
 function buildPageFromSvg(input: {
   svg: string
   originalName: string
   pageIndex: number
   templateName: string
   warnings: string[]
+  bundledFonts?: BundledTemplateFont[]
 }): StoredImportedSvgPage {
   const parsed = parseImportedSvgLayers(sanitizeSvg(input.svg), { sceneScale: IMPORTED_TEMPLATE_SCENE_SCALE })
+  applyBundledFontFallbacks(parsed, input.bundledFonts ?? [], input.warnings, input.pageIndex)
   input.warnings.push(...parsed.warnings.map((warning) => `Страница ${input.pageIndex + 1}: ${warning}`))
 
   if (parsed.removalRanges.length > 0) {
@@ -304,6 +366,9 @@ export function buildImportedSvgTemplateDocument(
   warnings: string[],
 ): ImportedSvgTemplateDocument {
   const ext = path.extname(file.originalname || '').toLowerCase()
+  const bundledFonts = ext === '.zip'
+    ? readZipFontEntries(file, templateName, warnings)
+    : []
   const entries = readSvgEntries(file, ext, warnings)
   const pages = entries.map((entry, index) => buildPageFromSvg({
     svg: entry.svg,
@@ -311,6 +376,7 @@ export function buildImportedSvgTemplateDocument(
     pageIndex: index,
     templateName,
     warnings,
+    bundledFonts,
   }))
   const first = pages[0]
   if (!first) importError('Не удалось собрать страницы шаблона.', warnings)
@@ -324,10 +390,6 @@ export function buildImportedSvgTemplateDocument(
       )
     }
   }
-
-  const bundledFonts = ext === '.zip'
-    ? readZipFontEntries(file, templateName, warnings)
-    : []
 
   return {
     pageWidthMm: first.parsed.widthMm,

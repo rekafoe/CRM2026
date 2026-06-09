@@ -5,9 +5,14 @@ export function normalizeFontFamilyName(value: string | undefined | null): strin
   return first.replace(/^['"]|['"]$/g, '').trim()
 }
 
+/** Ключ сравнения: без пробелов/дефисов, lower — HappyTimeTwo = Happy Time Two. */
+export function fontFamilyCompactKey(value: string | undefined | null): string {
+  return normalizeFontFamilyName(value).toLowerCase().replace(/[\s_-]+/g, '')
+}
+
 export function fontFamilyNamesMatch(a: string | undefined, b: string | undefined): boolean {
-  const na = normalizeFontFamilyName(a).toLowerCase()
-  const nb = normalizeFontFamilyName(b).toLowerCase()
+  const na = fontFamilyCompactKey(a)
+  const nb = fontFamilyCompactKey(b)
   if (!na || !nb) return false
   return na === nb
 }

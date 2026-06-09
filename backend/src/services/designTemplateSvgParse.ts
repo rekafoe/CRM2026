@@ -543,7 +543,20 @@ export function parseImportedSvgLayers(
 
   const groupStack: (string | null)[] = [null]
   const transformStack: SvgTransform[] = [IDENTITY_TRANSFORM]
+  const groupStyleStack: Array<Record<string, string>> = [{}]
   const groupFrameStack: Array<{ openLt: number; removable: boolean }> = []
+
+  function mergeGroupPresentationStyle(attrs: Record<string, string>): Record<string, string> {
+    const parent = groupStyleStack[groupStyleStack.length - 1] ?? {}
+    const self = {
+      ...styleFromClassNames(attrs.class, cssClassStyles),
+      ...parseStyle(attrs.style),
+    }
+    if (attrs['font-family']?.trim()) self['font-family'] = attrs['font-family'].trim()
+    if (attrs['font-size']?.trim()) self['font-size'] = attrs['font-size'].trim()
+    if (attrs['text-anchor']?.trim()) self['text-anchor'] = attrs['text-anchor'].trim()
+    return { ...parent, ...self }
+  }
 
   let i = 0
   while (i < svg.length) {
@@ -585,6 +598,7 @@ export function parseImportedSvgLayers(
       const framed = groupFrameStack.pop()
       if (groupStack.length > 1) groupStack.pop()
       if (transformStack.length > 1) transformStack.pop()
+      if (groupStyleStack.length > 1) groupStyleStack.pop()
       if (framed?.removable) removalRanges.push({ start: framed.openLt, end: gt + 1 })
       i = gt + 1
       continue
@@ -597,6 +611,7 @@ export function parseImportedSvgLayers(
       if (ln) warnUnhandledLayerName('группа', ln, warnings, warnedNames)
       groupStack.push(ln)
       transformStack.push(multiplyTransform(transformStack[transformStack.length - 1], parseSvgTransform(attrs.transform)))
+      groupStyleStack.push(mergeGroupPresentationStyle(attrs))
       groupFrameStack.push({ openLt: lt, removable: groupRemovable(ln) })
       i = gt + 1
       continue
@@ -694,16 +709,20 @@ export function parseImportedSvgLayers(
       const innerStr = closeLt > gt ? svg.slice(gt + 1, closeLt) : ''
 
       if (ef?.startsWith('text_')) {
+        const inheritedGroupStyle = groupStyleStack[groupStyleStack.length - 1] ?? {}
         const textStyle = {
+          ...inheritedGroupStyle,
           ...styleFromClassNames(attrs.class, cssClassStyles),
           ...parseStyle(attrs.style),
         }
         const tspan = firstTspan(innerStr)
         const tspanAttrs = tspan?.attrs ?? {}
         const tspanStyle = {
+          ...textStyle,
           ...styleFromClassNames(tspanAttrs.class, cssClassStyles),
           ...parseStyle(tspanAttrs.style),
         }
+        if (tspanAttrs['font-family']?.trim()) tspanStyle['font-family'] = tspanAttrs['font-family'].trim()
         const xv = parseNumber(pickAttr(tspanAttrs, attrs, 'x')) ?? 0
         const yv = parseNumber(pickAttr(tspanAttrs, attrs, 'y')) ?? 0
         const fontSize =

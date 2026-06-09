@@ -25,7 +25,9 @@ template.zip
   fonts/CeremoniousOne.woff2
 ```
 
-Имена файлов сопоставляются с family по эвристике (`HappyTime.woff2` → `Happy Time`). При несовпадении — предупреждение в импорте; уточните имя в библиотеке CRM.
+Имена файлов сопоставляются с family по эвристике (`HappyTime.woff2` → `Happy Time`). **Папка fonts/ не подставляет шрифт сама** — в `fabricJSON` попадает `font-family` из SVG (на `<text>`, `<tspan>` или родительской `<g>`). Если в SVG только Arial или font-family нет — будет предупреждение при импорте.
+
+Дополнительно: слой `text_happytime` может сопоставиться с файлом `HappyTime.otf` из ZIP; при одном шрифте в архиве он применится ко всем `text_*` без font-family.
 
 Приоритет: **глобальная библиотека** → **bundled из ZIP**.
 

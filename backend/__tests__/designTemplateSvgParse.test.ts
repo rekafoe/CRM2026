@@ -142,6 +142,20 @@ describe('parseImportedSvgLayers', () => {
     ])
   })
 
+  it('наследует font-family с родительской группы text_* (Corel/AI)', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <style type="text/css"><![CDATA[
+    .fnt_happy { font-family: 'Happy Time Two'; font-size: 24px; }
+  ]]></style>
+  <g id="text_name" class="fnt_happy">
+    <text x="100" y="200"><tspan>Имя</tspan></text>
+  </g>
+</svg>`
+    const r = parseImportedSvgLayers(svg, { sceneScale: 3 })
+    expect(r.textItems[0]?.fontFamily).toBe('Happy Time Two')
+  })
+
   it('сохраняет z-order когда text идёт раньше photo в SVG', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
