@@ -632,8 +632,9 @@ export const DesignEditorPage: React.FC = () => {
   }, [selectedObj?.underline, activeCanvas]);
 
   const handleTextAlignChange = useCallback((textAlign: string) => {
-    activeCanvas()?.setTextProp('textAlign', textAlign);
-  }, [activeCanvas]);
+    const originX = textAlign === 'center' ? 'center' : textAlign === 'right' ? 'right' : 'left';
+    canvasHandleRef.current?.applyTextPropsToSelection({ textAlign, originX });
+  }, []);
 
   const handleTextFontVariant = useCallback((fontWeight: string, fontStyle: string) => {
     canvasHandleRef.current?.setTextStyle({ fontWeight, fontStyle });

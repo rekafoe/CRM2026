@@ -2,6 +2,7 @@ import { Canvas, FabricImage } from 'fabric';
 import type { DesignTemplate } from '../../../api';
 import type { DesignPage } from './types';
 import { FABRIC_CUSTOM_PROPS } from './constants';
+import { upgradeEmptyPhotoFieldsOnCanvas } from './photoFieldEmpty';
 
 type AnyObj = Record<string, unknown>;
 
@@ -90,6 +91,7 @@ export async function loadDesignPageScene(input: {
   const hasJson = pageData?.fabricJSON && Object.keys(pageData.fabricJSON).length > 0;
   if (hasJson) {
     await canvas.loadFromJSON(pageData!.fabricJSON, fabricDeserializeReviver);
+    upgradeEmptyPhotoFieldsOnCanvas(canvas);
     normalizeBackgroundObjects(canvas, pageW, pageH);
     if (useTemplatePreviewBackground && !hasBackgroundObject(canvas)) {
       await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);

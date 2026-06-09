@@ -1,8 +1,14 @@
 /**
- * Пустое фото-поле — один Fabric Rect, как в импорте SVG-шаблона (designTemplateSvgImportBuilder).
- * Группа с дочерними объектами ломает ресайз в Fabric 7.
+ * Пустое фото-поле: группа с однородным фоном и иконкой камеры (как в legacy chrome).
+ * Один Fabric Rect на сцене ломал ресайз в Fabric 7 — группа с noop layout и relayoutEmptyPhotoFieldChrome.
  */
-import { Rect, type FabricObject } from 'fabric';
+import { Circle, Group, Rect, type Canvas, type FabricObject } from 'fabric';
+import { createPhotoFieldStaticLayoutManager, ensurePhotoFieldStaticLayout } from './photoFieldFit';
+import {
+  pickEmptyPhotoFieldFrameRect,
+  relayoutEmptyPhotoFieldChrome,
+  resolvePhotoFieldFrameSize,
+} from './photoFieldGeometry';
 
 type AnyObj = Record<string, unknown>;
 
@@ -10,12 +16,150 @@ function ax(obj: unknown): AnyObj {
   return obj as AnyObj;
 }
 
+const EMPTY_PHOTO_FIELD_FILL = '#eef2f7';
+const EMPTY_PHOTO_FIELD_STROKE = '#2563eb';
+const EMPTY_PHOTO_BADGE_FILL = '#dbeafe';
+const EMPTY_PHOTO_ICON_FILL = '#3b82f6';
+
+function buildEmptyPhotoFieldChrome(frameW: number, frameH: number): FabricObject[] {
+  const frameRect = new Rect({
+    left: 0,
+    top: 0,
+    originX: 'left',
+    originY: 'top',
+    width: frameW,
+    height: frameH,
+    fill: EMPTY_PHOTO_FIELD_FILL,
+    stroke: EMPTY_PHOTO_FIELD_STROKE,
+    strokeWidth: 1,
+    strokeDashArray: [6, 4],
+    strokeUniform: true,
+    rx: 6,
+    ry: 6,
+    selectable: false,
+    evented: false,
+    objectCaching: false,
+  });
+
+  const minSide = Math.min(frameW, frameH);
+  const badgeR = Math.max(12, Math.min(22, minSide * 0.22));
+  const badgeCx = frameW / 2;
+  const badgeCy = frameH / 2;
+  const camBodyW = badgeR * 0.82;
+  const camBodyH = badgeR * 0.55;
+
+  const badge = new Circle({
+    left: badgeCx,
+    top: badgeCy,
+    originX: 'center',
+    originY: 'center',
+    radius: badgeR,
+    fill: EMPTY_PHOTO_BADGE_FILL,
+    stroke: EMPTY_PHOTO_ICON_FILL,
+    strokeWidth: 1,
+    selectable: false,
+    evented: false,
+    objectCaching: false,
+  });
+
+  const camBody = new Rect({
+    left: badgeCx,
+    top: badgeCy + 1,
+    originX: 'center',
+    originY: 'center',
+    width: camBodyW,
+    height: camBodyH,
+    rx: 2,
+    ry: 2,
+    fill: EMPTY_PHOTO_ICON_FILL,
+    selectable: false,
+    evented: false,
+    objectCaching: false,
+  });
+
+  const camTop = new Rect({
+    left: badgeCx,
+    top: badgeCy - camBodyH / 2 - 2,
+    originX: 'center',
+    originY: 'center',
+    width: badgeR * 0.42,
+    height: badgeR * 0.18,
+    rx: 1,
+    ry: 1,
+    fill: EMPTY_PHOTO_ICON_FILL,
+    selectable: false,
+    evented: false,
+    objectCaching: false,
+  });
+
+  const camLens = new Circle({
+    left: badgeCx,
+    top: badgeCy + 1,
+    originX: 'center',
+    originY: 'center',
+    radius: Math.max(2, badgeR * 0.15),
+    fill: '#ffffff',
+    stroke: EMPTY_PHOTO_ICON_FILL,
+    strokeWidth: 1,
+    selectable: false,
+    evented: false,
+    objectCaching: false,
+  });
+
+  return [frameRect, badge, camBody, camTop, camLens];
+}
+
 export function isEmptyPhotoFieldRect(field: FabricObject): boolean {
   const o = ax(field);
   return field.type === 'rect' && o.isPhotoField === true && o.photoFieldFilled !== true;
 }
 
-/** Создаёт пустое поле — один rect на сцене (как parsed template fields). */
+export function needsEmptyPhotoFieldChromeUpgrade(field: FabricObject): boolean {
+  const o = ax(field);
+  if (o.isPhotoField !== true || o.photoFieldFilled === true) return false;
+  if (field.type === 'rect') return true;
+  if (field.type === 'group') {
+    return (field as Group).getObjects().length < 5;
+  }
+  return false;
+}
+
+function sceneAnchorTL(field: FabricObject): { x: number; y: number } {
+  const frame = pickEmptyPhotoFieldFrameRect(field) ?? field;
+  const coords = frame.getCoords();
+  if (coords[0]) return { x: coords[0].x, y: coords[0].y };
+  const br = field.getBoundingRect();
+  return { x: br.left, y: br.top };
+}
+
+/** Импортированный rect или урезанная группа → полноценное поле с иконкой. */
+export function upgradePlainEmptyPhotoField(field: FabricObject): FabricObject | null {
+  if (!needsEmptyPhotoFieldChromeUpgrade(field)) return null;
+  const o = ax(field);
+  const { fw, fh } = resolvePhotoFieldFrameSize(field);
+  const anchor = sceneAnchorTL(field);
+  return createEmptyPhotoField({
+    id: String(o.id ?? '').trim() || `field-${Date.now()}`,
+    left: anchor.x,
+    top: anchor.y,
+    width: fw,
+    height: fh,
+    clientAdded: o.photoFieldClientAdded === true,
+  });
+}
+
+/** После loadFromJSON: шаблонные photo_* без chrome получают фон и иконку камеры. */
+export function upgradeEmptyPhotoFieldsOnCanvas(canvas: Canvas): boolean {
+  const before = canvas.getObjects();
+  const next = before.map((obj) => upgradePlainEmptyPhotoField(obj) ?? obj);
+  const changed = next.some((obj, index) => obj !== before[index]);
+  if (!changed) return false;
+  canvas.clear();
+  canvas.add(...next);
+  return true;
+}
+
+/** Создаёт пустое поле — группа с фоном и иконкой камеры. */
 export function createEmptyPhotoField(opts: {
   id: string;
   left: number;
@@ -24,33 +168,34 @@ export function createEmptyPhotoField(opts: {
   height: number;
   clientAdded?: boolean;
 }): FabricObject {
-  const { id, left, top, width, height } = opts;
-  const rect = new Rect({
+  const { id, left, top } = opts;
+  const frameW = Math.max(32, Math.round(opts.width));
+  const frameH = Math.max(32, Math.round(opts.height));
+  const children = buildEmptyPhotoFieldChrome(frameW, frameH);
+  const group = new Group(children, {
     left,
     top,
     originX: 'left',
     originY: 'top',
-    width,
-    height,
-    fill: '#ffffff',
-    stroke: '#94a3b8',
-    strokeWidth: 1,
-    strokeDashArray: [6, 4],
-    strokeUniform: true,
-    rx: 6,
-    ry: 6,
+    width: frameW,
+    height: frameH,
+    subTargetCheck: false,
     objectCaching: false,
+    layoutManager: createPhotoFieldStaticLayoutManager(),
   });
-  const o = ax(rect);
+  relayoutEmptyPhotoFieldChrome(group, frameW, frameH);
+  ensurePhotoFieldStaticLayout(group);
+
+  const o = ax(group);
   o.isPhotoField = true;
   o.photoFieldFilled = false;
-  o.photoFieldFw = width;
-  o.photoFieldFh = height;
+  o.photoFieldFw = frameW;
+  o.photoFieldFh = frameH;
   o.id = id;
   if (opts.clientAdded) o.photoFieldClientAdded = true;
-  rect.set({ scaleX: 1, scaleY: 1 });
-  rect.setCoords();
-  return rect;
+  group.set({ scaleX: 1, scaleY: 1 });
+  group.setCoords();
+  return group;
 }
 
 /**

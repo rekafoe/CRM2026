@@ -11,6 +11,7 @@ import {
   buildRequiredFontEntries,
   extractUsedFontFamiliesFromDesignState,
   hasMissingRequiredFonts,
+  applyLibraryFontFallbacksToDesignState,
   normalizeDesignStateFontFamilies,
   type BundledTemplateFont,
   type GlobalFontRef,
@@ -375,7 +376,8 @@ export async function enrichSpecWithRequiredFonts(
   spec: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const libraryFonts = await listDesignFonts(true)
-  const normalizedDesignState = normalizeDesignStateFontFamilies(spec.designState, libraryFonts)
+  const withLibraryFallbacks = applyLibraryFontFallbacksToDesignState(spec.designState, libraryFonts)
+  const normalizedDesignState = normalizeDesignStateFontFamilies(withLibraryFallbacks, libraryFonts)
   const bundled = Array.isArray(spec.fonts) ? spec.fonts as BundledTemplateFont[] : []
   const requiredFonts = await buildRequiredFontsForDesignState(normalizedDesignState, bundled)
   const fontWarnings = requiredFonts

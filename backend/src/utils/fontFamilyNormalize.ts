@@ -17,6 +17,17 @@ export function fontFamilyNamesMatch(a: string | undefined, b: string | undefine
   return na === nb
 }
 
+const GENERIC_FONT_KEYS = new Set([
+  'arial', 'helvetica', 'sans-serif', 'serif', 'times', 'timesnewroman',
+  'courier', 'couriernew', 'symbol', 'default',
+])
+
+/** Arial / sans-serif / пустое — шрифт не задан в SVG. */
+export function isGenericFontFamily(family: string | undefined | null): boolean {
+  if (!family?.trim()) return true
+  return GENERIC_FONT_KEYS.has(fontFamilyCompactKey(family))
+}
+
 function titleCaseFontWords(value: string): string {
   return value.split(/\s+/).filter(Boolean).map((word) => (
     word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()

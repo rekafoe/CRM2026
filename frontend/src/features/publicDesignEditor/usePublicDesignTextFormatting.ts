@@ -37,7 +37,8 @@ export function usePublicDesignTextFormatting(
   }, [canvasHandleRef, selectedObj?.underline]);
 
   const handleTextAlignChange = useCallback((textAlign: string) => {
-    canvasHandleRef.current?.setTextProp('textAlign', textAlign);
+    const originX = textAlign === 'center' ? 'center' : textAlign === 'right' ? 'right' : 'left';
+    canvasHandleRef.current?.applyTextPropsToSelection({ textAlign, originX });
   }, [canvasHandleRef]);
 
   const handleLineHeightChange = useCallback((lineHeight: number) => {

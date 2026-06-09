@@ -1,4 +1,9 @@
-import { fontFamilyCompactKey, fontFamilyNamesMatch, normalizeFontFamilyName } from './fontFamilyNormalize'
+import {
+  fontFamilyCompactKey,
+  fontFamilyNamesMatch,
+  isGenericFontFamily,
+  normalizeFontFamilyName,
+} from './fontFamilyNormalize'
 
 type FabricObj = Record<string, unknown>
 
@@ -91,6 +96,64 @@ export function buildRequiredFontEntries(input: {
 
 export function hasMissingRequiredFonts(entries: RequiredFontEntry[]): boolean {
   return entries.some((e) => e.source === 'missing')
+}
+
+type LibraryFontRef = { family_name: string; name_aliases?: string[] }
+
+function matchLibraryFontToTextLayer(
+  textId: string,
+  libraryFonts: LibraryFontRef[],
+): string | undefined {
+  const suffixKey = fontFamilyCompactKey(textId.replace(/^text_/i, ''))
+  if (!suffixKey) return undefined
+  for (const font of libraryFonts) {
+    const canonical = normalizeFontFamilyName(font.family_name)
+    if (!canonical) continue
+    const names = [canonical, ...(font.name_aliases ?? [])]
+    for (const name of names) {
+      const familyKey = fontFamilyCompactKey(name)
+      if (!familyKey) continue
+      if (familyKey.includes(suffixKey) || suffixKey.includes(familyKey)) {
+        return canonical
+      }
+    }
+  }
+  return undefined
+}
+
+/**
+ * Для text_* без font-family в SVG (Arial в fabricJSON) подставляет шрифт из библиотеки CRM
+ * по имени слоя: text_voguella → Voguella.
+ */
+export function applyLibraryFontFallbacksToDesignState(
+  designState: unknown,
+  libraryFonts: LibraryFontRef[],
+): unknown {
+  if (!libraryFonts.length) return designState
+  if (!designState || typeof designState !== 'object' || Array.isArray(designState)) return designState
+  const pages = (designState as Record<string, unknown>).pages
+  if (!Array.isArray(pages)) return designState
+
+  const applyFabric = (value: unknown): void => {
+    walkFabric(value, (obj) => {
+      if (!isGenericFontFamily(String(obj.fontFamily ?? ''))) return
+      const id = String(obj.id ?? '')
+      if (!id.toLowerCase().startsWith('text_')) return
+      const matched = matchLibraryFontToTextLayer(id, libraryFonts)
+      if (matched) obj.fontFamily = matched
+    })
+  }
+
+  const nextPages = pages.map((page) => {
+    if (!page || typeof page !== 'object') return page
+    const fabricJSON = (page as Record<string, unknown>).fabricJSON
+    if (!fabricJSON || typeof fabricJSON !== 'object') return page
+    const cloned = JSON.parse(JSON.stringify(fabricJSON)) as Record<string, unknown>
+    applyFabric(cloned)
+    return { ...(page as Record<string, unknown>), fabricJSON: cloned }
+  })
+
+  return { ...(designState as Record<string, unknown>), pages: nextPages }
 }
 
 /** Приводит fontFamily в fabricJSON к family_name из библиотеки по алиасам (имя в SVG ≠ имя в файле). */

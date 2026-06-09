@@ -28,8 +28,14 @@ export type SvgText = {
   y: number
   fontSize: number
   fontFamily?: string
+  fontWeight?: string
+  fontStyle?: string
   text: string
   textAnchor: 'start' | 'middle' | 'end'
+  /** Ширина блочного textbox в px сцены (для text-align ≠ left). */
+  frameWidthScene?: number
+  /** Цвет заливки текста (SVG fill / CSS color). */
+  fill?: string
   /** Угол поворота в градусах (Fabric, по часовой), из SVG transform. */
   angle?: number
   svg: GeometryPoint & { fontSize: number }
@@ -380,19 +386,186 @@ function normalizeTextAnchor(value: string | undefined): SvgText['textAnchor'] {
   return 'start'
 }
 
-/** SVG text-anchor + CSS text-align (Corel часто пишет text-align в style). */
-function resolveTextAnchor(...sources: Array<Record<string, string> | undefined>): SvgText['textAnchor'] {
+/**
+ * SVG text-anchor + CSS text-align.
+ * Corel часто ставит text-anchor="start" и text-align:right — start не должен блокировать align.
+ */
+export function resolveTextAnchor(...sources: Array<Record<string, string> | undefined>): SvgText['textAnchor'] {
+  let anchorFromAttr: SvgText['textAnchor'] | undefined
   for (const source of sources) {
     if (!source) continue
     const anchor = source['text-anchor']?.trim()
-    if (anchor) return normalizeTextAnchor(anchor)
+    if (!anchor) continue
+    const normalized = normalizeTextAnchor(anchor)
+    if (normalized !== 'start') return normalized
+    anchorFromAttr = 'start'
   }
   for (const source of sources) {
     if (!source) continue
     const align = source['text-align']?.trim()
-    if (align) return normalizeTextAnchor(align)
+    if (!align) continue
+    const normalized = normalizeTextAnchor(align)
+    if (normalized !== 'start') return normalized
   }
-  return 'start'
+  return anchorFromAttr ?? 'start'
+}
+
+function estimateLineWidthSvg(text: string, fontSizeSvg: number): number {
+  return Math.max(1, text.length) * fontSizeSvg * 0.55
+}
+
+type TspanLineMetric = { left: number; right: number; y: number }
+
+function resolveTspanLineMetrics(
+  tspans: ParsedTspan[],
+  attrs: Record<string, string>,
+  fontSizeSvg: number,
+  transform: SvgTransform,
+): TspanLineMetric[] {
+  return tspans.map((tspan) => {
+    const x = parseNumber(pickAttr(tspan.attrs, attrs, 'x')) ?? 0
+    const y = parseNumber(pickAttr(tspan.attrs, attrs, 'y')) ?? 0
+    const pt = applyTransform(transform, x, y)
+    const w = estimateLineWidthSvg(tspan.text, fontSizeSvg)
+    return { left: pt.x, right: pt.x + w, y: pt.y }
+  })
+}
+
+/** Corel иногда выравнивает строки разными x при text-anchor:start. */
+function inferAlignedTextAnchor(
+  metrics: TspanLineMetric[],
+  fontSizeSvg: number,
+): { anchor: SvgText['textAnchor']; anchorX: number; anchorY: number } | undefined {
+  if (metrics.length < 2) return undefined
+  const rights = metrics.map((m) => m.right)
+  const lefts = metrics.map((m) => m.left)
+  const rightSpread = Math.max(...rights) - Math.min(...rights)
+  const leftSpread = Math.max(...lefts) - Math.min(...lefts)
+  const tol = fontSizeSvg * 0.35
+  if (rightSpread <= tol && leftSpread > tol) {
+    return { anchor: 'end', anchorX: Math.max(...rights), anchorY: metrics[0].y }
+  }
+  if (leftSpread <= tol && rightSpread > tol) {
+    return { anchor: 'start', anchorX: Math.min(...lefts), anchorY: metrics[0].y }
+  }
+  return undefined
+}
+
+function computeTextFrameWidthScene(
+  lines: string[],
+  metrics: TspanLineMetric[],
+  fontSizeScene: number,
+  textAnchor: SvgText['textAnchor'],
+): number | undefined {
+  if (lines.length <= 1 && metrics.length <= 1) return undefined
+  const widths = lines.map((line) => estimateLineWidthSvg(line, fontSizeScene))
+  const maxW = Math.max(...widths)
+  const span = metrics.length > 1
+    ? Math.max(...metrics.map((m) => m.right)) - Math.min(...metrics.map((m) => m.left))
+    : 0
+  if (textAnchor === 'end' || textAnchor === 'middle') {
+    return Math.max(maxW, span + maxW * 0.08, 120)
+  }
+  return Math.max(maxW, span + maxW * 0.05, 120)
+}
+
+function parseFontWeightFromStyle(style: Record<string, string>): string | undefined {
+  const direct = style['font-weight']?.trim().toLowerCase()
+  if (direct) {
+    if (direct === 'bold' || direct === 'bolder') return 'bold'
+    const n = Number.parseInt(direct, 10)
+    if (Number.isFinite(n) && n >= 600) return 'bold'
+    if (direct === 'normal' || direct === 'lighter' || (Number.isFinite(n) && n < 600)) return 'normal'
+  }
+  const shorthand = style.font?.trim()
+  if (!shorthand) return undefined
+  if (/\b(bold|bolder)\b/i.test(shorthand)) return 'bold'
+  if (/\b\d{3}\b/.test(shorthand)) {
+    const n = Number.parseInt(shorthand.match(/\b(\d{3})\b/)?.[1] ?? '', 10)
+    if (Number.isFinite(n) && n >= 600) return 'bold'
+  }
+  return undefined
+}
+
+function parseFontStyleFromStyle(style: Record<string, string>): string | undefined {
+  const direct = style['font-style']?.trim().toLowerCase()
+  if (direct === 'italic' || direct === 'oblique') return 'italic'
+  if (direct === 'normal') return 'normal'
+  const shorthand = style.font?.trim()
+  if (shorthand && /\b(italic|oblique)\b/i.test(shorthand)) return 'italic'
+  return undefined
+}
+
+const SVG_NAMED_COLORS: Record<string, string> = {
+  white: '#ffffff',
+  black: '#000000',
+  red: '#ff0000',
+  green: '#008000',
+  blue: '#0000ff',
+  yellow: '#ffff00',
+  gray: '#808080',
+  grey: '#808080',
+  silver: '#c0c0c0',
+  maroon: '#800000',
+  navy: '#000080',
+  teal: '#008080',
+  aqua: '#00ffff',
+  fuchsia: '#ff00ff',
+  lime: '#00ff00',
+  olive: '#808000',
+  purple: '#800080',
+}
+
+/** Нормализует SVG/CSS цвет для Fabric fill. */
+export function normalizeSvgPaintColor(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  const raw = value.trim()
+  if (!raw) return undefined
+  const lower = raw.toLowerCase()
+  if (lower === 'none' || lower === 'transparent' || lower === 'currentcolor') return undefined
+
+  if (lower.startsWith('#')) {
+    if (lower.length === 4) {
+      return `#${lower[1]}${lower[1]}${lower[2]}${lower[2]}${lower[3]}${lower[3]}`
+    }
+    return raw
+  }
+
+  const rgbMatch = lower.match(
+    /^rgba?\(\s*([\d.]+)(%?)\s*[,/\s]\s*([\d.]+)(%?)\s*[,/\s]\s*([\d.]+)(%?)(?:\s*[,/]\s*([\d.]+))?\s*\)$/,
+  )
+  if (rgbMatch) {
+    const channel = (part: string, pct: string) => {
+      const n = Number(part)
+      if (!Number.isFinite(n)) return 0
+      const scale = pct === '%' || n > 1 ? 255 / 100 : 255
+      return Math.round(Math.min(255, Math.max(0, n * scale)))
+    }
+    const r = channel(rgbMatch[1], rgbMatch[2])
+    const g = channel(rgbMatch[3], rgbMatch[4])
+    const b = channel(rgbMatch[5], rgbMatch[6])
+    const a = rgbMatch[7] != null ? Number(rgbMatch[7]) : 1
+    if (Number.isFinite(a) && a < 1) return `rgba(${r},${g},${b},${a})`
+    const hex = ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
+    return `#${hex}`
+  }
+
+  return SVG_NAMED_COLORS[lower] ?? raw
+}
+
+/** fill на атрибуте / в style / CSS-классе Corel (.fil1 { fill: … }). */
+function resolveTextFill(...sources: Array<Record<string, string> | undefined>): string | undefined {
+  for (const source of sources) {
+    if (!source) continue
+    const fill = normalizeSvgPaintColor(source.fill)
+    if (fill) return fill
+  }
+  for (const source of sources) {
+    if (!source) continue
+    const color = normalizeSvgPaintColor(source.color)
+    if (color) return color
+  }
+  return undefined
 }
 
 function parseFontSizeFromStyle(style: Record<string, string>): number | null {
@@ -655,6 +828,8 @@ export function parseImportedSvgLayers(
     if (attrs['font-size']?.trim()) self['font-size'] = attrs['font-size'].trim()
     if (attrs['text-anchor']?.trim()) self['text-anchor'] = attrs['text-anchor'].trim()
     if (attrs['text-align']?.trim()) self['text-align'] = attrs['text-align'].trim()
+    if (attrs.fill?.trim()) self.fill = attrs.fill.trim()
+    if (attrs.color?.trim()) self.color = attrs.color.trim()
     return { ...parent, ...self }
   }
 
@@ -824,6 +999,8 @@ export function parseImportedSvgLayers(
           ...parseStyle(tspanAttrs.style),
         }
         if (tspanAttrs['font-family']?.trim()) tspanStyle['font-family'] = tspanAttrs['font-family'].trim()
+        const fill = resolveTextFill(tspanAttrs, tspanStyle, attrs, textStyle, inheritedGroupStyle)
+          ?? normalizeSvgPaintColor(pickAttr(tspanAttrs, attrs, 'fill'))
         const xv = parseNumber(pickAttr(tspanAttrs, attrs, 'x')) ?? 0
         const yv = parseNumber(pickAttr(tspanAttrs, attrs, 'y')) ?? 0
         const fontSize =
@@ -832,24 +1009,46 @@ export function parseImportedSvgLayers(
           parseNumber(attrs['font-size']) ??
           parseFontSizeFromStyle(textStyle) ??
           18
-        const textAnchor = resolveTextAnchor(tspanAttrs, tspanStyle, attrs, textStyle)
+        let textAnchor = resolveTextAnchor(tspanAttrs, tspanStyle, attrs, textStyle, inheritedGroupStyle)
         const textTransform = multiplyTransform(
           multiplyTransform(inheritedTransform, parseSvgTransform(attrs.transform)),
           parseSvgTransform(tspanAttrs.transform),
         )
-        const point = applyTransform(textTransform, xv, yv)
-        const mmPoint = geometry.svgPointToMm(point)
         const transformedFontSize = fontSize * transformScale(textTransform)
         const fontSizeMm = geometry.svgFontSizeToMm(transformedFontSize)
+        const fontSizeScene = geometry.mmToPx(fontSizeMm)
+        const textContent = tspans.length > 1
+          ? tspans.sort((a, b) => a.order - b.order).map((t) => t.text).join('\n')
+          : primaryTspan?.text || decodeXmlText(innerStr) || ef.replace(/^text_/, '')
+        const lineMetrics = resolveTspanLineMetrics(tspans, attrs, transformedFontSize, textTransform)
+        const inferred = textAnchor === 'start'
+          ? inferAlignedTextAnchor(lineMetrics, transformedFontSize)
+          : undefined
+        if (inferred) textAnchor = inferred.anchor
+        const point = inferred
+          ? { x: inferred.anchorX, y: inferred.anchorY }
+          : applyTransform(textTransform, xv, yv)
+        const mmPoint = geometry.svgPointToMm(point)
         const scenePoint = geometry.mmPointToScene(mmPoint)
         const fontFamily =
           parseFontFamilyFromStyle(tspanStyle)
           ?? parseFontFamilyFromStyle(textStyle)
           ?? (tspanAttrs['font-family'] ? normalizeFontFamilyToken(tspanAttrs['font-family']) : undefined)
           ?? (attrs['font-family'] ? normalizeFontFamilyToken(attrs['font-family']) : undefined)
-        const textContent = tspans.length > 1
-          ? tspans.sort((a, b) => a.order - b.order).map((t) => t.text).join('\n')
-          : primaryTspan?.text || decodeXmlText(innerStr) || ef.replace(/^text_/, '')
+        const fontWeight =
+          parseFontWeightFromStyle(tspanStyle)
+          ?? parseFontWeightFromStyle(textStyle)
+          ?? parseFontWeightFromStyle(inheritedGroupStyle)
+        const fontStyle =
+          parseFontStyleFromStyle(tspanStyle)
+          ?? parseFontStyleFromStyle(textStyle)
+          ?? parseFontStyleFromStyle(inheritedGroupStyle)
+        const frameWidthScene = computeTextFrameWidthScene(
+          textContent.split('\n'),
+          lineMetrics,
+          fontSizeScene,
+          textAnchor,
+        )
         const angle = transformAngleDeg(textTransform)
         const textEntry: SvgText = {
           name: ef,
@@ -857,11 +1056,15 @@ export function parseImportedSvgLayers(
           y: mmPoint.y,
           fontSize: fontSizeMm,
           fontFamily,
+          fontWeight,
+          fontStyle,
           text: textContent,
           textAnchor,
+          frameWidthScene,
+          fill,
           angle: Math.abs(angle) > 0.01 ? angle : undefined,
           svg: { ...point, fontSize: transformedFontSize },
-          scene: { ...scenePoint, fontSize: geometry.mmToPx(fontSizeMm) },
+          scene: { ...scenePoint, fontSize: fontSizeScene },
         }
         textItems.push(textEntry)
         interactiveLayers.push({ kind: 'text', data: textEntry })

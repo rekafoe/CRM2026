@@ -1,7 +1,9 @@
 import {
   decodeCorelUnicodeEscapes,
   decodeXmlText,
+  normalizeSvgPaintColor,
   parseImportedSvgLayers,
+  resolveTextAnchor,
   transformAngleDeg,
 } from '../src/services/designTemplateSvgParse'
 
@@ -130,6 +132,25 @@ describe('parseImportedSvgLayers', () => {
     expect(text.fontSize).toBeCloseTo(6.35, 2)
     expect(text.scene.fontSize).toBeCloseTo(72, 0)
     expect(text.fontFamily).toBe('Arial')
+    expect(text.fill).toBe('#111111')
+  })
+
+  it('читает белый цвет текста из fill атрибута и CSS-класса Corel', () => {
+    const svgAttr = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <text id="text_title" x="100" y="80" font-size="24" fill="#ffffff">VOGUE</text>
+</svg>`
+    expect(parseImportedSvgLayers(svgAttr).textItems[0]?.fill).toBe('#ffffff')
+
+    const svgClass = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <style type="text/css"><![CDATA[.fil0 {fill:#FFFFFF}]]></style>
+  <text id="text_title" class="fil0" x="100" y="80" font-size="24">VOGUE</text>
+</svg>`
+    expect(parseImportedSvgLayers(svgClass).textItems[0]?.fill).toBe('#FFFFFF')
+
+    expect(normalizeSvgPaintColor('white')).toBe('#ffffff')
+    expect(normalizeSvgPaintColor('rgb(255, 255, 255)')).toBe('#ffffff')
   })
 
   it('сохраняет z-order: photo → text → photo как в SVG', () => {
@@ -179,6 +200,37 @@ describe('parseImportedSvgLayers', () => {
     const r = parseImportedSvgLayers(svg)
     expect(r.textItems).toHaveLength(1)
     expect(r.textItems[0].text).toBe('Строка первая\nСтрока вторая\nСтрока третья')
+  })
+
+  it('text-anchor:start не блокирует text-align:right (типичный Corel)', () => {
+    expect(resolveTextAnchor(
+      { 'text-anchor': 'start', 'text-align': 'right' },
+    )).toBe('end')
+
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <g id="text_address">
+    <text text-anchor="start" style="text-align:right;font-size:24px">
+      <tspan x="400" y="100">ул. Ленина, 1</tspan>
+      <tspan x="400" y="130">г. Минск</tspan>
+    </text>
+  </g>
+</svg>`
+    const text = parseImportedSvgLayers(svg).textItems[0]
+    expect(text?.textAnchor).toBe('end')
+    expect(text?.text).toContain('\n')
+    expect(text?.frameWidthScene).toBeGreaterThan(100)
+  })
+
+  it('читает жирный/курсив из CSS-класса Corel', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <style>.fnt0 {font-weight:bold;font-style:italic;font-size:24px;font-family:'Arial'}</style>
+  <text id="text_title" class="fnt0"><tspan x="100" y="80">Заголовок</tspan></text>
+</svg>`
+    const text = parseImportedSvgLayers(svg).textItems[0]
+    expect(text?.fontWeight).toBe('bold')
+    expect(text?.fontStyle).toBe('italic')
   })
 
   it('читает выравнивание по центру из text-anchor и text-align', () => {

@@ -1,7 +1,11 @@
 import path from 'path'
 import PizZip from 'pizzip'
 import { detectFontFormat, isFontUploadExtension, saveBufferToUploads } from '../config/upload'
-import { fontFamilyCompactKey, guessFontFamilyFromFilename } from '../utils/fontFamilyNormalize'
+import {
+  fontFamilyCompactKey,
+  guessFontFamilyFromFilename,
+  isGenericFontFamily,
+} from '../utils/fontFamilyNormalize'
 import type { BundledTemplateFont } from '../utils/extractDesignStateFonts'
 import {
   parseImportedSvgLayers,
@@ -73,14 +77,17 @@ function toFabricRect(rect: SvgRect) {
     top: rect.scene.y,
     width: rect.scene.width,
     height: rect.scene.height,
-    fill: 'rgba(248, 250, 252, 0.25)',
+    fill: '#eef2f7',
     stroke: '#2563eb',
-    strokeWidth: 0.8,
-    strokeDashArray: [4, 3],
-    rx: 2,
-    ry: 2,
+    strokeWidth: 1,
+    strokeDashArray: [6, 4],
+    rx: 6,
+    ry: 6,
     id: rect.name,
     isPhotoField: true,
+    photoFieldFilled: false,
+    photoFieldFw: rect.scene.width,
+    photoFieldFh: rect.scene.height,
   }
 }
 
@@ -92,6 +99,8 @@ function toFabricText(item: SvgText) {
   const top = Math.abs(angle) > 0.5
     ? item.scene.y
     : item.scene.y - fontSizePx * 0.8
+  const maxLineLen = Math.max(...item.text.split('\n').map((line) => line.length), 1)
+  const defaultWidth = Math.max(120, maxLineLen * fontSizePx * 0.55)
   const base = {
     version: '6.0.0',
     originX,
@@ -101,17 +110,18 @@ function toFabricText(item: SvgText) {
     text: item.text,
     fontSize: fontSizePx,
     fontFamily: item.fontFamily?.trim() || 'Arial',
-    fill: '#111827',
+    fill: item.fill?.trim() || '#111827',
     textAlign,
     id: item.name,
+    ...(item.fontWeight ? { fontWeight: item.fontWeight } : {}),
+    ...(item.fontStyle ? { fontStyle: item.fontStyle } : {}),
     ...(Math.abs(angle) > 0.5 ? { angle } : {}),
   }
   if (item.text.includes('\n')) {
-    const maxLineLen = Math.max(...item.text.split('\n').map((line) => line.length), 1)
     return {
       ...base,
       type: 'textbox',
-      width: Math.max(120, maxLineLen * fontSizePx * 0.55),
+      width: item.frameWidthScene ?? defaultWidth,
     }
   }
   return {
@@ -261,16 +271,6 @@ function readSvgEntries(file: ImportFile, ext: string, warnings: string[]): Arra
 
 function samePageSize(a: number, b: number): boolean {
   return Math.abs(a - b) <= 0.2
-}
-
-const GENERIC_FONT_KEYS = new Set([
-  'arial', 'helvetica', 'sans-serif', 'serif', 'times', 'timesnewroman',
-  'courier', 'couriernew', 'symbol', 'default',
-])
-
-function isGenericFontFamily(family: string | undefined): boolean {
-  if (!family?.trim()) return true
-  return GENERIC_FONT_KEYS.has(fontFamilyCompactKey(family))
 }
 
 function matchBundledFontToTextLayer(
