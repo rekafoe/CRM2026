@@ -7,6 +7,7 @@ import type { PublicDesignEditorAdapter } from './publicDesignEditorAdapter';
 import { ensureEvenInnerSpreadPages } from '../../pages/admin/designEditor/spreadUtils';
 import type { PublicDesignDocumentMode } from './useDesignDocumentNavigation';
 import type { PublicDesignPageSpec } from './usePublicDesignPageActions';
+import { loadDesignFontsFromSpec } from '../../utils/loadDesignFonts';
 
 export const DEFAULT_PUBLIC_DESIGN_PREPRESS_CONFIG: DesignPrepressConfig = {
   bleedMm: 2,
@@ -97,6 +98,7 @@ export function usePublicDesignBootstrap({
         setSpreadMode(nextSpreadMode);
         setCoverPages(nextCoverPages);
         setPrepressConfig(normalizePrepressConfig(sourceState?.prepress ?? spec.prepress));
+        await loadDesignFontsFromSpec(spec);
         setPages(spreadLayout.pages);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось открыть клиентский редактор');

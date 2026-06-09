@@ -270,6 +270,34 @@ function matchBundledFontToTextLayer(
   })
 }
 
+function collectNonGenericFontFamilies(parsed: ReturnType<typeof parseImportedSvgLayers>): string[] {
+  const families = new Set<string>()
+  for (const item of parsed.textItems) {
+    if (!isGenericFontFamily(item.fontFamily) && item.fontFamily?.trim()) {
+      families.add(item.fontFamily.trim())
+    }
+  }
+  return [...families]
+}
+
+function warnFontsNotInBundledZip(
+  usedFamilies: string[],
+  bundledFonts: BundledTemplateFont[],
+  warnings: string[],
+  pageIndex: number,
+): void {
+  if (usedFamilies.length === 0 || bundledFonts.length === 0) return
+  const bundledKeys = new Set(bundledFonts.map((font) => fontFamilyCompactKey(font.family)))
+  const notInZip = usedFamilies.filter((family) => !bundledKeys.has(fontFamilyCompactKey(family)))
+  if (notInZip.length > 0) {
+    warnings.push(
+      `Страница ${pageIndex + 1}: в SVG шрифты «${notInZip.join('», «')}» не совпадают с папкой fonts/ `
+      + `(в ZIP: ${bundledFonts.map((f) => f.family).join(', ')}). `
+      + 'Добавьте файлы с тем же family_name в библиотеку CRM (/adminpanel/design-fonts).',
+    )
+  }
+}
+
 function applyBundledFontFallbacks(
   parsed: ReturnType<typeof parseImportedSvgLayers>,
   bundledFonts: BundledTemplateFont[],
@@ -315,7 +343,9 @@ function buildPageFromSvg(input: {
   bundledFonts?: BundledTemplateFont[]
 }): StoredImportedSvgPage {
   const parsed = parseImportedSvgLayers(sanitizeSvg(input.svg), { sceneScale: IMPORTED_TEMPLATE_SCENE_SCALE })
-  applyBundledFontFallbacks(parsed, input.bundledFonts ?? [], input.warnings, input.pageIndex)
+  const bundledFonts = input.bundledFonts ?? []
+  applyBundledFontFallbacks(parsed, bundledFonts, input.warnings, input.pageIndex)
+  warnFontsNotInBundledZip(collectNonGenericFontFamilies(parsed), bundledFonts, input.warnings, input.pageIndex)
   input.warnings.push(...parsed.warnings.map((warning) => `Страница ${input.pageIndex + 1}: ${warning}`))
 
   if (parsed.removalRanges.length > 0) {

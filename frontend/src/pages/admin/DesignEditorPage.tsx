@@ -53,6 +53,7 @@ import type { GuideLine } from './designEditor/CanvasRulers';
 import { ImagePickerModal } from '../../components/ImagePickerModal';
 import { TextFloatingToolbar } from './designEditor/TextFloatingToolbar';
 import { useDesignEditorViewport } from './designEditor/useDesignEditorViewport';
+import { loadDesignFontsFromSpec } from '../../utils/loadDesignFonts';
 import { createDesignSceneGeometry } from './designEditor/designGeometry';
 import { EditorCanvasStage } from '../../features/designEditorShell/EditorCanvasStage';
 import { EditorPageNavigator } from '../../features/designEditorShell/EditorPageNavigator';
@@ -339,7 +340,15 @@ export const DesignEditorPage: React.FC = () => {
       const spreadLayout = sm
         ? ensureEvenInnerSpreadPages(loadedPages, count, cp, () => ({ ...EMPTY_PAGE }))
         : { pages: loadedPages, pageCount: count };
-      setTemplateState((s) => ({ ...s, template: t, loading: false, error: null }));
+      const fontResult = await loadDesignFontsFromSpec(spec);
+      setTemplateState((s) => ({
+        ...s,
+        template: t,
+        loading: false,
+        error: fontResult.missing.length > 0
+          ? `Не загружены шрифты: ${fontResult.missing.join(', ')}. Добавьте их в библиотеку CRM (family_name как в макете).`
+          : null,
+      }));
       setPageSpec({ pageWidth: w, pageHeight: h, pageCount: spreadLayout.pageCount, scale: sc });
       setPrepressConfig(prepress);
       setPages(spreadLayout.pages);
