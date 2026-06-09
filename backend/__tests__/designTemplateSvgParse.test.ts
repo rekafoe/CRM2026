@@ -341,6 +341,27 @@ describe('parseImportedSvgLayers', () => {
     expect(text?.scene.x).toBeGreaterThan(100)
   })
 
+  it('отбрасывает средний дубликат целой строки Corel (tspan в одном text)', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <style type="text/css"><![CDATA[
+    .fnt0 { font-family: 'Voguella'; font-size: 24px; }
+    .fnt1 { font-family: 'Ceremonious One'; font-size: 24px; }
+  ]]></style>
+  <text id="text_love" text-anchor="middle">
+    <tspan class="fnt0" x="300" y="120">Что я в тебе</tspan>
+    <tspan class="fnt0" x="300" y="120">Что я в тебе люблю</tspan>
+    <tspan class="fnt1" x="520" y="120">люблю</tspan>
+  </text>
+</svg>`
+    const text = parseImportedSvgLayers(svg).textItems[0]
+    expect(text?.text).toBe('Что я в тебе люблю')
+    expect(text?.text).not.toContain('люблюлюблю')
+    expect(text?.textStyles?.length).toBeGreaterThanOrEqual(2)
+    expect(text?.textStyles?.[0]?.fontFamily).toBe('Voguella')
+    expect(text?.textStyles?.some((s) => s.fontFamily === 'Ceremonious One')).toBe(true)
+  })
+
   it('отбрасывает дублирующую полную строку Corel при inline merge', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">

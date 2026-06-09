@@ -734,18 +734,74 @@ function normalizeInlineTextChunk(value: string): string {
   return value.replace(/\s+/g, ' ').trim()
 }
 
-/** Corel иногда дублирует целую строку и фрагменты с разными шрифтами. */
+function inlineChunkJoinGap(existing: string, next: string): string {
+  const prevCh = existing.slice(-1)
+  const nextCh = next.charAt(0)
+  if (
+    prevCh
+    && nextCh
+    && !/\s/.test(prevCh)
+    && !/\s/.test(nextCh)
+    && /\p{L}/u.test(prevCh)
+    && /\p{L}/u.test(nextCh)
+  ) {
+    return ' '
+  }
+  return ''
+}
+
+function joinInlineChunkTexts(texts: string[]): string {
+  if (!texts.length) return ''
+  let out = texts[0]!
+  for (let i = 1; i < texts.length; i++) {
+    const part = texts[i]!
+    out += inlineChunkJoinGap(out, part) + part
+  }
+  return out
+}
+
+function joinInlineChunkTextVariants(texts: string[]): string[] {
+  const variants = new Set<string>()
+  const add = (value: string) => {
+    const normalized = normalizeInlineTextChunk(value)
+    if (normalized) variants.add(normalized)
+  }
+  add(texts.join(''))
+  if (texts.length > 1) add(texts.join(' '))
+  add(joinInlineChunkTexts(texts))
+  return [...variants]
+}
+
+function inlineChunkJoinMatchesText(texts: string[], target: string): boolean {
+  const normalizedTarget = normalizeInlineTextChunk(target)
+  if (!normalizedTarget) return false
+  return joinInlineChunkTextVariants(texts).includes(normalizedTarget)
+}
+
+/** Убирает дубли Corel: целая строка среди фрагментов с разными шрифтами. */
+function pruneRedundantTextChunks<T extends { text: string }>(chunks: T[]): T[] {
+  if (chunks.length <= 1) return chunks
+  let pruned = [...chunks]
+  let changed = true
+  while (changed && pruned.length > 1) {
+    changed = false
+    const next = pruned.filter((item) => {
+      const others = pruned.filter((other) => other !== item)
+      if (!others.length) return true
+      return !inlineChunkJoinMatchesText(others.map((other) => other.text), item.text)
+    })
+    if (next.length < pruned.length) {
+      pruned = next
+      changed = true
+    }
+  }
+  return pruned
+}
+
 function pruneRedundantInlineChunks(items: SvgText[]): SvgText[] {
   if (items.length <= 1) return items
   const sorted = [...items].sort((a, b) => a.scene.x - b.scene.x || a.scene.y - b.scene.y)
-  return sorted.filter((item) => {
-    const others = sorted.filter((other) => other !== item)
-    if (!others.length) return true
-    const withoutJoin = normalizeInlineTextChunk(others.map((other) => other.text).join(''))
-    const self = normalizeInlineTextChunk(item.text)
-    // Удаляем chunk, если остальные уже дают тот же текст (дубликат целой строки).
-    return withoutJoin !== self
-  })
+  return pruneRedundantTextChunks(sorted)
 }
 
 function composeTextFromTspans(
@@ -759,11 +815,15 @@ function composeTextFromTspans(
   const textStyles: SvgTextStyleSegment[] = []
   for (const line of lines) {
     if (text.length > 0) text += '\n'
-    const sorted = [...line].sort(
-      (a, b) => (parseNumber(a.attrs.x) ?? 0) - (parseNumber(b.attrs.x) ?? 0) || a.order - b.order,
+    const sorted = pruneRedundantTextChunks(
+      [...line].sort(
+        (a, b) => (parseNumber(a.attrs.x) ?? 0) - (parseNumber(b.attrs.x) ?? 0) || a.order - b.order,
+      ),
     )
     let prevKey = ''
     for (const tspan of sorted) {
+      const gap = text.length > 0 ? inlineChunkJoinGap(text, tspan.text) : ''
+      if (gap) text += gap
       const start = text.length
       text += tspan.text
       const style = segmentStyle(tspan)
@@ -818,9 +878,11 @@ function mergeInlineTextItems(items: SvgText[]): SvgText {
   const textStyles: SvgTextStyleSegment[] = []
   let prevStyleKey = ''
   for (const item of sorted) {
-    const start = text.length
     const chunk = item.text
     if (!chunk) continue
+    const gap = text.length > 0 ? inlineChunkJoinGap(text, chunk) : ''
+    if (gap) text += gap
+    const start = text.length
     text += chunk
     const pushSegment = (seg: SvgTextStyleSegment) => {
       const key = segmentPresentationKey(seg)
