@@ -98,8 +98,10 @@ export function usePublicDesignBootstrap({
         setSpreadMode(nextSpreadMode);
         setCoverPages(nextCoverPages);
         setPrepressConfig(normalizePrepressConfig(sourceState?.prepress ?? spec.prepress));
-        await loadDesignFontsFromSpec(spec);
         setPages(spreadLayout.pages);
+        void loadDesignFontsFromSpec(spec).catch(() => {
+          /* шрифты не должны блокировать монтирование холста */
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось открыть клиентский редактор');
       } finally {

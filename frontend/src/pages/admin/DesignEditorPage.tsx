@@ -109,7 +109,8 @@ export const DesignEditorPage: React.FC = () => {
     template: DesignTemplate | null;
     loading: boolean;
     error: string | null;
-  }>({ template: null, loading: true, error: null });
+    fontWarning: string | null;
+  }>({ template: null, loading: true, error: null, fontWarning: null });
 
   const [saving, setSaving] = useState(false);
 
@@ -307,7 +308,7 @@ export const DesignEditorPage: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { template, loading, error } = templateState;
+  const { template, loading, error, fontWarning } = templateState;
 
   // ── Load template ────────────────────────────────────────────────────────────
   const loadTemplate = useCallback(async () => {
@@ -340,14 +341,12 @@ export const DesignEditorPage: React.FC = () => {
       const spreadLayout = sm
         ? ensureEvenInnerSpreadPages(loadedPages, count, cp, () => ({ ...EMPTY_PAGE }))
         : { pages: loadedPages, pageCount: count };
-      const fontResult = await loadDesignFontsFromSpec(spec);
       setTemplateState((s) => ({
         ...s,
         template: t,
         loading: false,
-        error: fontResult.missing.length > 0
-          ? `Не загружены шрифты: ${fontResult.missing.join(', ')}. Добавьте их в библиотеку CRM (family_name как в макете).`
-          : null,
+        error: null,
+        fontWarning: null,
       }));
       setPageSpec({ pageWidth: w, pageHeight: h, pageCount: spreadLayout.pageCount, scale: sc });
       setPrepressConfig(prepress);
@@ -356,6 +355,15 @@ export const DesignEditorPage: React.FC = () => {
       setThumbnails({});
       setSpreadMode(sm);
       setCoverPages(cp);
+      void loadDesignFontsFromSpec(spec).then((fontResult) => {
+        if (fontResult.missing.length === 0) return;
+        setTemplateState((s) => ({
+          ...s,
+          fontWarning: `Не загружены шрифты: ${fontResult.missing.join(', ')}. Добавьте их в библиотеку CRM (family_name как в макете).`,
+        }));
+      }).catch(() => {
+        /* шрифты не должны блокировать холст */
+      });
     } catch (err: unknown) {
       setTemplateState((s) => ({
         ...s,
@@ -941,6 +949,11 @@ export const DesignEditorPage: React.FC = () => {
             aria-hidden
           />
 
+          {fontWarning && (
+            <Alert type="warning" onClose={() => setTemplateState((s) => ({ ...s, fontWarning: null }))}>
+              {fontWarning}
+            </Alert>
+          )}
           {editorError && (
             <Alert type="error" onClose={() => setEditorError(null)}>
               {editorError}
