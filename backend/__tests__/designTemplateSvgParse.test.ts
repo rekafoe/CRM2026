@@ -341,6 +341,26 @@ describe('parseImportedSvgLayers', () => {
     expect(text?.scene.x).toBeGreaterThan(100)
   })
 
+  it('отбрасывает дублирующую полную строку Corel при inline merge', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <style type="text/css"><![CDATA[
+    .fnt0 { font-family: 'Voguella'; font-size: 24px; }
+    .fnt1 { font-family: 'Ceremonious One'; font-size: 24px; }
+  ]]></style>
+  <g id="text_love">
+    <text x="200" y="120" class="fnt0"><tspan>Что я в тебе люблю</tspan></text>
+    <text x="200" y="120" class="fnt0"><tspan>Что я в тебе </tspan></text>
+    <text x="420" y="120" class="fnt1"><tspan>люблю</tspan></text>
+  </g>
+</svg>`
+    const text = parseImportedSvgLayers(svg).textItems[0]
+    expect(text?.text).toBe('Что я в тебе люблю')
+    expect(text?.textStyles?.length).toBeGreaterThanOrEqual(2)
+    expect(text?.textStyles?.[0]?.fontFamily).toBe('Voguella')
+    expect(text?.textStyles?.some((s) => s.fontFamily === 'Ceremonious One')).toBe(true)
+  })
+
   it('сохраняет z-order когда text идёт раньше photo в SVG', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">

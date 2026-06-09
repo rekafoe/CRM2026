@@ -1,6 +1,7 @@
 import {
   applyLibraryFontFallbacksToDesignState,
   buildRequiredFontEntries,
+  extractUsedFontFamiliesFromDesignState,
   normalizeDesignStateFontFamilies,
 } from '../src/utils/extractDesignStateFonts'
 
@@ -47,6 +48,33 @@ describe('applyLibraryFontFallbacksToDesignState', () => {
 })
 
 describe('normalizeDesignStateFontFamilies', () => {
+  it('нормализует fontFamily внутри styles', () => {
+    const designState = {
+      pages: [{
+        fabricJSON: {
+          objects: [{
+            type: 'i-text',
+            fontFamily: 'Voguella',
+            text: 'Что я в тебе люблю',
+            styles: {
+              0: {
+                12: { fontFamily: 'CeremoniousOne' },
+              },
+            },
+          }],
+        },
+      }],
+    }
+    const normalized = normalizeDesignStateFontFamilies(designState, [{
+      family_name: 'Ceremonious One',
+      name_aliases: ['CeremoniousOne-Regular'],
+    }]) as typeof designState
+    const obj = (normalized.pages[0].fabricJSON as {
+      objects: Array<{ styles: Record<string, Record<string, { fontFamily: string }>> }>
+    }).objects[0]
+    expect(obj.styles[0][12].fontFamily).toBe('Ceremonious One')
+  })
+
   it('приводит fontFamily из SVG к family_name библиотеки по compact key', () => {
     const designState = {
       pages: [{
@@ -65,6 +93,31 @@ describe('normalizeDesignStateFontFamilies', () => {
     }]) as typeof designState
     const obj = (normalized.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
     expect(obj.fontFamily).toBe('Ceremonious One')
+  })
+})
+
+describe('extractUsedFontFamiliesFromDesignState', () => {
+  it('собирает шрифты из styles персонажей, не только верхний fontFamily', () => {
+    const designState = {
+      pages: [{
+        fabricJSON: {
+          objects: [{
+            type: 'i-text',
+            fontFamily: 'Voguella',
+            text: 'Что я в тебе люблю',
+            styles: {
+              0: {
+                0: { fontFamily: 'Voguella' },
+                12: { fontFamily: 'Ceremonious One' },
+              },
+            },
+          }],
+        },
+      }],
+    }
+    const families = extractUsedFontFamiliesFromDesignState(designState)
+    expect(families).toEqual(expect.arrayContaining(['Voguella', 'Ceremonious One']))
+    expect(families).toHaveLength(2)
   })
 })
 

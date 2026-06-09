@@ -94,6 +94,7 @@ function toFabricRect(rect: SvgRect) {
 function toFabricTextStyles(
   text: string,
   segments: NonNullable<SvgText['textStyles']>,
+  baseFontSizePx: number,
 ): Record<number, Record<number, Record<string, unknown>>> | undefined {
   const lines = text.split('\n')
   const lineStartOffsets: number[] = []
@@ -115,6 +116,10 @@ function toFabricTextStyles(
       if (seg.fontWeight) patch.fontWeight = seg.fontWeight
       if (seg.fontStyle) patch.fontStyle = seg.fontStyle
       if (seg.fill) patch.fill = seg.fill
+      if (seg.fontSize != null && Math.abs(seg.fontSize - baseFontSizePx) > 0.5) {
+        patch.fontSize = Math.max(6, seg.fontSize)
+      }
+      if (Object.keys(patch).length === 0) continue
       out[lineIndex] ??= {}
       out[lineIndex]![charIndex] = patch
     }
@@ -133,8 +138,11 @@ function toFabricText(item: SvgText) {
   const maxLineLen = Math.max(...item.text.split('\n').map((line) => line.length), 1)
   const defaultWidth = Math.max(120, maxLineLen * fontSizePx * 0.55)
   const styles = item.textStyles?.length
-    ? toFabricTextStyles(item.text, item.textStyles)
+    ? toFabricTextStyles(item.text, item.textStyles, fontSizePx)
     : undefined
+  const baseFontFamily = item.textStyles?.[0]?.fontFamily?.trim()
+    || item.fontFamily?.trim()
+    || 'Arial'
   const base = {
     version: '6.0.0',
     originX,
@@ -143,7 +151,7 @@ function toFabricText(item: SvgText) {
     top,
     text: item.text,
     fontSize: fontSizePx,
-    fontFamily: item.fontFamily?.trim() || 'Arial',
+    fontFamily: baseFontFamily,
     fill: item.fill?.trim() || '#111827',
     textAlign,
     id: item.name,

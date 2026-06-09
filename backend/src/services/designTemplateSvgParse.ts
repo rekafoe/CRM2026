@@ -29,6 +29,7 @@ export type SvgTextStyleSegment = {
   fontWeight?: string
   fontStyle?: string
   fill?: string
+  fontSize?: number
 }
 
 export type SvgText = {
@@ -716,6 +717,35 @@ type TspanSegmentPresentation = {
   fontWeight?: string
   fontStyle?: string
   fill?: string
+  fontSize?: number
+}
+
+function segmentPresentationKey(style: TspanSegmentPresentation): string {
+  return [
+    style.fontFamily ?? '',
+    style.fontWeight ?? '',
+    style.fontStyle ?? '',
+    style.fill ?? '',
+    style.fontSize != null ? String(style.fontSize) : '',
+  ].join('|')
+}
+
+function normalizeInlineTextChunk(value: string): string {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+/** Corel иногда дублирует целую строку и фрагменты с разными шрифтами. */
+function pruneRedundantInlineChunks(items: SvgText[]): SvgText[] {
+  if (items.length <= 1) return items
+  const sorted = [...items].sort((a, b) => a.scene.x - b.scene.x || a.scene.y - b.scene.y)
+  return sorted.filter((item) => {
+    const others = sorted.filter((other) => other !== item)
+    if (!others.length) return true
+    const withoutJoin = normalizeInlineTextChunk(others.map((other) => other.text).join(''))
+    const self = normalizeInlineTextChunk(item.text)
+    // Удаляем chunk, если остальные уже дают тот же текст (дубликат целой строки).
+    return withoutJoin !== self
+  })
 }
 
 function composeTextFromTspans(
@@ -732,18 +762,19 @@ function composeTextFromTspans(
     const sorted = [...line].sort(
       (a, b) => (parseNumber(a.attrs.x) ?? 0) - (parseNumber(b.attrs.x) ?? 0) || a.order - b.order,
     )
+    let prevKey = ''
     for (const tspan of sorted) {
       const start = text.length
       text += tspan.text
       const style = segmentStyle(tspan)
-      if (
-        style.fontFamily
-        || style.fontWeight
-        || style.fontStyle
-        || style.fill
-      ) {
-        textStyles.push({ start, end: text.length, ...style })
+      const key = segmentPresentationKey(style)
+      if (!(style.fontFamily || style.fontWeight || style.fontStyle || style.fill || style.fontSize)) continue
+      if (key === prevKey && textStyles.length > 0) {
+        textStyles[textStyles.length - 1]!.end = text.length
+        continue
       }
+      textStyles.push({ start, end: text.length, ...style })
+      prevKey = key
     }
   }
   return { text, textStyles }
@@ -782,16 +813,34 @@ function pickAnchorMmX(items: SvgText[], anchor: SvgText['textAnchor']): number 
 }
 
 function mergeInlineTextItems(items: SvgText[]): SvgText {
-  const sorted = [...items].sort((a, b) => a.x - b.x)
+  const sorted = pruneRedundantInlineChunks(items).sort((a, b) => a.scene.x - b.scene.x)
   let text = ''
   const textStyles: SvgTextStyleSegment[] = []
+  let prevStyleKey = ''
   for (const item of sorted) {
     const start = text.length
     const chunk = item.text
     if (!chunk) continue
     text += chunk
-    if (item.fontFamily || item.fontWeight || item.fontStyle || item.fill) {
-      textStyles.push({
+    const pushSegment = (seg: SvgTextStyleSegment) => {
+      const key = segmentPresentationKey(seg)
+      if (key === prevStyleKey) {
+        textStyles[textStyles.length - 1]!.end = seg.end
+        return
+      }
+      textStyles.push(seg)
+      prevStyleKey = key
+    }
+    if (item.textStyles?.length) {
+      for (const seg of item.textStyles) {
+        pushSegment({
+          ...seg,
+          start: start + seg.start,
+          end: start + seg.end,
+        })
+      }
+    } else if (item.fontFamily || item.fontWeight || item.fontStyle || item.fill) {
+      pushSegment({
         start,
         end: text.length,
         fontFamily: item.fontFamily,
@@ -799,14 +848,6 @@ function mergeInlineTextItems(items: SvgText[]): SvgText {
         fontStyle: item.fontStyle,
         fill: item.fill,
       })
-    } else if (item.textStyles?.length) {
-      for (const seg of item.textStyles) {
-        textStyles.push({
-          ...seg,
-          start: start + seg.start,
-          end: start + seg.end,
-        })
-      }
     }
   }
   const textAnchor = pickStrongestTextAnchor(sorted)
@@ -874,11 +915,11 @@ function mergeTextItemsByName(items: SvgText[]): SvgText[] {
     const group = groups.get(name)!
     if (group.length === 1) return group[0]!
     const sorted = [...group].sort((a, b) => a.y - b.y || a.x - b.x)
-    const yTol = sorted[0]!.fontSize * 0.6
+    const yTol = Math.max(sorted[0]!.scene.fontSize * 0.5, sorted[0]!.fontSize * 0.5)
     const clusters: SvgText[][] = []
     for (const item of sorted) {
       const last = clusters[clusters.length - 1]
-      if (last && Math.abs(item.y - last[0]!.y) <= yTol) last.push(item)
+      if (last && Math.abs(item.scene.y - last[0]!.scene.y) <= yTol) last.push(item)
       else clusters.push([item])
     }
     if (clusters.length === 1 && clusters[0]!.length > 1) {
@@ -1236,6 +1277,10 @@ export function parseImportedSvgLayers(
             ...parseStyle(tspan.attrs.style),
           }
           if (tspan.attrs['font-family']?.trim()) style['font-family'] = tspan.attrs['font-family'].trim()
+          const tspanFontSize =
+            parseNumber(tspan.attrs['font-size'])
+            ?? parseFontSizeFromStyle(style)
+            ?? parseFontSizeFromStyle(textStyle)
           return {
             fontFamily:
               parseFontFamilyFromStyle(style)
@@ -1250,6 +1295,7 @@ export function parseImportedSvgLayers(
               ?? parseFontStyleFromStyle(textStyle)
               ?? parseFontStyleFromStyle(inheritedGroupStyle),
             fill: resolveTextFill(tspan.attrs, style, attrs, textStyle, inheritedGroupStyle),
+            fontSize: tspanFontSize ?? undefined,
           }
         }
         const composed = tspans.length > 0
@@ -1259,7 +1305,7 @@ export function parseImportedSvgLayers(
           || primaryTspan?.text
           || decodeXmlText(innerStr)
           || ef.replace(/^text_/, '')
-        const textStyles = composed?.textStyles.length ? composed.textStyles : undefined
+        const textStyles = composed?.textStyles?.length ? composed.textStyles : undefined
         const effectiveTspans = tspans.length > 0
           ? resolveTspanEffectiveY(
             [...tspans].sort((a, b) => a.order - b.order),
@@ -1278,7 +1324,8 @@ export function parseImportedSvgLayers(
         const mmPoint = geometry.svgPointToMm(point)
         const scenePoint = geometry.mmPointToScene(mmPoint)
         const fontFamily =
-          parseFontFamilyFromStyle(tspanStyle)
+          textStyles?.[0]?.fontFamily
+          ?? parseFontFamilyFromStyle(tspanStyle)
           ?? parseFontFamilyFromStyle(textStyle)
           ?? (tspanAttrs['font-family'] ? normalizeFontFamilyToken(tspanAttrs['font-family']) : undefined)
           ?? (attrs['font-family'] ? normalizeFontFamilyToken(attrs['font-family']) : undefined)

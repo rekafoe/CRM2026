@@ -21,6 +21,32 @@ function walkFabric(value: unknown, visit: (obj: FabricObj) => void): void {
   walkFabric(obj.clipPath, visit)
 }
 
+function collectFontFamiliesFromFabricText(obj: FabricObj, families: Set<string>): void {
+  const ff = normalizeFontFamilyName(String(obj.fontFamily ?? ''))
+  if (ff) families.add(ff)
+  const styles = obj.styles
+  if (!styles || typeof styles !== 'object' || Array.isArray(styles)) return
+  for (const line of Object.values(styles as Record<string, unknown>)) {
+    if (!line || typeof line !== 'object' || Array.isArray(line)) continue
+    for (const style of Object.values(line as Record<string, unknown>)) {
+      if (!style || typeof style !== 'object' || Array.isArray(style)) continue
+      const segFont = normalizeFontFamilyName(String((style as FabricObj).fontFamily ?? ''))
+      if (segFont) families.add(segFont)
+    }
+  }
+}
+
+function walkFabricTextStyles(obj: FabricObj, visit: (style: FabricObj) => void): void {
+  const styles = obj.styles
+  if (!styles || typeof styles !== 'object' || Array.isArray(styles)) return
+  for (const line of Object.values(styles as Record<string, unknown>)) {
+    if (!line || typeof line !== 'object' || Array.isArray(line)) continue
+    for (const style of Object.values(line as Record<string, unknown>)) {
+      if (style && typeof style === 'object' && !Array.isArray(style)) visit(style as FabricObj)
+    }
+  }
+}
+
 export function extractUsedFontFamiliesFromDesignState(designState: unknown): string[] {
   if (!designState || typeof designState !== 'object' || Array.isArray(designState)) return []
   const pages = (designState as Record<string, unknown>).pages
@@ -30,8 +56,7 @@ export function extractUsedFontFamiliesFromDesignState(designState: unknown): st
     if (!page || typeof page !== 'object') continue
     const fabricJSON = (page as Record<string, unknown>).fabricJSON
     walkFabric(fabricJSON, (obj) => {
-      const ff = normalizeFontFamilyName(String(obj.fontFamily ?? ''))
-      if (ff) families.add(ff)
+      collectFontFamiliesFromFabricText(obj, families)
     })
   }
   return [...families].sort((a, b) => a.localeCompare(b, 'ru'))
@@ -136,11 +161,18 @@ export function applyLibraryFontFallbacksToDesignState(
 
   const applyFabric = (value: unknown): void => {
     walkFabric(value, (obj) => {
-      if (!isGenericFontFamily(String(obj.fontFamily ?? ''))) return
       const id = String(obj.id ?? '')
       if (!id.toLowerCase().startsWith('text_')) return
       const matched = matchLibraryFontToTextLayer(id, libraryFonts)
-      if (matched) obj.fontFamily = matched
+      if (!matched) return
+      if (isGenericFontFamily(String(obj.fontFamily ?? ''))) {
+        obj.fontFamily = matched
+      }
+      walkFabricTextStyles(obj, (style) => {
+        if (isGenericFontFamily(String(style.fontFamily ?? ''))) {
+          style.fontFamily = matched
+        }
+      })
     })
   }
 
@@ -179,11 +211,16 @@ export function normalizeDesignStateFontFamilies(
   const normalizeFabric = (value: unknown): void => {
     walkFabric(value, (obj) => {
       const current = normalizeFontFamilyName(String(obj.fontFamily ?? ''))
-      if (!current) return
-      const canonical = aliasToCanonical.get(fontFamilyCompactKey(current))
-      if (canonical) {
-        obj.fontFamily = canonical
+      if (current) {
+        const canonical = aliasToCanonical.get(fontFamilyCompactKey(current))
+        if (canonical) obj.fontFamily = canonical
       }
+      walkFabricTextStyles(obj, (style) => {
+        const segFont = normalizeFontFamilyName(String(style.fontFamily ?? ''))
+        if (!segFont) return
+        const canonical = aliasToCanonical.get(fontFamilyCompactKey(segFont))
+        if (canonical) style.fontFamily = canonical
+      })
     })
   }
 

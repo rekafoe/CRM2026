@@ -44,14 +44,28 @@ export function patchAllTextInFabricJSON(
   return next;
 }
 
+function collectFontFamiliesFromTextObject(o: Record<string, unknown>, out: Set<string>): void {
+  const ff = o.fontFamily;
+  if (typeof ff === 'string' && ff.trim()) out.add(ff.trim());
+  const styles = o.styles;
+  if (!styles || typeof styles !== 'object' || Array.isArray(styles)) return;
+  for (const line of Object.values(styles as Record<string, unknown>)) {
+    if (!line || typeof line !== 'object' || Array.isArray(line)) continue;
+    for (const style of Object.values(line as Record<string, unknown>)) {
+      if (!style || typeof style !== 'object' || Array.isArray(style)) continue;
+      const segFont = (style as Record<string, unknown>).fontFamily;
+      if (typeof segFont === 'string' && segFont.trim()) out.add(segFont.trim());
+    }
+  }
+}
+
 function collectFontFamiliesRecursive(objects: unknown[], out: Set<string>): void {
   for (const obj of objects) {
     if (!obj || typeof obj !== 'object') continue;
     const o = obj as Record<string, unknown>;
     const t = String(o.type ?? '').toLowerCase();
     if (TEXT_TYPES.has(t)) {
-      const ff = o.fontFamily;
-      if (typeof ff === 'string' && ff.trim()) out.add(ff.trim());
+      collectFontFamiliesFromTextObject(o, out);
     }
     if (Array.isArray(o.objects)) {
       collectFontFamiliesRecursive(o.objects as unknown[], out);
