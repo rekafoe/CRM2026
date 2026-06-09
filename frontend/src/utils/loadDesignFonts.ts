@@ -10,6 +10,27 @@ export type RequiredFontSpecEntry = {
   name_aliases?: string[];
 };
 
+export type CrmLibraryFont = {
+  id: number;
+  family_name: string;
+  name_aliases?: string[];
+  url?: string;
+  format?: string;
+};
+
+/** Сопоставление family из макета с записью библиотеки CRM (family_name + алиасы). */
+export function findCrmFontByFamily(
+  family: string,
+  libraryFonts: CrmLibraryFont[],
+): CrmLibraryFont | undefined {
+  const key = fontFamilyCompactKey(family);
+  if (!key) return undefined;
+  return libraryFonts.find((font) => {
+    const names = [font.family_name, ...(font.name_aliases ?? [])];
+    return names.some((name) => fontFamilyCompactKey(name) === key);
+  });
+}
+
 const FONT_LOAD_TIMEOUT_MS = 8000;
 
 type FontReadyListener = () => void;
@@ -264,16 +285,38 @@ export async function loadDesignFontFromLibrary(font: {
 /** Перед сменой шрифта в UI — дождаться FontFace (family_name как в макете). */
 export async function ensureDesignFontLoaded(
   family: string,
-  libraryFonts?: Array<{ id: number; family_name: string; format?: string; url?: string }>,
+  libraryFonts?: CrmLibraryFont[],
 ): Promise<boolean> {
   const name = normalizeFontFamilyName(family);
   if (!name) return false;
   if (isFontRegisteredAndReady(name)) return true;
-  const match = libraryFonts?.find(
-    (font) => fontFamilyCompactKey(font.family_name) === fontFamilyCompactKey(name),
-  );
-  if (match) return loadDesignFontFromLibrary(match);
+  const match = libraryFonts ? findCrmFontByFamily(name, libraryFonts) : undefined;
+  if (match) {
+    const ok = await loadDesignFontFromLibrary({
+      id: match.id,
+      family_name: match.family_name,
+      name_aliases: match.name_aliases,
+      url: match.url,
+      format: match.format,
+    });
+    if (ok) return true;
+  }
   return isFontFamilyLoaded(name);
+}
+
+/** Догружает шрифты из fabricJSON страниц (после обновления библиотеки CRM). */
+export async function loadDesignFontsFromPages(
+  pages: Array<{ fabricJSON: Record<string, unknown> }>,
+  libraryFonts: CrmLibraryFont[],
+): Promise<void> {
+  const { extractUsedFontFamiliesFromPages } = await import(
+    '../pages/admin/designEditor/patchFabricTextObjects'
+  );
+  const families = extractUsedFontFamiliesFromPages(pages);
+  for (const family of families) {
+    await ensureDesignFontLoaded(family, libraryFonts);
+  }
+  if (families.length > 0) notifyDesignFontsReady();
 }
 
 /** Загружает шрифты из spec.requiredFonts в document.fonts (перед отрисовкой Fabric). */

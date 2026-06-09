@@ -53,7 +53,12 @@ import type { GuideLine } from './designEditor/CanvasRulers';
 import { ImagePickerModal } from '../../components/ImagePickerModal';
 import { TextFloatingToolbar } from './designEditor/TextFloatingToolbar';
 import { useDesignEditorViewport } from './designEditor/useDesignEditorViewport';
-import { ensureDesignFontLoaded, loadDesignFontsFromSpec, onDesignFontsReady } from '../../utils/loadDesignFonts';
+import {
+  ensureDesignFontLoaded,
+  loadDesignFontsFromPages,
+  loadDesignFontsFromSpec,
+  onDesignFontsReady,
+} from '../../utils/loadDesignFonts';
 import { useCrmDesignFonts } from '../../hooks/useCrmDesignFonts';
 import { createDesignSceneGeometry } from './designEditor/designGeometry';
 import { EditorCanvasStage } from '../../features/designEditorShell/EditorCanvasStage';
@@ -310,7 +315,7 @@ export const DesignEditorPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { template, loading, error, fontWarning } = templateState;
-  const { fonts: crmFonts } = useCrmDesignFonts();
+  const { fonts: crmFonts, ready: crmFontsReady } = useCrmDesignFonts({ fresh: true });
 
   useEffect(() => {
     const reload = () => {
@@ -321,6 +326,15 @@ export const DesignEditorPage: React.FC = () => {
     const unsub = onDesignFontsReady(reload);
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!crmFontsReady || pages.length === 0) return;
+    void loadDesignFontsFromPages(pages, crmFonts).then(() => {
+      requestAnimationFrame(() => {
+        void canvasHandleRef.current?.reloadTextFonts();
+      });
+    });
+  }, [crmFontsReady, crmFonts, template?.id]);
 
   // ── Load template ────────────────────────────────────────────────────────────
   const loadTemplate = useCallback(async () => {

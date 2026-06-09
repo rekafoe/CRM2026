@@ -10,6 +10,13 @@ export function fontFamilyCompactKey(value: string | undefined | null): string {
   return normalizeFontFamilyName(value).toLowerCase().replace(/[\s_-]+/g, '');
 }
 
+export function fontFamilyNamesMatch(a: string | undefined | null, b: string | undefined | null): boolean {
+  const na = fontFamilyCompactKey(a);
+  const nb = fontFamilyCompactKey(b);
+  if (!na || !nb) return false;
+  return na === nb;
+}
+
 function titleCaseFontWords(value: string): string {
   return value.split(/\s+/).filter(Boolean).map((word) => (
     word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()

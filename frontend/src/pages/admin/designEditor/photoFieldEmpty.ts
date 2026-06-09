@@ -2,12 +2,13 @@
  * Пустое фото-поле: группа с однородным фоном и иконкой камеры (как в legacy chrome).
  * Один Fabric Rect на сцене ломал ресайз в Fabric 7 — группа с noop layout и relayoutEmptyPhotoFieldChrome.
  */
-import { Circle, Group, Rect, type Canvas, type FabricObject } from 'fabric';
+import { Circle, Group, Point, Rect, type Canvas, type FabricObject } from 'fabric';
 import { createPhotoFieldStaticLayoutManager, ensurePhotoFieldStaticLayout } from './photoFieldFit';
 import {
   pickEmptyPhotoFieldFrameRect,
   relayoutEmptyPhotoFieldChrome,
   resolvePhotoFieldFrameSize,
+  syncEmptyPhotoFieldSceneAnchor,
 } from './photoFieldGeometry';
 
 type AnyObj = Record<string, unknown>;
@@ -132,20 +133,47 @@ function sceneAnchorTL(field: FabricObject): { x: number; y: number } {
   return { x: br.left, y: br.top };
 }
 
+function stashPhotoFieldSceneAnchor(group: Group, anchor: { x: number; y: number }): void {
+  const o = ax(group);
+  o.photoFieldSceneAnchorX = anchor.x;
+  o.photoFieldSceneAnchorY = anchor.y;
+}
+
+/** После canvas.add: getCoords() надёжнее, чем до добавления на холст. */
+function applyStashedPhotoFieldSceneAnchors(canvas: Canvas): void {
+  for (const obj of canvas.getObjects()) {
+    const o = ax(obj);
+    if (obj.type !== 'group' || o.isPhotoField !== true || o.photoFieldFilled === true) continue;
+    const sx = Number(o.photoFieldSceneAnchorX);
+    const sy = Number(o.photoFieldSceneAnchorY);
+    if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
+    obj.setCoords();
+    syncEmptyPhotoFieldSceneAnchor(obj as Group, new Point(sx, sy));
+    delete o.photoFieldSceneAnchorX;
+    delete o.photoFieldSceneAnchorY;
+    obj.setCoords();
+  }
+}
+
 /** Импортированный rect или урезанная группа → полноценное поле с иконкой. */
 export function upgradePlainEmptyPhotoField(field: FabricObject): FabricObject | null {
   if (!needsEmptyPhotoFieldChromeUpgrade(field)) return null;
   const o = ax(field);
   const { fw, fh } = resolvePhotoFieldFrameSize(field);
+  field.setCoords();
   const anchor = sceneAnchorTL(field);
-  return createEmptyPhotoField({
+  const group = createEmptyPhotoField({
     id: String(o.id ?? '').trim() || `field-${Date.now()}`,
     left: anchor.x,
     top: anchor.y,
     width: fw,
     height: fh,
     clientAdded: o.photoFieldClientAdded === true,
-  });
+  }) as Group;
+  stashPhotoFieldSceneAnchor(group, anchor);
+  syncEmptyPhotoFieldSceneAnchor(group, new Point(anchor.x, anchor.y));
+  group.setCoords();
+  return group;
 }
 
 /** После loadFromJSON: шаблонные photo_* без chrome получают фон и иконку камеры. */
@@ -156,6 +184,7 @@ export function upgradeEmptyPhotoFieldsOnCanvas(canvas: Canvas): boolean {
   if (!changed) return false;
   canvas.clear();
   canvas.add(...next);
+  applyStashedPhotoFieldSceneAnchors(canvas);
   return true;
 }
 
@@ -194,6 +223,7 @@ export function createEmptyPhotoField(opts: {
   o.id = id;
   if (opts.clientAdded) o.photoFieldClientAdded = true;
   group.set({ scaleX: 1, scaleY: 1 });
+  syncEmptyPhotoFieldSceneAnchor(group, new Point(left, top));
   group.setCoords();
   return group;
 }

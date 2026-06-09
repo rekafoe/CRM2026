@@ -42,11 +42,12 @@ export function mergeFontSelectOptions(
   return [...extra, ...base];
 }
 
-export function useCrmDesignFonts() {
+export function useCrmDesignFonts(options?: { fresh?: boolean }) {
   const [fonts, setFonts] = useState<DesignFont[]>(fontsCache ?? []);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (options?.fresh) invalidateCrmDesignFontsCache();
     let cancelled = false;
     void (async () => {
       const list = await loadCrmFontsList();
@@ -60,7 +61,7 @@ export function useCrmDesignFonts() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [options?.fresh]);
 
   const catalogEntries = useMemo((): FontCatalogEntry[] => (
     fonts.map((font) => ({

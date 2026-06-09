@@ -13,6 +13,7 @@ import {
   type DesignFontBatchItemResult,
 } from '../../api';
 import { loadDesignFontForPreview } from '../../utils/loadDesignFonts';
+import { invalidateCrmDesignFontsCache } from '../../hooks/useCrmDesignFonts';
 import { guessFontFamilyFromFilename } from '../../utils/fontFamilyNormalize';
 import '../../styles/admin-page-layout.css';
 import '../../components/admin/ProductManagement.css';
@@ -176,6 +177,7 @@ export const DesignFontsPage: React.FC = () => {
         setEditFamilyName(false);
         setUploadOpen(false);
         notifySuccess('Шрифт добавлен в библиотеку');
+        invalidateCrmDesignFontsCache();
         await loadFonts();
       } else {
         const res = await createDesignFontsBatch(form.files);
@@ -184,6 +186,7 @@ export const DesignFontsPage: React.FC = () => {
         setForm({ family_name: '', files: [] });
         setEditFamilyName(false);
         if (created > 0 || updated > 0) {
+          invalidateCrmDesignFontsCache();
           await loadFonts();
         }
         if (failed === 0 && skipped === 0) {
