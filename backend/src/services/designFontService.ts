@@ -14,7 +14,12 @@ import {
   type BundledTemplateFont,
   type RequiredFontEntry,
 } from '../utils/extractDesignStateFonts'
-import { fontFamilyNamesMatch, normalizeFontFamilyName } from '../utils/fontFamilyNormalize'
+import {
+  fontFamilyCompactKey,
+  fontFamilyNamesMatch,
+  guessFontFamilyFromFilename,
+  normalizeFontFamilyName,
+} from '../utils/fontFamilyNormalize'
 
 export interface DesignFontRow {
   id: number
@@ -76,6 +81,71 @@ export async function getActiveDesignFontByFamily(familyName: string): Promise<R
   ) as DesignFontRow[]
   const row = rows?.find((r) => fontFamilyNamesMatch(r.family_name, normalized))
   return row ? mapRow(row) : null
+}
+
+export type DesignFontBatchItemResult =
+  | { status: 'created'; filename: string; family_name: string; font: ReturnType<typeof mapRow> }
+  | { status: 'skipped'; filename: string; family_name: string; reason: string }
+  | { status: 'error'; filename: string; family_name?: string; error: string }
+
+export async function createDesignFontsBatch(
+  files: Array<{ buffer: Buffer; originalname?: string }>,
+): Promise<{ results: DesignFontBatchItemResult[]; created: number; skipped: number; failed: number }> {
+  const results: DesignFontBatchItemResult[] = []
+  const seenInBatch = new Set<string>()
+  let created = 0
+  let skipped = 0
+  let failed = 0
+
+  for (const file of files) {
+    const filename = file.originalname || 'font'
+    const family_name = guessFontFamilyFromFilename(filename)
+    if (!family_name) {
+      results.push({ status: 'error', filename, error: 'Не удалось определить имя из файла' })
+      failed += 1
+      continue
+    }
+    const batchKey = fontFamilyCompactKey(family_name)
+    if (seenInBatch.has(batchKey)) {
+      results.push({
+        status: 'skipped',
+        filename,
+        family_name,
+        reason: 'Дубликат в этой загрузке',
+      })
+      skipped += 1
+      continue
+    }
+    seenInBatch.add(batchKey)
+
+    const existing = await getActiveDesignFontByFamily(family_name)
+    if (existing) {
+      results.push({
+        status: 'skipped',
+        filename,
+        family_name,
+        reason: `Уже в библиотеке (ID ${existing.id})`,
+      })
+      skipped += 1
+      continue
+    }
+
+    try {
+      const font = await createDesignFont({ family_name }, file)
+      results.push({ status: 'created', filename, family_name, font })
+      created += 1
+    } catch (err) {
+      results.push({
+        status: 'error',
+        filename,
+        family_name,
+        error: err instanceof Error ? err.message : 'Не удалось сохранить',
+      })
+      failed += 1
+    }
+  }
+
+  return { results, created, skipped, failed }
 }
 
 export async function createDesignFont(

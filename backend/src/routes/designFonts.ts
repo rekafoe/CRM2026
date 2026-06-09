@@ -5,6 +5,7 @@ import { asyncHandler, authenticate, type AuthenticatedRequest } from '../middle
 import {
   contentTypeForFontFormat,
   createDesignFont,
+  createDesignFontsBatch,
   deactivateDesignFont,
   getDesignFontById,
   listDesignFonts,
@@ -12,26 +13,56 @@ import {
   updateDesignFont,
 } from '../services/designFontService'
 import { isFontUploadExtension } from '../config/upload'
+import { guessFontFamilyFromFilename } from '../utils/fontFamilyNormalize'
 
 const router = Router()
+
+function fontUploadFileFilter(
+  _req: Request,
+  file: { originalname?: string },
+  cb: (error: Error | null, accept: boolean) => void,
+): void {
+  const ext = (file.originalname || '').toLowerCase().slice(file.originalname.lastIndexOf('.'))
+  if (!isFontUploadExtension(ext)) {
+    cb(new Error('Допустимы woff2, woff, ttf, otf'), false)
+    return
+  }
+  cb(null, true)
+}
 
 const fontUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024, files: 1 },
-  fileFilter: (_req, file, cb) => {
-    const ext = (file.originalname || '').toLowerCase().slice(file.originalname.lastIndexOf('.'))
-    if (!isFontUploadExtension(ext)) {
-      cb(new Error('Допустимы woff2, woff, ttf, otf'), false)
-      return
-    }
-    cb(null, true)
-  },
+  fileFilter: fontUploadFileFilter,
+})
+
+const fontBatchUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 100 },
+  fileFilter: fontUploadFileFilter,
 })
 
 router.get('/', authenticate, asyncHandler(async (_req: Request, res: Response) => {
   const fonts = await listDesignFonts()
   res.json(fonts)
 }))
+
+router.post(
+  '/batch',
+  authenticate,
+  fontBatchUpload.array('files', 100),
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const files = req.files
+    if (!Array.isArray(files) || files.length === 0) {
+      res.status(400).json({ error: 'Выберите один или несколько файлов шрифтов (woff2, woff, ttf, otf)' })
+      return
+    }
+    const result = await createDesignFontsBatch(
+      files.map((file) => ({ buffer: file.buffer, originalname: file.originalname })),
+    )
+    res.status(result.created > 0 ? 201 : 200).json(result)
+  }),
+)
 
 router.post(
   '/',
@@ -44,8 +75,9 @@ router.post(
       return
     }
     const family_name = String(req.body.family_name ?? req.body.familyName ?? '').trim()
+      || guessFontFamilyFromFilename(file.originalname || '')
     if (!family_name) {
-      res.status(400).json({ error: 'Укажите family_name (как в макете)' })
+      res.status(400).json({ error: 'Не удалось определить имя шрифта из файла' })
       return
     }
     const created = await createDesignFont(

@@ -1144,19 +1144,39 @@ export interface DesignFont {
 export const getDesignFonts = () => api.get<DesignFont[]>('/design-fonts');
 
 export const createDesignFont = (payload: {
-  family_name: string;
+  family_name?: string;
   label?: string;
   file: File;
   weight?: string;
   style?: string;
 }) => {
   const formData = new FormData();
-  formData.append('family_name', payload.family_name);
+  if (payload.family_name?.trim()) formData.append('family_name', payload.family_name.trim());
   if (payload.label) formData.append('label', payload.label);
   if (payload.weight) formData.append('weight', payload.weight);
   if (payload.style) formData.append('style', payload.style);
   formData.append('file', payload.file);
   return api.post<DesignFont>('/design-fonts', formData);
+};
+
+export type DesignFontBatchItemResult =
+  | { status: 'created'; filename: string; family_name: string; font: DesignFont }
+  | { status: 'skipped'; filename: string; family_name: string; reason: string }
+  | { status: 'error'; filename: string; family_name?: string; error: string };
+
+export interface DesignFontBatchResult {
+  results: DesignFontBatchItemResult[];
+  created: number;
+  skipped: number;
+  failed: number;
+}
+
+export const createDesignFontsBatch = (files: File[]) => {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append('files', file);
+  }
+  return api.post<DesignFontBatchResult>('/design-fonts/batch', formData);
 };
 
 export const updateDesignFont = (

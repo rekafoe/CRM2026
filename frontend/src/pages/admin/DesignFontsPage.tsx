@@ -5,12 +5,15 @@ import { AppIcon } from '../../components/ui/AppIcon';
 import { Alert } from '../../components/common';
 import {
   createDesignFont,
+  createDesignFontsBatch,
   deactivateDesignFont,
   getDesignFonts,
   updateDesignFont,
   type DesignFont,
+  type DesignFontBatchItemResult,
 } from '../../api';
 import { loadDesignFontFromLibrary } from '../../utils/loadDesignFonts';
+import { guessFontFamilyFromFilename } from '../../utils/fontFamilyNormalize';
 import '../../styles/admin-page-layout.css';
 import '../../components/admin/ProductManagement.css';
 import './DesignFontsPage.css';
@@ -18,6 +21,16 @@ import './DesignFontsPage.css';
 const FONT_PREVIEW = 'Съешь ещё этих мягких французских булок';
 const FONT_PREVIEW_LATIN = 'VOGUE · Birthday girl · 10.02.2004';
 const PREVIEW_STYLE_ID = 'design-fonts-preview-styles';
+const FONT_EXTENSIONS = /\.(woff2|woff|ttf|otf)$/i;
+
+function isFontFile(file: File): boolean {
+  return FONT_EXTENSIONS.test(file.name);
+}
+
+function pickFontFiles(fileList: FileList | null): File[] {
+  if (!fileList?.length) return [];
+  return Array.from(fileList).filter(isFontFile);
+}
 
 function escapeCssString(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -53,9 +66,10 @@ export const DesignFontsPage: React.FC = () => {
   const [loadedPreviewIds, setLoadedPreviewIds] = useState<Set<number>>(() => new Set());
   const [form, setForm] = useState({
     family_name: '',
-    label: '',
-    file: null as File | null,
+    files: [] as File[],
   });
+  const [editFamilyName, setEditFamilyName] = useState(false);
+  const [batchResults, setBatchResults] = useState<DesignFontBatchItemResult[] | null>(null);
   const [replaceId, setReplaceId] = useState<number | null>(null);
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -128,24 +142,65 @@ export const DesignFontsPage: React.FC = () => {
     window.setTimeout(() => setSuccess(null), 4000);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.file || !form.family_name.trim()) {
-      setError('Укажите family_name и файл шрифта (woff2, woff, ttf, otf)');
+  const handleFilesSelect = (fileList: FileList | null) => {
+    const files = pickFontFiles(fileList);
+    if (!files.length) {
+      setForm({ family_name: '', files: [] });
+      setEditFamilyName(false);
+      setBatchResults(null);
       return;
     }
+    setForm({
+      files,
+      family_name: files.length === 1 ? guessFontFamilyFromFilename(files[0].name) : '',
+    });
+    setEditFamilyName(false);
+    setBatchResults(null);
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.files.length) {
+      setError('Выберите файл шрифта (woff2, woff, ttf, otf)');
+      return;
+    }
+    const isSingle = form.files.length === 1;
     try {
       setSaving(true);
       setError(null);
-      await createDesignFont({
-        family_name: form.family_name.trim(),
-        label: form.label.trim() || form.family_name.trim(),
-        file: form.file,
-      });
-      setForm({ family_name: '', label: '', file: null });
-      setUploadOpen(false);
-      notifySuccess('Шрифт добавлен в библиотеку');
-      await loadFonts();
+      setBatchResults(null);
+
+      if (isSingle) {
+        const file = form.files[0];
+        const family_name = form.family_name.trim() || guessFontFamilyFromFilename(file.name);
+        await createDesignFont({
+          family_name: family_name || undefined,
+          file,
+        });
+        setForm({ family_name: '', files: [] });
+        setEditFamilyName(false);
+        setUploadOpen(false);
+        notifySuccess('Шрифт добавлен в библиотеку');
+        await loadFonts();
+      } else {
+        const res = await createDesignFontsBatch(form.files);
+        const { created, skipped, failed, results } = res.data;
+        setBatchResults(results);
+        setForm({ family_name: '', files: [] });
+        setEditFamilyName(false);
+        if (created > 0) {
+          await loadFonts();
+        }
+        if (failed === 0 && skipped === 0) {
+          setUploadOpen(false);
+          notifySuccess(`Добавлено шрифтов: ${created}`);
+        } else {
+          const parts = [`добавлено ${created}`];
+          if (skipped > 0) parts.push(`пропущено ${skipped}`);
+          if (failed > 0) parts.push(`ошибок ${failed}`);
+          notifySuccess(`Загрузка завершена: ${parts.join(', ')}`);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось добавить шрифт');
     } finally {
@@ -219,12 +274,12 @@ export const DesignFontsPage: React.FC = () => {
           {helpOpen && (
             <div className="design-fonts-help__body">
               <p>
-                Поле <strong>family_name</strong> должно совпадать с именем в SVG / Corel / Illustrator
-                (например <code>Ceremonious One</code>, <code>Voguella</code>).
+                Можно выбрать несколько файлов или целую папку — имена берутся из названий
+                (<code>HappyTime.otf</code> → <code>Happy Time</code>).
               </p>
               <p>
-                Файлы из папки <code>fonts/</code> в ZIP не переименуют шрифт в макете — только
-                доставят файл, если имя совпадает. Подробнее: <code>docs/design-fonts.md</code>.
+                Уже загруженные шрифты пропускаются. Для одного файла с другим написанием
+                (например <code>Voguella</code>) нажмите «Изменить имя» перед загрузкой.
               </p>
             </div>
           )}
@@ -262,54 +317,117 @@ export const DesignFontsPage: React.FC = () => {
 
           {uploadOpen && (
             <form className="design-fonts-upload" onSubmit={(e) => void handleCreate(e)}>
-              <div className="design-fonts-upload__grid">
-                <label className="design-fonts-field">
-                  <span className="design-fonts-field__label">family_name (как в макете)</span>
+              <label className="design-fonts-dropzone">
+                <span className="design-fonts-dropzone__icon" aria-hidden>
+                  <AppIcon name="download" size="md" />
+                </span>
+                <span className="design-fonts-dropzone__title">
+                  {form.files.length === 0
+                    ? 'Выберите файлы или папку со шрифтами'
+                    : form.files.length === 1
+                      ? form.files[0].name
+                      : `Выбрано файлов: ${form.files.length}`}
+                </span>
+                <span className="design-fonts-dropzone__hint">woff2, woff, ttf, otf · до 100 за раз</span>
+                <input
+                  type="file"
+                  className="design-fonts-file-picker__input"
+                  accept=".woff2,.woff,.ttf,.otf"
+                  multiple
+                  onChange={(e) => handleFilesSelect(e.target.files)}
+                />
+              </label>
+
+              <div className="design-fonts-upload__pickers">
+                <label className="design-fonts-folder-picker">
+                  <AppIcon name="folder" size="xs" />
+                  Выбрать папку
                   <input
-                    className="design-fonts-field__input"
-                    value={form.family_name}
-                    onChange={(e) => setForm((p) => ({ ...p, family_name: e.target.value }))}
-                    placeholder="Ceremonious One"
-                    required
+                    type="file"
+                    className="design-fonts-file-picker__input"
+                    accept=".woff2,.woff,.ttf,.otf"
+                    multiple
+                    onChange={(e) => handleFilesSelect(e.target.files)}
+                    // @ts-expect-error webkitdirectory is supported in Chromium-based browsers
+                    webkitdirectory=""
                   />
-                  <span className="design-fonts-field__hint">Точное имя из SVG / font-family</span>
-                </label>
-                <label className="design-fonts-field">
-                  <span className="design-fonts-field__label">Подпись в админке</span>
-                  <input
-                    className="design-fonts-field__input"
-                    value={form.label}
-                    onChange={(e) => setForm((p) => ({ ...p, label: e.target.value }))}
-                    placeholder="Ceremonious One"
-                  />
-                </label>
-                <label className="design-fonts-field design-fonts-field--file">
-                  <span className="design-fonts-field__label">Файл шрифта</span>
-                  <span className="design-fonts-file-picker">
-                    <span className="design-fonts-file-picker__btn">Выбрать файл</span>
-                    <span className="design-fonts-file-picker__name">
-                      {form.file?.name ?? 'woff2, woff, ttf, otf'}
-                    </span>
-                    <input
-                      type="file"
-                      className="design-fonts-file-picker__input"
-                      accept=".woff2,.woff,.ttf,.otf"
-                      onChange={(e) => setForm((p) => ({ ...p, file: e.target.files?.[0] ?? null }))}
-                      required
-                    />
-                  </span>
                 </label>
               </div>
+
+              {form.files.length === 1 && (
+                <div className="design-fonts-detected">
+                  {!editFamilyName ? (
+                    <p className="design-fonts-detected__text">
+                      Имя в библиотеке: <strong>{form.family_name}</strong>
+                      <button
+                        type="button"
+                        className="design-fonts-detected__edit"
+                        onClick={() => setEditFamilyName(true)}
+                      >
+                        Изменить имя
+                      </button>
+                    </p>
+                  ) : (
+                    <label className="design-fonts-field">
+                      <span className="design-fonts-field__label">Имя как в макете (font-family)</span>
+                      <input
+                        className="design-fonts-field__input"
+                        value={form.family_name}
+                        onChange={(e) => setForm((p) => ({ ...p, family_name: e.target.value }))}
+                        autoFocus
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+
+              {form.files.length > 1 && (
+                <ul className="design-fonts-batch-list">
+                  {form.files.map((file) => (
+                    <li key={`${file.name}-${file.size}-${file.lastModified}`} className="design-fonts-batch-list__item">
+                      <span className="design-fonts-batch-list__file">{file.name}</span>
+                      <span className="design-fonts-batch-list__family">
+                        {guessFontFamilyFromFilename(file.name)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {batchResults && batchResults.length > 0 && (
+                <ul className="design-fonts-batch-results">
+                  {batchResults.map((item) => (
+                    <li
+                      key={`${item.filename}-${item.status}-${item.family_name ?? ''}`}
+                      className={`design-fonts-batch-results__item design-fonts-batch-results__item--${item.status}`}
+                    >
+                      <span className="design-fonts-batch-results__file">{item.filename}</span>
+                      <span className="design-fonts-batch-results__detail">
+                        {item.status === 'created' && `→ ${item.family_name}`}
+                        {item.status === 'skipped' && `пропущен: ${item.reason}`}
+                        {item.status === 'error' && (item.error ?? 'ошибка')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
               <div className="design-fonts-upload__actions">
-                <button type="submit" className="lg-btn lg-btn--primary" disabled={saving}>
-                  {saving ? 'Загрузка…' : 'Загрузить в библиотеку'}
+                <button type="submit" className="lg-btn lg-btn--primary" disabled={saving || !form.files.length}>
+                  {saving
+                    ? 'Загрузка…'
+                    : form.files.length > 1
+                      ? `Загрузить ${form.files.length} шрифтов`
+                      : 'Загрузить'}
                 </button>
                 <button
                   type="button"
                   className="lg-btn"
                   onClick={() => {
                     setUploadOpen(false);
-                    setForm({ family_name: '', label: '', file: null });
+                    setForm({ family_name: '', files: [] });
+                    setEditFamilyName(false);
+                    setBatchResults(null);
                   }}
                 >
                   Отмена
@@ -329,7 +447,7 @@ export const DesignFontsPage: React.FC = () => {
         ) : filteredFonts.length === 0 ? (
           <div className="design-fonts-empty">
             {fonts.length === 0
-              ? 'Пока нет шрифтов. Нажмите «Добавить шрифт» и загрузите первый файл.'
+              ? 'Пока нет шрифтов. Нажмите «Добавить шрифт» и загрузите файлы или папку.'
               : 'Ничего не найдено по фильтру.'}
           </div>
         ) : (
