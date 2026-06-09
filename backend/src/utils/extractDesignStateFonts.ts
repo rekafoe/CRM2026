@@ -4,6 +4,7 @@ import {
   isGenericFontFamily,
   normalizeFontFamilyName,
 } from './fontFamilyNormalize'
+import { collectFontFamiliesFromTextField, type TextStyleRun } from './textStyleRuns'
 
 type FabricObj = Record<string, unknown>
 
@@ -22,17 +23,14 @@ function walkFabric(value: unknown, visit: (obj: FabricObj) => void): void {
 }
 
 function collectFontFamiliesFromFabricText(obj: FabricObj, families: Set<string>): void {
-  const ff = normalizeFontFamilyName(String(obj.fontFamily ?? ''))
-  if (ff) families.add(ff)
-  const styles = obj.styles
-  if (!styles || typeof styles !== 'object' || Array.isArray(styles)) return
-  for (const line of Object.values(styles as Record<string, unknown>)) {
-    if (!line || typeof line !== 'object' || Array.isArray(line)) continue
-    for (const style of Object.values(line as Record<string, unknown>)) {
-      if (!style || typeof style !== 'object' || Array.isArray(style)) continue
-      const segFont = normalizeFontFamilyName(String((style as FabricObj).fontFamily ?? ''))
-      if (segFont) families.add(segFont)
-    }
+  collectFontFamiliesFromTextField(obj, families)
+}
+
+function walkFabricTextStyleRuns(obj: FabricObj, visit: (run: TextStyleRun) => void): void {
+  const runs = obj.textStyleRuns
+  if (!Array.isArray(runs)) return
+  for (const run of runs) {
+    if (run && typeof run === 'object' && !Array.isArray(run)) visit(run as TextStyleRun)
   }
 }
 
@@ -173,6 +171,11 @@ export function applyLibraryFontFallbacksToDesignState(
           style.fontFamily = matched
         }
       })
+      walkFabricTextStyleRuns(obj, (run) => {
+        if (isGenericFontFamily(String(run.fontFamily ?? ''))) {
+          run.fontFamily = matched
+        }
+      })
     })
   }
 
@@ -220,6 +223,12 @@ export function normalizeDesignStateFontFamilies(
         if (!segFont) return
         const canonical = aliasToCanonical.get(fontFamilyCompactKey(segFont))
         if (canonical) style.fontFamily = canonical
+      })
+      walkFabricTextStyleRuns(obj, (run) => {
+        const segFont = normalizeFontFamilyName(String(run.fontFamily ?? ''))
+        if (!segFont) return
+        const canonical = aliasToCanonical.get(fontFamilyCompactKey(segFont))
+        if (canonical) run.fontFamily = canonical
       })
     })
   }

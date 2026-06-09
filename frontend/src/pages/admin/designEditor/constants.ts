@@ -75,6 +75,8 @@ export const FABRIC_CUSTOM_PROPS = [
   'photoFieldIntrinsicW',
   'photoFieldIntrinsicH',
   'photoFieldFileSize',
+  /** Диапазоны шрифтов в текстовом поле (источник правды; Fabric styles — runtime). */
+  'textStyleRuns',
 ];
 
 /** Пункты меню сайдбара */

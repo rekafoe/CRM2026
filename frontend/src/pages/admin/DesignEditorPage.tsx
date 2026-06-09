@@ -29,7 +29,9 @@ import {
 } from './designEditor/designEditorState';
 import {
   patchAllTextInFabricJSON,
+  patchAllTextFontFamilyInFabricJSON,
   extractUsedFontFamiliesFromPages,
+  isFabricTextObjectType,
 } from './designEditor/patchFabricTextObjects';
 import type {
   DesignPrepressConfig,
@@ -667,7 +669,7 @@ export const DesignEditorPage: React.FC = () => {
       const handle = canvasHandleRef.current;
       if (!handle) return;
       await ensureDesignFontLoaded(fontFamily, crmFonts);
-      if (selectedObj?.type === 'IText') {
+      if (isFabricTextObjectType(selectedObj?.type)) {
         handle.applyTextPropsToSelection({ fontFamily });
         await handle.reloadTextFonts();
         return;
@@ -675,7 +677,7 @@ export const DesignEditorPage: React.FC = () => {
       const saved = await handle.saveCurrentPage();
       const merged = mergeSavedEditorPages(pages, saved as PageSaveSnapshot, currentPage, leftPageIdx, rightPageIdx);
       const nextPages = merged.map((p) => ({
-        fabricJSON: patchAllTextInFabricJSON(p.fabricJSON as Record<string, unknown>, { fontFamily }),
+        fabricJSON: patchAllTextFontFamilyInFabricJSON(p.fabricJSON as Record<string, unknown>, fontFamily),
       }));
       setPages(nextPages);
       await handle.applyEditorViewState(nextPages);
@@ -688,7 +690,7 @@ export const DesignEditorPage: React.FC = () => {
     async (fill: string) => {
       const handle = canvasHandleRef.current;
       if (!handle) return;
-      if (selectedObj?.type === 'IText') {
+      if (isFabricTextObjectType(selectedObj?.type)) {
         handle.applyTextPropsToSelection({ fill });
         return;
       }
@@ -707,7 +709,7 @@ export const DesignEditorPage: React.FC = () => {
     async (v: TextEffectsValues) => {
       const handle = canvasHandleRef.current;
       if (!handle) return;
-      if (selectedObj?.type === 'IText') {
+      if (isFabricTextObjectType(selectedObj?.type)) {
         const props: Record<string, unknown> = {
           opacity: v.opacity,
           strokeWidth: v.strokeWidth,

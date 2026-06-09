@@ -91,41 +91,36 @@ function toFabricRect(rect: SvgRect) {
   }
 }
 
-function toFabricTextStyles(
-  text: string,
+export type TextStyleRun = {
+  start: number
+  end: number
+  fontFamily?: string
+  fontWeight?: string
+  fontStyle?: string
+  fill?: string
+  fontSize?: number
+}
+
+export function toTextStyleRuns(
   segments: NonNullable<SvgText['textStyles']>,
   baseFontSizePx: number,
-): Record<number, Record<number, Record<string, unknown>>> | undefined {
-  const lines = text.split('\n')
-  const lineStartOffsets: number[] = []
-  let offset = 0
-  for (const line of lines) {
-    lineStartOffsets.push(offset)
-    offset += line.length + 1
-  }
-  const out: Record<number, Record<number, Record<string, unknown>>> = {}
+): TextStyleRun[] | undefined {
+  if (!segments.length) return undefined
+  const runs: TextStyleRun[] = []
   for (const seg of segments) {
-    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-      const lineStart = lineStartOffsets[lineIndex]!
-      const lineText = lines[lineIndex] ?? ''
-      const lineEnd = lineStart + lineText.length
-      if (seg.end <= lineStart || seg.start >= lineEnd) continue
-      const charIndex = Math.max(0, seg.start - lineStart)
-      const patch: Record<string, unknown> = {}
-      if (seg.fontFamily) patch.fontFamily = seg.fontFamily
-      if (seg.fontWeight) patch.fontWeight = seg.fontWeight
-      if (seg.fontStyle) patch.fontStyle = seg.fontStyle
-      if (seg.fill) patch.fill = seg.fill
-      // Меньший font-size у декоративной буквы Corel не переносим — иначе одна буква меньше строки.
-      if (seg.fontSize != null && seg.fontSize > baseFontSizePx + 0.5) {
-        patch.fontSize = Math.max(6, seg.fontSize)
-      }
-      if (Object.keys(patch).length === 0) continue
-      out[lineIndex] ??= {}
-      out[lineIndex]![charIndex] = patch
+    const run: TextStyleRun = { start: seg.start, end: seg.end }
+    if (seg.fontFamily) run.fontFamily = seg.fontFamily
+    if (seg.fontWeight) run.fontWeight = seg.fontWeight
+    if (seg.fontStyle) run.fontStyle = seg.fontStyle
+    if (seg.fill) run.fill = seg.fill
+    if (seg.fontSize != null && seg.fontSize > baseFontSizePx + 0.5) {
+      run.fontSize = Math.max(6, seg.fontSize)
+    }
+    if (run.fontFamily || run.fontWeight || run.fontStyle || run.fill || run.fontSize) {
+      runs.push(run)
     }
   }
-  return Object.keys(out).length > 0 ? out : undefined
+  return runs.length > 0 ? runs : undefined
 }
 
 function toFabricText(item: SvgText) {
@@ -138,18 +133,20 @@ function toFabricText(item: SvgText) {
     : item.scene.y - fontSizePx * 0.8
   const maxLineLen = Math.max(...item.text.split('\n').map((line) => line.length), 1)
   const defaultWidth = Math.max(120, maxLineLen * fontSizePx * 0.55)
-  const styles = item.textStyles?.length
-    ? toFabricTextStyles(item.text, item.textStyles, fontSizePx)
+  const textStyleRuns = item.textStyles?.length
+    ? toTextStyleRuns(item.textStyles, fontSizePx)
     : undefined
   const baseFontFamily = item.textStyles?.[0]?.fontFamily?.trim()
     || item.fontFamily?.trim()
     || 'Arial'
-  const base = {
+  return {
     version: '6.0.0',
+    type: 'textbox',
     originX,
     originY: 'top' as const,
     left: item.scene.x,
     top,
+    width: item.frameWidthScene ?? defaultWidth,
     text: item.text,
     fontSize: fontSizePx,
     fontFamily: baseFontFamily,
@@ -158,21 +155,8 @@ function toFabricText(item: SvgText) {
     id: item.name,
     ...(item.fontWeight ? { fontWeight: item.fontWeight } : {}),
     ...(item.fontStyle ? { fontStyle: item.fontStyle } : {}),
-    ...(styles ? { styles } : {}),
+    ...(textStyleRuns ? { textStyleRuns } : {}),
     ...(Math.abs(angle) > 0.5 ? { angle } : {}),
-  }
-  const useTextbox = item.text.includes('\n')
-    || ((item.textAnchor === 'middle' || item.textAnchor === 'end') && Boolean(item.frameWidthScene))
-  if (useTextbox) {
-    return {
-      ...base,
-      type: 'textbox',
-      width: item.frameWidthScene ?? defaultWidth,
-    }
-  }
-  return {
-    ...base,
-    type: 'i-text',
   }
 }
 
@@ -451,6 +435,11 @@ function buildPageFromSvg(input: {
       },
     },
   }
+}
+
+/** @internal exported for tests */
+export function fabricTextFromSvgText(item: SvgText) {
+  return toFabricText(item)
 }
 
 export function buildImportedSvgTemplateDocument(

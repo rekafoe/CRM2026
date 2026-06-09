@@ -1,3 +1,5 @@
+import { collectFontFamiliesFromTextField, patchTextStyleRunsFontInFabricJSON } from './textStyleRuns';
+
 /** Патч всех текстовых объектов в Fabric JSON (i-text, textbox; рекурсивно в группах) */
 
 /** Fabric 6 сериализует IText как type: "IText" → toLowerCase "itext" */
@@ -15,13 +17,30 @@ function patchTextObjectsRecursive(objects: unknown[], patch: Record<string, unk
     const o = obj as Record<string, unknown>;
     const t = String(o.type ?? '').toLowerCase();
     if (TEXT_TYPES.has(t)) {
+      if (typeof patch.fontFamily === 'string') {
+        o.fontFamily = patch.fontFamily;
+        delete o.textStyleRuns;
+        delete o.styles;
+      }
       for (const [k, v] of Object.entries(patch)) {
+        if (k === 'fontFamily') continue;
         if (v === undefined) {
           delete o[k];
         } else {
           o[k] = v as unknown;
         }
       }
+      if (patch.fontFamily === undefined && Array.isArray(o.textStyleRuns)) {
+        o.textStyleRuns = (o.textStyleRuns as Array<Record<string, unknown>>).map((run) => {
+          const next = { ...run };
+          if (typeof patch.fill === 'string') next.fill = patch.fill;
+          if (typeof patch.fontWeight === 'string') next.fontWeight = patch.fontWeight;
+          if (typeof patch.fontStyle === 'string') next.fontStyle = patch.fontStyle;
+          if (typeof patch.fontSize === 'number') next.fontSize = patch.fontSize;
+          return next;
+        });
+      }
+      delete o.styles;
     }
     if (Array.isArray(o.objects)) {
       patchTextObjectsRecursive(o.objects as unknown[], patch);
@@ -44,19 +63,12 @@ export function patchAllTextInFabricJSON(
   return next;
 }
 
-function collectFontFamiliesFromTextObject(o: Record<string, unknown>, out: Set<string>): void {
-  const ff = o.fontFamily;
-  if (typeof ff === 'string' && ff.trim()) out.add(ff.trim());
-  const styles = o.styles;
-  if (!styles || typeof styles !== 'object' || Array.isArray(styles)) return;
-  for (const line of Object.values(styles as Record<string, unknown>)) {
-    if (!line || typeof line !== 'object' || Array.isArray(line)) continue;
-    for (const style of Object.values(line as Record<string, unknown>)) {
-      if (!style || typeof style !== 'object' || Array.isArray(style)) continue;
-      const segFont = (style as Record<string, unknown>).fontFamily;
-      if (typeof segFont === 'string' && segFont.trim()) out.add(segFont.trim());
-    }
-  }
+/** Глобальная смена шрифта: сбрасывает textStyleRuns и styles. */
+export function patchAllTextFontFamilyInFabricJSON(
+  fabricJSON: Record<string, unknown>,
+  fontFamily: string,
+): Record<string, unknown> {
+  return patchTextStyleRunsFontInFabricJSON(fabricJSON, fontFamily);
 }
 
 function collectFontFamiliesRecursive(objects: unknown[], out: Set<string>): void {
@@ -65,7 +77,7 @@ function collectFontFamiliesRecursive(objects: unknown[], out: Set<string>): voi
     const o = obj as Record<string, unknown>;
     const t = String(o.type ?? '').toLowerCase();
     if (TEXT_TYPES.has(t)) {
-      collectFontFamiliesFromTextObject(o, out);
+      collectFontFamiliesFromTextField(o, out);
     }
     if (Array.isArray(o.objects)) {
       collectFontFamiliesRecursive(o.objects as unknown[], out);

@@ -96,6 +96,29 @@ describe('normalizeDesignStateFontFamilies', () => {
   })
 })
 
+describe('extractUsedFontFamiliesFromDesignState textStyleRuns', () => {
+  it('собирает шрифты из textStyleRuns', () => {
+    const designState = {
+      pages: [{
+        fabricJSON: {
+          objects: [{
+            type: 'textbox',
+            fontFamily: 'Voguella',
+            text: 'Что я в тебе люблю',
+            textStyleRuns: [
+              { start: 0, end: 12, fontFamily: 'Voguella' },
+              { start: 12, end: 17, fontFamily: 'Ceremonious One' },
+            ],
+          }],
+        },
+      }],
+    }
+    const families = extractUsedFontFamiliesFromDesignState(designState)
+    expect(families).toEqual(expect.arrayContaining(['Voguella', 'Ceremonious One']))
+    expect(families).toHaveLength(2)
+  })
+})
+
 describe('extractUsedFontFamiliesFromDesignState', () => {
   it('собирает шрифты из styles персонажей, не только верхний fontFamily', () => {
     const designState = {

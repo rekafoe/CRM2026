@@ -5,6 +5,7 @@ import puppeteer, { type Browser } from 'puppeteer'
 import { getDb } from '../config/database'
 import { orderFilesDir, resolveSafeExistingPath, saveBufferToOrderFiles } from '../config/upload'
 import { resolveFontFilesForDesignState } from './designFontService'
+import { buildMixedFontTextInnerHtml } from '../utils/textStyleRuns'
 import { getDesignTemplate } from './designTemplateService'
 
 const MM_TO_PX = 96 / 25.4
@@ -125,8 +126,8 @@ function buildObjectHtml(
     const fontSize = Number(obj.fontSize ?? 16) * Math.min(scaleX, scaleY)
     const fontFamily = String(obj.fontFamily ?? 'Arial, sans-serif')
     const fontWeight = String(obj.fontWeight ?? 'normal')
-    const text = escapeHtml(String(obj.text ?? '').replace(/\n/g, '<br/>'))
-    return `<div style="${style};color:${escapeHtml(fill)};font-size:${fontSize}px;font-family:${escapeHtml(fontFamily)};font-weight:${escapeHtml(fontWeight)};white-space:pre-wrap;overflow:hidden">${text}</div>`
+    const inner = buildMixedFontTextInnerHtml(String(obj.text ?? ''), obj, Math.min(scaleX, scaleY))
+    return `<div style="${style};color:${escapeHtml(fill)};font-size:${fontSize}px;font-family:${escapeHtml(fontFamily)};font-weight:${escapeHtml(fontWeight)};white-space:pre-wrap;overflow:hidden;line-height:1.2">${inner}</div>`
   }
 
   if (type === 'rect' || type === 'circle') {

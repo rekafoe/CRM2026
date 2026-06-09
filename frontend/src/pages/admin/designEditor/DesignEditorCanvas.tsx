@@ -87,6 +87,14 @@ import {
   loadDesignPageScene,
   loadSpreadMergedScene,
 } from './designPageLoader';
+import {
+  applyFormatToTextField,
+  dehydrateTextObjectsInFabricJSON,
+  finishTextEditOnObject,
+  prepareTextObjectsOnCanvas,
+  stripFabricStylesForEditing,
+  type TextStyleRun,
+} from './textStyleRuns';
 
 // ─── Custom property names saved in Fabric JSON ───────────────────────────────
 
@@ -605,6 +613,7 @@ function beginTextEditingOnCanvas(
   if ((text as unknown as AnyObj).isEditing) return;
   captureBaseline?.(target);
   if (inlineEditSession) inlineEditSession.current = true;
+  stripFabricStylesForEditing(text);
   text.set({ editable: true });
   canvas.setActiveObject(text);
   if (typeof text.enterEditing === 'function') {
@@ -777,7 +786,9 @@ function scenePointToClient(canvas: Canvas, sx: number, sy: number): { x: number
 }
 
 function canvasToJSON(canvas: Canvas): Record<string, unknown> {
-  return canvas.toObject(CUSTOM_PROPS) as Record<string, unknown>;
+  const json = canvas.toObject(CUSTOM_PROPS) as Record<string, unknown>;
+  dehydrateTextObjectsInFabricJSON(json);
+  return json;
 }
 
 function bakeClientPhotoFieldIfNeeded(
@@ -1048,6 +1059,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       isLoadingRef.current = true;
       try {
         await canvas.loadFromJSON(JSON.parse(stack[newIndex]) as Record<string, unknown>, fabricDeserializeReviver);
+        prepareTextObjectsOnCanvas(canvas.getObjects());
         canvas.requestRenderAll();
       } finally {
         isLoadingRef.current = false;
@@ -1065,6 +1077,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       isLoadingRef.current = true;
       try {
         await canvas.loadFromJSON(JSON.parse(stack[newIndex]) as Record<string, unknown>, fabricDeserializeReviver);
+        prepareTextObjectsOnCanvas(canvas.getObjects());
         canvas.requestRenderAll();
       } finally {
         isLoadingRef.current = false;
@@ -1155,6 +1168,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           const fieldId = String(asAny(target).id ?? '').trim();
           const textBefore = baseline?.fieldId === fieldId ? baseline.text : undefined;
           const textAfter = normalizeTextForDisplay(text.text);
+          finishTextEditOnObject(text, textBefore);
           emitTextFillHintIfNeeded(textBefore, textAfter);
           text.set({ editable: false });
           const hidden = (text as unknown as { hiddenTextarea?: HTMLTextAreaElement }).hiddenTextarea;
@@ -2473,8 +2487,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         const canvas = fabricRef.current;
         if (!canvas) return;
         const active = canvas.getActiveObject();
-        if (!active) return;
-        active.set({ [key]: value } as Parameters<typeof active.set>[0]);
+        if (!active || !isTextLikeObject(active)) return;
+        applyFormatToTextField(active as IText & { textStyleRuns?: TextStyleRun[] }, { [key]: value });
         canvas.requestRenderAll();
         onSelectionChange(getObjProps(active));
         saveSnapshot();
@@ -2483,8 +2497,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         const canvas = fabricRef.current;
         if (!canvas) return;
         const active = canvas.getActiveObject();
-        if (!active || (active.type !== 'i-text' && active.type !== 'textbox')) return;
-        active.set(props as Parameters<typeof active.set>[0]);
+        if (!active || !isTextLikeObject(active)) return;
+        applyFormatToTextField(active as IText & { textStyleRuns?: TextStyleRun[] }, props);
         canvas.requestRenderAll();
         onSelectionChange(getObjProps(active));
         saveSnapshot();
@@ -2493,12 +2507,12 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         const canvas = fabricRef.current;
         if (!canvas) return;
         const active = canvas.getActiveObject();
-        if (!active || (active.type !== 'i-text' && active.type !== 'textbox')) return;
+        if (!active || !isTextLikeObject(active)) return;
         const next: Record<string, unknown> = { ...props };
         if (next.shadow != null && typeof next.shadow === 'object' && !(next.shadow instanceof Shadow)) {
           next.shadow = new Shadow(next.shadow as object);
         }
-        active.set(next as Parameters<typeof active.set>[0]);
+        applyFormatToTextField(active as IText & { textStyleRuns?: TextStyleRun[] }, next);
         canvas.requestRenderAll();
         onSelectionChange(getObjProps(active));
         saveSnapshot();
@@ -2673,6 +2687,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       }
       const textObj = target as IText;
       textObj.set('text', normalizeTextForFabric(text));
+      finishTextEditOnObject(textObj, textBefore);
       canvas.setActiveObject(textObj);
       canvas.requestRenderAll();
       onSelectionChange(getObjProps(textObj));
