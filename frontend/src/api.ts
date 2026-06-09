@@ -1143,6 +1143,8 @@ export interface DesignFont {
 
 export const getDesignFonts = () => api.get<DesignFont[]>('/design-fonts');
 
+export const getPublicDesignFonts = () => api.get<DesignFont[]>('/design-fonts/public/list');
+
 export const createDesignFont = (payload: {
   family_name?: string;
   label?: string;
@@ -1161,12 +1163,14 @@ export const createDesignFont = (payload: {
 
 export type DesignFontBatchItemResult =
   | { status: 'created'; filename: string; family_name: string; font: DesignFont }
+  | { status: 'updated'; filename: string; family_name: string; font: DesignFont }
   | { status: 'skipped'; filename: string; family_name: string; reason: string }
   | { status: 'error'; filename: string; family_name?: string; error: string };
 
 export interface DesignFontBatchResult {
   results: DesignFontBatchItemResult[];
   created: number;
+  updated: number;
   skipped: number;
   failed: number;
 }

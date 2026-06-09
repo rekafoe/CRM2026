@@ -50,6 +50,7 @@ export function usePublicDesignBootstrap({
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState<string | null>(null);
   const [organizationLogoError, setOrganizationLogoError] = useState(false);
   const [minimumPageCount, setMinimumPageCount] = useState(1);
+  const [fontsLoadedTick, setFontsLoadedTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,7 +100,11 @@ export function usePublicDesignBootstrap({
         setCoverPages(nextCoverPages);
         setPrepressConfig(normalizePrepressConfig(sourceState?.prepress ?? spec.prepress));
         setPages(spreadLayout.pages);
-        void loadDesignFontsFromSpec(spec).catch(() => {
+        void loadDesignFontsFromSpec(spec).then((fontResult) => {
+          if (fontResult.loaded.length > 0) {
+            setFontsLoadedTick((tick) => tick + 1);
+          }
+        }).catch(() => {
           /* шрифты не должны блокировать монтирование холста */
         });
       } catch (err) {
@@ -145,6 +150,7 @@ export function usePublicDesignBootstrap({
     organizationLogoUrl,
     setOrganizationLogoError,
     template,
+    fontsLoadedTick,
   };
 }
 

@@ -1,4 +1,8 @@
-import { parseImportedSvgLayers } from '../src/services/designTemplateSvgParse'
+import {
+  decodeCorelUnicodeEscapes,
+  decodeXmlText,
+  parseImportedSvgLayers,
+} from '../src/services/designTemplateSvgParse'
 
 describe('parseImportedSvgLayers', () => {
   it('наследует photo_* с <g> если у rect нет id', () => {
@@ -154,6 +158,41 @@ describe('parseImportedSvgLayers', () => {
 </svg>`
     const r = parseImportedSvgLayers(svg, { sceneScale: 3 })
     expect(r.textItems[0]?.fontFamily).toBe('Happy Time Two')
+  })
+
+  it('декодирует Corel _xNNNN_ в тексте и именах слоёв', () => {
+    expect(decodeCorelUnicodeEscapes('Лизочка_x0020_-_x0020_это')).toBe('Лизочка - это')
+    expect(decodeCorelUnicodeEscapes('Слой_x0020_1')).toBe('Слой 1')
+    expect(decodeXmlText('foo_x002c_bar')).toBe('foo,bar')
+  })
+
+  it('объединяет несколько tspan в один текст с переносами', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <text id="text_body" x="10" y="20" font-size="18">
+    <tspan x="10" y="20">Строка первая</tspan>
+    <tspan x="10" dy="1.2em">Строка вторая</tspan>
+    <tspan x="10" dy="1.2em">Строка третья</tspan>
+  </text>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.textItems).toHaveLength(1)
+    expect(r.textItems[0].text).toBe('Строка первая\nСтрока вторая\nСтрока третья')
+  })
+
+  it('объединяет несколько <text> в группе text_* в один блок', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <g id="text_about">
+    <text x="10" y="20" font-size="18"><tspan>Линия 1</tspan></text>
+    <text x="10" y="40" font-size="18"><tspan>Линия 2</tspan></text>
+  </g>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.textItems).toHaveLength(1)
+    expect(r.textItems[0].name).toBe('text_about')
+    expect(r.textItems[0].text).toBe('Линия 1\nЛиния 2')
+    expect(r.interactiveLayers.filter((l) => l.kind === 'text')).toHaveLength(1)
   })
 
   it('сохраняет z-order когда text идёт раньше photo в SVG', () => {

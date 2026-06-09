@@ -160,6 +160,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     organizationLogoUrl,
     setOrganizationLogoError,
     template,
+    fontsLoadedTick,
   } = usePublicDesignBootstrap({
     adapter,
     documentMode,
@@ -385,6 +386,13 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     });
     return () => cancelAnimationFrame(id);
   }, [fitReady, fitZoom, loading, templateId]);
+
+  useEffect(() => {
+    if (!fontsLoadedTick) return;
+    requestAnimationFrame(() => {
+      void canvasHandleRef.current?.applyEditorViewState();
+    });
+  }, [fontsLoadedTick]);
 
   useEffect(() => {
     setDraftToken(bootstrapDraftToken);

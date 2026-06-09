@@ -1,5 +1,15 @@
 /** Синхронно с backend/src/utils/fontFamilyNormalize.ts */
 
+export function normalizeFontFamilyName(value: string | undefined | null): string {
+  if (!value) return '';
+  const first = String(value).split(',')[0]?.trim() ?? '';
+  return first.replace(/^['"]|['"]$/g, '').trim();
+}
+
+export function fontFamilyCompactKey(value: string | undefined | null): string {
+  return normalizeFontFamilyName(value).toLowerCase().replace(/[\s_-]+/g, '');
+}
+
 function titleCaseFontWords(value: string): string {
   return value.split(/\s+/).filter(Boolean).map((word) => (
     word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()

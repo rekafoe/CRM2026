@@ -184,18 +184,23 @@ export const DesignFontsPage: React.FC = () => {
         await loadFonts();
       } else {
         const res = await createDesignFontsBatch(form.files);
-        const { created, skipped, failed, results } = res.data;
+        const { created, updated, skipped, failed, results } = res.data;
         setBatchResults(results);
         setForm({ family_name: '', files: [] });
         setEditFamilyName(false);
-        if (created > 0) {
+        if (created > 0 || updated > 0) {
           await loadFonts();
         }
         if (failed === 0 && skipped === 0) {
           setUploadOpen(false);
-          notifySuccess(`Добавлено шрифтов: ${created}`);
+          const ok = created + updated;
+          notifySuccess(ok === created
+            ? `Добавлено шрифтов: ${created}`
+            : `Обработано шрифтов: ${ok} (новых ${created}, обновлено ${updated})`);
         } else {
-          const parts = [`добавлено ${created}`];
+          const parts: string[] = [];
+          if (created > 0) parts.push(`добавлено ${created}`);
+          if (updated > 0) parts.push(`обновлено ${updated}`);
           if (skipped > 0) parts.push(`пропущено ${skipped}`);
           if (failed > 0) parts.push(`ошибок ${failed}`);
           notifySuccess(`Загрузка завершена: ${parts.join(', ')}`);
@@ -404,6 +409,7 @@ export const DesignFontsPage: React.FC = () => {
                       <span className="design-fonts-batch-results__file">{item.filename}</span>
                       <span className="design-fonts-batch-results__detail">
                         {item.status === 'created' && `→ ${item.family_name}`}
+                        {item.status === 'updated' && `обновлён: ${item.family_name}`}
                         {item.status === 'skipped' && `пропущен: ${item.reason}`}
                         {item.status === 'error' && (item.error ?? 'ошибка')}
                       </span>

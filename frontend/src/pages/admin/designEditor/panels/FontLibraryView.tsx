@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AppIcon } from '../../../../components/ui/AppIcon';
+import { useCrmDesignFonts } from '../../../../hooks/useCrmDesignFonts';
+import { fontFamilyCompactKey } from '../../../../utils/fontFamilyNormalize';
 import {
   FONT_CATALOG,
   FONT_PREVIEW_PANGRAM,
@@ -52,15 +54,32 @@ export const FontLibraryView: React.FC<FontLibraryViewProps> = ({
   const [query, setQuery] = useState('');
   const [scriptFilter, setScriptFilter] = useState<'all' | 'cyrillic'>('cyrillic');
   const [categoryFilter, setCategoryFilter] = useState<'all' | FontCategory>('all');
+  const { catalogEntries: crmFontEntries } = useCrmDesignFonts();
 
   const usedEntries = useMemo(
     () => usedFonts.map(entryForUsedFamily),
     [usedFonts],
   );
 
+  const crmKeys = useMemo(
+    () => new Set(crmFontEntries.map((f) => fontFamilyCompactKey(f.value))),
+    [crmFontEntries],
+  );
+
+  const filteredCrmLibrary = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return crmFontEntries.filter((f) => {
+      if (scriptFilter === 'cyrillic' && !f.cyrillic) return false;
+      if (categoryFilter !== 'all' && f.category !== categoryFilter) return false;
+      if (!q) return true;
+      return f.label.toLowerCase().includes(q) || f.value.toLowerCase().includes(q);
+    });
+  }, [crmFontEntries, query, scriptFilter, categoryFilter]);
+
   const filteredCatalog = useMemo(() => {
     const q = query.trim().toLowerCase();
     return FONT_CATALOG.filter((f) => {
+      if (crmKeys.has(fontFamilyCompactKey(f.value))) return false;
       if (scriptFilter === 'cyrillic' && !f.cyrillic) return false;
       if (categoryFilter !== 'all' && f.category !== categoryFilter) return false;
       if (!q) return true;
@@ -69,7 +88,7 @@ export const FontLibraryView: React.FC<FontLibraryViewProps> = ({
         f.value.toLowerCase().includes(q)
       );
     });
-  }, [query, scriptFilter, categoryFilter]);
+  }, [crmKeys, query, scriptFilter, categoryFilter]);
 
   const filteredUsed = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -178,9 +197,38 @@ export const FontLibraryView: React.FC<FontLibraryViewProps> = ({
           </section>
         )}
 
+        {filteredCrmLibrary.length > 0 && (
+          <section className="font-library__section font-library__section--crm" aria-label="Библиотека CRM">
+            <h4 className="font-library__section-title">
+              Библиотека CRM ({filteredCrmLibrary.length})
+            </h4>
+            <ul className="font-library__list">
+              {filteredCrmLibrary.map((f) => (
+                <li key={`crm-${f.value}`}>
+                  <button
+                    type="button"
+                    className={`font-library__row${
+                      currentFontFamily === f.value ? ' font-library__row--active' : ''
+                    }`}
+                    onClick={() => onSelectFont(f.value)}
+                  >
+                    <span className="font-library__name">{f.label}</span>
+                    <span
+                      className="font-library__preview font-library__preview--solo"
+                      style={{ fontFamily: `"${f.value}", sans-serif` }}
+                    >
+                      {FONT_PREVIEW_PANGRAM}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section className="font-library__section" aria-label="Все шрифты">
           <h4 className="font-library__section-title">
-            Все шрифты ({filteredCatalog.length})
+            Системные и веб-шрифты ({filteredCatalog.length})
           </h4>
           <ul className="font-library__list">
             {filteredCatalog.map((f) => (

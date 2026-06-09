@@ -6,7 +6,9 @@ import {
   extractUsedFontFamiliesFromPages,
   patchAllTextInFabricJSON,
 } from '../../pages/admin/designEditor/patchFabricTextObjects';
+import { mergeFontSelectOptions, useCrmDesignFonts } from '../../hooks/useCrmDesignFonts';
 import { TEXT_FONTS } from '../../pages/admin/designEditor/constants';
+import { fontFamilyCompactKey } from '../../utils/fontFamilyNormalize';
 import type {
   DesignPage,
   SelectedObjProps,
@@ -59,10 +61,14 @@ export const PublicDesignAdvancedTools: React.FC<PublicDesignAdvancedToolsProps>
 }) => {
   const [section, setSection] = useState<ClientToolSection | null>(null);
   const usedFonts = useMemo(() => extractUsedFontFamiliesFromPages(pages), [pages]);
+  const { selectOptions: crmFontOptions } = useCrmDesignFonts();
   const fontOptions = useMemo(() => {
-    const defaults = TEXT_FONTS.map((font) => font.value);
-    return Array.from(new Set([...defaults, ...usedFonts]));
-  }, [usedFonts]);
+    const merged = mergeFontSelectOptions(crmFontOptions, TEXT_FONTS).map((f) => f.value);
+    const extra = usedFonts.filter(
+      (family) => !merged.some((value) => fontFamilyCompactKey(value) === fontFamilyCompactKey(family)),
+    );
+    return [...extra, ...merged];
+  }, [crmFontOptions, usedFonts]);
 
   const applyTextPatch = useCallback(
     async (patch: Record<string, unknown>) => {

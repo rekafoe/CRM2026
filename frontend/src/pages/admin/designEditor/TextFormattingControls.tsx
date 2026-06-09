@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AppIcon } from '../../../components/ui/AppIcon';
+import { mergeFontSelectOptions, useCrmDesignFonts } from '../../../hooks/useCrmDesignFonts';
+import { fontFamilyCompactKey } from '../../../utils/fontFamilyNormalize';
 import { TEXT_FONTS } from './constants';
 import type { SelectedObjProps } from './types';
 import { TEXT_PRESET_STYLE, textPresetIdFromSelection } from './textFormattingPresets';
@@ -50,6 +52,16 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
   onBringForward,
   onDelete,
 }) => {
+  const { selectOptions: crmFontOptions } = useCrmDesignFonts();
+  const fontOptions = useMemo(() => {
+    const merged = mergeFontSelectOptions(crmFontOptions, TEXT_FONTS);
+    const current = selectedObj.fontFamily?.trim();
+    if (current && !merged.some((f) => fontFamilyCompactKey(f.value) === fontFamilyCompactKey(current))) {
+      return [{ value: current, label: current }, ...merged];
+    }
+    return merged;
+  }, [crmFontOptions, selectedObj.fontFamily]);
+
   const size = Math.round(selectedObj.fontSize ?? 24);
   const fill =
     selectedObj.fill && selectedObj.fill !== 'transparent' ? selectedObj.fill : '#000000';
@@ -91,7 +103,7 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
         onChange={(e) => onFontChange(e.target.value)}
         title="Шрифт"
       >
-        {TEXT_FONTS.map((f) => (
+        {fontOptions.map((f) => (
           <option key={f.value} value={f.value}>
             {f.label}
           </option>
@@ -250,7 +262,7 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
             value={selectedObj.fontFamily ?? TEXT_FONTS[0].value}
             onChange={(e) => onFontChange(e.target.value)}
           >
-            {TEXT_FONTS.map((f) => (
+            {fontOptions.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
               </option>

@@ -79,12 +79,16 @@ async function loadFontFaceFromSource(
   }
 }
 
-async function fetchLibraryFontBlobUrl(fontId: number): Promise<string> {
+async function fetchFontBlobUrl(path: string): Promise<string> {
   const { api } = await import('../api');
-  const res = await api.get(`/design-fonts/public/${fontId}/content`, { responseType: 'blob' });
+  const res = await api.get(path, { responseType: 'blob' });
   const blobUrl = URL.createObjectURL(res.data as Blob);
   retainedFontBlobUrls.add(blobUrl);
   return blobUrl;
+}
+
+async function fetchLibraryFontBlobUrl(fontId: number): Promise<string> {
+  return fetchFontBlobUrl(`/design-fonts/public/${fontId}/content`);
 }
 
 /** Одна запись из библиотеки CRM — для превью в админке (обходит CORS через API). */
@@ -133,8 +137,33 @@ export async function loadDesignFontsFromSpec(
       loaded.push(family);
       continue;
     }
-    const src = resolveFontAssetUrl(entry.url);
-    const ok = await loadFontFaceFromSource(family, src, entry.format);
+
+    let ok = false;
+    if (entry.source === 'global' && entry.fontId) {
+      try {
+        const blobUrl = await fetchLibraryFontBlobUrl(entry.fontId);
+        ok = await loadFontFaceFromSource(family, blobUrl, entry.format);
+      } catch {
+        ok = false;
+      }
+    }
+    if (!ok && entry.url) {
+      if (entry.source === 'global' && entry.url.includes('/design-fonts/public/')) {
+        try {
+          const blobUrl = await fetchFontBlobUrl(
+            entry.url.replace(/^\/api/, '') || entry.url,
+          );
+          ok = await loadFontFaceFromSource(family, blobUrl, entry.format);
+        } catch {
+          ok = false;
+        }
+      }
+      if (!ok) {
+        const src = resolveFontAssetUrl(entry.url);
+        ok = await loadFontFaceFromSource(family, src, entry.format);
+      }
+    }
+
     if (ok) loaded.push(family);
     else missing.push(family);
   }

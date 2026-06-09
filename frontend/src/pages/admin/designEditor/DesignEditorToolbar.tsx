@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AppIcon } from '../../../components/ui/AppIcon';
 import { Button } from '../../../components/common';
+import { mergeFontSelectOptions, useCrmDesignFonts } from '../../../hooks/useCrmDesignFonts';
+import { fontFamilyCompactKey } from '../../../utils/fontFamilyNormalize';
 import { TEXT_FONTS } from './constants';
 import type { SelectedObjProps } from './types';
 
@@ -79,6 +81,15 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
   suppressTextFormat = false,
 }) => {
   const isText = selectedObj?.type === 'IText';
+  const { selectOptions: crmFontOptions } = useCrmDesignFonts();
+  const fontOptions = useMemo(() => {
+    const merged = mergeFontSelectOptions(crmFontOptions, TEXT_FONTS);
+    const current = selectedObj?.fontFamily?.trim();
+    if (current && !merged.some((f) => fontFamilyCompactKey(f.value) === fontFamilyCompactKey(current))) {
+      return [{ value: current, label: current }, ...merged];
+    }
+    return merged;
+  }, [crmFontOptions, selectedObj?.fontFamily]);
 
   return (
     <div className="design-editor-toolbar">
@@ -136,7 +147,7 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
             onChange={(e) => onFontChange(e.target.value)}
             title="Шрифт"
           >
-            {TEXT_FONTS.map((f) => (
+            {fontOptions.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
               </option>

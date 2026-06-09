@@ -356,6 +356,11 @@ export const DesignEditorPage: React.FC = () => {
       setSpreadMode(sm);
       setCoverPages(cp);
       void loadDesignFontsFromSpec(spec).then((fontResult) => {
+        if (fontResult.loaded.length > 0) {
+          requestAnimationFrame(() => {
+            void canvasHandleRef.current?.applyEditorViewState();
+          });
+        }
         if (fontResult.missing.length === 0) return;
         setTemplateState((s) => ({
           ...s,

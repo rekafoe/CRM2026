@@ -405,28 +405,89 @@ export function parseLengthMm(value: string | undefined): number | null {
   return n * PX_TO_MM
 }
 
-export function decodeXmlText(value: string): string {
-  return value
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .trim()
+/** Corel DRAW: «Слой_x0020_1» → «Слой 1», текст «foo_x0020_bar» → «foo bar». */
+export function decodeCorelUnicodeEscapes(value: string): string {
+  return value.replace(/_x([0-9a-fA-F]{4})_/g, (_, hex: string) => (
+    String.fromCharCode(parseInt(hex, 16))
+  ))
 }
 
-function firstTspan(innerSvg: string): { attrs: Record<string, string>; text: string } | null {
-  const match = innerSvg.match(/<tspan\b([^>]*)>([\s\S]*?)<\/tspan>/i)
-  if (!match) return null
-  return {
-    attrs: parseAttributes(match[1] ?? ''),
-    text: decodeXmlText(match[2] ?? ''),
+export function decodeXmlText(value: string): string {
+  return decodeCorelUnicodeEscapes(
+    value
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"'),
+  ).trim()
+}
+
+type ParsedTspan = { attrs: Record<string, string>; text: string; y: number; order: number }
+
+function collectTspans(innerSvg: string): ParsedTspan[] {
+  const results: ParsedTspan[] = []
+  const re = /<tspan\b([^>]*)>([\s\S]*?)<\/tspan>/gi
+  let match: RegExpExecArray | null
+  let order = 0
+  while ((match = re.exec(innerSvg)) !== null) {
+    const attrs = parseAttributes(match[1] ?? '')
+    const text = decodeXmlText(match[2] ?? '')
+    if (!text) continue
+    results.push({
+      attrs,
+      text,
+      y: parseNumber(attrs.y) ?? 0,
+      order: order++,
+    })
   }
+  return results
+}
+
+function mergeTextItemsByName(items: SvgText[]): SvgText[] {
+  const order: string[] = []
+  const groups = new Map<string, SvgText[]>()
+  for (const item of items) {
+    if (!groups.has(item.name)) order.push(item.name)
+    const group = groups.get(item.name) ?? []
+    group.push(item)
+    groups.set(item.name, group)
+  }
+  return order.map((name) => {
+    const group = groups.get(name)!
+    if (group.length === 1) return group[0]
+    const sorted = [...group].sort((a, b) => a.y - b.y || a.x - b.x)
+    return {
+      ...sorted[0],
+      text: sorted.map((t) => t.text).join('\n'),
+    }
+  })
+}
+
+function alignInteractiveTextLayers(
+  layers: SvgInteractiveLayer[],
+  mergedTextByName: Map<string, SvgText>,
+): SvgInteractiveLayer[] {
+  const seenText = new Set<string>()
+  const out: SvgInteractiveLayer[] = []
+  for (const layer of layers) {
+    if (layer.kind !== 'text') {
+      out.push(layer)
+      continue
+    }
+    const name = layer.data.name
+    if (seenText.has(name)) continue
+    seenText.add(name)
+    const merged = mergedTextByName.get(name)
+    out.push(merged ? { kind: 'text', data: merged } : layer)
+  }
+  return out
 }
 
 function getLayerName(attrs: Record<string, string>): string | null {
-  return attrs.id || attrs['inkscape:label'] || attrs['data-name'] || null
+  const raw = attrs.id || attrs['inkscape:label'] || attrs['data-name'] || null
+  return raw ? decodeCorelUnicodeEscapes(raw) : null
 }
 
 function dimsFromSvgRoot(svg: string): {
@@ -715,8 +776,9 @@ export function parseImportedSvgLayers(
           ...styleFromClassNames(attrs.class, cssClassStyles),
           ...parseStyle(attrs.style),
         }
-        const tspan = firstTspan(innerStr)
-        const tspanAttrs = tspan?.attrs ?? {}
+        const tspans = collectTspans(innerStr)
+        const primaryTspan = tspans[0]
+        const tspanAttrs = primaryTspan?.attrs ?? {}
         const tspanStyle = {
           ...textStyle,
           ...styleFromClassNames(tspanAttrs.class, cssClassStyles),
@@ -751,13 +813,16 @@ export function parseImportedSvgLayers(
           ?? parseFontFamilyFromStyle(textStyle)
           ?? (tspanAttrs['font-family'] ? normalizeFontFamilyToken(tspanAttrs['font-family']) : undefined)
           ?? (attrs['font-family'] ? normalizeFontFamilyToken(attrs['font-family']) : undefined)
+        const textContent = tspans.length > 1
+          ? tspans.sort((a, b) => a.order - b.order).map((t) => t.text).join('\n')
+          : primaryTspan?.text || decodeXmlText(innerStr) || ef.replace(/^text_/, '')
         const textEntry: SvgText = {
           name: ef,
           x: mmPoint.x,
           y: mmPoint.y,
           fontSize: fontSizeMm,
           fontFamily,
-          text: tspan?.text || decodeXmlText(innerStr) || ef.replace(/^text_/, ''),
+          text: textContent,
           textAnchor,
           svg: { ...point, fontSize: transformedFontSize },
           scene: { ...scenePoint, fontSize: geometry.mmToPx(fontSizeMm) },
@@ -781,28 +846,37 @@ export function parseImportedSvgLayers(
       ? inferPrepressFromGuides(guideRectsMm, warnings)
       : null
 
-  if (photoRects.length === 0 && textItems.length === 0) {
+  const mergedTextItems = mergeTextItemsByName(textItems)
+  const mergedTextByName = new Map(mergedTextItems.map((t) => [t.name, t]))
+  const mergedInteractiveLayers = alignInteractiveTextLayers(interactiveLayers, mergedTextByName)
+  if (mergedTextItems.length < textItems.length) {
+    warnings.push(
+      `Объединены строки в ${textItems.length - mergedTextItems.length} многострочных текстовых блоков (группа text_* / несколько <tspan>).`,
+    )
+  }
+
+  if (photoRects.length === 0 && mergedTextItems.length === 0) {
     warnings.push(
       'Не найдено объектов photo_* или text_*; добавьте поля вручную или проверьте имена групп.',
     )
   }
   warnings.push(
-    `Импорт SVG: найдено фото-полей ${photoRects.length}, текстовых полей ${textItems.length}, направляющих ${Object.keys(guideRectsMm).length}.`,
+    `Импорт SVG: найдено фото-полей ${photoRects.length}, текстовых полей ${mergedTextItems.length}, направляющих ${Object.keys(guideRectsMm).length}.`,
   )
 
   return {
     widthMm,
     heightMm,
     photoRects,
-    textItems,
-    interactiveLayers,
+    textItems: mergedTextItems,
+    interactiveLayers: mergedInteractiveLayers,
     guideRectsMm,
     lockedBgDetected,
     prepressHints,
     geometry,
     summary: {
       photoFields: photoRects.length,
-      textFields: textItems.length,
+      textFields: mergedTextItems.length,
       guides: Object.keys(guideRectsMm),
       strippedLayers: mergedRanges.length,
     },

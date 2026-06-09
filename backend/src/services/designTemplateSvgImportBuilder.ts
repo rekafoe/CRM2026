@@ -87,19 +87,31 @@ function toFabricRect(rect: SvgRect) {
 function toFabricText(item: SvgText) {
   const fontSizePx = Math.max(6, item.scene.fontSize)
   const originX = item.textAnchor === 'middle' ? 'center' : item.textAnchor === 'end' ? 'right' : 'left'
-  return {
-    type: 'i-text',
+  const textAlign = item.textAnchor === 'end' ? 'right' : item.textAnchor === 'middle' ? 'center' : 'left'
+  const base = {
     version: '6.0.0',
     originX,
-    originY: 'top',
+    originY: 'top' as const,
     left: item.scene.x,
     top: item.scene.y - fontSizePx * 0.8,
     text: item.text,
     fontSize: fontSizePx,
     fontFamily: item.fontFamily?.trim() || 'Arial',
     fill: '#111827',
-    textAlign: item.textAnchor === 'end' ? 'right' : item.textAnchor === 'middle' ? 'center' : 'left',
+    textAlign,
     id: item.name,
+  }
+  if (item.text.includes('\n')) {
+    const maxLineLen = Math.max(...item.text.split('\n').map((line) => line.length), 1)
+    return {
+      ...base,
+      type: 'textbox',
+      width: Math.max(120, maxLineLen * fontSizePx * 0.55),
+    }
+  }
+  return {
+    ...base,
+    type: 'i-text',
   }
 }
 

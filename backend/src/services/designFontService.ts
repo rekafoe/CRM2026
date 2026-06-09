@@ -73,27 +73,32 @@ export async function getDesignFontById(id: number): Promise<ReturnType<typeof m
 }
 
 export async function getActiveDesignFontByFamily(familyName: string): Promise<ReturnType<typeof mapRow> | null> {
+  const font = await getDesignFontByFamily(familyName)
+  return font?.is_active ? font : null
+}
+
+export async function getDesignFontByFamily(familyName: string): Promise<ReturnType<typeof mapRow> | null> {
   const normalized = normalizeFontFamilyName(familyName)
   if (!normalized) return null
   const db = await getDb()
-  const rows = await db.all(
-    'SELECT * FROM design_fonts WHERE is_active = 1',
-  ) as DesignFontRow[]
+  const rows = await db.all('SELECT * FROM design_fonts') as DesignFontRow[]
   const row = rows?.find((r) => fontFamilyNamesMatch(r.family_name, normalized))
   return row ? mapRow(row) : null
 }
 
 export type DesignFontBatchItemResult =
   | { status: 'created'; filename: string; family_name: string; font: ReturnType<typeof mapRow> }
+  | { status: 'updated'; filename: string; family_name: string; font: ReturnType<typeof mapRow> }
   | { status: 'skipped'; filename: string; family_name: string; reason: string }
   | { status: 'error'; filename: string; family_name?: string; error: string }
 
 export async function createDesignFontsBatch(
   files: Array<{ buffer: Buffer; originalname?: string }>,
-): Promise<{ results: DesignFontBatchItemResult[]; created: number; skipped: number; failed: number }> {
+): Promise<{ results: DesignFontBatchItemResult[]; created: number; updated: number; skipped: number; failed: number }> {
   const results: DesignFontBatchItemResult[] = []
   const seenInBatch = new Set<string>()
   let created = 0
+  let updated = 0
   let skipped = 0
   let failed = 0
 
@@ -118,15 +123,26 @@ export async function createDesignFontsBatch(
     }
     seenInBatch.add(batchKey)
 
-    const existing = await getActiveDesignFontByFamily(family_name)
+    const existing = await getDesignFontByFamily(family_name)
     if (existing) {
-      results.push({
-        status: 'skipped',
-        filename,
-        family_name,
-        reason: `Уже в библиотеке (ID ${existing.id})`,
-      })
-      skipped += 1
+      try {
+        const font = await updateDesignFont(
+          existing.id,
+          { family_name, is_active: true },
+          file,
+        )
+        if (!font) throw new Error('Не удалось обновить шрифт')
+        results.push({ status: 'updated', filename, family_name, font })
+        updated += 1
+      } catch (err) {
+        results.push({
+          status: 'error',
+          filename,
+          family_name,
+          error: err instanceof Error ? err.message : 'Не удалось обновить',
+        })
+        failed += 1
+      }
       continue
     }
 
@@ -145,7 +161,7 @@ export async function createDesignFontsBatch(
     }
   }
 
-  return { results, created, skipped, failed }
+  return { results, created, updated, skipped, failed }
 }
 
 export async function createDesignFont(
@@ -154,6 +170,25 @@ export async function createDesignFont(
 ): Promise<ReturnType<typeof mapRow>> {
   const family_name = normalizeFontFamilyName(input.family_name)
   if (!family_name) throw new Error('Укажите family_name шрифта')
+
+  const existing = await getDesignFontByFamily(family_name)
+  if (existing) {
+    const updated = await updateDesignFont(
+      existing.id,
+      {
+        family_name,
+        label: input.label,
+        weight: input.weight,
+        style: input.style,
+        sort_order: input.sort_order,
+        is_active: input.is_active === false ? false : true,
+      },
+      file,
+    )
+    if (!updated) throw new Error('Не удалось обновить существующий шрифт')
+    return updated
+  }
+
   const stored = saveBufferToDesignFonts(file.buffer, file.originalname, family_name)
   if (!stored) throw new Error('Не удалось сохранить файл шрифта (woff2, woff, ttf, otf)')
 

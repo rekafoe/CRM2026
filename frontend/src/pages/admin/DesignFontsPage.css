@@ -253,7 +253,8 @@
   border-bottom: none;
 }
 
-.design-fonts-batch-results__item--created {
+.design-fonts-batch-results__item--created,
+.design-fonts-batch-results__item--updated {
   background: #f0fdf4;
 }
 

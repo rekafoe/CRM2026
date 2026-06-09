@@ -190,7 +190,16 @@ export async function getDesignTemplate(id: number): Promise<DesignTemplateListR
      WHERE dt.id = ?`,
     [id],
   ) as Record<string, unknown> | undefined
-  return row ? mapListRow(row) : null
+  if (!row) return null
+  const mapped = mapListRow(row)
+  if (!mapped.spec) return mapped
+  try {
+    const parsed = JSON.parse(mapped.spec) as Record<string, unknown>
+    const enriched = await enrichSpecWithRequiredFonts(parsed)
+    return { ...mapped, spec: JSON.stringify(enriched) }
+  } catch {
+    return mapped
+  }
 }
 
 export async function getPublicDesignTemplate(id: number): Promise<DesignTemplateRow | null> {
