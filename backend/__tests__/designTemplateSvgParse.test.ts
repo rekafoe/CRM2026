@@ -124,5 +124,31 @@ describe('parseImportedSvgLayers', () => {
     expect(text.svg.fontSize).toBe(635)
     expect(text.fontSize).toBeCloseTo(6.35, 2)
     expect(text.scene.fontSize).toBeCloseTo(72, 0)
+    expect(text.fontFamily).toBe('Arial')
+  })
+
+  it('сохраняет z-order: photo → text → photo как в SVG', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <rect id="photo_bg" x="0" y="0" width="100" height="50"/>
+  <text id="text_title" x="10" y="20" font-size="12">Заголовок</text>
+  <rect id="photo_stamp" x="80" y="35" width="15" height="10"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.interactiveLayers.map((l) => `${l.kind}:${l.data.name}`)).toEqual([
+      'photo:photo_bg',
+      'text:text_title',
+      'photo:photo_stamp',
+    ])
+  })
+
+  it('сохраняет z-order когда text идёт раньше photo в SVG', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <text id="text_watermark" x="5" y="45" font-size="8">водяной знак</text>
+  <rect id="photo_main" x="10" y="5" width="80" height="40"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.interactiveLayers.map((l) => l.data.name)).toEqual(['text_watermark', 'photo_main'])
   })
 })

@@ -1126,6 +1126,54 @@ export const updateDesignTemplateCategory = (
 export const deleteDesignTemplateCategory = (id: number) =>
   api.delete(`/design-templates/categories/${id}`);
 
+export interface DesignFont {
+  id: number;
+  family_name: string;
+  label: string;
+  filename: string;
+  format: string;
+  weight: string;
+  style: string;
+  sort_order: number;
+  is_active: boolean;
+  url: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const getDesignFonts = () => api.get<DesignFont[]>('/design-fonts');
+
+export const createDesignFont = (payload: {
+  family_name: string;
+  label?: string;
+  file: File;
+  weight?: string;
+  style?: string;
+}) => {
+  const formData = new FormData();
+  formData.append('family_name', payload.family_name);
+  if (payload.label) formData.append('label', payload.label);
+  if (payload.weight) formData.append('weight', payload.weight);
+  if (payload.style) formData.append('style', payload.style);
+  formData.append('file', payload.file);
+  return api.post<DesignFont>('/design-fonts', formData);
+};
+
+export const updateDesignFont = (
+  id: number,
+  payload: { family_name?: string; label?: string; file?: File; is_active?: boolean },
+) => {
+  const formData = new FormData();
+  if (payload.family_name) formData.append('family_name', payload.family_name);
+  if (payload.label) formData.append('label', payload.label);
+  if (payload.is_active === false) formData.append('is_active', 'false');
+  if (payload.is_active === true) formData.append('is_active', 'true');
+  if (payload.file) formData.append('file', payload.file);
+  return api.put<DesignFont>(`/design-fonts/${id}`, formData);
+};
+
+export const deactivateDesignFont = (id: number) => api.delete(`/design-fonts/${id}`);
+
 export const getDesignTemplates = () => api.get<DesignTemplate[]>('/design-templates');
 export const getDesignTemplatesByCategory = (category: string) =>
   api.get<DesignTemplate[]>(`/design-templates/category/${encodeURIComponent(category)}`);

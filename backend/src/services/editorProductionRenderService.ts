@@ -4,6 +4,8 @@ import { PDFDocument } from 'pdf-lib'
 import puppeteer, { type Browser } from 'puppeteer'
 import { getDb } from '../config/database'
 import { orderFilesDir, resolveSafeExistingPath, saveBufferToOrderFiles } from '../config/upload'
+import { resolveFontFilesForDesignState } from './designFontService'
+import { getDesignTemplate } from './designTemplateService'
 
 const MM_TO_PX = 96 / 25.4
 const EXPORT_DPI = 300
@@ -137,6 +139,25 @@ function buildObjectHtml(
   return ''
 }
 
+function cssFontFormat(format: string): string {
+  switch (format) {
+    case 'woff2': return 'woff2'
+    case 'woff': return 'woff'
+    case 'otf': return 'opentype'
+    default: return 'truetype'
+  }
+}
+
+function buildFontFaceCss(
+  fonts: Array<{ family: string; filePath: string; format: string }>,
+): string {
+  return fonts.map((font) => {
+    const fileUrl = `file://${font.filePath.replace(/\\/g, '/')}`
+    const family = font.family.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+    return `@font-face{font-family:'${family}';src:url('${fileUrl}') format('${cssFontFormat(font.format)}');font-weight:normal;font-style:normal;}`
+  }).join('\n')
+}
+
 function buildPageHtml(
   fabricJSON: unknown,
   orderId: number,
@@ -144,6 +165,7 @@ function buildPageHtml(
   pageWidthMm: number,
   pageHeightMm: number,
   bleedMm: number,
+  fontFaceCss = '',
 ): { html: string; widthMm: number; heightMm: number } {
   const bleed = Math.max(0, bleedMm)
   const widthMm = pageWidthMm + bleed * 2
@@ -160,6 +182,7 @@ function buildPageHtml(
   })
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
+    ${fontFaceCss}
     *{box-sizing:border-box;margin:0;padding:0}
     body{margin:0;background:#fff}
     .sheet{position:relative;width:${widthMm}mm;height:${heightMm}mm;overflow:hidden;background:${bg}}
@@ -174,6 +197,7 @@ async function renderHtmlToPdfBuffer(html: string, widthMm: number, heightMm: nu
   const page = await browser.newPage()
   try {
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 120000 })
+    await page.evaluate(() => document.fonts.ready)
     const pdf = await page.pdf({
       width: `${widthMm}mm`,
       height: `${heightMm}mm`,
@@ -201,12 +225,31 @@ async function loadOrderFileUrlMap(orderId: number, orderItemId: number): Promis
   return map
 }
 
+async function loadTemplateSpecForOrderItem(orderItemId: number): Promise<Record<string, unknown> | null> {
+  const db = await getDb()
+  const item = await db.get<{ params: string | null }>('SELECT params FROM items WHERE id = ?', [orderItemId])
+  if (!item?.params) return null
+  try {
+    const params = JSON.parse(item.params) as Record<string, unknown>
+    const templateId = Number(params.designTemplateId)
+    if (!Number.isFinite(templateId) || templateId <= 0) return null
+    const template = await getDesignTemplate(templateId)
+    if (!template?.spec) return null
+    return JSON.parse(template.spec) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
 export async function renderDesignStateProductionPdf(
   orderId: number,
   orderItemId: number,
   designState: unknown,
 ): Promise<{ filename: string; size: number; pageCount: number }> {
   const state = parseJsonObject(designState)
+  const templateSpec = await loadTemplateSpecForOrderItem(orderItemId)
+  const resolvedFonts = await resolveFontFilesForDesignState(designState, templateSpec)
+  const fontFaceCss = buildFontFaceCss(resolvedFonts)
   const pageWidthMm = Number(state.pageWidth ?? 90)
   const pageHeightMm = Number(state.pageHeight ?? 50)
   const prepress = parseJsonObject(state.prepress)
@@ -226,6 +269,7 @@ export async function renderDesignStateProductionPdf(
       pageWidthMm,
       pageHeightMm,
       bleedMm,
+      fontFaceCss,
     )
     const singlePdf = await renderHtmlToPdfBuffer(html, widthMm, heightMm)
     const doc = await PDFDocument.load(singlePdf)

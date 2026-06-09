@@ -12,6 +12,10 @@ import {
   isSupportedNormalizedTemplateExt,
   layerDebug,
 } from './designTemplateSvgImportBuilder'
+import { enrichSpecWithRequiredFonts } from './designFontService'
+import type { BundledTemplateFont } from '../utils/extractDesignStateFonts'
+
+const IMPORTER_VERSION = 7
 
 export interface ImportDesignTemplateInput {
   file?: {
@@ -44,6 +48,10 @@ export interface ImportDesignTemplateResult {
 }
 
 const MASTER_SOURCE_EXTENSIONS = new Set(['.ai', '.cdr', '.indd', '.indt', '.pdf', '.svg'])
+
+async function finalizeImportedSpec(spec: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return enrichSpecWithRequiredFonts(spec)
+}
 
 function parseTemplateSpec(row: DesignTemplateRow): Record<string, unknown> {
   if (!row.spec) return {}
@@ -154,16 +162,18 @@ export async function reimportDesignTemplateFromFile(
   }
   if (documentPrepress) designState.prepress = documentPrepress
 
+  const bundledFonts: BundledTemplateFont[] = importedDocument.bundledFonts ?? []
   const mergedSpec: Record<string, unknown> = {
     ...existingSpec,
     width_mm: importedDocument.pageWidthMm,
     height_mm: importedDocument.pageHeightMm,
     page_count: importedDocument.pageCount,
+    fonts: bundledFonts.length > 0 ? bundledFonts : existingSpec.fonts,
     source_format: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
     import: {
       ...prevImport,
       importer: importedDocument.pageCount > 1 ? 'svg-named-layers-multipage' : 'svg-named-layers',
-      importerVersion: 6,
+      importerVersion: IMPORTER_VERSION,
       reimportedAt: new Date().toISOString(),
       sourceFormat: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
       sourceFile: sourceFileUrl,
@@ -203,7 +213,7 @@ export async function reimportDesignTemplateFromFile(
 
   const template = await updateDesignTemplate(input.templateId, {
     preview_url: previewUrl,
-    spec: mergedSpec,
+    spec: await finalizeImportedSpec(mergedSpec),
     is_active: existing.is_active === 1,
   })
   if (!template) throw new Error('Не удалось обновить шаблон')
@@ -305,28 +315,19 @@ export async function importDesignTemplateFromFile(
   }
   if (documentPrepress) designState.prepress = documentPrepress
 
-  const template = await createDesignTemplate({
-    name: input.name.trim(),
-    description: input.description,
-    category_id: input.category_id,
-    category: input.category,
-    preview_url: previewUrl,
-    is_active: true,
-    sort_order: input.sortOrder ?? 0,
-    author_user_id: input.authorUserId ?? null,
-    usage_fee: input.usageFee,
-    author_percent: input.authorPercent,
-    spec: {
+  const bundledFonts: BundledTemplateFont[] = importedDocument.bundledFonts ?? []
+  const importSpec: Record<string, unknown> = {
       width_mm: importedDocument.pageWidthMm,
       height_mm: importedDocument.pageHeightMm,
       page_count: importedDocument.pageCount,
       productId: input.productId,
       typeId: input.typeId,
       sizeId: input.sizeId,
+      fonts: bundledFonts,
       source_format: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
       import: {
         importer: importedDocument.pageCount > 1 ? 'svg-named-layers-multipage' : 'svg-named-layers',
-        importerVersion: 6,
+        importerVersion: IMPORTER_VERSION,
         sourceFormat: storedSource ? sourceExt.replace(/^\./, '') : importedDocument.normalizedFormat,
         sourceFile: sourceFileUrl,
         sourceFileUrl,
@@ -361,7 +362,20 @@ export async function importDesignTemplateFromFile(
           'id/inkscape:label: locked_bg (в фоне), photo_* rect, text_* text, группы <g>; trim/bleed/safe rect → prepress',
       },
       designState,
-    },
+  }
+
+  const template = await createDesignTemplate({
+    name: input.name.trim(),
+    description: input.description,
+    category_id: input.category_id,
+    category: input.category,
+    preview_url: previewUrl,
+    is_active: true,
+    sort_order: input.sortOrder ?? 0,
+    author_user_id: input.authorUserId ?? null,
+    usage_fee: input.usageFee,
+    author_percent: input.authorPercent,
+    spec: await finalizeImportedSpec(importSpec),
   })
 
   if (input.productId && input.typeId) {

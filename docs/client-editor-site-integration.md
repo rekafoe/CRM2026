@@ -270,6 +270,9 @@ Backend сайта **не рендерит** редактор. Он хранит
 | GET | `/api/design-templates/public/categories` |
 | GET | `/api/design-templates/public?productId=&typeId=&sizeId=` |
 | GET | `/api/design-templates/public/:id` |
+| GET | `/api/design-fonts/public/:id/content` |
+
+Ответ `GET /api/design-templates/public/:id` включает `spec.requiredFonts` — массив `{ family, source, url?, designFontId? }`. Перед отрисовкой canvas загрузите шрифты с `url` через `FontFace` / `document.fonts`. Подробнее: [design-fonts.md](./design-fonts.md).
 
 ### Файлы draft в `<img src>`
 

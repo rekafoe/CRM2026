@@ -13,6 +13,13 @@ export type ProductBindingLabels = {
 
 export type TemplateCatalogStatus = 'active' | 'inactive' | 'draft';
 
+export type RequiredFontSpecEntry = {
+  family: string;
+  source: 'global' | 'bundled' | 'missing';
+  fontId?: number;
+  url?: string;
+};
+
 export type ParsedTemplateCatalogSpec = {
   width_mm?: number;
   height_mm?: number;
@@ -24,12 +31,16 @@ export type ParsedTemplateCatalogSpec = {
   importStatus?: string;
   importWarnings: string[];
   importerVersion?: number;
+  requiredFonts: RequiredFontSpecEntry[];
+  fontsResolved: boolean;
 };
 
 export function parseTemplateSpec(template: DesignTemplate): ParsedTemplateCatalogSpec {
   const empty: ParsedTemplateCatalogSpec = {
     hasDesignState: false,
     importWarnings: [],
+    requiredFonts: [],
+    fontsResolved: true,
   };
   if (!template.spec) return empty;
   try {
@@ -40,6 +51,11 @@ export function parseTemplateSpec(template: DesignTemplate): ParsedTemplateCatal
     const designState = spec.designState as Record<string, unknown> | undefined;
     const warnings = Array.isArray(importMeta?.warnings)
       ? importMeta.warnings.filter((w): w is string => typeof w === 'string')
+      : [];
+    const requiredFonts = Array.isArray(spec.requiredFonts)
+      ? spec.requiredFonts.filter((f): f is RequiredFontSpecEntry => (
+        f != null && typeof f === 'object' && typeof (f as RequiredFontSpecEntry).family === 'string'
+      ))
       : [];
     return {
       width_mm: Number(spec.width_mm ?? designState?.pageWidth) || undefined,
@@ -52,6 +68,8 @@ export function parseTemplateSpec(template: DesignTemplate): ParsedTemplateCatal
       importStatus: typeof importMeta?.status === 'string' ? importMeta.status : undefined,
       importWarnings: warnings,
       importerVersion: typeof importMeta?.importerVersion === 'number' ? importMeta.importerVersion : undefined,
+      requiredFonts,
+      fontsResolved: spec.fontsResolved !== false && !requiredFonts.some((f) => f.source === 'missing'),
     };
   } catch {
     return empty;

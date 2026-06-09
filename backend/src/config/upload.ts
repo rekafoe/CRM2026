@@ -13,6 +13,11 @@ export const uploadsDir = process.env.UPLOADS_DIR
 // Файлы заказов (макеты клиентов) — в отдельной папке, НЕ отдаются через /api/uploads (безопасность)
 export const orderFilesDir = path.join(uploadsDir, 'orders')
 
+/** Шрифты библиотеки design_fonts — отдаются через /api/design-fonts/public/:id/content */
+export const designFontsDir = path.join(uploadsDir, 'design-fonts')
+
+const FONT_EXTENSIONS = new Set(['.woff2', '.woff', '.ttf', '.otf'])
+
 /** Лимит тела для multer (и согласованная проверка в handlers после приёма файла) */
 export const MAX_UPLOAD_FILE_SIZE_BYTES = Number(process.env.UPLOAD_MAX_FILE_SIZE_BYTES || 25 * 1024 * 1024)
 const MAX_UPLOAD_FIELDS = Number(process.env.UPLOAD_MAX_FIELDS || 50)
@@ -35,6 +40,7 @@ const allowedUploadMimes = new Set([
 try {
   fs.mkdirSync(uploadsDir, { recursive: true })
   fs.mkdirSync(orderFilesDir, { recursive: true })
+  fs.mkdirSync(designFontsDir, { recursive: true })
 } catch {}
 
 export const storage = multer.diskStorage({
@@ -163,6 +169,42 @@ export function saveBufferToUploads(
  * Записать файл заказа (макет клиента) в защищённую папку orders/.
  * НЕ отдаётся через /api/uploads — только через GET /api/orders/:id/files/:fileId/download (с авторизацией).
  */
+export function detectFontFormat(originalName?: string): 'woff2' | 'woff' | 'ttf' | 'otf' {
+  const ext = path.extname(originalName || '').toLowerCase()
+  if (ext === '.woff2') return 'woff2'
+  if (ext === '.woff') return 'woff'
+  if (ext === '.otf') return 'otf'
+  return 'ttf'
+}
+
+export function isFontUploadExtension(ext: string): boolean {
+  return FONT_EXTENSIONS.has(ext.toLowerCase())
+}
+
+/**
+ * Сохранить файл шрифта в uploads/design-fonts/.
+ */
+export function saveBufferToDesignFonts(
+  buffer: Buffer | undefined,
+  originalName?: string,
+  prefix?: string,
+): { filename: string; size: number; originalName: string; format: 'woff2' | 'woff' | 'ttf' | 'otf' } | null {
+  if (!buffer || buffer.length === 0) return null
+  const raw = (originalName || '').trim()
+  const ext = path.extname(raw).toLowerCase()
+  if (!FONT_EXTENSIONS.has(ext)) return null
+  const base = prefix ? toSlug(prefix) : 'font'
+  const unique = `${base}-${shortId(4)}${ext}`
+  const filePath = path.join(designFontsDir, unique)
+  fs.writeFileSync(filePath, buffer)
+  return {
+    filename: unique,
+    size: buffer.length,
+    originalName: raw || unique,
+    format: detectFontFormat(raw),
+  }
+}
+
 export function saveBufferToOrderFiles(
   buffer: Buffer | undefined,
   originalName?: string

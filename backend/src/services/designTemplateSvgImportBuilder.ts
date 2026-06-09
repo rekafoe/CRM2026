@@ -1,6 +1,8 @@
 import path from 'path'
 import PizZip from 'pizzip'
-import { saveBufferToUploads } from '../config/upload'
+import { detectFontFormat, isFontUploadExtension, saveBufferToUploads } from '../config/upload'
+import { guessFontFamilyFromFilename } from '../utils/fontFamilyNormalize'
+import type { BundledTemplateFont } from '../utils/extractDesignStateFonts'
 import {
   parseImportedSvgLayers,
   type PrepressFromSvgGuides,
@@ -46,6 +48,7 @@ export type ImportedSvgTemplateDocument = {
   normalizedOriginalName: string
   normalizedSize: number
   pages: StoredImportedSvgPage[]
+  bundledFonts: BundledTemplateFont[]
 }
 
 export function isSupportedNormalizedTemplateExt(ext: string): boolean {
@@ -93,7 +96,7 @@ function toFabricText(item: SvgText) {
     top: item.scene.y - fontSizePx * 0.8,
     text: item.text,
     fontSize: fontSizePx,
-    fontFamily: 'Arial',
+    fontFamily: item.fontFamily?.trim() || 'Arial',
     fill: '#111827',
     textAlign: item.textAnchor === 'end' ? 'right' : item.textAnchor === 'middle' ? 'center' : 'left',
     id: item.name,
@@ -164,6 +167,49 @@ function shouldSkipZipEntry(name: string): boolean {
   return normalized.startsWith('__MACOSX/')
     || basename.startsWith('.')
     || basename.startsWith('~')
+}
+
+function readZipFontEntries(
+  file: ImportFile,
+  templateName: string,
+  warnings: string[],
+): BundledTemplateFont[] {
+  if (!file.buffer?.length) return []
+  let zip: PizZip
+  try {
+    zip = new PizZip(file.buffer)
+  } catch {
+    return []
+  }
+
+  const fonts: BundledTemplateFont[] = []
+  for (const [name, entry] of Object.entries(zip.files)) {
+    if (entry.dir || shouldSkipZipEntry(name)) continue
+    const normalized = name.replace(/\\/g, '/')
+    const basename = path.posix.basename(normalized)
+    const ext = path.extname(basename).toLowerCase()
+    if (!isFontUploadExtension(ext)) continue
+    const inFontsFolder = /(?:^|\/)fonts\//i.test(normalized)
+    if (!inFontsFolder && Object.keys(zip.files).some((k) => /fonts\//i.test(k.replace(/\\/g, '/')))) {
+      continue
+    }
+    const buffer = entry.asNodeBuffer()
+    const stored = saveBufferToUploads(buffer, basename, `${templateName}-font`)
+    if (!stored) continue
+    const family = guessFontFamilyFromFilename(basename)
+    fonts.push({
+      family,
+      source: 'bundled',
+      filename: stored.filename,
+      url: `/api/uploads/${stored.filename}`,
+      format: detectFontFormat(basename),
+    })
+  }
+
+  if (fonts.length > 0) {
+    warnings.push(`Импорт ZIP: найдено файлов шрифтов: ${fonts.length}.`)
+  }
+  return fonts
 }
 
 function readSvgEntries(file: ImportFile, ext: string, warnings: string[]): Array<{ name: string; svg: string }> {
@@ -242,8 +288,9 @@ function buildPageFromSvg(input: {
         version: '6.0.0',
         objects: [
           toFabricBackground(previewUrl, parsed.geometry.scenePx, parsed.geometry.sceneScale),
-          ...parsed.photoRects.map(toFabricRect),
-          ...parsed.textItems.map(toFabricText),
+          ...parsed.interactiveLayers.map((layer) => (
+            layer.kind === 'photo' ? toFabricRect(layer.data) : toFabricText(layer.data)
+          )),
         ],
         background: 'white',
       },
@@ -278,6 +325,10 @@ export function buildImportedSvgTemplateDocument(
     }
   }
 
+  const bundledFonts = ext === '.zip'
+    ? readZipFontEntries(file, templateName, warnings)
+    : []
+
   return {
     pageWidthMm: first.parsed.widthMm,
     pageHeightMm: first.parsed.heightMm,
@@ -288,5 +339,6 @@ export function buildImportedSvgTemplateDocument(
     normalizedOriginalName: file.originalname || first.normalizedOriginalName,
     normalizedSize: file.buffer?.length ?? first.normalizedSize,
     pages,
+    bundledFonts,
   }
 }

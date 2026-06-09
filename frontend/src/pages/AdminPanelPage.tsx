@@ -67,6 +67,9 @@ const AdminProductManager = lazy(() =>
 const DesignTemplatesPage = lazy(() =>
   import('./admin/DesignTemplatesPage').then((m) => ({ default: m.DesignTemplatesPage }))
 );
+const DesignFontsPage = lazy(() =>
+  import('./admin/DesignFontsPage').then((m) => ({ default: m.DesignFontsPage }))
+);
 const DesignEditorPage = lazy(() =>
   import('./admin/DesignEditorPage').then((m) => ({ default: m.DesignEditorPage }))
 );
@@ -388,6 +391,7 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/counters" element={<CountersServicePage />} />
           <Route path="/preflight" element={<PreflightPage />} />
           <Route path="/design-templates" element={<DesignTemplatesPage />} />
+          <Route path="/design-fonts" element={<DesignFontsPage />} />
           <Route path="/design-editor/:templateId" element={<DesignEditorPage />} />
           <Route path="/public-design-editor-preview/:templateId" element={<PublicDesignEditorPreviewPage />} />
           <Route path="/clients/:id" element={<CustomerDetailPage />} />

@@ -364,6 +364,29 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   }, [fitZoom, fitReady, currentPage, navigation.pageLoadKey]);
 
   useEffect(() => {
+    const el = scrollAreaRef.current;
+    const sync = () => {
+      canvasHandleRef.current?.syncTextFloatingAnchor?.();
+      canvasHandleRef.current?.syncCanvasOffset();
+    };
+    el?.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('resize', sync);
+    return () => {
+      el?.removeEventListener('scroll', sync);
+      window.removeEventListener('resize', sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (loading || !fitReady) return;
+    const id = requestAnimationFrame(() => {
+      canvasHandleRef.current?.syncCanvasOffset();
+      canvasHandleRef.current?.setSelectionDisplayScale(fitZoom);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [fitReady, fitZoom, loading, templateId]);
+
+  useEffect(() => {
     setDraftToken(bootstrapDraftToken);
     setCurrentPage(0);
     setSelectedObj(null);

@@ -1,5 +1,6 @@
 import { getDb } from '../config/database'
 import { resolveTemplateCategory } from './designTemplateCategoryResolve'
+import { enrichSpecWithRequiredFonts } from './designFontService'
 
 export interface DesignTemplateRow {
   id: number
@@ -87,6 +88,25 @@ function stripPrivateImportFields(row: DesignTemplateRow): DesignTemplateRow {
 function stripRoyaltyFields(row: DesignTemplateRow): DesignTemplateRow {
   const { author_user_id: _a, usage_fee: _u, author_percent: _p, ...rest } = row
   return rest as DesignTemplateRow
+}
+
+async function enrichPublicTemplateSpec(spec: string | null): Promise<string | null> {
+  if (!spec) return spec
+  try {
+    const parsed = JSON.parse(spec) as Record<string, unknown>
+    const enriched = await enrichSpecWithRequiredFonts(parsed)
+    return JSON.stringify(enriched)
+  } catch {
+    return spec
+  }
+}
+
+async function enrichPublicTemplateRow(row: DesignTemplateRow): Promise<DesignTemplateRow> {
+  const stripped = stripPrivateImportFields(stripRoyaltyFields(row))
+  return {
+    ...stripped,
+    spec: await enrichPublicTemplateSpec(stripped.spec),
+  }
 }
 
 function mapListRow(row: Record<string, unknown>): DesignTemplateListRow {
@@ -181,7 +201,7 @@ export async function getPublicDesignTemplate(id: number): Promise<DesignTemplat
      WHERE dt.id = ? AND dt.is_active = 1`,
     [id],
   ) as DesignTemplateRow | undefined
-  return row ? stripPrivateImportFields(stripRoyaltyFields(row)) : null
+  return row ? await enrichPublicTemplateRow(row) : null
 }
 
 export async function getPublicDesignTemplates(params: {
@@ -240,7 +260,7 @@ export async function getPublicDesignTemplates(params: {
     ) as DesignTemplateRow[]
   }
 
-  return rows.map((row) => stripPrivateImportFields(stripRoyaltyFields(row)))
+  return Promise.all(rows.map((row) => enrichPublicTemplateRow(row)))
 }
 
 async function resolveInputCategory(
@@ -310,9 +330,18 @@ export async function updateDesignTemplate(
     category = cat.category
   }
   const preview_url = input.preview_url !== undefined ? input.preview_url : existing.preview_url
-  const spec = input.spec !== undefined
+  let spec = input.spec !== undefined
     ? (typeof input.spec === 'string' ? input.spec : JSON.stringify(input.spec))
     : existing.spec
+  if (input.spec !== undefined && spec) {
+    try {
+      const parsed = typeof spec === 'string' ? JSON.parse(spec) as Record<string, unknown> : spec
+      const enriched = await enrichSpecWithRequiredFonts(parsed)
+      spec = JSON.stringify(enriched)
+    } catch {
+      // keep original spec if JSON invalid
+    }
+  }
   const is_active = input.is_active !== undefined ? (input.is_active ? 1 : 0) : existing.is_active
   const sort_order = input.sort_order !== undefined ? input.sort_order : existing.sort_order
   const author_user_id = input.author_user_id !== undefined

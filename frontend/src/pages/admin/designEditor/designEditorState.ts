@@ -40,6 +40,54 @@ export function mergeSavedEditorPages(
   });
 }
 
+export function buildEmptyDesignState(input: {
+  pageWidth?: number;
+  pageHeight?: number;
+  pageCount?: number;
+  sceneScale?: number;
+}): DesignState {
+  const pageWidth = Number.isFinite(input.pageWidth) && (input.pageWidth ?? 0) > 0 ? input.pageWidth! : 90;
+  const pageHeight = Number.isFinite(input.pageHeight) && (input.pageHeight ?? 0) > 0 ? input.pageHeight! : 55;
+  const pageCount = Math.max(1, Math.min(99, Number(input.pageCount) || 1));
+  const sceneScale = Number(input.sceneScale);
+  return {
+    templateId: null,
+    pageWidth,
+    pageHeight,
+    pageCount,
+    sceneScale: Number.isFinite(sceneScale) && sceneScale > 0 ? sceneScale : 1,
+    pages: Array.from({ length: pageCount }, () => ({ fabricJSON: {} })),
+    spread_mode: false,
+    cover_pages: 1,
+  };
+}
+
+/** Подтянуть мм из карточки шаблона в designState (после правки размеров без повторного входа в редактор). */
+export function syncDesignStateDimensions(
+  designState: DesignState,
+  patch: { pageWidth?: number; pageHeight?: number; pageCount?: number },
+): DesignState {
+  const pageWidth = patch.pageWidth != null && patch.pageWidth > 0 ? patch.pageWidth : designState.pageWidth;
+  const pageHeight = patch.pageHeight != null && patch.pageHeight > 0 ? patch.pageHeight : designState.pageHeight;
+  const targetCount = patch.pageCount != null && patch.pageCount > 0
+    ? Math.max(1, Math.min(99, patch.pageCount))
+    : designState.pageCount;
+  const pages = [...designState.pages];
+  while (pages.length < targetCount) {
+    pages.push({ fabricJSON: {} });
+  }
+  if (pages.length > targetCount) {
+    pages.length = targetCount;
+  }
+  return {
+    ...designState,
+    pageWidth,
+    pageHeight,
+    pageCount: targetCount,
+    pages,
+  };
+}
+
 export function buildDesignState(input: {
   templateId: string | undefined;
   pageWidth: number;

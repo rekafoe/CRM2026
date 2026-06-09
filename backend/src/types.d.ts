@@ -56,6 +56,7 @@ declare module 'pizzip' {
     dir: boolean;
     asText(): string;
     asBinary(): string;
+    asNodeBuffer(): Buffer;
   }
 
   class PizZip {

@@ -27,11 +27,17 @@ export type SvgText = {
   x: number
   y: number
   fontSize: number
+  fontFamily?: string
   text: string
   textAnchor: 'start' | 'middle' | 'end'
   svg: GeometryPoint & { fontSize: number }
   scene: GeometryPoint & { fontSize: number }
 }
+
+/** Интерактивный слой в порядке появления в SVG (z-order для Fabric). */
+export type SvgInteractiveLayer =
+  | { kind: 'photo'; data: SvgRect }
+  | { kind: 'text'; data: SvgText }
 
 export type MmRect = {
   name: string
@@ -53,6 +59,8 @@ export interface ImportedSvgLayers {
   heightMm: number
   photoRects: SvgRect[]
   textItems: SvgText[]
+  /** photo_* и text_* в порядке документа SVG (для z-order в fabricJSON). */
+  interactiveLayers: SvgInteractiveLayer[]
   guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>>
   lockedBgDetected: boolean
   prepressHints: PrepressFromSvgGuides | null
@@ -358,6 +366,26 @@ function parseFontSizeFromStyle(style: Record<string, string>): number | null {
   return match ? Number(match[1]) : null
 }
 
+/** Первое семейство из font-family или shorthand font. */
+export function parseFontFamilyFromStyle(style: Record<string, string>): string | undefined {
+  const raw = style['font-family']?.trim()
+  if (raw) return normalizeFontFamilyToken(raw)
+  const shorthand = style.font?.trim()
+  if (!shorthand) return undefined
+  const withoutSize = shorthand.replace(
+    /^(?:italic|oblique|normal|bold|bolder|lighter|\d{3})\s+/i,
+    '',
+  )
+  const match = withoutSize.match(/^(?:\d+(?:\.\d+)?(?:px|pt|mm|cm|in)?(?:\/[\d.]+)?\s+)?(.+)$/i)
+  if (!match?.[1]) return undefined
+  return normalizeFontFamilyToken(match[1].split(/\s+\/\s+/)[0] ?? match[1])
+}
+
+function normalizeFontFamilyToken(value: string): string {
+  const first = value.split(',')[0]?.trim() ?? value.trim()
+  return first.replace(/^['"]|['"]$/g, '').trim() || first
+}
+
 function parseNumber(value: string | undefined): number | null {
   if (!value) return null
   const match = value.trim().match(/^-?\d+(?:\.\d+)?/)
@@ -507,6 +535,7 @@ export function parseImportedSvgLayers(
   const warnings = [...dims.warnings]
   const photoRects: SvgRect[] = []
   const textItems: SvgText[] = []
+  const interactiveLayers: SvgInteractiveLayer[] = []
   const guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>> = {}
   let lockedBgDetected = false
   const warnedNames = new Set<string>()
@@ -621,12 +650,14 @@ export function parseImportedSvgLayers(
       if (ef?.startsWith('photo_') && width != null && height != null && width > 0 && height > 0) {
         const tr = transformedRect(x, y, width, height, objectTransform)
         const mmRect = geometry.svgRectToMm(tr)
-        photoRects.push({
+        const photoEntry: SvgRect = {
           name: ef,
           ...mmRect,
           svg: tr,
           scene: geometry.mmRectToScene(mmRect),
-        })
+        }
+        photoRects.push(photoEntry)
+        interactiveLayers.push({ kind: 'photo', data: photoEntry })
       }
 
       i = gt + 1
@@ -696,16 +727,24 @@ export function parseImportedSvgLayers(
         const transformedFontSize = fontSize * transformScale(textTransform)
         const fontSizeMm = geometry.svgFontSizeToMm(transformedFontSize)
         const scenePoint = geometry.mmPointToScene(mmPoint)
-        textItems.push({
+        const fontFamily =
+          parseFontFamilyFromStyle(tspanStyle)
+          ?? parseFontFamilyFromStyle(textStyle)
+          ?? (tspanAttrs['font-family'] ? normalizeFontFamilyToken(tspanAttrs['font-family']) : undefined)
+          ?? (attrs['font-family'] ? normalizeFontFamilyToken(attrs['font-family']) : undefined)
+        const textEntry: SvgText = {
           name: ef,
           x: mmPoint.x,
           y: mmPoint.y,
           fontSize: fontSizeMm,
+          fontFamily,
           text: tspan?.text || decodeXmlText(innerStr) || ef.replace(/^text_/, ''),
           textAnchor,
           svg: { ...point, fontSize: transformedFontSize },
           scene: { ...scenePoint, fontSize: geometry.mmToPx(fontSizeMm) },
-        })
+        }
+        textItems.push(textEntry)
+        interactiveLayers.push({ kind: 'text', data: textEntry })
       }
 
       i = outerEnd
@@ -737,6 +776,7 @@ export function parseImportedSvgLayers(
     heightMm,
     photoRects,
     textItems,
+    interactiveLayers,
     guideRectsMm,
     lockedBgDetected,
     prepressHints,

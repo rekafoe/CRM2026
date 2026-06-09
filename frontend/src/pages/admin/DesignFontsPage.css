@@ -1,0 +1,76 @@
+.design-fonts-upload {
+  margin-bottom: 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
+  background: var(--surface-elevated, #fff);
+}
+
+.design-fonts-upload__form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 32rem;
+}
+
+.design-fonts-upload__form label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.design-fonts-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.design-fonts-list__item {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  background: var(--surface-elevated, #fff);
+}
+
+.design-fonts-list__item--inactive {
+  opacity: 0.65;
+}
+
+.design-fonts-list__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.design-fonts-list__family,
+.design-fonts-list__format {
+  color: var(--text-muted, #6b7280);
+  font-size: 0.875rem;
+}
+
+.design-fonts-list__badge {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.design-fonts-list__preview {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+  line-height: 1.35;
+}
+
+.design-fonts-list__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.design-fonts-list__empty {
+  color: var(--text-muted, #6b7280);
+}

@@ -31,6 +31,11 @@ import {
   resolveTemplatePreviewUrl,
   type TemplateCatalogStatus,
 } from './designTemplates/designTemplateCatalogUtils';
+import {
+  buildEmptyDesignState,
+  syncDesignStateDimensions,
+} from './designEditor/designEditorState';
+import type { DesignState } from './designEditor/types';
 import { DesignTemplateBindingsPanel } from './designTemplates/DesignTemplateBindingsPanel';
 import { DesignTemplateCategoriesModal } from './designTemplates/DesignTemplateCategoriesModal';
 import { DesignTemplateCategoryField } from './designTemplates/DesignTemplateCategoryField';
@@ -90,6 +95,26 @@ function mergeSpecOnSave(
   else delete base.typeId;
   if (patch.sizeId) base.sizeId = patch.sizeId;
   else delete base.sizeId;
+
+  const existingDesignState = base.designState as DesignState | undefined;
+  if (existingDesignState && typeof existingDesignState === 'object') {
+    base.designState = syncDesignStateDimensions(existingDesignState, {
+      pageWidth: patch.width_mm,
+      pageHeight: patch.height_mm,
+      pageCount: patch.page_count,
+    });
+  } else if (
+    patch.width_mm != null
+    || patch.height_mm != null
+    || patch.page_count != null
+  ) {
+    base.designState = buildEmptyDesignState({
+      pageWidth: patch.width_mm,
+      pageHeight: patch.height_mm,
+      pageCount: patch.page_count,
+    });
+  }
+
   return base;
 }
 
@@ -626,6 +651,11 @@ export const DesignTemplatesPage: React.FC = () => {
                   {parsed.importWarnings.length} предупр.
                 </span>
               )}
+              {parsed.hasDesignState && !parsed.fontsResolved && (
+                <span className="design-template-meta design-template-warnings-badge" title="Не все шрифты найдены в библиотеке CRM">
+                  шрифты
+                </span>
+              )}
             </div>
           )}
           {(t.author_name || t.author_user_id) && (
@@ -787,6 +817,9 @@ export const DesignTemplatesPage: React.FC = () => {
           </button>
           <button type="button" className="lg-btn" onClick={() => setCategoriesModalOpen(true)}>
             <AppIcon name="folder" size="xs" /> Категории
+          </button>
+          <button type="button" className="lg-btn" onClick={() => navigate('/adminpanel/design-fonts')}>
+            <AppIcon name="document" size="xs" /> Шрифты
           </button>
           <input
             type="search"
@@ -991,6 +1024,10 @@ export const DesignTemplatesPage: React.FC = () => {
               onChange={(bind) => setForm((p) => ({ ...p, ...bind }))}
             />
           </div>
+          <div className="design-template-manual-hint">
+            Поля <code>photo_*</code> / <code>text_*</code> из SVG не создаются автоматически — для парсинга макета используйте <strong>Импорт SVG</strong>.
+            Здесь можно задать размеры и фон-превью, затем собрать поля в master-редакторе («Шаблон»).
+          </div>
           <div className="form-row">
             <label>Превью (фон в редакторе)</label>
             <div className="preview-upload">
@@ -1158,6 +1195,29 @@ export const DesignTemplatesPage: React.FC = () => {
             )}
             {formatAuthorRoyaltyLine(infoTemplate) && (
               <p><strong>ЗП автора:</strong> {formatAuthorRoyaltyLine(infoTemplate)} (внутр., не клиенту)</p>
+            )}
+            {infoParsed.requiredFonts.length > 0 && (
+              <div className="design-template-fonts-panel">
+                <strong>Шрифты макета:</strong>
+                <ul>
+                  {infoParsed.requiredFonts.map((font) => (
+                    <li key={font.family}>
+                      {font.family}
+                      {' — '}
+                      {font.source === 'missing' ? 'не найден' : font.source === 'global' ? 'библиотека CRM' : 'в ZIP шаблона'}
+                    </li>
+                  ))}
+                </ul>
+                {!infoParsed.fontsResolved && (
+                  <p className="design-template-fonts-panel__hint">
+                    Загрузите недостающие шрифты в{' '}
+                    <button type="button" className="design-template-link-btn" onClick={() => { setInfoTemplate(null); navigate('/adminpanel/design-fonts'); }}>
+                      библиотеку шрифтов
+                    </button>
+                    {' '}или приложите папку fonts/ к ZIP при reimport.
+                  </p>
+                )}
+              </div>
             )}
             {infoParsed.importWarnings.length > 0 && (
               <div className="design-template-import-warnings">

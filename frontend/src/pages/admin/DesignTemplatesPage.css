@@ -1,3 +1,32 @@
+.design-template-fonts-panel {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.design-template-fonts-panel ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.design-template-fonts-panel__hint {
+  margin: 0.5rem 0 0;
+  color: #92400e;
+  font-size: 0.875rem;
+}
+
+.design-template-link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
 /* Каталог шаблонов — в стиле product-management / data-card админки */
 
 .design-templates-layout {
@@ -682,6 +711,20 @@
   background: #eff6ff;
   border: 1px solid #bfdbfe;
   border-radius: 12px;
+}
+
+.design-template-manual-hint {
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 12px;
+}
+
+.design-template-manual-hint code {
+  font-size: 12px;
 }
 
 .preview-upload .form-hint {
