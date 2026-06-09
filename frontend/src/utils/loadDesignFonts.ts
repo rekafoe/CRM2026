@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../config/constants';
+import { APP_CONFIG } from '../types';
 import { collectFontNameAliases, readFontMetadataFromBuffer } from './fontFileMetadata';
 import { fontFamilyCompactKey, normalizeFontFamilyName } from './fontFamilyNormalize';
 
@@ -151,17 +153,41 @@ async function loadFontFaceFromSource(
   }
 }
 
-async function fetchFontBlob(path: string): Promise<Blob> {
-  const { api } = await import('../api');
-  const res = await api.get(path, { responseType: 'blob' });
-  return res.data as Blob;
+function readAuthToken(): string | null {
+  try {
+    return localStorage.getItem(APP_CONFIG?.storage?.token || '') || localStorage.getItem('crmToken');
+  } catch {
+    return null;
+  }
 }
 
-async function fetchFontBlobUrl(path: string): Promise<string> {
-  const blob = await fetchFontBlob(path);
-  const blobUrl = URL.createObjectURL(blob);
-  retainedFontBlobUrls.add(blobUrl);
-  return blobUrl;
+/** Бинарники через fetch: axios + gzip на sendFile давал ERR_CONTENT_DECODING_FAILED. */
+async function fetchFontBlob(path: string): Promise<Blob> {
+  const base = API_BASE_URL.replace(/\/$/, '');
+  const rel = path.startsWith('/') ? path : `/${path}`;
+  const url = `${base}${rel}`;
+  const headers: HeadersInit = {};
+  const token = readAuthToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(url, { headers, credentials: 'same-origin' });
+  if (!res.ok) throw new Error(`Font HTTP ${res.status}`);
+  return res.blob();
+}
+
+async function fetchFontBlobById(fontId: number): Promise<Blob> {
+  const hasAuth = Boolean(readAuthToken());
+  const paths = hasAuth
+    ? [`/design-fonts/${fontId}/content`, `/design-fonts/public/${fontId}/content`]
+    : [`/design-fonts/public/${fontId}/content`, `/design-fonts/${fontId}/content`];
+  let lastError: unknown;
+  for (const path of paths) {
+    try {
+      return await fetchFontBlob(path);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError ?? new Error('Font fetch failed');
 }
 
 async function loadFontFaceAliases(
@@ -190,12 +216,11 @@ function collectFontRegistrationNames(
   });
 }
 
-async function fetchLibraryFontBlobUrl(fontId: number): Promise<string> {
-  return fetchFontBlobUrl(`/design-fonts/public/${fontId}/content`);
-}
-
-async function fetchAdminFontBlobUrl(fontId: number): Promise<string> {
-  return fetchFontBlobUrl(`/design-fonts/${fontId}/content`);
+async function fetchFontBlobUrlById(fontId: number): Promise<string> {
+  const blob = await fetchFontBlobById(fontId);
+  const blobUrl = URL.createObjectURL(blob);
+  retainedFontBlobUrls.add(blobUrl);
+  return blobUrl;
 }
 
 export function buildDesignFontPreviewCss(
@@ -233,7 +258,7 @@ export async function loadDesignFontForPreview(font: {
   try {
     let blobUrl = previewFontBlobCache.get(cacheKey);
     if (!blobUrl) {
-      blobUrl = await fetchAdminFontBlobUrl(font.id);
+      blobUrl = await fetchFontBlobUrlById(font.id);
       previewFontBlobCache.set(cacheKey, blobUrl);
     }
     const css = buildDesignFontPreviewCss(font, previewFamily, blobUrl);
@@ -262,9 +287,7 @@ export async function loadDesignFontFromLibrary(font: {
 
   let ok = false;
   try {
-    const blob = font.id
-      ? await fetchFontBlob(`/design-fonts/${font.id}/content`).catch(() => fetchFontBlob(`/design-fonts/public/${font.id}/content`))
-      : null;
+    const blob = font.id ? await fetchFontBlobById(font.id) : null;
     if (blob) {
       const names = await collectFontRegistrationNames(family, font.name_aliases, blob);
       const blobUrl = URL.createObjectURL(blob);

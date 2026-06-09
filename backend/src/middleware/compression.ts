@@ -12,10 +12,18 @@ function isUploadsOrStaticPath(req: Request): boolean {
   )
 }
 
+function isDesignFontContentPath(req: Request): boolean {
+  const path = req.path || ''
+  const base = (req.originalUrl || '').split('?')[0] || path
+  const re = /\/api\/design-fonts\/(?:public\/)?[0-9]+\/content\/?$/
+  return re.test(path) || re.test(base)
+}
+
 function isBinaryFileResponsePath(req: Request): boolean {
   const path = req.path || ''
   const base = (req.originalUrl || '').split('?')[0] || path
   return (
+    isDesignFontContentPath(req) ||
     /\/api\/public-editor\/drafts\/[^/]+\/files\/[0-9]+\/content\/?$/.test(path) ||
     /\/api\/public-editor\/drafts\/[^/]+\/files\/[0-9]+\/content\/?$/.test(base)
   )
