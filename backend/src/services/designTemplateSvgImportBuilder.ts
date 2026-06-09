@@ -116,7 +116,8 @@ function toFabricTextStyles(
       if (seg.fontWeight) patch.fontWeight = seg.fontWeight
       if (seg.fontStyle) patch.fontStyle = seg.fontStyle
       if (seg.fill) patch.fill = seg.fill
-      if (seg.fontSize != null && Math.abs(seg.fontSize - baseFontSizePx) > 0.5) {
+      // Меньший font-size у декоративной буквы Corel не переносим — иначе одна буква меньше строки.
+      if (seg.fontSize != null && seg.fontSize > baseFontSizePx + 0.5) {
         patch.fontSize = Math.max(6, seg.fontSize)
       }
       if (Object.keys(patch).length === 0) continue

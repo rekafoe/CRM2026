@@ -734,6 +734,24 @@ function normalizeInlineTextChunk(value: string): string {
   return value.replace(/\s+/g, ' ').trim()
 }
 
+function isLetterLikeChar(ch: string): boolean {
+  if (!ch || /\s/.test(ch)) return false
+  const code = ch.codePointAt(0)
+  if (code == null) return false
+  return (code >= 0x41 && code <= 0x5a)
+    || (code >= 0x61 && code <= 0x7a)
+    || (code >= 0xc0 && code <= 0x24f)
+    || (code >= 0x400 && code <= 0x4ff)
+}
+
+function endsWithLetterLike(value: string): boolean {
+  return value.length > 0 && isLetterLikeChar(value.slice(-1))
+}
+
+function startsWithLetterLike(value: string): boolean {
+  return value.length > 0 && isLetterLikeChar(value.charAt(0))
+}
+
 function inlineChunkJoinGap(existing: string, next: string): string {
   const prevCh = existing.slice(-1)
   const nextCh = next.charAt(0)
@@ -742,8 +760,8 @@ function inlineChunkJoinGap(existing: string, next: string): string {
     && nextCh
     && !/\s/.test(prevCh)
     && !/\s/.test(nextCh)
-    && /\p{L}/u.test(prevCh)
-    && /\p{L}/u.test(nextCh)
+    && isLetterLikeChar(prevCh)
+    && isLetterLikeChar(nextCh)
   ) {
     return ' '
   }
@@ -804,6 +822,104 @@ function pruneRedundantInlineChunks(items: SvgText[]): SvgText[] {
   return pruneRedundantTextChunks(sorted)
 }
 
+function normalizeSegmentFontSize(
+  style: TspanSegmentPresentation,
+  baseFontSize: number,
+): TspanSegmentPresentation {
+  if (style.fontSize != null && style.fontSize < baseFontSize - 0.5) {
+    const { fontSize: _drop, ...rest } = style
+    return rest
+  }
+  return style
+}
+
+/**
+ * Corel иногда экспортирует декоративный шрифт только на первую букву слова,
+ * остаток слова — снова базовым шрифтом (л + юблю → люблю).
+ */
+function mergeSplitWordAlternateFontTspans(
+  tspans: ParsedTspan[],
+  segmentStyle: (tspan: ParsedTspan) => TspanSegmentPresentation,
+  basePresentationKey: string,
+  baseFontSize: number,
+): ParsedTspan[] {
+  if (tspans.length <= 1) return tspans
+  const styleKey = (tspan: ParsedTspan) =>
+    segmentPresentationKey(normalizeSegmentFontSize(segmentStyle(tspan), baseFontSize))
+  const out: ParsedTspan[] = []
+  let i = 0
+  while (i < tspans.length) {
+    let current = tspans[i]!
+    let currentKey = styleKey(current)
+    while (i + 1 < tspans.length) {
+      const next = tspans[i + 1]!
+      const nextKey = styleKey(next)
+      const continuesWord =
+        !/\s$/.test(current.text)
+        && !/^\s/.test(next.text)
+        && currentKey !== nextKey
+        && currentKey !== basePresentationKey
+        && nextKey === basePresentationKey
+        && endsWithLetterLike(current.text)
+        && startsWithLetterLike(next.text)
+      if (!continuesWord) break
+      current = { ...current, text: current.text + next.text }
+      currentKey = styleKey(current)
+      i++
+    }
+    out.push(current)
+    i++
+  }
+  return out
+}
+
+function mergeSplitWordAlternateFontTextItems(items: SvgText[]): SvgText[] {
+  if (items.length <= 1) return items
+  const baseKey = segmentPresentationKey({
+    fontFamily: items[0]?.fontFamily,
+    fontWeight: items[0]?.fontWeight,
+    fontStyle: items[0]?.fontStyle,
+    fill: items[0]?.fill,
+    fontSize: items[0]?.scene.fontSize,
+  })
+  const out: SvgText[] = []
+  let i = 0
+  while (i < items.length) {
+    let current = items[i]!
+    let currentKey = segmentPresentationKey({
+      fontFamily: current.fontFamily,
+      fontWeight: current.fontWeight,
+      fontStyle: current.fontStyle,
+      fill: current.fill,
+      fontSize: current.scene.fontSize,
+    })
+    while (i + 1 < items.length) {
+      const next = items[i + 1]!
+      const nextKey = segmentPresentationKey({
+        fontFamily: next.fontFamily,
+        fontWeight: next.fontWeight,
+        fontStyle: next.fontStyle,
+        fill: next.fill,
+        fontSize: next.scene.fontSize,
+      })
+      const continuesWord =
+        !/\s$/.test(current.text)
+        && !/^\s/.test(next.text)
+        && currentKey !== nextKey
+        && currentKey !== baseKey
+        && nextKey === baseKey
+        && endsWithLetterLike(current.text)
+        && startsWithLetterLike(next.text)
+      if (!continuesWord) break
+      current = { ...current, text: current.text + next.text }
+      i++
+    }
+    out.push(current)
+    i++
+  }
+  return out
+}
+
 function composeTextFromTspans(
   tspans: ParsedTspan[],
   baseY: number,
@@ -815,18 +931,21 @@ function composeTextFromTspans(
   const textStyles: SvgTextStyleSegment[] = []
   for (const line of lines) {
     if (text.length > 0) text += '\n'
-    const sorted = pruneRedundantTextChunks(
-      [...line].sort(
-        (a, b) => (parseNumber(a.attrs.x) ?? 0) - (parseNumber(b.attrs.x) ?? 0) || a.order - b.order,
-      ),
+    const sortedByX = [...line].sort(
+      (a, b) => (parseNumber(a.attrs.x) ?? 0) - (parseNumber(b.attrs.x) ?? 0) || a.order - b.order,
     )
+    const pruned = pruneRedundantTextChunks(sortedByX)
+    const basePresentationKey = segmentPresentationKey(
+      normalizeSegmentFontSize(segmentStyle(pruned[0] ?? sortedByX[0]!), fontSize),
+    )
+    const sorted = mergeSplitWordAlternateFontTspans(pruned, segmentStyle, basePresentationKey, fontSize)
     let prevKey = ''
     for (const tspan of sorted) {
       const gap = text.length > 0 ? inlineChunkJoinGap(text, tspan.text) : ''
       if (gap) text += gap
       const start = text.length
       text += tspan.text
-      const style = segmentStyle(tspan)
+      const style = normalizeSegmentFontSize(segmentStyle(tspan), fontSize)
       const key = segmentPresentationKey(style)
       if (!(style.fontFamily || style.fontWeight || style.fontStyle || style.fill || style.fontSize)) continue
       if (key === prevKey && textStyles.length > 0) {
@@ -873,7 +992,9 @@ function pickAnchorMmX(items: SvgText[], anchor: SvgText['textAnchor']): number 
 }
 
 function mergeInlineTextItems(items: SvgText[]): SvgText {
-  const sorted = pruneRedundantInlineChunks(items).sort((a, b) => a.scene.x - b.scene.x)
+  const sorted = mergeSplitWordAlternateFontTextItems(
+    pruneRedundantInlineChunks(items).sort((a, b) => a.scene.x - b.scene.x),
+  )
   let text = ''
   const textStyles: SvgTextStyleSegment[] = []
   let prevStyleKey = ''

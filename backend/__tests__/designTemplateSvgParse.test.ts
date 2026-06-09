@@ -341,6 +341,28 @@ describe('parseImportedSvgLayers', () => {
     expect(text?.scene.x).toBeGreaterThan(100)
   })
 
+  it('склеивает Corel-разбитое слово: декоративная первая буква + остаток базовым шрифтом', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <style type="text/css"><![CDATA[
+    .fnt0 { font-family: 'Voguella'; font-size: 48px; }
+    .fnt1 { font-family: 'Ceremonious One'; font-size: 36px; }
+  ]]></style>
+  <text id="text_love" text-anchor="middle">
+    <tspan class="fnt0" x="300" y="120">Что я в тебе </tspan>
+    <tspan class="fnt1" x="520" y="120">л</tspan>
+    <tspan class="fnt0" x="540" y="120">юблю</tspan>
+  </text>
+</svg>`
+    const text = parseImportedSvgLayers(svg).textItems[0]
+    expect(text?.text).toBe('Что я в тебе люблю')
+    const loveStart = text!.text.indexOf('люблю')
+    const cerSeg = text?.textStyles?.find((s) => s.fontFamily === 'Ceremonious One')
+    expect(cerSeg?.start).toBe(loveStart)
+    expect(cerSeg?.end).toBe(text!.text.length)
+    expect(cerSeg?.fontSize).toBeUndefined()
+  })
+
   it('отбрасывает средний дубликат целой строки Corel (tspan в одном text)', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
