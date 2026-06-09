@@ -86,20 +86,25 @@ function toFabricRect(rect: SvgRect) {
 
 function toFabricText(item: SvgText) {
   const fontSizePx = Math.max(6, item.scene.fontSize)
+  const angle = item.angle ?? 0
   const originX = item.textAnchor === 'middle' ? 'center' : item.textAnchor === 'end' ? 'right' : 'left'
   const textAlign = item.textAnchor === 'end' ? 'right' : item.textAnchor === 'middle' ? 'center' : 'left'
+  const top = Math.abs(angle) > 0.5
+    ? item.scene.y
+    : item.scene.y - fontSizePx * 0.8
   const base = {
     version: '6.0.0',
     originX,
     originY: 'top' as const,
     left: item.scene.x,
-    top: item.scene.y - fontSizePx * 0.8,
+    top,
     text: item.text,
     fontSize: fontSizePx,
     fontFamily: item.fontFamily?.trim() || 'Arial',
     fill: '#111827',
     textAlign,
     id: item.name,
+    ...(Math.abs(angle) > 0.5 ? { angle } : {}),
   }
   if (item.text.includes('\n')) {
     const maxLineLen = Math.max(...item.text.split('\n').map((line) => line.length), 1)

@@ -30,6 +30,8 @@ export type SvgText = {
   fontFamily?: string
   text: string
   textAnchor: 'start' | 'middle' | 'end'
+  /** Угол поворота в градусах (Fabric, по часовой), из SVG transform. */
+  angle?: number
   svg: GeometryPoint & { fontSize: number }
   scene: GeometryPoint & { fontSize: number }
 }
@@ -118,6 +120,15 @@ function transformScale(t: SvgTransform): number {
   return Number.isFinite(scale) && scale > 0 ? scale : 1
 }
 
+/** Угол поворота матрицы → градусы Fabric (по часовой). */
+export function transformAngleDeg(t: SvgTransform): number {
+  const angle = (Math.atan2(t.b, t.a) * 180) / Math.PI
+  if (!Number.isFinite(angle)) return 0
+  const det = t.a * t.d - t.b * t.c
+  if (det < 0) return angle + 180
+  return angle
+}
+
 function parseTransformNumbers(value: string): number[] {
   return value
     .split(/[\s,]+/)
@@ -128,7 +139,7 @@ function parseTransformNumbers(value: string): number[] {
 function parseSvgTransform(value: string | undefined): SvgTransform {
   if (!value) return IDENTITY_TRANSFORM
   let current = IDENTITY_TRANSFORM
-  const re = /(matrix|translate|scale)\s*\(([^)]*)\)/gi
+  const re = /(matrix|translate|scale|rotate)\s*\(([^)]*)\)/gi
   let match: RegExpExecArray | null
   while ((match = re.exec(value))) {
     const [, kind, rawArgs] = match
@@ -140,6 +151,17 @@ function parseSvgTransform(value: string | undefined): SvgTransform {
       next = { ...IDENTITY_TRANSFORM, e: nums[0], f: nums[1] ?? 0 }
     } else if (kind.toLowerCase() === 'scale' && nums.length >= 1) {
       next = { ...IDENTITY_TRANSFORM, a: nums[0], d: nums[1] ?? nums[0] }
+    } else if (kind.toLowerCase() === 'rotate' && nums.length >= 1) {
+      const deg = nums[0]
+      const cx = nums[1] ?? 0
+      const cy = nums[2] ?? 0
+      const rad = (deg * Math.PI) / 180
+      const cos = Math.cos(rad)
+      const sin = Math.sin(rad)
+      const rot: SvgTransform = { a: cos, b: sin, c: -sin, d: cos, e: 0, f: 0 }
+      const toOrigin: SvgTransform = { a: 1, b: 0, c: 0, d: 1, e: -cx, f: -cy }
+      const fromOrigin: SvgTransform = { a: 1, b: 0, c: 0, d: 1, e: cx, f: cy }
+      next = multiplyTransform(fromOrigin, multiplyTransform(rot, toOrigin))
     }
     current = multiplyTransform(current, next)
   }
@@ -352,8 +374,24 @@ function pickAttr(
 }
 
 function normalizeTextAnchor(value: string | undefined): SvgText['textAnchor'] {
-  if (value === 'middle' || value === 'center') return 'middle'
-  if (value === 'end' || value === 'right') return 'end'
+  const v = value?.trim().toLowerCase()
+  if (v === 'middle' || v === 'center') return 'middle'
+  if (v === 'end' || v === 'right') return 'end'
+  return 'start'
+}
+
+/** SVG text-anchor + CSS text-align (Corel часто пишет text-align в style). */
+function resolveTextAnchor(...sources: Array<Record<string, string> | undefined>): SvgText['textAnchor'] {
+  for (const source of sources) {
+    if (!source) continue
+    const anchor = source['text-anchor']?.trim()
+    if (anchor) return normalizeTextAnchor(anchor)
+  }
+  for (const source of sources) {
+    if (!source) continue
+    const align = source['text-align']?.trim()
+    if (align) return normalizeTextAnchor(align)
+  }
   return 'start'
 }
 
@@ -616,6 +654,7 @@ export function parseImportedSvgLayers(
     if (attrs['font-family']?.trim()) self['font-family'] = attrs['font-family'].trim()
     if (attrs['font-size']?.trim()) self['font-size'] = attrs['font-size'].trim()
     if (attrs['text-anchor']?.trim()) self['text-anchor'] = attrs['text-anchor'].trim()
+    if (attrs['text-align']?.trim()) self['text-align'] = attrs['text-align'].trim()
     return { ...parent, ...self }
   }
 
@@ -793,12 +832,7 @@ export function parseImportedSvgLayers(
           parseNumber(attrs['font-size']) ??
           parseFontSizeFromStyle(textStyle) ??
           18
-        const textAnchor = normalizeTextAnchor(
-          tspanAttrs['text-anchor'] ??
-          tspanStyle['text-anchor'] ??
-          attrs['text-anchor'] ??
-          textStyle['text-anchor'],
-        )
+        const textAnchor = resolveTextAnchor(tspanAttrs, tspanStyle, attrs, textStyle)
         const textTransform = multiplyTransform(
           multiplyTransform(inheritedTransform, parseSvgTransform(attrs.transform)),
           parseSvgTransform(tspanAttrs.transform),
@@ -816,6 +850,7 @@ export function parseImportedSvgLayers(
         const textContent = tspans.length > 1
           ? tspans.sort((a, b) => a.order - b.order).map((t) => t.text).join('\n')
           : primaryTspan?.text || decodeXmlText(innerStr) || ef.replace(/^text_/, '')
+        const angle = transformAngleDeg(textTransform)
         const textEntry: SvgText = {
           name: ef,
           x: mmPoint.x,
@@ -824,6 +859,7 @@ export function parseImportedSvgLayers(
           fontFamily,
           text: textContent,
           textAnchor,
+          angle: Math.abs(angle) > 0.01 ? angle : undefined,
           svg: { ...point, fontSize: transformedFontSize },
           scene: { ...scenePoint, fontSize: geometry.mmToPx(fontSizeMm) },
         }

@@ -2,6 +2,7 @@ import {
   decodeCorelUnicodeEscapes,
   decodeXmlText,
   parseImportedSvgLayers,
+  transformAngleDeg,
 } from '../src/services/designTemplateSvgParse'
 
 describe('parseImportedSvgLayers', () => {
@@ -178,6 +179,42 @@ describe('parseImportedSvgLayers', () => {
     const r = parseImportedSvgLayers(svg)
     expect(r.textItems).toHaveLength(1)
     expect(r.textItems[0].text).toBe('Строка первая\nСтрока вторая\nСтрока третья')
+  })
+
+  it('читает выравнивание по центру из text-anchor и text-align', () => {
+    const svgAnchor = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <text id="text_title" x="450" y="100" text-anchor="middle" font-size="24">ISABELLA</text>
+</svg>`
+    expect(parseImportedSvgLayers(svgAnchor).textItems[0]?.textAnchor).toBe('middle')
+
+    const svgAlign = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <g id="text_title" style="text-align:center">
+    <text x="450" y="100" font-size="24"><tspan>ISABELLA</tspan></text>
+  </g>
+</svg>`
+    expect(parseImportedSvgLayers(svgAlign).textItems[0]?.textAnchor).toBe('middle')
+  })
+
+  it('сохраняет угол поворота вертикального текста (rotate / matrix)', () => {
+    const svgRotate = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <g id="text_date" transform="rotate(-90 450 250)">
+    <text x="450" y="250" font-size="18">10.02.2004</text>
+  </g>
+</svg>`
+    const r1 = parseImportedSvgLayers(svgRotate)
+    expect(r1.textItems[0]?.text).toBe('10.02.2004')
+    expect(r1.textItems[0]?.angle).toBeCloseTo(-90, 0)
+
+    const svgMatrix = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <text id="text_date" transform="matrix(0 -1 1 0 450 250)" x="0" y="0" font-size="18">10.02.2004</text>
+</svg>`
+    const r2 = parseImportedSvgLayers(svgMatrix)
+    expect(r2.textItems[0]?.angle).toBeCloseTo(-90, 0)
+    expect(transformAngleDeg({ a: 0, b: -1, c: 1, d: 0, e: 0, f: 0 })).toBeCloseTo(-90, 0)
   })
 
   it('объединяет несколько <text> в группе text_* в один блок', () => {
