@@ -1,4 +1,5 @@
 import { Point, type Canvas, type FabricObject, type Group } from 'fabric';
+import { getPhotoFieldFrameSceneBounds } from './photoFieldGeometry';
 
 function ax(o: FabricObject): Record<string, unknown> {
   return o as unknown as Record<string, unknown>;
@@ -6,6 +7,17 @@ function ax(o: FabricObject): Record<string, unknown> {
 
 /** Попадание в объект в координатах сцены. */
 export function ptInFieldScene(o: FabricObject, sceneX: number, sceneY: number): boolean {
+  if (ax(o).isPhotoField) {
+    const frame = getPhotoFieldFrameSceneBounds(o);
+    if (frame) {
+      return (
+        sceneX >= frame.left
+        && sceneX <= frame.left + frame.width
+        && sceneY >= frame.top
+        && sceneY <= frame.top + frame.height
+      );
+    }
+  }
   const point = new Point(sceneX, sceneY);
   try {
     if (typeof o.containsPoint === 'function' && o.containsPoint(point)) return true;

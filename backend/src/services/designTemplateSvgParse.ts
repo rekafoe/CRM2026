@@ -22,6 +22,15 @@ export type SvgRect = {
   scene: GeometryRect
 }
 
+export type SvgTextStyleSegment = {
+  start: number
+  end: number
+  fontFamily?: string
+  fontWeight?: string
+  fontStyle?: string
+  fill?: string
+}
+
 export type SvgText = {
   name: string
   x: number
@@ -32,6 +41,8 @@ export type SvgText = {
   fontStyle?: string
   text: string
   textAnchor: 'start' | 'middle' | 'end'
+  /** Диапазоны символов с отличным шрифтом/цветом (одна строка или весь блок). */
+  textStyles?: SvgTextStyleSegment[]
   /** Ширина блочного textbox в px сцены (для text-align ≠ left). */
   frameWidthScene?: number
   /** Цвет заливки текста (SVG fill / CSS color). */
@@ -439,14 +450,19 @@ function inferAlignedTextAnchor(
   if (metrics.length < 2) return undefined
   const rights = metrics.map((m) => m.right)
   const lefts = metrics.map((m) => m.left)
+  const centers = metrics.map((m) => (m.left + m.right) / 2)
   const rightSpread = Math.max(...rights) - Math.min(...rights)
   const leftSpread = Math.max(...lefts) - Math.min(...lefts)
+  const centerSpread = Math.max(...centers) - Math.min(...centers)
   const tol = fontSizeSvg * 0.35
+  if (centerSpread <= tol && (leftSpread > tol || rightSpread > tol)) {
+    return { anchor: 'middle', anchorX: centers[0]!, anchorY: metrics[0]!.y }
+  }
   if (rightSpread <= tol && leftSpread > tol) {
-    return { anchor: 'end', anchorX: Math.max(...rights), anchorY: metrics[0].y }
+    return { anchor: 'end', anchorX: Math.max(...rights), anchorY: metrics[0]!.y }
   }
   if (leftSpread <= tol && rightSpread > tol) {
-    return { anchor: 'start', anchorX: Math.min(...lefts), anchorY: metrics[0].y }
+    return { anchor: 'start', anchorX: Math.min(...lefts), anchorY: metrics[0]!.y }
   }
   return undefined
 }
@@ -457,15 +473,15 @@ function computeTextFrameWidthScene(
   fontSizeScene: number,
   textAnchor: SvgText['textAnchor'],
 ): number | undefined {
-  if (lines.length <= 1 && metrics.length <= 1) return undefined
   const widths = lines.map((line) => estimateLineWidthSvg(line, fontSizeScene))
-  const maxW = Math.max(...widths)
+  const maxW = Math.max(...widths, 1)
   const span = metrics.length > 1
     ? Math.max(...metrics.map((m) => m.right)) - Math.min(...metrics.map((m) => m.left))
     : 0
   if (textAnchor === 'end' || textAnchor === 'middle') {
     return Math.max(maxW, span + maxW * 0.08, 120)
   }
+  if (lines.length <= 1 && metrics.length <= 1) return undefined
   return Math.max(maxW, span + maxW * 0.05, 120)
 }
 
@@ -623,8 +639,8 @@ export function decodeCorelUnicodeEscapes(value: string): string {
   ))
 }
 
-export function decodeXmlText(value: string): string {
-  return decodeCorelUnicodeEscapes(
+function decodeXmlTextRaw(value: string, trim = true): string {
+  const decoded = decodeCorelUnicodeEscapes(
     value
       .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
@@ -632,7 +648,12 @@ export function decodeXmlText(value: string): string {
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"'),
-  ).trim()
+  )
+  return trim ? decoded.trim() : decoded
+}
+
+export function decodeXmlText(value: string): string {
+  return decodeXmlTextRaw(value, true)
 }
 
 type ParsedTspan = { attrs: Record<string, string>; text: string; y: number; order: number }
@@ -644,7 +665,7 @@ function collectTspans(innerSvg: string): ParsedTspan[] {
   let order = 0
   while ((match = re.exec(innerSvg)) !== null) {
     const attrs = parseAttributes(match[1] ?? '')
-    const text = decodeXmlText(match[2] ?? '')
+    const text = decodeXmlTextRaw(match[2] ?? '', false)
     if (!text) continue
     results.push({
       attrs,
@@ -654,6 +675,190 @@ function collectTspans(innerSvg: string): ParsedTspan[] {
     })
   }
   return results
+}
+
+function parseTspanDyOffset(dy: string | undefined, fontSize: number): number {
+  if (!dy?.trim()) return 0
+  const trimmed = dy.trim()
+  if (trimmed.endsWith('em')) return (parseNumber(trimmed) ?? 0) * fontSize
+  return parseNumber(trimmed) ?? 0
+}
+
+function resolveTspanEffectiveY(
+  tspans: ParsedTspan[],
+  baseY: number,
+  fontSize: number,
+): ParsedTspan[] {
+  let currentY = baseY
+  return tspans.map((tspan) => {
+    const explicitY = parseNumber(tspan.attrs.y)
+    if (explicitY != null) currentY = explicitY
+    else currentY += parseTspanDyOffset(tspan.attrs.dy, fontSize)
+    return { ...tspan, y: currentY }
+  })
+}
+
+function groupTspansByLine(tspans: ParsedTspan[], fontSize: number): ParsedTspan[][] {
+  const sorted = [...tspans].sort((a, b) => a.order - b.order)
+  const withY = resolveTspanEffectiveY(sorted, sorted[0]?.y ?? 0, fontSize)
+  const lines: ParsedTspan[][] = []
+  const tol = fontSize * 0.35
+  for (const tspan of withY) {
+    const last = lines[lines.length - 1]
+    if (last && Math.abs(tspan.y - last[0]!.y) <= tol) last.push(tspan)
+    else lines.push([tspan])
+  }
+  return lines
+}
+
+type TspanSegmentPresentation = {
+  fontFamily?: string
+  fontWeight?: string
+  fontStyle?: string
+  fill?: string
+}
+
+function composeTextFromTspans(
+  tspans: ParsedTspan[],
+  baseY: number,
+  fontSize: number,
+  segmentStyle: (tspan: ParsedTspan) => TspanSegmentPresentation,
+): { text: string; textStyles: SvgTextStyleSegment[] } {
+  const lines = groupTspansByLine(tspans, fontSize)
+  let text = ''
+  const textStyles: SvgTextStyleSegment[] = []
+  for (const line of lines) {
+    if (text.length > 0) text += '\n'
+    const sorted = [...line].sort(
+      (a, b) => (parseNumber(a.attrs.x) ?? 0) - (parseNumber(b.attrs.x) ?? 0) || a.order - b.order,
+    )
+    for (const tspan of sorted) {
+      const start = text.length
+      text += tspan.text
+      const style = segmentStyle(tspan)
+      if (
+        style.fontFamily
+        || style.fontWeight
+        || style.fontStyle
+        || style.fill
+      ) {
+        textStyles.push({ start, end: text.length, ...style })
+      }
+    }
+  }
+  return { text, textStyles }
+}
+
+function pickStrongestTextAnchor(items: SvgText[]): SvgText['textAnchor'] {
+  const rank: Record<SvgText['textAnchor'], number> = { middle: 3, end: 2, start: 1 }
+  return items.reduce(
+    (best, item) => (rank[item.textAnchor] > rank[best] ? item.textAnchor : best),
+    'start' as SvgText['textAnchor'],
+  )
+}
+
+function pickAnchorSceneX(items: SvgText[], anchor: SvgText['textAnchor']): number {
+  const xs = items.map((item) => item.scene.x)
+  const tol = items[0]!.scene.fontSize * 0.35
+  const spread = Math.max(...xs) - Math.min(...xs)
+  if (anchor === 'middle') {
+    if (spread <= tol) return xs[0]!
+    return xs.reduce((sum, x) => sum + x, 0) / xs.length
+  }
+  if (anchor === 'end') return Math.max(...xs)
+  return Math.min(...xs)
+}
+
+function pickAnchorMmX(items: SvgText[], anchor: SvgText['textAnchor']): number {
+  const xs = items.map((item) => item.x)
+  const tol = items[0]!.fontSize * 0.35
+  const spread = Math.max(...xs) - Math.min(...xs)
+  if (anchor === 'middle') {
+    if (spread <= tol) return xs[0]!
+    return xs.reduce((sum, x) => sum + x, 0) / xs.length
+  }
+  if (anchor === 'end') return Math.max(...xs)
+  return Math.min(...xs)
+}
+
+function mergeInlineTextItems(items: SvgText[]): SvgText {
+  const sorted = [...items].sort((a, b) => a.x - b.x)
+  let text = ''
+  const textStyles: SvgTextStyleSegment[] = []
+  for (const item of sorted) {
+    const start = text.length
+    const chunk = item.text
+    if (!chunk) continue
+    text += chunk
+    if (item.fontFamily || item.fontWeight || item.fontStyle || item.fill) {
+      textStyles.push({
+        start,
+        end: text.length,
+        fontFamily: item.fontFamily,
+        fontWeight: item.fontWeight,
+        fontStyle: item.fontStyle,
+        fill: item.fill,
+      })
+    } else if (item.textStyles?.length) {
+      for (const seg of item.textStyles) {
+        textStyles.push({
+          ...seg,
+          start: start + seg.start,
+          end: start + seg.end,
+        })
+      }
+    }
+  }
+  const textAnchor = pickStrongestTextAnchor(sorted)
+  const base = sorted[0]!
+  const sceneX = pickAnchorSceneX(sorted, textAnchor)
+  const mmX = pickAnchorMmX(sorted, textAnchor)
+  const fontSizeScene = base.scene.fontSize
+  const lines = text.split('\n')
+  const metrics = lines.map((line, index) => {
+    const y = base.scene.y + index * fontSizeScene * 1.2
+    const w = estimateLineWidthSvg(line, fontSizeScene)
+    const left = textAnchor === 'middle' ? sceneX - w / 2 : textAnchor === 'end' ? sceneX - w : sceneX
+    return { left, right: left + w, y }
+  })
+  return {
+    ...base,
+    x: mmX,
+    y: base.y,
+    text,
+    textAnchor,
+    textStyles: textStyles.length > 0 ? textStyles : undefined,
+    frameWidthScene: computeTextFrameWidthScene(lines, metrics, fontSizeScene, textAnchor),
+    scene: { ...base.scene, x: sceneX },
+    svg: { ...base.svg, x: sceneX },
+  }
+}
+
+function mergeStackedTextItems(items: SvgText[]): SvgText {
+  const sorted = [...items].sort((a, b) => a.y - b.y || a.x - b.x)
+  const text = sorted.map((item) => item.text).join('\n')
+  const textAnchor = pickStrongestTextAnchor(sorted)
+  const base = sorted[0]!
+  const sceneX = pickAnchorSceneX(sorted, textAnchor)
+  const mmX = pickAnchorMmX(sorted, textAnchor)
+  const fontSizeScene = base.scene.fontSize
+  const lines = text.split('\n')
+  const metrics = sorted.map((item, index) => {
+    const line = lines[index] ?? item.text
+    const w = estimateLineWidthSvg(line, fontSizeScene)
+    const left = textAnchor === 'middle' ? item.scene.x - w / 2 : textAnchor === 'end' ? item.scene.x - w : item.scene.x
+    return { left, right: left + w, y: item.scene.y }
+  })
+  return {
+    ...base,
+    x: mmX,
+    y: base.y,
+    text,
+    textAnchor,
+    frameWidthScene: computeTextFrameWidthScene(lines, metrics, fontSizeScene, textAnchor),
+    scene: { ...base.scene, x: sceneX },
+    svg: { ...base.svg, x: sceneX },
+  }
 }
 
 function mergeTextItemsByName(items: SvgText[]): SvgText[] {
@@ -667,12 +872,19 @@ function mergeTextItemsByName(items: SvgText[]): SvgText[] {
   }
   return order.map((name) => {
     const group = groups.get(name)!
-    if (group.length === 1) return group[0]
+    if (group.length === 1) return group[0]!
     const sorted = [...group].sort((a, b) => a.y - b.y || a.x - b.x)
-    return {
-      ...sorted[0],
-      text: sorted.map((t) => t.text).join('\n'),
+    const yTol = sorted[0]!.fontSize * 0.6
+    const clusters: SvgText[][] = []
+    for (const item of sorted) {
+      const last = clusters[clusters.length - 1]
+      if (last && Math.abs(item.y - last[0]!.y) <= yTol) last.push(item)
+      else clusters.push([item])
     }
+    if (clusters.length === 1 && clusters[0]!.length > 1) {
+      return mergeInlineTextItems(clusters[0]!)
+    }
+    return mergeStackedTextItems(sorted)
   })
 }
 
@@ -1017,10 +1229,45 @@ export function parseImportedSvgLayers(
         const transformedFontSize = fontSize * transformScale(textTransform)
         const fontSizeMm = geometry.svgFontSizeToMm(transformedFontSize)
         const fontSizeScene = geometry.mmToPx(fontSizeMm)
-        const textContent = tspans.length > 1
-          ? tspans.sort((a, b) => a.order - b.order).map((t) => t.text).join('\n')
-          : primaryTspan?.text || decodeXmlText(innerStr) || ef.replace(/^text_/, '')
-        const lineMetrics = resolveTspanLineMetrics(tspans, attrs, transformedFontSize, textTransform)
+        const parseTspanPresentation = (tspan: ParsedTspan): TspanSegmentPresentation => {
+          const style = {
+            ...textStyle,
+            ...styleFromClassNames(tspan.attrs.class, cssClassStyles),
+            ...parseStyle(tspan.attrs.style),
+          }
+          if (tspan.attrs['font-family']?.trim()) style['font-family'] = tspan.attrs['font-family'].trim()
+          return {
+            fontFamily:
+              parseFontFamilyFromStyle(style)
+              ?? parseFontFamilyFromStyle(textStyle)
+              ?? (tspan.attrs['font-family'] ? normalizeFontFamilyToken(tspan.attrs['font-family']) : undefined),
+            fontWeight:
+              parseFontWeightFromStyle(style)
+              ?? parseFontWeightFromStyle(textStyle)
+              ?? parseFontWeightFromStyle(inheritedGroupStyle),
+            fontStyle:
+              parseFontStyleFromStyle(style)
+              ?? parseFontStyleFromStyle(textStyle)
+              ?? parseFontStyleFromStyle(inheritedGroupStyle),
+            fill: resolveTextFill(tspan.attrs, style, attrs, textStyle, inheritedGroupStyle),
+          }
+        }
+        const composed = tspans.length > 0
+          ? composeTextFromTspans(tspans, yv, transformedFontSize, parseTspanPresentation)
+          : null
+        const textContent = composed?.text
+          || primaryTspan?.text
+          || decodeXmlText(innerStr)
+          || ef.replace(/^text_/, '')
+        const textStyles = composed?.textStyles.length ? composed.textStyles : undefined
+        const effectiveTspans = tspans.length > 0
+          ? resolveTspanEffectiveY(
+            [...tspans].sort((a, b) => a.order - b.order),
+            yv,
+            transformedFontSize,
+          )
+          : tspans
+        const lineMetrics = resolveTspanLineMetrics(effectiveTspans, attrs, transformedFontSize, textTransform)
         const inferred = textAnchor === 'start'
           ? inferAlignedTextAnchor(lineMetrics, transformedFontSize)
           : undefined
@@ -1060,6 +1307,7 @@ export function parseImportedSvgLayers(
           fontStyle,
           text: textContent,
           textAnchor,
+          textStyles,
           frameWidthScene,
           fill,
           angle: Math.abs(angle) > 0.01 ? angle : undefined,

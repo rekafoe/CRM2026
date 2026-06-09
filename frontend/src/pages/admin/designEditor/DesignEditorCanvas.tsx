@@ -54,7 +54,7 @@ import {
   syncFilledPhotoFieldSceneAnchor,
 } from './photoFieldGeometry';
 import { resolvePhotoFieldSizeForPage } from './photoFieldClientSizing';
-import { createEmptyPhotoField } from './photoFieldEmpty';
+import { createEmptyPhotoField, finalizeEmptyPhotoFieldPlacement } from './photoFieldEmpty';
 import { PhotoFieldCropModal } from './PhotoFieldCropModal';
 import { PhotoFieldFillOverlay } from './PhotoFieldFillOverlay';
 import { cropSpreadThumbnail } from './cropSpreadThumbnail';
@@ -378,6 +378,7 @@ function clearFilledPhotoField(canvas: Canvas, field: FabricObject): boolean {
     canvas.add(empty);
   }
 
+  finalizeEmptyPhotoFieldPlacement(empty as Group, anchor);
   canvas.setActiveObject(empty);
   empty.setCoords();
   return true;
@@ -2233,16 +2234,19 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         }
 
         const fieldId = `field-${Date.now()}`;
+        const fieldLeft = safeLeft + (safeWidth - width) / 2;
+        const fieldTop = safeTop + (safeHeight - height) / 2;
         const field = createEmptyPhotoField({
           id: fieldId,
-          left: safeLeft + (safeWidth - width) / 2,
-          top: safeTop + (safeHeight - height) / 2,
+          left: fieldLeft,
+          top: fieldTop,
           width,
           height,
           clientAdded: true,
         });
         photoFieldSkipBakeOnceRef.current = fieldId;
         canvas.add(field);
+        finalizeEmptyPhotoFieldPlacement(field as Group, { x: fieldLeft, y: fieldTop });
         canvas.setActiveObject(field);
         if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
         canvas.requestRenderAll();
@@ -2270,18 +2274,26 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
             const y = Math.max(0, Math.min(1, Number(cell.y) || 0));
             const w = Math.max(0.02, Math.min(1, Number(cell.w) || 0));
             const h = Math.max(0.02, Math.min(1, Number(cell.h) || 0));
-            return createEmptyPhotoField({
-              id: `field-${stamp}-${index}`,
-              left: safeLeft + (margin + x * scale) * safeWidth,
-              top: safeTop + (margin + y * scale) * safeHeight,
-              width: Math.max(24, w * scale * safeWidth),
-              height: Math.max(24, h * scale * safeHeight),
-            });
+            const left = safeLeft + (margin + x * scale) * safeWidth;
+            const top = safeTop + (margin + y * scale) * safeHeight;
+            return {
+              field: createEmptyPhotoField({
+                id: `field-${stamp}-${index}`,
+                left,
+                top,
+                width: Math.max(24, w * scale * safeWidth),
+                height: Math.max(24, h * scale * safeHeight),
+              }),
+              anchor: { x: left, y: top },
+            };
           });
 
-        canvas.add(...fields);
+        canvas.add(...fields.map((entry) => entry.field));
+        for (const entry of fields) {
+          finalizeEmptyPhotoFieldPlacement(entry.field as Group, entry.anchor);
+        }
         canvas.discardActiveObject();
-        canvas.setActiveObject(fields[0]);
+        canvas.setActiveObject(fields[0]!.field);
         canvas.requestRenderAll();
         saveSnapshot();
       },

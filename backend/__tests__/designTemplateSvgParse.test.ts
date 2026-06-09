@@ -284,6 +284,63 @@ describe('parseImportedSvgLayers', () => {
     expect(r.interactiveLayers.filter((l) => l.kind === 'text')).toHaveLength(1)
   })
 
+  it('объединяет tspan на одной строке с разными шрифтами в один текст', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <style type="text/css"><![CDATA[
+    .fnt0 { font-family: 'Voguella'; font-size: 48px; }
+    .fnt1 { font-family: 'Ceremonious One'; font-size: 48px; }
+  ]]></style>
+  <text id="text_love" text-anchor="middle">
+    <tspan class="fnt0" x="450" y="120">Что я в тебе </tspan>
+    <tspan class="fnt1" x="620" y="120">люблю</tspan>
+  </text>
+</svg>`
+    const text = parseImportedSvgLayers(svg).textItems[0]
+    expect(text?.text).toBe('Что я в тебе люблю')
+    expect(text?.text).not.toContain('\n')
+    expect(text?.textAnchor).toBe('middle')
+    expect(text?.textStyles?.length).toBeGreaterThanOrEqual(2)
+    expect(text?.textStyles?.[0]?.fontFamily).toBe('Voguella')
+    expect(text?.textStyles?.[1]?.fontFamily).toBe('Ceremonious One')
+  })
+
+  it('объединяет несколько <text> на одной линии в группе text_*', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <style type="text/css"><![CDATA[
+    .fnt0 { font-family: 'Voguella'; font-size: 24px; }
+    .fnt1 { font-family: 'Ceremonious One'; font-size: 24px; }
+  ]]></style>
+  <g id="text_love" style="text-align:center">
+    <text x="300" y="120" class="fnt0"><tspan>Что я в тебе </tspan></text>
+    <text x="520" y="120" class="fnt1"><tspan>люблю</tspan></text>
+  </g>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.textItems).toHaveLength(1)
+    expect(r.textItems[0]?.text).toBe('Что я в тебе люблю')
+    expect(r.textItems[0]?.textAnchor).toBe('middle')
+    expect(r.textItems[0]?.textStyles?.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('сохраняет центрирование многострочного textbox', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <g id="text_body" style="text-align:center">
+    <text font-size="24">
+      <tspan x="450" y="100">Ты умеешь быть моей опорой даже</tspan>
+      <tspan x="450" y="130">в моменты, когда я не верю в себя</tspan>
+    </text>
+  </g>
+</svg>`
+    const text = parseImportedSvgLayers(svg).textItems[0]
+    expect(text?.textAnchor).toBe('middle')
+    expect(text?.text).toContain('\n')
+    expect(text?.frameWidthScene).toBeGreaterThan(100)
+    expect(text?.scene.x).toBeGreaterThan(100)
+  })
+
   it('сохраняет z-order когда text идёт раньше photo в SVG', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">

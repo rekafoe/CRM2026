@@ -91,6 +91,37 @@ function toFabricRect(rect: SvgRect) {
   }
 }
 
+function toFabricTextStyles(
+  text: string,
+  segments: NonNullable<SvgText['textStyles']>,
+): Record<number, Record<number, Record<string, unknown>>> | undefined {
+  const lines = text.split('\n')
+  const lineStartOffsets: number[] = []
+  let offset = 0
+  for (const line of lines) {
+    lineStartOffsets.push(offset)
+    offset += line.length + 1
+  }
+  const out: Record<number, Record<number, Record<string, unknown>>> = {}
+  for (const seg of segments) {
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+      const lineStart = lineStartOffsets[lineIndex]!
+      const lineText = lines[lineIndex] ?? ''
+      const lineEnd = lineStart + lineText.length
+      if (seg.end <= lineStart || seg.start >= lineEnd) continue
+      const charIndex = Math.max(0, seg.start - lineStart)
+      const patch: Record<string, unknown> = {}
+      if (seg.fontFamily) patch.fontFamily = seg.fontFamily
+      if (seg.fontWeight) patch.fontWeight = seg.fontWeight
+      if (seg.fontStyle) patch.fontStyle = seg.fontStyle
+      if (seg.fill) patch.fill = seg.fill
+      out[lineIndex] ??= {}
+      out[lineIndex]![charIndex] = patch
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 function toFabricText(item: SvgText) {
   const fontSizePx = Math.max(6, item.scene.fontSize)
   const angle = item.angle ?? 0
@@ -101,6 +132,9 @@ function toFabricText(item: SvgText) {
     : item.scene.y - fontSizePx * 0.8
   const maxLineLen = Math.max(...item.text.split('\n').map((line) => line.length), 1)
   const defaultWidth = Math.max(120, maxLineLen * fontSizePx * 0.55)
+  const styles = item.textStyles?.length
+    ? toFabricTextStyles(item.text, item.textStyles)
+    : undefined
   const base = {
     version: '6.0.0',
     originX,
@@ -115,9 +149,12 @@ function toFabricText(item: SvgText) {
     id: item.name,
     ...(item.fontWeight ? { fontWeight: item.fontWeight } : {}),
     ...(item.fontStyle ? { fontStyle: item.fontStyle } : {}),
+    ...(styles ? { styles } : {}),
     ...(Math.abs(angle) > 0.5 ? { angle } : {}),
   }
-  if (item.text.includes('\n')) {
+  const useTextbox = item.text.includes('\n')
+    || ((item.textAnchor === 'middle' || item.textAnchor === 'end') && Boolean(item.frameWidthScene))
+  if (useTextbox) {
     return {
       ...base,
       type: 'textbox',

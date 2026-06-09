@@ -217,6 +217,36 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
   ax(group).photoFieldFh = frameH;
 }
 
+/** Границы видимой рамки photo-поля в координатах сцены (для hit-test). */
+export function getPhotoFieldFrameSceneBounds(field: FabricObject): {
+  left: number
+  top: number
+  width: number
+  height: number
+} | null {
+  const o = ax(field)
+  if (!o.isPhotoField) return null
+  const frame = pickEmptyPhotoFieldFrameRect(field) ?? field
+  frame.setCoords()
+  const coords = frame.getCoords()
+  if (coords.length >= 4) {
+    const xs = coords.map((p) => p.x)
+    const ys = coords.map((p) => p.y)
+    const left = Math.min(...xs)
+    const top = Math.min(...ys)
+    const right = Math.max(...xs)
+    const bottom = Math.max(...ys)
+    return {
+      left,
+      top,
+      width: Math.max(1, right - left),
+      height: Math.max(1, bottom - top),
+    }
+  }
+  const br = frame.getBoundingRect()
+  return { left: br.left, top: br.top, width: br.width, height: br.height }
+}
+
 /** Пустое поле: рамка в (0,0) группы — якорь по TL серого rect. */
 export function syncEmptyPhotoFieldSceneAnchor(group: Group, anchorSceneTL: Point): void {
   const frameAnchor = pickEmptyPhotoFieldFrameRect(group);
