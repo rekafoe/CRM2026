@@ -24,6 +24,28 @@ function cssFontFormat(format?: string): string {
   }
 }
 
+/** Одна запись из библиотеки CRM (design_fonts). */
+export async function loadDesignFontFromLibrary(font: {
+  family_name: string;
+  url: string;
+  format?: string;
+}): Promise<boolean> {
+  const family = font.family_name?.trim();
+  if (!family || !font.url) return false;
+  try {
+    const src = resolveFontAssetUrl(font.url);
+    const face = new FontFace(
+      family,
+      `url(${src}) format('${cssFontFormat(font.format)}')`,
+    );
+    await face.load();
+    document.fonts.add(face);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Загружает шрифты из spec.requiredFonts в document.fonts (перед отрисовкой Fabric). */
 export async function loadDesignFontsFromSpec(
   spec: Record<string, unknown> | null | undefined,
