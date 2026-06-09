@@ -66,6 +66,7 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'POST', path: /^\/api\/orders\/from-website$/ },
   { method: 'POST', path: /^\/api\/orders\/from-website\/with-files$/ },
   { method: 'POST', path: /^\/api\/orders\/from-website\/[0-9]+\/files$/ },
+  { method: 'POST', path: /^\/api\/orders\/from-website\/confirm-prepayment$/ },
   { method: 'POST', path: /^\/api\/orders\/from-website\/[0-9]+\/confirm-prepayment$/ },
   { method: 'GET', path: /^\/api\/orders\/from-website\/[0-9]+\/status$/ },
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/items$/ },

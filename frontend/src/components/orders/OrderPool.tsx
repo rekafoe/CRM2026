@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
-import { parseNumberFlexible } from '../../utils/numberInput';
+import { isPaidPrepaymentStatus, parseNumberFlexible } from '../../utils/numberInput';
 import { MoneyAmount } from '../ui';
 
 interface UnifiedOrder {
@@ -288,7 +288,7 @@ export const OrderPool: React.FC<OrderPoolProps> = ({
                       <strong>Предоплата:</strong>{' '}
                       <MoneyAmount value={normalizeAmount(searchResult.prepaymentAmount || 0, searchResult.type)} />
                       {searchResult.prepaymentStatus
-                        ? ` (${searchResult.prepaymentStatus === 'paid' ? 'оплачено' : 'ожидает'})`
+                        ? ` (${isPaidPrepaymentStatus(searchResult.prepaymentStatus) ? 'оплачено' : 'ожидает'})`
                         : ''}
                     </div>
                     <div className="text-sm text-gray-600">

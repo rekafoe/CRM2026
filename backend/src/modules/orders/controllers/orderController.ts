@@ -287,30 +287,44 @@ export class OrderController {
   }
 
   /**
+   * POST /api/orders/from-website/confirm-prepayment
    * POST /api/orders/from-website/:orderId/confirm-prepayment
    * Webhook BePaid на сайте: зафиксировать оплату только после successful.
    */
   static async confirmWebsiteOrderPrepayment(req: Request, res: Response) {
-    const orderId = Number(req.params.orderId)
-    if (!Number.isFinite(orderId) || orderId <= 0) {
-      res.status(400).json({ error: 'Некорректный ID заказа' })
-      return
+    const body = (req.body ?? {}) as {
+      amount?: unknown
+      paymentStatus?: unknown
+      paymentId?: unknown
+      orderNumber?: unknown
     }
 
-    const rawAmount = Number((req.body as { amount?: unknown })?.amount ?? 0)
-    const paymentStatus = String((req.body as { paymentStatus?: unknown })?.paymentStatus ?? '')
-      .trim()
-      .toLowerCase()
+    const rawAmount = Number(body.amount ?? 0)
+    const paymentStatus = String(body.paymentStatus ?? '').trim().toLowerCase()
     const paymentId =
-      typeof (req.body as { paymentId?: unknown })?.paymentId === 'string'
-        ? String((req.body as { paymentId: string }).paymentId).trim()
-        : null
+      typeof body.paymentId === 'string' ? String(body.paymentId).trim() : null
+    const orderNumber =
+      typeof body.orderNumber === 'string' ? String(body.orderNumber).trim() : ''
+
+    const orderIdParam = Number(req.params.orderId)
+    const orderIdFromPath =
+      Number.isFinite(orderIdParam) && orderIdParam > 0 ? Math.trunc(orderIdParam) : null
 
     const db = await getDb()
-    const row = await db.get<{ id: number; source?: string | null }>(
-      'SELECT id, source FROM orders WHERE id = ?',
-      orderId
-    )
+    let row = orderIdFromPath
+      ? await db.get<{ id: number; source?: string | null; number?: string | null }>(
+          'SELECT id, source, number FROM orders WHERE id = ?',
+          orderIdFromPath
+        )
+      : undefined
+
+    if (!row && orderNumber) {
+      row = await db.get<{ id: number; source?: string | null; number?: string | null }>(
+        'SELECT id, source, number FROM orders WHERE number = ?',
+        orderNumber
+      )
+    }
+
     if (!row) {
       res.status(404).json({ error: 'Заказ не найден' })
       return
@@ -320,6 +334,8 @@ export class OrderController {
       return
     }
 
+    const orderId = row.id
+
     let hasPrepaymentUpdatedAt = false
     try {
       hasPrepaymentUpdatedAt = await hasColumn('orders', 'prepaymentUpdatedAt')
@@ -327,17 +343,19 @@ export class OrderController {
       hasPrepaymentUpdatedAt = false
     }
 
-    if (paymentStatus === 'successful') {
+    const isSuccessful = paymentStatus === 'successful' || paymentStatus === 'paid'
+
+    if (isSuccessful) {
       const amount = rawAmount > 0 ? rawAmount : 0
       if (amount <= 0) {
         res.status(400).json({ error: 'amount обязателен при successful' })
         return
       }
       const updateSql = hasPrepaymentUpdatedAt
-        ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'successful', paymentMethod = 'online',
+        ? `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'online',
            paymentUrl = NULL, paymentId = ?, prepaymentUpdatedAt = datetime('now','localtime'), updated_at = datetime('now','localtime')
            WHERE id = ?`
-        : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'successful', paymentMethod = 'online',
+        : `UPDATE orders SET prepaymentAmount = ?, prepaymentStatus = 'paid', paymentMethod = 'online',
            paymentUrl = NULL, paymentId = ?, updated_at = datetime('now','localtime') WHERE id = ?`
       await db.run(updateSql, amount, paymentId, orderId)
       const updated = await db.get('SELECT * FROM orders WHERE id = ?', orderId)

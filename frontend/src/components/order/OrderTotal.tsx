@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppIcon } from '../ui/AppIcon';
 import { BynSymbol } from '../ui/BynSymbol';
+import { isPaidPrepaymentStatus } from '../../utils/numberInput';
 
 export interface OrderAmountsDisplayProps {
   subtotal: number;
@@ -41,7 +42,7 @@ export const OrderTotal: React.FC<OrderAmountsDisplayProps> = ({
     typeof debtFromApi === 'number' && Number.isFinite(debtFromApi)
       ? debtFromApi
       : Math.max(0, Math.round((total - prepayment) * 100) / 100);
-  const isPaid = prepaymentStatus === 'paid';
+  const isPaid = isPaidPrepaymentStatus(prepaymentStatus);
 
   return (
     <div className="order-total">

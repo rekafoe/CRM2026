@@ -13,7 +13,7 @@ function getEffectiveResponsibleUserId(order: Order): number | null {
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
 }
-import { parseNumberFlexible } from '../utils/numberInput';
+import { isPaidPrepaymentStatus, parseNumberFlexible } from '../utils/numberInput';
 import { getOrderAmounts } from '../utils/orderTotal';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { OrderHeader } from '../components/optimized/OrderHeader';
@@ -194,11 +194,11 @@ const OrderRow = React.memo<{
       <td className="numeric">
         <div className="order-prepayment">
           {getOrderPrepayment(order) > 0 ? (
-            <span className={`prepayment-amount ${order.prepaymentStatus === 'paid' ? 'paid' : 'pending'}`}>
+            <span className={`prepayment-amount ${isPaidPrepaymentStatus(order.prepaymentStatus) ? 'paid' : 'pending'}`}>
               <MoneyAmount value={getOrderPrepayment(order)} />
               <br />
-              <small className={`prepayment-status ${order.prepaymentStatus === 'paid' ? 'paid' : 'pending'}`}>
-                {order.prepaymentStatus === 'paid' ? 'Оплачено' : 'Ожидает'}
+              <small className={`prepayment-status ${isPaidPrepaymentStatus(order.prepaymentStatus) ? 'paid' : 'pending'}`}>
+                {isPaidPrepaymentStatus(order.prepaymentStatus) ? 'Оплачено' : 'Ожидает'}
               </small>
             </span>
           ) : (

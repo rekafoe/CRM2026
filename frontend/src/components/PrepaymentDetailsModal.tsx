@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { parseNumberFlexible } from '../utils/numberInput';
+import { isPaidPrepaymentStatus, parseNumberFlexible } from '../utils/numberInput';
 import { Order } from '../types';
 import { createPrepaymentLink } from '../api';
 import { MoneyAmount } from './ui';
@@ -49,7 +49,7 @@ export const PrepaymentDetailsModal: React.FC<PrepaymentDetailsModalProps> = ({
   if (!isOpen || !order) return null;
 
   const hasPrepayment = order.prepaymentAmount && order.prepaymentAmount > 0;
-  const isPaid = order.prepaymentStatus === 'paid';
+  const isPaid = isPaidPrepaymentStatus(order.prepaymentStatus);
   
   // Расчёт общей суммы заказа и долга
   const totalOrderAmount = order.items?.reduce((sum, item) => {

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isPaidPrepaymentStatus } from '../utils/numberInput';
 import { Order } from '../types';
 import { createPrepaymentLink } from '../api';
 import { MoneyAmount } from './ui';
@@ -42,7 +43,7 @@ export const CompactPrepaymentSection: React.FC<CompactPrepaymentSectionProps> =
   };
 
   const hasPrepayment = order.prepaymentAmount && order.prepaymentAmount > 0;
-  const isPaid = order.prepaymentStatus === 'paid';
+  const isPaid = isPaidPrepaymentStatus(order.prepaymentStatus);
 
   return (
     <div className="compact-prepayment-section">

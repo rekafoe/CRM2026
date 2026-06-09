@@ -60,6 +60,12 @@ export function isOrderExcludedFromCashCounter(order: { status?: number | string
   return Number(order.status) === 0;
 }
 
+/** Онлайн-предоплата с сайта: confirm-prepayment пишет `successful`, офлайн — `paid`. */
+export function isPaidPrepaymentStatus(status: string | null | undefined): boolean {
+  const s = String(status ?? '').toLowerCase();
+  return s === 'paid' || s === 'successful';
+}
+
 function countsAsPaidForCashCounter(
   order: {
     prepaymentStatus?: string | null;
@@ -70,8 +76,7 @@ function countsAsPaidForCashCounter(
   },
   reportDate: string,
 ): boolean {
-  const status = String(order.prepaymentStatus ?? '').toLowerCase();
-  if (status === 'paid' || status === 'successful') return true;
+  if (isPaidPrepaymentStatus(order.prepaymentStatus)) return true;
   const prepayment = parseNumberFlexible(order.prepaymentAmount ?? order.prepayment_amount ?? 0);
   if (prepayment <= 0) return false;
   const method = String(order.paymentMethod ?? '').toLowerCase();
