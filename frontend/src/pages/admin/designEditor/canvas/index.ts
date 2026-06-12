@@ -47,6 +47,22 @@ export {
   resolvePhotoFieldTarget,
 } from './canvasSelection';
 export { canvasToJSON, parsePageLoadKey } from './canvasSerialization';
+export { createDesignEditorCanvasHandle } from './createDesignEditorCanvasHandle';
+export type { DesignEditorCanvasHandleDeps } from './createDesignEditorCanvasHandle';
+export { runPageLoadKeyTransition } from './canvasPageTransitions';
+export type {
+  PageLoadKeyTransitionCallbacks,
+  PageLoadKeyTransitionParams,
+  PageLoadKeyTransitionRefs,
+} from './canvasPageTransitions';
+export { usePageLoadKeyEffect } from './usePageLoadKeyEffect';
+export type { UsePageLoadKeyEffectInput } from './usePageLoadKeyEffect';
+export { useDesignEditorCanvasHistory } from './useDesignEditorCanvasHistory';
+export { useDesignEditorInAppFieldHandlers } from './useDesignEditorInAppFieldHandlers';
+export { useDesignEditorTextSheets } from './useDesignEditorTextSheets';
+export { useDesignEditorCanvasSetup } from './useDesignEditorCanvasSetup';
+export { useDesignEditorRuntimeEffects } from './useDesignEditorRuntimeEffects';
+export { useDesignEditorPhotoFileInput } from './useDesignEditorPhotoFileInput';
 export {
   beginTextEditingOnCanvas,
   normalizeTextForDisplay,

@@ -2,6 +2,7 @@ import type { DesignTemplate } from '../../../api';
 import type { DesignPage, DesignPrepressConfig, DesignState } from './types';
 import type { PageSaveSnapshot } from './mergePagesSnapshot';
 import { mergePagesWithSavedSnapshot } from './mergePagesSnapshot';
+import { inferSceneScaleFromPageExtents } from './designFields/sceneScale';
 
 export type DesignTemplateSpec = {
   width_mm?: number;
@@ -38,6 +39,27 @@ export function mergeSavedEditorPages(
     leftPageIdx,
     rightPageIdx,
   });
+}
+
+/** sceneScale: явное значение из designState, иначе вывод по JSON / backgroundSceneScale. */
+export function resolveDesignSceneScale(
+  designState: Pick<DesignState, 'sceneScale' | 'pages' | 'pageWidth' | 'pageHeight'> | null | undefined,
+): number {
+  const explicit = Number(designState?.sceneScale);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const inferred = inferSceneScaleFromPageExtents(designState);
+  if (inferred != null) return inferred;
+  for (const page of designState?.pages ?? []) {
+    const objects = page.fabricJSON?.objects;
+    if (!Array.isArray(objects)) continue;
+    for (const raw of objects) {
+      const obj = raw as Record<string, unknown>;
+      if (!obj.isBackground) continue;
+      const fromBg = Number(obj.backgroundSceneScale);
+      if (Number.isFinite(fromBg) && fromBg > 0) return fromBg;
+    }
+  }
+  return 1;
 }
 
 export function buildEmptyDesignState(input: {

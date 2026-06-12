@@ -4,6 +4,7 @@
  * фоновый файл без этих элементов и без дубля с редактором overlay.
  */
 
+import { performance } from 'perf_hooks'
 import {
   createSvgGeometry,
   PX_TO_MM,
@@ -74,6 +75,42 @@ export type PrepressFromSvgGuides = {
 
 export type RemovalRange = { start: number; end: number }
 
+export type ParserLayerStatus = 'parsed_interactive' | 'kept_as_background' | 'ignored_technical'
+export type ParserReasonCode =
+  | 'PHOTO_PARSED'
+  | 'TEXT_PARSED'
+  | 'PHOTO_NO_VALID_RECT'
+  | 'TXT_NO_VALID_NODE'
+  | 'GUIDE_IGNORED'
+  | 'TECHNICAL_IGNORED'
+  | 'LAYER_NOT_CLASSIFIED'
+
+export type ParserLayerReport = {
+  name: string
+  kindExpected: 'photo' | 'text' | 'guide' | 'technical' | 'unknown'
+  status: ParserLayerStatus
+  reasonCode: ParserReasonCode
+  bboxSvg?: GeometryRect
+  bboxScene?: GeometryRect
+}
+
+export type ParserTimings = {
+  sanitizeMs: number
+  scanMs: number
+  geometryMs: number
+  textMs: number
+  assembleMs: number
+  totalMs: number
+}
+
+export type ParserReport = {
+  layers: ParserLayerReport[]
+  countsByStatus: Record<ParserLayerStatus, number>
+  countsByReasonCode: Record<string, number>
+  unsupportedFeatures: string[]
+  timings: ParserTimings
+}
+
 export interface ImportedSvgLayers {
   widthMm: number
   heightMm: number
@@ -90,17 +127,26 @@ export interface ImportedSvgLayers {
     textFields: number
     guides: string[]
     strippedLayers: number
+    interactiveLayerCount: number
+    interactiveParsedPercent: number
+    fallbackBackgroundPercent: number
+    unsupportedFeatures: string[]
   }
   /** Интервалы вырезаемых блоков SVG (слиянные). */
   removalRanges: RemovalRange[]
   /** Тот же SVG без интерактивных/guide слоёв — для загрузки фона без дубликатов. */
   strippedSvg: string
   warnings: string[]
+  parserReport: ParserReport
+  trace?: {
+    timeline: string[]
+  }
 }
 
 const TECH_PREFIXES = ['hidden_', 'guide_']
 
 const GUIDE_NAMES = new Set(['trim', 'bleed', 'safe'])
+const MAX_SVG_GROUP_DEPTH = 128
 
 type SvgTransform = {
   a: number
@@ -112,6 +158,18 @@ type SvgTransform = {
 }
 
 const IDENTITY_TRANSFORM: SvgTransform = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
+
+function warnWithCode(warnings: string[], code: string, message: string): void {
+  warnings.push(`[${code}] ${message}`)
+}
+
+function inferKindExpected(name: string): ParserLayerReport['kindExpected'] {
+  if (name.startsWith('photo_')) return 'photo'
+  if (name.startsWith('text_')) return 'text'
+  if (GUIDE_NAMES.has(name as 'trim' | 'bleed' | 'safe')) return 'guide'
+  if (TECH_PREFIXES.some((p) => name.startsWith(p))) return 'technical'
+  return 'unknown'
+}
 
 function multiplyTransform(left: SvgTransform, right: SvgTransform): SvgTransform {
   return {
@@ -154,22 +212,26 @@ function parseTransformNumbers(value: string): number[] {
     .filter(Number.isFinite)
 }
 
-function parseSvgTransform(value: string | undefined): SvgTransform {
+function parseSvgTransform(
+  value: string | undefined,
+  unsupportedFeatures?: Set<string>,
+): SvgTransform {
   if (!value) return IDENTITY_TRANSFORM
   let current = IDENTITY_TRANSFORM
-  const re = /(matrix|translate|scale|rotate)\s*\(([^)]*)\)/gi
+  const re = /(matrix|translate|scale|rotate|skewX|skewY)\s*\(([^)]*)\)/gi
   let match: RegExpExecArray | null
   while ((match = re.exec(value))) {
     const [, kind, rawArgs] = match
     const nums = parseTransformNumbers(rawArgs)
     let next = IDENTITY_TRANSFORM
-    if (kind.toLowerCase() === 'matrix' && nums.length >= 6) {
+    const kindLower = kind.toLowerCase()
+    if (kindLower === 'matrix' && nums.length >= 6) {
       next = { a: nums[0], b: nums[1], c: nums[2], d: nums[3], e: nums[4], f: nums[5] }
-    } else if (kind.toLowerCase() === 'translate' && nums.length >= 1) {
+    } else if (kindLower === 'translate' && nums.length >= 1) {
       next = { ...IDENTITY_TRANSFORM, e: nums[0], f: nums[1] ?? 0 }
-    } else if (kind.toLowerCase() === 'scale' && nums.length >= 1) {
+    } else if (kindLower === 'scale' && nums.length >= 1) {
       next = { ...IDENTITY_TRANSFORM, a: nums[0], d: nums[1] ?? nums[0] }
-    } else if (kind.toLowerCase() === 'rotate' && nums.length >= 1) {
+    } else if (kindLower === 'rotate' && nums.length >= 1) {
       const deg = nums[0]
       const cx = nums[1] ?? 0
       const cy = nums[2] ?? 0
@@ -180,8 +242,21 @@ function parseSvgTransform(value: string | undefined): SvgTransform {
       const toOrigin: SvgTransform = { a: 1, b: 0, c: 0, d: 1, e: -cx, f: -cy }
       const fromOrigin: SvgTransform = { a: 1, b: 0, c: 0, d: 1, e: cx, f: cy }
       next = multiplyTransform(fromOrigin, multiplyTransform(rot, toOrigin))
+    } else if (kindLower === 'skewx' && nums.length >= 1) {
+      const tan = Math.tan((nums[0] * Math.PI) / 180)
+      next = { ...IDENTITY_TRANSFORM, c: tan }
+    } else if (kindLower === 'skewy' && nums.length >= 1) {
+      const tan = Math.tan((nums[0] * Math.PI) / 180)
+      next = { ...IDENTITY_TRANSFORM, b: tan }
+    } else {
+      unsupportedFeatures?.add(`transform:${kind}`)
     }
     current = multiplyTransform(current, next)
+  }
+  const knownKinds = new Set(['matrix', 'translate', 'scale', 'rotate', 'skewX', 'skewY'])
+  const allKinds = value.match(/[a-zA-Z]+\s*\(/g)?.map((v) => v.replace(/\s*\($/, '')) ?? []
+  for (const kind of allKinds) {
+    if (!knownKinds.has(kind)) unsupportedFeatures?.add(`transform:${kind}`)
   }
   return current
 }
@@ -252,10 +327,14 @@ function inferPrepressFromGuides(
     if (mm != null && mm >= 0.05 && mm < 80) {
       bleedMm = Math.round(mm * 20) / 20
     } else {
-      warnings.push('Слои bleed и trim не соотносятся как вложенные — дозаливка по умолчанию 2 мм.')
+      warnWithCode(
+        warnings,
+        'PREPRESS_BLEED_TRIM_RELATION_INVALID',
+        'Слои bleed и trim не соотносятся как вложенные — дозаливка по умолчанию 2 мм.',
+      )
     }
   } else if (B && !T) {
-    warnings.push('Слой bleed без trim — укажите trim для точной дозаливки.')
+    warnWithCode(warnings, 'PREPRESS_BLEED_WITHOUT_TRIM', 'Слой bleed без trim — укажите trim для точной дозаливки.')
   }
 
   if (T && S) {
@@ -263,17 +342,23 @@ function inferPrepressFromGuides(
     if (mm != null && mm >= 0.05 && mm < 80) {
       safeMm = Math.round(mm * 20) / 20
     } else {
-      warnings.push('Слои trim и safe не соотносятся как вложенные — безопасная зона по умолчанию 5 мм.')
+      warnWithCode(
+        warnings,
+        'PREPRESS_TRIM_SAFE_RELATION_INVALID',
+        'Слои trim и safe не соотносятся как вложенные — безопасная зона по умолчанию 5 мм.',
+      )
     }
   } else if (S && !T) {
-    warnings.push('Слой safe без trim — укажите trim для точной безопасной зоны.')
+    warnWithCode(warnings, 'PREPRESS_SAFE_WITHOUT_TRIM', 'Слой safe без trim — укажите trim для точной безопасной зоны.')
   }
 
   if (B && T && !S) {
-    warnings.push('Подсказка: добавьте rect safe внутри trim для оценки safe zone.')
+    warnWithCode(warnings, 'PREPRESS_SAFE_RECOMMENDED', 'Подсказка: добавьте rect safe внутри trim для оценки safe zone.')
   }
 
-  warnings.push(
+  warnWithCode(
+    warnings,
+    'PREPRESS_HINT',
     `Подсказка prepress по SVG: дозаливка ~${bleedMm} мм, безопасная зона ~${safeMm} мм — сверить с производством.`,
   )
 
@@ -1160,7 +1245,7 @@ function dimsFromSvgRoot(svg: string): {
     (viewBoxHeight != null ? viewBoxHeight * PX_TO_MM : 100)
 
   if (!svgAttrs.width || !svgAttrs.height) {
-    warnings.push('SVG не содержит явные width/height, размеры взяты из viewBox или fallback.')
+    warnWithCode(warnings, 'SVG_DIMENSIONS_MISSING', 'SVG не содержит явные width/height, размеры взяты из viewBox или fallback.')
   }
 
   return { widthMm, heightMm, svgAttrs, warnings }
@@ -1218,14 +1303,30 @@ function findOuterTextCloseEnd(svg: string, openingGt: number): number | null {
 function groupRemovable(layerName: string | null): boolean {
   if (!layerName || layerName === 'locked_bg') return false
   if (GUIDE_NAMES.has(layerName)) return true
-  if (layerName.startsWith('photo_') || layerName.startsWith('text_')) return true
+  // Fail-open: interactive groups stay in background unless parser extracted them.
   return TECH_PREFIXES.some((p) => layerName.startsWith(p))
 }
 
 export function parseImportedSvgLayers(
   svg: string,
-  options: { sceneScale?: number } = {},
+  options: { sceneScale?: number; trace?: boolean } = {},
 ): ImportedSvgLayers {
+  const t0 = performance.now()
+  const traceTimeline: string[] = []
+  const traceEnabled = options.trace === true
+  const pushTrace = (message: string): void => {
+    if (traceEnabled) traceTimeline.push(message)
+  }
+  const timing = {
+    sanitizeMs: 0,
+    scanMs: 0,
+    geometryMs: 0,
+    textMs: 0,
+    assembleMs: 0,
+    totalMs: 0,
+  }
+
+  const geometryStart = performance.now()
   const dims = dimsFromSvgRoot(svg)
   const vb = (dims.svgAttrs.viewBox || '').split(/\s+/).map(Number).filter(Number.isFinite)
   const viewBox = vb.length === 4
@@ -1234,11 +1335,15 @@ export function parseImportedSvgLayers(
   const widthMm = dims.widthMm
   const heightMm = dims.heightMm
   const cssClassStyles = parseCssClassStyles(svg)
+  const unsupportedFeatures = new Set<string>()
   const geometry = createSvgGeometry({
     pageMm: { width: widthMm, height: heightMm },
     viewBox,
+    preserveAspectRatio: dims.svgAttrs.preserveAspectRatio,
     sceneScale: options.sceneScale,
   })
+  timing.geometryMs = Math.round((performance.now() - geometryStart) * 1000) / 1000
+  pushTrace(`geometry-ready viewBox=${viewBox ? 'yes' : 'no'} scale=${geometry.sceneScale}`)
 
   const warnings = [...dims.warnings]
   const photoRects: SvgRect[] = []
@@ -1248,11 +1353,40 @@ export function parseImportedSvgLayers(
   let lockedBgDetected = false
   const warnedNames = new Set<string>()
   const removalRanges: RemovalRange[] = []
+  const seenPhotoLayerNames = new Set<string>()
+  const seenTextLayerNames = new Set<string>()
+  const parsedPhotoLayerNames = new Set<string>()
+  const parsedTextLayerNames = new Set<string>()
+  const namedLayerReports = new Map<string, ParserLayerReport>()
+  const seenLayerOrder: string[] = []
+
+  function markLayerReport(
+    name: string,
+    patch: Partial<ParserLayerReport> & Pick<ParserLayerReport, 'status' | 'reasonCode'>,
+  ): void {
+    const existing = namedLayerReports.get(name)
+    if (!existing) {
+      namedLayerReports.set(name, {
+        name,
+        kindExpected: inferKindExpected(name),
+        status: patch.status,
+        reasonCode: patch.reasonCode,
+        bboxSvg: patch.bboxSvg,
+        bboxScene: patch.bboxScene,
+      })
+      seenLayerOrder.push(name)
+      return
+    }
+    namedLayerReports.set(name, {
+      ...existing,
+      ...patch,
+    })
+  }
 
   const groupStack: (string | null)[] = [null]
   const transformStack: SvgTransform[] = [IDENTITY_TRANSFORM]
   const groupStyleStack: Array<Record<string, string>> = [{}]
-  const groupFrameStack: Array<{ openLt: number; removable: boolean }> = []
+  const groupFrameStack: Array<{ openLt: number; removable: boolean; layerName: string | null }> = []
 
   function mergeGroupPresentationStyle(attrs: Record<string, string>): Record<string, string> {
     const parent = groupStyleStack[groupStyleStack.length - 1] ?? {}
@@ -1269,6 +1403,7 @@ export function parseImportedSvgLayers(
     return { ...parent, ...self }
   }
 
+  const scanStart = performance.now()
   let i = 0
   while (i < svg.length) {
     const lt = svg.indexOf('<', i)
@@ -1310,7 +1445,16 @@ export function parseImportedSvgLayers(
       if (groupStack.length > 1) groupStack.pop()
       if (transformStack.length > 1) transformStack.pop()
       if (groupStyleStack.length > 1) groupStyleStack.pop()
-      if (framed?.removable) removalRanges.push({ start: framed.openLt, end: gt + 1 })
+      if (framed) {
+        const ln = framed.layerName
+        const removableInteractive = !!ln && (
+          (ln.startsWith('photo_') && parsedPhotoLayerNames.has(ln))
+          || (ln.startsWith('text_') && parsedTextLayerNames.has(ln))
+        )
+        if (framed.removable || removableInteractive) {
+          removalRanges.push({ start: framed.openLt, end: gt + 1 })
+        }
+      }
       i = gt + 1
       continue
     }
@@ -1318,12 +1462,30 @@ export function parseImportedSvgLayers(
     if (!closing && tagLc === 'g') {
       const attrs = parseAttributes(attrPart)
       const ln = getLayerName(attrs)
+      if (ln) {
+        markLayerReport(ln, {
+          status: ln.startsWith('photo_') || ln.startsWith('text_') ? 'kept_as_background' : 'ignored_technical',
+          reasonCode: ln.startsWith('photo_') || ln.startsWith('text_')
+            ? (ln.startsWith('photo_') ? 'PHOTO_NO_VALID_RECT' : 'TXT_NO_VALID_NODE')
+            : (GUIDE_NAMES.has(ln as 'trim' | 'bleed' | 'safe') ? 'GUIDE_IGNORED' : 'TECHNICAL_IGNORED'),
+        })
+      }
+      if (ln?.startsWith('photo_')) seenPhotoLayerNames.add(ln)
+      if (ln?.startsWith('text_')) seenTextLayerNames.add(ln)
       if (ln === 'locked_bg') lockedBgDetected = true
       if (ln) warnUnhandledLayerName('группа', ln, warnings, warnedNames)
       groupStack.push(ln)
-      transformStack.push(multiplyTransform(transformStack[transformStack.length - 1], parseSvgTransform(attrs.transform)))
+      if (groupStack.length > MAX_SVG_GROUP_DEPTH) {
+        throw new Error(`[SVG_GROUP_DEPTH_LIMIT_EXCEEDED] Превышена глубина групп SVG: ${groupStack.length} > ${MAX_SVG_GROUP_DEPTH}.`)
+      }
+      transformStack.push(
+        multiplyTransform(
+          transformStack[transformStack.length - 1],
+          parseSvgTransform(attrs.transform, unsupportedFeatures),
+        ),
+      )
       groupStyleStack.push(mergeGroupPresentationStyle(attrs))
-      groupFrameStack.push({ openLt: lt, removable: groupRemovable(ln) })
+      groupFrameStack.push({ openLt: lt, removable: groupRemovable(ln), layerName: ln })
       i = gt + 1
       continue
     }
@@ -1340,16 +1502,27 @@ export function parseImportedSvgLayers(
       const attrs = parseAttributes(attrPart)
       const explicit = getLayerName(attrs)
       const ef = explicit ?? inherited
+      if (ef) {
+        markLayerReport(ef, {
+          status: ef.startsWith('photo_') || ef.startsWith('text_') ? 'kept_as_background' : 'ignored_technical',
+          reasonCode: ef.startsWith('photo_') || ef.startsWith('text_')
+            ? (ef.startsWith('photo_') ? 'PHOTO_NO_VALID_RECT' : 'TXT_NO_VALID_NODE')
+            : (GUIDE_NAMES.has(ef as 'trim' | 'bleed' | 'safe') ? 'GUIDE_IGNORED' : 'TECHNICAL_IGNORED'),
+        })
+      }
+      if (ef?.startsWith('photo_')) seenPhotoLayerNames.add(ef)
+      if (ef?.startsWith('text_')) seenTextLayerNames.add(ef)
       const x = parseNumber(attrs.x) ?? 0
       const y = parseNumber(attrs.y) ?? 0
       const width = parseNumber(attrs.width)
       const height = parseNumber(attrs.height)
-      const objectTransform = multiplyTransform(inheritedTransform, parseSvgTransform(attrs.transform))
+      const objectTransform = multiplyTransform(
+        inheritedTransform,
+        parseSvgTransform(attrs.transform, unsupportedFeatures),
+      )
 
       let stripRect = false
-      if (ef?.startsWith('photo_')) stripRect = true
-      else if (ef && GUIDE_NAMES.has(ef)) stripRect = true
-      else if (ef?.startsWith('text_')) stripRect = true
+      if (ef && GUIDE_NAMES.has(ef)) stripRect = true
       else if (ef && TECH_PREFIXES.some((p) => ef.startsWith(p))) stripRect = true
 
       if (stripRect) removalRanges.push({ start: lt, end: gt + 1 })
@@ -1384,6 +1557,14 @@ export function parseImportedSvgLayers(
         }
         photoRects.push(photoEntry)
         interactiveLayers.push({ kind: 'photo', data: photoEntry })
+        parsedPhotoLayerNames.add(ef)
+        markLayerReport(ef, {
+          status: 'parsed_interactive',
+          reasonCode: 'PHOTO_PARSED',
+          bboxSvg: tr,
+          bboxScene: photoEntry.scene,
+        })
+        removalRanges.push({ start: lt, end: gt + 1 })
       }
 
       i = gt + 1
@@ -1392,26 +1573,34 @@ export function parseImportedSvgLayers(
 
     if (tagLc === 'text') {
       if (selfClosing) {
-        warnings.push('<text /> без содержимого пропускается.')
+        warnWithCode(warnings, 'TXT_EMPTY_SELF_CLOSING', '<text /> без содержимого пропускается.')
         i = gt + 1
         continue
       }
 
       const attrs = parseAttributes(attrPart)
       const ef = getLayerName(attrs) ?? inherited
+      if (ef) {
+        markLayerReport(ef, {
+          status: ef.startsWith('text_') || ef.startsWith('photo_') ? 'kept_as_background' : 'ignored_technical',
+          reasonCode: ef.startsWith('text_')
+            ? 'TXT_NO_VALID_NODE'
+            : ef.startsWith('photo_')
+              ? 'PHOTO_NO_VALID_RECT'
+              : (GUIDE_NAMES.has(ef as 'trim' | 'bleed' | 'safe') ? 'GUIDE_IGNORED' : 'TECHNICAL_IGNORED'),
+        })
+      }
+      if (ef?.startsWith('photo_')) seenPhotoLayerNames.add(ef)
+      if (ef?.startsWith('text_')) seenTextLayerNames.add(ef)
       const outerEnd = findOuterTextCloseEnd(svg, gt)
 
       if (outerEnd == null) {
-        warnings.push('Незакрытый <text>.')
+        warnWithCode(warnings, 'TXT_UNCLOSED_NODE', 'Незакрытый <text>.')
         i = gt + 1
         continue
       }
 
-      if (
-        ef?.startsWith('text_') ||
-        ef?.startsWith('photo_') ||
-        (ef ? GUIDE_NAMES.has(ef) || TECH_PREFIXES.some((p) => ef.startsWith(p)) : false)
-      )
+      if (ef ? GUIDE_NAMES.has(ef) || TECH_PREFIXES.some((p) => ef.startsWith(p)) : false)
         removalRanges.push({ start: lt, end: outerEnd })
 
       if (ef) warnUnhandledLayerName('text', ef, warnings, warnedNames)
@@ -1447,8 +1636,8 @@ export function parseImportedSvgLayers(
           18
         let textAnchor = resolveTextAnchor(tspanAttrs, tspanStyle, attrs, textStyle, inheritedGroupStyle)
         const textTransform = multiplyTransform(
-          multiplyTransform(inheritedTransform, parseSvgTransform(attrs.transform)),
-          parseSvgTransform(tspanAttrs.transform),
+          multiplyTransform(inheritedTransform, parseSvgTransform(attrs.transform, unsupportedFeatures)),
+          parseSvgTransform(tspanAttrs.transform, unsupportedFeatures),
         )
         const transformedFontSize = fontSize * transformScale(textTransform)
         const fontSizeMm = geometry.svgFontSizeToMm(transformedFontSize)
@@ -1546,6 +1735,24 @@ export function parseImportedSvgLayers(
         }
         textItems.push(textEntry)
         interactiveLayers.push({ kind: 'text', data: textEntry })
+        parsedTextLayerNames.add(ef)
+        markLayerReport(ef, {
+          status: 'parsed_interactive',
+          reasonCode: 'TEXT_PARSED',
+          bboxSvg: {
+            x: point.x,
+            y: point.y - transformedFontSize,
+            width: Math.max(1, estimateLineWidthSvg(textContent.split('\n')[0] ?? textContent, transformedFontSize)),
+            height: Math.max(transformedFontSize, transformedFontSize * textContent.split('\n').length * 1.2),
+          },
+          bboxScene: {
+            x: scenePoint.x,
+            y: scenePoint.y - fontSizeScene,
+            width: Math.max(1, frameWidthScene ?? estimateLineWidthSvg(textContent.split('\n')[0] ?? textContent, fontSizeScene)),
+            height: Math.max(fontSizeScene, fontSizeScene * textContent.split('\n').length * 1.2),
+          },
+        })
+        removalRanges.push({ start: lt, end: outerEnd })
       }
 
       i = outerEnd
@@ -1554,32 +1761,85 @@ export function parseImportedSvgLayers(
 
     i = gt + 1
   }
+  timing.scanMs = Math.round((performance.now() - scanStart) * 1000) / 1000
 
   const mergedRanges = mergeRemovalRanges(removalRanges)
   const strippedSvg = applyRemovalRanges(svg, mergedRanges)
+
+  for (const name of seenTextLayerNames) {
+    if (parsedTextLayerNames.has(name)) continue
+    warnWithCode(
+      warnings,
+      'TXT_NO_VALID_NODE',
+      `Слой ${name} оставлен в фоне: не удалось извлечь валидный интерактивный text-объект.`,
+    )
+  }
+  for (const name of seenPhotoLayerNames) {
+    if (parsedPhotoLayerNames.has(name)) continue
+    warnWithCode(
+      warnings,
+      'PHOTO_NO_VALID_RECT',
+      `Слой ${name} оставлен в фоне: не найден валидный rect для photo-поля.`,
+    )
+  }
+  if (unsupportedFeatures.size > 0) {
+    warnWithCode(
+      warnings,
+      'TRANSFORM_UNSUPPORTED',
+      `Обнаружены неподдерживаемые трансформации: ${[...unsupportedFeatures].join(', ')}`,
+    )
+  }
 
   const prepressHints =
     Object.keys(guideRectsMm).length > 0
       ? inferPrepressFromGuides(guideRectsMm, warnings)
       : null
 
+  const textStageStart = performance.now()
   const mergedTextItems = mergeTextItemsByName(textItems)
   const mergedTextByName = new Map(mergedTextItems.map((t) => [t.name, t]))
   const mergedInteractiveLayers = alignInteractiveTextLayers(interactiveLayers, mergedTextByName)
+  timing.textMs = Math.round((performance.now() - textStageStart) * 1000) / 1000
   if (mergedTextItems.length < textItems.length) {
-    warnings.push(
+    warnWithCode(
+      warnings,
+      'TXT_MERGED_MULTILINE',
       `Объединены строки в ${textItems.length - mergedTextItems.length} многострочных текстовых блоков (группа text_* / несколько <tspan>).`,
     )
   }
 
   if (photoRects.length === 0 && mergedTextItems.length === 0) {
-    warnings.push(
+    warnWithCode(
+      warnings,
+      'INTERACTIVE_FIELDS_NOT_FOUND',
       'Не найдено объектов photo_* или text_*; добавьте поля вручную или проверьте имена групп.',
     )
   }
-  warnings.push(
+  warnWithCode(
+    warnings,
+    'IMPORT_SUMMARY',
     `Импорт SVG: найдено фото-полей ${photoRects.length}, текстовых полей ${mergedTextItems.length}, направляющих ${Object.keys(guideRectsMm).length}.`,
   )
+
+  const assembleStart = performance.now()
+  const layerReports = seenLayerOrder.map((name) => namedLayerReports.get(name)!).filter(Boolean)
+  const countsByStatus: Record<ParserLayerStatus, number> = {
+    parsed_interactive: 0,
+    kept_as_background: 0,
+    ignored_technical: 0,
+  }
+  const countsByReasonCode: Record<string, number> = {}
+  for (const layer of layerReports) {
+    countsByStatus[layer.status] += 1
+    countsByReasonCode[layer.reasonCode] = (countsByReasonCode[layer.reasonCode] ?? 0) + 1
+  }
+  timing.assembleMs = Math.round((performance.now() - assembleStart) * 1000) / 1000
+  timing.totalMs = Math.round((performance.now() - t0) * 1000) / 1000
+  timing.sanitizeMs = Math.max(
+    0,
+    Math.round((timing.totalMs - timing.scanMs - timing.geometryMs - timing.textMs - timing.assembleMs) * 1000) / 1000,
+  )
+  pushTrace(`scan=${timing.scanMs}ms text=${timing.textMs}ms assemble=${timing.assembleMs}ms`)
 
   return {
     widthMm,
@@ -1596,9 +1856,36 @@ export function parseImportedSvgLayers(
       textFields: mergedTextItems.length,
       guides: Object.keys(guideRectsMm),
       strippedLayers: mergedRanges.length,
+      interactiveLayerCount: interactiveLayers.length,
+      interactiveParsedPercent: (seenPhotoLayerNames.size + seenTextLayerNames.size) > 0
+        ? Math.round(
+          ((parsedPhotoLayerNames.size + parsedTextLayerNames.size)
+            / (seenPhotoLayerNames.size + seenTextLayerNames.size)) * 1000,
+        ) / 10
+        : 100,
+      fallbackBackgroundPercent: (seenPhotoLayerNames.size + seenTextLayerNames.size) > 0
+        ? Math.round(
+          (((seenPhotoLayerNames.size + seenTextLayerNames.size)
+            - (parsedPhotoLayerNames.size + parsedTextLayerNames.size))
+            / (seenPhotoLayerNames.size + seenTextLayerNames.size)) * 1000,
+        ) / 10
+        : 0,
+      unsupportedFeatures: [...unsupportedFeatures],
     },
     removalRanges: mergedRanges,
     strippedSvg,
     warnings,
+    parserReport: {
+      layers: layerReports,
+      countsByStatus,
+      countsByReasonCode,
+      unsupportedFeatures: [...unsupportedFeatures],
+      timings: timing,
+    },
+    trace: traceEnabled
+      ? {
+        timeline: traceTimeline,
+      }
+      : undefined,
   }
 }

@@ -28,12 +28,12 @@ interface PageStripProps {
   thumbW: number;
   thumbH: number;
   spreadMode: boolean;
-  onGoTo: (pageIndex: number) => void;
-  onAddSpread: () => void;
-  onAddPage: () => void;
-  onInsertPage?: (pageIndex: number) => void;
-  onDeletePage?: (pageIndex: number) => void;
-  onDeleteLast: () => void;
+  onGoTo: (pageIndex: number) => void | Promise<void>;
+  onAddSpread: () => void | Promise<void>;
+  onAddPage: () => void | Promise<void>;
+  onInsertPage?: (pageIndex: number) => void | Promise<void>;
+  onDeletePage?: (pageIndex: number) => void | Promise<void>;
+  onDeleteLast: () => void | Promise<void>;
   canDelete: boolean;
   canAdd?: boolean;
   canAddPage?: boolean;
@@ -87,6 +87,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
   const [canScrollRight, setCanScrollRight] = useState(false);
   /** Перед какой страницей показана кнопка вставки */
   const [openInsertBefore, setOpenInsertBefore] = useState<number | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
   const activeIdx = findStripItemForPage(items, currentPage);
   const stripThumbH = compact
     ? COMPACT_STRIP_THUMB_H
@@ -141,16 +142,24 @@ export const PageStrip: React.FC<PageStripProps> = ({
   const allowAddSpread = canAddSpread ?? canAdd;
   const canAddCurrentMode = spreadMode ? allowAddSpread : allowAddPage;
   const lastInsertIndex = items.length > 0 ? Math.max(...items.flatMap((item) => item.pages)) + 1 : 0;
+  const runStripAction = useCallback((action: () => void | Promise<void>) => {
+    if (actionBusy) return;
+    setActionBusy(true);
+    void Promise.resolve(action()).finally(() => {
+      setActionBusy(false);
+    });
+  }, [actionBusy]);
+
   const handleAddAtEnd = () => {
     if (spreadMode) {
-      onAddSpread();
+      runStripAction(onAddSpread);
       return;
     }
     if (onAddPage) {
-      onAddPage();
+      runStripAction(onAddPage);
       return;
     }
-    if (onInsertPage) onInsertPage(lastInsertIndex);
+    if (onInsertPage) runStripAction(() => onInsertPage(lastInsertIndex));
   };
   const handleStripScroll = (direction: -1 | 1) => {
     const strip = stripRef.current;
@@ -159,7 +168,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
   };
 
   return (
-    <div className={`ps-root${collapsed ? ' is-collapsed' : ''}${compact ? ' ps-root--compact' : ''}${appearance === 'client' ? ' ps-root--client' : ''}`}>
+    <div className={`ps-root${collapsed ? ' is-collapsed' : ''}${compact ? ' ps-root--compact' : ''}${appearance === 'client' ? ' ps-root--client' : ''}${actionBusy ? ' is-busy' : ''}`}>
       {/* Заголовок */}
       <div className="ps-header">
         <div className="ps-header-left">
@@ -258,7 +267,8 @@ export const PageStrip: React.FC<PageStripProps> = ({
               <button
                 type="button"
                 className="psitem-delete"
-                onClick={() => onDeletePage(item.pages[0])}
+                onClick={() => runStripAction(() => onDeletePage(item.pages[0]))}
+                disabled={actionBusy}
                 title={`Удалить ${item.label}`}
                 aria-label={`Удалить ${item.label}`}
               >
@@ -273,7 +283,8 @@ export const PageStrip: React.FC<PageStripProps> = ({
                 <button
                   type="button"
                   className="psitem-main"
-                  onClick={() => onGoTo(item.goToPage)}
+                  onClick={() => runStripAction(() => onGoTo(item.goToPage))}
+                  disabled={actionBusy}
                 >
                   <div
                     className={`psitem-thumbs${isSpread ? ' psitem-thumbs--spread' : ''}`}
@@ -321,7 +332,8 @@ export const PageStrip: React.FC<PageStripProps> = ({
                   <button
                     type="button"
                     className="psitem-delete-action"
-                    onClick={() => onDeletePage(item.pages[0])}
+                    onClick={() => runStripAction(() => onDeletePage(item.pages[0]))}
+                    disabled={actionBusy}
                   >
                     Удалить
                   </button>
@@ -343,8 +355,8 @@ export const PageStrip: React.FC<PageStripProps> = ({
             const handleInsertClick = (event: React.MouseEvent<HTMLButtonElement>) => {
               event.preventDefault();
               event.stopPropagation();
-              onInsertPage?.(insertIndex);
               setOpenInsertBefore(null);
+              if (onInsertPage) runStripAction(() => onInsertPage(insertIndex));
             };
 
             return (
@@ -357,7 +369,8 @@ export const PageStrip: React.FC<PageStripProps> = ({
                   <button
                     type="button"
                     className="ps-insert-btn"
-                    onMouseDown={handleInsertClick}
+                    onClick={handleInsertClick}
+                    disabled={actionBusy}
                     title={`Вставить страницу перед ${item.label}`}
                     aria-label={`Вставить страницу перед ${item.label}`}
                   >
@@ -378,6 +391,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
               type="button"
               className="psitem psitem--add"
               onClick={handleAddAtEnd}
+              disabled={actionBusy}
               title={spreadMode ? (labels?.addSpread ?? 'Добавить разворот') : (labels?.addPage ?? 'Добавить страницу')}
             >
               <span className="psitem-main">
@@ -397,7 +411,8 @@ export const PageStrip: React.FC<PageStripProps> = ({
           <button
             type="button"
             className="ps-del-btn"
-            onClick={onDeleteLast}
+            onClick={() => runStripAction(onDeleteLast)}
+            disabled={actionBusy}
             title={spreadMode ? (labels?.deleteSpread ?? 'Удалить последний разворот') : (labels?.deletePage ?? 'Удалить последнюю страницу')}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">

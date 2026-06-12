@@ -53,22 +53,22 @@ export async function getProductTemplateConfig(productId: number): Promise<Produ
   if (cached && Array.isArray(cached) && cached.length > 0) return cached[0];
   if (cached && Array.isArray(cached) && cached.length === 0) return null;
 
-  try {
-    const response = await api.get(`/products/${productId}/config`);
-    const data = (response as any)?.data ?? response;
-    if (data && !data.error) {
-      configsCache.set(cacheKey, [data]);
-      return data;
-    }
-    configsCache.set(cacheKey, []);
-    return null;
-  } catch (err: any) {
-    if (err?.response?.status === 404) {
-      configsCache.set(cacheKey, []);
-      return null;
-    }
-    throw err;
+  // Стабильный путь без legacy /config endpoint (он может отсутствовать и шуметь 404 в консоли).
+  const activeTemplateConfigs = await getProductConfigs(productId, { template: true, active: true });
+  if (activeTemplateConfigs.length > 0) {
+    configsCache.set(cacheKey, [activeTemplateConfigs[0]]);
+    return activeTemplateConfigs[0];
   }
+
+  // Фолбэк: иногда template-конфиг есть, но не помечен как active.
+  const allTemplateConfigs = await getProductConfigs(productId, { template: true });
+  if (allTemplateConfigs.length > 0) {
+    configsCache.set(cacheKey, [allTemplateConfigs[0]]);
+    return allTemplateConfigs[0];
+  }
+
+  configsCache.set(cacheKey, []);
+  return null;
 }
 
 /**

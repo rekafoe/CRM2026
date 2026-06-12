@@ -39,6 +39,7 @@ export interface ImportDesignTemplateInput {
   authorUserId?: number
   usageFee?: number
   authorPercent?: number
+  trace?: boolean
 }
 
 export interface ImportDesignTemplateResult {
@@ -66,6 +67,7 @@ export interface ReimportDesignTemplateInput {
   templateId: number
   file?: ImportDesignTemplateInput['file']
   sourceFile?: ImportDesignTemplateInput['sourceFile']
+  trace?: boolean
 }
 
 export async function reimportDesignTemplateFromFile(
@@ -145,7 +147,9 @@ export async function reimportDesignTemplateFromFile(
     return { template, warnings, errors }
   }
 
-  const importedDocument = buildImportedSvgTemplateDocument(input.file!, existing.name, warnings)
+  const importedDocument = buildImportedSvgTemplateDocument(input.file!, existing.name, warnings, {
+    trace: input.trace === true,
+  })
   const previewUrl = importedDocument.previewUrl
   const normalizedFileUrl = importedDocument.normalizedFileUrl
   const sourceFileUrl = storedSource ? `/api/uploads/${storedSource.filename}` : normalizedFileUrl
@@ -201,9 +205,11 @@ export async function reimportDesignTemplateFromFile(
         geometry: page.parsed.geometry,
         layers: layerDebug(page.parsed),
         parserSummary: page.parsed.summary,
+        parserReport: page.parsed.parserReport,
         guideRectsMmParsed: page.parsed.guideRectsMm,
         lockedBgDetected: page.parsed.lockedBgDetected,
         strippedInteractiveLayers: page.parsed.removalRanges.length > 0,
+        ...(input.trace === true && page.parsed.trace ? { trace: page.parsed.trace } : {}),
       })),
       layerConvention:
         'id/inkscape:label: locked_bg (в фоне), photo_* rect, text_* text, группы <g>; trim/bleed/safe rect → prepress',
@@ -299,7 +305,9 @@ export async function importDesignTemplateFromFile(
     return { template: fresh ?? template, warnings, errors }
   }
 
-  const importedDocument = buildImportedSvgTemplateDocument(input.file!, input.name, warnings)
+  const importedDocument = buildImportedSvgTemplateDocument(input.file!, input.name, warnings, {
+    trace: input.trace === true,
+  })
   const previewUrl = importedDocument.previewUrl
   const normalizedFileUrl = importedDocument.normalizedFileUrl
   const sourceFileUrl = storedSource ? `/api/uploads/${storedSource.filename}` : normalizedFileUrl
@@ -354,9 +362,11 @@ export async function importDesignTemplateFromFile(
           geometry: page.parsed.geometry,
           layers: layerDebug(page.parsed),
           parserSummary: page.parsed.summary,
+          parserReport: page.parsed.parserReport,
           guideRectsMmParsed: page.parsed.guideRectsMm,
           lockedBgDetected: page.parsed.lockedBgDetected,
           strippedInteractiveLayers: page.parsed.removalRanges.length > 0,
+          ...(input.trace === true && page.parsed.trace ? { trace: page.parsed.trace } : {}),
         })),
         layerConvention:
           'id/inkscape:label: locked_bg (в фоне), photo_* rect, text_* text, группы <g>; trim/bleed/safe rect → prepress',

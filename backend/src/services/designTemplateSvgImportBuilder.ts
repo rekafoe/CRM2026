@@ -16,6 +16,15 @@ import {
 
 const IMPORTED_TEMPLATE_SCENE_SCALE = 3
 const MAX_IMPORTED_SVG_PAGES = 99
+const MAX_IMPORTED_SVG_BYTES = 8 * 1024 * 1024
+const MAX_IMPORTED_SVG_TAGS = 120000
+const MAX_IMPORTED_SVG_GROUP_DEPTH = 128
+const MAX_SVG_NODE_LIMITS: Record<'text' | 'tspan' | 'rect' | 'path', number> = {
+  text: 20000,
+  tspan: 80000,
+  rect: 80000,
+  path: 80000,
+}
 
 type ParsedSvg = ReturnType<typeof parseImportedSvgLayers>
 
@@ -23,6 +32,10 @@ type ImportFile = {
   buffer?: Buffer
   originalname?: string
   mimetype?: string
+}
+
+type BuildDocumentOptions = {
+  trace?: boolean
 }
 
 export type StoredImportedSvgPage = {
@@ -132,7 +145,13 @@ function toFabricText(item: SvgText) {
     ? item.scene.y
     : item.scene.y - fontSizePx * 0.8
   const maxLineLen = Math.max(...item.text.split('\n').map((line) => line.length), 1)
-  const defaultWidth = Math.max(120, maxLineLen * fontSizePx * 0.55)
+  /**
+   * 0.55 часто недостаточно для декоративных serif/uppercase (например "ISABELLE MATHERS"):
+   * textbox начинает переносить строку, хотя в SVG она однострочная.
+   * Делаем более безопасную базовую ширину + небольшой запас.
+   */
+  const estimatedLineWidth = maxLineLen * fontSizePx * 0.7
+  const defaultWidth = Math.max(120, estimatedLineWidth + fontSizePx * 0.9)
   const textStyleRuns = item.textStyles?.length
     ? toTextStyleRuns(item.textStyles, fontSizePx)
     : undefined
@@ -146,7 +165,7 @@ function toFabricText(item: SvgText) {
     originY: 'top' as const,
     left: item.scene.x,
     top,
-    width: item.frameWidthScene ?? defaultWidth,
+    width: Math.max(item.frameWidthScene ?? 0, defaultWidth),
     text: item.text,
     fontSize: fontSizePx,
     fontFamily: baseFontFamily,
@@ -207,9 +226,10 @@ function buildImportedPrepress(
   }
 }
 
-function importError(message: string, warnings: string[]): never {
-  throw Object.assign(new Error(message), {
-    importErrors: [message],
+function importError(message: string, warnings: string[], code = 'IMPORT_ERROR'): never {
+  const coded = `[${code}] ${message}`
+  throw Object.assign(new Error(coded), {
+    importErrors: [coded],
     importWarnings: warnings,
   })
 }
@@ -307,11 +327,16 @@ function matchBundledFontToTextLayer(
   textName: string,
   bundled: BundledTemplateFont[],
 ): BundledTemplateFont | undefined {
-  const suffixKey = fontFamilyCompactKey(textName.replace(/^text_/i, ''))
+  const rawSuffix = textName.replace(/^text_/i, '').trim()
+  const suffixKey = fontFamilyCompactKey(rawSuffix)
   if (!suffixKey) return undefined
+  const normalizedHint = rawSuffix.replace(/[_-]+/g, ' ')
+  const hasExplicitFontHint = /\b(font|fnt|family|typeface)\b/i.test(normalizedHint)
   return bundled.find((font) => {
     const familyKey = fontFamilyCompactKey(font.family)
     const fileKey = fontFamilyCompactKey(guessFontFamilyFromFilename(font.filename))
+    if (familyKey === suffixKey || fileKey === suffixKey) return true
+    if (!hasExplicitFontHint) return false
     return familyKey.includes(suffixKey) || suffixKey.includes(familyKey)
       || fileKey.includes(suffixKey) || suffixKey.includes(fileKey)
   })
@@ -363,12 +388,6 @@ function applyBundledFontFallbacks(
       text.fontFamily = matched.family
       continue
     }
-    if (bundledFonts.length === 1) {
-      text.fontFamily = bundledFonts[0].family
-      warnings.push(
-        `Страница ${pageIndex + 1}: для ${text.name} применён единственный шрифт из ZIP (${bundledFonts[0].family}).`,
-      )
-    }
   }
 
   const unresolved = parsed.textItems.filter((item) => isGenericFontFamily(item.fontFamily))
@@ -388,8 +407,62 @@ function buildPageFromSvg(input: {
   templateName: string
   warnings: string[]
   bundledFonts?: BundledTemplateFont[]
+  trace?: boolean
 }): StoredImportedSvgPage {
-  const parsed = parseImportedSvgLayers(sanitizeSvg(input.svg), { sceneScale: IMPORTED_TEMPLATE_SCENE_SCALE })
+  const svgBytes = Buffer.byteLength(input.svg, 'utf8')
+  if (svgBytes > MAX_IMPORTED_SVG_BYTES) {
+    importError(
+      `SVG страницы ${input.pageIndex + 1} слишком большой (${svgBytes} bytes), лимит ${MAX_IMPORTED_SVG_BYTES}.`,
+      input.warnings,
+      'SVG_SIZE_LIMIT_EXCEEDED',
+    )
+  }
+  const tagApprox = (input.svg.match(/</g) ?? []).length
+  if (tagApprox > MAX_IMPORTED_SVG_TAGS) {
+    importError(
+      `SVG страницы ${input.pageIndex + 1} слишком сложный (${tagApprox} тегов), лимит ${MAX_IMPORTED_SVG_TAGS}.`,
+      input.warnings,
+      'SVG_COMPLEXITY_LIMIT_EXCEEDED',
+    )
+  }
+  const groupDepthApprox = (() => {
+    const re = /<\/?g\b/gi
+    let depth = 0
+    let maxDepth = 0
+    let m: RegExpExecArray | null
+    while ((m = re.exec(input.svg)) !== null) {
+      const token = m[0]
+      if (token.startsWith('</')) depth = Math.max(0, depth - 1)
+      else {
+        depth += 1
+        if (depth > maxDepth) maxDepth = depth
+      }
+    }
+    return maxDepth
+  })()
+  if (groupDepthApprox > MAX_IMPORTED_SVG_GROUP_DEPTH) {
+    importError(
+      `SVG страницы ${input.pageIndex + 1} слишком глубоко вложен (${groupDepthApprox}), лимит ${MAX_IMPORTED_SVG_GROUP_DEPTH}.`,
+      input.warnings,
+      'SVG_GROUP_DEPTH_LIMIT_EXCEEDED',
+    )
+  }
+  for (const [tag, limit] of Object.entries(MAX_SVG_NODE_LIMITS) as Array<[keyof typeof MAX_SVG_NODE_LIMITS, number]>) {
+    const re = new RegExp(`<${tag}\\b`, 'gi')
+    const count = (input.svg.match(re) ?? []).length
+    if (count > limit) {
+      importError(
+        `SVG страницы ${input.pageIndex + 1}: узлов <${tag}> ${count}, лимит ${limit}.`,
+        input.warnings,
+        'SVG_NODE_COUNT_LIMIT_EXCEEDED',
+      )
+    }
+  }
+
+  const parsed = parseImportedSvgLayers(sanitizeSvg(input.svg), {
+    sceneScale: IMPORTED_TEMPLATE_SCENE_SCALE,
+    trace: input.trace === true,
+  })
   const bundledFonts = input.bundledFonts ?? []
   applyBundledFontFallbacks(parsed, bundledFonts, input.warnings, input.pageIndex)
   warnFontsNotInBundledZip(collectNonGenericFontFamilies(parsed), bundledFonts, input.warnings, input.pageIndex)
@@ -446,6 +519,7 @@ export function buildImportedSvgTemplateDocument(
   file: ImportFile,
   templateName: string,
   warnings: string[],
+  options: BuildDocumentOptions = {},
 ): ImportedSvgTemplateDocument {
   const ext = path.extname(file.originalname || '').toLowerCase()
   const bundledFonts = ext === '.zip'
@@ -459,6 +533,7 @@ export function buildImportedSvgTemplateDocument(
     templateName,
     warnings,
     bundledFonts,
+    trace: options.trace === true,
   }))
   const first = pages[0]
   if (!first) importError('Не удалось собрать страницы шаблона.', warnings)

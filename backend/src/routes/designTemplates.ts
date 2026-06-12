@@ -327,10 +327,12 @@ router.post('/:id/reimport', uploadOrderFilesMemory.fields([
       originalname?: string
       mimetype?: string
     }>> | undefined
+    const body = req.body as Record<string, unknown>
     const result = await reimportDesignTemplateFromFile({
       templateId: id,
       file: files?.file?.[0],
       sourceFile: files?.sourceFile?.[0],
+      trace: body.trace === true || body.trace === 'true' || body.trace === '1',
     })
     res.json(result)
   } catch (err: unknown) {
@@ -484,6 +486,7 @@ router.post('/import', uploadOrderFilesMemory.fields([
       authorUserId: royalty.author_user_id ?? authUser?.id,
       usageFee: royalty.usage_fee,
       authorPercent: royalty.author_percent,
+      trace: body.trace === true || body.trace === 'true' || body.trace === '1',
     })
     res.status(201).json(result)
   } catch (err: unknown) {

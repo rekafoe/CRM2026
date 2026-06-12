@@ -108,7 +108,15 @@ export function resolvePhotoFieldFitMode(o: AnyObj): PhotoFieldFitMode {
 }
 
 /** Натуральный размер bitmap (иначе вписывание ломается до layout Fabric). */
-export function getFabricImageIntrinsicSize(img: FabricImage): { iw: number; ih: number } {
+export function getFabricImageIntrinsicSize(
+  img: FabricImage,
+  fieldMeta?: AnyObj,
+): { iw: number; ih: number } {
+  const savedW = Number(fieldMeta?.photoFieldIntrinsicW);
+  const savedH = Number(fieldMeta?.photoFieldIntrinsicH);
+  if (Number.isFinite(savedW) && savedW > 0 && Number.isFinite(savedH) && savedH > 0) {
+    return { iw: savedW, ih: savedH };
+  }
   const oz = typeof img.getOriginalSize === 'function' ? img.getOriginalSize() : undefined;
   if (oz?.width != null && oz.width > 0 && oz.height != null && oz.height > 0) {
     return { iw: Math.max(1, oz.width), ih: Math.max(1, oz.height) };
@@ -262,7 +270,7 @@ function relayoutFilledPhotoFieldFrame(
     && fitMode === 'cover'
     && (Math.abs(oldFw - frameW) > 1 || Math.abs(oldFh - frameH) > 1)
   ) {
-    const { iw, ih } = getFabricImageIntrinsicSize(inner);
+    const { iw, ih } = getFabricImageIntrinsicSize(inner, o);
     const zoom = normalizePhotoFieldZoom(o.photoFieldZoom ?? 1);
     const baseLayout = computePhotoFieldLayout(fitMode, oldFw, oldFh, iw, ih);
     const layout = zoomPhotoFieldLayout(baseLayout, zoom);
@@ -317,7 +325,7 @@ function relayoutFilledPhotoFieldFrame(
     height: frameH,
   });
   if (preservedCrop && inner) {
-    const { iw, ih } = getFabricImageIntrinsicSize(inner);
+    const { iw, ih } = getFabricImageIntrinsicSize(inner, o);
     const next = resolvePanZoomFromPhotoFieldCropSource(
       frameW,
       frameH,
@@ -339,6 +347,26 @@ function relayoutFilledPhotoFieldFrame(
   group.setCoords();
 }
 
+function resolveFilledPhotoFieldAnchor(group: Group): Point {
+  const anchorRect = group.getObjects('rect')[0];
+  const frameCoords = anchorRect?.getCoords();
+  if (frameCoords?.[0]) {
+    return new Point(frameCoords[0].x, frameCoords[0].y);
+  }
+  return new Point(group.left ?? 0, group.top ?? 0);
+}
+
+/** Пересобрать рамку и clip из photoFieldFw/Fh (после loadFromJSON / noop-layout). */
+export function relayoutFilledPhotoFieldFromProps(group: Group): boolean {
+  const o = ax(group);
+  const pW = Math.max(32, Math.round(Number(o.photoFieldFw ?? 0)));
+  const pH = Math.max(32, Math.round(Number(o.photoFieldFh ?? 0)));
+  if (pW < 32 || pH < 32) return false;
+  ensurePhotoFieldStaticLayout(group);
+  relayoutFilledPhotoFieldFrame(group, pW, pH, resolveFilledPhotoFieldAnchor(group));
+  return true;
+}
+
 function restoreFilledPhotoFieldFromProps(group: Group): boolean {
   const o = ax(group);
   const pW = Math.max(32, Math.round(Number(o.photoFieldFw ?? 0)));
@@ -348,18 +376,12 @@ function restoreFilledPhotoFieldFromProps(group: Group): boolean {
   const sy = Math.abs(Number(group.scaleY ?? 1));
   if (sx > 1.004 || sy > 1.004) return false;
 
-  const anchorRect = group.getObjects('rect')[0];
-  const frameCoords = anchorRect?.getCoords();
-  const anchorPoint = frameCoords?.[0]
-    ? new Point(frameCoords[0].x, frameCoords[0].y)
-    : new Point(group.left ?? 0, group.top ?? 0);
-
   const measured = measureFilledPhotoFieldFrameSize(group);
   const curW = Math.max(1, Math.round(measured?.fw ?? group.getScaledWidth()));
   const curH = Math.max(1, Math.round(measured?.fh ?? group.getScaledHeight()));
   if (Math.abs(curW - pW) <= 1 && Math.abs(curH - pH) <= 1) return false;
 
-  relayoutFilledPhotoFieldFrame(group, pW, pH, anchorPoint);
+  relayoutFilledPhotoFieldFrame(group, pW, pH, resolveFilledPhotoFieldAnchor(group));
   return true;
 }
 
@@ -490,6 +512,61 @@ export function bakeFilledPhotoFieldScaleInPlace(
   return true;
 }
 
+function waitForFabricImage(inner: FabricImage): Promise<void> {
+  return new Promise((resolve) => {
+    const finish = () => resolve();
+    const el = inner.getElement?.() as HTMLImageElement | undefined;
+    if (el?.complete && (el.naturalWidth || 0) > 0) {
+      finish();
+      return;
+    }
+    el?.addEventListener('load', finish, { once: true });
+    el?.addEventListener('error', finish, { once: true });
+    window.setTimeout(finish, 8000);
+  });
+}
+
+export function refreshFilledPhotoFieldLayout(group: Group): void {
+  const o = ax(group);
+  relayoutFilledPhotoFieldFromProps(group);
+  applyPhotoFieldPanToGroup(
+    group,
+    Number(o.photoFieldPanX ?? 0),
+    Number(o.photoFieldPanY ?? 0),
+    Number(o.photoFieldZoom ?? 1),
+  );
+  group.setCoords();
+}
+
+/** После loadFromJSON: пересчитать cover/contain и рамку заполненных полей. */
+export async function normalizeFilledPhotoFieldsOnCanvas(canvas: Canvas): Promise<void> {
+  const groups: Group[] = [];
+  for (const obj of canvas.getObjects()) {
+    const o = ax(obj);
+    if (obj.type !== 'group' || o.isPhotoField !== true || o.photoFieldFilled !== true) continue;
+    groups.push(obj as Group);
+  }
+  for (const group of groups) {
+    refreshFilledPhotoFieldLayout(group);
+  }
+  await Promise.all(
+    groups.map(async (group) => {
+      const inner = group.getObjects('image')[0] as FabricImage | undefined;
+      if (!inner) return;
+      await waitForFabricImage(inner);
+      refreshFilledPhotoFieldLayout(group);
+    }),
+  );
+}
+
+export async function refreshFilledPhotoFieldLayoutWhenReady(group: Group): Promise<void> {
+  refreshFilledPhotoFieldLayout(group);
+  const inner = group.getObjects('image')[0] as FabricImage | undefined;
+  if (!inner) return;
+  await waitForFabricImage(inner);
+  refreshFilledPhotoFieldLayout(group);
+}
+
 export function applyPhotoFieldPanToGroup(group: Group, panX: number, panY: number, zoom?: number): void {
   const g = ax(group);
   if (!g.isPhotoField || !g.photoFieldFilled) return;
@@ -499,7 +576,7 @@ export function applyPhotoFieldPanToGroup(group: Group, panX: number, panY: numb
   const innerList = group.getObjects('image');
   const inner = innerList[0] as FabricImage | undefined;
   if (!inner) return;
-  const { iw, ih } = getFabricImageIntrinsicSize(inner);
+  const { iw, ih } = getFabricImageIntrinsicSize(inner, g);
   const nextZoom = normalizePhotoFieldZoom(zoom ?? g.photoFieldZoom ?? 1);
   const layout = zoomPhotoFieldLayout(computePhotoFieldLayout(fitMode, fw, fh, iw, ih), nextZoom);
   const clamped = clampPhotoFieldPan(fw, fh, layout, panX, panY, fitMode);
@@ -533,7 +610,7 @@ export function getFilledPhotoCropContext(field: FabricObject): {
       typeof el?.src === 'string' && el.src.length ? el.src : (inner.getSrc?.() ?? '');
     if (!fallback) return null;
     const previewUrl = resolvePhotoFieldModalPreviewUrl(inner, fallback);
-    const { iw, ih } = getFabricImageIntrinsicSize(inner);
+    const { iw, ih } = getFabricImageIntrinsicSize(inner, o);
     return {
       previewUrl,
       frameW: Number(o.photoFieldFw ?? grp.width ?? 1),

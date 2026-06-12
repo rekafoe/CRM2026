@@ -205,7 +205,17 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
           textAnchorRafRef.current = requestAnimationFrame(() => {
             const cb = onTextFloatingAnchorRef.current;
             if (!cb) return;
-            canvas.calcOffset();
+            const upper = canvas.upperCanvasEl;
+            if (!upper || !upper.isConnected) {
+              cb(null);
+              return;
+            }
+            try {
+              canvas.calcOffset();
+            } catch {
+              cb(null);
+              return;
+            }
             const active = canvas.getActiveObject();
             if (!active || (active.type !== 'i-text' && active.type !== 'textbox')) {
               cb(null);
@@ -603,6 +613,11 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
 
         let lastCoarseTapHandledAt = 0;
         let coarseTouchStart: { x: number; y: number } | null = null;
+        let basicTextClickLock: {
+          target: FabricObject;
+          lockMovementX: boolean | undefined;
+          lockMovementY: boolean | undefined;
+        } | null = null;
         const shouldUseCoarseTapActions = () =>
           modeRef.current === 'basic' || isCoarsePointerEnvironment() || isRestrictiveInAppBrowser();
 
@@ -625,6 +640,33 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
           }
           return handled;
         };
+
+        const restoreBasicTextClickLock = () => {
+          if (!basicTextClickLock) return;
+          const { target, lockMovementX, lockMovementY } = basicTextClickLock;
+          basicTextClickLock = null;
+          target.set({ lockMovementX, lockMovementY });
+          target.setCoords();
+        };
+
+        canvas.on('mouse:down:before', (opt) => {
+          if (modeRef.current !== 'basic') return;
+          const target = opt.target as FabricObject | undefined;
+          if (!target || !isTextLikeObject(target)) return;
+          if (canvas.getActiveObject() === target) return;
+
+          restoreBasicTextClickLock();
+          basicTextClickLock = {
+            target,
+            lockMovementX: target.lockMovementX,
+            lockMovementY: target.lockMovementY,
+          };
+          target.set({ lockMovementX: true, lockMovementY: true });
+          activateTextTarget(target, opt.e);
+          lastCoarseTapHandledAt = Date.now();
+          opt.e.preventDefault();
+          opt.e.stopPropagation();
+        });
 
         const onCanvasTouchStart = (ev: TouchEvent) => {
           if (!shouldUseCoarseTapActions()) return;
@@ -677,6 +719,7 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
         canvas.on('mouse:up', (opt) => {
           isPanning = false;
           canvas.selection = true;
+          restoreBasicTextClickLock();
           if (shouldUseCoarseTapActions() || isCoarsePointerEvent(opt.e)) {
             handleCoarseTap(opt.e, opt.target as FabricObject | undefined);
           }
@@ -934,6 +977,7 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
         window.addEventListener('paste', onPaste);
 
   return () => {
+    restoreBasicTextClickLock();
     removeCanvasDropListeners?.();
     cancelAnimationFrame(textAnchorRafRef.current);
     scheduleTextAnchorRef.current = null;

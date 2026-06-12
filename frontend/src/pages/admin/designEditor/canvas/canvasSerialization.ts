@@ -1,11 +1,30 @@
-import type { Canvas } from 'fabric';
+import type { Canvas, FabricObject } from 'fabric';
 import { FABRIC_CUSTOM_PROPS } from '../constants';
 import { dehydrateTextObjectsInFabricJSON } from '../textStyleRuns';
 
 const CUSTOM_PROPS = FABRIC_CUSTOM_PROPS;
 
+function safeSerializeObject(obj: FabricObject): Record<string, unknown> | null {
+  try {
+    return obj.toObject(CUSTOM_PROPS) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 export function canvasToJSON(canvas: Canvas): Record<string, unknown> {
-  const json = canvas.toObject(CUSTOM_PROPS) as Record<string, unknown>;
+  let json: Record<string, unknown>;
+  try {
+    json = canvas.toObject(CUSTOM_PROPS) as Record<string, unknown>;
+  } catch {
+    const objects = (canvas.getObjects() as FabricObject[])
+      .map((obj) => safeSerializeObject(obj))
+      .filter((obj): obj is Record<string, unknown> => !!obj);
+    json = {
+      objects,
+      backgroundColor: (canvas as unknown as { backgroundColor?: unknown }).backgroundColor,
+    };
+  }
   dehydrateTextObjectsInFabricJSON(json);
   return json;
 }

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="55mm" viewBox="0 0 900 550" preserveAspectRatio="xMaxYMid meet">
+  <rect id="locked_bg" x="0" y="0" width="900" height="550" fill="#d1d5db"/>
+  <g id="text_date" transform="rotate(-90 830 500)">
+    <text x="830" y="500" text-anchor="end" style="font-family:Arial;font-size:24px;fill:#ffffff">10.02.2004</text>
+  </g>
+  <g id="text_subtitle" style="text-align:right">
+    <text text-anchor="start" x="780" y="360" style="font-family:Arial;font-size:24px;fill:#ffffff">
+      <tspan x="780" y="360">Strong, bright, beautiful</tspan>
+      <tspan x="780" y="392">and remarkable</tspan>
+    </text>
+  </g>
+</svg>

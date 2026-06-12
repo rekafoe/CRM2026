@@ -45,7 +45,12 @@
 - **Выравнивание:** `text-anchor` и CSS `text-align` на `<text>`, `<tspan>` и родительской `<g>` → `originX` / `textAlign` в Fabric (`start` / `center` / `end`).
 - **Цвет текста:** SVG-атрибут `fill`, CSS `fill` / `color` (в т.ч. классы Corel `.fil0 { fill: #FFFFFF }`) → `fill` в Fabric; без цвета в SVG — тёмно-серый `#111827`.
 - **Фото-поля `photo_*`:** при открытии в редакторе пустые ячейки показывают серый фон, синюю пунктирную рамку и иконку камеры по центру (импорт из SVG даёт rect, редактор дорисовывает chrome).
+- **Диагностические коды warning-ов:** parser добавляет префиксы вида `[CODE]` (например `TXT_NO_VALID_NODE`, `PHOTO_NO_VALID_RECT`, `TRANSFORM_UNSUPPORTED`) для детерминированной диагностики проблемных слоёв.
+- **Parser report:** в `spec.import.pages[].parserReport` сохраняется структурированный отчёт по слоям (`status`, `reasonCode`, `bboxSvg`, `bboxScene`), агрегаты (`countsByStatus`, `countsByReasonCode`) и тайминги стадий (`sanitize/scan/geometry/text/assemble/total`).
+- **Trace-режим:** при `trace=true` в admin import/reimport в `spec.import.pages[].trace.timeline` сохраняется сжатый трейс решений парсера (по умолчанию trace не пишется).
 - **Импортёр v6:** из текста каждой SVG-страницы перед сохранением в uploads **вырезаются** интерактивные поля (`photo_*`, `text_*`), технические имена (`hidden_*`, `guide_*`), **`trim` / `bleed` / `safe`**, узел **`locked_bg`**, если он распознан. В результате **превью/фон** не дублирует синие области фото и линии prepress поверх них; при этом при вырезании слоёв в `warnings` добавляется поясняющее сообщение.
+- При невозможности распарсить `text_*` или `photo_*` в интерактивный объект слой остаётся в фоне (fail-open по визуалу), а в warning фиксируется причина.
+- **Hard limits:** importer останавливает сверхтяжёлые файлы с кодированными ошибками (`SVG_SIZE_LIMIT_EXCEEDED`, `SVG_COMPLEXITY_LIMIT_EXCEEDED`, `SVG_GROUP_DEPTH_LIMIT_EXCEEDED`, `SVG_NODE_COUNT_LIMIT_EXCEEDED`) вместо зависаний.
 - Прямые `rect` **`trim`** / **`bleed`** / **`safe`** служат источником **`designState.prepress`** (дозаливка и безопасная зона **оцениваются** из взаимного положения прямоугольников; значения нужно сверять с производством). Если направляющих в SVG не было — блок `prepress` не записывается.
 - Объекты с нестандартными именами → предупреждение «не используется».
 

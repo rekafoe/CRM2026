@@ -5,7 +5,8 @@ import {
   isTextLikeFabricObject,
 } from '../designEditorTextChrome';
 import { ensurePhotoFieldStaticLayout } from '../photoFieldFit';
-import { createEmptyPhotoField, finalizeEmptyPhotoFieldPlacement } from '../photoFieldEmpty';
+import { createEmptyPhotoField, isClientAddedPhotoField } from '../designFields';
+import { finalizeEmptyPhotoFieldPlacement } from '../photoFieldEmpty';
 import { detachFabricObject } from './canvasObjectDetach';
 import { resolvePhotoFieldFrameSceneTL } from './canvasPhotoFieldFrame';
 import { resolvePhotoFieldTarget } from './canvasSelection';
@@ -18,11 +19,7 @@ export function isBasicDecorShape(obj: FabricObject): boolean {
     || obj.type === 'triangle';
 }
 
-/** Поле, добавленное клиентом через «Фото/поля», а не из SVG-шаблона */
-export function isClientAddedPhotoField(o: AnyObj): boolean {
-  if (o.photoFieldClientAdded === true) return true;
-  return /^field-\d{10,}$/.test(String(o.id ?? '').trim());
-}
+export { isClientAddedPhotoField } from '../designFields';
 
 /** Применяет ограничения basic-режима к объектам холста */
 export function applyBasicModeConstraints(canvas: Canvas, displayScale = 1): void {

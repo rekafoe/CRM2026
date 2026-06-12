@@ -2,7 +2,7 @@ import { Canvas, FabricImage } from 'fabric';
 import type { DesignTemplate } from '../../../api';
 import type { DesignPage } from './types';
 import { FABRIC_CUSTOM_PROPS } from './constants';
-import { upgradeEmptyPhotoFieldsOnCanvas } from './photoFieldEmpty';
+import { normalizeDesignFieldsOnCanvas } from './designFields';
 import { prepareTextObjectsOnCanvas } from './textStyleRuns';
 
 type AnyObj = Record<string, unknown>;
@@ -20,6 +20,24 @@ export function fabricDeserializeReviver(
 
 function asAny(value: unknown): AnyObj {
   return value as AnyObj;
+}
+
+function normalizeFabricJsonRoot(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const root = { ...(value as Record<string, unknown>) };
+  if (!Array.isArray(root.objects)) root.objects = [];
+  if (root.backgroundImage != null && typeof root.backgroundImage !== 'object') {
+    root.backgroundImage = undefined;
+  }
+  return root;
+}
+
+function deepCloneFabricJson(value: Record<string, unknown>): Record<string, unknown> {
+  try {
+    return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  } catch {
+    return { ...value, objects: Array.isArray(value.objects) ? [...value.objects] : [] };
+  }
 }
 
 function resolvePreviewUrl(template: DesignTemplate | null, apiBaseUrl: string): string | null {
@@ -89,11 +107,20 @@ export async function loadDesignPageScene(input: {
 }): Promise<void> {
   const { canvas, pageData, pageIndex, template, pageW, pageH, apiBaseUrl } = input;
   const useTemplatePreviewBackground = pageIndex == null || pageIndex === 0;
-  const hasJson = pageData?.fabricJSON && Object.keys(pageData.fabricJSON).length > 0;
+  const fabricJson = normalizeFabricJsonRoot(pageData?.fabricJSON);
+  const hasJson = !!fabricJson
+    && Object.keys(fabricJson).length > 0;
   if (hasJson) {
-    await canvas.loadFromJSON(pageData!.fabricJSON, fabricDeserializeReviver);
-    prepareTextObjectsOnCanvas(canvas.getObjects());
-    upgradeEmptyPhotoFieldsOnCanvas(canvas);
+    canvas.clear();
+    (canvas as unknown as AnyObj).backgroundColor = 'white';
+    try {
+      // Не даём Fabric мутировать snapshot страницы в React state при переходах.
+      await canvas.loadFromJSON(deepCloneFabricJson(fabricJson), fabricDeserializeReviver);
+    } catch {
+      canvas.clear();
+      (canvas as unknown as AnyObj).backgroundColor = 'white';
+    }
+    await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
     normalizeBackgroundObjects(canvas, pageW, pageH);
     if (useTemplatePreviewBackground && !hasBackgroundObject(canvas)) {
       await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
@@ -137,3 +164,4 @@ export async function loadSpreadMergedScene(input: {
   temp.dispose();
   canvas.requestRenderAll();
 }
+

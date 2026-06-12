@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="55mm" viewBox="0 0 900 550" preserveAspectRatio="xMidYMid meet">
+  <rect id="locked_bg" x="0" y="0" width="900" height="550" fill="#d1d5db"/>
+  <rect id="trim" x="20" y="20" width="860" height="510" fill="none" stroke="#ef4444" stroke-width="1"/>
+  <rect id="photo_cover" x="70" y="70" width="760" height="410" fill="#d1d5db"/>
+  <text id="text_title" x="450" y="140" text-anchor="middle" style="font-family:Arial;font-size:56px;fill:#ffffff">VOGUE</text>
+  <text id="text_name" x="450" y="455" text-anchor="middle" style="font-family:Arial;font-size:46px;fill:#ffffff">ISABELLE MATHERS</text>
+</svg>

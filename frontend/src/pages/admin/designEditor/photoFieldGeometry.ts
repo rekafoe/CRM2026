@@ -1,6 +1,6 @@
 import type { FabricObject } from 'fabric';
 import type { Group } from 'fabric';
-import type { Point } from 'fabric';
+import { Point } from 'fabric';
 
 type AnyObj = Record<string, unknown>;
 
@@ -17,6 +17,13 @@ export function pickEmptyPhotoFieldFrameRect(field: FabricObject): FabricObject 
   const rects = (field as Group).getObjects().filter((obj) => obj.type === 'rect');
   if (rects.length === 0) return null;
   if (rects.length === 1) return rects[0]!;
+  const byRole = rects.find((obj) => ax(obj).photoFieldRole === 'frame');
+  if (byRole) return byRole;
+  const byDashedStroke = rects.find((obj) => {
+    const dash = ax(obj).strokeDashArray;
+    return Array.isArray(dash) && dash.length > 0;
+  });
+  if (byDashedStroke) return byDashedStroke;
   let best = rects[0]!;
   let bestA = Math.max(1e-9, best.getScaledWidth() * best.getScaledHeight());
   for (let i = 1; i < rects.length; i++) {
@@ -137,11 +144,13 @@ export function resolvePhotoFieldFrameSize(field: FabricObject): { fw: number; f
  * Совмещаем фактический TL прозрачной рамки с точкой плейсхолдера.
  */
 export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, frameH: number): void {
+  const ox = -frameW / 2;
+  const oy = -frameH / 2;
   const frameRect = pickEmptyPhotoFieldFrameRect(group);
   if (frameRect) {
     frameRect.set({
-      left: 0,
-      top: 0,
+      left: ox,
+      top: oy,
       originX: 'left',
       originY: 'top',
       width: frameW,
@@ -154,17 +163,18 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
   }
 
   const minSide = Math.min(frameW, frameH);
-  const badgeR = Math.max(12, Math.min(22, minSide * 0.22));
-  const badgeCx = frameW / 2;
-  const badgeCy = frameH / 2;
+  const badgeR = Math.max(18, Math.min(80, minSide * 0.18));
+  const badgeCx = 0;
+  const badgeCy = 0;
   const camBodyW = badgeR * 0.82;
   const camBodyH = badgeR * 0.55;
 
   const kids = group.getObjects();
-  const badge = kids[1];
-  const camBody = kids[2];
-  const camTop = kids[3];
-  const camLens = kids[4];
+  const badge = kids.find((obj) => ax(obj).photoFieldRole === 'badge') ?? kids[1];
+  const camBody = kids.find((obj) => ax(obj).photoFieldRole === 'camera-body') ?? kids[2];
+  const camTop = kids.find((obj) => ax(obj).photoFieldRole === 'camera-top') ?? kids[3];
+  const camLens = kids.find((obj) => ax(obj).photoFieldRole === 'camera-lens') ?? kids[4];
+  const photoLabel = kids.find((obj) => ax(obj).photoFieldRole === 'label');
 
   if (badge?.type === 'circle') {
     badge.set({
@@ -212,6 +222,17 @@ export function relayoutEmptyPhotoFieldChrome(group: Group, frameW: number, fram
       scaleY: 1,
     });
   }
+  if (photoLabel?.type === 'text') {
+    photoLabel.set({
+      left: badgeCx,
+      top: badgeCy + badgeR + 10,
+      originX: 'center',
+      originY: 'top',
+      fontSize: Math.max(12, Math.min(32, badgeR * 0.62)),
+      scaleX: 1,
+      scaleY: 1,
+    });
+  }
 
   ax(group).photoFieldFw = frameW;
   ax(group).photoFieldFh = frameH;
@@ -245,6 +266,15 @@ export function getPhotoFieldFrameSceneBounds(field: FabricObject): {
   }
   const br = frame.getBoundingRect()
   return { left: br.left, top: br.top, width: br.width, height: br.height }
+}
+
+export function resolvePhotoFieldFrameSceneTL(field: FabricObject): Point {
+  const bounds = getPhotoFieldFrameSceneBounds(field)
+  if (bounds) return new Point(bounds.left, bounds.top)
+  const coords = field.getCoords()
+  if (coords.length >= 1) return coords[0]!
+  const br = field.getBoundingRect()
+  return new Point(br.left, br.top)
 }
 
 /** Пустое поле: рамка в (0,0) группы — якорь по TL серого rect. */

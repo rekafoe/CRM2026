@@ -56,8 +56,3 @@ npm run dev  # Запуск на порту 5173
 - **Bot:** Telegram Bot API
 - **Image Processing:** Sharp
 - **PDF Generation:** Puppeteer
-
-## 📞 Поддержка
-
-При возникновении проблем проверьте документацию по конкретному сервису или создайте Issue в GitHub.
-

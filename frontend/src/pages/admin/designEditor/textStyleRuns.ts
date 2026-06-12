@@ -17,6 +17,9 @@ type TextLikeObject = FabricObject & {
   text?: string;
   fontSize?: number;
   fontFamily?: string;
+  width?: number;
+  id?: string;
+  textFieldClientAdded?: boolean;
   styles?: FabricStyles;
   textStyleRuns?: TextStyleRun[];
   initDimensions?: () => void;
@@ -176,6 +179,22 @@ export function hydrateTextObjectStyles(obj: TextLikeObject): void {
   obj.setCoords?.();
 }
 
+function normalizeImportedSingleLineTextboxWidth(obj: TextLikeObject): void {
+  if (obj.type !== 'textbox') return;
+  if (obj.textFieldClientAdded === true) return;
+  const id = String(obj.id ?? '');
+  if (!id.toLowerCase().startsWith('text_')) return;
+  const text = String(obj.text ?? '');
+  if (!text || text.includes('\n')) return;
+  const fontSize = Math.max(6, Number(obj.fontSize) || 16);
+  const minWidth = Math.max(120, text.length * fontSize * 0.7 + fontSize * 0.9);
+  const width = Number(obj.width ?? 0);
+  if (!Number.isFinite(width) || width + 1 >= minWidth) return;
+  obj.set({ width: minWidth });
+  obj.initDimensions?.();
+  obj.setCoords?.();
+}
+
 export function applyFormatToTextField(
   obj: TextLikeObject,
   patch: Record<string, unknown>,
@@ -274,7 +293,9 @@ export function dehydrateTextObjectsInFabricJSON(fabricJSON: Record<string, unkn
 
 export function migrateAndHydrateTextObject(obj: FabricObject): void {
   if (!isFabricTextObjectType(obj.type)) return;
-  hydrateTextObjectStyles(obj as TextLikeObject);
+  const textObj = obj as TextLikeObject;
+  hydrateTextObjectStyles(textObj);
+  normalizeImportedSingleLineTextboxWidth(textObj);
 }
 
 export function prepareTextObjectsOnCanvas(objects: FabricObject[]): void {

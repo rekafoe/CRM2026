@@ -3,12 +3,13 @@ import {
   applyPhotoFieldPanToGroup,
   buildFilledPhotoFieldGroup,
   getFabricImageIntrinsicSize,
+  refreshFilledPhotoFieldLayoutWhenReady,
   resolvePhotoFieldFitMode,
   resolvePhotoFieldFrameSize,
   wrapLegacyFilledPhotoImage,
 } from '../photoFieldFit';
 import { syncFilledPhotoFieldSceneAnchor } from '../photoFieldGeometry';
-import { isClientAddedPhotoField } from './canvasBasicMode';
+import { isClientAddedPhotoField } from '../designFields';
 import { detachFabricObject } from './canvasObjectDetach';
 import {
   resolvePhotoFieldFrameSceneTL,
@@ -141,6 +142,11 @@ export async function fillPhotoField(
     syncPlacement();
     queueMicrotask(syncPlacement);
     requestAnimationFrame(syncPlacement);
+    void refreshFilledPhotoFieldLayoutWhenReady(group).then(() => {
+      syncFilledPhotoFieldSceneAnchor(group, anchorSceneTL);
+      parent?.setCoords();
+      canvas.requestRenderAll();
+    });
     canvas.setActiveObject(group);
     afterFill?.();
   } finally {

@@ -129,3 +129,17 @@
   background: #f1f5f9;
   border-radius: 0 0 12px 12px;
 }
+
+.design-editor-snap-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.design-editor-snap-line {
+  stroke: #f43f5e;
+  stroke-width: 0.8;
+  stroke-dasharray: 3 3;
+}

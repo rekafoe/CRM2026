@@ -8,21 +8,26 @@ export type PageTransitionGate = {
 };
 
 export function createPageTransitionGate(): PageTransitionGate {
-  let busy = false;
+  let depth = 0;
   const waiters: Array<() => void> = [];
 
+  const notifyIfIdle = () => {
+    if (depth > 0) return;
+    const pending = waiters.splice(0);
+    pending.forEach((resolve) => resolve());
+  };
+
   return {
-    isBusy: () => busy,
+    isBusy: () => depth > 0,
     begin: () => {
-      busy = true;
+      depth += 1;
     },
     end: () => {
-      busy = false;
-      const pending = waiters.splice(0);
-      pending.forEach((resolve) => resolve());
+      depth = Math.max(0, depth - 1);
+      notifyIfIdle();
     },
     waitUntilIdle: () => {
-      if (!busy) return Promise.resolve();
+      if (depth === 0) return Promise.resolve();
       return new Promise<void>((resolve) => {
         waiters.push(resolve);
       });

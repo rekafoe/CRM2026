@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getPublicDesignTemplate, getPublicEditorBranding, type DesignTemplate } from '../../api';
 import { EMPTY_PAGE, SAFE_ZONE_MM } from '../../pages/admin/designEditor/constants';
-import { readDesignTemplateSpec } from '../../pages/admin/designEditor/designEditorState';
+import { readDesignTemplateSpec, resolveDesignSceneScale } from '../../pages/admin/designEditor/designEditorState';
 import type { DesignPage, DesignPrepressConfig } from '../../pages/admin/designEditor/types';
 import type { PublicDesignEditorAdapter } from './publicDesignEditorAdapter';
 import { ensureEvenInnerSpreadPages } from '../../pages/admin/designEditor/spreadUtils';
@@ -76,7 +76,7 @@ export function usePublicDesignBootstrap({
           Number(spec.page_count) || 1,
         );
         const count = Math.max(1, Math.min(99, requestedPageCount));
-        const scale = Number(sourceState?.sceneScale ?? 1);
+        const scale = resolveDesignSceneScale(sourceState);
         const savedSpreadMode = sourceState?.spread_mode;
         const nextSpreadMode = documentMode === 'multipage'
           && (typeof savedSpreadMode === 'boolean' ? savedSpreadMode : true);
@@ -94,7 +94,7 @@ export function usePublicDesignBootstrap({
           pageWidth: w,
           pageHeight: h,
           pageCount: spreadLayout.pageCount,
-          scale: Number.isFinite(scale) && scale > 0 ? scale : 1,
+          scale,
         });
         setSpreadMode(nextSpreadMode);
         setCoverPages(nextCoverPages);

@@ -46,6 +46,42 @@ describe('parseImportedSvgLayers', () => {
     expect(/<svg[\s\S]*<\/svg>/.test(r.strippedSvg.trim())).toBe(true)
   })
 
+  it('оставляет text_* в фоне, если внутри нет валидного <text>', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <g id="text_title">
+    <path d="M10 10 L20 20" fill="#ffffff"/>
+  </g>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.textItems).toHaveLength(0)
+    expect(r.strippedSvg.includes('text_title')).toBe(true)
+    expect(r.warnings.some((w) => w.includes('text_title') && w.includes('оставлен в фоне'))).toBe(true)
+  })
+
+  it('оставляет photo_* в фоне, если не найден валидный rect', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <g id="photo_slot">
+    <rect x="10" y="5" width="0" height="40"/>
+  </g>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.photoRects).toHaveLength(0)
+    expect(r.strippedSvg.includes('photo_slot')).toBe(true)
+    expect(r.warnings.some((w) => w.includes('photo_slot') && w.includes('оставлен в фоне'))).toBe(true)
+  })
+
+  it('убирает text_* из strippedSvg, если интерактивный text успешно извлечён', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <text id="text_title" x="10" y="20" font-size="12">VOGUE</text>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.textItems).toHaveLength(1)
+    expect(r.strippedSvg.includes('text_title')).toBe(false)
+  })
+
   it('вычисляет prepressHints по связке trim/bleed/safe в мм', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
@@ -412,5 +448,73 @@ describe('parseImportedSvgLayers', () => {
 </svg>`
     const r = parseImportedSvgLayers(svg)
     expect(r.interactiveLayers.map((l) => l.data.name)).toEqual(['text_watermark', 'photo_main'])
+  })
+
+  it('учитывает preserveAspectRatio=xMaxYMid meet при пересчёте координат', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 200 100" preserveAspectRatio="xMaxYMid meet">
+  <rect id="photo_slot" x="180" y="40" width="20" height="20"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg, { sceneScale: 1 })
+    expect(r.photoRects).toHaveLength(1)
+    // При xMaxYMid meet контент "прижат" вправо, а по Y центрируется.
+    expect(r.photoRects[0].x).toBeGreaterThan(80)
+    expect(r.photoRects[0].y).toBeGreaterThan(40)
+  })
+
+  it('поддерживает skewX/skewY трансформации', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <g transform="skewX(20) skewY(5)">
+    <rect id="photo_skew" x="100" y="120" width="300" height="150"/>
+  </g>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.photoRects).toHaveLength(1)
+    expect(r.photoRects[0].width).toBeGreaterThan(25)
+  })
+
+  it('пишет расширенный parserSummary с процентами распознавания', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <rect id="photo_ok" x="10" y="10" width="100" height="60"/>
+  <g id="text_bad"><path d="M0 0 L10 10"/></g>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.summary.interactiveLayerCount).toBeGreaterThanOrEqual(1)
+    expect(r.summary.interactiveParsedPercent).toBeGreaterThan(0)
+    expect(r.summary.fallbackBackgroundPercent).toBeGreaterThan(0)
+  })
+
+  it('формирует parserReport со статусами и reasonCode', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <rect id="photo_ok" x="10" y="10" width="100" height="60"/>
+  <g id="text_bad"><path d="M0 0 L10 10"/></g>
+  <rect id="guide_tmp" x="0" y="0" width="10" height="10"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.parserReport.layers.length).toBeGreaterThanOrEqual(2)
+    expect(r.parserReport.countsByStatus.parsed_interactive).toBeGreaterThanOrEqual(1)
+    expect(r.parserReport.countsByReasonCode.PHOTO_PARSED).toBeGreaterThanOrEqual(1)
+    expect(r.parserReport.timings.totalMs).toBeGreaterThan(0)
+  })
+
+  it('добавляет trace timeline только при trace=true', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <rect id="photo_1" x="10" y="10" width="100" height="60"/>
+</svg>`
+    const withTrace = parseImportedSvgLayers(svg, { trace: true })
+    const withoutTrace = parseImportedSvgLayers(svg)
+    expect(withTrace.trace?.timeline.length).toBeGreaterThan(0)
+    expect(withoutTrace.trace).toBeUndefined()
+  })
+
+  it('падает с кодом лимита при слишком глубокой вложенности групп', () => {
+    const open = '<g>'.repeat(140)
+    const close = '</g>'.repeat(140)
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm">${open}<rect id="photo_1" x="1" y="1" width="4" height="4"/>${close}</svg>`
+    expect(() => parseImportedSvgLayers(svg)).toThrow('SVG_GROUP_DEPTH_LIMIT_EXCEEDED')
   })
 })

@@ -1,13 +1,13 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
-import { useSerializedPageNavigation } from './useSerializedPageNavigation';
 import { EMPTY_PAGE } from '../../pages/admin/designEditor/constants';
 import type { PageSaveSnapshot } from '../../pages/admin/designEditor/mergePagesSnapshot';
 import { mergeSavedEditorPages } from '../../pages/admin/designEditor/designEditorState';
 import type { DesignPage } from '../../pages/admin/designEditor/types';
 import { buildSpreadPageInsert, getLastInnerSpreadRange } from '../../pages/admin/designEditor/spreadUtils';
 import type { DesignDocumentNavigationState, PublicDesignDocumentMode } from './useDesignDocumentNavigation';
+import { createPageActionQueue } from './pageActionQueue';
 
 export interface PublicDesignPageSpec {
   pageWidth: number;
@@ -47,7 +47,9 @@ export function usePublicDesignPageActions({
   setThumbnails,
   markDirty,
 }: UsePublicDesignPageActionsInput) {
-  const { runPageNavigation } = useSerializedPageNavigation(canvasHandleRef);
+  const pageActionQueueRef = useRef(createPageActionQueue({
+    getIdleSource: () => canvasHandleRef.current,
+  }));
 
   const saveCurrentCanvasPage = useCallback(async () => {
     const handle = canvasHandleRef.current;
@@ -63,49 +65,55 @@ export function usePublicDesignPageActions({
     ));
   }, [canvasHandleRef, currentPage, navigation.leftPageIdx, navigation.rightPageIdx, setPages]);
 
-  const handleGoToPage = useCallback(async (pageIndex: number) => {
-    await runPageNavigation(async () => {
-      const targetItem = navigation.stripItems.find(
-        (item) => item.goToPage === pageIndex || item.pages.includes(pageIndex),
-      );
-      if (!targetItem) return;
-      if (targetItem.pages.includes(currentPage)) return;
+  const enqueuePageAction = useCallback((task: () => Promise<void>) => {
+    return pageActionQueueRef.current.enqueue(task);
+  }, []);
 
-      await saveCurrentCanvasPage();
-      setCurrentPage(targetItem.goToPage);
-    });
-  }, [currentPage, navigation.stripItems, runPageNavigation, saveCurrentCanvasPage, setCurrentPage]);
+  const handleGoToPage = useCallback(async (pageIndex: number) => {
+    const currentStripItem = navigation.stripItems.find((item) => item.pages.includes(currentPage));
+    const targetItem = navigation.stripItems.find(
+      (item) => item.goToPage === pageIndex || item.pages.includes(pageIndex),
+    );
+    if (!targetItem) return;
+    if (currentStripItem === targetItem) return;
+    setCurrentPage(targetItem.goToPage);
+  }, [currentPage, navigation.stripItems, setCurrentPage]);
 
   const handleAddClientPage = useCallback(async () => {
-    await saveCurrentCanvasPage();
-    const nextPageIndex = pageSpec.pageCount;
-    setPages((prev) => [
-      ...Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE }),
-      { ...EMPTY_PAGE },
-    ]);
-    setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + 1 }));
-    setCurrentPage(nextPageIndex);
-    markDirty();
-  }, [markDirty, pageSpec.pageCount, saveCurrentCanvasPage, setCurrentPage, setPageSpec, setPages]);
+    await enqueuePageAction(async () => {
+      await saveCurrentCanvasPage();
+      const nextPageIndex = pageSpec.pageCount;
+      setPages((prev) => [
+        ...Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE }),
+        { ...EMPTY_PAGE },
+      ]);
+      setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + 1 }));
+      setCurrentPage(nextPageIndex);
+      markDirty();
+    });
+  }, [enqueuePageAction, markDirty, pageSpec.pageCount, saveCurrentCanvasPage, setCurrentPage, setPageSpec, setPages]);
 
   const handleInsertClientPage = useCallback(async (pageIndex: number) => {
-    await saveCurrentCanvasPage();
-    const safeIndex = Math.max(0, Math.min(pageSpec.pageCount, pageIndex));
-    setPages((prev) => {
-      const normalized = Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
-      return [
-        ...normalized.slice(0, safeIndex),
-        { ...EMPTY_PAGE },
-        ...normalized.slice(safeIndex),
-      ];
+    await enqueuePageAction(async () => {
+      await saveCurrentCanvasPage();
+      const safeIndex = Math.max(0, Math.min(pageSpec.pageCount, pageIndex));
+      setPages((prev) => {
+        const normalized = Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
+        return [
+          ...normalized.slice(0, safeIndex),
+          { ...EMPTY_PAGE },
+          ...normalized.slice(safeIndex),
+        ];
+      });
+      setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + 1 }));
+      setCurrentPage(safeIndex);
+      setThumbnails((prev) => shiftThumbnails(prev, safeIndex, 1));
+      markDirty();
     });
-    setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + 1 }));
-    setCurrentPage(safeIndex);
-    setThumbnails((prev) => shiftThumbnails(prev, safeIndex, 1));
-    markDirty();
   }, [
     markDirty,
     pageSpec.pageCount,
+    enqueuePageAction,
     saveCurrentCanvasPage,
     setCurrentPage,
     setPageSpec,
@@ -114,36 +122,39 @@ export function usePublicDesignPageActions({
   ]);
 
   const handleAddClientSpread = useCallback(async () => {
-    await saveCurrentCanvasPage();
-    const { insertAt, addCount } = spreadMode && documentMode === 'multipage'
-      ? buildSpreadPageInsert(pageSpec.pageCount, coverPages)
-      : { insertAt: pageSpec.pageCount, addCount: 2 as const };
-    setPages((prev) => {
-      const normalized = Array.from(
-        { length: pageSpec.pageCount },
-        (_, index) => prev[index] ?? { ...EMPTY_PAGE },
-      );
-      return [
-        ...normalized.slice(0, insertAt),
-        ...Array.from({ length: addCount }, () => ({ ...EMPTY_PAGE })),
-        ...normalized.slice(insertAt),
-      ];
+    await enqueuePageAction(async () => {
+      await saveCurrentCanvasPage();
+      const { insertAt, addCount } = spreadMode && documentMode === 'multipage'
+        ? buildSpreadPageInsert(pageSpec.pageCount, coverPages)
+        : { insertAt: pageSpec.pageCount, addCount: 2 as const };
+      setPages((prev) => {
+        const normalized = Array.from(
+          { length: pageSpec.pageCount },
+          (_, index) => prev[index] ?? { ...EMPTY_PAGE },
+        );
+        return [
+          ...normalized.slice(0, insertAt),
+          ...Array.from({ length: addCount }, () => ({ ...EMPTY_PAGE })),
+          ...normalized.slice(insertAt),
+        ];
+      });
+      setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + addCount }));
+      setThumbnails((prev) => {
+        let next = prev;
+        for (let i = 0; i < addCount; i += 1) {
+          next = shiftThumbnails(next, insertAt, 1);
+        }
+        return next;
+      });
+      setCurrentPage(insertAt);
+      markDirty();
     });
-    setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + addCount }));
-    setThumbnails((prev) => {
-      let next = prev;
-      for (let i = 0; i < addCount; i += 1) {
-        next = shiftThumbnails(next, insertAt, 1);
-      }
-      return next;
-    });
-    setCurrentPage(insertAt);
-    markDirty();
   }, [
     coverPages,
     documentMode,
     markDirty,
     pageSpec.pageCount,
+    enqueuePageAction,
     saveCurrentCanvasPage,
     setCurrentPage,
     setPageSpec,
@@ -154,47 +165,50 @@ export function usePublicDesignPageActions({
 
   const handleDeleteClientLast = useCallback(async () => {
     if (pageSpec.pageCount <= minimumPageCount) return;
-    await saveCurrentCanvasPage();
+    await enqueuePageAction(async () => {
+      await saveCurrentCanvasPage();
 
-    const spreadRange = spreadMode && documentMode === 'multipage'
-      ? getLastInnerSpreadRange(pageSpec.pageCount, coverPages)
-      : null;
-    const removeStart = spreadRange?.start ?? pageSpec.pageCount - 1;
-    const removeCount = spreadRange?.length ?? 1;
+      const spreadRange = spreadMode && documentMode === 'multipage'
+        ? getLastInnerSpreadRange(pageSpec.pageCount, coverPages)
+        : null;
+      const removeStart = spreadRange?.start ?? pageSpec.pageCount - 1;
+      const removeCount = spreadRange?.length ?? 1;
 
-    if (pageSpec.pageCount - removeCount < minimumPageCount) return;
+      if (pageSpec.pageCount - removeCount < minimumPageCount) return;
 
-    setPages((prev) => {
-      const normalized = Array.from(
-        { length: pageSpec.pageCount },
-        (_, index) => prev[index] ?? { ...EMPTY_PAGE },
-      );
-      const next = [
-        ...normalized.slice(0, removeStart),
-        ...normalized.slice(removeStart + removeCount),
-      ];
-      return next.length ? next : [{ ...EMPTY_PAGE }];
+      setPages((prev) => {
+        const normalized = Array.from(
+          { length: pageSpec.pageCount },
+          (_, index) => prev[index] ?? { ...EMPTY_PAGE },
+        );
+        const next = [
+          ...normalized.slice(0, removeStart),
+          ...normalized.slice(removeStart + removeCount),
+        ];
+        return next.length ? next : [{ ...EMPTY_PAGE }];
+      });
+      setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount - removeCount }));
+      setCurrentPage((page) => {
+        if (page >= removeStart + removeCount) return Math.max(0, page - removeCount);
+        if (page >= removeStart) return Math.max(0, removeStart - 1);
+        return page;
+      });
+      setThumbnails((prev) => {
+        let next = prev;
+        for (let i = 0; i < removeCount; i += 1) {
+          next = shiftThumbnails(next, removeStart + removeCount - i, -1);
+        }
+        return next;
+      });
+      markDirty();
     });
-    setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount - removeCount }));
-    setCurrentPage((page) => {
-      if (page >= removeStart + removeCount) return Math.max(0, page - removeCount);
-      if (page >= removeStart) return Math.max(0, removeStart - 1);
-      return page;
-    });
-    setThumbnails((prev) => {
-      let next = prev;
-      for (let i = 0; i < removeCount; i += 1) {
-        next = shiftThumbnails(next, removeStart + removeCount - i, -1);
-      }
-      return next;
-    });
-    markDirty();
   }, [
     coverPages,
     documentMode,
     markDirty,
     minimumPageCount,
     pageSpec.pageCount,
+    enqueuePageAction,
     saveCurrentCanvasPage,
     setCurrentPage,
     setPageSpec,
@@ -205,25 +219,28 @@ export function usePublicDesignPageActions({
 
   const handleDeleteClientPage = useCallback(async (pageIndex: number) => {
     if (pageSpec.pageCount <= minimumPageCount) return;
-    await saveCurrentCanvasPage();
-    const safeIndex = Math.max(0, Math.min(pageSpec.pageCount - 1, pageIndex));
-    setPages((prev) => {
-      const normalized = Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
-      const next = normalized.filter((_, index) => index !== safeIndex);
-      return next.length ? next : [{ ...EMPTY_PAGE }];
+    await enqueuePageAction(async () => {
+      await saveCurrentCanvasPage();
+      const safeIndex = Math.max(0, Math.min(pageSpec.pageCount - 1, pageIndex));
+      setPages((prev) => {
+        const normalized = Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
+        const next = normalized.filter((_, index) => index !== safeIndex);
+        return next.length ? next : [{ ...EMPTY_PAGE }];
+      });
+      setPageSpec((spec) => ({ ...spec, pageCount: Math.max(minimumPageCount, spec.pageCount - 1) }));
+      setCurrentPage((page) => {
+        if (page === safeIndex) return Math.max(0, safeIndex - 1);
+        if (page > safeIndex) return page - 1;
+        return Math.min(page, Math.max(0, pageSpec.pageCount - 2));
+      });
+      setThumbnails((prev) => shiftThumbnails(prev, safeIndex + 1, -1));
+      markDirty();
     });
-    setPageSpec((spec) => ({ ...spec, pageCount: Math.max(minimumPageCount, spec.pageCount - 1) }));
-    setCurrentPage((page) => {
-      if (page === safeIndex) return Math.max(0, safeIndex - 1);
-      if (page > safeIndex) return page - 1;
-      return Math.min(page, Math.max(0, pageSpec.pageCount - 2));
-    });
-    setThumbnails((prev) => shiftThumbnails(prev, safeIndex + 1, -1));
-    markDirty();
   }, [
     markDirty,
     minimumPageCount,
     pageSpec.pageCount,
+    enqueuePageAction,
     saveCurrentCanvasPage,
     setCurrentPage,
     setPageSpec,

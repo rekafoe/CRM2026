@@ -26,6 +26,7 @@ import {
   buildTemplateSpecWithDesignState,
   mergeSavedEditorPages,
   readDesignTemplateSpec,
+  resolveDesignSceneScale,
 } from './designEditor/designEditorState';
 import {
   extractUsedFontFamiliesFromPages,
@@ -378,8 +379,7 @@ export const DesignEditorPage: React.FC = () => {
         ? Math.max(1, Math.min(99, ds.pages.length))
         : Math.max(1, Math.min(99, Number(spec.page_count) || 1));
       const sm = !!(ds?.spread_mode ?? spec.spread_mode);
-      const rawSceneScale = Number(ds?.sceneScale ?? 1);
-      const sc = Number.isFinite(rawSceneScale) && rawSceneScale > 0 ? rawSceneScale : 1;
+      const sc = resolveDesignSceneScale(ds);
       const cp = Math.max(0, Math.min(3, Number(ds?.cover_pages ?? spec.cover_pages ?? 1)));
       const prepress = normalizePrepressConfig(ds?.prepress ?? spec.prepress);
       const loadedPages = ds?.pages && ds.pages.length > 0

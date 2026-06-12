@@ -11,6 +11,7 @@
     "migrate:dev": "ts-node src/scripts/migrate.ts",
     "generate:act-template": "ts-node scripts/generateActTemplate.ts",
     "delete:old-act-templates": "ts-node scripts/deleteOldActTemplates.ts",
+    "profile:svg-import": "ts-node scripts/profileSvgImporter.ts",
     "recalculate:earnings": "ts-node -r dotenv/config scripts/recalculateEarnings.ts",
     "restore:order-to-pool": "node dist/scripts/restoreOrderToPool.js",
     "restore:order-to-pool:dev": "ts-node src/scripts/restoreOrderToPool.ts"

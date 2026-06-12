@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <style><![CDATA[
+    .fnt0 { font-family: 'Arial'; font-size: 40px; fill: #ffffff; }
+    .fnt1 { font-family: 'Times New Roman'; font-size: 40px; fill: #ffffff; }
+  ]]></style>
+  <rect id="locked_bg" x="0" y="0" width="900" height="500" fill="#9ca3af"/>
+  <rect id="photo_main" x="120" y="60" width="660" height="360" fill="#9ca3af"/>
+  <text id="text_love" text-anchor="middle">
+    <tspan class="fnt0" x="450" y="130">'B> O 2 B515 </tspan>
+    <tspan class="fnt1" x="620" y="130">;N1;N</tspan>
+  </text>
+</svg>
