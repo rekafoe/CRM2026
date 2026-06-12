@@ -6,7 +6,7 @@ const INTERNAL_PARAM_KEYS = new Set([
   '_crmPendingNoLayoutPayload',
   '_crmCalculationSnapshot',
   'crmCalculateConfiguration',
-  'editorDraftToken',
+  // editorDraftToken — контракт checkout редактора; нужен до prepareWebsiteItemsWithEditorDrafts
   'designEditorMode',
 ]);
 
