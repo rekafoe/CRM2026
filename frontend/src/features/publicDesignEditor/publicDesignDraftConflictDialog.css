@@ -1,0 +1,48 @@
+.public-design-draft-conflict {
+  display: grid;
+  gap: 16px;
+}
+
+.public-design-draft-conflict__message {
+  margin: 0;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.public-design-draft-conflict__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.public-design-draft-conflict__btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.public-design-draft-conflict__btn--secondary {
+  color: #334155;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.public-design-draft-conflict__btn--secondary:hover {
+  background: #e2e8f0;
+}
+
+.public-design-draft-conflict__btn--primary {
+  color: #fff;
+  background: #2563eb;
+}
+
+.public-design-draft-conflict__btn--primary:hover {
+  background: #1d4ed8;
+}

@@ -1,0 +1,30 @@
+.text-patch-scope-dialog__message {
+  margin: 0 0 1rem;
+  color: var(--de-text-muted, #5f6368);
+  line-height: 1.45;
+}
+
+.text-patch-scope-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.text-patch-scope-dialog__btn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.5rem 0.85rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.text-patch-scope-dialog__btn--secondary {
+  background: var(--de-surface-2, #f1f3f4);
+  color: var(--de-text, #202124);
+}
+
+.text-patch-scope-dialog__btn--primary {
+  background: var(--de-accent, #1a73e8);
+  color: #fff;
+}

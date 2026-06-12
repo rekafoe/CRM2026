@@ -54,6 +54,7 @@ import {
   PublicDesignEditorMobileDock,
   type PublicDesignMobilePanel,
 } from './PublicDesignEditorMobileDock';
+import { PublicDesignDraftConflictDialog } from './PublicDesignDraftConflictDialog';
 import '../../pages/admin/DesignEditorPage.css';
 import '../../pages/admin/designEditor/designEditorGlassTheme.css';
 import '../designEditorShell/editorShell.css';
@@ -99,6 +100,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   }
   const bootstrapDraftToken = bootstrapDraftTokenRef.current.token;
   const canvasHandleRef = useRef<DesignEditorCanvasHandle | null>(null);
+  const commitCanvasToPagesRef = useRef<() => void>(() => {});
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const fitScalerRef = useRef<HTMLDivElement>(null);
@@ -432,6 +434,10 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     handleSaveDraft,
     resolveImageAsset,
     resolveImageFileUrl,
+    draftConflictOpen,
+    handleDismissDraftConflict,
+    handleReloadDraftFromServer,
+    handleForceSaveDraft,
   } = usePublicDesignDraftActions({
     adapter,
     autosaveDelayMs,
@@ -457,6 +463,11 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setSaveState,
     setSaving,
     setStatus,
+    setCurrentPage,
+    setPageSpec,
+    setSpreadMode,
+    setCoverPages,
+    setPrepressConfig,
     onDraftTokenChange,
     onReadyForCart,
   });
@@ -509,6 +520,10 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setThumbnails,
     markDirty,
   });
+
+  commitCanvasToPagesRef.current = () => {
+    void saveCurrentCanvasPage();
+  };
 
   const {
     handleFieldFocus,
@@ -834,6 +849,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           onTextEditCommitted: () => {
             void saveCurrentCanvasPage();
           },
+          onCanvasDocumentCommit: () => {
+            commitCanvasToPagesRef.current();
+          },
           onDropRemoteImageUrl: handleImageUrlSubmit,
           onSidebarPhotoDropped: removeSidebarPhoto,
           resolveImageFileUrl,
@@ -1004,6 +1022,12 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           if (pendingDeletePage == null) return;
           void handleDeleteClientPage(pendingDeletePage);
         }}
+      />
+      <PublicDesignDraftConflictDialog
+        isOpen={draftConflictOpen}
+        onClose={handleDismissDraftConflict}
+        onReloadFromServer={() => void handleReloadDraftFromServer()}
+        onForceSave={() => void handleForceSaveDraft()}
       />
     </div>
   );

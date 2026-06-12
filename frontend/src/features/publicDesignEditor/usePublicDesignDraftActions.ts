@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import {
@@ -6,12 +6,18 @@ import {
   mergeSavedEditorPages,
 } from '../../pages/admin/designEditor/designEditorState';
 import type { PageSaveSnapshot } from '../../pages/admin/designEditor/mergePagesSnapshot';
-import type { DesignPage, DesignPrepressConfig } from '../../pages/admin/designEditor/types';
+import type { DesignPage, DesignPrepressConfig, DesignState } from '../../pages/admin/designEditor/types';
 import { analyzePublicDesignPages } from './publicDesignPreflight';
 import type { PublicDesignEditorAdapter } from './publicDesignEditorAdapter';
 import type { PublicEditorDraftFile } from '../../api';
 import type { PublicDesignDocumentMode } from './useDesignDocumentNavigation';
 import type { PublicDesignPageSpec } from './usePublicDesignPageActions';
+import { isDraftVersionConflictError } from './draftConflict';
+import {
+  extractDesignStateFromDraftPayload,
+  normalizePrepressFromDesignState,
+  resolvePagesFromDesignState,
+} from './applyPublicDesignState';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -46,6 +52,11 @@ interface UsePublicDesignDraftActionsInput {
   setSaveState: (state: SaveState) => void;
   setSaving: (saving: boolean) => void;
   setStatus: (message: string | null) => void;
+  setCurrentPage: Dispatch<SetStateAction<number>>;
+  setPageSpec: Dispatch<SetStateAction<PublicDesignPageSpec>>;
+  setSpreadMode: Dispatch<SetStateAction<boolean>>;
+  setCoverPages: Dispatch<SetStateAction<number>>;
+  setPrepressConfig: Dispatch<SetStateAction<DesignPrepressConfig>>;
   onDraftTokenChange?: (token: string) => void;
   onReadyForCart?: (draftToken: string) => void;
 }
@@ -75,11 +86,55 @@ export function usePublicDesignDraftActions({
   setSaveState,
   setSaving,
   setStatus,
+  setCurrentPage,
+  setPageSpec,
+  setSpreadMode,
+  setCoverPages,
+  setPrepressConfig,
   onDraftTokenChange,
   onReadyForCart,
 }: UsePublicDesignDraftActionsInput) {
   const savedDirtyVersionRef = useRef(0);
   const draftVersionRef = useRef<number | null>(null);
+  const [draftConflictOpen, setDraftConflictOpen] = useState(false);
+  const autosavePausedRef = useRef(false);
+
+  const applyDesignStateFromServer = useCallback(async (designState: DesignState) => {
+    const spreadModeActive = documentMode === 'multipage' && designState.spread_mode === true;
+    const nextCoverPages = documentMode === 'multipage'
+      ? Math.max(1, Math.min(3, Number(designState.cover_pages ?? coverPages)))
+      : Math.max(0, Math.min(3, Number(designState.cover_pages ?? coverPages)));
+    const { pages: nextPages, pageCount } = resolvePagesFromDesignState(
+      designState,
+      documentMode,
+      nextCoverPages,
+    );
+    const scale = Number(designState.sceneScale);
+    setPages(nextPages);
+    setPageSpec({
+      pageWidth: designState.pageWidth,
+      pageHeight: designState.pageHeight,
+      pageCount,
+      scale: Number.isFinite(scale) && scale > 0 ? scale : pageSpec.scale,
+    });
+    setSpreadMode(spreadModeActive);
+    setCoverPages(nextCoverPages);
+    setPrepressConfig(normalizePrepressFromDesignState(designState.prepress));
+    setCurrentPage(0);
+    await canvasHandleRef.current?.whenPageTransitionIdle?.();
+    await canvasHandleRef.current?.applyEditorViewState(nextPages);
+  }, [
+    canvasHandleRef,
+    coverPages,
+    documentMode,
+    pageSpec.scale,
+    setCoverPages,
+    setCurrentPage,
+    setPageSpec,
+    setPages,
+    setPrepressConfig,
+    setSpreadMode,
+  ]);
 
   const ensureDraft = useCallback(async () => {
     if (draftToken) return draftToken;
@@ -134,48 +189,116 @@ export function usePublicDesignDraftActions({
     templateId,
   ]);
 
-  const handleSaveDraft = useCallback(async (silent = false) => {
-    try {
-      setSaving(true);
-      setSaveState('saving');
-      if (!silent) setStatus(null);
-      const token = await ensureDraft();
-      const { pages: updatedPages, designState } = await buildCurrentDesignState();
-      const savedDraft = await adapter.updateDraft(token, {
-        designState,
-        ...(draftVersionRef.current ? { expectedVersion: draftVersionRef.current } : {}),
-      });
-      if (savedDraft && typeof savedDraft.version === 'number') draftVersionRef.current = savedDraft.version;
-      setPages(updatedPages);
-      savedDirtyVersionRef.current = dirtyVersion;
-      setSaveState('saved');
-      if (!silent) setStatus('Макет сохранён.');
-    } catch (err) {
-      setSaveState('error');
-      setError(err instanceof Error ? err.message : 'Не удалось сохранить макет');
-    } finally {
-      setSaving(false);
+  const persistDraft = useCallback(async (
+    silent: boolean,
+    options?: { skipExpectedVersion?: boolean },
+  ) => {
+    setSaving(true);
+    setSaveState('saving');
+    if (!silent) setStatus(null);
+    const token = await ensureDraft();
+    const { pages: updatedPages, designState } = await buildCurrentDesignState();
+    const patch: Record<string, unknown> = { designState };
+    if (!options?.skipExpectedVersion && draftVersionRef.current) {
+      patch.expectedVersion = draftVersionRef.current;
     }
+    const savedDraft = await adapter.updateDraft(token, patch);
+    if (savedDraft && typeof savedDraft.version === 'number') draftVersionRef.current = savedDraft.version;
+    setPages(updatedPages);
+    savedDirtyVersionRef.current = dirtyVersion;
+    setSaveState('saved');
+    if (!silent) setStatus('Макет сохранён.');
   }, [
     adapter,
     buildCurrentDesignState,
     dirtyVersion,
     ensureDraft,
-    setError,
     setPages,
     setSaveState,
     setSaving,
     setStatus,
   ]);
 
+  const handleSaveDraft = useCallback(async (silent = false) => {
+    if (draftConflictOpen || autosavePausedRef.current) return;
+    try {
+      await persistDraft(silent);
+    } catch (err) {
+      if (isDraftVersionConflictError(err)) {
+        setDraftConflictOpen(true);
+        autosavePausedRef.current = true;
+        setSaveState('dirty');
+        if (!silent) setStatus(null);
+        return;
+      }
+      setSaveState('error');
+      setError(err instanceof Error ? err.message : 'Не удалось сохранить макет');
+    } finally {
+      setSaving(false);
+    }
+  }, [draftConflictOpen, persistDraft, setError, setSaveState, setStatus]);
+
+  const handleDismissDraftConflict = useCallback(() => {
+    setDraftConflictOpen(false);
+    autosavePausedRef.current = false;
+    setSaveState('dirty');
+  }, [setSaveState]);
+
+  const handleReloadDraftFromServer = useCallback(async () => {
+    try {
+      setSaving(true);
+      const token = await ensureDraft();
+      const draft = await adapter.getDraft(token);
+      if (typeof draft.version === 'number') draftVersionRef.current = draft.version;
+      const designState = extractDesignStateFromDraftPayload(draft.payloadParsed);
+      if (!designState) throw new Error('На сервере нет данных макета.');
+      await applyDesignStateFromServer(designState);
+      setDraftConflictOpen(false);
+      autosavePausedRef.current = false;
+      savedDirtyVersionRef.current = dirtyVersion;
+      setSaveState('saved');
+      setStatus('Загружена версия макета с сервера.');
+      setError(null);
+    } catch (err) {
+      setSaveState('error');
+      setError(err instanceof Error ? err.message : 'Не удалось загрузить макет с сервера');
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    adapter,
+    applyDesignStateFromServer,
+    dirtyVersion,
+    ensureDraft,
+    setError,
+    setSaveState,
+    setSaving,
+    setStatus,
+  ]);
+
+  const handleForceSaveDraft = useCallback(async () => {
+    try {
+      setDraftConflictOpen(false);
+      autosavePausedRef.current = false;
+      await persistDraft(true, { skipExpectedVersion: true });
+      setStatus('Ваша версия макета сохранена на сервере.');
+      setError(null);
+    } catch (err) {
+      setSaveState('error');
+      setError(err instanceof Error ? err.message : 'Не удалось сохранить макет');
+    } finally {
+      setSaving(false);
+    }
+  }, [persistDraft, setError, setSaveState, setStatus]);
+
   useEffect(() => {
-    if (dirtyVersion === 0 || loading || saving) return;
+    if (dirtyVersion === 0 || loading || saving || draftConflictOpen || autosavePausedRef.current) return;
     if (dirtyVersion === savedDirtyVersionRef.current) return;
     const timer = window.setTimeout(() => {
       void handleSaveDraft(true);
     }, autosaveDelayMs);
     return () => window.clearTimeout(timer);
-  }, [autosaveDelayMs, dirtyVersion, handleSaveDraft, loading, saving]);
+  }, [autosaveDelayMs, dirtyVersion, draftConflictOpen, handleSaveDraft, loading, saving]);
 
   const resolveImageAsset = useCallback(async (
     file: File,
@@ -253,5 +376,9 @@ export function usePublicDesignDraftActions({
     handleSaveDraft,
     resolveImageAsset,
     resolveImageFileUrl,
+    draftConflictOpen,
+    handleDismissDraftConflict,
+    handleReloadDraftFromServer,
+    handleForceSaveDraft,
   };
 }

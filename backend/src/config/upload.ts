@@ -16,6 +16,9 @@ export const orderFilesDir = path.join(uploadsDir, 'orders')
 /** Шрифты библиотеки design_fonts — отдаются через /api/design-fonts/public/:id/content */
 export const designFontsDir = path.join(uploadsDir, 'design-fonts')
 
+/** Изображения шаблонов design_templates — отдаются через /api/design-templates/public/:id/assets/:fileId/content */
+export const designTemplateAssetsDir = path.join(uploadsDir, 'design-template-assets')
+
 const FONT_EXTENSIONS = new Set(['.woff2', '.woff', '.ttf', '.otf'])
 
 /** Лимит тела для multer (и согласованная проверка в handlers после приёма файла) */
@@ -41,6 +44,7 @@ try {
   fs.mkdirSync(uploadsDir, { recursive: true })
   fs.mkdirSync(orderFilesDir, { recursive: true })
   fs.mkdirSync(designFontsDir, { recursive: true })
+  fs.mkdirSync(designTemplateAssetsDir, { recursive: true })
 } catch {}
 
 export const storage = multer.diskStorage({
@@ -203,6 +207,20 @@ export function saveBufferToDesignFonts(
     originalName: raw || unique,
     format: detectFontFormat(raw),
   }
+}
+
+export function saveBufferToDesignTemplateAssets(
+  buffer: Buffer | undefined,
+  originalName?: string,
+): { filename: string; size: number; originalName: string } | null {
+  if (!buffer || buffer.length === 0) return null
+  const raw = (originalName || '').trim()
+  const ext = path.extname(raw) || '.jpg'
+  const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`
+  const filePath = path.join(designTemplateAssetsDir, unique)
+  fs.writeFileSync(filePath, buffer)
+  const displayName = raw || (ext ? `document${ext}` : `file-${unique}`)
+  return { filename: unique, size: buffer.length, originalName: displayName }
 }
 
 export function saveBufferToOrderFiles(

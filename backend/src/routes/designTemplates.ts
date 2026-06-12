@@ -1,5 +1,13 @@
 import { Router, Request, Response } from 'express'
 import { upload, uploadOrderFilesMemory } from '../config/upload'
+import {
+  buildDesignTemplateAssetContentPath,
+  buildDesignTemplateAssetThumbPath,
+  createDesignTemplateAsset,
+  getDesignTemplateAsset,
+  resolveDesignTemplateAssetPath,
+} from '../services/designTemplateAssetService'
+import { hasBlobUrl } from '../utils/fabricJsonValidation'
 import { asyncHandler, authenticate, type AuthenticatedRequest } from '../middleware'
 import {
   getAllDesignTemplates,
@@ -169,6 +177,41 @@ router.get('/public', asyncHandler(async (req: Request, res: Response) => {
  *       404:
  *         description: Шаблон не найден или неактивен
  */
+async function sendTemplateAssetContent(req: Request, res: Response, kind: 'content' | 'thumb'): Promise<void> {
+  const templateId = parseInt(req.params.id)
+  const fileId = Number(req.params.fileId)
+  if (!Number.isFinite(templateId) || templateId <= 0 || !Number.isFinite(fileId)) {
+    res.status(400).json({ message: 'Неверный ID' })
+    return
+  }
+  const template = await getDesignTemplate(templateId)
+  if (!template) {
+    res.status(404).json({ message: 'Шаблон не найден' })
+    return
+  }
+  const asset = await getDesignTemplateAsset(templateId, fileId)
+  const filePath = asset ? resolveDesignTemplateAssetPath(asset, kind) : null
+  if (!asset || !filePath) {
+    res.status(404).json({ message: kind === 'thumb' ? 'Миниатюра не найдена' : 'Файл не найден' })
+    return
+  }
+  if (kind === 'thumb') {
+    res.type('image/jpeg')
+  } else if (asset.mime) {
+    res.type(asset.mime)
+  }
+  res.sendFile(filePath)
+}
+
+/** Public asset content for canvas image rendering (no JWT). */
+router.get('/public/:id/assets/:fileId/content', asyncHandler(async (req: Request, res: Response) => {
+  await sendTemplateAssetContent(req, res, 'content')
+}))
+
+router.get('/public/:id/assets/:fileId/thumb', asyncHandler(async (req: Request, res: Response) => {
+  await sendTemplateAssetContent(req, res, 'thumb')
+}))
+
 /** Public API for external website: single active template with designState. */
 router.get('/public/:id', asyncHandler(async (req: Request, res: Response) => {
   const id = parseInt(req.params.id)
@@ -298,6 +341,42 @@ router.post('/:id/reimport', uploadOrderFilesMemory.fields([
       warnings: details.importWarnings ?? [],
     })
   }
+}))
+
+/** POST /api/design-templates/:id/assets — загрузить изображение в шаблон */
+router.post('/:id/assets', uploadOrderFilesMemory.single('file'), asyncHandler(async (req: Request, res: Response) => {
+  const templateId = parseInt(req.params.id)
+  if (!Number.isFinite(templateId) || templateId <= 0) {
+    res.status(400).json({ message: 'Неверный ID' })
+    return
+  }
+  const file = (req as any).file as { buffer?: Buffer; originalname?: string; mimetype?: string } | undefined
+  try {
+    const asset = await createDesignTemplateAsset(templateId, file ?? {})
+    res.status(201).json({
+      id: asset.id,
+      templateId: asset.templateId,
+      filename: asset.filename,
+      originalName: asset.originalName,
+      mime: asset.mime,
+      size: asset.size,
+      width: asset.width,
+      height: asset.height,
+      url: buildDesignTemplateAssetContentPath(templateId, asset.id),
+      thumbUrl: asset.thumbFilename ? buildDesignTemplateAssetThumbPath(templateId, asset.id) : null,
+    })
+  } catch (err: unknown) {
+    res.status(400).json({ message: err instanceof Error ? err.message : 'Ошибка загрузки файла' })
+  }
+}))
+
+/** GET /api/design-templates/:id/assets/:fileId/content — содержимое asset (админ) */
+router.get('/:id/assets/:fileId/content', asyncHandler(async (req: Request, res: Response) => {
+  await sendTemplateAssetContent(req, res, 'content')
+}))
+
+router.get('/:id/assets/:fileId/thumb', asyncHandler(async (req: Request, res: Response) => {
+  await sendTemplateAssetContent(req, res, 'thumb')
 }))
 
 /** GET /api/design-templates/:id — один шаблон */
@@ -437,7 +516,14 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     return
   }
   if (body.preview_url != null) input.preview_url = String(body.preview_url)
-  if (body.spec != null) input.spec = typeof body.spec === 'string' ? JSON.parse(body.spec) : (body.spec as object)
+  if (body.spec != null) {
+    const spec = typeof body.spec === 'string' ? JSON.parse(body.spec) : (body.spec as object)
+    if (hasBlobUrl(spec)) {
+      res.status(400).json({ message: 'В макете остались временные blob-ссылки на изображения. Загрузите фото через редактор и сохраните снова.' })
+      return
+    }
+    input.spec = spec
+  }
   if (body.is_active != null) input.is_active = body.is_active === true
   if (body.sort_order != null) input.sort_order = Number(body.sort_order)
   const royalty = parseRoyaltyFields(body)

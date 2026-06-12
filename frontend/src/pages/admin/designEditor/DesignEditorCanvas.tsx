@@ -27,7 +27,6 @@ import {
   TEXT_BLOCK_PRESETS,
   TEXT_FONTS,
   SIDEBAR_PHOTO_DRAG_MIME,
-  FABRIC_CUSTOM_PROPS,
 } from './constants';
 import type { TextBlockPresetKind } from './constants';
 import { isLikelyImageFile, looksLikeHttpUrl } from '../../../utils/imageFile';
@@ -47,7 +46,6 @@ import {
   getFilledPhotoCropContext,
   resolvePhotoFieldFitMode,
   resolvePhotoFieldFrameSize,
-  wrapLegacyFilledPhotoImage,
 } from './photoFieldFit';
 import {
   pickEmptyPhotoFieldFrameRect,
@@ -95,10 +93,57 @@ import {
   stripFabricStylesForEditing,
   type TextStyleRun,
 } from './textStyleRuns';
+import { createPageTransitionGate } from './pageTransitionGate';
+import {
+  CanvasHistoryStack,
+  addImageFileToCanvas,
+  addImageUrlToCanvas,
+  applyBasicModeConstraints,
+  bakeClientPhotoFieldIfNeeded,
+  beginTextEditingOnCanvas,
+  canDeleteObjectInBasicMode,
+  canDuplicateObjectInBasicMode,
+  canKeyboardTransformObject,
+  canvasToJSON,
+  clearFilledPhotoField,
+  deletePhotoFieldTargetInBasicMode,
+  duplicateActiveObjects,
+  fillPhotoField,
+  findDesignObjectByIdDeep,
+  findPhotoFieldByIdDeep,
+  getObjProps,
+  isBasicDecorShape,
+  isClientAddedPhotoField,
+  isCoarsePointerEnvironment,
+  isCoarsePointerEvent,
+  isMobileTextInputEnvironment,
+  isTextLikeObject,
+  keepGrabPointAlignedWithSnap,
+  lockTextInlineEditing,
+  moveActiveObjectsByKeyboard,
+  normalizeTextForDisplay,
+  normalizeTextForFabric,
+  parsePageLoadKey,
+  pinFabricHiddenTextarea,
+  releaseBasicModeConstraints,
+  resolveClientPhotoFieldId,
+  resolveInteractiveTargetAtScene,
+  resolveKeyboardNudgePx,
+  getKeyboardTargetObjects,
+  resolvePhotoFieldTarget,
+  scenePointFromInteractionEvent,
+  scenePointToClient,
+  wrapLegacyFilledPhotoImage,
+  asAny,
+  CLIPBOARD_PASTE_OFFSET_PX,
+  cloneFabricObjects,
+  activateClonedObjects,
+  detachFabricObject,
+} from './canvas';
+import type { AnyObj } from './canvas/canvasUtils';
+import type { EditorMode, ResolveImageFileUrl } from './canvas/types';
 
-// ─── Custom property names saved in Fabric JSON ───────────────────────────────
-
-const CUSTOM_PROPS = FABRIC_CUSTOM_PROPS;
+export type { EditorMode } from './canvas/types';
 
 // ─── Public handle exposed via forwardRef ────────────────────────────────────
 
@@ -168,17 +213,12 @@ export interface DesignEditorCanvasHandle {
   openTextEditSheetForActive: () => boolean;
   /** Inline-редактирование на холсте (клавиатура на мобилке). */
   beginTextEditingForActive: () => boolean;
+  /** Дождаться завершения async-перехода страницы/разворота */
+  whenPageTransitionIdle: () => Promise<void>;
+  isPageTransitionBusy: () => boolean;
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
-
-/** basic — только заполнение предопределённых зон; advanced — полный доступ */
-export type EditorMode = 'basic' | 'advanced';
-
-type ResolveImageFileUrl = (
-  file: File,
-  onProgress?: (progress: number) => void,
-) => Promise<string | null | undefined>;
 
 interface DesignEditorCanvasProps {
   template: DesignTemplate | null;
@@ -225,596 +265,8 @@ interface DesignEditorCanvasProps {
   onTextFillHint?: (message: string) => void;
   /** После завершения inline-правки текста — синхронизировать fabricJSON в pages для preflight */
   onTextEditCommitted?: () => void;
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-type AnyObj = Record<string, unknown>;
-type FabricDragTransform = {
-  offsetX?: number;
-  offsetY?: number;
-};
-
-const KEYBOARD_NUDGE_FAST_MULTIPLIER = 10;
-const CLIPBOARD_PASTE_OFFSET_PX = 16;
-
-/** Применяет ограничения basic-режима к объектам холста */
-function applyBasicModeConstraints(canvas: Canvas, displayScale = 1): void {
-  const inv = 1 / Math.max(0.22, Math.min(1, displayScale));
-  const canvasZoom = canvas.getZoom();
-  canvas.getObjects().forEach((obj) => {
-    const o = obj as unknown as AnyObj;
-    if (o.isBackground) {
-      obj.set({ selectable: false, evented: false });
-    } else if (o.isPhotoField) {
-      const clientAdded = isClientAddedPhotoField(o);
-      const filled = o.photoFieldFilled === true;
-      if (obj.type === 'group') {
-        const group = obj as Group;
-        ensurePhotoFieldStaticLayout(group);
-        if (filled) {
-          group.getObjects().forEach((child) => {
-            if (child.type === 'image') {
-              child.set({
-                lockScalingX: true,
-                lockScalingY: true,
-                hasControls: false,
-                hasBorders: false,
-              });
-            }
-          });
-        }
-      }
-      obj.set({
-        selectable: true,
-        evented: true,
-        lockMovementX: !clientAdded,
-        lockMovementY: !clientAdded,
-        lockScalingX: !clientAdded,
-        lockScalingY: !clientAdded,
-        lockRotation: true,
-        hasControls: clientAdded,
-        hasBorders: true,
-        borderColor: '#2563eb',
-        ...(clientAdded
-          ? {}
-          : {
-              borderScaleFactor: 2.75 * inv,
-              padding: Math.round(8 * inv),
-            }),
-      });
-      if (clientAdded) {
-        applyPhotoFieldSelectionChrome(obj, displayScale, canvasZoom);
-      }
-      if (filled) {
-        obj.set({ hoverCursor: 'pointer' });
-      }
-    } else if (isTextLikeFabricObject(obj)) {
-      applyTextSelectionChrome(obj, 'basic', displayScale, canvasZoom);
-    } else if (isBasicDecorShape(obj)) {
-      obj.set({
-        selectable: true,
-        evented: true,
-        lockMovementX: false,
-        lockMovementY: false,
-        lockScalingX: true,
-        lockScalingY: true,
-        lockRotation: true,
-        hasControls: false,
-        hasBorders: true,
-        borderColor: '#2563eb',
-        borderScaleFactor: 2.75 * inv,
-        padding: Math.round(8 * inv),
-      });
-    } else {
-      // прочие объекты (свободные изображения и т.п.) — заблокированы
-      obj.set({ selectable: false, evented: false });
-    }
-  });
-  canvas.requestRenderAll();
-}
-
-function isBasicDecorShape(obj: FabricObject): boolean {
-  return obj.type === 'rect'
-    || obj.type === 'circle'
-    || obj.type === 'line'
-    || obj.type === 'triangle';
-}
-
-/** Поле, добавленное клиентом через «Фото/поля», а не из SVG-шаблона */
-function isClientAddedPhotoField(o: AnyObj): boolean {
-  if (o.photoFieldClientAdded === true) return true;
-  return /^field-\d{10,}$/.test(String(o.id ?? '').trim());
-}
-
-function canDeleteObjectInBasicMode(obj: FabricObject): boolean {
-  const o = asAny(obj);
-  if (o.isBackground) return false;
-  if (isTextLikeObject(obj) || isBasicDecorShape(obj)) return true;
-  const field = resolvePhotoFieldTarget(obj);
-  if (field) return true;
-  if (o.isPhotoField) return true;
-  return false;
-}
-
-/** Delete / Backspace: клиентское поле целиком; шаблонное заполненное — только сброс фото. */
-function deletePhotoFieldTargetInBasicMode(canvas: Canvas, obj: FabricObject): void {
-  const field = resolvePhotoFieldTarget(obj) ?? (asAny(obj).isPhotoField ? obj : undefined);
-  if (!field) {
-    detachFabricObject(canvas, obj);
-    return;
-  }
-  const o = asAny(field);
-  if (o.photoFieldFilled === true && !isClientAddedPhotoField(o)) {
-    clearFilledPhotoField(canvas, field);
-    return;
-  }
-  detachFabricObject(canvas, field);
-}
-
-function clearFilledPhotoField(canvas: Canvas, field: FabricObject): boolean {
-  const o = asAny(field);
-  if (!o.isPhotoField || o.photoFieldFilled !== true) return false;
-  const id = String(o.id ?? '').trim() || `field-${Date.now()}`;
-  const fw = Math.max(1, Number(o.photoFieldFw ?? field.width ?? 1));
-  const fh = Math.max(1, Number(o.photoFieldFh ?? field.height ?? 1));
-  const anchor = resolvePhotoFieldFrameSceneTL(field);
-  const clientAdded = isClientAddedPhotoField(o);
-  const parent = field.group;
-  const stackIndex = parent != null ? parent.getObjects().indexOf(field) : -1;
-
-  detachFabricObject(canvas, field);
-
-  const empty = createEmptyPhotoField({
-    id,
-    left: anchor.x,
-    top: anchor.y,
-    width: fw,
-    height: fh,
-    clientAdded,
-  });
-
-  if (parent != null && stackIndex >= 0) {
-    parent.insertAt(stackIndex, empty);
-    parent.set({ dirty: true });
-    parent.setCoords();
-  } else if (parent != null) {
-    parent.add(empty);
-    parent.set({ dirty: true });
-    parent.setCoords();
-  } else {
-    canvas.add(empty);
-  }
-
-  finalizeEmptyPhotoFieldPlacement(empty as Group, anchor);
-  canvas.setActiveObject(empty);
-  empty.setCoords();
-  return true;
-}
-
-function canDuplicateObjectInBasicMode(obj: FabricObject): boolean {
-  if (asAny(obj).isBackground || asAny(obj).isPhotoField) return false;
-  return isTextLikeObject(obj) || isBasicDecorShape(obj);
-}
-
-/** Снимает ограничения basic-режима (полный редактор) */
-function releaseBasicModeConstraints(canvas: Canvas): void {
-  canvas.getObjects().forEach((obj) => {
-    const o = obj as unknown as AnyObj;
-    if (o.isBackground) {
-      obj.set({ selectable: false, evented: false });
-      return;
-    }
-    if (o.isPhotoField && o.photoFieldFilled === true && obj.type === 'group') {
-      obj.set({
-        selectable: true,
-        evented: true,
-        lockMovementX: false,
-        lockMovementY: false,
-        lockScalingX: true,
-        lockScalingY: true,
-        lockRotation: true,
-        hasControls: true,
-        hasBorders: true,
-      });
-      return;
-    }
-    if (isTextLikeFabricObject(obj)) {
-      applyTextSelectionChrome(obj, 'advanced');
-      return;
-    }
-    obj.set({
-      selectable: true,
-      evented: true,
-      lockMovementX: false,
-      lockMovementY: false,
-      lockScalingX: false,
-      lockScalingY: false,
-      lockRotation: false,
-      hasControls: true,
-      hasBorders: true,
-    });
-  });
-  lockTextInlineEditing(canvas);
-  canvas.requestRenderAll();
-}
-
-/** Текст только выделяется по клику; inline-редактирование — по dblclick / листу. */
-function lockTextInlineEditing(canvas: Canvas): void {
-  canvas.getObjects().forEach((obj) => {
-    if (!isTextLikeObject(obj)) return;
-    const text = obj as IText;
-    if ((text as unknown as AnyObj).isEditing) {
-      text.exitEditing();
-    }
-    text.set({ editable: false });
-  });
-}
-
-function asAny(obj: unknown): AnyObj {
-  return obj as unknown as AnyObj;
-}
-
-function isTextLikeObject(obj: FabricObject): boolean {
-  return isTextLikeFabricObject(obj);
-}
-
-function resolvePhotoFieldTarget(target: FabricObject | undefined): FabricObject | undefined {
-  let field = target;
-  if (field?.group && asAny(field.group).isPhotoField) field = field.group as FabricObject;
-  if (!field || !asAny(field).isPhotoField) return undefined;
-  return field;
-}
-
-function isCoarsePointerEnvironment(): boolean {
-  if (typeof window === 'undefined') return false;
-  return (
-    window.matchMedia('(pointer: coarse)').matches
-    || window.matchMedia('(max-width: 760px)').matches
-  );
-}
-
-function isCoarsePointerEvent(e: Event | undefined): boolean {
-  if (!e) return false;
-  const pe = e as PointerEvent;
-  if (pe.pointerType === 'touch' || pe.pointerType === 'pen') return true;
-  if ('TouchEvent' in window) {
-    const te = e as TouchEvent;
-    if (te.touches?.length || te.changedTouches?.length) return true;
-  }
-  return isCoarsePointerEnvironment();
-}
-
-function scenePointFromClientPointer(canvas: Canvas, clientX: number, clientY: number): Point {
-  const el = canvas.upperCanvasEl;
-  const rect = el.getBoundingClientRect();
-  const canvasW = canvas.getWidth() ?? 0;
-  const canvasH = canvas.getHeight() ?? 0;
-  if (rect.width <= 0 || rect.height <= 0 || canvasW <= 0 || canvasH <= 0) {
-    return new Point(0, 0);
-  }
-  // Пропорция по экранному bbox: запасной путь, если getScenePoint недоступен.
-  const x = ((clientX - rect.left) / rect.width) * canvasW;
-  const y = ((clientY - rect.top) / rect.height) * canvasH;
-  return new Point(x, y);
-}
-
-function scenePointFromInteractionEvent(canvas: Canvas, e: Event): Point {
-  canvas.calcOffset();
-  try {
-    const p = canvas.getScenePoint(e as never);
-    if (Number.isFinite(p.x) && Number.isFinite(p.y)) return p;
-  } catch {
-    /* fallback */
-  }
-  const pe = e as PointerEvent & TouchEvent;
-  const touch = pe.changedTouches?.[0] ?? pe.touches?.[0];
-  if (touch) return scenePointFromClientPointer(canvas, touch.clientX, touch.clientY);
-  if (typeof pe.clientX === 'number' && typeof pe.clientY === 'number') {
-    return scenePointFromClientPointer(canvas, pe.clientX, pe.clientY);
-  }
-  return new Point(0, 0);
-}
-
-function resolveInteractiveTargetAtScene(
-  canvas: Canvas,
-  sceneX: number,
-  sceneY: number,
-  directTarget?: FabricObject,
-): FabricObject | undefined {
-  const photoFromTarget = resolvePhotoFieldTarget(directTarget);
-  if (photoFromTarget) return photoFromTarget;
-  if (directTarget && isTextLikeObject(directTarget)) return directTarget;
-
-  const photo = findPhotoFieldAtScene(canvas, sceneX, sceneY);
-  if (photo) return photo;
-  return findTextAtScene(canvas, sceneX, sceneY);
-}
-
-
-function normalizeTextForDisplay(text: string | undefined): string {
-  return String(text ?? '').replace(/\u200b/g, '');
-}
-
-function normalizeTextForFabric(text: string): string {
-  const normalized = text.replace(/\r\n/g, '\n');
-  return normalized.length > 0 ? normalized : '\u200b';
-}
-
-function isMobileTextInputEnvironment(): boolean {
-  if (typeof window === 'undefined') return false;
-  return (
-    window.matchMedia('(pointer: coarse)').matches
-    || window.matchMedia('(max-width: 760px)').matches
-  );
-}
-
-function pinFabricHiddenTextarea(canvas: Canvas, text: IText): void {
-  const hidden = (text as unknown as { hiddenTextarea?: HTMLTextAreaElement }).hiddenTextarea;
-  if (!hidden) return;
-  hidden.classList.add('de-fabric-text-input');
-  hidden.style.margin = '0';
-  hidden.style.transform = 'none';
-  hidden.style.zIndex = '10050';
-  hidden.style.boxSizing = 'border-box';
-
-  if (isMobileTextInputEnvironment()) {
-    /* Над полосой страниц / mobile chrome — фокус открывает клавиатуру без scroll jump */
-    hidden.style.position = 'fixed';
-    hidden.style.left = '12px';
-    hidden.style.right = '12px';
-    hidden.style.top = 'auto';
-    hidden.style.width = 'auto';
-    hidden.style.bottom = 'max(148px, calc(128px + env(safe-area-inset-bottom, 0px)))';
-    hidden.style.minHeight = '44px';
-    hidden.style.maxHeight = '120px';
-    hidden.style.padding = '10px 12px';
-    hidden.style.fontSize = '16px';
-    hidden.style.lineHeight = '1.35';
-    hidden.style.color = '#0f172a';
-    hidden.style.background = '#ffffff';
-    hidden.style.border = '1px solid rgba(15, 23, 42, 0.14)';
-    hidden.style.borderRadius = '12px';
-    hidden.style.boxShadow = '0 8px 24px rgba(15, 23, 42, 0.12)';
-    hidden.style.opacity = '1';
-  } else {
-    const br = text.getBoundingRect();
-    const cx = br.left + br.width / 2;
-    const cy = br.top + Math.min(20, Math.max(8, br.height / 2));
-    const { x, y } = scenePointToClient(canvas, cx, cy);
-    hidden.style.position = 'fixed';
-    hidden.style.left = `${Math.round(Math.max(8, x - 64))}px`;
-    hidden.style.top = `${Math.round(Math.max(8, y - 14))}px`;
-    hidden.style.right = 'auto';
-    hidden.style.bottom = 'auto';
-    hidden.style.width = `${Math.max(96, Math.round(br.width))}px`;
-    hidden.style.minHeight = '28px';
-    hidden.style.opacity = '0.01';
-    hidden.style.background = 'transparent';
-    hidden.style.border = 'none';
-    hidden.style.boxShadow = 'none';
-  }
-
-  try {
-    hidden.focus({ preventScroll: true });
-  } catch {
-    hidden.focus();
-  }
-}
-
-function beginTextEditingOnCanvas(
-  canvas: Canvas,
-  target: FabricObject,
-  inlineEditSession?: React.MutableRefObject<boolean>,
-  captureBaseline?: (target: FabricObject) => void,
-): void {
-  if (!isTextLikeObject(target)) return;
-  const text = target as IText;
-  if ((text as unknown as AnyObj).isEditing) return;
-  captureBaseline?.(target);
-  if (inlineEditSession) inlineEditSession.current = true;
-  stripFabricStylesForEditing(text);
-  text.set({ editable: true });
-  canvas.setActiveObject(text);
-  if (typeof text.enterEditing === 'function') {
-    text.enterEditing();
-    pinFabricHiddenTextarea(canvas, text);
-  }
-  canvas.requestRenderAll();
-}
-
-function canKeyboardTransformObject(obj: FabricObject, mode: EditorMode): boolean {
-  const o = asAny(obj);
-  if (o.isBackground) return false;
-  if (mode === 'basic') {
-    return (!!o.isPhotoField && isClientAddedPhotoField(o))
-      || isTextLikeObject(obj)
-      || isBasicDecorShape(obj);
-  }
-  return obj.selectable !== false;
-}
-
-function getKeyboardTargetObjects(canvas: Canvas, mode: EditorMode): FabricObject[] {
-  return canvas.getActiveObjects().filter((obj) => canKeyboardTransformObject(obj, mode));
-}
-
-function resolveKeyboardNudgePx(canvas: Canvas, fast: boolean): number {
-  const shortSide = Math.max(1, Math.min(canvas.getWidth(), canvas.getHeight()));
-  const baseStep = Math.max(1, Math.round(shortSide / 350));
-  return fast ? baseStep * KEYBOARD_NUDGE_FAST_MULTIPLIER : baseStep;
-}
-
-function moveActiveObjectsByKeyboard(canvas: Canvas, dx: number, dy: number, mode: EditorMode): boolean {
-  const targets = getKeyboardTargetObjects(canvas, mode);
-  if (targets.length === 0) return false;
-  targets.forEach((obj) => {
-    obj.set({
-      left: (obj.left ?? 0) + dx,
-      top: (obj.top ?? 0) + dy,
-    });
-    obj.setCoords();
-  });
-  canvas.getActiveObject()?.setCoords();
-  canvas.requestRenderAll();
-  return true;
-}
-
-async function cloneFabricObjects(
-  objects: FabricObject[],
-  options?: { offset?: number; regenerateIds?: boolean },
-): Promise<FabricObject[]> {
-  const clones = await Promise.all(objects.map((obj) => obj.clone() as Promise<FabricObject>));
-  clones.forEach((clone) => {
-    if (options?.offset) {
-      clone.set({
-        left: (clone.left ?? 0) + options.offset,
-        top: (clone.top ?? 0) + options.offset,
-      });
-    }
-    if (options?.regenerateIds) regenerateClonedObjectIdentity(clone);
-    clone.setCoords();
-  });
-  return clones;
-}
-
-function regenerateClonedObjectIdentity(obj: FabricObject): void {
-  const o = asAny(obj);
-  if (typeof o.id === 'string' && o.id.trim()) {
-    const prefix = o.isPhotoField ? 'field' : 'obj';
-    o.id = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  }
-  if (typeof (obj as Group).getObjects === 'function') {
-    (obj as Group).getObjects().forEach(regenerateClonedObjectIdentity);
-  }
-}
-
-function activateClonedObjects(canvas: Canvas, objects: FabricObject[]): void {
-  canvas.discardActiveObject();
-  if (objects.length === 1) {
-    canvas.setActiveObject(objects[0]!);
-  } else if (objects.length > 1) {
-    canvas.setActiveObject(new ActiveSelection(objects, { canvas }));
-  }
-}
-
-function keepGrabPointAlignedWithSnap(event: unknown, dx: number, dy: number): void {
-  const transform = (event as { transform?: FabricDragTransform }).transform;
-  if (!transform) return;
-  if (dx !== 0 && typeof transform.offsetX === 'number') transform.offsetX -= dx;
-  if (dy !== 0 && typeof transform.offsetY === 'number') transform.offsetY -= dy;
-}
-
-/** Поле для фото может быть внутри группы; `canvas.getObjects().find` его не находит. */
-function findPhotoFieldByIdDeep(canvas: Canvas, fieldId: string): FabricObject | undefined {
-  if (!fieldId) return undefined;
-  const walk = (list: FabricObject[]): FabricObject | undefined => {
-    for (const o of list) {
-      if (asAny(o).isPhotoField && String(asAny(o).id ?? '') === fieldId) return o;
-      if (typeof (o as Group).getObjects === 'function') {
-        const nested = walk((o as Group).getObjects());
-        if (nested) return nested;
-      }
-    }
-    return undefined;
-  };
-  return walk(canvas.getObjects());
-}
-
-function findDesignObjectByIdDeep(canvas: Canvas, id: string): FabricObject | undefined {
-  const targetId = id.trim();
-  if (!targetId) return undefined;
-  const walk = (list: FabricObject[]): FabricObject | undefined => {
-    for (const o of list) {
-      if (String(asAny(o).id ?? '') === targetId) return o;
-      if (typeof (o as Group).getObjects === 'function') {
-        const nested = walk((o as Group).getObjects());
-        if (nested) return nested.group ?? nested;
-      }
-    }
-    return undefined;
-  };
-  return walk(canvas.getObjects());
-}
-
-function getObjProps(obj: unknown): SelectedObjProps {
-  const o = asAny(obj);
-  const typeName = (o.type as string) ?? '';
-  const isPhoto = !!o.isPhotoField;
-
-  let type: SelectedObjProps['type'] = 'other';
-  if (isPhoto) type = 'photoField';
-  else if (typeName === 'i-text' || typeName === 'textbox') type = 'IText';
-  else if (typeName === 'image') type = 'image';
-  else if (typeName === 'rect') type = 'rect';
-  else if (typeName === 'circle') type = 'circle';
-  else if (typeName === 'line') type = 'line';
-  else if (typeName === 'triangle') type = 'triangle';
-
-  const id = String(o.id ?? '').trim();
-  return {
-    type,
-    id: id || undefined,
-    photoFieldFilled: type === 'photoField' ? o.photoFieldFilled === true : undefined,
-    text: type === 'IText' ? (o.text as string) : undefined,
-    fontFamily: o.fontFamily as string | undefined,
-    fontSize: o.fontSize as number | undefined,
-    fontWeight: (o.fontWeight as string) ?? 'normal',
-    fontStyle: (o.fontStyle as string) ?? 'normal',
-    underline: !!(o.underline),
-    textAlign: (o.textAlign as string) ?? 'left',
-    lineHeight: type === 'IText' ? (typeof o.lineHeight === 'number' ? o.lineHeight : 1.16) : undefined,
-    fill: o.fill as string | undefined,
-    stroke: o.stroke as string | undefined,
-    strokeWidth: o.strokeWidth as number | undefined,
-    opacity: (o.opacity as number) ?? 1,
-    flipX: !!(o.flipX),
-    flipY: !!(o.flipY),
-    locked: !!(o.locked),
-  };
-}
-
-/** Сцена Fabric → координаты клиента (для плавающей панели над текстом) */
-function scenePointToClient(canvas: Canvas, sx: number, sy: number): { x: number; y: number } {
-  const vpt = canvas.viewportTransform!;
-  const vp = new Point(sx, sy).transform(vpt);
-  const upper = canvas.upperCanvasEl;
-  const b = upper.getBoundingClientRect();
-  return {
-    x: b.left + (vp.x / upper.width) * b.width,
-    y: b.top + (vp.y / upper.height) * b.height,
-  };
-}
-
-function canvasToJSON(canvas: Canvas): Record<string, unknown> {
-  const json = canvas.toObject(CUSTOM_PROPS) as Record<string, unknown>;
-  dehydrateTextObjectsInFabricJSON(json);
-  return json;
-}
-
-function bakeClientPhotoFieldIfNeeded(
-  target: FabricObject | undefined,
-  sizeOverride?: { fw: number; fh: number },
-): boolean {
-  const field = resolvePhotoFieldTarget(target) ?? (target && asAny(target).isPhotoField ? target : undefined);
-  if (!field || !isClientAddedPhotoField(asAny(field))) return false;
-  if (asAny(field).photoFieldFilled === true) {
-    return bakeFilledPhotoFieldScaleInPlace(field, sizeOverride);
-  }
-  return bakeEmptyPhotoFieldScaleInPlace(field, sizeOverride);
-}
-
-function resolveClientPhotoFieldId(field: FabricObject): string {
-  return String(asAny(field).id ?? '').trim();
-}
-
-function parsePageLoadKey(
-  key: string,
-): { type: 'single'; index: number } | { type: 'spread'; left: number; right: number } | null {
-  const m = key.match(/^single-(\d+)$/);
-  if (m) return { type: 'single', index: parseInt(m[1], 10) };
-  const s = key.match(/^spread-(\d+)-(\d+)$/);
-  if (s) return { type: 'spread', left: parseInt(s[1], 10), right: parseInt(s[2], 10) };
-  return null;
+  /** Debounced: текущая страница canvas → pages[] (preflight / autosave) */
+  onCanvasDocumentCommit?: () => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -852,12 +304,13 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       resolveImageFileUrl,
       onTextFillHint,
       onTextEditCommitted,
+      onCanvasDocumentCommit,
     },
     ref,
   ) => {
     const canvasElRef = useRef<HTMLCanvasElement>(null);
     const fabricRef = useRef<Canvas | null>(null);
-    const historyRef = useRef<{ stack: string[]; index: number }>({ stack: [], index: -1 });
+    const historyRef = useRef(new CanvasHistoryStack());
     const isLoadingRef = useRef(false);
     const photoFieldBakeLockRef = useRef(false);
     /** Fabric сбрасывает scale до object:modified — размер с scaling сохраняем здесь. */
@@ -869,6 +322,11 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const prevPageLoadKeyRef = useRef<string | null>(null);
     /** Блокирует синхронный resize по canvasWidthPx во время async split/load при смене pageLoadKey */
     const pageTransitionLockRef = useRef(false);
+    const pageTransitionGateRef = useRef<ReturnType<typeof createPageTransitionGate> | null>(null);
+    if (!pageTransitionGateRef.current) {
+      pageTransitionGateRef.current = createPageTransitionGate();
+    }
+    const pageTransitionGate = pageTransitionGateRef.current;
     const spreadPairPagesRef = useRef(spreadPairPages);
     spreadPairPagesRef.current = spreadPairPages;
     const pageWidthRef = useRef(pageWidthPx);
@@ -911,7 +369,20 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     onTextFillHintRef.current = onTextFillHint;
     const onTextEditCommittedRef = useRef(onTextEditCommitted);
     onTextEditCommittedRef.current = onTextEditCommitted;
+    const onCanvasDocumentCommitRef = useRef(onCanvasDocumentCommit);
+    onCanvasDocumentCommitRef.current = onCanvasDocumentCommit;
+    const documentCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scheduleTextAnchorRef = useRef<(() => void) | null>(null);
+
+    const scheduleCanvasDocumentCommit = useCallback(() => {
+      if (!onCanvasDocumentCommitRef.current) return;
+      if (documentCommitTimerRef.current) clearTimeout(documentCommitTimerRef.current);
+      documentCommitTimerRef.current = setTimeout(() => {
+        documentCommitTimerRef.current = null;
+        if (isLoadingRef.current || pageTransitionLockRef.current) return;
+        onCanvasDocumentCommitRef.current?.();
+      }, 400);
+    }, []);
 
     const captureTextEditBaseline = useCallback((target: FabricObject) => {
       const fieldId = String(asAny(target).id ?? '').trim();
@@ -1012,13 +483,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       const canvas = fabricRef.current;
       if (!canvas || isLoadingRef.current) return;
       const json = JSON.stringify(canvasToJSON(canvas));
-      const { stack, index } = historyRef.current;
-      const newStack = stack.slice(0, index + 1);
-      newStack.push(json);
-      if (newStack.length > 50) newStack.shift();
-      historyRef.current = { stack: newStack, index: newStack.length - 1 };
-      onHistoryChange(newStack.length > 1, false);
-    }, [onHistoryChange]);
+      const flags = historyRef.current.push(json);
+      onHistoryChange(flags.canUndo, flags.canRedo);
+      scheduleCanvasDocumentCommit();
+    }, [onHistoryChange, scheduleCanvasDocumentCommit]);
 
     const fillPhotoFieldWithSnapshot = useCallback(
       async (canvas: Canvas, field: FabricObject, file: File): Promise<void> => {
@@ -1052,37 +520,35 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const undo = useCallback(async () => {
       const canvas = fabricRef.current;
       if (!canvas) return;
-      const { stack, index } = historyRef.current;
-      if (index <= 0) return;
-      const newIndex = index - 1;
-      historyRef.current.index = newIndex;
+      const target = historyRef.current.moveUndo();
+      if (!target) return;
       isLoadingRef.current = true;
       try {
-        await canvas.loadFromJSON(JSON.parse(stack[newIndex]) as Record<string, unknown>, fabricDeserializeReviver);
+        await canvas.loadFromJSON(JSON.parse(target) as Record<string, unknown>, fabricDeserializeReviver);
         prepareTextObjectsOnCanvas(canvas.getObjects());
         canvas.requestRenderAll();
       } finally {
         isLoadingRef.current = false;
       }
-      onHistoryChange(newIndex > 0, newIndex < stack.length - 1);
+      const flags = historyRef.current.flags();
+      onHistoryChange(flags.canUndo, flags.canRedo);
     }, [onHistoryChange]);
 
     const redo = useCallback(async () => {
       const canvas = fabricRef.current;
       if (!canvas) return;
-      const { stack, index } = historyRef.current;
-      if (index >= stack.length - 1) return;
-      const newIndex = index + 1;
-      historyRef.current.index = newIndex;
+      const target = historyRef.current.moveRedo();
+      if (!target) return;
       isLoadingRef.current = true;
       try {
-        await canvas.loadFromJSON(JSON.parse(stack[newIndex]) as Record<string, unknown>, fabricDeserializeReviver);
+        await canvas.loadFromJSON(JSON.parse(target) as Record<string, unknown>, fabricDeserializeReviver);
         prepareTextObjectsOnCanvas(canvas.getObjects());
         canvas.requestRenderAll();
       } finally {
         isLoadingRef.current = false;
       }
-      onHistoryChange(newIndex > 0, newIndex < stack.length - 1);
+      const flags = historyRef.current.flags();
+      onHistoryChange(flags.canUndo, flags.canRedo);
     }, [onHistoryChange]);
 
     // ── Canvas init (once) ───────────────────────────────────────────────────
@@ -1892,6 +1358,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 
       const targetKey = pageLoadKey;
       pageTransitionLockRef.current = true;
+      pageTransitionGate.begin();
       void (async () => {
         try {
           // Снимок страниц после сохранения с холста — сразу, т.к. setPages не обновит pagesRef до следующего рендера
@@ -1927,7 +1394,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           }
 
           if (pageLoadKeyRef.current !== targetKey) return;
-          historyRef.current = { stack: [], index: -1 };
+          historyRef.current.reset();
           onHistoryChange(false, false);
 
           const parsedNext = parsePageLoadKey(targetKey);
@@ -1968,7 +1435,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
           else lockTextInlineEditing(canvas);
           const snap = JSON.stringify(canvasToJSON(canvas));
-          historyRef.current = { stack: [snap], index: 0 };
+          historyRef.current.reset(snap);
 
           const thumb = canvas.toDataURL({ format: 'jpeg', multiplier: 0.14, quality: 0.7 });
           if (parsedNext?.type === 'spread') {
@@ -1985,11 +1452,13 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           if (pageLoadKeyRef.current === targetKey) {
             pageTransitionLockRef.current = false;
           }
+          pageTransitionGate.end();
         }
       })();
 
       return () => {
         pageTransitionLockRef.current = false;
+        pageTransitionGate.end();
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pageLoadKey]);
@@ -2387,6 +1856,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       getDataURL: (opts) =>
         fabricRef.current?.toDataURL({ format: 'png', multiplier: opts?.multiplier ?? 2 }) ?? '',
       saveCurrentPage: async (): Promise<SavePageResult> => {
+        await pageTransitionGate.waitUntilIdle();
         const canvas = fabricRef.current;
         if (!canvas) return { kind: 'single', json: {} };
         const pw = pageWidthRef.current;
@@ -2466,7 +1936,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
           canvas.requestRenderAll();
           if (pagesOverride) {
             const snap = JSON.stringify(canvasToJSON(canvas));
-            historyRef.current = { stack: [snap], index: 0 };
+            historyRef.current.reset(snap);
             onHistoryChange(false, false);
           }
         } finally {
@@ -2651,6 +2121,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
         beginTextEditingOnCanvas(canvas, active, inlineTextEditSessionRef, captureTextEditBaseline);
         return true;
       },
+      whenPageTransitionIdle: () => pageTransitionGate.waitUntilIdle(),
+      isPageTransitionBusy: () => pageTransitionGate.isBusy(),
     }));
 
 
@@ -2812,211 +2284,3 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 );
 
 DesignEditorCanvas.displayName = 'DesignEditorCanvas';
-
-// ─── Canvas helpers (module-level) ───────────────────────────────────────────
-
-async function addImageFileToCanvas(
-  canvas: Canvas,
-  file: File,
-  resolveImageFileUrl?: ResolveImageFileUrl,
-): Promise<void> {
-  const stableUrl = await resolveImageFileUrl?.(file);
-  const url = stableUrl || URL.createObjectURL(file);
-  try {
-    const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
-    const maxW = canvas.width! * 0.6;
-    const maxH = canvas.height! * 0.6;
-    const scale = Math.min(
-      img.width! > maxW ? maxW / img.width! : 1,
-      img.height! > maxH ? maxH / img.height! : 1,
-    );
-    img.set({
-      left: canvas.width! / 2 - (img.width! * scale) / 2,
-      top: canvas.height! / 2 - (img.height! * scale) / 2,
-      scaleX: scale,
-      scaleY: scale,
-    });
-    canvas.add(img);
-    canvas.setActiveObject(img);
-    canvas.requestRenderAll();
-  } finally {
-    if (!stableUrl) {
-      // Fabric может догружать blob после await — откладываем revoke
-      setTimeout(() => URL.revokeObjectURL(url), 750);
-    }
-  }
-}
-
-async function addImageUrlToCanvas(canvas: Canvas, url: string): Promise<void> {
-  const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
-  const maxW = canvas.width! * 0.6;
-  const maxH = canvas.height! * 0.6;
-  const scale = Math.min(
-    img.width! > maxW ? maxW / img.width! : 1,
-    img.height! > maxH ? maxH / img.height! : 1,
-  );
-  img.set({
-    left: canvas.width! / 2 - (img.width! * scale) / 2,
-    top: canvas.height! / 2 - (img.height! * scale) / 2,
-    scaleX: scale,
-    scaleY: scale,
-  });
-  canvas.add(img);
-  canvas.setActiveObject(img);
-  canvas.requestRenderAll();
-}
-
-function duplicateActiveObjects(
-  canvas: Canvas,
-  mode: EditorMode,
-  afterDone: () => void,
-  displayScale = 1,
-): void {
-  const active = canvas.getActiveObjects().filter((obj) => (
-    mode === 'basic' ? canDuplicateObjectInBasicMode(obj) : canKeyboardTransformObject(obj, 'advanced')
-  ));
-  if (!active.length) return;
-  void cloneFabricObjects(active, {
-    offset: CLIPBOARD_PASTE_OFFSET_PX,
-    regenerateIds: true,
-  }).then((copies) => {
-    copies.forEach((copy) => canvas.add(copy));
-    if (mode === 'basic') applyBasicModeConstraints(canvas, displayScale);
-    activateClonedObjects(canvas, copies);
-    canvas.requestRenderAll();
-    afterDone();
-  });
-}
-
-/** Удалить объект с канваса или из родительской группы (canvas.remove только для потомков корня). */
-function detachFabricObject(canvas: Canvas, obj: FabricObject): void {
-  const parent = obj.group;
-  if (parent) {
-    parent.remove(obj);
-    parent.set({ dirty: true });
-    parent.setCoords();
-  } else {
-    canvas.remove(obj);
-  }
-}
-
-/** Снимок трансформа без позиции. origin не копируем — заполненная группа всегда LT, иначе setXY по углу рамки даёт артефакты при center/center у плейсхолдера. */
-function snapshotPhotoFieldTransformNoPosition(
-  field: FabricObject,
-  options?: { bakeScaleIntoFrame?: boolean },
-): Record<string, unknown> {
-  return {
-    angle: field.angle ?? 0,
-    scaleX: options?.bakeScaleIntoFrame ? 1 : (field.scaleX ?? 1),
-    scaleY: options?.bakeScaleIntoFrame ? 1 : (field.scaleY ?? 1),
-    skewX: field.skewX ?? 0,
-    skewY: field.skewY ?? 0,
-    flipX: !!field.flipX,
-    flipY: !!field.flipY,
-    opacity: field.opacity ?? 1,
-    originX: 'left',
-    originY: 'top',
-  };
-}
-
-/** Левый верх рамки поля на сцене — по серому rect пустого поля или fallback. */
-function resolvePhotoFieldFrameSceneTL(field: FabricObject): Point {
-  const emptyRect = pickEmptyPhotoFieldFrameRect(field);
-  if (emptyRect) {
-    const c = emptyRect.getCoords();
-    if (c.length >= 1) return c[0]!;
-  }
-  if (field.type === 'group') {
-    const inner = (field as Group).getObjects()[0];
-    if (inner?.type === 'rect') {
-      const c = inner.getCoords();
-      if (c.length >= 1) return c[0]!;
-    }
-  }
-  const c = field.getCoords();
-  if (c.length >= 1) return c[0]!;
-  const br = field.getBoundingRect();
-  return new Point(br.left, br.top);
-}
-
-/** Заполняет поле для фото: вписывание без искажений (по умолчанию cover со скрытой частью за клипом; явно contain — целиком в рамке). */
-async function fillPhotoField(
-  canvas: Canvas,
-  field: FabricObject,
-  file: File,
-  resolveImageFileUrl?: ResolveImageFileUrl,
-  afterFill?: () => void,
-  onUploadProgress?: (progress: number) => void,
-): Promise<void> {
-  const stableUrl = await resolveImageFileUrl?.(file, onUploadProgress);
-  const url = stableUrl || URL.createObjectURL(file);
-  try {
-    const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
-    const f = field as unknown as AnyObj;
-    const rawId = f.id;
-    const idCandidate =
-      rawId != null && String(rawId).trim() !== '' ? String(rawId) : undefined;
-    const { fw, fh } = resolvePhotoFieldFrameSize(field);
-    const fitMode = resolvePhotoFieldFitMode(f);
-    const panX = Number(f.photoFieldPanX ?? 0);
-    const panY = Number(f.photoFieldPanY ?? 0);
-    const zoom = Number(f.photoFieldZoom ?? 1);
-
-    const anchorSceneTL = resolvePhotoFieldFrameSceneTL(field);
-    const placementSnap = snapshotPhotoFieldTransformNoPosition(field, { bakeScaleIntoFrame: true });
-
-    const parent = field.group;
-    const stackIndex =
-      parent != null ? parent.getObjects().indexOf(field) : -1;
-
-    detachFabricObject(canvas, field);
-
-    const { iw, ih } = getFabricImageIntrinsicSize(img);
-
-    const group = buildFilledPhotoFieldGroup({
-      left: 0,
-      top: 0,
-      frameW: fw,
-      frameH: fh,
-      intrinsicW: iw,
-      intrinsicH: ih,
-      image: img,
-      id: idCandidate ?? `field-${Date.now()}`,
-      panX,
-      panY,
-      zoom,
-      fitMode,
-      fileSize: file.size,
-      clientAdded: isClientAddedPhotoField(f),
-    });
-
-    if (parent != null && stackIndex >= 0) {
-      parent.insertAt(stackIndex, group);
-      parent.set({ dirty: true });
-      parent.setCoords();
-    } else if (parent != null) {
-      parent.add(group);
-      parent.set({ dirty: true });
-      parent.setCoords();
-    } else {
-      canvas.add(group);
-    }
-    const syncPlacement = (): void => {
-      group.set(placementSnap as Parameters<typeof group.set>[0]);
-      group.setXY(anchorSceneTL, 'left', 'top');
-      group.setCoords();
-      syncFilledPhotoFieldSceneAnchor(group, anchorSceneTL);
-      applyPhotoFieldPanToGroup(group, panX, panY, zoom);
-      parent?.setCoords();
-      canvas.requestRenderAll();
-    };
-    syncPlacement();
-    queueMicrotask(syncPlacement);
-    requestAnimationFrame(syncPlacement);
-    canvas.setActiveObject(group);
-    afterFill?.();
-  } finally {
-    if (!stableUrl) setTimeout(() => URL.revokeObjectURL(url), 750);
-  }
-}
-

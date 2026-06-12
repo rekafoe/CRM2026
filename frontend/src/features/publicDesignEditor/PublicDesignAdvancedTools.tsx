@@ -1,11 +1,11 @@
 import React, { useCallback, useMemo, useState, type RefObject } from 'react';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
-import type { PageSaveSnapshot } from '../../pages/admin/designEditor/mergePagesSnapshot';
-import { mergeSavedEditorPages } from '../../pages/admin/designEditor/designEditorState';
+import { applyDocumentTextPatch } from '../../pages/admin/designEditor/applyDocumentTextPatch';
 import {
   extractUsedFontFamiliesFromPages,
-  patchAllTextInFabricJSON,
 } from '../../pages/admin/designEditor/patchFabricTextObjects';
+import { TextPatchScopeDialog } from '../../pages/admin/designEditor/TextPatchScopeDialog';
+import { useTextPatchScopeDialog } from '../../pages/admin/designEditor/useTextPatchScopeDialog';
 import { mergeFontSelectOptions, useCrmDesignFonts } from '../../hooks/useCrmDesignFonts';
 import { TEXT_FONTS } from '../../pages/admin/designEditor/constants';
 import { fontFamilyCompactKey } from '../../utils/fontFamilyNormalize';
@@ -60,6 +60,12 @@ export const PublicDesignAdvancedTools: React.FC<PublicDesignAdvancedToolsProps>
   onDirty,
 }) => {
   const [section, setSection] = useState<ClientToolSection | null>(null);
+  const {
+    textPatchScopeOpen,
+    askTextPatchScope,
+    handleTextPatchScopeClose,
+    handleTextPatchScopeChoose,
+  } = useTextPatchScopeDialog();
   const usedFonts = useMemo(() => extractUsedFontFamiliesFromPages(pages), [pages]);
   const { selectOptions: crmFontOptions } = useCrmDesignFonts();
   const fontOptions = useMemo(() => {
@@ -74,27 +80,50 @@ export const PublicDesignAdvancedTools: React.FC<PublicDesignAdvancedToolsProps>
     async (patch: Record<string, unknown>) => {
       const handle = canvasHandleRef.current;
       if (!handle) return;
+
       if (selectedObj?.type === 'IText') {
-        handle.applyTextPropsToSelection(patch);
+        await applyDocumentTextPatch({
+          scope: 'selection',
+          patch,
+          canvasHandle: handle,
+          selectedObj,
+          pages,
+          setPages,
+          currentPage,
+          leftPageIdx,
+          rightPageIdx,
+        });
         onDirty();
         return;
       }
-      const saved = await handle.saveCurrentPage();
-      const merged = mergeSavedEditorPages(
+
+      const scope = await askTextPatchScope();
+      if (!scope) return;
+
+      await applyDocumentTextPatch({
+        scope,
+        patch,
+        canvasHandle: handle,
+        selectedObj,
         pages,
-        saved as PageSaveSnapshot,
+        setPages,
         currentPage,
         leftPageIdx,
         rightPageIdx,
-      );
-      const nextPages = merged.map((page) => ({
-        fabricJSON: patchAllTextInFabricJSON(page.fabricJSON, patch),
-      }));
-      setPages(nextPages);
-      await handle.applyEditorViewState(nextPages);
+      });
       onDirty();
     },
-    [canvasHandleRef, currentPage, leftPageIdx, onDirty, pages, rightPageIdx, selectedObj?.type, setPages],
+    [
+      askTextPatchScope,
+      canvasHandleRef,
+      currentPage,
+      leftPageIdx,
+      onDirty,
+      pages,
+      rightPageIdx,
+      selectedObj,
+      setPages,
+    ],
   );
 
   const handleAddPhotoField = useCallback((options?: { aspectW?: number; aspectH?: number }) => {
@@ -198,6 +227,12 @@ export const PublicDesignAdvancedTools: React.FC<PublicDesignAdvancedToolsProps>
           </div>
         ))}
       </div>
+
+      <TextPatchScopeDialog
+        isOpen={textPatchScopeOpen}
+        onClose={handleTextPatchScopeClose}
+        onChoose={handleTextPatchScopeChoose}
+      />
     </section>
   );
 };

@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
+import { useSerializedPageNavigation } from './useSerializedPageNavigation';
 import { EMPTY_PAGE } from '../../pages/admin/designEditor/constants';
 import type { PageSaveSnapshot } from '../../pages/admin/designEditor/mergePagesSnapshot';
 import { mergeSavedEditorPages } from '../../pages/admin/designEditor/designEditorState';
@@ -46,9 +47,12 @@ export function usePublicDesignPageActions({
   setThumbnails,
   markDirty,
 }: UsePublicDesignPageActionsInput) {
+  const { runPageNavigation } = useSerializedPageNavigation(canvasHandleRef);
+
   const saveCurrentCanvasPage = useCallback(async () => {
     const handle = canvasHandleRef.current;
     if (!handle) return;
+    await handle.whenPageTransitionIdle?.();
     const saved = await handle.saveCurrentPage();
     setPages((currentPages) => mergeSavedEditorPages(
       currentPages,
@@ -60,15 +64,17 @@ export function usePublicDesignPageActions({
   }, [canvasHandleRef, currentPage, navigation.leftPageIdx, navigation.rightPageIdx, setPages]);
 
   const handleGoToPage = useCallback(async (pageIndex: number) => {
-    const targetItem = navigation.stripItems.find(
-      (item) => item.goToPage === pageIndex || item.pages.includes(pageIndex),
-    );
-    if (!targetItem) return;
-    if (targetItem.pages.includes(currentPage)) return;
+    await runPageNavigation(async () => {
+      const targetItem = navigation.stripItems.find(
+        (item) => item.goToPage === pageIndex || item.pages.includes(pageIndex),
+      );
+      if (!targetItem) return;
+      if (targetItem.pages.includes(currentPage)) return;
 
-    await saveCurrentCanvasPage();
-    setCurrentPage(targetItem.goToPage);
-  }, [currentPage, navigation.stripItems, saveCurrentCanvasPage, setCurrentPage]);
+      await saveCurrentCanvasPage();
+      setCurrentPage(targetItem.goToPage);
+    });
+  }, [currentPage, navigation.stripItems, runPageNavigation, saveCurrentCanvasPage, setCurrentPage]);
 
   const handleAddClientPage = useCallback(async () => {
     await saveCurrentCanvasPage();

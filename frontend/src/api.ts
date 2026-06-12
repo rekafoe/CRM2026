@@ -1213,6 +1213,29 @@ export const uploadDesignTemplatePreview = (file: File) => {
   formData.append('preview', file);
   return api.post<{ filename: string; url: string }>('/design-templates/upload-preview', formData);
 };
+
+export interface DesignTemplateAsset {
+  id: number;
+  templateId: number;
+  filename: string;
+  originalName: string | null;
+  mime?: string | null;
+  size: number;
+  width?: number | null;
+  height?: number | null;
+  url: string;
+  thumbUrl?: string | null;
+}
+
+export const uploadDesignTemplateAsset = (
+  templateId: number,
+  file: File,
+  onUploadProgress?: (event: AxiosProgressEvent) => void,
+) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api.post<DesignTemplateAsset>(`/design-templates/${templateId}/assets`, formData, { onUploadProgress });
+};
 export const importDesignTemplateFile = (payload: {
   file?: File | null;
   sourceFile?: File | null;

@@ -28,11 +28,14 @@ import {
   readDesignTemplateSpec,
 } from './designEditor/designEditorState';
 import {
-  patchAllTextInFabricJSON,
-  patchAllTextFontFamilyInFabricJSON,
   extractUsedFontFamiliesFromPages,
   isFabricTextObjectType,
 } from './designEditor/patchFabricTextObjects';
+import { applyDocumentTextPatch } from './designEditor/applyDocumentTextPatch';
+import { hasBlobUrl } from './designEditor/fabricJsonValidation';
+import { TextPatchScopeDialog } from './designEditor/TextPatchScopeDialog';
+import { useDesignTemplateAssetUpload } from './designEditor/useDesignTemplateAssetUpload';
+import { useTextPatchScopeDialog } from './designEditor/useTextPatchScopeDialog';
 import type {
   DesignPrepressConfig,
   DesignPage,
@@ -121,6 +124,24 @@ export const DesignEditorPage: React.FC = () => {
   }>({ template: null, loading: true, error: null, fontWarning: null });
 
   const [saving, setSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  const numericTemplateId = useMemo(() => {
+    const id = parseInt(templateId ?? '0', 10);
+    return Number.isFinite(id) && id > 0 ? id : null;
+  }, [templateId]);
+
+  const { resolveImageFileUrl } = useDesignTemplateAssetUpload(numericTemplateId);
+  const {
+    textPatchScopeOpen,
+    askTextPatchScope,
+    handleTextPatchScopeClose,
+    handleTextPatchScopeChoose,
+  } = useTextPatchScopeDialog();
+
+  const markDirty = useCallback(() => {
+    setHasUnsavedChanges(true);
+  }, []);
 
   // ── Pages / canvas state ────────────────────────────────────────────────────
   const [pages, setPages] = useState<DesignPage[]>([{ ...EMPTY_PAGE }]);
@@ -383,6 +404,7 @@ export const DesignEditorPage: React.FC = () => {
       setThumbnails({});
       setSpreadMode(sm);
       setCoverPages(cp);
+      setHasUnsavedChanges(false);
       void loadDesignFontsFromSpec(spec).then((fontResult) => {
         if (fontResult.loaded.length > 0) {
           requestAnimationFrame(() => {
@@ -415,6 +437,16 @@ export const DesignEditorPage: React.FC = () => {
     const t = window.setTimeout(() => setSaveSuccessMessage(null), 5000);
     return () => window.clearTimeout(t);
   }, [saveSuccessMessage]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges || saving) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges, saving]);
 
   // ── Image from file picker ───────────────────────────────────────────────────
   const addImageFromFile = useCallback(async (file: File) => {
@@ -664,45 +696,68 @@ export const DesignEditorPage: React.FC = () => {
     canvasHandleRef.current?.addTextPreset(kind);
   }, []);
 
+  const runScopedTextPatch = useCallback(async (patch: Record<string, unknown>) => {
+    const handle = canvasHandleRef.current;
+    if (!handle) return;
+
+    if (typeof patch.fontFamily === 'string') {
+      await ensureDesignFontLoaded(patch.fontFamily, crmFonts);
+    }
+
+    if (isFabricTextObjectType(selectedObj?.type)) {
+      await applyDocumentTextPatch({
+        scope: 'selection',
+        patch,
+        canvasHandle: handle,
+        selectedObj,
+        pages,
+        setPages,
+        currentPage,
+        leftPageIdx,
+        rightPageIdx,
+      });
+      markDirty();
+      return;
+    }
+
+    const scope = await askTextPatchScope();
+    if (!scope) return;
+
+    await applyDocumentTextPatch({
+      scope,
+      patch,
+      canvasHandle: handle,
+      selectedObj,
+      pages,
+      setPages,
+      currentPage,
+      leftPageIdx,
+      rightPageIdx,
+    });
+    markDirty();
+  }, [
+    askTextPatchScope,
+    crmFonts,
+    currentPage,
+    leftPageIdx,
+    markDirty,
+    pages,
+    rightPageIdx,
+    selectedObj,
+  ]);
+
   const handleSidebarApplyFont = useCallback(
     async (fontFamily: string) => {
-      const handle = canvasHandleRef.current;
-      if (!handle) return;
-      await ensureDesignFontLoaded(fontFamily, crmFonts);
-      if (isFabricTextObjectType(selectedObj?.type)) {
-        handle.applyTextPropsToSelection({ fontFamily });
-        await handle.reloadTextFonts();
-        return;
-      }
-      const saved = await handle.saveCurrentPage();
-      const merged = mergeSavedEditorPages(pages, saved as PageSaveSnapshot, currentPage, leftPageIdx, rightPageIdx);
-      const nextPages = merged.map((p) => ({
-        fabricJSON: patchAllTextFontFamilyInFabricJSON(p.fabricJSON as Record<string, unknown>, fontFamily),
-      }));
-      setPages(nextPages);
-      await handle.applyEditorViewState(nextPages);
-      await handle.reloadTextFonts();
+      await runScopedTextPatch({ fontFamily });
     },
-    [selectedObj?.type, currentPage, leftPageIdx, rightPageIdx, pages, crmFonts],
+    [runScopedTextPatch],
   );
 
   const handleSidebarApplyTextColor = useCallback(
     async (fill: string) => {
-      const handle = canvasHandleRef.current;
-      if (!handle) return;
-      if (isFabricTextObjectType(selectedObj?.type)) {
-        handle.applyTextPropsToSelection({ fill });
-        return;
-      }
-      const saved = await handle.saveCurrentPage();
-      const merged = mergeSavedEditorPages(pages, saved as PageSaveSnapshot, currentPage, leftPageIdx, rightPageIdx);
-      const nextPages = merged.map((p) => ({
-        fabricJSON: patchAllTextInFabricJSON(p.fabricJSON as Record<string, unknown>, { fill }),
-      }));
-      setPages(nextPages);
-      await handle.applyEditorViewState(nextPages);
+      await runScopedTextPatch({ fill });
     },
-    [selectedObj?.type, currentPage, leftPageIdx, rightPageIdx, pages],
+    [runScopedTextPatch],
   );
 
   const handleSidebarApplyEffects = useCallback(
@@ -724,6 +779,7 @@ export const DesignEditorPage: React.FC = () => {
           props.shadow = null;
         }
         handle.applyTextPropsToSelection(props);
+        markDirty();
         return;
       }
       const patch: Record<string, unknown> = {
@@ -731,15 +787,9 @@ export const DesignEditorPage: React.FC = () => {
         strokeWidth: v.strokeWidth,
         stroke: v.strokeWidth > 0 ? v.stroke : '',
       };
-      const saved = await handle.saveCurrentPage();
-      const merged = mergeSavedEditorPages(pages, saved as PageSaveSnapshot, currentPage, leftPageIdx, rightPageIdx);
-      const nextPages = merged.map((p) => ({
-        fabricJSON: patchAllTextInFabricJSON(p.fabricJSON as Record<string, unknown>, patch),
-      }));
-      setPages(nextPages);
-      await handle.applyEditorViewState(nextPages);
+      await runScopedTextPatch(patch);
     },
-    [selectedObj?.type, currentPage, leftPageIdx, rightPageIdx, pages],
+    [markDirty, runScopedTextPatch, selectedObj?.type],
   );
 
   // ── Save ─────────────────────────────────────────────────────────────────────
@@ -767,9 +817,14 @@ export const DesignEditorPage: React.FC = () => {
       coverPages,
     });
 
-    const tid = templateId ? parseInt(templateId, 10) : 0;
+    const tid = numericTemplateId ?? 0;
     if (!tid) {
       setEditorError('Не удалось сохранить: не указан шаблон.');
+      return;
+    }
+
+    if (hasBlobUrl(designState)) {
+      setEditorError('В макете остались временные blob-ссылки на изображения. Дождитесь загрузки фото и сохраните снова.');
       return;
     }
 
@@ -781,6 +836,7 @@ export const DesignEditorPage: React.FC = () => {
       const res = await updateDesignTemplate(tid, { spec: mergedSpec });
       setTemplateState((s) => ({ ...s, template: res.data }));
       setPages(updatedPages);
+      setHasUnsavedChanges(false);
       setSaveSuccessMessage('Макет сохранён в шаблоне. При следующем открытии подтянется из каталога.');
     } catch (err: unknown) {
       setEditorError(err instanceof Error ? err.message : 'Ошибка сохранения шаблона');
@@ -800,6 +856,7 @@ export const DesignEditorPage: React.FC = () => {
     coverPages,
     leftPageIdx,
     rightPageIdx,
+    numericTemplateId,
   ]);
 
   // ── PDF export ────────────────────────────────────────────────────────────────
@@ -906,6 +963,15 @@ export const DesignEditorPage: React.FC = () => {
           templateName={template.name}
           documentLabel="Админский шаблон"
           saving={saving}
+          saveState={
+            saving
+              ? 'saving'
+              : hasUnsavedChanges
+                ? 'dirty'
+                : saveSuccessMessage
+                  ? 'saved'
+                  : 'idle'
+          }
           orderLabel="Сохранить"
           savingLabel="Сохраняем..."
           onPrimaryAction={() => void handleSave()}
@@ -1081,7 +1147,9 @@ export const DesignEditorPage: React.FC = () => {
               onHistoryChange: (u, r) => {
                 setCanUndo(u);
                 setCanRedo(r);
+                if (u) markDirty();
               },
+              resolveImageFileUrl,
               onZoomChange: setZoom,
               onPageThumbReady: handlePageThumbReady,
               onDropRemoteImageUrl: handleImageUrlSubmit,
@@ -1154,6 +1222,12 @@ export const DesignEditorPage: React.FC = () => {
           }}
           onSelect={handleImagePickerSelect}
           initialFiles={imagePickerInitialFiles}
+        />
+
+        <TextPatchScopeDialog
+          isOpen={textPatchScopeOpen}
+          onClose={handleTextPatchScopeClose}
+          onChoose={handleTextPatchScopeChoose}
         />
         </div>
       </div>

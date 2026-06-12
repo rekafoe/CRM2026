@@ -4,6 +4,7 @@ import {
   estimateTextSceneBox,
 } from './editorDesignTextBounds'
 import { assertMultipagePagesConsistency } from '../utils/multipagePagesConsistency'
+import { hasBlobUrl } from '../utils/fabricJsonValidation'
 
 export type EditorPreflightIssueLevel = 'error' | 'warning'
 
@@ -50,13 +51,6 @@ function walkFabricObjects(value: unknown, visit: (obj: FabricJsonObject) => voi
     if (Array.isArray(children)) children.forEach((child) => walkFabricObjects(child, visit))
   }
   walkFabricObjects(value.clipPath, visit)
-}
-
-function hasBlobUrl(value: unknown): boolean {
-  if (typeof value === 'string') return value.startsWith('blob:')
-  if (Array.isArray(value)) return value.some(hasBlobUrl)
-  if (!isRecord(value)) return false
-  return Object.values(value).some(hasBlobUrl)
 }
 
 function isTextObject(obj: FabricJsonObject): boolean {
