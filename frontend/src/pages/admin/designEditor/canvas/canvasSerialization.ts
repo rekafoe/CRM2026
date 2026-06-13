@@ -29,16 +29,10 @@ export function canvasToJSON(canvas: Canvas): Record<string, unknown> {
   try {
     json = canvas.toObject(CUSTOM_PROPS) as Record<string, unknown>;
   } catch {
-    const failedObjectIndexes: number[] = [];
-    const objects = (canvas.getObjects() as FabricObject[]).map((obj, index) => {
+    const objects = (canvas.getObjects() as FabricObject[]).map((obj) => {
       const serialized = safeSerializeObject(obj);
-      if (serialized) return serialized;
-      failedObjectIndexes.push(index);
-      return null;
+      return serialized;
     }).filter((obj): obj is Record<string, unknown> => !!obj);
-    if (failedObjectIndexes.length > 0) {
-      throw new Error(`Failed to serialize objects: [${failedObjectIndexes.join(', ')}]`);
-    }
     json = {
       objects,
       backgroundColor: (canvas as unknown as { backgroundColor?: unknown }).backgroundColor,

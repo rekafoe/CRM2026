@@ -4,7 +4,6 @@ import type { DesignTemplate } from '../../../../api';
 import type { DesignPage } from '../types';
 import { cropSpreadThumbnail } from '../cropSpreadThumbnail';
 import { loadDesignPageScene, loadSpreadMergedScene } from '../designPageLoader';
-import { splitSpreadCanvasToPagesSync } from '../spreadCanvas';
 import type { EditorMode } from './types';
 import { applyBasicModeConstraints, lockTextInlineEditing } from './canvasBasicMode';
 import { canvasToJSON, parsePageLoadKey } from './canvasSerialization';
@@ -147,40 +146,12 @@ export async function runPageLoadKeyTransition({
     pageThumbReadyRef,
     selectionDisplayScaleRef,
   } = refs;
-  const { setPages, onHistoryChange, apiBaseUrl } = callbacks;
+  const { onHistoryChange, apiBaseUrl } = callbacks;
 
   try {
-    let snapshotPages: DesignPage[] = pagesRef.current;
-    let pagesChanged = false;
+    const snapshotPages: DesignPage[] = pagesRef.current;
     const beforeDigest = buildTransitionObjectDigest(canvas);
     const objectCountBeforeFlush = canvas.getObjects().length;
-
-    if (prevKey != null) {
-      const parsedPrev = parsePageLoadKey(prevKey);
-      if (parsedPrev?.type === 'spread') {
-        const { left, right } = splitSpreadCanvasToPagesSync(canvas, pageWidthRef.current);
-        snapshotPages = pagesRef.current.map((p, i) => {
-          if (i === parsedPrev.left) return { fabricJSON: left };
-          if (i === parsedPrev.right) return { fabricJSON: right };
-          return p;
-        });
-        pagesChanged = true;
-        await emitSpreadPageThumbs(canvas, parsedPrev.left, parsedPrev.right, pageThumbReadyRef.current);
-      } else if (parsedPrev?.type === 'single') {
-        const json = canvasToJSON(canvas);
-        snapshotPages = pagesRef.current.map((p, i) =>
-          i === parsedPrev.index ? { fabricJSON: json } : p,
-        );
-        pagesChanged = true;
-        await emitSinglePageThumb(canvas, parsedPrev.index, pageThumbReadyRef.current);
-      }
-    }
-
-    if (pagesChanged) {
-      // Transition runner is the canonical writer for outgoing flush; keep ref in sync immediately
-      // so loadIncoming never reads stale pages between async React renders.
-      pagesRef.current = snapshotPages;
-    }
 
     historyRef.current.reset();
     onHistoryChange(false, false);
@@ -230,8 +201,6 @@ export async function runPageLoadKeyTransition({
       beforeDigest,
       afterDigest: buildTransitionObjectDigest(canvas),
     });
-
-    if (pagesChanged) setPages(snapshotPages);
 
     if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
     else lockTextInlineEditing(canvas);

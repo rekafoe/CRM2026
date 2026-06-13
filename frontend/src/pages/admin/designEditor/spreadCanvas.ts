@@ -45,7 +45,7 @@ function getObjectHorizontalBounds(
 
 function serializeCanvasObjectsStrict(canvas: Canvas, objects: FabricObject[]): {
   base: Record<string, unknown>;
-  serialized: Record<string, unknown>[];
+  serialized: Array<Record<string, unknown> | null>;
 } {
   try {
     const base = canvas.toObject(CUSTOM_PROPS) as Record<string, unknown>;
@@ -64,9 +64,11 @@ function serializeCanvasObjectsStrict(canvas: Canvas, objects: FabricObject[]): 
   const serialized = objects.map((obj, index) => {
     const next = safeSerializeObject(obj);
     if (next) return next;
-    throw new Error(`Failed to serialize spread object at index ${index}`);
+    if (import.meta.env.DEV) {
+      console.warn('[DesignEditorCanvas] spread split skipped unserializable object', { index });
+    }
+    return null;
   });
-
   return {
     base: {
       objects: [],
@@ -93,7 +95,8 @@ export function splitSpreadCanvasToPagesSync(
 
   for (let index = 0; index < objects.length; index += 1) {
     const obj = objects[index]!;
-    const serializedObject = serialized[index]!;
+    const serializedObject = serialized[index];
+    if (!serializedObject) continue;
     const bounds = getObjectHorizontalBounds(obj, serializedObject);
 
     // Never drop an object from both pages: if bounds are invalid, duplicate defensively.

@@ -88,7 +88,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   initialDraftToken,
   onDraftTokenChange,
   adapter = crmPreviewPublicDesignEditorAdapter,
-  autosaveDelayMs = 1200,
+  autosaveDelayMs = 180000,
   showFinalizeButton = false,
   documentMode = 'single',
   onReadyForCart,

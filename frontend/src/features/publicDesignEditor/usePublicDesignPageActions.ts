@@ -77,11 +77,12 @@ export function usePublicDesignPageActions({
 
   const runNavigationTransaction = useCallback(async (
     task: () => Promise<boolean>,
+    options?: { markDirtyOnChange?: boolean },
   ) => {
     await enqueuePageAction(async () => {
       const changed = await task();
       await canvasHandleRef.current?.whenPageTransitionIdle?.();
-      if (changed) markDirty();
+      if (changed && options?.markDirtyOnChange !== false) markDirty();
     });
   }, [canvasHandleRef, enqueuePageAction, markDirty]);
 
@@ -95,7 +96,7 @@ export function usePublicDesignPageActions({
       if (currentStripItem === targetItem) return false;
       setCurrentPage(targetItem.goToPage);
       return true;
-    });
+    }, { markDirtyOnChange: false });
   }, [currentPage, navigation.stripItems, runNavigationTransaction, setCurrentPage]);
 
   const handleAddClientPage = useCallback(async () => {
