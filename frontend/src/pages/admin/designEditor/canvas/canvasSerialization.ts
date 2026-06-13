@@ -12,6 +12,18 @@ function safeSerializeObject(obj: FabricObject): Record<string, unknown> | null 
   }
 }
 
+function isSyntheticTemplatePreviewBackground(obj: Record<string, unknown>): boolean {
+  return obj.isBackground === true && obj.backgroundFit === 'page';
+}
+
+function stripSyntheticTemplatePreviewBackgrounds(json: Record<string, unknown>): void {
+  if (!Array.isArray(json.objects)) return;
+  json.objects = json.objects.filter((obj) => {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return true;
+    return !isSyntheticTemplatePreviewBackground(obj as Record<string, unknown>);
+  });
+}
+
 export function canvasToJSON(canvas: Canvas): Record<string, unknown> {
   let json: Record<string, unknown>;
   try {
@@ -25,6 +37,9 @@ export function canvasToJSON(canvas: Canvas): Record<string, unknown> {
       backgroundColor: (canvas as unknown as { backgroundColor?: unknown }).backgroundColor,
     };
   }
+  // Template preview background is derived data; persisting it in page snapshots
+  // can produce stale/broken image state after page transitions.
+  stripSyntheticTemplatePreviewBackgrounds(json);
   dehydrateTextObjectsInFabricJSON(json);
   return json;
 }
