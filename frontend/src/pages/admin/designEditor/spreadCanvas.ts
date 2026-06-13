@@ -20,6 +20,29 @@ function safeSerializeObject(obj: FabricObject): Record<string, unknown> | null 
   }
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getObjectHorizontalBounds(
+  obj: FabricObject,
+  serialized: Record<string, unknown>,
+): { left: number; right: number } | null {
+  const rect = obj.getBoundingRect();
+  if (Number.isFinite(rect.left) && Number.isFinite(rect.width) && rect.width >= 0) {
+    return { left: rect.left, right: rect.left + rect.width };
+  }
+
+  const left = toFiniteNumber(serialized.left);
+  const width = toFiniteNumber(serialized.width);
+  const scaleX = toFiniteNumber(serialized.scaleX) ?? 1;
+  if (left == null || width == null) return null;
+  const renderedWidth = Math.abs(width * scaleX);
+  return { left, right: left + renderedWidth };
+}
+
 function serializeCanvasObjectsStrict(canvas: Canvas, objects: FabricObject[]): {
   base: Record<string, unknown>;
   serialized: Record<string, unknown>[];
@@ -71,18 +94,30 @@ export function splitSpreadCanvasToPagesSync(
   for (let index = 0; index < objects.length; index += 1) {
     const obj = objects[index]!;
     const serializedObject = serialized[index]!;
-    const br = obj.getBoundingRect();
-    const rightEdge = br.left + br.width;
-    const crosses = br.left < spine && rightEdge > spine;
+    const bounds = getObjectHorizontalBounds(obj, serializedObject);
 
+    // Never drop an object from both pages: if bounds are invalid, duplicate defensively.
+    if (!bounds) {
+      leftJson.push(deepCloneJson(serializedObject));
+      const rightCopy = deepCloneJson(serializedObject);
+      shiftLeftInSerialized(rightCopy, -spine);
+      rightJson.push(rightCopy);
+      continue;
+    }
+
+    const crosses = bounds.left < spine && bounds.right > spine;
     if (crosses) {
       leftJson.push(deepCloneJson(serializedObject));
       const rightCopy = deepCloneJson(serializedObject);
       shiftLeftInSerialized(rightCopy, -spine);
       rightJson.push(rightCopy);
-    } else if (rightEdge <= spine + 0.5) {
+      continue;
+    }
+
+    const centerX = bounds.left + (bounds.right - bounds.left) / 2;
+    if (centerX < spine) {
       leftJson.push(serializedObject);
-    } else if (br.left >= spine - 0.5) {
+    } else {
       const o = deepCloneJson(serializedObject);
       shiftLeftInSerialized(o, -spine);
       rightJson.push(o);

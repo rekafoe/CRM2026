@@ -42,6 +42,58 @@ export interface PageLoadKeyTransitionParams {
   callbacks: PageLoadKeyTransitionCallbacks;
 }
 
+type TransitionObjectDigest = {
+  key: string;
+  type: string;
+  id: string | null;
+};
+
+function buildTransitionObjectDigest(canvas: Canvas): TransitionObjectDigest[] {
+  return canvas.getObjects().map((obj, index) => {
+    const anyObj = obj as unknown as { id?: unknown; type?: unknown };
+    const type = typeof anyObj.type === 'string' ? anyObj.type : obj.type ?? 'unknown';
+    const id = typeof anyObj.id === 'string' ? anyObj.id : null;
+    return {
+      key: id ? `${type}:${id}` : `${type}:#${index}`,
+      type,
+      id,
+    };
+  });
+}
+
+function buildTypeHistogram(digest: TransitionObjectDigest[]): Record<string, number> {
+  const histogram: Record<string, number> = {};
+  digest.forEach((item) => {
+    histogram[item.type] = (histogram[item.type] ?? 0) + 1;
+  });
+  return histogram;
+}
+
+function logTransitionLossIfAny(input: {
+  targetKey: string;
+  prevKey: string | null;
+  beforeDigest: TransitionObjectDigest[];
+  afterDigest: TransitionObjectDigest[];
+}): void {
+  if (!import.meta.env.DEV) return;
+  const { targetKey, prevKey, beforeDigest, afterDigest } = input;
+  const beforeKeys = new Set(beforeDigest.map((item) => item.key));
+  const afterKeys = new Set(afterDigest.map((item) => item.key));
+  const dropped = beforeDigest.filter((item) => !afterKeys.has(item.key));
+  const appeared = afterDigest.filter((item) => !beforeKeys.has(item.key));
+  if (dropped.length === 0 && appeared.length === 0) return;
+  console.warn('[DesignEditorCanvas] transition object delta', {
+    prevKey,
+    targetKey,
+    beforeCount: beforeDigest.length,
+    afterCount: afterDigest.length,
+    beforeTypes: buildTypeHistogram(beforeDigest),
+    afterTypes: buildTypeHistogram(afterDigest),
+    dropped: dropped.slice(0, 20).map((item) => ({ key: item.key, type: item.type, id: item.id })),
+    appeared: appeared.slice(0, 20).map((item) => ({ key: item.key, type: item.type, id: item.id })),
+  });
+}
+
 async function emitSinglePageThumb(
   canvas: Canvas,
   pageIndex: number,
@@ -100,6 +152,7 @@ export async function runPageLoadKeyTransition({
   try {
     let snapshotPages: DesignPage[] = pagesRef.current;
     let pagesChanged = false;
+    const beforeDigest = buildTransitionObjectDigest(canvas);
     const objectCountBeforeFlush = canvas.getObjects().length;
 
     if (prevKey != null) {
@@ -170,6 +223,13 @@ export async function runPageLoadKeyTransition({
       prevPageLoadKeyRef.current = targetKey;
       loadedPageForInstanceRef.current = canvasInstance;
     }
+
+    logTransitionLossIfAny({
+      targetKey,
+      prevKey,
+      beforeDigest,
+      afterDigest: buildTransitionObjectDigest(canvas),
+    });
 
     if (pagesChanged) setPages(snapshotPages);
 
