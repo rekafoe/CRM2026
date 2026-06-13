@@ -69,19 +69,31 @@ export function usePublicDesignPageActions({
     return pageActionQueueRef.current.enqueue(task);
   }, []);
 
-  const handleGoToPage = useCallback(async (pageIndex: number) => {
-    const currentStripItem = navigation.stripItems.find((item) => item.pages.includes(currentPage));
-    const targetItem = navigation.stripItems.find(
-      (item) => item.goToPage === pageIndex || item.pages.includes(pageIndex),
-    );
-    if (!targetItem) return;
-    if (currentStripItem === targetItem) return;
-    setCurrentPage(targetItem.goToPage);
-  }, [currentPage, navigation.stripItems, setCurrentPage]);
-
-  const handleAddClientPage = useCallback(async () => {
+  const runNavigationAction = useCallback(async (
+    task: () => Promise<boolean>,
+  ) => {
     await enqueuePageAction(async () => {
       await saveCurrentCanvasPage();
+      const changed = await task();
+      if (changed) markDirty();
+    });
+  }, [enqueuePageAction, markDirty, saveCurrentCanvasPage]);
+
+  const handleGoToPage = useCallback(async (pageIndex: number) => {
+    await runNavigationAction(async () => {
+      const currentStripItem = navigation.stripItems.find((item) => item.pages.includes(currentPage));
+      const targetItem = navigation.stripItems.find(
+        (item) => item.goToPage === pageIndex || item.pages.includes(pageIndex),
+      );
+      if (!targetItem) return false;
+      if (currentStripItem === targetItem) return false;
+      setCurrentPage(targetItem.goToPage);
+      return true;
+    });
+  }, [currentPage, navigation.stripItems, runNavigationAction, setCurrentPage]);
+
+  const handleAddClientPage = useCallback(async () => {
+    await runNavigationAction(async () => {
       const nextPageIndex = pageSpec.pageCount;
       setPages((prev) => [
         ...Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE }),
@@ -89,13 +101,12 @@ export function usePublicDesignPageActions({
       ]);
       setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + 1 }));
       setCurrentPage(nextPageIndex);
-      markDirty();
+      return true;
     });
-  }, [enqueuePageAction, markDirty, pageSpec.pageCount, saveCurrentCanvasPage, setCurrentPage, setPageSpec, setPages]);
+  }, [pageSpec.pageCount, runNavigationAction, setCurrentPage, setPageSpec, setPages]);
 
   const handleInsertClientPage = useCallback(async (pageIndex: number) => {
-    await enqueuePageAction(async () => {
-      await saveCurrentCanvasPage();
+    await runNavigationAction(async () => {
       const safeIndex = Math.max(0, Math.min(pageSpec.pageCount, pageIndex));
       setPages((prev) => {
         const normalized = Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
@@ -108,13 +119,11 @@ export function usePublicDesignPageActions({
       setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + 1 }));
       setCurrentPage(safeIndex);
       setThumbnails((prev) => shiftThumbnails(prev, safeIndex, 1));
-      markDirty();
+      return true;
     });
   }, [
-    markDirty,
     pageSpec.pageCount,
-    enqueuePageAction,
-    saveCurrentCanvasPage,
+    runNavigationAction,
     setCurrentPage,
     setPageSpec,
     setPages,
@@ -122,8 +131,7 @@ export function usePublicDesignPageActions({
   ]);
 
   const handleAddClientSpread = useCallback(async () => {
-    await enqueuePageAction(async () => {
-      await saveCurrentCanvasPage();
+    await runNavigationAction(async () => {
       const { insertAt, addCount } = spreadMode && documentMode === 'multipage'
         ? buildSpreadPageInsert(pageSpec.pageCount, coverPages)
         : { insertAt: pageSpec.pageCount, addCount: 2 as const };
@@ -147,15 +155,13 @@ export function usePublicDesignPageActions({
         return next;
       });
       setCurrentPage(insertAt);
-      markDirty();
+      return true;
     });
   }, [
     coverPages,
     documentMode,
-    markDirty,
     pageSpec.pageCount,
-    enqueuePageAction,
-    saveCurrentCanvasPage,
+    runNavigationAction,
     setCurrentPage,
     setPageSpec,
     setPages,
@@ -165,8 +171,7 @@ export function usePublicDesignPageActions({
 
   const handleDeleteClientLast = useCallback(async () => {
     if (pageSpec.pageCount <= minimumPageCount) return;
-    await enqueuePageAction(async () => {
-      await saveCurrentCanvasPage();
+    await runNavigationAction(async () => {
 
       const spreadRange = spreadMode && documentMode === 'multipage'
         ? getLastInnerSpreadRange(pageSpec.pageCount, coverPages)
@@ -174,7 +179,7 @@ export function usePublicDesignPageActions({
       const removeStart = spreadRange?.start ?? pageSpec.pageCount - 1;
       const removeCount = spreadRange?.length ?? 1;
 
-      if (pageSpec.pageCount - removeCount < minimumPageCount) return;
+      if (pageSpec.pageCount - removeCount < minimumPageCount) return false;
 
       setPages((prev) => {
         const normalized = Array.from(
@@ -200,16 +205,14 @@ export function usePublicDesignPageActions({
         }
         return next;
       });
-      markDirty();
+      return true;
     });
   }, [
     coverPages,
     documentMode,
-    markDirty,
     minimumPageCount,
     pageSpec.pageCount,
-    enqueuePageAction,
-    saveCurrentCanvasPage,
+    runNavigationAction,
     setCurrentPage,
     setPageSpec,
     setPages,
@@ -219,8 +222,7 @@ export function usePublicDesignPageActions({
 
   const handleDeleteClientPage = useCallback(async (pageIndex: number) => {
     if (pageSpec.pageCount <= minimumPageCount) return;
-    await enqueuePageAction(async () => {
-      await saveCurrentCanvasPage();
+    await runNavigationAction(async () => {
       const safeIndex = Math.max(0, Math.min(pageSpec.pageCount - 1, pageIndex));
       setPages((prev) => {
         const normalized = Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
@@ -234,14 +236,12 @@ export function usePublicDesignPageActions({
         return Math.min(page, Math.max(0, pageSpec.pageCount - 2));
       });
       setThumbnails((prev) => shiftThumbnails(prev, safeIndex + 1, -1));
-      markDirty();
+      return true;
     });
   }, [
-    markDirty,
     minimumPageCount,
     pageSpec.pageCount,
-    enqueuePageAction,
-    saveCurrentCanvasPage,
+    runNavigationAction,
     setCurrentPage,
     setPageSpec,
     setPages,

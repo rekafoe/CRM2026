@@ -116,6 +116,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [pageTransitionBusy, setPageTransitionBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle');
   const [dirtyVersion, setDirtyVersion] = useState(0);
@@ -427,6 +428,16 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveState]);
+
+  useEffect(() => {
+    const syncBusyState = () => {
+      const busy = canvasHandleRef.current?.isPageTransitionBusy?.() ?? false;
+      setPageTransitionBusy((prev) => (prev === busy ? prev : busy));
+    };
+    syncBusyState();
+    const timer = window.setInterval(syncBusyState, 80);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const {
     handleFinalize,
@@ -746,6 +757,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           ? 'На телефоне — по одной странице. Развороты редактируются на компьютере.'
           : undefined
       }
+      transitionBusy={pageTransitionBusy}
     />
   );
 

@@ -40,6 +40,7 @@ interface EditorPageNavigatorProps {
   showInfoLine?: boolean;
   /** Подсказка в мобильном пейджере (напр. постраничный режим на телефоне) */
   mobilePagesOnlyHint?: string;
+  transitionBusy?: boolean;
 }
 
 export const EditorPageNavigator: React.FC<EditorPageNavigatorProps> = ({
@@ -74,6 +75,7 @@ export const EditorPageNavigator: React.FC<EditorPageNavigatorProps> = ({
   appearance = 'admin',
   showInfoLine = true,
   mobilePagesOnlyHint,
+  transitionBusy = false,
 }) => {
   if (!showWhenSingle && pageCount <= 1 && !canAddPages && !canAddSpread) return null;
 
@@ -90,6 +92,7 @@ export const EditorPageNavigator: React.FC<EditorPageNavigatorProps> = ({
           canAddSpread={canAddSpread && spreadMode}
           addSpreadLabel={labels?.addSpread}
           pagesOnlyHint={mobilePagesOnlyHint}
+          transitionBusy={transitionBusy}
           onGoTo={onGoTo}
           onAddSpread={onAddSpread}
         />
@@ -125,6 +128,7 @@ export const EditorPageNavigator: React.FC<EditorPageNavigatorProps> = ({
         labels={labels}
         compact={compact}
         appearance={appearance}
+        transitionBusy={transitionBusy}
       />
     </div>
   );
