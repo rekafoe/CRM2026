@@ -51,6 +51,14 @@ function hasBackgroundObject(canvas: Canvas): boolean {
   return canvas.getObjects().some((obj) => !!asAny(obj).isBackground);
 }
 
+function ensureWhiteCanvasBackground(canvas: Canvas): void {
+  const currentBg = (canvas as unknown as { backgroundColor?: unknown }).backgroundColor;
+  const hasExplicitBg = typeof currentBg === 'string' && currentBg.trim().length > 0;
+  if (!hasExplicitBg) {
+    (canvas as unknown as AnyObj).backgroundColor = 'white';
+  }
+}
+
 function normalizeBackgroundObjects(canvas: Canvas, pageW: number, pageH: number): void {
   canvas.getObjects().forEach((obj) => {
     const meta = asAny(obj);
@@ -120,6 +128,8 @@ export async function loadDesignPageScene(input: {
       canvas.clear();
       (canvas as unknown as AnyObj).backgroundColor = 'white';
     }
+    // Для пустых страниц без backgroundColor в JSON сохраняем непрозрачный белый фон.
+    ensureWhiteCanvasBackground(canvas);
     await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
     normalizeBackgroundObjects(canvas, pageW, pageH);
     if (useTemplatePreviewBackground && !hasBackgroundObject(canvas)) {
@@ -132,6 +142,7 @@ export async function loadDesignPageScene(input: {
       await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
     }
   }
+  ensureWhiteCanvasBackground(canvas);
   canvas.requestRenderAll();
 }
 

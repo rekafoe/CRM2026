@@ -107,8 +107,9 @@ async function emitSinglePageThumb(
 }
 
 function shouldEmitIncomingThumb(canvas: Canvas, pageIndex: number): boolean {
-  if (pageIndex === 0) return true;
-  return canvas.getObjects().length > 0;
+  void canvas;
+  void pageIndex;
+  return true;
 }
 
 async function emitSpreadPageThumbs(
