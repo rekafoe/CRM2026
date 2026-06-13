@@ -134,3 +134,20 @@ export function loadCachedThumbnailsForPages(
 export function clearThumbnailCacheForScope(scope: DesignPageThumbnailCacheScope): void {
   pruneScopeStorage(scope);
 }
+
+export function clearThumbnailCacheForPage(scope: DesignPageThumbnailCacheScope, pageIndex: number): void {
+  const pagePrefix = `${scopePrefix(scope)}${pageIndex}:`;
+  for (const key of Array.from(memoryCache.keys())) {
+    if (key.startsWith(pagePrefix)) memoryCache.delete(key);
+  }
+  try {
+    const storageKeys: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith(pagePrefix)) storageKeys.push(key);
+    }
+    storageKeys.forEach((key) => sessionStorage.removeItem(key));
+  } catch {
+    /* ignore */
+  }
+}

@@ -162,7 +162,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
       addConfirmTimerRef.current = window.setTimeout(() => {
         setAddConfirmArmed(false);
         addConfirmTimerRef.current = null;
-      }, 2200);
+      }, 1200);
       return;
     }
     if (addConfirmTimerRef.current != null) {
@@ -170,6 +170,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
       addConfirmTimerRef.current = null;
     }
     setAddConfirmArmed(false);
+    setOpenInsertBefore(null);
     if (spreadMode) {
       runStripAction(onAddSpread);
       return;
@@ -188,6 +189,14 @@ export const PageStrip: React.FC<PageStripProps> = ({
       }
     };
   }, []);
+  useEffect(() => {
+    if (!addConfirmArmed) return;
+    if (isBusy) setAddConfirmArmed(false);
+  }, [addConfirmArmed, isBusy]);
+  useEffect(() => {
+    setAddConfirmArmed(false);
+    setOpenInsertBefore(null);
+  }, [items.length]);
   const handleStripScroll = (direction: -1 | 1) => {
     const strip = stripRef.current;
     if (!strip) return;

@@ -48,6 +48,18 @@
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
+.public-design-editor--client .public-design-editor__page-strip .ps-root--client.is-collapsed .ps-header {
+  border-bottom: 0;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-root--client.is-collapsed .ps-strip-row {
+  display: none;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-root--client.is-collapsed .ps-mode-toggle {
+  display: none;
+}
+
 .public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
   .public-design-editor__main-column
   > .public-design-editor__page-chrome
@@ -110,6 +122,14 @@
 .public-design-editor--client .public-design-editor__page-strip .ps-root--client .ps-collapse-btn:hover {
   color: var(--pc-ink);
   background: #f1f5f9;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-root--client .ps-collapse-btn svg {
+  transition: transform 0.16s ease;
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-root--client.is-collapsed .ps-collapse-btn svg {
+  transform: rotate(180deg);
 }
 
 .public-design-editor--client .public-design-editor__page-strip .ps-root--client .ps-mode-toggle {

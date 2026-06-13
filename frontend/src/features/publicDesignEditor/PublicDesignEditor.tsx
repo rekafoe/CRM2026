@@ -44,7 +44,11 @@ import { usePublicDesignDraftActions } from './usePublicDesignDraftActions';
 import { usePublicDesignGuidedActions } from './usePublicDesignGuidedActions';
 import { usePublicDesignPageActions } from './usePublicDesignPageActions';
 import { usePublicDesignPhotoLibrary } from './usePublicDesignPhotoLibrary';
-import { rememberPageThumbnail } from '../../pages/admin/designEditor/designPageThumbnailCache';
+import {
+  clearThumbnailCacheForPage,
+  rememberPageThumbnail,
+} from '../../pages/admin/designEditor/designPageThumbnailCache';
+import { findStripItemForPage } from '../../pages/admin/designEditor/spreadUtils';
 import { onDesignFontsReady } from '../../utils/loadDesignFonts';
 import { usePublicDesignThumbnailPrefetch } from './usePublicDesignThumbnailPrefetch';
 import { useSpreadLayoutNormalize } from './useSpreadLayoutNormalize';
@@ -203,7 +207,15 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     }),
     [pages, saveState, sceneGeometry.pageWidthPx, sceneGeometry.pageHeightPx, sceneGeometry.safeZonePx],
   );
-  const currentStripItem = navigation.stripItems.find((item) => item.pages.includes(currentPage));
+  const activeStripIndex = useMemo(
+    () => findStripItemForPage(navigation.stripItems, currentPage),
+    [currentPage, navigation.stripItems],
+  );
+  const currentStripItem = activeStripIndex >= 0 ? navigation.stripItems[activeStripIndex] : null;
+  const prevStripItem = activeStripIndex > 0 ? navigation.stripItems[activeStripIndex - 1] : null;
+  const nextStripItem = activeStripIndex >= 0 && activeStripIndex < navigation.stripItems.length - 1
+    ? navigation.stripItems[activeStripIndex + 1]
+    : null;
   const currentFragmentPages = currentStripItem?.pages ?? [currentPage];
   const currentFragment = useMemo(
     () => buildPublicDesignFragmentSummary({
@@ -335,6 +347,31 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     onThumb: handlePageThumbReady,
     onHydrate: handleHydrateThumbnails,
   });
+
+  const prevPageCountRef = useRef(pageSpec.pageCount);
+  useEffect(() => {
+    const prevCount = prevPageCountRef.current;
+    const nextCount = pageSpec.pageCount;
+    if (nextCount <= prevCount) {
+      prevPageCountRef.current = nextCount;
+      return;
+    }
+    const addedIndexes = Array.from({ length: nextCount - prevCount }, (_, idx) => prevCount + idx);
+    if (thumbnailCacheScope) {
+      addedIndexes.forEach((pageIndex) => clearThumbnailCacheForPage(thumbnailCacheScope, pageIndex));
+    }
+    setThumbnails((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      addedIndexes.forEach((pageIndex) => {
+        if (!(pageIndex in next)) return;
+        delete next[pageIndex];
+        changed = true;
+      });
+      return changed ? next : prev;
+    });
+    prevPageCountRef.current = nextCount;
+  }, [pageSpec.pageCount, thumbnailCacheScope]);
 
   useEffect(() => {
     const el = fitScalerRef.current;
@@ -751,7 +788,21 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   );
 
   const canvasStageColumn = (
-    <div className="public-design-editor__canvas-column">
+    <div className={`public-design-editor__canvas-column${!isMobile && navigation.stripItems.length > 1 ? ' public-design-editor__canvas-column--with-edge-nav' : ''}`}>
+      {!isMobile && navigation.stripItems.length > 1 && (
+        <button
+          type="button"
+          className="public-design-editor__edge-page-nav public-design-editor__edge-page-nav--prev"
+          disabled={!prevStripItem || pageTransitionBusy}
+          aria-label="Предыдущая страница"
+          onClick={() => {
+            if (!prevStripItem) return;
+            void handleGoToPage(prevStripItem.goToPage);
+          }}
+        >
+          ‹
+        </button>
+      )}
       <EditorCanvasStage
         template={template}
         editorMode="basic"
@@ -859,6 +910,20 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           resolveImageFileUrl,
         }}
       />
+      {!isMobile && navigation.stripItems.length > 1 && (
+        <button
+          type="button"
+          className="public-design-editor__edge-page-nav public-design-editor__edge-page-nav--next"
+          disabled={!nextStripItem || pageTransitionBusy}
+          aria-label="Следующая страница"
+          onClick={() => {
+            if (!nextStripItem) return;
+            void handleGoToPage(nextStripItem.goToPage);
+          }}
+        >
+          ›
+        </button>
+      )}
     </div>
   );
 
