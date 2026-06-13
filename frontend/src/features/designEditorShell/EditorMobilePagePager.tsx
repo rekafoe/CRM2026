@@ -18,6 +18,7 @@ interface EditorMobilePagePagerProps {
   pagesOnlyHint?: string;
   onGoTo: (pageIndex: number) => void;
   onAddSpread?: () => void;
+  transitionBusy?: boolean;
 }
 
 export const EditorMobilePagePager: React.FC<EditorMobilePagePagerProps> = ({
@@ -32,6 +33,7 @@ export const EditorMobilePagePager: React.FC<EditorMobilePagePagerProps> = ({
   pagesOnlyHint,
   onGoTo,
   onAddSpread,
+  transitionBusy = false,
 }) => {
   const activeIdx = findStripItemForPage(items, currentPage);
   const activeItem = activeIdx >= 0 ? items[activeIdx] : null;
@@ -79,7 +81,7 @@ export const EditorMobilePagePager: React.FC<EditorMobilePagePagerProps> = ({
         <button
           type="button"
           className="editor-mobile-page-pager__nav"
-          disabled={!prevItem}
+          disabled={!prevItem || transitionBusy}
           aria-label="Предыдущая страница"
           onClick={() => prevItem && onGoTo(prevItem.goToPage)}
         >
@@ -104,7 +106,7 @@ export const EditorMobilePagePager: React.FC<EditorMobilePagePagerProps> = ({
         <button
           type="button"
           className="editor-mobile-page-pager__nav"
-          disabled={!nextItem}
+          disabled={!nextItem || transitionBusy}
           aria-label="Следующая страница"
           onClick={() => nextItem && onGoTo(nextItem.goToPage)}
         >
@@ -116,6 +118,7 @@ export const EditorMobilePagePager: React.FC<EditorMobilePagePagerProps> = ({
         <button
           type="button"
           className="editor-mobile-page-pager__add"
+          disabled={transitionBusy}
           onClick={onAddSpread}
         >
           <span className="editor-mobile-page-pager__add-icon" aria-hidden>+</span>

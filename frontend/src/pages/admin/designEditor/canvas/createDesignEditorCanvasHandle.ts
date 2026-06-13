@@ -245,7 +245,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         d.saveSnapshot();
       },
       addImageFromFile: async (file: File) => {
-        const canvas = d.fabricRef.current;
+        const canvas = await getCanvasForEdit();
         if (!canvas) return;
         await addImageFileToCanvas(canvas, file, d.resolveImageFileUrlRef.current);
       },
@@ -539,7 +539,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         duplicateActiveObjects(canvas, d.modeRef.current, d.saveSnapshot, d.selectionDisplayScaleRef.current);
       },
       addImageFromUrl: async (url: string) => {
-        const canvas = d.fabricRef.current;
+        const canvas = await getCanvasForEdit();
         if (!canvas) return;
         await addImageUrlToCanvas(canvas, url);
       },

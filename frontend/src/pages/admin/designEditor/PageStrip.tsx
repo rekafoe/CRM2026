@@ -49,6 +49,7 @@ interface PageStripProps {
   compact?: boolean;
   /** Светлая полоса клиентского редактора (без админской тёмной темы) */
   appearance?: 'admin' | 'client';
+  transitionBusy?: boolean;
 }
 
 const DEFAULT_STRIP_THUMB_H = 82;
@@ -81,6 +82,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
   pageStatuses,
   titleLabel,
   labels,
+  transitionBusy = false,
 }) => {
   const stripRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -142,13 +144,14 @@ export const PageStrip: React.FC<PageStripProps> = ({
   const allowAddSpread = canAddSpread ?? canAdd;
   const canAddCurrentMode = spreadMode ? allowAddSpread : allowAddPage;
   const lastInsertIndex = items.length > 0 ? Math.max(...items.flatMap((item) => item.pages)) + 1 : 0;
+  const isBusy = actionBusy || transitionBusy;
   const runStripAction = useCallback((action: () => void | Promise<void>) => {
-    if (actionBusy) return;
+    if (isBusy) return;
     setActionBusy(true);
     void Promise.resolve(action()).finally(() => {
       setActionBusy(false);
     });
-  }, [actionBusy]);
+  }, [isBusy]);
 
   const handleAddAtEnd = () => {
     if (spreadMode) {
@@ -168,7 +171,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
   };
 
   return (
-    <div className={`ps-root${collapsed ? ' is-collapsed' : ''}${compact ? ' ps-root--compact' : ''}${appearance === 'client' ? ' ps-root--client' : ''}${actionBusy ? ' is-busy' : ''}`}>
+    <div className={`ps-root${collapsed ? ' is-collapsed' : ''}${compact ? ' ps-root--compact' : ''}${appearance === 'client' ? ' ps-root--client' : ''}${isBusy ? ' is-busy' : ''}`}>
       {/* Заголовок */}
       <div className="ps-header">
         <div className="ps-header-left">
@@ -268,7 +271,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
                 type="button"
                 className="psitem-delete"
                 onClick={() => runStripAction(() => onDeletePage(item.pages[0]))}
-                disabled={actionBusy}
+                disabled={isBusy}
                 title={`Удалить ${item.label}`}
                 aria-label={`Удалить ${item.label}`}
               >
@@ -284,7 +287,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
                   type="button"
                   className="psitem-main"
                   onClick={() => runStripAction(() => onGoTo(item.goToPage))}
-                  disabled={actionBusy}
+                  disabled={isBusy}
                 >
                   <div
                     className={`psitem-thumbs${isSpread ? ' psitem-thumbs--spread' : ''}`}
@@ -333,7 +336,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
                     type="button"
                     className="psitem-delete-action"
                     onClick={() => runStripAction(() => onDeletePage(item.pages[0]))}
-                    disabled={actionBusy}
+                    disabled={isBusy}
                   >
                     Удалить
                   </button>
@@ -370,7 +373,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
                     type="button"
                     className="ps-insert-btn"
                     onClick={handleInsertClick}
-                    disabled={actionBusy}
+                    disabled={isBusy}
                     title={`Вставить страницу перед ${item.label}`}
                     aria-label={`Вставить страницу перед ${item.label}`}
                   >
@@ -391,7 +394,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
               type="button"
               className="psitem psitem--add"
               onClick={handleAddAtEnd}
-              disabled={actionBusy}
+              disabled={isBusy}
               title={spreadMode ? (labels?.addSpread ?? 'Добавить разворот') : (labels?.addPage ?? 'Добавить страницу')}
             >
               <span className="psitem-main">
@@ -412,7 +415,7 @@ export const PageStrip: React.FC<PageStripProps> = ({
             type="button"
             className="ps-del-btn"
             onClick={() => runStripAction(onDeleteLast)}
-            disabled={actionBusy}
+            disabled={isBusy}
             title={spreadMode ? (labels?.deleteSpread ?? 'Удалить последний разворот') : (labels?.deletePage ?? 'Удалить последнюю страницу')}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
