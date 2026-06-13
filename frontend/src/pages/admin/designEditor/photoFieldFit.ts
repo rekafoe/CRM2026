@@ -668,6 +668,7 @@ export async function wrapLegacyFilledPhotoImage(
   const src = typeof el?.src === 'string' && el.src.length ? el.src : (img.getSrc?.() ?? '');
   if (!src) return null;
 
+  const canvasStackIndex = canvas.getObjects().indexOf(img);
   const fresh = await FabricImage.fromURL(src, { crossOrigin: 'anonymous' });
   canvas.remove(img);
 
@@ -687,6 +688,10 @@ export async function wrapLegacyFilledPhotoImage(
     fitMode: 'cover',
   });
 
-  canvas.add(group);
+  if (canvasStackIndex >= 0) {
+    canvas.insertAt(canvasStackIndex, group);
+  } else {
+    canvas.add(group);
+  }
   return group;
 }

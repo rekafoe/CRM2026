@@ -9,9 +9,9 @@
 .public-design-editor.public-design-editor--client:not(.public-design-editor--mobile) {
   --pde-sidebar-w: clamp(360px, 32vw, 420px);
   /* шапка + ряд миниатюр (thumb + подпись) + запас под скроллбар и скругление */
-  --pde-page-strip-thumb-h: 96px;
+  --pde-page-strip-thumb-h: 108px;
   --pde-page-strip-header-h: 64px;
-  --pde-page-strip-label-h: 50px;
+  --pde-page-strip-label-h: 54px;
   --pde-page-strip-item-pad: 12px;
   --pde-page-strip-safe-pad: 14px;
   --pde-page-strip-h: calc(
@@ -592,7 +592,7 @@
   flex-shrink: 0;
   min-height: 0;
   overflow-x: hidden;
-  overflow-y: visible;
+  overflow-y: hidden;
 }
 
 .public-design-editor:not(.public-design-editor--client) .public-design-editor__page-chrome {

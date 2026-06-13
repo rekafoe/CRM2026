@@ -1,7 +1,7 @@
 /* Клиентская полоса страниц — светлая тема, без наследия тёмного admin PageStrip */
 
 .public-design-editor--client .public-design-editor__page-strip {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
   min-height: 0;
   max-width: 100%;
@@ -365,12 +365,12 @@
 }
 
 .public-design-editor--client .public-design-editor__page-strip .ps-root--client .psitem--add {
-  min-width: 72px;
+  min-width: 58px;
   min-height: calc(var(--ps-thumb-h, 96px) + var(--pde-page-strip-label-h, 48px));
   padding: 4px 4px 8px;
-  color: #2563eb;
-  background: #ffffff;
-  border: 1px dashed rgba(37, 99, 235, 0.35);
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px dashed rgba(100, 116, 139, 0.32);
   border-radius: 12px;
   cursor: pointer;
   pointer-events: auto;
@@ -388,6 +388,12 @@
 
 .public-design-editor--client .public-design-editor__page-strip .ps-root--client .psitem--add:hover,
 .public-design-editor--client .public-design-editor__page-strip .ps-root--client .psitem--add:focus-visible {
+  color: var(--pc-ink);
+  background: #ffffff;
+  border-color: rgba(37, 99, 235, 0.32);
+}
+
+.public-design-editor--client .public-design-editor__page-strip .ps-root--client .psitem--add.psitem--add-armed {
   color: #ffffff;
   background: linear-gradient(135deg, var(--pc-cyan), var(--pc-blue));
   border-color: transparent;
@@ -415,6 +421,9 @@
 .public-design-editor--client .public-design-editor__page-strip .ps-root--client .psitem--add .psitem-label {
   font-size: 9px;
   font-weight: 800;
+  white-space: normal;
+  line-height: 1.2;
+  text-overflow: clip;
 }
 
 .public-design-editor--client .public-design-editor__page-strip .ps-root--client .psitem-status-label--add {

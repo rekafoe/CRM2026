@@ -97,6 +97,8 @@ export async function fillPhotoField(
     const parent = field.group;
     const stackIndex =
       parent != null ? parent.getObjects().indexOf(field) : -1;
+    const canvasStackIndex =
+      parent == null ? canvas.getObjects().indexOf(field) : -1;
 
     detachFabricObject(canvas, field);
 
@@ -127,6 +129,8 @@ export async function fillPhotoField(
       parent.add(group);
       parent.set({ dirty: true });
       parent.setCoords();
+    } else if (canvasStackIndex >= 0) {
+      canvas.insertAt(canvasStackIndex, group);
     } else {
       canvas.add(group);
     }

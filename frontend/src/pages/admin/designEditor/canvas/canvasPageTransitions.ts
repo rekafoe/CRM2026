@@ -106,6 +106,11 @@ async function emitSinglePageThumb(
   }
 }
 
+function shouldEmitIncomingThumb(canvas: Canvas, pageIndex: number): boolean {
+  if (pageIndex === 0) return true;
+  return canvas.getObjects().length > 0;
+}
+
 async function emitSpreadPageThumbs(
   canvas: Canvas,
   leftPageIndex: number,
@@ -210,7 +215,9 @@ export async function runPageLoadKeyTransition({
     if (parsedNext?.type === 'spread') {
       await emitSpreadPageThumbs(canvas, parsedNext.left, parsedNext.right, pageThumbReadyRef.current);
     } else if (parsedNext?.type === 'single') {
-      await emitSinglePageThumb(canvas, parsedNext.index, pageThumbReadyRef.current);
+      if (shouldEmitIncomingThumb(canvas, parsedNext.index)) {
+        await emitSinglePageThumb(canvas, parsedNext.index, pageThumbReadyRef.current);
+      }
     }
 
     prevPageLoadKeyRef.current = targetKey;

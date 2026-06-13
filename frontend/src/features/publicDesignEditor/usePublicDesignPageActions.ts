@@ -108,9 +108,15 @@ export function usePublicDesignPageActions({
       ]);
       setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + 1 }));
       setCurrentPage(nextPageIndex);
+      setThumbnails((prev) => {
+        if (!(nextPageIndex in prev)) return prev;
+        const next = { ...prev };
+        delete next[nextPageIndex];
+        return next;
+      });
       return true;
     });
-  }, [pageSpec.pageCount, runNavigationTransaction, setCurrentPage, setPageSpec, setPages]);
+  }, [pageSpec.pageCount, runNavigationTransaction, setCurrentPage, setPageSpec, setPages, setThumbnails]);
 
   const handleInsertClientPage = useCallback(async (pageIndex: number) => {
     await runNavigationTransaction(async () => {
@@ -125,7 +131,13 @@ export function usePublicDesignPageActions({
       });
       setPageSpec((spec) => ({ ...spec, pageCount: spec.pageCount + 1 }));
       setCurrentPage(safeIndex);
-      setThumbnails((prev) => shiftThumbnails(prev, safeIndex, 1));
+      setThumbnails((prev) => {
+        const shifted = shiftThumbnails(prev, safeIndex, 1);
+        if (!(safeIndex in shifted)) return shifted;
+        const next = { ...shifted };
+        delete next[safeIndex];
+        return next;
+      });
       return true;
     });
   }, [
@@ -158,6 +170,11 @@ export function usePublicDesignPageActions({
         let next = prev;
         for (let i = 0; i < addCount; i += 1) {
           next = shiftThumbnails(next, insertAt, 1);
+        }
+        if (insertAt in next || (insertAt + 1) in next) {
+          next = { ...next };
+          delete next[insertAt];
+          delete next[insertAt + 1];
         }
         return next;
       });

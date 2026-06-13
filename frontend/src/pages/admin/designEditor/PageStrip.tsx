@@ -90,6 +90,8 @@ export const PageStrip: React.FC<PageStripProps> = ({
   /** Перед какой страницей показана кнопка вставки */
   const [openInsertBefore, setOpenInsertBefore] = useState<number | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
+  const [addConfirmArmed, setAddConfirmArmed] = useState(false);
+  const addConfirmTimerRef = useRef<number | null>(null);
   const activeIdx = findStripItemForPage(items, currentPage);
   const stripThumbH = compact
     ? COMPACT_STRIP_THUMB_H
@@ -154,6 +156,20 @@ export const PageStrip: React.FC<PageStripProps> = ({
   }, [isBusy]);
 
   const handleAddAtEnd = () => {
+    if (appearance === 'client' && !addConfirmArmed) {
+      setAddConfirmArmed(true);
+      if (addConfirmTimerRef.current != null) window.clearTimeout(addConfirmTimerRef.current);
+      addConfirmTimerRef.current = window.setTimeout(() => {
+        setAddConfirmArmed(false);
+        addConfirmTimerRef.current = null;
+      }, 2200);
+      return;
+    }
+    if (addConfirmTimerRef.current != null) {
+      window.clearTimeout(addConfirmTimerRef.current);
+      addConfirmTimerRef.current = null;
+    }
+    setAddConfirmArmed(false);
     if (spreadMode) {
       runStripAction(onAddSpread);
       return;
@@ -164,6 +180,14 @@ export const PageStrip: React.FC<PageStripProps> = ({
     }
     if (onInsertPage) runStripAction(() => onInsertPage(lastInsertIndex));
   };
+
+  useEffect(() => {
+    return () => {
+      if (addConfirmTimerRef.current != null) {
+        window.clearTimeout(addConfirmTimerRef.current);
+      }
+    };
+  }, []);
   const handleStripScroll = (direction: -1 | 1) => {
     const strip = stripRef.current;
     if (!strip) return;
@@ -392,17 +416,25 @@ export const PageStrip: React.FC<PageStripProps> = ({
           <div className="ps-add-wrap">
             <button
               type="button"
-              className="psitem psitem--add"
+              className={`psitem psitem--add${addConfirmArmed ? ' psitem--add-armed' : ''}`}
               onClick={handleAddAtEnd}
               disabled={isBusy}
-              title={spreadMode ? (labels?.addSpread ?? 'Добавить разворот') : (labels?.addPage ?? 'Добавить страницу')}
+              title={addConfirmArmed
+                ? 'Нажмите еще раз для подтверждения'
+                : spreadMode
+                  ? (labels?.addSpread ?? 'Добавить разворот')
+                  : (labels?.addPage ?? 'Добавить страницу')}
             >
               <span className="psitem-main">
                 <span className="psitem-thumbs ps-add-thumbs" style={{ width: singleW, height: stripThumbH }}>
                   <span className="ps-add-symbol">+</span>
                 </span>
                 <span className="psitem-label">
-                  {spreadMode ? (labels?.addSpread ?? 'Добавить разворот') : (labels?.addPage ?? 'Добавить страницу')}
+                  {addConfirmArmed
+                    ? 'Подтвердите добавление'
+                    : spreadMode
+                      ? (labels?.addSpread ?? 'Добавить разворот')
+                      : (labels?.addPage ?? 'Добавить страницу')}
                 </span>
                 <span className="psitem-status-label psitem-status-label--add">Новая</span>
               </span>
