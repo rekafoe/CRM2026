@@ -261,7 +261,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const mobileTextToolbarOpen = isMobile && selectedObj?.type === 'IText';
   const viewportLayoutTrigger =
     (mobileTextToolbarOpen ? 1 : 0)
-    + (isMobile ? { canvas: 0, photos: 1, text: 2, check: 3 }[mobilePanel] ?? 0 : 0) * 4;
+    + (isMobile ? { canvas: 0, photos: 1, text: 2, check: 3 }[mobilePanel] ?? 0 : 0) * 4
+    + (!isMobile && stripCollapsed ? 1 : 0) * 16;
 
   const { fitZoom, viewportReady: fitReady, rulerOrigin, layoutWidthPx, layoutHeightPx } = useDesignEditorViewport({
     viewportRef,

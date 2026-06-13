@@ -88,7 +88,7 @@ export function usePublicDesignThumbnailPrefetch(input: {
           if (!cancelled) onThumbRef.current(pageIndex, thumbUrl);
         },
       });
-    }, Object.keys(cached).length > 0 ? 80 : 400);
+    }, Object.keys(cached).length > 0 ? 0 : 80);
 
     return () => {
       cancelled = true;
