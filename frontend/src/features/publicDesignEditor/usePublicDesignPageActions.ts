@@ -69,18 +69,18 @@ export function usePublicDesignPageActions({
     return pageActionQueueRef.current.enqueue(task);
   }, []);
 
-  const runNavigationAction = useCallback(async (
+  const runNavigationTransaction = useCallback(async (
     task: () => Promise<boolean>,
   ) => {
     await enqueuePageAction(async () => {
-      await saveCurrentCanvasPage();
       const changed = await task();
+      await canvasHandleRef.current?.whenPageTransitionIdle?.();
       if (changed) markDirty();
     });
-  }, [enqueuePageAction, markDirty, saveCurrentCanvasPage]);
+  }, [canvasHandleRef, enqueuePageAction, markDirty]);
 
   const handleGoToPage = useCallback(async (pageIndex: number) => {
-    await runNavigationAction(async () => {
+    await runNavigationTransaction(async () => {
       const currentStripItem = navigation.stripItems.find((item) => item.pages.includes(currentPage));
       const targetItem = navigation.stripItems.find(
         (item) => item.goToPage === pageIndex || item.pages.includes(pageIndex),
@@ -90,10 +90,10 @@ export function usePublicDesignPageActions({
       setCurrentPage(targetItem.goToPage);
       return true;
     });
-  }, [currentPage, navigation.stripItems, runNavigationAction, setCurrentPage]);
+  }, [currentPage, navigation.stripItems, runNavigationTransaction, setCurrentPage]);
 
   const handleAddClientPage = useCallback(async () => {
-    await runNavigationAction(async () => {
+    await runNavigationTransaction(async () => {
       const nextPageIndex = pageSpec.pageCount;
       setPages((prev) => [
         ...Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE }),
@@ -103,10 +103,10 @@ export function usePublicDesignPageActions({
       setCurrentPage(nextPageIndex);
       return true;
     });
-  }, [pageSpec.pageCount, runNavigationAction, setCurrentPage, setPageSpec, setPages]);
+  }, [pageSpec.pageCount, runNavigationTransaction, setCurrentPage, setPageSpec, setPages]);
 
   const handleInsertClientPage = useCallback(async (pageIndex: number) => {
-    await runNavigationAction(async () => {
+    await runNavigationTransaction(async () => {
       const safeIndex = Math.max(0, Math.min(pageSpec.pageCount, pageIndex));
       setPages((prev) => {
         const normalized = Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
@@ -123,7 +123,7 @@ export function usePublicDesignPageActions({
     });
   }, [
     pageSpec.pageCount,
-    runNavigationAction,
+    runNavigationTransaction,
     setCurrentPage,
     setPageSpec,
     setPages,
@@ -131,7 +131,7 @@ export function usePublicDesignPageActions({
   ]);
 
   const handleAddClientSpread = useCallback(async () => {
-    await runNavigationAction(async () => {
+    await runNavigationTransaction(async () => {
       const { insertAt, addCount } = spreadMode && documentMode === 'multipage'
         ? buildSpreadPageInsert(pageSpec.pageCount, coverPages)
         : { insertAt: pageSpec.pageCount, addCount: 2 as const };
@@ -161,7 +161,7 @@ export function usePublicDesignPageActions({
     coverPages,
     documentMode,
     pageSpec.pageCount,
-    runNavigationAction,
+    runNavigationTransaction,
     setCurrentPage,
     setPageSpec,
     setPages,
@@ -171,7 +171,7 @@ export function usePublicDesignPageActions({
 
   const handleDeleteClientLast = useCallback(async () => {
     if (pageSpec.pageCount <= minimumPageCount) return;
-    await runNavigationAction(async () => {
+    await runNavigationTransaction(async () => {
 
       const spreadRange = spreadMode && documentMode === 'multipage'
         ? getLastInnerSpreadRange(pageSpec.pageCount, coverPages)
@@ -212,7 +212,7 @@ export function usePublicDesignPageActions({
     documentMode,
     minimumPageCount,
     pageSpec.pageCount,
-    runNavigationAction,
+    runNavigationTransaction,
     setCurrentPage,
     setPageSpec,
     setPages,
@@ -222,7 +222,7 @@ export function usePublicDesignPageActions({
 
   const handleDeleteClientPage = useCallback(async (pageIndex: number) => {
     if (pageSpec.pageCount <= minimumPageCount) return;
-    await runNavigationAction(async () => {
+    await runNavigationTransaction(async () => {
       const safeIndex = Math.max(0, Math.min(pageSpec.pageCount - 1, pageIndex));
       setPages((prev) => {
         const normalized = Array.from({ length: pageSpec.pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
@@ -241,7 +241,7 @@ export function usePublicDesignPageActions({
   }, [
     minimumPageCount,
     pageSpec.pageCount,
-    runNavigationAction,
+    runNavigationTransaction,
     setCurrentPage,
     setPageSpec,
     setPages,

@@ -99,6 +99,8 @@ export async function runPageLoadKeyTransition({
 
   try {
     let snapshotPages: DesignPage[] = pagesRef.current;
+    let pagesChanged = false;
+    const objectCountBeforeFlush = canvas.getObjects().length;
 
     if (prevKey != null) {
       const parsedPrev = parsePageLoadKey(prevKey);
@@ -109,14 +111,14 @@ export async function runPageLoadKeyTransition({
           if (i === parsedPrev.right) return { fabricJSON: right };
           return p;
         });
-        setPages(snapshotPages);
+        pagesChanged = true;
         await emitSpreadPageThumbs(canvas, parsedPrev.left, parsedPrev.right, pageThumbReadyRef.current);
       } else if (parsedPrev?.type === 'single') {
         const json = canvasToJSON(canvas);
         snapshotPages = pagesRef.current.map((p, i) =>
           i === parsedPrev.index ? { fabricJSON: json } : p,
         );
-        setPages(snapshotPages);
+        pagesChanged = true;
         await emitSinglePageThumb(canvas, parsedPrev.index, pageThumbReadyRef.current);
       }
     }
@@ -163,6 +165,10 @@ export async function runPageLoadKeyTransition({
       loadedPageForInstanceRef.current = canvasInstance;
     }
 
+    if (pagesChanged) {
+      setPages(snapshotPages);
+    }
+
     if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
     else lockTextInlineEditing(canvas);
     const snap = JSON.stringify(canvasToJSON(canvas));
@@ -176,7 +182,13 @@ export async function runPageLoadKeyTransition({
 
     prevPageLoadKeyRef.current = targetKey;
     loadedPageForInstanceRef.current = canvasInstance;
-    return { displayedKey: targetKey, canvasInstance };
+    return {
+      displayedKey: targetKey,
+      canvasInstance,
+      activePageIndex: parsedNext.type === 'single' ? parsedNext.index : parsedNext.left,
+      objectCountBeforeFlush,
+      objectCountAfterLoad: canvas.getObjects().length,
+    };
   } finally {
     isLoadingRef.current = false;
     if (pageLoadKeyRef.current === targetKey) {

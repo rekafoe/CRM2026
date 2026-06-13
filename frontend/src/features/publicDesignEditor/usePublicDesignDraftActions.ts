@@ -3,9 +3,7 @@ import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import {
   buildDesignState,
-  mergeSavedEditorPages,
 } from '../../pages/admin/designEditor/designEditorState';
-import type { PageSaveSnapshot } from '../../pages/admin/designEditor/mergePagesSnapshot';
 import type { DesignPage, DesignPrepressConfig, DesignState } from '../../pages/admin/designEditor/types';
 import { analyzePublicDesignPages } from './publicDesignPreflight';
 import type { PublicDesignEditorAdapter } from './publicDesignEditorAdapter';
@@ -32,13 +30,11 @@ interface UsePublicDesignDraftActionsInput {
   autosaveDelayMs: number;
   canvasHandleRef: RefObject<DesignEditorCanvasHandle | null>;
   coverPages: number;
-  currentPage: number;
   customerForm: CustomerFormState;
   dirtyVersion: number;
   documentMode: PublicDesignDocumentMode;
   draftToken: string | null;
   loading: boolean;
-  navigation: { leftPageIdx: number; rightPageIdx: number };
   pageSpec: PublicDesignPageSpec;
   pages: DesignPage[];
   prepressConfig: DesignPrepressConfig;
@@ -66,13 +62,11 @@ export function usePublicDesignDraftActions({
   autosaveDelayMs,
   canvasHandleRef,
   coverPages,
-  currentPage,
   customerForm,
   dirtyVersion,
   documentMode,
   draftToken,
   loading,
-  navigation,
   pageSpec,
   pages,
   prepressConfig,
@@ -151,16 +145,8 @@ export function usePublicDesignDraftActions({
     return token;
   }, [adapter, documentMode, draftToken, onDraftTokenChange, setDraftToken, templateId]);
 
-  const buildCurrentDesignState = useCallback(async () => {
-    const handle = canvasHandleRef.current;
-    const saved = handle ? await handle.saveCurrentPage() : { kind: 'single', json: {} };
-    const updatedPages = mergeSavedEditorPages(
-      pages,
-      saved as PageSaveSnapshot,
-      currentPage,
-      navigation.leftPageIdx,
-      navigation.rightPageIdx,
-    );
+  const buildCurrentDesignState = useCallback(() => {
+    const updatedPages = pages;
     return {
       pages: updatedPages,
       designState: buildDesignState({
@@ -176,12 +162,8 @@ export function usePublicDesignDraftActions({
       }),
     };
   }, [
-    canvasHandleRef,
     coverPages,
-    currentPage,
     documentMode,
-    navigation.leftPageIdx,
-    navigation.rightPageIdx,
     pageSpec,
     pages,
     prepressConfig,
@@ -197,7 +179,7 @@ export function usePublicDesignDraftActions({
     setSaveState('saving');
     if (!silent) setStatus(null);
     const token = await ensureDraft();
-    const { pages: updatedPages, designState } = await buildCurrentDesignState();
+    const { pages: updatedPages, designState } = buildCurrentDesignState();
     const patch: Record<string, unknown> = { designState };
     if (!options?.skipExpectedVersion && draftVersionRef.current) {
       patch.expectedVersion = draftVersionRef.current;
@@ -344,7 +326,7 @@ export function usePublicDesignDraftActions({
   const handleReadyForCart = useCallback(async () => {
     try {
       setError(null);
-      const { pages: updatedPages } = await buildCurrentDesignState();
+      const { pages: updatedPages } = buildCurrentDesignState();
       const nextPreflight = analyzePublicDesignPages(updatedPages, 'saved');
       setPages(updatedPages);
       if (nextPreflight.hasBlockingIssues) {

@@ -122,6 +122,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
           assertPageTransitionDisplayed({
             result,
             targetKey,
+            requestedKey: requestedKeyRef.current,
             displayedKey: prevPageLoadKeyRef.current,
             loadedCanvasInstance: loadedPageForInstanceRef.current,
             expectedCanvasInstance: canvasInstance,
@@ -129,7 +130,10 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
           if (import.meta.env.DEV) {
             canvas.upperCanvasEl.dataset.pageRequestedKey = targetKey;
             canvas.upperCanvasEl.dataset.pageDisplayedKey = result.displayedKey;
+            canvas.upperCanvasEl.dataset.pageActiveIndex = String(result.activePageIndex);
+            canvas.upperCanvasEl.dataset.pageObjectCountBeforeFlush = String(result.objectCountBeforeFlush);
             canvas.upperCanvasEl.dataset.pageObjectCount = String(canvas.getObjects().length);
+            canvas.upperCanvasEl.dataset.pageObjectCountAfterLoad = String(result.objectCountAfterLoad);
           }
 
           if (requestedKeyRef.current === targetKey) break;

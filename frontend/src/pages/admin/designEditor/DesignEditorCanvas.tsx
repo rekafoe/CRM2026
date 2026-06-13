@@ -1,5 +1,6 @@
 import './fabricDesignSerialization';
 import React, {
+  useEffect,
   useRef,
   useImperativeHandle,
   forwardRef,
@@ -192,6 +193,8 @@ interface DesignEditorCanvasProps {
   onTextEditCommitted?: () => void;
   /** Debounced: текущая страница canvas → pages[] (preflight / autosave) */
   onCanvasDocumentCommit?: () => void;
+  /** Lifecycle страницы/разворота: true на start, false на end transition. */
+  onPageTransitionBusyChange?: (busy: boolean) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -230,6 +233,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       onTextFillHint,
       onTextEditCommitted,
       onCanvasDocumentCommit,
+      onPageTransitionBusyChange,
     },
     ref,
   ) => {
@@ -298,6 +302,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     onTextEditCommittedRef.current = onTextEditCommitted;
     const onCanvasDocumentCommitRef = useRef(onCanvasDocumentCommit);
     onCanvasDocumentCommitRef.current = onCanvasDocumentCommit;
+    const onPageTransitionBusyChangeRef = useRef(onPageTransitionBusyChange);
+    onPageTransitionBusyChangeRef.current = onPageTransitionBusyChange;
     const documentCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scheduleTextAnchorRef = useRef<(() => void) | null>(null);
 
@@ -446,6 +452,10 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       pageThumbReadyRef,
       selectionDisplayScaleRef,
     });
+
+    useEffect(() => pageTransitionGate.subscribe((busy) => {
+      onPageTransitionBusyChangeRef.current?.(busy);
+    }), [pageTransitionGate]);
 
     useDesignEditorRuntimeEffects({
       fabricRef,

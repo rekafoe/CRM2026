@@ -429,16 +429,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveState]);
 
-  useEffect(() => {
-    const syncBusyState = () => {
-      const busy = canvasHandleRef.current?.isPageTransitionBusy?.() ?? false;
-      setPageTransitionBusy((prev) => (prev === busy ? prev : busy));
-    };
-    syncBusyState();
-    const timer = window.setInterval(syncBusyState, 80);
-    return () => window.clearInterval(timer);
-  }, []);
-
   const {
     handleFinalize,
     handleReadyForCart,
@@ -454,13 +444,11 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     autosaveDelayMs,
     canvasHandleRef,
     coverPages,
-    currentPage,
     customerForm,
     dirtyVersion,
     documentMode,
     draftToken,
     loading,
-    navigation,
     pageSpec,
     pages,
     prepressConfig,
@@ -864,6 +852,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           onCanvasDocumentCommit: () => {
             commitCanvasToPagesRef.current();
           },
+          onPageTransitionBusyChange: setPageTransitionBusy,
           onDropRemoteImageUrl: handleImageUrlSubmit,
           onSidebarPhotoDropped: removeSidebarPhoto,
           resolveImageFileUrl,

@@ -5,25 +5,33 @@ export type PageTransitionGate = {
   begin: () => void;
   end: () => void;
   waitUntilIdle: () => Promise<void>;
+  subscribe: (listener: (busy: boolean) => void) => () => void;
 };
 
 export function createPageTransitionGate(): PageTransitionGate {
   let depth = 0;
   const waiters: Array<() => void> = [];
+  const listeners = new Set<(busy: boolean) => void>();
 
   const notifyIfIdle = () => {
     if (depth > 0) return;
     const pending = waiters.splice(0);
     pending.forEach((resolve) => resolve());
   };
+  const notifyBusyChanged = () => {
+    const busy = depth > 0;
+    listeners.forEach((listener) => listener(busy));
+  };
 
   return {
     isBusy: () => depth > 0,
     begin: () => {
       depth += 1;
+      notifyBusyChanged();
     },
     end: () => {
       depth = Math.max(0, depth - 1);
+      notifyBusyChanged();
       notifyIfIdle();
     },
     waitUntilIdle: () => {
@@ -31,6 +39,13 @@ export function createPageTransitionGate(): PageTransitionGate {
       return new Promise<void>((resolve) => {
         waiters.push(resolve);
       });
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      listener(depth > 0);
+      return () => {
+        listeners.delete(listener);
+      };
     },
   };
 }

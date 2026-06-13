@@ -37,6 +37,7 @@ interface EditorCanvasViewportProps {
   onTextFillHint?: Parameters<typeof DesignEditorCanvas>[0]['onTextFillHint'];
   onTextEditCommitted?: Parameters<typeof DesignEditorCanvas>[0]['onTextEditCommitted'];
   onCanvasDocumentCommit?: Parameters<typeof DesignEditorCanvas>[0]['onCanvasDocumentCommit'];
+  onPageTransitionBusyChange?: Parameters<typeof DesignEditorCanvas>[0]['onPageTransitionBusyChange'];
   onSnapLinesChange?: Parameters<typeof DesignEditorCanvas>[0]['onSnapLinesChange'];
   onDropRemoteImageUrl?: (url: string) => Promise<void>;
   onSidebarPhotoDropped?: (id: string) => void;
@@ -73,6 +74,7 @@ export const EditorCanvasViewport: React.FC<EditorCanvasViewportProps> = ({
   onTextFillHint,
   onTextEditCommitted,
   onCanvasDocumentCommit,
+  onPageTransitionBusyChange,
   onSnapLinesChange,
   onDropRemoteImageUrl,
   onSidebarPhotoDropped,
@@ -109,6 +111,7 @@ export const EditorCanvasViewport: React.FC<EditorCanvasViewportProps> = ({
           onTextFillHint={onTextFillHint}
           onTextEditCommitted={onTextEditCommitted}
           onCanvasDocumentCommit={onCanvasDocumentCommit}
+          onPageTransitionBusyChange={onPageTransitionBusyChange}
           onSnapLinesChange={onSnapLinesChange}
           guideLinesPx={showGuides ? guideLinesPx : []}
           onDropRemoteImageUrl={onDropRemoteImageUrl}
