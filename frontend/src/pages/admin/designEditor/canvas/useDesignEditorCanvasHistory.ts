@@ -44,7 +44,10 @@ export function useDesignEditorCanvasHistory({
     if (documentCommitTimerRef.current) clearTimeout(documentCommitTimerRef.current);
     documentCommitTimerRef.current = setTimeout(() => {
       documentCommitTimerRef.current = null;
-      if (isLoadingRef.current || pageTransitionLockRef.current) return;
+      if (isLoadingRef.current || pageTransitionLockRef.current) {
+        scheduleCanvasDocumentCommit();
+        return;
+      }
       onCanvasDocumentCommitRef.current?.();
     }, 400);
   }, [documentCommitTimerRef, isLoadingRef, onCanvasDocumentCommitRef, pageTransitionLockRef]);

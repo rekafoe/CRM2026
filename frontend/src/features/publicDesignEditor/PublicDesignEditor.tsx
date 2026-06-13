@@ -498,6 +498,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
 
   const {
     saveCurrentCanvasPage,
+    commitCanvasToPages,
     handleGoToPage,
     handleAddClientPage,
     handleInsertClientPage,
@@ -521,7 +522,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   });
 
   commitCanvasToPagesRef.current = () => {
-    void saveCurrentCanvasPage();
+    void commitCanvasToPages();
   };
 
   const {
@@ -847,7 +848,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           onTextFloatingAnchor: isMobile ? undefined : setTextFloatingAnchor,
           onTextFillHint: handleTextFillHint,
           onTextEditCommitted: () => {
-            void saveCurrentCanvasPage();
+            void commitCanvasToPages();
           },
           onCanvasDocumentCommit: () => {
             commitCanvasToPagesRef.current();
@@ -912,7 +913,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
             onIssueFocus={handleIssueFocus}
             onBeforeCheckTab={() => {
-              void saveCurrentCanvasPage();
+              void commitCanvasToPages();
             }}
           />
         )}

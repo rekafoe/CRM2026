@@ -123,6 +123,12 @@ export async function runPageLoadKeyTransition({
       }
     }
 
+    if (pagesChanged) {
+      // Transition runner is the canonical writer for outgoing flush; keep ref in sync immediately
+      // so loadIncoming never reads stale pages between async React renders.
+      pagesRef.current = snapshotPages;
+    }
+
     historyRef.current.reset();
     onHistoryChange(false, false);
 
@@ -165,9 +171,7 @@ export async function runPageLoadKeyTransition({
       loadedPageForInstanceRef.current = canvasInstance;
     }
 
-    if (pagesChanged) {
-      setPages(snapshotPages);
-    }
+    if (pagesChanged) setPages(snapshotPages);
 
     if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
     else lockTextInlineEditing(canvas);

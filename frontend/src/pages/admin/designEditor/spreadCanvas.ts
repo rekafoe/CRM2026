@@ -20,6 +20,39 @@ function safeSerializeObject(obj: FabricObject): Record<string, unknown> | null 
   }
 }
 
+function serializeCanvasObjectsStrict(canvas: Canvas, objects: FabricObject[]): {
+  base: Record<string, unknown>;
+  serialized: Record<string, unknown>[];
+} {
+  try {
+    const base = canvas.toObject(CUSTOM_PROPS) as Record<string, unknown>;
+    if (Array.isArray(base.objects) && base.objects.length === objects.length) {
+      const serialized = base.objects.filter(
+        (item): item is Record<string, unknown> => !!item && typeof item === 'object' && !Array.isArray(item),
+      );
+      if (serialized.length === objects.length) {
+        return { base, serialized };
+      }
+    }
+  } catch {
+    // Fallback below keeps behavior predictable even if canvas.toObject throws.
+  }
+
+  const serialized = objects.map((obj, index) => {
+    const next = safeSerializeObject(obj);
+    if (next) return next;
+    throw new Error(`Failed to serialize spread object at index ${index}`);
+  });
+
+  return {
+    base: {
+      objects: [],
+      backgroundColor: (canvas as unknown as { backgroundColor?: unknown }).backgroundColor,
+    },
+    serialized,
+  };
+}
+
 /**
  * Делит широкий холст разворота на два JSON страниц (без await clone — без гонок с resize).
  * Объекты, пересекающие корешок, дублируются на обе страницы (полная копия на каждой стороне).
@@ -33,36 +66,27 @@ export function splitSpreadCanvasToPagesSync(
   const rightJson: Record<string, unknown>[] = [];
 
   const objects = canvas.getObjects() as FabricObject[];
+  const { base, serialized } = serializeCanvasObjectsStrict(canvas, objects);
 
-  for (const obj of objects) {
+  for (let index = 0; index < objects.length; index += 1) {
+    const obj = objects[index]!;
+    const serializedObject = serialized[index]!;
     const br = obj.getBoundingRect();
     const rightEdge = br.left + br.width;
     const crosses = br.left < spine && rightEdge > spine;
-    const serialized = safeSerializeObject(obj);
-    if (!serialized) continue;
 
     if (crosses) {
-      leftJson.push(deepCloneJson(serialized));
-      const rightCopy = deepCloneJson(serialized);
+      leftJson.push(deepCloneJson(serializedObject));
+      const rightCopy = deepCloneJson(serializedObject);
       shiftLeftInSerialized(rightCopy, -spine);
       rightJson.push(rightCopy);
     } else if (rightEdge <= spine + 0.5) {
-      leftJson.push(serialized);
+      leftJson.push(serializedObject);
     } else if (br.left >= spine - 0.5) {
-      const o = deepCloneJson(serialized);
+      const o = deepCloneJson(serializedObject);
       shiftLeftInSerialized(o, -spine);
       rightJson.push(o);
     }
-  }
-
-  let base: Record<string, unknown>;
-  try {
-    base = canvas.toObject(CUSTOM_PROPS) as Record<string, unknown>;
-  } catch {
-    base = {
-      objects: [],
-      backgroundColor: (canvas as unknown as { backgroundColor?: unknown }).backgroundColor,
-    };
   }
   return {
     left: { ...base, objects: leftJson },

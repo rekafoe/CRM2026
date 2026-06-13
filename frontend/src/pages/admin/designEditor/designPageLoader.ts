@@ -116,9 +116,12 @@ export async function loadDesignPageScene(input: {
     try {
       // Не даём Fabric мутировать snapshot страницы в React state при переходах.
       await canvas.loadFromJSON(deepCloneFabricJson(fabricJson), fabricDeserializeReviver);
-    } catch {
+    } catch (error) {
       canvas.clear();
       (canvas as unknown as AnyObj).backgroundColor = 'white';
+      throw new Error(
+        `Failed to load page scene from fabricJSON: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
     await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
     normalizeBackgroundObjects(canvas, pageW, pageH);

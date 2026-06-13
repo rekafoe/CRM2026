@@ -69,6 +69,12 @@ export function usePublicDesignPageActions({
     return pageActionQueueRef.current.enqueue(task);
   }, []);
 
+  const commitCanvasToPages = useCallback(async () => {
+    await enqueuePageAction(async () => {
+      await saveCurrentCanvasPage();
+    });
+  }, [enqueuePageAction, saveCurrentCanvasPage]);
+
   const runNavigationTransaction = useCallback(async (
     task: () => Promise<boolean>,
   ) => {
@@ -250,6 +256,7 @@ export function usePublicDesignPageActions({
 
   return {
     saveCurrentCanvasPage,
+    commitCanvasToPages,
     handleGoToPage,
     handleAddClientPage,
     handleInsertClientPage,
