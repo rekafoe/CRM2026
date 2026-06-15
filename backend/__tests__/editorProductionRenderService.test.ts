@@ -4,6 +4,10 @@ describe('editorProductionRenderService internals', () => {
   const transparentPng =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='
 
+  afterAll(async () => {
+    await __editorProductionRenderInternals.closeProductionRenderBrowser()
+  }, 30000)
+
   it('renders filled photo field group as clipped container instead of flattening children', () => {
     const fabricJSON = {
       objects: [
@@ -63,4 +67,58 @@ describe('editorProductionRenderService internals', () => {
     expect(diagnostics.images).toBe(1)
     expect(diagnostics.unresolvedImages).toEqual([])
   })
+
+  it('fails loudly for single-color production renders', () => {
+    expect(() => __editorProductionRenderInternals.assertHealthyPixelStats({
+      width: 100,
+      height: 100,
+      sampledPixels: 100,
+      nonWhiteRatio: 1,
+      nonBlackRatio: 1,
+      uniqueColorSamples: 1,
+    }, 'Page 1')).toThrow(/single-color/)
+  })
+
+  it('fails loudly for almost fully white or black production renders', () => {
+    expect(() => __editorProductionRenderInternals.assertHealthyPixelStats({
+      width: 100,
+      height: 100,
+      sampledPixels: 100,
+      nonWhiteRatio: 0,
+      nonBlackRatio: 1,
+      uniqueColorSamples: 2,
+    }, 'Page 1')).toThrow(/almost fully white/)
+
+    expect(() => __editorProductionRenderInternals.assertHealthyPixelStats({
+      width: 100,
+      height: 100,
+      sampledPixels: 100,
+      nonWhiteRatio: 1,
+      nonBlackRatio: 0,
+      uniqueColorSamples: 2,
+    }, 'Page 2')).toThrow(/almost fully black/)
+  })
+
+  it('builds a full-page raster wrapper for PNG production pages', () => {
+    const html = __editorProductionRenderInternals.buildRasterPageHtml(Buffer.from('abc'), 92, 54)
+
+    expect(html).toContain('width:92mm')
+    expect(html).toContain('height:54mm')
+    expect(html).toContain('data:image/png;base64,YWJj')
+  })
+
+  it('renders a Fabric page through the headless browser bridge', async () => {
+    const rendered = await __editorProductionRenderInternals.renderFabricPageToPng({
+      version: '7.4.0',
+      objects: [
+        { type: 'rect', left: 6, top: 6, width: 40, height: 24, fill: '#c01818' },
+        { type: 'text', left: 8, top: 34, text: 'PDF', fontSize: 14, fill: '#111111' },
+      ],
+    }, new Map(), 30, 20, 2, '', 0)
+
+    expect(rendered.png.length).toBeGreaterThan(100)
+    expect(rendered.widthMm).toBe(34)
+    expect(rendered.heightMm).toBe(24)
+    expect(rendered.pixelStats.uniqueColorSamples).toBeGreaterThan(1)
+  }, 30000)
 })

@@ -18,6 +18,17 @@ import { logger } from '../utils/logger'
 const MM_TO_PX = 96 / 25.4
 const EXPORT_DPI = 300
 const PX_PER_MM_AT_96 = MM_TO_PX
+const EXPORT_PX_PER_MM = EXPORT_DPI / 25.4
+const FABRIC_EXPORT_MULTIPLIER = EXPORT_DPI / 96
+const FABRIC_BROWSER_BUNDLE_PATH = path.join(
+  __dirname,
+  '..',
+  '..',
+  'node_modules',
+  'fabric',
+  'dist',
+  'index.min.js',
+)
 
 type FabricObj = Record<string, unknown>
 
@@ -30,6 +41,22 @@ type ProductionPageDiagnostics = {
   unresolvedImages: string[]
 }
 
+type RenderedFabricPage = {
+  png: Buffer
+  widthMm: number
+  heightMm: number
+  pixelStats: ProductionPixelStats
+}
+
+type ProductionPixelStats = {
+  width: number
+  height: number
+  sampledPixels: number
+  nonWhiteRatio: number
+  nonBlackRatio: number
+  uniqueColorSamples: number
+}
+
 let browserPromise: Promise<Browser> | null = null
 
 async function getBrowser(): Promise<Browser> {
@@ -40,13 +67,40 @@ async function getBrowser(): Promise<Browser> {
   browserPromise = puppeteer.launch({
     headless: true,
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_BIN,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--allow-file-access-from-files',
+    ],
   })
   const browser = await browserPromise
   browser.on('disconnected', () => {
     browserPromise = null
   })
   return browser
+}
+
+export async function closeProductionRenderBrowser(): Promise<void> {
+  const browser = browserPromise ? await browserPromise.catch(() => null) : null
+  browserPromise = null
+  if (browser?.connected) {
+    const browserProcess = (browser as unknown as { process?: () => { kill?: () => void } | null }).process?.()
+    let timeout: NodeJS.Timeout | null = null
+    try {
+      await Promise.race([
+        browser.close(),
+        new Promise<void>((resolve) => {
+          timeout = setTimeout(() => {
+            browserProcess?.kill?.()
+            resolve()
+          }, 5000)
+        }),
+      ])
+    } finally {
+      if (timeout) clearTimeout(timeout)
+    }
+  }
 }
 
 function parseJsonObject(value: unknown): Record<string, unknown> {
@@ -134,6 +188,46 @@ function resolveImageSrc(
   if (byName) return `file://${byName.replace(/\\/g, '/')}`
 
   return null
+}
+
+function remapFabricImageSources(value: unknown, fileNameByUrl: Map<string, string>): unknown {
+  if (Array.isArray(value)) return value.map((item) => remapFabricImageSources(item, fileNameByUrl))
+  if (!value || typeof value !== 'object') return value
+  const obj: FabricObj = { ...(value as FabricObj) }
+  if (typeof obj.src === 'string') {
+    const resolved = resolveImageSrc(obj.src, fileNameByUrl)
+    if (resolved) obj.src = resolved
+  }
+  if (Array.isArray(obj.objects)) obj.objects = obj.objects.map((item) => remapFabricImageSources(item, fileNameByUrl))
+  if (Array.isArray(obj._objects)) obj._objects = obj._objects.map((item) => remapFabricImageSources(item, fileNameByUrl))
+  if (obj.clipPath) obj.clipPath = remapFabricImageSources(obj.clipPath, fileNameByUrl)
+  if (obj.backgroundImage) obj.backgroundImage = remapFabricImageSources(obj.backgroundImage, fileNameByUrl)
+  if (obj.overlayImage) obj.overlayImage = remapFabricImageSources(obj.overlayImage, fileNameByUrl)
+  return obj
+}
+
+function buildFabricRenderHtml(fontFaceCss = ''): string {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
+    ${fontFaceCss}
+    *{box-sizing:border-box}
+    body{margin:0;background:#fff}
+    canvas{display:block}
+  </style></head><body></body></html>`
+}
+
+function assertHealthyPixelStats(stats: ProductionPixelStats, pageLabel: string): void {
+  if (stats.sampledPixels <= 0) {
+    throw new Error(`${pageLabel}: production render did not produce pixels`)
+  }
+  if (stats.uniqueColorSamples <= 1) {
+    throw new Error(`${pageLabel}: production render is a single-color page`)
+  }
+  if (stats.nonWhiteRatio < 0.0001) {
+    throw new Error(`${pageLabel}: production render is almost fully white`)
+  }
+  if (stats.nonBlackRatio < 0.0001) {
+    throw new Error(`${pageLabel}: production render is almost fully black`)
+  }
 }
 
 function cssNumber(value: unknown, fallback = 0): number {
@@ -375,6 +469,188 @@ async function renderHtmlToPdfBuffer(html: string, widthMm: number, heightMm: nu
   }
 }
 
+function buildRasterPageHtml(png: Buffer, widthMm: number, heightMm: number): string {
+  const dataUrl = `data:image/png;base64,${png.toString('base64')}`
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:${widthMm}mm;height:${heightMm}mm;margin:0;background:#fff;overflow:hidden}
+    img{display:block;width:${widthMm}mm;height:${heightMm}mm;object-fit:fill}
+  </style></head><body><img src="${dataUrl}" alt=""/></body></html>`
+}
+
+async function renderFabricPageToPng(
+  fabricJSON: unknown,
+  fileNameByUrl: Map<string, string>,
+  pageWidthMm: number,
+  pageHeightMm: number,
+  bleedMm: number,
+  fontFaceCss: string,
+  pageIndex: number,
+): Promise<RenderedFabricPage> {
+  if (!fs.existsSync(FABRIC_BROWSER_BUNDLE_PATH)) {
+    throw new Error(`Fabric browser bundle not found: ${FABRIC_BROWSER_BUNDLE_PATH}`)
+  }
+
+  const browser = await getBrowser()
+  const page = await browser.newPage()
+  const normalizedFabricJSON = remapFabricImageSources(parseJsonObject(fabricJSON), fileNameByUrl)
+  const bleed = Math.max(0, Number.isFinite(bleedMm) ? bleedMm : 0)
+  const widthMm = pageWidthMm + bleed * 2
+  const heightMm = pageHeightMm + bleed * 2
+  const renderPayload = {
+    fabricJSON: normalizedFabricJSON,
+    pageWidthPx: Math.round(pageWidthMm * PX_PER_MM_AT_96),
+    pageHeightPx: Math.round(pageHeightMm * PX_PER_MM_AT_96),
+    bleedPx: Math.round(bleed * EXPORT_PX_PER_MM),
+    sheetWidthPx: Math.max(1, Math.round(widthMm * EXPORT_PX_PER_MM)),
+    sheetHeightPx: Math.max(1, Math.round(heightMm * EXPORT_PX_PER_MM)),
+    multiplier: FABRIC_EXPORT_MULTIPLIER,
+    cutMarks: true,
+  }
+
+  try {
+    await page.setViewport({
+      width: Math.max(1, Math.ceil(renderPayload.sheetWidthPx / 2)),
+      height: Math.max(1, Math.ceil(renderPayload.sheetHeightPx / 2)),
+      deviceScaleFactor: 1,
+    })
+    await page.setContent(buildFabricRenderHtml(fontFaceCss), { waitUntil: 'load', timeout: 120000 })
+    await page.addScriptTag({ path: FABRIC_BROWSER_BUNDLE_PATH })
+    await page.evaluate(() => document.fonts.ready)
+    const result = await page.evaluate(async (payload) => {
+      const fabricNamespace = (window as unknown as { fabric?: any }).fabric
+      if (!fabricNamespace?.Canvas) throw new Error('Fabric browser bundle did not expose Canvas')
+
+      const sourceElement = document.createElement('canvas')
+      sourceElement.width = payload.pageWidthPx
+      sourceElement.height = payload.pageHeightPx
+      sourceElement.style.width = `${payload.pageWidthPx}px`
+      sourceElement.style.height = `${payload.pageHeightPx}px`
+      document.body.appendChild(sourceElement)
+
+      const canvas = new fabricNamespace.Canvas(sourceElement, {
+        width: payload.pageWidthPx,
+        height: payload.pageHeightPx,
+        backgroundColor: 'white',
+        preserveObjectStacking: true,
+        renderOnAddRemove: false,
+        enableRetinaScaling: false,
+      })
+
+      try {
+        const loadResult = canvas.loadFromJSON(payload.fabricJSON)
+        if (loadResult && typeof loadResult.then === 'function') {
+          await loadResult
+        } else {
+          await new Promise<void>((resolve) => {
+            canvas.loadFromJSON(payload.fabricJSON, () => resolve())
+          })
+        }
+        canvas.getObjects().forEach((obj: any) => {
+          if (obj && typeof obj.set === 'function') {
+            obj.set({ selectable: false, evented: false })
+            if (obj.type === 'image' || obj.photoFieldFilled === true) {
+              obj.objectCaching = false
+              obj.noScaleCache = true
+            }
+          }
+        })
+        canvas.renderAll()
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+        await document.fonts.ready
+
+        const trimDataUrl = canvas.toDataURL({ format: 'png', multiplier: payload.multiplier })
+        const trimImage = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image()
+          img.onload = () => resolve(img)
+          img.onerror = () => reject(new Error('Unable to decode Fabric trim PNG'))
+          img.src = trimDataUrl
+        })
+
+        const sheet = document.createElement('canvas')
+        sheet.width = payload.sheetWidthPx
+        sheet.height = payload.sheetHeightPx
+        const ctx = sheet.getContext('2d')
+        if (!ctx) throw new Error('Unable to create production sheet canvas')
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, sheet.width, sheet.height)
+        ctx.imageSmoothingEnabled = true
+        ctx.imageSmoothingQuality = 'high'
+        ctx.drawImage(trimImage, payload.bleedPx, payload.bleedPx)
+
+        if (payload.cutMarks && payload.bleedPx > 0) {
+          const trimW = trimImage.naturalWidth || Math.round(payload.pageWidthPx * payload.multiplier)
+          const trimH = trimImage.naturalHeight || Math.round(payload.pageHeightPx * payload.multiplier)
+          const left = payload.bleedPx
+          const top = payload.bleedPx
+          const right = left + trimW
+          const bottom = top + trimH
+          const mark = Math.max(18, Math.round(payload.bleedPx * 0.75))
+          const gap = Math.max(6, Math.round(payload.bleedPx * 0.18))
+          ctx.save()
+          ctx.strokeStyle = '#000000'
+          ctx.lineWidth = Math.max(1, Math.round(payload.multiplier))
+          ctx.beginPath()
+          ctx.moveTo(left - gap - mark, top); ctx.lineTo(left - gap, top)
+          ctx.moveTo(left, top - gap - mark); ctx.lineTo(left, top - gap)
+          ctx.moveTo(right + gap, top); ctx.lineTo(right + gap + mark, top)
+          ctx.moveTo(right, top - gap - mark); ctx.lineTo(right, top - gap)
+          ctx.moveTo(left - gap - mark, bottom); ctx.lineTo(left - gap, bottom)
+          ctx.moveTo(left, bottom + gap); ctx.lineTo(left, bottom + gap + mark)
+          ctx.moveTo(right + gap, bottom); ctx.lineTo(right + gap + mark, bottom)
+          ctx.moveTo(right, bottom + gap); ctx.lineTo(right, bottom + gap + mark)
+          ctx.stroke()
+          ctx.restore()
+        }
+
+        const sampleCtx = ctx
+        const stepX = Math.max(1, Math.floor(sheet.width / 80))
+        const stepY = Math.max(1, Math.floor(sheet.height / 80))
+        let sampledPixels = 0
+        let nonWhite = 0
+        let nonBlack = 0
+        const unique = new Set<string>()
+        for (let y = 0; y < sheet.height; y += stepY) {
+          for (let x = 0; x < sheet.width; x += stepX) {
+            const [r, g, b, a] = sampleCtx.getImageData(x, y, 1, 1).data
+            if (a === 0) continue
+            sampledPixels += 1
+            if (!(r > 248 && g > 248 && b > 248)) nonWhite += 1
+            if (!(r < 7 && g < 7 && b < 7)) nonBlack += 1
+            unique.add(`${r >> 4},${g >> 4},${b >> 4},${a >> 6}`)
+          }
+        }
+
+        return {
+          dataUrl: sheet.toDataURL('image/png'),
+          pixelStats: {
+            width: sheet.width,
+            height: sheet.height,
+            sampledPixels,
+            nonWhiteRatio: sampledPixels > 0 ? nonWhite / sampledPixels : 0,
+            nonBlackRatio: sampledPixels > 0 ? nonBlack / sampledPixels : 0,
+            uniqueColorSamples: unique.size,
+          },
+        }
+      } finally {
+        canvas.dispose()
+        sourceElement.remove()
+      }
+    }, renderPayload)
+
+    assertHealthyPixelStats(result.pixelStats, `Page ${pageIndex + 1}`)
+    const base64 = result.dataUrl.replace(/^data:image\/png;base64,/, '')
+    return {
+      png: Buffer.from(base64, 'base64'),
+      widthMm,
+      heightMm,
+      pixelStats: result.pixelStats,
+    }
+  } finally {
+    await page.close()
+  }
+}
+
 async function loadOrderFileUrlMap(orderId: number, orderItemId: number): Promise<Map<string, string>> {
   const db = await getDb()
   const files = await db.all<Array<{ filename: string; originalName: string | null }>>(
@@ -456,15 +732,33 @@ export async function renderDesignStateProductionPdf(
         unresolvedImages: diagnostics.unresolvedImages.slice(0, 10),
       })
     }
-    const { html, widthMm, heightMm } = buildPageHtml(
+    if (diagnostics.unresolvedImages.length > 0) {
+      throw new Error(
+        `Production PDF page ${index + 1}: unresolved images: ${diagnostics.unresolvedImages.slice(0, 5).join(', ')}`,
+      )
+    }
+    const rendered = await renderFabricPageToPng(
       fabricJSON,
       fileNameByUrl,
       pageWidthMm,
       pageHeightMm,
       bleedMm,
       fontFaceCss,
+      index,
     )
-    const singlePdf = await renderHtmlToPdfBuffer(html, widthMm, heightMm)
+    logger.info('Editor production Fabric page rendered', {
+      orderId,
+      orderItemId,
+      page: index + 1,
+      widthMm: rendered.widthMm,
+      heightMm: rendered.heightMm,
+      pixelStats: rendered.pixelStats,
+    })
+    const singlePdf = await renderHtmlToPdfBuffer(
+      buildRasterPageHtml(rendered.png, rendered.widthMm, rendered.heightMm),
+      rendered.widthMm,
+      rendered.heightMm,
+    )
     const doc = await PDFDocument.load(singlePdf)
     const copied = await merged.copyPages(doc, doc.getPageIndices())
     copied.forEach((p) => merged.addPage(p))
@@ -502,7 +796,12 @@ export async function renderDesignStateProductionPdf(
 
 /** @internal exported for regression tests */
 export const __editorProductionRenderInternals = {
+  assertHealthyPixelStats,
   buildPageHtml,
+  buildRasterPageHtml,
+  closeProductionRenderBrowser,
   collectProductionPageDiagnostics,
+  remapFabricImageSources,
+  renderFabricPageToPng,
   resolveImageSrc,
 }
