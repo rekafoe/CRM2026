@@ -3,16 +3,32 @@ import path from 'path'
 import { PDFDocument } from 'pdf-lib'
 import puppeteer, { type Browser } from 'puppeteer'
 import { getDb } from '../config/database'
-import { orderFilesDir, resolveSafeExistingPath, saveBufferToOrderFiles } from '../config/upload'
+import {
+  designTemplateAssetsDir,
+  orderFilesDir,
+  resolveSafeExistingPath,
+  saveBufferToOrderFiles,
+  uploadsDir,
+} from '../config/upload'
 import { resolveFontFilesForDesignState } from './designFontService'
 import { buildMixedFontTextInnerHtml } from '../utils/textStyleRuns'
 import { getDesignTemplate } from './designTemplateService'
+import { logger } from '../utils/logger'
 
 const MM_TO_PX = 96 / 25.4
 const EXPORT_DPI = 300
 const PX_PER_MM_AT_96 = MM_TO_PX
 
 type FabricObj = Record<string, unknown>
+
+type ProductionPageDiagnostics = {
+  objects: number
+  groups: number
+  filledPhotoFields: number
+  clipPaths: number
+  images: number
+  unresolvedImages: string[]
+}
 
 let browserPromise: Promise<Browser> | null = null
 
@@ -57,6 +73,17 @@ function walkFabric(value: unknown, visit: (obj: FabricObj) => void): void {
   walkFabric(obj.clipPath, visit)
 }
 
+function getFabricChildren(obj: FabricObj): FabricObj[] {
+  const objects = Array.isArray(obj.objects)
+    ? obj.objects
+    : Array.isArray(obj._objects)
+      ? obj._objects
+      : []
+  return objects.filter((child): child is FabricObj => (
+    Boolean(child) && typeof child === 'object' && !Array.isArray(child)
+  ))
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -65,9 +92,24 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;')
 }
 
+function resolveKnownUrlPath(src: string): { filename: string; dirs: string[] } | null {
+  const raw = src.trim()
+  if (!raw) return null
+  let pathname = raw
+  try {
+    pathname = new URL(raw, 'https://assets.local').pathname
+  } catch {
+    pathname = raw.split('?')[0] ?? raw
+  }
+  const uploadMatch = pathname.match(/\/(?:api\/)?uploads\/([^/?#]+)$/i)
+  if (uploadMatch?.[1]) {
+    return { filename: decodeURIComponent(uploadMatch[1]), dirs: [uploadsDir] }
+  }
+  return null
+}
+
 function resolveImageSrc(
   src: string,
-  orderId: number,
   fileNameByUrl: Map<string, string>,
 ): string | null {
   const trimmed = src.trim()
@@ -77,32 +119,52 @@ function resolveImageSrc(
 
   const stored = fileNameByUrl.get(trimmed) ?? fileNameByUrl.get(trimmed.split('?')[0] ?? '')
   if (stored) {
-    const filePath = resolveSafeExistingPath([orderFilesDir], stored)
+    const filePath = resolveSafeExistingPath([orderFilesDir, uploadsDir, designTemplateAssetsDir], stored)
+    if (filePath) return `file://${filePath.replace(/\\/g, '/')}`
+  }
+
+  const known = resolveKnownUrlPath(trimmed)
+  if (known) {
+    const filePath = resolveSafeExistingPath(known.dirs, known.filename)
     if (filePath) return `file://${filePath.replace(/\\/g, '/')}`
   }
 
   const baseName = path.basename(trimmed)
-  const byName = resolveSafeExistingPath([orderFilesDir], baseName)
+  const byName = resolveSafeExistingPath([orderFilesDir, uploadsDir, designTemplateAssetsDir], baseName)
   if (byName) return `file://${byName.replace(/\\/g, '/')}`
 
   return null
 }
 
-function buildObjectHtml(
-  obj: FabricObj,
-  orderId: number,
-  fileNameByUrl: Map<string, string>,
-  canvasW: number,
-  canvasH: number,
-): string {
-  const left = Number(obj.left ?? 0)
-  const top = Number(obj.top ?? 0)
-  const scaleX = Number(obj.scaleX ?? 1)
-  const scaleY = Number(obj.scaleY ?? 1)
-  const angle = Number(obj.angle ?? 0)
-  const opacity = Number(obj.opacity ?? 1)
-  const w = Number(obj.width ?? 0) * scaleX
-  const h = Number(obj.height ?? 0) * scaleY
+function cssNumber(value: unknown, fallback = 0): number {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function originOffset(origin: unknown, size: number): number {
+  if (origin === 'center') return size / 2
+  if (origin === 'right' || origin === 'bottom') return size
+  return 0
+}
+
+function buildBoxStyle(obj: FabricObj, opts?: {
+  left?: number
+  top?: number
+  width?: number
+  height?: number
+  local?: boolean
+  overflow?: string
+}): string {
+  const scaleX = cssNumber(obj.scaleX, 1)
+  const scaleY = cssNumber(obj.scaleY, 1)
+  const angle = cssNumber(obj.angle, 0)
+  const opacity = cssNumber(obj.opacity, 1)
+  const w = opts?.width ?? Math.abs(cssNumber(obj.width) * scaleX)
+  const h = opts?.height ?? Math.abs(cssNumber(obj.height) * scaleY)
+  const rawLeft = opts?.left ?? cssNumber(obj.left)
+  const rawTop = opts?.top ?? cssNumber(obj.top)
+  const left = rawLeft - (opts?.local ? 0 : originOffset(obj.originX, w))
+  const top = rawTop - (opts?.local ? 0 : originOffset(obj.originY, h))
   const style = [
     'position:absolute',
     `left:${left}px`,
@@ -112,13 +174,84 @@ function buildObjectHtml(
     `transform:rotate(${angle}deg)`,
     `opacity:${opacity}`,
     'transform-origin:top left',
-  ].join(';')
+  ]
+  if (opts?.overflow) style.push(`overflow:${opts.overflow}`)
+  return style.join(';')
+}
 
+function childLocalLeft(parent: FabricObj, child: FabricObj, childW: number): number {
+  const parentW = Math.max(1, cssNumber(parent.width, 1))
+  return parentW / 2 + cssNumber(child.left) - originOffset(child.originX, childW)
+}
+
+function childLocalTop(parent: FabricObj, child: FabricObj, childH: number): number {
+  const parentH = Math.max(1, cssNumber(parent.height, 1))
+  return parentH / 2 + cssNumber(child.top) - originOffset(child.originY, childH)
+}
+
+function buildFilledPhotoFieldHtml(
+  group: FabricObj,
+  fileNameByUrl: Map<string, string>,
+): string {
+  const children = getFabricChildren(group)
+  const image = children.find((child) => String(child.type ?? '').toLowerCase() === 'image')
+  const src = typeof image?.src === 'string' ? resolveImageSrc(image.src, fileNameByUrl) : null
+  if (!image || !src) return ''
+
+  const frameW = Math.max(1, cssNumber(group.photoFieldFw, cssNumber(group.width, 1)))
+  const frameH = Math.max(1, cssNumber(group.photoFieldFh, cssNumber(group.height, 1)))
+  const outer = buildBoxStyle(group, { width: frameW, height: frameH, overflow: 'hidden' })
+  const imageW = Math.max(1, cssNumber(image.width, 1) * cssNumber(image.scaleX, 1))
+  const imageH = Math.max(1, cssNumber(image.height, 1) * cssNumber(image.scaleY, 1))
+  const imageLeft = frameW / 2 + cssNumber(image.left) - originOffset(image.originX, imageW)
+  const imageTop = frameH / 2 + cssNumber(image.top) - originOffset(image.originY, imageH)
+  const imageStyle = [
+    'position:absolute',
+    `left:${imageLeft}px`,
+    `top:${imageTop}px`,
+    `width:${imageW}px`,
+    `height:${imageH}px`,
+    `transform:rotate(${cssNumber(image.angle, 0)}deg)`,
+    'transform-origin:top left',
+  ].join(';')
+  return `<div style="${outer}"><img src="${escapeHtml(src)}" alt="" style="${imageStyle}" /></div>`
+}
+
+function buildObjectHtml(
+  obj: FabricObj,
+  fileNameByUrl: Map<string, string>,
+  parent?: FabricObj,
+): string {
   const type = String(obj.type ?? '').toLowerCase()
+  const scaleX = cssNumber(obj.scaleX, 1)
+  const scaleY = cssNumber(obj.scaleY, 1)
+  const w = Math.abs(cssNumber(obj.width) * scaleX)
+  const h = Math.abs(cssNumber(obj.height) * scaleY)
+  const style = parent
+    ? buildBoxStyle(obj, {
+      left: childLocalLeft(parent, obj, w),
+      top: childLocalTop(parent, obj, h),
+      width: w,
+      height: h,
+      local: true,
+    })
+    : buildBoxStyle(obj)
+
+  if (type === 'group') {
+    if (obj.isPhotoField === true && obj.photoFieldFilled === true) {
+      return buildFilledPhotoFieldHtml(obj, fileNameByUrl)
+    }
+    const children = getFabricChildren(obj)
+      .map((child) => buildObjectHtml(child, fileNameByUrl, obj))
+      .join('')
+    return `<div style="${style};overflow:visible">${children}</div>`
+  }
+
   if (type === 'image' || obj.isPhotoField === true) {
-    const src = typeof obj.src === 'string' ? resolveImageSrc(obj.src, orderId, fileNameByUrl) : null
+    const src = typeof obj.src === 'string' ? resolveImageSrc(obj.src, fileNameByUrl) : null
     if (!src) return ''
-    return `<img src="${escapeHtml(src)}" alt="" style="${style};object-fit:cover" />`
+    const fit = obj.backgroundFit === 'page' ? 'fill' : 'cover'
+    return `<img src="${escapeHtml(src)}" alt="" style="${style};object-fit:${fit}" />`
   }
 
   if (type === 'i-text' || type === 'textbox' || type === 'text') {
@@ -138,6 +271,33 @@ function buildObjectHtml(
   }
 
   return ''
+}
+
+function collectProductionPageDiagnostics(
+  fabricJSON: unknown,
+  fileNameByUrl: Map<string, string>,
+): ProductionPageDiagnostics {
+  const diagnostics: ProductionPageDiagnostics = {
+    objects: 0,
+    groups: 0,
+    filledPhotoFields: 0,
+    clipPaths: 0,
+    images: 0,
+    unresolvedImages: [],
+  }
+  walkFabric(fabricJSON, (obj) => {
+    diagnostics.objects += 1
+    const type = String(obj.type ?? '').toLowerCase()
+    if (type === 'group') diagnostics.groups += 1
+    if (obj.photoFieldFilled === true) diagnostics.filledPhotoFields += 1
+    if (obj.clipPath) diagnostics.clipPaths += 1
+    if (type === 'image' || typeof obj.src === 'string') {
+      diagnostics.images += 1
+      const src = typeof obj.src === 'string' ? obj.src : ''
+      if (src && !resolveImageSrc(src, fileNameByUrl)) diagnostics.unresolvedImages.push(src)
+    }
+  })
+  return diagnostics
 }
 
 function cssFontFormat(format: string): string {
@@ -161,7 +321,6 @@ function buildFontFaceCss(
 
 function buildPageHtml(
   fabricJSON: unknown,
-  orderId: number,
   fileNameByUrl: Map<string, string>,
   pageWidthMm: number,
   pageHeightMm: number,
@@ -176,11 +335,15 @@ function buildPageHtml(
   const bleedPx = Math.round(bleed * PX_PER_MM_AT_96)
 
   let bg = '#ffffff'
+  const root = parseJsonObject(fabricJSON)
+  const rootObjects = Array.isArray(root.objects) ? root.objects : []
   const parts: string[] = []
-  walkFabric(fabricJSON, (obj) => {
+  for (const raw of rootObjects) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue
+    const obj = raw as FabricObj
     if (obj.isBackground === true && typeof obj.fill === 'string') bg = obj.fill
-    parts.push(buildObjectHtml(obj, orderId, fileNameByUrl, canvasW, canvasH))
-  })
+    parts.push(buildObjectHtml(obj, fileNameByUrl))
+  }
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
     ${fontFaceCss}
@@ -226,6 +389,23 @@ async function loadOrderFileUrlMap(orderId: number, orderItemId: number): Promis
   return map
 }
 
+async function addTemplateAssetUrlMap(map: Map<string, string>, templateId: number | null): Promise<void> {
+  if (!templateId) return
+  const db = await getDb()
+  const rows = await db.all<Array<{ id: number; filename: string; thumb_filename: string | null }>>(
+    'SELECT id, filename, thumb_filename FROM design_template_assets WHERE template_id = ?',
+    [templateId],
+  )
+  for (const row of rows ?? []) {
+    map.set(`/api/design-templates/public/${templateId}/assets/${row.id}/content`, row.filename)
+    map.set(`/api/design-templates/${templateId}/assets/${row.id}/content`, row.filename)
+    if (row.thumb_filename) {
+      map.set(`/api/design-templates/public/${templateId}/assets/${row.id}/thumb`, row.thumb_filename)
+      map.set(`/api/design-templates/${templateId}/assets/${row.id}/thumb`, row.thumb_filename)
+    }
+  }
+}
+
 async function loadTemplateSpecForOrderItem(orderItemId: number): Promise<Record<string, unknown> | null> {
   const db = await getDb()
   const item = await db.get<{ params: string | null }>('SELECT params FROM items WHERE id = ?', [orderItemId])
@@ -258,14 +438,26 @@ export async function renderDesignStateProductionPdf(
   const pages = Array.isArray(state.pages) ? state.pages : []
   if (pages.length === 0) throw new Error('В designState нет страниц')
 
+  const templateId = Number(state.templateId)
   const fileNameByUrl = await loadOrderFileUrlMap(orderId, orderItemId)
+  await addTemplateAssetUrlMap(fileNameByUrl, Number.isFinite(templateId) && templateId > 0 ? templateId : null)
   const merged = await PDFDocument.create()
 
-  for (const page of pages) {
+  for (let index = 0; index < pages.length; index += 1) {
+    const page = pages[index]
     const fabricJSON = parseJsonObject(page).fabricJSON ?? page
+    const diagnostics = collectProductionPageDiagnostics(fabricJSON, fileNameByUrl)
+    if (diagnostics.unresolvedImages.length > 0 || diagnostics.groups > 0 || diagnostics.clipPaths > 0) {
+      logger.info('Editor production page diagnostics', {
+        orderId,
+        orderItemId,
+        page: index + 1,
+        ...diagnostics,
+        unresolvedImages: diagnostics.unresolvedImages.slice(0, 10),
+      })
+    }
     const { html, widthMm, heightMm } = buildPageHtml(
       fabricJSON,
-      orderId,
       fileNameByUrl,
       pageWidthMm,
       pageHeightMm,
@@ -306,4 +498,11 @@ export async function renderDesignStateProductionPdf(
   )
 
   return { filename: saved.filename, size: saved.size, pageCount: pages.length }
+}
+
+/** @internal exported for regression tests */
+export const __editorProductionRenderInternals = {
+  buildPageHtml,
+  collectProductionPageDiagnostics,
+  resolveImageSrc,
 }
