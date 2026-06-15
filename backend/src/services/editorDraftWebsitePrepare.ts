@@ -17,6 +17,66 @@ function parseDesignState(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function walkFabricLikeTree(value: unknown, visit: (obj: Record<string, unknown>) => void): void {
+  const obj = asRecord(value)
+  if (!obj) return
+  visit(obj)
+  const keys = ['objects', '_objects', 'clipPath']
+  for (const key of keys) {
+    const child = obj[key]
+    if (Array.isArray(child)) {
+      for (const node of child) walkFabricLikeTree(node, visit)
+      continue
+    }
+    walkFabricLikeTree(child, visit)
+  }
+}
+
+function extractDraftFileIdFromSrc(src: string): number | null {
+  const raw = src.trim()
+  if (!raw) return null
+  const parsePath = (pathname: string): number | null => {
+    const match = pathname.match(/\/drafts\/[^/]+\/files\/(\d+)\/content$/i)
+    if (!match?.[1]) return null
+    const fileId = Number(match[1])
+    return Number.isFinite(fileId) ? fileId : null
+  }
+  try {
+    const parsed = new URL(raw, 'https://draft.local')
+    return parsePath(parsed.pathname)
+  } catch {
+    return parsePath(raw)
+  }
+}
+
+function normalizeDesignStateDraftImageUrls(
+  designState: unknown,
+  fileNameByDraftFileId: Map<number, string>,
+): void {
+  const state = parseDesignState(designState)
+  if (!state) return
+  const pages = Array.isArray(state.pages) ? state.pages : []
+  for (const page of pages) {
+    const pageRec = asRecord(page)
+    if (!pageRec) continue
+    const fabricRoot = asRecord(pageRec.fabricJSON) ?? pageRec
+    walkFabricLikeTree(fabricRoot, (obj) => {
+      const src = typeof obj.src === 'string' ? obj.src : null
+      if (!src) return
+      const fileId = extractDraftFileIdFromSrc(src)
+      if (fileId == null) return
+      const fileName = fileNameByDraftFileId.get(fileId)
+      if (!fileName) return
+      obj.src = fileName
+    })
+  }
+}
+
 function mergeDesignStates(states: Array<Record<string, unknown>>): Record<string, unknown> | null {
   if (states.length === 0) return null
   const base = { ...states[0] }
@@ -209,17 +269,19 @@ export async function attachEditorDraftsToOrderItems(
   for (const draftItem of editorDraftItems) {
     const orderItemId = itemIds[draftItem.index]
     if (!orderItemId) throw new Error('Не найдена позиция заказа для editor draft')
+    const fileNameByDraftFileId = new Map<number, string>()
 
     for (const token of draftItem.tokens) {
       const draft = await getEditorDraft(token)
       if (!draft) throw new Error('Draft не найден')
       if (draft.status !== 'draft') throw new Error('Draft уже финализирован')
 
-      const draftFiles = await db.all<Array<{ filename: string; originalName: string | null; mime: string | null; size: number | null }>>(
-        'SELECT filename, originalName, mime, size FROM editor_draft_files WHERE draft_id = ? ORDER BY id ASC',
+      const draftFiles = await db.all<Array<{ id: number; filename: string; originalName: string | null; mime: string | null; size: number | null }>>(
+        'SELECT id, filename, originalName, mime, size FROM editor_draft_files WHERE draft_id = ? ORDER BY id ASC',
         [draft.id],
       )
       for (const file of draftFiles ?? []) {
+        fileNameByDraftFileId.set(Number(file.id), file.filename)
         await db.run(
           'INSERT INTO order_files (orderId, orderItemId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?, ?)',
           [orderId, orderItemId, file.filename, file.originalName, file.mime, file.size],
@@ -239,6 +301,7 @@ export async function attachEditorDraftsToOrderItems(
     if (item?.params) {
       try {
         const params = JSON.parse(item.params) as Record<string, unknown>
+        normalizeDesignStateDraftImageUrls(params.designState, fileNameByDraftFileId)
         const enriched = enrichParamsWithPreflight(params, params.designState, orderItemId)
         await db.run(
           'UPDATE items SET params = ? WHERE id = ? AND orderId = ?',
