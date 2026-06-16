@@ -1,4 +1,7 @@
+import fs from 'fs'
+import path from 'path'
 import { __editorProductionRenderInternals } from '../src/services/editorProductionRenderService'
+import { orderFilesDir } from '../src/config/upload'
 
 describe('editorProductionRenderService internals', () => {
   const transparentPng =
@@ -66,6 +69,29 @@ describe('editorProductionRenderService internals', () => {
 
     expect(diagnostics.images).toBe(1)
     expect(diagnostics.unresolvedImages).toEqual([])
+  })
+
+  it('resolves website editor draft file URLs for production PDF renders', () => {
+    const filename = `draft-resolve-test-${Date.now()}.png`
+    const filePath = path.join(orderFilesDir, filename)
+    fs.writeFileSync(filePath, Buffer.from('test'))
+    try {
+      const map = new Map<string, string>()
+      __editorProductionRenderInternals.addEditorDraftFileUrlAliases(
+        map,
+        '7mRT6Md0k5QeNfM79pLNeVTs',
+        94,
+        filename,
+      )
+      const src = 'https://printcore.by/api/editor/drafts/7mRT6Md0k5QeNfM79pLNeVTs/files/94/content'
+
+      expect(__editorProductionRenderInternals.resolveImageSrc(src, map)).toMatch(/^file:\/\//)
+      expect(__editorProductionRenderInternals.collectProductionPageDiagnostics({
+        objects: [{ type: 'image', src }],
+      }, map).unresolvedImages).toEqual([])
+    } finally {
+      fs.rmSync(filePath, { force: true })
+    }
   })
 
   it('fails loudly for single-color production renders', () => {

@@ -162,6 +162,35 @@ function resolveKnownUrlPath(src: string): { filename: string; dirs: string[] } 
   return null
 }
 
+function buildImageSrcLookupKeys(src: string): string[] {
+  const raw = src.trim()
+  if (!raw) return []
+  const withoutQuery = raw.split('?')[0] ?? raw
+  const keys = new Set<string>([raw, withoutQuery])
+  try {
+    const parsed = new URL(raw, 'https://assets.local')
+    keys.add(parsed.pathname)
+    keys.add(parsed.pathname + parsed.search)
+  } catch {
+    // Keep raw relative paths; they are already in the set above.
+  }
+  return [...keys].filter(Boolean)
+}
+
+function addEditorDraftFileUrlAliases(
+  map: Map<string, string>,
+  token: string,
+  fileId: number,
+  filename: string,
+): void {
+  const safeToken = encodeURIComponent(token)
+  const safeFileId = encodeURIComponent(String(fileId))
+  const suffix = `/drafts/${safeToken}/files/${safeFileId}/content`
+  for (const prefix of ['/api/editor', '/api/public-editor', '/public-editor', '/services/poligrafy/api/editor']) {
+    map.set(`${prefix}${suffix}`, filename)
+  }
+}
+
 function resolveImageSrc(
   src: string,
   fileNameByUrl: Map<string, string>,
@@ -171,7 +200,11 @@ function resolveImageSrc(
   if (trimmed.startsWith('data:')) return trimmed
   if (trimmed.startsWith('file://')) return trimmed
 
-  const stored = fileNameByUrl.get(trimmed) ?? fileNameByUrl.get(trimmed.split('?')[0] ?? '')
+  let stored: string | undefined
+  for (const key of buildImageSrcLookupKeys(trimmed)) {
+    stored = fileNameByUrl.get(key)
+    if (stored) break
+  }
   if (stored) {
     const filePath = resolveSafeExistingPath([orderFilesDir, uploadsDir, designTemplateAssetsDir], stored)
     if (filePath) return `file://${filePath.replace(/\\/g, '/')}`
@@ -662,7 +695,52 @@ async function loadOrderFileUrlMap(orderId: number, orderItemId: number): Promis
     map.set(file.filename, file.filename)
     if (file.originalName) map.set(file.originalName, file.filename)
   }
+  await addEditorDraftFileUrlMap(map, orderId, orderItemId)
   return map
+}
+
+function collectEditorDraftTokensFromParams(params: unknown): string[] {
+  const parsed = parseJsonObject(params)
+  const tokens = new Set<string>()
+  const addToken = (value: unknown) => {
+    if (typeof value === 'string' && value.trim()) tokens.add(value.trim())
+  }
+  addToken(parsed.editorDraftToken)
+  if (Array.isArray(parsed.editorDraftTokens)) {
+    for (const token of parsed.editorDraftTokens) addToken(token)
+  }
+  const group = parseJsonObject(parsed.editorLayoutGroup)
+  if (Array.isArray(group.slots)) {
+    for (const slot of group.slots) addToken(parseJsonObject(slot).editorDraftToken)
+  }
+  return [...tokens]
+}
+
+async function addEditorDraftFileUrlMap(
+  map: Map<string, string>,
+  orderId: number,
+  orderItemId: number,
+): Promise<void> {
+  const db = await getDb()
+  const item = await db.get<{ params: string | null }>(
+    'SELECT params FROM items WHERE id = ? AND orderId = ?',
+    [orderItemId, orderId],
+  )
+  const tokens = collectEditorDraftTokensFromParams(item?.params)
+  if (tokens.length === 0) return
+
+  for (const token of tokens) {
+    const rows = await db.all<Array<{ id: number; filename: string }>>(
+      `SELECT edf.id, edf.filename
+       FROM editor_drafts ed
+       JOIN editor_draft_files edf ON edf.draft_id = ed.id
+       WHERE ed.token = ?`,
+      [token],
+    )
+    for (const row of rows ?? []) {
+      addEditorDraftFileUrlAliases(map, token, Number(row.id), row.filename)
+    }
+  }
 }
 
 async function addTemplateAssetUrlMap(map: Map<string, string>, templateId: number | null): Promise<void> {
@@ -796,9 +874,11 @@ export async function renderDesignStateProductionPdf(
 
 /** @internal exported for regression tests */
 export const __editorProductionRenderInternals = {
+  addEditorDraftFileUrlAliases,
   assertHealthyPixelStats,
   buildPageHtml,
   buildRasterPageHtml,
+  buildImageSrcLookupKeys,
   closeProductionRenderBrowser,
   collectProductionPageDiagnostics,
   remapFabricImageSources,
