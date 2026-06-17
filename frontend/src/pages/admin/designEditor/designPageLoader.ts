@@ -5,7 +5,7 @@ import { FABRIC_CUSTOM_PROPS } from './constants';
 import { normalizeDesignFieldsOnCanvas } from './designFields';
 import { prepareTextObjectsOnCanvas } from './textStyleRuns';
 import { PUBLIC_EDITOR_FEATURE_FLAGS } from '../../../features/publicDesignEditor/publicEditorFeatureFlags';
-import { recordPublicEditorPerfMetric } from '../../../features/publicDesignEditor/publicEditorPerf';
+import { PUBLIC_EDITOR_DEV, recordPublicEditorPerfMetric } from '../../../features/publicDesignEditor/publicEditorPerf';
 
 type AnyObj = Record<string, unknown>;
 
@@ -120,7 +120,7 @@ function buildSpreadMergedFabricJson(input: {
     leftObjects: leftObjects.length,
     rightObjects: rightObjects.length,
   });
-  if (import.meta.env.DEV && dedupedMirrorCount > 0) {
+  if (PUBLIC_EDITOR_DEV && dedupedMirrorCount > 0) {
     console.info('[DesignEditorCanvas] spread merge reconciled mirrored duplicates', {
       dedupedMirrorCount,
       leftObjects: leftObjects.length,
@@ -303,7 +303,7 @@ export async function loadSpreadMergedScene(input: {
         clone.set({ left: clone.left ?? 0 });
         canvas.add(clone);
       } catch (error) {
-        if (import.meta.env.DEV) console.warn('[DesignEditorCanvas] skipped left spread object clone', error);
+        if (PUBLIC_EDITOR_DEV) console.warn('[DesignEditorCanvas] skipped left spread object clone', error);
       }
     }
 
@@ -313,7 +313,7 @@ export async function loadSpreadMergedScene(input: {
         clone.set({ left: (clone.left ?? 0) + pageW });
         canvas.add(clone);
       } catch (error) {
-        if (import.meta.env.DEV) console.warn('[DesignEditorCanvas] skipped right spread object clone', error);
+        if (PUBLIC_EDITOR_DEV) console.warn('[DesignEditorCanvas] skipped right spread object clone', error);
       }
     }
   } finally {

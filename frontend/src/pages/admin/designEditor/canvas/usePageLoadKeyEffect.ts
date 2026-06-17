@@ -11,6 +11,7 @@ import {
   type PageLoadKeyTransitionRefs,
 } from './canvasPageTransitions';
 import { getPageTransitionInvariantError } from './pageTransitionInvariant';
+import { PUBLIC_EDITOR_DEV } from '../../../../features/publicDesignEditor/publicEditorPerf';
 
 export interface UsePageLoadKeyEffectInput {
   fabricRef: RefObject<Canvas | null>;
@@ -107,7 +108,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
         while (fabricRef.current && canvasReady) {
           drainIterations += 1;
           if (drainIterations > 48) {
-            if (import.meta.env.DEV) {
+            if (PUBLIC_EDITOR_DEV) {
               console.warn('[DesignEditorCanvas] transition drain reached safety limit', {
                 requestedKey: requestedKeyRef.current,
                 displayedKey: prevPageLoadKeyRef.current,
@@ -138,7 +139,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
               callbacks,
             });
           } catch (transitionError) {
-            if (import.meta.env.DEV) {
+            if (PUBLIC_EDITOR_DEV) {
               console.warn('[DesignEditorCanvas] transition iteration failed, retrying drain', {
                 targetKey,
                 requestedKey: requestedKeyRef.current,
@@ -159,7 +160,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
             expectedCanvasInstance: canvasInstance,
           });
           if (invariantError) {
-            if (import.meta.env.DEV) {
+            if (PUBLIC_EDITOR_DEV) {
               console.warn('[DesignEditorCanvas] transition invariant mismatch, self-healing', {
                 targetKey,
                 requestedKey: requestedKeyRef.current,
@@ -181,7 +182,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
             invariantRetryKey = null;
             invariantRetryCount = 0;
           }
-          if (import.meta.env.DEV) {
+          if (PUBLIC_EDITOR_DEV) {
             canvas.upperCanvasEl.dataset.pageRequestedKey = targetKey;
             canvas.upperCanvasEl.dataset.pageDisplayedKey = result.displayedKey;
             canvas.upperCanvasEl.dataset.pageActiveIndex = String(result.activePageIndex);
@@ -194,7 +195,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
         }
       } catch (error) {
         // Ошибка загрузки страницы не должна оставлять pagestrip в busy-состоянии.
-        if (import.meta.env.DEV) {
+        if (PUBLIC_EDITOR_DEV) {
           console.error('[DesignEditorCanvas] page transition failed', error);
         }
       } finally {

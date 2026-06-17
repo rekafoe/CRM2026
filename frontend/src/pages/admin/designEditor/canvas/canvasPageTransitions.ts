@@ -12,6 +12,7 @@ import { canvasToJSON, parsePageLoadKey } from './canvasSerialization';
 import type { CanvasHistoryStack } from './canvasHistory';
 import type { PageLoadKeyTransitionResult } from './pageTransitionInvariant';
 import {
+  PUBLIC_EDITOR_DEV,
   recordPublicEditorPerfMetric,
   recordPublicEditorTransitionDrift,
   startPublicEditorPerfSpan,
@@ -81,7 +82,7 @@ function logTransitionLossIfAny(input: {
   beforeDigest: TransitionObjectDigest[];
   afterDigest: TransitionObjectDigest[];
 }): void {
-  if (!import.meta.env.DEV) return;
+  if (!PUBLIC_EDITOR_DEV) return;
   const { targetKey, prevKey, beforeDigest, afterDigest } = input;
   const beforeKeys = new Set(beforeDigest.map((item) => item.key));
   const afterKeys = new Set(afterDigest.map((item) => item.key));

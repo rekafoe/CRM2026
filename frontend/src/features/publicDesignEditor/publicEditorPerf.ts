@@ -43,7 +43,7 @@ const TRANSITION_DRIFT_ACCEPTANCE_SAMPLES = 30;
 const startedAt = Date.now();
 const metricBuckets = new Map<string, MetricBucket>();
 const transitionPairStats = new Map<string, TransitionPairStats>();
-const PERF_DEV = (() => {
+export const PUBLIC_EDITOR_DEV = (() => {
   try {
     const meta = import.meta as ImportMeta & { env?: { DEV?: unknown } };
     if (meta.env && typeof meta.env.DEV !== 'undefined') return Boolean(meta.env.DEV);
@@ -75,7 +75,7 @@ function percentile(samples: number[], p: number): number {
 }
 
 function maybeWarnTransitionP95(metricName: string): void {
-  if (!PERF_DEV) return;
+  if (!PUBLIC_EDITOR_DEV) return;
   if (metricName !== 'transition.total.ms') return;
   const bucket = metricBuckets.get(metricName);
   if (!bucket || bucket.count < 10) return;
@@ -90,7 +90,7 @@ function maybeWarnTransitionP95(metricName: string): void {
 }
 
 function maybeWarnTransitionDrift(pair: string, stats: TransitionPairStats): void {
-  if (!PERF_DEV) return;
+  if (!PUBLIC_EDITOR_DEV) return;
   if (stats.reportedAt30 || stats.samples < TRANSITION_DRIFT_ACCEPTANCE_SAMPLES) return;
   stats.reportedAt30 = true;
   if (stats.driftSamples === 0) {

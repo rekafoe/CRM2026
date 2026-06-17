@@ -68,7 +68,7 @@ import {
 } from './PublicDesignEditorMobileDock';
 import { PublicDesignDraftConflictDialog } from './PublicDesignDraftConflictDialog';
 import { PUBLIC_EDITOR_FEATURE_FLAGS } from './publicEditorFeatureFlags';
-import { startPublicEditorPerfSpan } from './publicEditorPerf';
+import { PUBLIC_EDITOR_DEV, startPublicEditorPerfSpan } from './publicEditorPerf';
 import '../../pages/admin/DesignEditorPage.css';
 import '../../pages/admin/designEditor/designEditorGlassTheme.css';
 import '../designEditorShell/editorShell.css';
@@ -1075,7 +1075,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     </div>
   );
 
-  const editorRootDevProps = import.meta.env.DEV
+  const editorRootDevProps = PUBLIC_EDITOR_DEV
     ? ({ 'data-pde-build': 'client-desktop-main-column' } as const)
     : undefined;
 

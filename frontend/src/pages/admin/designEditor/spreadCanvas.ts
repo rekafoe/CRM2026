@@ -1,7 +1,7 @@
 import type { Canvas } from 'fabric';
 import type { FabricObject } from 'fabric';
 import { FABRIC_CUSTOM_PROPS as CUSTOM_PROPS } from './constants';
-import { recordPublicEditorPerfMetric } from '../../../features/publicDesignEditor/publicEditorPerf';
+import { PUBLIC_EDITOR_DEV, recordPublicEditorPerfMetric } from '../../../features/publicDesignEditor/publicEditorPerf';
 
 function deepCloneJson<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj)) as T;
@@ -44,7 +44,7 @@ function safeSerializeObject(obj: FabricObject, index: number): Record<string, u
     return obj.toObject(CUSTOM_PROPS) as Record<string, unknown>;
   } catch {
     const fallback = buildFallbackSerializedObject(obj, index);
-    if (import.meta.env.DEV) {
+    if (PUBLIC_EDITOR_DEV) {
       console.warn('[DesignEditorCanvas] spread split used fallback serialization', {
         index,
         type: obj.type,
@@ -217,7 +217,7 @@ export function splitSpreadCanvasToPagesSync(
       fallbackCount,
     },
   );
-  if (import.meta.env.DEV && leftJson.length + rightJson.length < objects.length) {
+  if (PUBLIC_EDITOR_DEV && leftJson.length + rightJson.length < objects.length) {
     console.warn('[DesignEditorCanvas] spread split dropped objects unexpectedly', {
       sourceCount: objects.length,
       leftCount: leftJson.length,
