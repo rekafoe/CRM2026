@@ -4,6 +4,8 @@ import type { DesignTemplate } from '../../../../api';
 import type { DesignPage } from '../types';
 import { cropSpreadThumbnail } from '../cropSpreadThumbnail';
 import { loadDesignPageScene, loadSpreadMergedScene } from '../designPageLoader';
+import { mergePagesWithSavedSnapshot, type PageSaveSnapshot } from '../mergePagesSnapshot';
+import { splitSpreadCanvasToPagesSync } from '../spreadCanvas';
 import type { EditorMode } from './types';
 import { applyBasicModeConstraints, lockTextInlineEditing } from './canvasBasicMode';
 import { canvasToJSON, parsePageLoadKey } from './canvasSerialization';
@@ -112,6 +114,55 @@ function shouldEmitIncomingThumb(canvas: Canvas, pageIndex: number): boolean {
   return true;
 }
 
+function areFabricJsonEqual(a: unknown, b: unknown): boolean {
+  try {
+    return JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
+  } catch {
+    return false;
+  }
+}
+
+function commitOutgoingCanvasToPages(input: {
+  canvas: Canvas;
+  prevKey: string | null;
+  pages: DesignPage[];
+  pageWidthPx: number;
+}): DesignPage[] | null {
+  const parsedPrev = input.prevKey ? parsePageLoadKey(input.prevKey) : null;
+  if (!parsedPrev) return null;
+
+  let saved: PageSaveSnapshot;
+  let currentPage = 0;
+  let leftPageIdx = -1;
+  let rightPageIdx = -1;
+
+  if (parsedPrev.type === 'spread') {
+    const { left, right } = splitSpreadCanvasToPagesSync(input.canvas, input.pageWidthPx);
+    saved = { kind: 'spread', left, right };
+    currentPage = parsedPrev.left;
+    leftPageIdx = parsedPrev.left;
+    rightPageIdx = parsedPrev.right;
+  } else {
+    const json = canvasToJSON(input.canvas);
+    saved = { kind: 'single', json };
+    currentPage = parsedPrev.index;
+  }
+
+  const nextPages = mergePagesWithSavedSnapshot(input.pages, saved, {
+    currentPage,
+    leftPageIdx,
+    rightPageIdx,
+  });
+
+  if (nextPages.length === input.pages.length) {
+    const changed = nextPages.some((page, index) => (
+      !areFabricJsonEqual(page.fabricJSON, input.pages[index]?.fabricJSON)
+    ));
+    if (!changed) return input.pages;
+  }
+  return nextPages;
+}
+
 async function emitSpreadPageThumbs(
   canvas: Canvas,
   leftPageIndex: number,
@@ -171,10 +222,9 @@ export async function runPageLoadKeyTransition({
     pageThumbReadyRef,
     selectionDisplayScaleRef,
   } = refs;
-  const { onHistoryChange, apiBaseUrl } = callbacks;
+  const { setPages, onHistoryChange, apiBaseUrl } = callbacks;
 
   try {
-    const snapshotPages: DesignPage[] = pagesRef.current;
     const beforeDigest = buildTransitionObjectDigest(canvas);
     const objectCountBeforeFlush = canvas.getObjects().length;
 
@@ -187,6 +237,17 @@ export async function runPageLoadKeyTransition({
     }
     const pw = pageWidthRef.current;
     const ph = pageHeightRef.current;
+    const committedPages = commitOutgoingCanvasToPages({
+      canvas,
+      prevKey,
+      pages: pagesRef.current,
+      pageWidthPx: pw,
+    });
+    if (committedPages && committedPages !== pagesRef.current) {
+      pagesRef.current = committedPages;
+      setPages(committedPages);
+    }
+    const snapshotPages: DesignPage[] = committedPages ?? pagesRef.current;
 
     if (parsedNext?.type === 'spread') {
       canvas.setDimensions({ width: pw * 2, height: ph });

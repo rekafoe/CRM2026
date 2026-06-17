@@ -2,6 +2,8 @@
 
 **Точка входа** для команд frontend, backend и DevOps сайта. Детали по отдельным темам — в связанных документах (см. [раздел 11](#11-связанные-документы)).
 
+**Текущее состояние последних правок:** [CLIENT_EDITOR_CURRENT_STATE.md](./CLIENT_EDITOR_CURRENT_STATE.md).
+
 ## Содержание
 
 1. [Введение](#1-введение)
@@ -479,6 +481,7 @@ CRM: `prepareWebsiteItemsWithEditorDrafts` → `order_items.params.designState` 
 
 | Документ | Содержание |
 |----------|------------|
+| [CLIENT_EDITOR_CURRENT_STATE.md](./CLIENT_EDITOR_CURRENT_STATE.md) | Последний handoff по CRM/site editor, pushed commits, проверки, manual QA |
 | [client-editor-crm-site-boundary.md](./client-editor-crm-site-boundary.md) | Граница CRM/сайт, cart contract, roadmap CRM |
 | [site-design-gallery-integration.md](./site-design-gallery-integration.md) | 4 экрана, id продукта/типа/размера, smoke галереи |
 | [website-orders-integration.md](./website-orders-integration.md) | Order Pool, `from-website`, примеры curl |
