@@ -99,6 +99,10 @@ export function usePublicDesignPageActions({
   }));
   const pagesRef = useRef(pages);
   pagesRef.current = pages;
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
+  const pageMergeIndicesRef = useRef({ leftPageIdx: navigation.leftPageIdx, rightPageIdx: navigation.rightPageIdx });
+  pageMergeIndicesRef.current = { leftPageIdx: navigation.leftPageIdx, rightPageIdx: navigation.rightPageIdx };
 
   const saveCurrentCanvasPage = useCallback(async (): Promise<DesignPage[] | null> => {
     const handle = canvasHandleRef.current;
@@ -108,14 +112,14 @@ export function usePublicDesignPageActions({
     const nextPages = mergeSavedEditorPages(
       pagesRef.current,
       saved as PageSaveSnapshot,
-      currentPage,
-      navigation.leftPageIdx,
-      navigation.rightPageIdx,
+      currentPageRef.current,
+      pageMergeIndicesRef.current.leftPageIdx,
+      pageMergeIndicesRef.current.rightPageIdx,
     );
     pagesRef.current = nextPages;
     setPages(nextPages);
     return nextPages;
-  }, [canvasHandleRef, currentPage, navigation.leftPageIdx, navigation.rightPageIdx, setPages]);
+  }, [canvasHandleRef, setPages]);
 
   const enqueuePageAction = useCallback((task: () => Promise<void>) => {
     return pageActionQueueRef.current.enqueue(task);

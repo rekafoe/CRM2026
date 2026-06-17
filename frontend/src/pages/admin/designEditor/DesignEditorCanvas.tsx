@@ -357,6 +357,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     }, []);
 
     const {
+    invalidatePendingDocumentCommit,
       saveSnapshot,
       flushCanvasDocumentCommit,
       fillPhotoFieldWithSnapshot,
@@ -367,6 +368,8 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       historyRef,
       isLoadingRef,
       pageTransitionLockRef,
+      pageLoadKeyRef,
+      waitForPageTransitionIdle: () => pageTransitionGate.waitUntilIdle(),
       onCanvasDocumentCommitRef,
       documentCommitTimerRef,
       pageWidthRef,
@@ -454,6 +457,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       historyRef,
       pageThumbReadyRef,
       selectionDisplayScaleRef,
+      invalidatePendingDocumentCommit,
     });
 
     useEffect(() => pageTransitionGate.subscribe((busy) => {

@@ -13,6 +13,8 @@ interface UseDesignEditorCanvasHistoryInput {
   historyRef: MutableRefObject<CanvasHistoryStack>;
   isLoadingRef: MutableRefObject<boolean>;
   pageTransitionLockRef: MutableRefObject<boolean>;
+  pageLoadKeyRef: MutableRefObject<string>;
+  waitForPageTransitionIdle: () => Promise<void>;
   onCanvasDocumentCommitRef: MutableRefObject<(() => void | Promise<void>) | undefined>;
   documentCommitTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   pageWidthRef: MutableRefObject<number>;
@@ -29,6 +31,8 @@ export function useDesignEditorCanvasHistory({
   historyRef,
   isLoadingRef,
   pageTransitionLockRef,
+  pageLoadKeyRef,
+  waitForPageTransitionIdle,
   onCanvasDocumentCommitRef,
   documentCommitTimerRef,
   pageWidthRef,
@@ -40,38 +44,64 @@ export function useDesignEditorCanvasHistory({
   onHistoryChange,
 }: UseDesignEditorCanvasHistoryInput) {
   const snapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const documentCommitEpochRef = useRef(0);
+
+  const invalidatePendingDocumentCommit = useCallback(() => {
+    documentCommitEpochRef.current += 1;
+    if (documentCommitTimerRef.current) {
+      clearTimeout(documentCommitTimerRef.current);
+      documentCommitTimerRef.current = null;
+    }
+  }, [documentCommitTimerRef]);
 
   const runCanvasDocumentCommit = useCallback(async () => {
     if (!onCanvasDocumentCommitRef.current) return;
     await Promise.resolve(onCanvasDocumentCommitRef.current());
   }, [onCanvasDocumentCommitRef]);
 
+  const runScheduledDocumentCommit = useCallback(async (epoch: number, scheduledPageLoadKey: string) => {
+    if (epoch !== documentCommitEpochRef.current) return;
+    if (pageLoadKeyRef.current !== scheduledPageLoadKey) return;
+    if (isLoadingRef.current || pageTransitionLockRef.current) {
+      await waitForPageTransitionIdle();
+      if (epoch !== documentCommitEpochRef.current) return;
+      if (pageLoadKeyRef.current !== scheduledPageLoadKey) return;
+      if (isLoadingRef.current || pageTransitionLockRef.current) return;
+    }
+    await runCanvasDocumentCommit();
+  }, [
+    isLoadingRef,
+    pageLoadKeyRef,
+    pageTransitionLockRef,
+    runCanvasDocumentCommit,
+    waitForPageTransitionIdle,
+  ]);
+
   const scheduleCanvasDocumentCommit = useCallback(() => {
     if (!onCanvasDocumentCommitRef.current) return;
+    const epoch = documentCommitEpochRef.current;
+    const scheduledPageLoadKey = pageLoadKeyRef.current;
     if (documentCommitTimerRef.current) clearTimeout(documentCommitTimerRef.current);
     documentCommitTimerRef.current = setTimeout(() => {
       documentCommitTimerRef.current = null;
-      if (isLoadingRef.current || pageTransitionLockRef.current) {
-        scheduleCanvasDocumentCommit();
-        return;
-      }
-      void runCanvasDocumentCommit();
+      void runScheduledDocumentCommit(epoch, scheduledPageLoadKey);
     }, 400);
   }, [
     documentCommitTimerRef,
-    isLoadingRef,
     onCanvasDocumentCommitRef,
-    pageTransitionLockRef,
-    runCanvasDocumentCommit,
+    pageLoadKeyRef,
+    runScheduledDocumentCommit,
   ]);
 
-  const saveSnapshotNow = useCallback(() => {
+  const saveSnapshotNow = useCallback((options?: { scheduleDocumentCommit?: boolean }) => {
     const canvas = fabricRef.current;
     if (!canvas || isLoadingRef.current) return;
     const json = JSON.stringify(canvasToJSON(canvas));
     const flags = historyRef.current.push(json);
     onHistoryChange(flags.canUndo, flags.canRedo);
-    scheduleCanvasDocumentCommit();
+    if (options?.scheduleDocumentCommit !== false) {
+      scheduleCanvasDocumentCommit();
+    }
   }, [fabricRef, historyRef, isLoadingRef, onHistoryChange, scheduleCanvasDocumentCommit]);
 
   const saveSnapshot = useCallback((options?: { debounce?: boolean }) => {
@@ -91,14 +121,21 @@ export function useDesignEditorCanvasHistory({
   }, [saveSnapshotNow]);
 
   const flushCanvasDocumentCommit = useCallback(async () => {
+    let hadPendingSnapshot = false;
     if (snapshotTimerRef.current) {
       clearTimeout(snapshotTimerRef.current);
       snapshotTimerRef.current = null;
-      saveSnapshotNow();
+      hadPendingSnapshot = true;
     }
     if (documentCommitTimerRef.current) {
       clearTimeout(documentCommitTimerRef.current);
       documentCommitTimerRef.current = null;
+    }
+    if (isLoadingRef.current || pageTransitionLockRef.current) {
+      await waitForPageTransitionIdle();
+    }
+    if (hadPendingSnapshot) {
+      saveSnapshotNow({ scheduleDocumentCommit: false });
     }
     if (isLoadingRef.current || pageTransitionLockRef.current) return;
     await runCanvasDocumentCommit();
@@ -108,6 +145,7 @@ export function useDesignEditorCanvasHistory({
     pageTransitionLockRef,
     runCanvasDocumentCommit,
     saveSnapshotNow,
+    waitForPageTransitionIdle,
   ]);
 
   useEffect(() => () => {
@@ -219,6 +257,7 @@ export function useDesignEditorCanvasHistory({
   ]);
 
   return {
+    invalidatePendingDocumentCommit,
     scheduleCanvasDocumentCommit,
     saveSnapshot,
     flushCanvasDocumentCommit,

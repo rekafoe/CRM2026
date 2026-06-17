@@ -34,6 +34,7 @@ export interface UsePageLoadKeyEffectInput {
   historyRef: { current: CanvasHistoryStack };
   pageThumbReadyRef: { current: ((pageIndex: number, thumbUrl: string) => void) | undefined };
   selectionDisplayScaleRef: { current: number };
+  invalidatePendingDocumentCommit?: () => void;
 }
 
 /**
@@ -63,6 +64,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
     historyRef,
     pageThumbReadyRef,
     selectionDisplayScaleRef,
+    invalidatePendingDocumentCommit,
   } = input;
   const requestedKeyRef = useRef(pageLoadKey);
   const drainingRef = useRef(false);
@@ -72,6 +74,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
     if (!fabricRef.current || !canvasReady) return;
     if (drainingRef.current) return;
 
+    invalidatePendingDocumentCommit?.();
     drainingRef.current = true;
     pageTransitionGate.begin();
 
@@ -152,5 +155,5 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
 
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageLoadKey, canvasReady]);
+  }, [pageLoadKey, canvasReady, invalidatePendingDocumentCommit]);
 }

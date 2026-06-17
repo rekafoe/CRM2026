@@ -189,8 +189,9 @@ export function usePublicDesignDraftActions({
     setSaveState('saving');
     if (!silent) setStatus(null);
     await canvasHandleRef.current?.flushPendingDocumentCommit?.();
+    await canvasHandleRef.current?.whenPageTransitionIdle?.();
     const token = await ensureDraft();
-    const { pages: updatedPages, designState, selectedParams: nextSelectedParams } = buildCurrentDesignState();
+    const { designState, selectedParams: nextSelectedParams } = buildCurrentDesignState();
     const patch: Record<string, unknown> = { designState };
     if (nextSelectedParams) patch.selectedParams = nextSelectedParams;
     if (!options?.skipExpectedVersion && draftVersionRef.current) {
@@ -198,7 +199,6 @@ export function usePublicDesignDraftActions({
     }
     const savedDraft = await adapter.updateDraft(token, patch);
     if (savedDraft && typeof savedDraft.version === 'number') draftVersionRef.current = savedDraft.version;
-    setPages(updatedPages);
     savedDirtyVersionRef.current = dirtyVersion;
     setSaveState('saved');
     if (!silent) setStatus('Макет сохранён.');

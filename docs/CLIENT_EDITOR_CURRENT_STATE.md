@@ -29,6 +29,11 @@ Important: when changing editor code, update the CRM source first and mirror the
 ### Canvas Stability
 
 - Follow-up fix: page transitions now commit the outgoing live canvas into `pages[]` inside `runPageLoadKeyTransition()` before loading the incoming page/spread. This prevents page switching from depending only on external debounced flush timing.
+- Stability reset (race hardening): pending document commits are now stamped by `pageLoadKey` and invalidated on page transitions; stale delayed commits can no longer overwrite a newly loaded page state.
+- `flushPendingDocumentCommit()` now waits for page transition idle before commit instead of returning early under lock.
+- Page merge during `commitCanvasToPages()` no longer relies on stale closure values of `currentPage/navigation`; refs are used to avoid wrong-page writes during rapid strip clicks.
+- Draft persist now waits for transition idle before building payload, and no longer force-applies `setPages(updatedPages)` after save (avoids clobber race).
+- Default autosave interval is reduced from 180s to 30s to improve reload recovery without forcing server-save on every strip click.
 - Added debounced and flushable commit flow from live canvas to `pages[]`.
 - Removed heavy `commitCanvasToPages()` from the text-edit exit path.
 - Coalesced `text:changed` and text toolbar updates through debounced snapshots.
