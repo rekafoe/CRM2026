@@ -11,15 +11,36 @@ export interface DesignPageThumbnailCacheScope {
 }
 
 const memoryCache = new Map<string, string>();
+const fabricFingerprintCache = new WeakMap<object, string>();
 
-export function pageContentFingerprint(page: DesignPage | undefined): string {
-  const raw = JSON.stringify(page?.fabricJSON ?? {});
+function hashFingerprintRaw(raw: string): string {
   let hash = 2_166_136_261;
   for (let i = 0; i < raw.length; i += 1) {
     hash ^= raw.charCodeAt(i);
     hash = Math.imul(hash, 1_677_761_9);
   }
   return `${raw.length}:${(hash >>> 0).toString(36)}`;
+}
+
+function safeSerializeForFingerprint(value: unknown): string {
+  try {
+    return JSON.stringify(value ?? {});
+  } catch {
+    return '{}';
+  }
+}
+
+export function pageContentFingerprint(page: DesignPage | undefined): string {
+  const fabricJson = page?.fabricJSON;
+  if (fabricJson && typeof fabricJson === 'object' && !Array.isArray(fabricJson)) {
+    const cached = fabricFingerprintCache.get(fabricJson);
+    if (cached) return cached;
+    const raw = safeSerializeForFingerprint(fabricJson);
+    const next = hashFingerprintRaw(raw);
+    fabricFingerprintCache.set(fabricJson, next);
+    return next;
+  }
+  return hashFingerprintRaw(safeSerializeForFingerprint(fabricJson ?? {}));
 }
 
 function scopePrefix(scope: DesignPageThumbnailCacheScope): string {
@@ -123,8 +144,21 @@ export function loadCachedThumbnailsForPages(
   pages: DesignPage[],
   pageCount: number,
 ): Record<number, string> {
+  return loadCachedThumbnailsForIndexes(
+    scope,
+    pages,
+    Array.from({ length: pageCount }, (_, pageIndex) => pageIndex),
+  );
+}
+
+export function loadCachedThumbnailsForIndexes(
+  scope: DesignPageThumbnailCacheScope,
+  pages: DesignPage[],
+  pageIndexes: number[],
+): Record<number, string> {
   const result: Record<number, string> = {};
-  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+  for (const pageIndex of pageIndexes) {
+    if (!Number.isInteger(pageIndex) || pageIndex < 0) continue;
     const cached = getCachedPageThumbnail(scope, pageIndex, pages[pageIndex]);
     if (cached) result[pageIndex] = cached;
   }

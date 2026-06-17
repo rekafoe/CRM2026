@@ -34,7 +34,81 @@ export interface EditorDraftRow {
   updated_at: string
 }
 
-const MAX_DRAFT_PAYLOAD_BYTES = Number(process.env.EDITOR_DRAFT_MAX_PAYLOAD_BYTES || 2 * 1024 * 1024)
+function parseByteLimit(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback
+  const value = raw.trim().toLowerCase()
+  if (!value) return fallback
+  const match = value.match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/i)
+  if (!match) return fallback
+  const amount = Number(match[1])
+  const unit = (match[2] || 'b').toLowerCase()
+  if (!Number.isFinite(amount) || amount <= 0) return fallback
+  const multiplier = unit === 'gb'
+    ? 1024 ** 3
+    : unit === 'mb'
+      ? 1024 ** 2
+      : unit === 'kb'
+        ? 1024
+        : 1
+  return Math.max(1, Math.floor(amount * multiplier))
+}
+
+const REQUEST_BODY_LIMIT_BYTES = parseByteLimit(process.env.REQUEST_BODY_LIMIT, 2 * 1024 * 1024)
+const CONFIGURED_DRAFT_PAYLOAD_BYTES = parseByteLimit(
+  process.env.EDITOR_DRAFT_MAX_PAYLOAD_BYTES,
+  REQUEST_BODY_LIMIT_BYTES,
+)
+const MAX_DRAFT_PAYLOAD_BYTES = Math.max(
+  128 * 1024,
+  Math.min(
+    CONFIGURED_DRAFT_PAYLOAD_BYTES,
+    REQUEST_BODY_LIMIT_BYTES,
+  ),
+)
+const DRAFT_UPDATE_RATE_WINDOW_MS = (() => {
+  const parsed = Number(process.env.EDITOR_DRAFT_RATE_WINDOW_MS || 10_000)
+  return Number.isFinite(parsed) && parsed > 0 ? Math.max(1000, Math.floor(parsed)) : 10_000
+})()
+const DRAFT_UPDATE_RATE_MAX = (() => {
+  const parsed = Number(process.env.EDITOR_DRAFT_RATE_MAX || 25)
+  return Number.isFinite(parsed) && parsed > 0 ? Math.max(2, Math.floor(parsed)) : 25
+})()
+const draftUpdateRateState = new Map<string, { windowStart: number; count: number; lastSeen: number }>()
+
+export class EditorDraftRateLimitError extends Error {
+  constructor(message = 'Слишком частые autosave-запросы. Подождите несколько секунд и повторите.') {
+    super(message)
+    this.name = 'EditorDraftRateLimitError'
+  }
+}
+
+function enforceEditorDraftRateLimit(token: string): void {
+  const now = Date.now()
+  const state = draftUpdateRateState.get(token)
+  if (!state || now - state.windowStart > DRAFT_UPDATE_RATE_WINDOW_MS) {
+    draftUpdateRateState.set(token, {
+      windowStart: now,
+      count: 1,
+      lastSeen: now,
+    })
+    return
+  }
+  state.count += 1
+  state.lastSeen = now
+  if (state.count > DRAFT_UPDATE_RATE_MAX) {
+    throw new EditorDraftRateLimitError()
+  }
+}
+
+function cleanupEditorDraftRateState(): void {
+  const now = Date.now()
+  const ttlMs = DRAFT_UPDATE_RATE_WINDOW_MS * 8
+  for (const [token, state] of draftUpdateRateState.entries()) {
+    if (now - state.lastSeen > ttlMs) {
+      draftUpdateRateState.delete(token)
+    }
+  }
+}
 
 async function ensureEditorDraftVersionColumn(): Promise<void> {
   const exists = await hasColumn('editor_drafts', 'version').catch(() => false)
@@ -47,6 +121,14 @@ async function ensureEditorDraftVersionColumn(): Promise<void> {
 function parsePayload(row: EditorDraftRow): Record<string, unknown> {
   try {
     return row.payload ? JSON.parse(row.payload) as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
+}
+
+function parsePayloadRaw(payload: string | null): Record<string, unknown> {
+  try {
+    return payload ? JSON.parse(payload) as Record<string, unknown> : {}
   } catch {
     return {}
   }
@@ -115,14 +197,30 @@ export async function updateEditorDraftPayload(
   patch: Record<string, unknown>,
 ): Promise<EditorDraftRow & { payloadParsed: Record<string, unknown> }> {
   await ensureEditorDraftVersionColumn()
-  const existing = await getEditorDraft(token)
+  cleanupEditorDraftRateState()
+  enforceEditorDraftRateLimit(token)
+  const db = await getDb()
+  const existing = await db.get<EditorDraftRow>('SELECT * FROM editor_drafts WHERE token = ?', token)
   if (!existing) throw new Error('Draft не найден')
   if (existing.status !== 'draft') throw new Error('Draft уже финализирован')
 
   const expectedVersion = readExpectedVersion(patch)
-  const payload = { ...existing.payloadParsed, ...stripDraftControlKeys(patch) }
-  const db = await getDb()
+  const payloadPatch = stripDraftControlKeys(patch)
+  const currentPayload = parsePayloadRaw(existing.payload)
+  const payload = { ...currentPayload, ...payloadPatch }
   const serializedPayload = stringifyDraftPayload(payload)
+  const currentSerialized = existing.payload ?? '{}'
+  const versionNow = Number(existing.version ?? 1) || 1
+  if (serializedPayload === currentSerialized) {
+    if (expectedVersion && versionNow !== expectedVersion) {
+      throw new Error('Draft изменился в другой вкладке. Обновите страницу и повторите сохранение.')
+    }
+    return {
+      ...existing,
+      payloadParsed: payload,
+      version: versionNow,
+    }
+  }
   const result = expectedVersion
     ? await db.run(
       `UPDATE editor_drafts
@@ -139,9 +237,12 @@ export async function updateEditorDraftPayload(
   if ((result.changes ?? 0) === 0) {
     throw new Error('Draft изменился в другой вкладке. Обновите страницу и повторите сохранение.')
   }
-  const updated = await getEditorDraft(token)
+  const updated = await db.get<EditorDraftRow>('SELECT * FROM editor_drafts WHERE token = ?', token)
   if (!updated) throw new Error('Draft не найден')
-  return updated
+  return {
+    ...updated,
+    payloadParsed: payload,
+  }
 }
 
 function parseItemParams(value: unknown): Record<string, unknown> {

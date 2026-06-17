@@ -75,6 +75,11 @@ export const FABRIC_CUSTOM_PROPS = [
   'photoFieldIntrinsicW',
   'photoFieldIntrinsicH',
   'photoFieldFileSize',
+  /** Метаданные split/merge разворота для устранения дублирования cross-seam объектов. */
+  'spreadMirrorId',
+  'spreadMirrorSide',
+  'spreadMirrorSpineX',
+  'spreadFallbackProxy',
   /** Диапазоны шрифтов в текстовом поле (источник правды; Fabric styles — runtime). */
   'textStyleRuns',
 ];

@@ -29,6 +29,9 @@ import { EditorTopBar } from '../designEditorShell/EditorTopBar';
 import type { EditorViewOptions } from '../designEditorShell/EditorViewControls';
 import {
   analyzePublicDesignPages,
+  analyzePublicDesignPage,
+  buildPublicDesignPreflightSummary,
+  type PublicEditorPreflightPageAnalysis,
 } from './publicDesignPreflight';
 import {
   buildPublicDesignFragmentSummary,
@@ -64,6 +67,8 @@ import {
   type PublicDesignMobilePanel,
 } from './PublicDesignEditorMobileDock';
 import { PublicDesignDraftConflictDialog } from './PublicDesignDraftConflictDialog';
+import { PUBLIC_EDITOR_FEATURE_FLAGS } from './publicEditorFeatureFlags';
+import { startPublicEditorPerfSpan } from './publicEditorPerf';
 import '../../pages/admin/DesignEditorPage.css';
 import '../../pages/admin/designEditor/designEditorGlassTheme.css';
 import '../designEditorShell/editorShell.css';
@@ -154,15 +159,19 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   }
   const bootstrapDraftToken = bootstrapDraftTokenRef.current.token;
   const canvasHandleRef = useRef<DesignEditorCanvasHandle | null>(null);
-  const latestPagesRef = useRef<DesignPage[]>([]);
+  const latestPagesRef = useRef<DesignPage[]>([{ ...EMPTY_PAGE }]);
   const commitCanvasToPagesRef = useRef<() => Promise<DesignPage[] | null>>(() => Promise.resolve(null));
+  const preflightPageCacheRef = useRef(new Map<number, {
+    pageRef: DesignPage | undefined;
+    boundsKey: string;
+    analysis: PublicEditorPreflightPageAnalysis;
+  }>());
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const fitScalerRef = useRef<HTMLDivElement>(null);
 
   const [draftToken, setDraftToken] = useState<string | null>(bootstrapDraftToken);
   const [pages, setPages] = useState<DesignPage[]>([{ ...EMPTY_PAGE }]);
-  latestPagesRef.current = pages;
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedObj, setSelectedObj] = useState<SelectedObjProps | null>(null);
   const [textFloatingAnchor, setTextFloatingAnchor] = useState<{ x: number; y: number } | null>(null);
@@ -200,6 +209,10 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const [coverPages, setCoverPages] = useState(1);
   const [prepressConfig, setPrepressConfig] = useState<DesignPrepressConfig>(DEFAULT_PUBLIC_DESIGN_PREPRESS_CONFIG);
   const [viewOptions, setViewOptions] = useState<EditorViewOptions>(DEFAULT_VIEW_OPTIONS);
+
+  useEffect(() => {
+    latestPagesRef.current = pages;
+  }, [pages]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -252,13 +265,57 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     }),
     [pageSpec.pageWidth, pageSpec.pageHeight, pageSpec.scale, prepressConfig.safeZoneMm, prepressConfig.bleedMm],
   );
-  const preflight = useMemo(
-    () => analyzePublicDesignPages(pages, saveState, {
+  const preflightBounds = useMemo(
+    () => ({
       pageWidthPx: sceneGeometry.pageWidthPx,
       pageHeightPx: sceneGeometry.pageHeightPx,
       safeZonePx: sceneGeometry.safeZonePx,
     }),
-    [pages, saveState, sceneGeometry.pageWidthPx, sceneGeometry.pageHeightPx, sceneGeometry.safeZonePx],
+    [sceneGeometry.pageHeightPx, sceneGeometry.pageWidthPx, sceneGeometry.safeZonePx],
+  );
+  const preflightBoundsKey = `${preflightBounds.pageWidthPx}x${preflightBounds.pageHeightPx}:${preflightBounds.safeZonePx}`;
+  const preflight = useMemo(
+    () => {
+      if (!PUBLIC_EDITOR_FEATURE_FLAGS.incrementalPreflight) {
+        return analyzePublicDesignPages(pages, saveState, preflightBounds);
+      }
+      const stop = startPublicEditorPerfSpan('preflight.total.ms', {
+        pageCount: pages.length,
+        mode: 'incremental',
+      });
+      try {
+        const cache = preflightPageCacheRef.current;
+        const analyses: PublicEditorPreflightPageAnalysis[] = [];
+        for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+          const page = pages[pageIndex];
+          const cached = cache.get(pageIndex);
+          if (
+            cached
+            && cached.pageRef === page
+            && cached.boundsKey === preflightBoundsKey
+          ) {
+            analyses.push(cached.analysis);
+            continue;
+          }
+          const analysis = analyzePublicDesignPage(page, pageIndex, preflightBounds);
+          cache.set(pageIndex, {
+            pageRef: page,
+            boundsKey: preflightBoundsKey,
+            analysis,
+          });
+          analyses.push(analysis);
+        }
+        for (const key of Array.from(cache.keys())) {
+          if (key >= pages.length) {
+            cache.delete(key);
+          }
+        }
+        return buildPublicDesignPreflightSummary(analyses);
+      } finally {
+        stop({ saveState });
+      }
+    },
+    [pages, preflightBounds, preflightBoundsKey, saveState],
   );
   const activeStripIndex = useMemo(
     () => findStripItemForPage(navigation.stripItems, currentPage),
@@ -654,11 +711,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const openCheckoutPreviewAfterFlush = useCallback(() => {
     void (async () => {
       await canvasHandleRef.current?.flushPendingDocumentCommit?.();
-      const latestPreflight = analyzePublicDesignPages(latestPagesRef.current, saveState, {
-        pageWidthPx: sceneGeometry.pageWidthPx,
-        pageHeightPx: sceneGeometry.pageHeightPx,
-        safeZonePx: sceneGeometry.safeZonePx,
-      });
+      const latestPreflight = buildPublicDesignPreflightSummary(
+        latestPagesRef.current.map((page, pageIndex) => analyzePublicDesignPage(page, pageIndex, preflightBounds)),
+      );
       if (latestPreflight.hasBlockingIssues) {
         setActiveTaskTab('check');
         setError('Перед возвратом в корзину исправьте ошибки проверки макета.');
@@ -670,10 +725,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   }, [
     canvasHandleRef,
     isMobile,
-    saveState,
-    sceneGeometry.pageHeightPx,
-    sceneGeometry.pageWidthPx,
-    sceneGeometry.safeZonePx,
+    preflightBounds,
     setActiveTaskTab,
     setError,
   ]);

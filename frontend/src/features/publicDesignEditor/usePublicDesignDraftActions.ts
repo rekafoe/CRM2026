@@ -16,6 +16,10 @@ import {
   normalizePrepressFromDesignState,
   resolvePagesFromDesignState,
 } from './applyPublicDesignState';
+import {
+  recordPublicEditorPerfMetric,
+  startPublicEditorPerfSpan,
+} from './publicEditorPerf';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -59,6 +63,54 @@ interface UsePublicDesignDraftActionsInput {
   selectedParams?: Record<string, unknown>;
 }
 
+interface PersistDraftOptions {
+  skipExpectedVersion?: boolean;
+}
+
+interface QueuedPersistRequest {
+  silent: boolean;
+  options?: PersistDraftOptions;
+  waiters: Array<{
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  }>;
+}
+
+function hashPayloadRaw(raw: string): string {
+  let hash = 2_166_136_261;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash ^= raw.charCodeAt(i);
+    hash = Math.imul(hash, 1_677_761_9);
+  }
+  return `${raw.length}:${(hash >>> 0).toString(36)}`;
+}
+
+function buildAutosavePayloadDigest(input: {
+  designState: Record<string, unknown>;
+  selectedParams: Record<string, unknown> | undefined;
+}): {
+  hash: string;
+  bytes: number;
+} {
+  const designStateRaw = JSON.stringify(input.designState);
+  const selectedParamsRaw = input.selectedParams ? JSON.stringify(input.selectedParams) : '';
+  const raw = selectedParamsRaw ? `${designStateRaw}|${selectedParamsRaw}` : designStateRaw;
+  return {
+    hash: hashPayloadRaw(raw),
+    bytes: raw.length * 2,
+  };
+}
+
+function mergePersistOptions(
+  left?: PersistDraftOptions,
+  right?: PersistDraftOptions,
+): PersistDraftOptions | undefined {
+  if (!left && !right) return undefined;
+  return {
+    skipExpectedVersion: Boolean(left?.skipExpectedVersion || right?.skipExpectedVersion),
+  };
+}
+
 export function usePublicDesignDraftActions({
   adapter,
   autosaveDelayMs,
@@ -96,6 +148,11 @@ export function usePublicDesignDraftActions({
   const draftVersionRef = useRef<number | null>(null);
   const [draftConflictOpen, setDraftConflictOpen] = useState(false);
   const autosavePausedRef = useRef(false);
+  const persistDrainRunningRef = useRef(false);
+  const queuedPersistRef = useRef<QueuedPersistRequest | null>(null);
+  const versionHydrationPromiseRef = useRef<Promise<void> | null>(null);
+  const lastSavedPayloadHashRef = useRef<string | null>(null);
+  const lastSavedPayloadTokenRef = useRef<string | null>(null);
 
   const applyDesignStateFromServer = useCallback(async (designState: DesignState) => {
     const spreadModeActive = documentMode === 'multipage' && designState.spread_mode === true;
@@ -134,6 +191,13 @@ export function usePublicDesignDraftActions({
     setSpreadMode,
   ]);
 
+  useEffect(() => {
+    draftVersionRef.current = null;
+    lastSavedPayloadHashRef.current = null;
+    lastSavedPayloadTokenRef.current = null;
+    versionHydrationPromiseRef.current = null;
+  }, [draftToken]);
+
   const ensureDraft = useCallback(async () => {
     if (draftToken) return draftToken;
     const res = await adapter.createDraft({
@@ -148,6 +212,31 @@ export function usePublicDesignDraftActions({
     onDraftTokenChange?.(token);
     return token;
   }, [adapter, documentMode, draftToken, onDraftTokenChange, setDraftToken, templateId]);
+
+  const hydrateDraftVersion = useCallback(async (token: string) => {
+    if (!token) return;
+    if (draftVersionRef.current != null) return;
+    if (versionHydrationPromiseRef.current) {
+      await versionHydrationPromiseRef.current;
+      return;
+    }
+    versionHydrationPromiseRef.current = (async () => {
+      try {
+        const draft = await adapter.getDraft(token);
+        if (typeof draft.version === 'number' && draft.version > 0) {
+          draftVersionRef.current = draft.version;
+        }
+      } finally {
+        versionHydrationPromiseRef.current = null;
+      }
+    })();
+    await versionHydrationPromiseRef.current;
+  }, [adapter]);
+
+  useEffect(() => {
+    if (!draftToken || loading || draftVersionRef.current != null) return;
+    void hydrateDraftVersion(draftToken).catch(() => undefined);
+  }, [draftToken, hydrateDraftVersion, loading]);
 
   const buildCurrentDesignState = useCallback(() => {
     const updatedPages = getLatestPages?.() ?? pages;
@@ -183,41 +272,141 @@ export function usePublicDesignDraftActions({
 
   const persistDraft = useCallback(async (
     silent: boolean,
-    options?: { skipExpectedVersion?: boolean },
+    options?: PersistDraftOptions,
   ) => {
-    setSaving(true);
+    const stopPersist = startPublicEditorPerfSpan('autosave.persist.total.ms', {
+      silent,
+    });
     setSaveState('saving');
     if (!silent) setStatus(null);
-    await canvasHandleRef.current?.flushPendingDocumentCommit?.();
-    await canvasHandleRef.current?.whenPageTransitionIdle?.();
-    const token = await ensureDraft();
-    const { designState, selectedParams: nextSelectedParams } = buildCurrentDesignState();
-    const patch: Record<string, unknown> = { designState };
-    if (nextSelectedParams) patch.selectedParams = nextSelectedParams;
-    if (!options?.skipExpectedVersion && draftVersionRef.current) {
-      patch.expectedVersion = draftVersionRef.current;
+    try {
+      await canvasHandleRef.current?.flushPendingDocumentCommit?.();
+      await canvasHandleRef.current?.whenPageTransitionIdle?.();
+      const token = await ensureDraft();
+      if (!options?.skipExpectedVersion) {
+        await hydrateDraftVersion(token).catch(() => undefined);
+      }
+      const { designState, selectedParams: nextSelectedParams } = buildCurrentDesignState();
+      const digest = buildAutosavePayloadDigest({
+        designState: designState as unknown as Record<string, unknown>,
+        selectedParams: nextSelectedParams,
+      });
+      recordPublicEditorPerfMetric('autosave.payload.bytes', digest.bytes, {
+        token,
+      });
+      if (
+        !options?.skipExpectedVersion
+        && lastSavedPayloadTokenRef.current === token
+        && lastSavedPayloadHashRef.current === digest.hash
+      ) {
+        recordPublicEditorPerfMetric('autosave.skippedUnchanged.count', 1, { token });
+        savedDirtyVersionRef.current = dirtyVersion;
+        setSaveState('saved');
+        if (!silent) setStatus('Изменений нет, макет уже сохранён.');
+        return;
+      }
+
+      const patch: Record<string, unknown> = { designState };
+      if (nextSelectedParams) patch.selectedParams = nextSelectedParams;
+      if (!options?.skipExpectedVersion && draftVersionRef.current != null) {
+        patch.expectedVersion = draftVersionRef.current;
+      }
+      const stopPatch = startPublicEditorPerfSpan('autosave.persist.patch.ms', { token });
+      let savedDraft: Awaited<ReturnType<PublicDesignEditorAdapter['updateDraft']>>;
+      try {
+        savedDraft = await adapter.updateDraft(token, patch);
+      } finally {
+        stopPatch();
+      }
+      if (savedDraft && typeof savedDraft.version === 'number') {
+        draftVersionRef.current = savedDraft.version;
+      }
+      lastSavedPayloadHashRef.current = digest.hash;
+      lastSavedPayloadTokenRef.current = token;
+      savedDirtyVersionRef.current = dirtyVersion;
+      setSaveState('saved');
+      if (!silent) setStatus('Макет сохранён.');
+    } finally {
+      stopPersist();
     }
-    const savedDraft = await adapter.updateDraft(token, patch);
-    if (savedDraft && typeof savedDraft.version === 'number') draftVersionRef.current = savedDraft.version;
-    savedDirtyVersionRef.current = dirtyVersion;
-    setSaveState('saved');
-    if (!silent) setStatus('Макет сохранён.');
   }, [
     adapter,
     buildCurrentDesignState,
     canvasHandleRef,
     dirtyVersion,
     ensureDraft,
-    setPages,
+    hydrateDraftVersion,
     setSaveState,
-    setSaving,
     setStatus,
   ]);
+
+  const executePersistRequest = useCallback(async (
+    silent: boolean,
+    options?: PersistDraftOptions,
+  ) => {
+    if (draftConflictOpen || autosavePausedRef.current) return;
+    setSaving(true);
+    try {
+      await persistDraft(silent, options);
+    } finally {
+      setSaving(false);
+    }
+  }, [draftConflictOpen, persistDraft, setSaving]);
+
+  const enqueuePersistDraft = useCallback((
+    silent: boolean,
+    options?: PersistDraftOptions,
+  ): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const waiter = { resolve, reject };
+      const mergeInto = (target: QueuedPersistRequest) => {
+        target.silent = target.silent && silent;
+        target.options = mergePersistOptions(target.options, options);
+        target.waiters.push(waiter);
+      };
+
+      if (persistDrainRunningRef.current) {
+        if (queuedPersistRef.current) {
+          mergeInto(queuedPersistRef.current);
+        } else {
+          queuedPersistRef.current = {
+            silent,
+            options,
+            waiters: [waiter],
+          };
+        }
+        return;
+      }
+
+      persistDrainRunningRef.current = true;
+      let current: QueuedPersistRequest | null = {
+        silent,
+        options,
+        waiters: [waiter],
+      };
+      void (async () => {
+        try {
+          while (current) {
+            try {
+              await executePersistRequest(current.silent, current.options);
+              current.waiters.forEach((entry) => entry.resolve());
+            } catch (error) {
+              current.waiters.forEach((entry) => entry.reject(error));
+            }
+            current = queuedPersistRef.current;
+            queuedPersistRef.current = null;
+          }
+        } finally {
+          persistDrainRunningRef.current = false;
+        }
+      })();
+    });
+  }, [executePersistRequest]);
 
   const handleSaveDraft = useCallback(async (silent = false) => {
     if (draftConflictOpen || autosavePausedRef.current) return;
     try {
-      await persistDraft(silent);
+      await enqueuePersistDraft(silent);
     } catch (err) {
       if (isDraftVersionConflictError(err)) {
         setDraftConflictOpen(true);
@@ -228,10 +417,8 @@ export function usePublicDesignDraftActions({
       }
       setSaveState('error');
       setError(err instanceof Error ? err.message : 'Не удалось сохранить макет');
-    } finally {
-      setSaving(false);
     }
-  }, [draftConflictOpen, persistDraft, setError, setSaveState, setStatus]);
+  }, [draftConflictOpen, enqueuePersistDraft, setError, setSaveState, setStatus]);
 
   const handleDismissDraftConflict = useCallback(() => {
     setDraftConflictOpen(false);
@@ -275,16 +462,14 @@ export function usePublicDesignDraftActions({
     try {
       setDraftConflictOpen(false);
       autosavePausedRef.current = false;
-      await persistDraft(true, { skipExpectedVersion: true });
+      await enqueuePersistDraft(true, { skipExpectedVersion: true });
       setStatus('Ваша версия макета сохранена на сервере.');
       setError(null);
     } catch (err) {
       setSaveState('error');
       setError(err instanceof Error ? err.message : 'Не удалось сохранить макет');
-    } finally {
-      setSaving(false);
     }
-  }, [persistDraft, setError, setSaveState, setStatus]);
+  }, [enqueuePersistDraft, setError, setSaveState, setStatus]);
 
   useEffect(() => {
     if (dirtyVersion === 0 || loading || saving || draftConflictOpen || autosavePausedRef.current) return;

@@ -13,6 +13,7 @@ import {
   uploadPublicEditorPreviewDraftFile,
 } from '../../api';
 import type { PublicEditorDraftFile } from '../../api';
+import { startPublicEditorPerfSpan } from './publicEditorPerf';
 
 export interface PublicEditorDraftResponse {
   token: string;
@@ -105,12 +106,15 @@ export function createWebsiteBffPublicDesignEditorAdapter({
         .then((response) => readJsonResponse<PublicEditorDraftResponse>(response));
     },
     updateDraft(token, patch) {
+      const stop = startPublicEditorPerfSpan('autosave.adapter.updateDraft.ms', { adapter: 'website-bff' });
       return fetch(joinBffPath(baseUrl, `/drafts/${encodeURIComponent(token)}`), {
         method: 'PATCH',
         credentials,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
-      }).then((response) => readJsonResponse<PublicEditorDraftResponse>(response));
+      }).then((response) => readJsonResponse<PublicEditorDraftResponse>(response)).finally(() => {
+        stop();
+      });
     },
     listDraftFiles(token) {
       return fetch(joinBffPath(baseUrl, `/drafts/${encodeURIComponent(token)}/files`), { credentials })
@@ -145,8 +149,13 @@ export const crmPreviewPublicDesignEditorAdapter: PublicDesignEditorAdapter = {
     return res.data as PublicEditorDraftResponse;
   },
   async updateDraft(token, patch) {
-    const res = await updatePublicEditorPreviewDraft(token, patch);
-    return res.data as PublicEditorDraftResponse;
+    const stop = startPublicEditorPerfSpan('autosave.adapter.updateDraft.ms', { adapter: 'crm-preview' });
+    try {
+      const res = await updatePublicEditorPreviewDraft(token, patch);
+      return res.data as PublicEditorDraftResponse;
+    } finally {
+      stop();
+    }
   },
   async listDraftFiles(token) {
     const res = await listPublicEditorPreviewDraftFiles(token);
@@ -178,8 +187,13 @@ export const publicWebsiteDesignEditorAdapter: PublicDesignEditorAdapter = {
     return res.data as PublicEditorDraftResponse;
   },
   async updateDraft(token, patch) {
-    const res = await updatePublicEditorDraft(token, patch);
-    return res.data as PublicEditorDraftResponse;
+    const stop = startPublicEditorPerfSpan('autosave.adapter.updateDraft.ms', { adapter: 'public-website' });
+    try {
+      const res = await updatePublicEditorDraft(token, patch);
+      return res.data as PublicEditorDraftResponse;
+    } finally {
+      stop();
+    }
   },
   async listDraftFiles(token) {
     const res = await listPublicEditorDraftFiles(token);

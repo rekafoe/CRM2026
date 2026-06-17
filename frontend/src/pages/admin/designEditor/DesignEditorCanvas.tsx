@@ -274,7 +274,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const currentPageRef = useRef(currentPage);
     currentPageRef.current = currentPage;
     const pagesRef = useRef(pages);
-    pagesRef.current = pages;
+    const pendingPagesWriteRef = useRef<DesignPage[] | null>(null);
     const templateRef = useRef(template);
     templateRef.current = template;
     const modeRef = useRef(mode);
@@ -324,6 +324,28 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
     const [textEditSheet, setTextEditSheet] = useState<TextEditSheetState | null>(null);
 
     const [photoFieldFillLoading, setPhotoFieldFillLoading] = useState<{ progress: number } | null>(null);
+
+    useEffect(() => {
+      if (pendingPagesWriteRef.current) {
+        if (pages === pendingPagesWriteRef.current) {
+          pendingPagesWriteRef.current = null;
+          pagesRef.current = pages;
+        }
+        return;
+      }
+      pagesRef.current = pages;
+    }, [pages]);
+
+    const setPagesMonotonic = useCallback((next: React.SetStateAction<DesignPage[]>) => {
+      setPages((prev) => {
+        const resolved = typeof next === 'function'
+          ? (next as (value: DesignPage[]) => DesignPage[])(prev)
+          : next;
+        pendingPagesWriteRef.current = resolved;
+        pagesRef.current = resolved;
+        return resolved;
+      });
+    }, [setPages]);
 
     const reportPhotoFillProgress = useCallback((progress: number | null) => {
       if (progress == null) {
@@ -440,7 +462,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       canvasReady,
       pageLoadKey,
       apiBaseUrl,
-      setPages,
+      setPages: setPagesMonotonic,
       onHistoryChange,
       pageTransitionGate,
       prevPageLoadKeyRef,

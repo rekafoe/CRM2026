@@ -71,6 +71,7 @@ import { EditorCanvasStage } from '../../features/designEditorShell/EditorCanvas
 import { EditorPageNavigator } from '../../features/designEditorShell/EditorPageNavigator';
 import { EditorTopBar } from '../../features/designEditorShell/EditorTopBar';
 import type { EditorViewOptions } from '../../features/designEditorShell/EditorViewControls';
+import { useSerializedPageNavigation } from '../../features/publicDesignEditor/useSerializedPageNavigation';
 import '../../styles/admin-page-layout.css';
 import './DesignEditorPage.css';
 import './designEditor/designEditorGlassTheme.css';
@@ -301,6 +302,18 @@ export const DesignEditorPage: React.FC = () => {
   }, [fitZoom, fitReady, currentPage, pageLoadKey]);
 
   const activeCanvas = useCallback(() => canvasHandleRef.current, []);
+  const { runPageNavigation } = useSerializedPageNavigation(canvasHandleRef);
+  const runAdminPageAction = useCallback((
+    task: () => void | Promise<void>,
+    options?: { flushBefore?: boolean },
+  ) => {
+    return runPageNavigation(async () => {
+      if (options?.flushBefore !== false) {
+        await canvasHandleRef.current?.flushPendingDocumentCommit?.();
+      }
+      await Promise.resolve(task());
+    });
+  }, [runPageNavigation]);
 
   // ── UI ──────────────────────────────────────────────────────────────────────
   const [ui, setUi] = useState<{ sidebarSection: SidebarSection | null }>({
@@ -515,62 +528,70 @@ export const DesignEditorPage: React.FC = () => {
 
   // ── Add / remove pages & spreads ─────────────────────────────────────────────
   const handleAddSpread = useCallback(() => {
-    captureCurrentThumb();
-    const { insertAt, addCount } = buildSpreadPageInsert(pageCount, coverPages);
-    setPages((prev) => {
-      const normalized = Array.from({ length: pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
-      return [
-        ...normalized.slice(0, insertAt),
-        ...Array.from({ length: addCount }, () => ({ ...EMPTY_PAGE })),
-        ...normalized.slice(insertAt),
-      ];
+    void runAdminPageAction(() => {
+      captureCurrentThumb();
+      const { insertAt, addCount } = buildSpreadPageInsert(pageCount, coverPages);
+      setPages((prev) => {
+        const normalized = Array.from({ length: pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
+        return [
+          ...normalized.slice(0, insertAt),
+          ...Array.from({ length: addCount }, () => ({ ...EMPTY_PAGE })),
+          ...normalized.slice(insertAt),
+        ];
+      });
+      setPageSpec((s) => ({ ...s, pageCount: s.pageCount + addCount }));
+      setCurrentPage(insertAt);
     });
-    setPageSpec((s) => ({ ...s, pageCount: s.pageCount + addCount }));
-    setCurrentPage(insertAt);
-  }, [captureCurrentThumb, coverPages, pageCount]);
+  }, [captureCurrentThumb, coverPages, pageCount, runAdminPageAction]);
 
   const handleAddPage = useCallback(() => {
-    captureCurrentThumb();
-    setPages((prev) => [...prev, { ...EMPTY_PAGE }]);
-    setPageSpec((s) => ({ ...s, pageCount: s.pageCount + 1 }));
-  }, [captureCurrentThumb]);
+    void runAdminPageAction(() => {
+      captureCurrentThumb();
+      setPages((prev) => [...prev, { ...EMPTY_PAGE }]);
+      setPageSpec((s) => ({ ...s, pageCount: s.pageCount + 1 }));
+    });
+  }, [captureCurrentThumb, runAdminPageAction]);
 
   const handleDeleteLast = useCallback(() => {
-    const spreadRange = spreadMode ? getLastInnerSpreadRange(pageCount, coverPages) : null;
-    const removeStart = spreadRange?.start ?? pageCount - 1;
-    const removeCount = spreadRange?.length ?? 1;
-    if (pageCount - removeCount < 1) return;
+    void runAdminPageAction(() => {
+      const spreadRange = spreadMode ? getLastInnerSpreadRange(pageCount, coverPages) : null;
+      const removeStart = spreadRange?.start ?? pageCount - 1;
+      const removeCount = spreadRange?.length ?? 1;
+      if (pageCount - removeCount < 1) return;
 
-    setPages((prev) => {
-      const normalized = Array.from({ length: pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
-      const next = [
-        ...normalized.slice(0, removeStart),
-        ...normalized.slice(removeStart + removeCount),
-      ];
-      return next.length ? next : [{ ...EMPTY_PAGE }];
-    });
-    setPageSpec((s) => ({ ...s, pageCount: Math.max(1, s.pageCount - removeCount) }));
-    setCurrentPage((p) => {
-      if (p >= removeStart + removeCount) return Math.max(0, p - removeCount);
-      if (p >= removeStart) return Math.max(0, removeStart - 1);
-      return p;
-    });
-    setThumbnails((prev) => {
-      const next: Record<number, string> = {};
-      Object.entries(prev).forEach(([rawIndex, value]) => {
-        const index = Number(rawIndex);
-        if (!Number.isFinite(index)) return;
-        if (index < removeStart) next[index] = value;
-        else if (index >= removeStart + removeCount) next[index - removeCount] = value;
+      setPages((prev) => {
+        const normalized = Array.from({ length: pageCount }, (_, index) => prev[index] ?? { ...EMPTY_PAGE });
+        const next = [
+          ...normalized.slice(0, removeStart),
+          ...normalized.slice(removeStart + removeCount),
+        ];
+        return next.length ? next : [{ ...EMPTY_PAGE }];
       });
-      return next;
+      setPageSpec((s) => ({ ...s, pageCount: Math.max(1, s.pageCount - removeCount) }));
+      setCurrentPage((p) => {
+        if (p >= removeStart + removeCount) return Math.max(0, p - removeCount);
+        if (p >= removeStart) return Math.max(0, removeStart - 1);
+        return p;
+      });
+      setThumbnails((prev) => {
+        const next: Record<number, string> = {};
+        Object.entries(prev).forEach(([rawIndex, value]) => {
+          const index = Number(rawIndex);
+          if (!Number.isFinite(index)) return;
+          if (index < removeStart) next[index] = value;
+          else if (index >= removeStart + removeCount) next[index - removeCount] = value;
+        });
+        return next;
+      });
     });
-  }, [coverPages, pageCount, spreadMode]);
+  }, [coverPages, pageCount, runAdminPageAction, spreadMode]);
 
   const handleGoToPage = useCallback((pageIndex: number) => {
-    captureCurrentThumb();
-    setCurrentPage(pageIndex);
-  }, [captureCurrentThumb]);
+    void runAdminPageAction(() => {
+      captureCurrentThumb();
+      setCurrentPage(pageIndex);
+    }, { flushBefore: false });
+  }, [captureCurrentThumb, runAdminPageAction]);
 
   const handleImageUrlSubmit = useCallback(
     async (url: string) => {

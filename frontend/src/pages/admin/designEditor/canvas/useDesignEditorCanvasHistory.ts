@@ -7,6 +7,10 @@ import { applyBasicModeConstraints, releaseBasicModeConstraints } from './canvas
 import type { CanvasHistoryStack } from './canvasHistory';
 import { canvasToJSON } from './canvasSerialization';
 import type { EditorMode, ResolveImageFileUrl } from './types';
+import {
+  recordPublicEditorPerfMetric,
+  startPublicEditorPerfSpan,
+} from '../../../../features/publicDesignEditor/publicEditorPerf';
 
 interface UseDesignEditorCanvasHistoryInput {
   fabricRef: MutableRefObject<Canvas | null>;
@@ -48,6 +52,10 @@ export function useDesignEditorCanvasHistory({
 
   const invalidatePendingDocumentCommit = useCallback(() => {
     documentCommitEpochRef.current += 1;
+    if (snapshotTimerRef.current) {
+      clearTimeout(snapshotTimerRef.current);
+      snapshotTimerRef.current = null;
+    }
     if (documentCommitTimerRef.current) {
       clearTimeout(documentCommitTimerRef.current);
       documentCommitTimerRef.current = null;
@@ -56,14 +64,21 @@ export function useDesignEditorCanvasHistory({
 
   const runCanvasDocumentCommit = useCallback(async () => {
     if (!onCanvasDocumentCommitRef.current) return;
-    await Promise.resolve(onCanvasDocumentCommitRef.current());
+    const stop = startPublicEditorPerfSpan('history.documentCommit.ms');
+    try {
+      await Promise.resolve(onCanvasDocumentCommitRef.current());
+    } finally {
+      stop();
+    }
   }, [onCanvasDocumentCommitRef]);
 
   const runScheduledDocumentCommit = useCallback(async (epoch: number, scheduledPageLoadKey: string) => {
     if (epoch !== documentCommitEpochRef.current) return;
     if (pageLoadKeyRef.current !== scheduledPageLoadKey) return;
     if (isLoadingRef.current || pageTransitionLockRef.current) {
+      const stopWait = startPublicEditorPerfSpan('history.documentCommit.waitIdle.ms');
       await waitForPageTransitionIdle();
+      stopWait();
       if (epoch !== documentCommitEpochRef.current) return;
       if (pageLoadKeyRef.current !== scheduledPageLoadKey) return;
       if (isLoadingRef.current || pageTransitionLockRef.current) return;
@@ -96,7 +111,10 @@ export function useDesignEditorCanvasHistory({
   const saveSnapshotNow = useCallback((options?: { scheduleDocumentCommit?: boolean }) => {
     const canvas = fabricRef.current;
     if (!canvas || isLoadingRef.current) return;
+    const stopSerialize = startPublicEditorPerfSpan('history.snapshot.serialize.ms');
     const json = JSON.stringify(canvasToJSON(canvas));
+    stopSerialize();
+    recordPublicEditorPerfMetric('history.snapshot.bytes', json.length);
     const flags = historyRef.current.push(json);
     onHistoryChange(flags.canUndo, flags.canRedo);
     if (options?.scheduleDocumentCommit !== false) {
@@ -121,24 +139,31 @@ export function useDesignEditorCanvasHistory({
   }, [saveSnapshotNow]);
 
   const flushCanvasDocumentCommit = useCallback(async () => {
-    let hadPendingSnapshot = false;
-    if (snapshotTimerRef.current) {
-      clearTimeout(snapshotTimerRef.current);
-      snapshotTimerRef.current = null;
-      hadPendingSnapshot = true;
+    const stopFlush = startPublicEditorPerfSpan('history.flushDocumentCommit.ms');
+    try {
+      let hadPendingSnapshot = false;
+      if (snapshotTimerRef.current) {
+        clearTimeout(snapshotTimerRef.current);
+        snapshotTimerRef.current = null;
+        hadPendingSnapshot = true;
+      }
+      if (documentCommitTimerRef.current) {
+        clearTimeout(documentCommitTimerRef.current);
+        documentCommitTimerRef.current = null;
+      }
+      if (isLoadingRef.current || pageTransitionLockRef.current) {
+        const stopWait = startPublicEditorPerfSpan('history.flush.waitIdle.ms');
+        await waitForPageTransitionIdle();
+        stopWait();
+      }
+      if (hadPendingSnapshot) {
+        saveSnapshotNow({ scheduleDocumentCommit: false });
+      }
+      if (isLoadingRef.current || pageTransitionLockRef.current) return;
+      await runCanvasDocumentCommit();
+    } finally {
+      stopFlush();
     }
-    if (documentCommitTimerRef.current) {
-      clearTimeout(documentCommitTimerRef.current);
-      documentCommitTimerRef.current = null;
-    }
-    if (isLoadingRef.current || pageTransitionLockRef.current) {
-      await waitForPageTransitionIdle();
-    }
-    if (hadPendingSnapshot) {
-      saveSnapshotNow({ scheduleDocumentCommit: false });
-    }
-    if (isLoadingRef.current || pageTransitionLockRef.current) return;
-    await runCanvasDocumentCommit();
   }, [
     documentCommitTimerRef,
     isLoadingRef,

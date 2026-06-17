@@ -7,6 +7,7 @@ import {
 } from './designPageThumbnailCache';
 import { loadDesignPageScene } from './designPageLoader';
 import type { DesignPage } from './types';
+import { startPublicEditorPerfSpan } from '../../../features/publicDesignEditor/publicEditorPerf';
 
 const THUMB_EXPORT = { format: 'jpeg' as const, multiplier: 0.14, quality: 0.7 };
 
@@ -40,65 +41,77 @@ export async function generatePageStripThumbnails(input: {
   cacheScope?: DesignPageThumbnailCacheScope | null;
   pageIndexes?: number[];
 }): Promise<void> {
-  const {
-    pages,
-    template,
-    pageW,
-    pageH,
-    apiBaseUrl,
-    onThumb,
-    shouldAbort,
-    cacheScope = null,
-    pageIndexes,
-  } = input;
-  if (pages.length === 0 || pageW <= 0 || pageH <= 0) return;
-
-  const indices = pageIndexes ?? pages.map((_, index) => index);
-  const pending: number[] = [];
-
-  for (const pageIndex of indices) {
-    if (shouldAbort?.()) return;
-    if (cacheScope) {
-      const cached = getCachedPageThumbnail(cacheScope, pageIndex, pages[pageIndex]);
-      if (cached) {
-        onThumb(pageIndex, cached);
-        continue;
-      }
-    }
-    pending.push(pageIndex);
-  }
-
-  if (pending.length === 0) return;
-
-  const el = document.createElement('canvas');
-  const canvas = new Canvas(el, {
-    width: pageW,
-    height: pageH,
-    backgroundColor: 'white',
-    preserveObjectStacking: true,
+  const stopTotal = startPublicEditorPerfSpan('thumb.prefetch.total.ms', {
+    pageCount: input.pages.length,
   });
-
   try {
-    for (const pageIndex of pending) {
+    const {
+      pages,
+      template,
+      pageW,
+      pageH,
+      apiBaseUrl,
+      onThumb,
+      shouldAbort,
+      cacheScope = null,
+      pageIndexes,
+    } = input;
+    if (pages.length === 0 || pageW <= 0 || pageH <= 0) return;
+
+    const indices = pageIndexes ?? pages.map((_, index) => index);
+    const pending: number[] = [];
+
+    for (const pageIndex of indices) {
       if (shouldAbort?.()) return;
-      await loadDesignPageScene({
-        canvas,
-        pageData: pages[pageIndex],
-        pageIndex,
-        template,
-        pageW,
-        pageH,
-        apiBaseUrl,
-      });
-      await waitForCanvasPaint(canvas);
-      if (shouldAbort?.()) return;
-      const thumbUrl = canvas.toDataURL(THUMB_EXPORT);
       if (cacheScope) {
-        rememberPageThumbnail(cacheScope, pageIndex, pages[pageIndex], thumbUrl);
+        const cached = getCachedPageThumbnail(cacheScope, pageIndex, pages[pageIndex]);
+        if (cached) {
+          onThumb(pageIndex, cached);
+          continue;
+        }
       }
-      onThumb(pageIndex, thumbUrl);
+      pending.push(pageIndex);
+    }
+
+    if (pending.length === 0) return;
+
+    const el = document.createElement('canvas');
+    const canvas = new Canvas(el, {
+      width: pageW,
+      height: pageH,
+      backgroundColor: 'white',
+      preserveObjectStacking: true,
+    });
+
+    try {
+      for (const pageIndex of pending) {
+        if (shouldAbort?.()) return;
+        const stopOne = startPublicEditorPerfSpan('thumb.prefetch.single.ms', { pageIndex });
+        try {
+          await loadDesignPageScene({
+            canvas,
+            pageData: pages[pageIndex],
+            pageIndex,
+            template,
+            pageW,
+            pageH,
+            apiBaseUrl,
+          });
+          await waitForCanvasPaint(canvas);
+          if (shouldAbort?.()) return;
+          const thumbUrl = canvas.toDataURL(THUMB_EXPORT);
+          if (cacheScope) {
+            rememberPageThumbnail(cacheScope, pageIndex, pages[pageIndex], thumbUrl);
+          }
+          onThumb(pageIndex, thumbUrl);
+        } finally {
+          stopOne();
+        }
+      }
+    } finally {
+      canvas.dispose();
     }
   } finally {
-    canvas.dispose();
+    stopTotal();
   }
 }

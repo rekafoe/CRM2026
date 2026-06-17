@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { DesignTemplate } from '../../api';
 import { API_BASE_URL } from '../../config/constants';
 import {
-  loadCachedThumbnailsForPages,
-  pageContentFingerprint,
+  loadCachedThumbnailsForIndexes,
   type DesignPageThumbnailCacheScope,
 } from '../../pages/admin/designEditor/designPageThumbnailCache';
 import { generatePageStripThumbnails } from '../../pages/admin/designEditor/generatePageStripThumbnails';
@@ -35,6 +34,8 @@ export function usePublicDesignThumbnailPrefetch(input: {
   } = input;
   const onThumbRef = useRef(onThumb);
   const onHydrateRef = useRef(onHydrate);
+  const previousPagesRef = useRef<DesignPage[]>([]);
+  const initialHydrationDoneRef = useRef(false);
   onThumbRef.current = onThumb;
   onHydrateRef.current = onHydrate;
 
@@ -48,18 +49,37 @@ export function usePublicDesignThumbnailPrefetch(input: {
     };
   }, [draftToken, enabled, pageHeightPx, pageWidthPx, template, templateId]);
 
-  const pagesKey = useMemo(
-    () => Array.from({ length: pageCount }, (_, index) => {
-      const page = pages[index];
-      return `${index}:${pageContentFingerprint(page)}`;
-    }).join('|'),
-    [pageCount, pages],
+  const cacheScopeKey = useMemo(
+    () => cacheScope
+      ? `${cacheScope.templateId}:${cacheScope.draftToken ?? 'template'}:${cacheScope.pageWidthPx}x${cacheScope.pageHeightPx}`
+      : 'none',
+    [cacheScope],
   );
+
+  useEffect(() => {
+    previousPagesRef.current = [];
+    initialHydrationDoneRef.current = false;
+  }, [cacheScopeKey]);
 
   useEffect(() => {
     if (!enabled || !template || !cacheScope || pageWidthPx <= 0 || pageHeightPx <= 0) return;
 
-    const cached = loadCachedThumbnailsForPages(cacheScope, pages, pageCount);
+    const previousPages = previousPagesRef.current;
+    const changedIndexes: number[] = [];
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+      if (previousPages[pageIndex] !== pages[pageIndex]) {
+        changedIndexes.push(pageIndex);
+      }
+    }
+    previousPagesRef.current = pages.slice(0, pageCount);
+
+    const indexesToCheck = initialHydrationDoneRef.current
+      ? changedIndexes
+      : Array.from({ length: pageCount }, (_, pageIndex) => pageIndex);
+    if (indexesToCheck.length === 0) return;
+
+    const cached = loadCachedThumbnailsForIndexes(cacheScope, pages, indexesToCheck);
+    initialHydrationDoneRef.current = true;
     if (Object.keys(cached).length > 0) {
       onHydrateRef.current?.(cached);
       Object.entries(cached).forEach(([rawIndex, url]) => {
@@ -67,10 +87,7 @@ export function usePublicDesignThumbnailPrefetch(input: {
       });
     }
 
-    const missingIndexes: number[] = [];
-    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
-      if (!cached[pageIndex]) missingIndexes.push(pageIndex);
-    }
+    const missingIndexes = indexesToCheck.filter((pageIndex) => !cached[pageIndex]);
     if (missingIndexes.length === 0) return;
 
     let cancelled = false;
@@ -94,5 +111,5 @@ export function usePublicDesignThumbnailPrefetch(input: {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [cacheScope, enabled, pageCount, pageHeightPx, pageWidthPx, pages, pagesKey, template]);
+  }, [cacheScope, enabled, pageCount, pageHeightPx, pageWidthPx, pages, template]);
 }

@@ -6,14 +6,14 @@ export interface PageLoadKeyTransitionResult {
   objectCountAfterLoad: number;
 }
 
-export function assertPageTransitionDisplayed(input: {
+export function getPageTransitionInvariantError(input: {
   result: PageLoadKeyTransitionResult;
   targetKey: string;
   requestedKey: string;
   displayedKey: string | null;
   loadedCanvasInstance: number;
   expectedCanvasInstance: number;
-}): void {
+}): string | null {
   const {
     result,
     targetKey,
@@ -27,15 +27,29 @@ export function assertPageTransitionDisplayed(input: {
     || displayedKey !== targetKey
     || loadedCanvasInstance !== expectedCanvasInstance
   ) {
-    throw new Error(`Page transition did not display requested key: ${targetKey}`);
+    return `Page transition did not display requested key: ${targetKey}`;
   }
   if (!Number.isInteger(result.activePageIndex) || result.activePageIndex < 0) {
-    throw new Error(`Page transition has invalid active page index: ${String(result.activePageIndex)}`);
+    return `Page transition has invalid active page index: ${String(result.activePageIndex)}`;
   }
   if (result.objectCountBeforeFlush < 0 || result.objectCountAfterLoad < 0) {
-    throw new Error('Page transition has invalid object count metrics.');
+    return 'Page transition has invalid object count metrics.';
   }
   if (requestedKey !== targetKey) {
-    throw new Error(`Page transition invariant mismatch: requested=${requestedKey}, target=${targetKey}`);
+    return `Page transition invariant mismatch: requested=${requestedKey}, target=${targetKey}`;
   }
+  return null;
+}
+
+export function assertPageTransitionDisplayed(input: {
+  result: PageLoadKeyTransitionResult;
+  targetKey: string;
+  requestedKey: string;
+  displayedKey: string | null;
+  loadedCanvasInstance: number;
+  expectedCanvasInstance: number;
+}): void {
+  const error = getPageTransitionInvariantError(input);
+  if (!error) return;
+  throw new Error(error);
 }

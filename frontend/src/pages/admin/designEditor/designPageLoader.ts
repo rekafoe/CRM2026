@@ -4,6 +4,8 @@ import type { DesignPage } from './types';
 import { FABRIC_CUSTOM_PROPS } from './constants';
 import { normalizeDesignFieldsOnCanvas } from './designFields';
 import { prepareTextObjectsOnCanvas } from './textStyleRuns';
+import { PUBLIC_EDITOR_FEATURE_FLAGS } from '../../../features/publicDesignEditor/publicEditorFeatureFlags';
+import { recordPublicEditorPerfMetric } from '../../../features/publicDesignEditor/publicEditorPerf';
 
 type AnyObj = Record<string, unknown>;
 
@@ -52,6 +54,19 @@ function shiftSerializedLeft(obj: Record<string, unknown>, delta: number): void 
   obj.left = (Number.isFinite(current) ? current : 0) + delta;
 }
 
+function clearSpreadMirrorMeta(obj: Record<string, unknown>): void {
+  delete obj.spreadMirrorId;
+  delete obj.spreadMirrorSide;
+  delete obj.spreadMirrorSpineX;
+}
+
+function readSpreadMirrorMeta(obj: Record<string, unknown>): { id: string; side: 'left' | 'right' } | null {
+  const id = typeof obj.spreadMirrorId === 'string' ? obj.spreadMirrorId.trim() : '';
+  const side = obj.spreadMirrorSide;
+  if (!id || (side !== 'left' && side !== 'right')) return null;
+  return { id, side };
+}
+
 function normalizeSerializedBackgroundObject(obj: Record<string, unknown>, pageW: number, pageH: number): void {
   if (obj.isBackground !== true) return;
   obj.selectable = false;
@@ -73,17 +88,45 @@ function buildSpreadMergedFabricJson(input: {
 }): Record<string, unknown> | null {
   const leftRoot = normalizeFabricJsonRoot(input.leftPage?.fabricJSON);
   const rightRoot = normalizeFabricJsonRoot(input.rightPage?.fabricJSON);
+  const enableMirrorReconciliation = PUBLIC_EDITOR_FEATURE_FLAGS.spreadMirrorReconciliation;
+  const leftMirrorIds = new Set<string>();
   const leftObjects = getFabricJsonObjects(leftRoot).map((obj) => {
     const next = deepCloneFabricJson(obj);
+    const mirror = readSpreadMirrorMeta(next);
+    if (enableMirrorReconciliation && mirror?.side === 'left') {
+      leftMirrorIds.add(mirror.id);
+    }
+    clearSpreadMirrorMeta(next);
     normalizeSerializedBackgroundObject(next, input.pageW, input.pageH);
     return next;
   });
-  const rightObjects = getFabricJsonObjects(rightRoot).map((obj) => {
+  let dedupedMirrorCount = 0;
+  const rightObjects = getFabricJsonObjects(rightRoot).flatMap((obj) => {
     const next = deepCloneFabricJson(obj);
+    const mirror = readSpreadMirrorMeta(next);
+    const isMirroredDuplicate = enableMirrorReconciliation
+      && mirror?.side === 'right'
+      && leftMirrorIds.has(mirror.id);
+    clearSpreadMirrorMeta(next);
+    if (isMirroredDuplicate) {
+      dedupedMirrorCount += 1;
+      return [];
+    }
     normalizeSerializedBackgroundObject(next, input.pageW, input.pageH);
     shiftSerializedLeft(next, input.pageW);
-    return next;
+    return [next];
   });
+  recordPublicEditorPerfMetric('spread.merge.dedupedMirrors', dedupedMirrorCount, {
+    leftObjects: leftObjects.length,
+    rightObjects: rightObjects.length,
+  });
+  if (import.meta.env.DEV && dedupedMirrorCount > 0) {
+    console.info('[DesignEditorCanvas] spread merge reconciled mirrored duplicates', {
+      dedupedMirrorCount,
+      leftObjects: leftObjects.length,
+      rightObjects: rightObjects.length,
+    });
+  }
   if (leftObjects.length === 0 && rightObjects.length === 0) return null;
   return {
     ...(leftRoot ?? rightRoot ?? {}),

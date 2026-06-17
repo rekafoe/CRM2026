@@ -11,6 +11,11 @@ import { applyBasicModeConstraints, lockTextInlineEditing } from './canvasBasicM
 import { canvasToJSON, parsePageLoadKey } from './canvasSerialization';
 import type { CanvasHistoryStack } from './canvasHistory';
 import type { PageLoadKeyTransitionResult } from './pageTransitionInvariant';
+import {
+  recordPublicEditorPerfMetric,
+  recordPublicEditorTransitionDrift,
+  startPublicEditorPerfSpan,
+} from '../../../../features/publicDesignEditor/publicEditorPerf';
 
 export interface PageLoadKeyTransitionRefs {
   pageLoadKeyRef: { current: string };
@@ -100,11 +105,14 @@ async function emitSinglePageThumb(
   pageIndex: number,
   pageThumbReady: ((pageIndex: number, thumbUrl: string) => void) | undefined,
 ): Promise<void> {
+  const stop = startPublicEditorPerfSpan('thumb.emit.single.ms', { pageIndex });
   try {
     const thumbUrl = canvas.toDataURL({ format: 'jpeg', multiplier: 0.14, quality: 0.7 });
     pageThumbReady?.(pageIndex, thumbUrl);
   } catch {
     // Thumbnail export must never block page switching (CORS/tainted canvas, decode errors).
+  } finally {
+    stop();
   }
 }
 
@@ -128,39 +136,55 @@ function commitOutgoingCanvasToPages(input: {
   pages: DesignPage[];
   pageWidthPx: number;
 }): DesignPage[] | null {
+  const stopCommit = startPublicEditorPerfSpan('transition.commit.outgoing.ms', {
+    prevKey: input.prevKey,
+  });
   const parsedPrev = input.prevKey ? parsePageLoadKey(input.prevKey) : null;
-  if (!parsedPrev) return null;
+  if (!parsedPrev) {
+    stopCommit();
+    return null;
+  }
 
   let saved: PageSaveSnapshot;
   let currentPage = 0;
   let leftPageIdx = -1;
   let rightPageIdx = -1;
 
-  if (parsedPrev.type === 'spread') {
-    const { left, right } = splitSpreadCanvasToPagesSync(input.canvas, input.pageWidthPx);
-    saved = { kind: 'spread', left, right };
-    currentPage = parsedPrev.left;
-    leftPageIdx = parsedPrev.left;
-    rightPageIdx = parsedPrev.right;
-  } else {
-    const json = canvasToJSON(input.canvas);
-    saved = { kind: 'single', json };
-    currentPage = parsedPrev.index;
-  }
+  try {
+    if (parsedPrev.type === 'spread') {
+      const stopSerialize = startPublicEditorPerfSpan('transition.serialize.spread.ms');
+      const { left, right } = splitSpreadCanvasToPagesSync(input.canvas, input.pageWidthPx);
+      stopSerialize();
+      saved = { kind: 'spread', left, right };
+      currentPage = parsedPrev.left;
+      leftPageIdx = parsedPrev.left;
+      rightPageIdx = parsedPrev.right;
+    } else {
+      const stopSerialize = startPublicEditorPerfSpan('transition.serialize.single.ms');
+      const json = canvasToJSON(input.canvas);
+      stopSerialize();
+      saved = { kind: 'single', json };
+      currentPage = parsedPrev.index;
+    }
 
-  const nextPages = mergePagesWithSavedSnapshot(input.pages, saved, {
-    currentPage,
-    leftPageIdx,
-    rightPageIdx,
-  });
+    const nextPages = mergePagesWithSavedSnapshot(input.pages, saved, {
+      currentPage,
+      leftPageIdx,
+      rightPageIdx,
+    });
 
-  if (nextPages.length === input.pages.length) {
-    const changed = nextPages.some((page, index) => (
-      !areFabricJsonEqual(page.fabricJSON, input.pages[index]?.fabricJSON)
-    ));
-    if (!changed) return input.pages;
+    if (nextPages.length === input.pages.length) {
+      const stopCompare = startPublicEditorPerfSpan('transition.pages.compare.ms');
+      const changed = nextPages.some((page, index) => (
+        !areFabricJsonEqual(page.fabricJSON, input.pages[index]?.fabricJSON)
+      ));
+      stopCompare();
+      if (!changed) return input.pages;
+    }
+    return nextPages;
+  } finally {
+    stopCommit();
   }
-  return nextPages;
 }
 
 async function emitSpreadPageThumbs(
@@ -169,6 +193,10 @@ async function emitSpreadPageThumbs(
   rightPageIndex: number,
   pageThumbReady: ((pageIndex: number, thumbUrl: string) => void) | undefined,
 ): Promise<void> {
+  const stop = startPublicEditorPerfSpan('thumb.emit.spread.ms', {
+    leftPageIndex,
+    rightPageIndex,
+  });
   try {
     const thumbUrl = canvas.toDataURL({ format: 'jpeg', multiplier: 0.14, quality: 0.7 });
     const spreadThumbs = await cropSpreadThumbnail(thumbUrl);
@@ -176,6 +204,8 @@ async function emitSpreadPageThumbs(
     pageThumbReady?.(rightPageIndex, spreadThumbs.right);
   } catch {
     // Thumbnail export must never block page switching (CORS/tainted canvas, decode errors).
+  } finally {
+    stop();
   }
 }
 
@@ -207,6 +237,10 @@ export async function runPageLoadKeyTransition({
   refs,
   callbacks,
 }: PageLoadKeyTransitionParams): Promise<PageLoadKeyTransitionResult> {
+  const stopTotal = startPublicEditorPerfSpan('transition.total.ms', {
+    targetKey,
+    prevKey,
+  });
   const {
     pageLoadKeyRef,
     pagesRef,
@@ -250,33 +284,43 @@ export async function runPageLoadKeyTransition({
     const snapshotPages: DesignPage[] = committedPages ?? pagesRef.current;
 
     if (parsedNext?.type === 'spread') {
-      canvas.setDimensions({ width: pw * 2, height: ph });
-      isLoadingRef.current = true;
-      await loadSpreadMergedScene({
-        canvas,
-        leftPage: snapshotPages[parsedNext.left],
-        rightPage: snapshotPages[parsedNext.right],
-        leftPageIndex: parsedNext.left,
-        rightPageIndex: parsedNext.right,
-        pageW: pw,
-        pageH: ph,
-        template: templateRef.current,
-        apiBaseUrl,
-      });
+      const stopLoad = startPublicEditorPerfSpan('transition.load.spread.ms');
+      try {
+        canvas.setDimensions({ width: pw * 2, height: ph });
+        isLoadingRef.current = true;
+        await loadSpreadMergedScene({
+          canvas,
+          leftPage: snapshotPages[parsedNext.left],
+          rightPage: snapshotPages[parsedNext.right],
+          leftPageIndex: parsedNext.left,
+          rightPageIndex: parsedNext.right,
+          pageW: pw,
+          pageH: ph,
+          template: templateRef.current,
+          apiBaseUrl,
+        });
+      } finally {
+        stopLoad();
+      }
       prevPageLoadKeyRef.current = targetKey;
       loadedPageForInstanceRef.current = canvasInstance;
     } else if (parsedNext?.type === 'single') {
-      canvas.setDimensions({ width: pw, height: ph });
-      isLoadingRef.current = true;
-      await loadDesignPageScene({
-        canvas,
-        pageData: snapshotPages[parsedNext.index],
-        pageIndex: parsedNext.index,
-        template: templateRef.current,
-        pageW: pw,
-        pageH: ph,
-        apiBaseUrl,
-      });
+      const stopLoad = startPublicEditorPerfSpan('transition.load.single.ms');
+      try {
+        canvas.setDimensions({ width: pw, height: ph });
+        isLoadingRef.current = true;
+        await loadDesignPageScene({
+          canvas,
+          pageData: snapshotPages[parsedNext.index],
+          pageIndex: parsedNext.index,
+          template: templateRef.current,
+          pageW: pw,
+          pageH: ph,
+          apiBaseUrl,
+        });
+      } finally {
+        stopLoad();
+      }
       prevPageLoadKeyRef.current = targetKey;
       loadedPageForInstanceRef.current = canvasInstance;
     }
@@ -290,7 +334,9 @@ export async function runPageLoadKeyTransition({
 
     if (modeRef.current === 'basic') applyBasicModeConstraints(canvas, selectionDisplayScaleRef.current);
     else lockTextInlineEditing(canvas);
+    const stopHistorySeed = startPublicEditorPerfSpan('transition.history.seed.ms');
     const snap = JSON.stringify(canvasToJSON(canvas));
+    stopHistorySeed();
     historyRef.current.reset(snap);
 
     if (
@@ -308,14 +354,26 @@ export async function runPageLoadKeyTransition({
 
     prevPageLoadKeyRef.current = targetKey;
     loadedPageForInstanceRef.current = canvasInstance;
+    const objectCountAfterLoad = canvas.getObjects().length;
+    recordPublicEditorPerfMetric(
+      'transition.objectCountDelta',
+      objectCountAfterLoad - objectCountBeforeFlush,
+      { targetKey, prevKey },
+    );
+    recordPublicEditorTransitionDrift({
+      prevKey,
+      targetKey,
+      objectCountAfterLoad,
+    });
     return {
       displayedKey: targetKey,
       canvasInstance,
       activePageIndex: parsedNext.type === 'single' ? parsedNext.index : parsedNext.left,
       objectCountBeforeFlush,
-      objectCountAfterLoad: canvas.getObjects().length,
+      objectCountAfterLoad,
     };
   } finally {
+    stopTotal();
     isLoadingRef.current = false;
     if (pageLoadKeyRef.current === targetKey) {
       pageTransitionLockRef.current = false;

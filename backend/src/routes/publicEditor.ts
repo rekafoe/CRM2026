@@ -5,6 +5,7 @@ import { asyncHandler, authenticate } from '../middleware'
 import { requireWebsiteOrderApiKey } from '../middleware/websiteOrderApiKey'
 import {
   addEditorDraftFile,
+  EditorDraftRateLimitError,
   createEditorDraft,
   createEditorDraftFromOrderItem,
   finalizeEditorDraft,
@@ -199,7 +200,8 @@ router.patch('/admin-preview/drafts/:token', authenticate, asyncHandler(async (r
     const draft = await updateEditorDraftPayload(req.params.token, req.body ?? {})
     res.json(draft)
   } catch (err: unknown) {
-    res.status(409).json({ message: err instanceof Error ? err.message : 'Не удалось сохранить draft' })
+    res.status(err instanceof EditorDraftRateLimitError ? 429 : 409)
+      .json({ message: err instanceof Error ? err.message : 'Не удалось сохранить draft' })
   }
 }))
 
@@ -403,7 +405,8 @@ router.patch('/drafts/:token', asyncHandler(async (req: Request, res: Response) 
     const draft = await updateEditorDraftPayload(req.params.token, req.body ?? {})
     res.json(draft)
   } catch (err: unknown) {
-    res.status(409).json({ message: err instanceof Error ? err.message : 'Не удалось сохранить draft' })
+    res.status(err instanceof EditorDraftRateLimitError ? 429 : 409)
+      .json({ message: err instanceof Error ? err.message : 'Не удалось сохранить draft' })
   }
 }))
 

@@ -10,7 +10,7 @@ import {
   type PageLoadKeyTransitionCallbacks,
   type PageLoadKeyTransitionRefs,
 } from './canvasPageTransitions';
-import { assertPageTransitionDisplayed } from './pageTransitionInvariant';
+import { getPageTransitionInvariantError } from './pageTransitionInvariant';
 
 export interface UsePageLoadKeyEffectInput {
   fabricRef: RefObject<Canvas | null>;
@@ -101,7 +101,20 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
           apiBaseUrl,
         };
 
+        let drainIterations = 0;
+        let invariantRetryKey: string | null = null;
+        let invariantRetryCount = 0;
         while (fabricRef.current && canvasReady) {
+          drainIterations += 1;
+          if (drainIterations > 48) {
+            if (import.meta.env.DEV) {
+              console.warn('[DesignEditorCanvas] transition drain reached safety limit', {
+                requestedKey: requestedKeyRef.current,
+                displayedKey: prevPageLoadKeyRef.current,
+              });
+            }
+            break;
+          }
           const targetKey = requestedKeyRef.current;
           const prevKey = prevPageLoadKeyRef.current;
           const canvasInstance = canvasInstanceRef.current;
@@ -114,15 +127,30 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
           }
 
           pageTransitionLockRef.current = true;
-          const result = await runPageLoadKeyTransition({
-            canvas,
-            targetKey,
-            prevKey,
-            canvasInstance,
-            refs,
-            callbacks,
-          });
-          assertPageTransitionDisplayed({
+          let result: Awaited<ReturnType<typeof runPageLoadKeyTransition>> | null = null;
+          try {
+            result = await runPageLoadKeyTransition({
+              canvas,
+              targetKey,
+              prevKey,
+              canvasInstance,
+              refs,
+              callbacks,
+            });
+          } catch (transitionError) {
+            if (import.meta.env.DEV) {
+              console.warn('[DesignEditorCanvas] transition iteration failed, retrying drain', {
+                targetKey,
+                requestedKey: requestedKeyRef.current,
+                error: transitionError,
+              });
+            }
+            if (requestedKeyRef.current === targetKey) {
+              prevPageLoadKeyRef.current = null;
+            }
+            continue;
+          }
+          const invariantError = getPageTransitionInvariantError({
             result,
             targetKey,
             requestedKey: requestedKeyRef.current,
@@ -130,6 +158,29 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
             loadedCanvasInstance: loadedPageForInstanceRef.current,
             expectedCanvasInstance: canvasInstance,
           });
+          if (invariantError) {
+            if (import.meta.env.DEV) {
+              console.warn('[DesignEditorCanvas] transition invariant mismatch, self-healing', {
+                targetKey,
+                requestedKey: requestedKeyRef.current,
+                invariantError,
+              });
+            }
+            if (invariantRetryKey === targetKey) {
+              invariantRetryCount += 1;
+            } else {
+              invariantRetryKey = targetKey;
+              invariantRetryCount = 1;
+            }
+            if (invariantRetryCount <= 2) {
+              prevPageLoadKeyRef.current = null;
+              loadedPageForInstanceRef.current = -1;
+              continue;
+            }
+          } else {
+            invariantRetryKey = null;
+            invariantRetryCount = 0;
+          }
           if (import.meta.env.DEV) {
             canvas.upperCanvasEl.dataset.pageRequestedKey = targetKey;
             canvas.upperCanvasEl.dataset.pageDisplayedKey = result.displayedKey;
