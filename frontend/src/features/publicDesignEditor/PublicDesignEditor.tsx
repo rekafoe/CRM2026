@@ -130,6 +130,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const [activeTaskTab, setActiveTaskTab] = useState<PublicDesignTaskTab>('photo');
   const suppressDirtyRef = useRef(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [clientAsideCollapsed, setClientAsideCollapsed] = useState(false);
   const [selectedLibraryPhotoId, setSelectedLibraryPhotoId] = useState<string | null>(null);
   const [checkoutPreviewOpen, setCheckoutPreviewOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<PublicDesignMobilePanel>('canvas');
@@ -262,7 +263,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const viewportLayoutTrigger =
     (mobileTextToolbarOpen ? 1 : 0)
     + (isMobile ? { canvas: 0, photos: 1, text: 2, check: 3 }[mobilePanel] ?? 0 : 0) * 4
-    + (!isMobile && stripCollapsed ? 1 : 0) * 16;
+    + (!isMobile && stripCollapsed ? 1 : 0) * 16
+    + (!isMobile && clientAsideCollapsed ? 1 : 0) * 32;
 
   const { fitZoom, viewportReady: fitReady, rulerOrigin, layoutWidthPx, layoutHeightPx } = useDesignEditorViewport({
     viewportRef,
@@ -722,6 +724,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     'public-design-editor',
     'public-design-editor--client',
     `public-design-editor--${isMultipageDocument ? 'multipage' : 'single'}`,
+    clientAsideCollapsed && !isMobile ? 'public-design-editor--aside-collapsed' : '',
     isMobile ? 'public-design-editor--mobile' : '',
     isMobile ? `public-design-editor--mobile-panel-${mobilePanel}` : '',
   ].filter(Boolean).join(' ');
@@ -958,6 +961,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       <div className={workspaceClassName} {...workspaceLayoutProps}>
         {!isMobile && (
           <PublicDesignClientAside
+            collapsed={clientAsideCollapsed}
             fragmentLabel={currentFragment.label}
             fragmentPreflight={fragmentPreflight}
             globalPreflight={preflight}
@@ -978,6 +982,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             onPhotoReplace={handlePhotoReplace}
             onPlaceSelectedPhoto={selectedLibraryPhoto ? handlePlaceSelectedPhoto : undefined}
             onIssueFocus={handleIssueFocus}
+            onCollapsedChange={setClientAsideCollapsed}
             onBeforeCheckTab={() => {
               void commitCanvasToPages();
             }}

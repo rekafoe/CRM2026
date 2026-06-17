@@ -53,6 +53,7 @@ function summarizeCheck(preflight: PublicEditorPreflightSummary): { title: strin
 }
 
 interface PublicDesignClientAsideProps {
+  collapsed?: boolean;
   fragmentLabel: string;
   fragmentPreflight: PublicEditorPreflightSummary;
   globalPreflight: PublicEditorPreflightSummary;
@@ -73,11 +74,13 @@ interface PublicDesignClientAsideProps {
   onPhotoReplace: (field: PublicEditorPreflightField) => void;
   onPlaceSelectedPhoto?: (field: PublicEditorPreflightField) => void;
   onIssueFocus: (issue: PublicEditorPreflightIssue) => void;
+  onCollapsedChange?: (collapsed: boolean) => void;
   /** Перед показом вкладки «Проверка» — подтянуть fabricJSON с холста */
   onBeforeCheckTab?: () => void | Promise<void>;
 }
 
 export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = ({
+  collapsed = false,
   fragmentLabel,
   fragmentPreflight,
   globalPreflight,
@@ -98,6 +101,7 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
   onPhotoReplace,
   onPlaceSelectedPhoto,
   onIssueFocus,
+  onCollapsedChange,
   onBeforeCheckTab,
 }) => {
   const [activeTab, setActiveTab] = useState<PublicDesignClientAsideTab>('photos');
@@ -183,8 +187,27 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
   );
 
   return (
-    <aside className="public-design-editor__client-aside" aria-label="Панель редактора">
+    <aside
+      className={`public-design-editor__client-aside${collapsed ? ' public-design-editor__client-aside--collapsed' : ''}`}
+      aria-label="Панель редактора"
+      aria-expanded={!collapsed}
+    >
       <nav className="public-design-editor__client-aside-rail" aria-label="Разделы панели">
+        <button
+          type="button"
+          title={collapsed ? 'Показать панель' : 'Скрыть панель'}
+          className="public-design-editor__client-aside-rail-btn public-design-editor__client-aside-collapse"
+          onClick={() => onCollapsedChange?.(!collapsed)}
+          aria-label={collapsed ? 'Показать панель' : 'Скрыть панель'}
+        >
+          <span className="public-design-editor__client-aside-rail-icon" aria-hidden="true">
+            {collapsed ? '›' : '‹'}
+          </span>
+          <span className="public-design-editor__client-aside-rail-label">
+            {collapsed ? 'Показать' : 'Скрыть'}
+            <small>панель</small>
+          </span>
+        </button>
         {RAIL_TABS.map((tab) => {
           const badge = resolveTabBadge(tab.id);
           return (
@@ -193,7 +216,10 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
               type="button"
               title={tab.title}
               className={`public-design-editor__client-aside-rail-btn${activeTab === tab.id ? ' is-active' : ''}`}
-              onClick={() => selectAsideTab(tab.id)}
+              onClick={() => {
+                if (collapsed) onCollapsedChange?.(false);
+                selectAsideTab(tab.id);
+              }}
               aria-current={activeTab === tab.id ? 'page' : undefined}
             >
               <span className="public-design-editor__client-aside-rail-icon" aria-hidden="true">
@@ -211,6 +237,7 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
         })}
       </nav>
 
+      {!collapsed && (
       <div className="public-design-editor__client-aside-panel">
         {activeTab === 'photos' && (
           <>
@@ -309,6 +336,7 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
           </div>
         )}
       </div>
+      )}
     </aside>
   );
 };

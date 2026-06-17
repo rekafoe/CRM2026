@@ -9,6 +9,11 @@
   box-shadow: 0 22px 56px rgba(15, 23, 42, 0.1);
 }
 
+.public-design-editor__client-aside--collapsed {
+  flex: 0 0 84px;
+  max-width: 84px;
+}
+
 .public-design-editor__client-aside-rail {
   display: flex;
   flex-direction: column;
@@ -19,6 +24,23 @@
   padding: 10px 6px;
   background: rgba(248, 250, 252, 0.98);
   border-right: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.public-design-editor__client-aside--collapsed .public-design-editor__client-aside-rail {
+  border-right: 0;
+}
+
+.public-design-editor__client-aside-collapse {
+  margin-bottom: 4px;
+  color: #2563eb;
+  background: #ffffff;
+  border-color: rgba(37, 99, 235, 0.16);
+}
+
+.public-design-editor__client-aside-collapse .public-design-editor__client-aside-rail-icon {
+  font-size: 24px;
+  font-weight: 950;
+  line-height: 1;
 }
 
 .public-design-editor__client-aside-rail-btn {
