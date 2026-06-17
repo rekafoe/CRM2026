@@ -40,6 +40,58 @@ function deepCloneFabricJson(value: Record<string, unknown>): Record<string, unk
   }
 }
 
+function getFabricJsonObjects(value: Record<string, unknown> | null): Record<string, unknown>[] {
+  if (!value || !Array.isArray(value.objects)) return [];
+  return value.objects.filter(
+    (obj): obj is Record<string, unknown> => !!obj && typeof obj === 'object' && !Array.isArray(obj),
+  );
+}
+
+function shiftSerializedLeft(obj: Record<string, unknown>, delta: number): void {
+  const current = typeof obj.left === 'number' ? obj.left : Number(obj.left ?? 0);
+  obj.left = (Number.isFinite(current) ? current : 0) + delta;
+}
+
+function normalizeSerializedBackgroundObject(obj: Record<string, unknown>, pageW: number, pageH: number): void {
+  if (obj.isBackground !== true) return;
+  obj.selectable = false;
+  obj.evented = false;
+  if (obj.backgroundFit !== 'page') return;
+  const width = Math.max(Number(obj.width) || pageW, 1);
+  const height = Math.max(Number(obj.height) || pageH, 1);
+  obj.left = 0;
+  obj.top = 0;
+  obj.scaleX = pageW / width;
+  obj.scaleY = pageH / height;
+}
+
+function buildSpreadMergedFabricJson(input: {
+  leftPage: DesignPage | undefined;
+  rightPage: DesignPage | undefined;
+  pageW: number;
+  pageH: number;
+}): Record<string, unknown> | null {
+  const leftRoot = normalizeFabricJsonRoot(input.leftPage?.fabricJSON);
+  const rightRoot = normalizeFabricJsonRoot(input.rightPage?.fabricJSON);
+  const leftObjects = getFabricJsonObjects(leftRoot).map((obj) => {
+    const next = deepCloneFabricJson(obj);
+    normalizeSerializedBackgroundObject(next, input.pageW, input.pageH);
+    return next;
+  });
+  const rightObjects = getFabricJsonObjects(rightRoot).map((obj) => {
+    const next = deepCloneFabricJson(obj);
+    normalizeSerializedBackgroundObject(next, input.pageW, input.pageH);
+    shiftSerializedLeft(next, input.pageW);
+    return next;
+  });
+  if (leftObjects.length === 0 && rightObjects.length === 0) return null;
+  return {
+    ...(leftRoot ?? rightRoot ?? {}),
+    objects: [...leftObjects, ...rightObjects],
+    backgroundColor: 'white',
+  };
+}
+
 function resolvePreviewUrl(template: DesignTemplate | null, apiBaseUrl: string): string | null {
   if (!template?.preview_url) return null;
   if (template.preview_url.startsWith('http')) return template.preview_url;
@@ -158,6 +210,25 @@ export async function loadSpreadMergedScene(input: {
   apiBaseUrl: string;
 }): Promise<void> {
   const { canvas, leftPage, rightPage, leftPageIndex, rightPageIndex, pageW, pageH, template, apiBaseUrl } = input;
+  const mergedJson = buildSpreadMergedFabricJson({ leftPage, rightPage, pageW, pageH });
+  if (mergedJson) {
+    canvas.clear();
+    canvas.setDimensions({ width: pageW * 2, height: pageH });
+    (canvas as unknown as AnyObj).backgroundColor = 'white';
+    try {
+      await canvas.loadFromJSON(mergedJson, fabricDeserializeReviver);
+      ensureWhiteCanvasBackground(canvas);
+      await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
+      canvas.renderAll();
+      canvas.requestRenderAll();
+      return;
+    } catch {
+      canvas.clear();
+      canvas.setDimensions({ width: pageW * 2, height: pageH });
+      (canvas as unknown as AnyObj).backgroundColor = 'white';
+    }
+  }
+
   const leftTempEl = document.createElement('canvas');
   const rightTempEl = document.createElement('canvas');
   const leftTemp = new Canvas(leftTempEl, {

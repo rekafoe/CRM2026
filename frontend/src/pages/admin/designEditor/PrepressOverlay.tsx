@@ -46,11 +46,13 @@ export const PrepressOverlay: React.FC<PrepressOverlayProps> = ({
   const shouldShowBleed = showBleed && bleedPx > 0;
   const shouldShowSafeZone = showSafeZone && safeZonePx > 0;
   const shouldShowSpreadSeamWarning = isSpreadView && pageWidthPx > 0 && pageHeightPx > 0;
-  const seamWarningWidth = Math.max(18, Math.min(48, safeZonePx > 0 ? safeZonePx * 1.4 : 24));
-  const seamLabelY = Math.min(
-    Math.max(42, safeZonePx + 24),
-    Math.max(42, pageHeightPx - 24),
-  );
+  const seamWarningWidth = Math.max(28, Math.min(72, safeZonePx > 0 ? safeZonePx * 2 : 36));
+  const safeLabelY = Math.max(32, Math.min(safeZonePx + 18, pageHeightPx - 32));
+  const pageSafeLabelWidth = Math.max(120, Math.min(pageWidthPx - 24, 430));
+  const spreadSafeLabelWidth = Math.max(180, Math.min(canvasWidthPx - 32, 720));
+  const safeLabelBoxHeight = 38;
+  const seamLabelY = pageHeightPx / 2;
+  const seamLabelLength = Math.max(160, Math.min(pageHeightPx - 48, 560));
 
   return (
     <svg
@@ -119,17 +121,52 @@ export const PrepressOverlay: React.FC<PrepressOverlayProps> = ({
                 width={Math.max(1, pageWidthPx - safeZonePx * 2)}
                 height={Math.max(1, pageHeightPx - safeZonePx * 2)}
               />
-              <text
-                className="prepress-overlay__label"
-                x={pageX + pageWidthPx / 2}
-                y={Math.max(16, safeZonePx / 2)}
-              >
-                Не размещайте важные элементы за красной линией
-              </text>
+              {!isSpreadView && (
+                <rect
+                  className="prepress-overlay__label-bg"
+                  x={pageX + pageWidthPx / 2 - pageSafeLabelWidth / 2}
+                  y={safeLabelY - safeLabelBoxHeight / 2}
+                  width={pageSafeLabelWidth}
+                  height={safeLabelBoxHeight}
+                  rx={safeLabelBoxHeight / 2}
+                />
+              )}
+              {!isSpreadView && (
+                <text
+                  className="prepress-overlay__label"
+                  x={pageX + pageWidthPx / 2}
+                  y={safeLabelY}
+                  textLength={pageSafeLabelWidth - 24}
+                  lengthAdjust="spacingAndGlyphs"
+                >
+                  Обрезка: важное держите внутри красной линии
+                </text>
+              )}
             </>
           )}
         </g>
       ))}
+      {shouldShowSafeZone && isSpreadView && (
+        <>
+          <rect
+            className="prepress-overlay__label-bg"
+            x={canvasWidthPx / 2 - spreadSafeLabelWidth / 2}
+            y={safeLabelY - safeLabelBoxHeight / 2}
+            width={spreadSafeLabelWidth}
+            height={safeLabelBoxHeight}
+            rx={safeLabelBoxHeight / 2}
+          />
+          <text
+            className="prepress-overlay__label prepress-overlay__label--spread"
+            x={canvasWidthPx / 2}
+            y={safeLabelY}
+            textLength={spreadSafeLabelWidth - 32}
+            lengthAdjust="spacingAndGlyphs"
+          >
+            Обрезка: важные элементы держите внутри красной линии
+          </text>
+        </>
+      )}
       {shouldShowSpreadSeamWarning && (
         <g className="prepress-overlay__spread-seam">
           <rect
@@ -164,6 +201,9 @@ export const PrepressOverlay: React.FC<PrepressOverlayProps> = ({
             className="prepress-overlay__spread-seam-label"
             x={pageWidthPx}
             y={seamLabelY}
+            transform={`rotate(-90 ${pageWidthPx} ${seamLabelY})`}
+            textLength={seamLabelLength}
+            lengthAdjust="spacingAndGlyphs"
           >
             Стык страниц: не размещайте текст и фото
           </text>
