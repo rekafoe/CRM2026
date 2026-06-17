@@ -49,6 +49,7 @@ import {
   rememberPageThumbnail,
 } from '../../pages/admin/designEditor/designPageThumbnailCache';
 import { findStripItemForPage } from '../../pages/admin/designEditor/spreadUtils';
+import type { PublicDesignPageCountLimits } from './usePublicDesignPageActions';
 import { onDesignFontsReady } from '../../utils/loadDesignFonts';
 import { usePublicDesignThumbnailPrefetch } from './usePublicDesignThumbnailPrefetch';
 import { useSpreadLayoutNormalize } from './useSpreadLayoutNormalize';
@@ -76,6 +77,22 @@ const DEFAULT_VIEW_OPTIONS: EditorViewOptions = {
   showSafeZone: true,
 };
 
+function canApplyPageCount(
+  count: number,
+  limits: PublicDesignPageCountLimits | undefined,
+  minimumPageCount: number,
+): boolean {
+  const next = Math.floor(Number(count));
+  if (!Number.isFinite(next) || next < 1) return false;
+  const min = Math.max(minimumPageCount, Math.floor(Number(limits?.min) || 0));
+  if (next < min) return false;
+  const max = Math.floor(Number(limits?.max) || 0);
+  if (max > 0 && next > max) return false;
+  const step = Math.floor(Number(limits?.step) || 0);
+  if (step > 1 && next % step !== 0) return false;
+  return true;
+}
+
 interface PublicDesignEditorProps {
   templateId: number;
   initialDraftToken?: string | null;
@@ -85,6 +102,9 @@ interface PublicDesignEditorProps {
   showFinalizeButton?: boolean;
   documentMode?: PublicDesignDocumentMode;
   onReadyForCart?: (draftToken: string) => void;
+  selectedParams?: Record<string, unknown>;
+  pageCountLimits?: PublicDesignPageCountLimits;
+  onPageCountChange?: (pageCount: number) => void;
 }
 
 export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
@@ -96,6 +116,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   showFinalizeButton = false,
   documentMode = 'single',
   onReadyForCart,
+  selectedParams,
+  pageCountLimits,
+  onPageCountChange,
 }) => {
   const bootstrapKey = `${documentMode}:${templateId}`;
   const bootstrapDraftTokenRef = useRef<{ key: string; token: string | null } | null>(null);
@@ -119,7 +142,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const [guides, setGuides] = useState<GuideLine[]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
-  const [zoom, setZoom] = useState(1);
   const [pageTransitionBusy, setPageTransitionBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle');
@@ -247,6 +269,21 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     () => buildPublicDesignPageStatuses(pageSpec.pageCount, preflight),
     [pageSpec.pageCount, preflight],
   );
+  const canAddSinglePage = useMemo(() => canApplyPageCount(pageSpec.pageCount + 1, pageCountLimits, minimumPageCount), [
+    minimumPageCount,
+    pageCountLimits,
+    pageSpec.pageCount,
+  ]);
+  const canAddSpread = useMemo(() => canApplyPageCount(pageSpec.pageCount + 2, pageCountLimits, minimumPageCount), [
+    minimumPageCount,
+    pageCountLimits,
+    pageSpec.pageCount,
+  ]);
+  const canDeleteSinglePage = useMemo(() => canApplyPageCount(pageSpec.pageCount - 1, pageCountLimits, minimumPageCount), [
+    minimumPageCount,
+    pageCountLimits,
+    pageSpec.pageCount,
+  ]);
 
   const visibleShowBleed = prepressConfig.showBleed && viewOptions.showBleed && viewOptions.showGuides;
   const visibleShowTrim = prepressConfig.showTrim && viewOptions.showTrim && viewOptions.showGuides;
@@ -294,6 +331,11 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     }, 500);
     return () => window.clearTimeout(timer);
   }, [loading]);
+
+  useEffect(() => {
+    if (loading || documentMode !== 'multipage') return;
+    onPageCountChange?.(pageSpec.pageCount);
+  }, [documentMode, loading, onPageCountChange, pageSpec.pageCount]);
 
   const thumbnailCacheScope = useMemo(() => {
     if (!template) return null;
@@ -456,7 +498,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setGuides([]);
     setCanUndo(false);
     setCanRedo(false);
-    setZoom(1);
   }, [bootstrapDraftToken, documentMode, templateId]);
 
   useEffect(() => {
@@ -509,6 +550,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setPrepressConfig,
     onDraftTokenChange,
     onReadyForCart,
+    selectedParams,
   });
 
   const {
@@ -559,6 +601,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setPageSpec,
     setThumbnails,
     markDirty,
+    pageCountLimits,
+    onPageCountRejected: setError,
   });
 
   commitCanvasToPagesRef.current = () => {
@@ -683,19 +727,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       ? 'Стороны'
       : 'Страница';
   const showOrganizationLogo = organizationLogoUrl && !organizationLogoError;
-  const handleZoomIn = useCallback(() => {
-    const handle = canvasHandleRef.current;
-    if (!handle) return;
-    handle.setZoom(handle.getZoom() * 1.15);
-  }, []);
-  const handleZoomOut = useCallback(() => {
-    const handle = canvasHandleRef.current;
-    if (!handle) return;
-    handle.setZoom(handle.getZoom() / 1.15);
-  }, []);
-  const handleZoomReset = useCallback(() => {
-    canvasHandleRef.current?.setZoom(1);
-  }, []);
 
   const missingPhotoCount = Math.max(0, fragmentPreflight.photoTotal - fragmentPreflight.photoReady);
   const missingTextCount = Math.max(0, fragmentPreflight.textTotal - fragmentPreflight.textReady);
@@ -750,14 +781,14 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       thumbH={sceneGeometry.pageHeightPx}
       pageWidth={pageSpec.pageWidth}
       pageHeight={pageSpec.pageHeight}
-      zoom={zoom}
+      zoom={1}
       spreadMode={editorSpreadMode}
       collapsed={isMobile ? false : stripCollapsed}
       pageStatuses={pageStatuses}
       showWhenSingle
-      canAddPages={documentMode === 'multipage' || pageSpec.pageCount > 1}
-      canAddSpread={documentMode === 'multipage' && !isMobile}
-      canDeletePages={(documentMode === 'multipage' || pageSpec.pageCount > 1) && pageSpec.pageCount > minimumPageCount}
+      canAddPages={(documentMode === 'multipage' || pageSpec.pageCount > 1) && canAddSinglePage}
+      canAddSpread={documentMode === 'multipage' && !isMobile && canAddSpread}
+      canDeletePages={(documentMode === 'multipage' || pageSpec.pageCount > 1) && pageSpec.pageCount > minimumPageCount && canDeleteSinglePage}
       titleLabel="Страницы"
       appearance="client"
       showInfoLine={false}
@@ -850,7 +881,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
         history={{
           canUndo,
           canRedo,
-          zoom,
         }}
         toolsSlot={(
           <PublicDesignAdvancedTools
@@ -889,16 +919,13 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           onGuidesChange: setGuides,
           onUndo: () => canvasHandleRef.current?.undo(),
           onRedo: () => canvasHandleRef.current?.redo(),
-          onZoomOut: handleZoomOut,
-          onZoomIn: handleZoomIn,
-          onZoomReset: handleZoomReset,
           onSelectionChange: setSelectedObj,
           onHistoryChange: (u, r) => {
             setCanUndo(u);
             setCanRedo(r);
             if (u || r) markDirty();
           },
-          onZoomChange: setZoom,
+          onZoomChange: () => undefined,
           onPageThumbReady: handlePageThumbReady,
           onTextFloatingAnchor: isMobile ? undefined : setTextFloatingAnchor,
           onTextFillHint: handleTextFillHint,
@@ -992,7 +1019,10 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
         {!isMobile ? (
           <div className="public-design-editor__main-column">
             {canvasStageColumn}
-            <footer className="public-design-editor__page-chrome" aria-label="Навигация по макету">
+            <footer
+              className={`public-design-editor__page-chrome public-design-editor__page-chrome--${stripCollapsed ? 'collapsed' : 'expanded'}`}
+              aria-label="Навигация по макету"
+            >
               {pageNavigator}
             </footer>
           </div>

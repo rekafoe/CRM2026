@@ -152,7 +152,6 @@ export const DesignEditorPage: React.FC = () => {
   const [textFloatingAnchor, setTextFloatingAnchor] = useState<{ x: number; y: number } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
-  const [zoom, setZoom] = useState(1);
 
   // ── Thumbnails (pageIndex → data URL) ──────────────────────────────────────
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
@@ -1111,7 +1110,6 @@ export const DesignEditorPage: React.FC = () => {
             history={{
               canUndo,
               canRedo,
-              zoom,
             }}
             assets={{
               sidebarPhotos,
@@ -1140,9 +1138,6 @@ export const DesignEditorPage: React.FC = () => {
               onGuidesChange: setGuides,
               onUndo: () => activeCanvas()?.undo(),
               onRedo: () => activeCanvas()?.redo(),
-              onZoomOut: () => { const c = activeCanvas(); c?.setZoom((c.getZoom() / 1.2)); },
-              onZoomIn: () => { const c = activeCanvas(); c?.setZoom((c.getZoom() * 1.2)); },
-              onZoomReset: () => activeCanvas()?.setZoom(1),
               onSelectionChange: setSelectedObj,
               onHistoryChange: (u, r) => {
                 setCanUndo(u);
@@ -1150,7 +1145,7 @@ export const DesignEditorPage: React.FC = () => {
                 if (u) markDirty();
               },
               resolveImageFileUrl,
-              onZoomChange: setZoom,
+              onZoomChange: () => undefined,
               onPageThumbReady: handlePageThumbReady,
               onDropRemoteImageUrl: handleImageUrlSubmit,
               onSidebarPhotoDropped: removeSidebarPhoto,
@@ -1168,7 +1163,7 @@ export const DesignEditorPage: React.FC = () => {
             thumbH={pageH}
             pageWidth={pageWidth}
             pageHeight={pageHeight}
-            zoom={zoom}
+            zoom={1}
             spreadMode={spreadMode}
             collapsed={stripCollapsed}
             canAddPages

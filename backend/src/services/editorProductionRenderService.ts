@@ -252,14 +252,14 @@ function assertHealthyPixelStats(stats: ProductionPixelStats, pageLabel: string)
   if (stats.sampledPixels <= 0) {
     throw new Error(`${pageLabel}: production render did not produce pixels`)
   }
-  if (stats.uniqueColorSamples <= 1) {
-    throw new Error(`${pageLabel}: production render is a single-color page`)
-  }
   if (stats.nonWhiteRatio < 0.0001) {
     throw new Error(`${pageLabel}: production render is almost fully white`)
   }
   if (stats.nonBlackRatio < 0.0001) {
     throw new Error(`${pageLabel}: production render is almost fully black`)
+  }
+  if (stats.uniqueColorSamples <= 1) {
+    throw new Error(`${pageLabel}: production render is a single-color page`)
   }
 }
 
@@ -636,22 +636,29 @@ async function renderFabricPageToPng(
           ctx.restore()
         }
 
-        const sampleCtx = ctx
-        const stepX = Math.max(1, Math.floor(sheet.width / 80))
-        const stepY = Math.max(1, Math.floor(sheet.height / 80))
+        const sampleCanvas = document.createElement('canvas')
+        sampleCanvas.width = Math.min(180, sheet.width)
+        sampleCanvas.height = Math.min(180, sheet.height)
+        const sampleCtx = sampleCanvas.getContext('2d')
+        if (!sampleCtx) throw new Error('Unable to create production sample canvas')
+        sampleCtx.imageSmoothingEnabled = true
+        sampleCtx.imageSmoothingQuality = 'high'
+        sampleCtx.drawImage(sheet, 0, 0, sampleCanvas.width, sampleCanvas.height)
+        const sample = sampleCtx.getImageData(0, 0, sampleCanvas.width, sampleCanvas.height).data
         let sampledPixels = 0
         let nonWhite = 0
         let nonBlack = 0
         const unique = new Set<string>()
-        for (let y = 0; y < sheet.height; y += stepY) {
-          for (let x = 0; x < sheet.width; x += stepX) {
-            const [r, g, b, a] = sampleCtx.getImageData(x, y, 1, 1).data
-            if (a === 0) continue
-            sampledPixels += 1
-            if (!(r > 248 && g > 248 && b > 248)) nonWhite += 1
-            if (!(r < 7 && g < 7 && b < 7)) nonBlack += 1
-            unique.add(`${r >> 4},${g >> 4},${b >> 4},${a >> 6}`)
-          }
+        for (let i = 0; i < sample.length; i += 4) {
+          const r = sample[i]
+          const g = sample[i + 1]
+          const b = sample[i + 2]
+          const a = sample[i + 3]
+          if (a === 0) continue
+          sampledPixels += 1
+          if (!(r > 248 && g > 248 && b > 248)) nonWhite += 1
+          if (!(r < 7 && g < 7 && b < 7)) nonBlack += 1
+          unique.add(`${r >> 4},${g >> 4},${b >> 4},${a >> 6}`)
         }
 
         return {

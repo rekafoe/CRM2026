@@ -13,6 +13,7 @@ export interface SubtypeDesignRow {
   description: string | null
   category: string | null
   preview_url: string | null
+  site_preview_url: string | null
   spec: string | null
   is_active: number
 }
@@ -55,7 +56,7 @@ export async function getSubtypeDesigns(
     return db.all<SubtypeDesignRow[]>(
       `SELECT
          psd.id, psd.product_id, psd.type_id, psd.size_id, psd.design_template_id, psd.sort_order, psd.created_at,
-         dt.name, dt.description, dt.category, dt.preview_url, dt.spec, dt.is_active
+         dt.name, dt.description, dt.category, dt.preview_url, dt.site_preview_url, dt.spec, dt.is_active
        FROM product_subtype_designs psd
        JOIN design_templates dt ON dt.id = psd.design_template_id
        WHERE psd.product_id = ? AND psd.type_id = ? AND psd.size_id = ?
@@ -68,7 +69,7 @@ export async function getSubtypeDesigns(
   return db.all<SubtypeDesignRow[]>(
     `SELECT
        psd.id, psd.product_id, psd.type_id, psd.size_id, psd.design_template_id, psd.sort_order, psd.created_at,
-       dt.name, dt.description, dt.category, dt.preview_url, dt.spec, dt.is_active
+       dt.name, dt.description, dt.category, dt.preview_url, dt.site_preview_url, dt.spec, dt.is_active
      FROM product_subtype_designs psd
      JOIN design_templates dt ON dt.id = psd.design_template_id
      WHERE psd.product_id = ? AND psd.type_id = ?
@@ -114,7 +115,7 @@ export async function addSubtypeDesign(
   const row = await db.get<SubtypeDesignRow>(
     `SELECT
        psd.id, psd.product_id, psd.type_id, psd.size_id, psd.design_template_id, psd.sort_order, psd.created_at,
-       dt.name, dt.description, dt.category, dt.preview_url, dt.spec, dt.is_active
+       dt.name, dt.description, dt.category, dt.preview_url, dt.site_preview_url, dt.spec, dt.is_active
      FROM product_subtype_designs psd
      JOIN design_templates dt ON dt.id = psd.design_template_id
      WHERE psd.id = ?`,

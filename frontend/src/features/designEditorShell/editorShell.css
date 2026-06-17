@@ -6,7 +6,6 @@
   --pc-card: rgba(255, 255, 255, 0.94);
   --pc-cyan: #00a6d6;
   --pc-blue: #2563eb;
-  --pc-orange: #f97316;
   --pc-green: #16a34a;
   --pc-shadow: 0 24px 70px rgba(2, 8, 23, 0.14);
   display: grid;
@@ -101,9 +100,37 @@
 
 .public-design-editor__title {
   justify-self: center;
+  width: min(100%, 620px);
   min-width: 0;
   padding: 0 16px;
   text-align: center;
+}
+
+.public-design-editor__title-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.public-design-editor__title-main .public-design-editor__eyebrow {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.public-design-editor__title-main .public-design-editor__eyebrow::after {
+  content: '·';
+  margin-left: 8px;
+  color: var(--pc-muted);
+  opacity: 0.65;
+}
+
+.public-design-editor__title-main h1 {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
 }
 
 .public-design-editor__eyebrow {
@@ -241,9 +268,9 @@
 }
 
 .public-design-editor__top-actions .btn-primary {
-  background: linear-gradient(135deg, var(--pc-orange), #fb923c) !important;
-  border-color: rgba(251, 146, 60, 0.7) !important;
-  box-shadow: 0 16px 34px rgba(249, 115, 22, 0.32);
+  background: linear-gradient(135deg, var(--pc-cyan), var(--pc-blue)) !important;
+  border-color: rgba(37, 99, 235, 0.7) !important;
+  box-shadow: 0 16px 34px rgba(37, 99, 235, 0.28);
 }
 
 .public-design-editor__top-actions .btn-secondary {
@@ -366,19 +393,6 @@
   text-overflow: ellipsis;
 }
 
-.public-design-editor__zoom-value {
-  min-width: 56px;
-  min-height: 30px;
-  padding: 5px 8px;
-  color: var(--pc-ink-soft);
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 999px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
-}
-
 .public-design-editor__scroll {
   position: relative;
   isolation: isolate;
@@ -391,18 +405,46 @@
   background-size: 40px 40px;
 }
 
-.public-design-editor__stage-logo {
+.public-design-editor__stage-watermark {
   position: absolute;
-  right: 42px;
-  bottom: 34px;
-  z-index: 2;
-  width: min(36vw, 460px);
-  max-height: 48%;
-  object-fit: contain;
-  opacity: 0.18;
-  filter: grayscale(1);
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
   pointer-events: none;
   user-select: none;
+}
+
+.public-design-editor__stage-logo {
+  position: absolute;
+  width: clamp(120px, 16vw, 240px);
+  max-height: 24%;
+  object-fit: contain;
+  opacity: 0.055;
+  filter: grayscale(1);
+  transform: rotate(-10deg);
+  pointer-events: none;
+  user-select: none;
+}
+
+.public-design-editor__stage-logo--primary {
+  right: 7%;
+  bottom: 8%;
+}
+
+.public-design-editor__stage-logo--secondary {
+  top: 14%;
+  left: 8%;
+  width: clamp(96px, 12vw, 180px);
+  opacity: 0.04;
+  transform: rotate(-10deg) scale(0.9);
+}
+
+.public-design-editor__stage-logo--tertiary {
+  right: 28%;
+  top: 46%;
+  width: clamp(88px, 10vw, 150px);
+  opacity: 0.032;
+  transform: rotate(-10deg) scale(0.8);
 }
 
 .public-design-editor__scroll .design-editor-viewport {

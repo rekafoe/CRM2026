@@ -78,6 +78,18 @@ function parseCategoryFields(body: Record<string, unknown>): Pick<DesignTemplate
   return out
 }
 
+function hasOwn(body: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(body, key)
+}
+
+function parseOptionalUrlField(body: Record<string, unknown>, key: string): string | null | undefined {
+  if (!hasOwn(body, key)) return undefined
+  const value = body[key]
+  if (value == null) return null
+  const trimmed = String(value).trim()
+  return trimmed ? trimmed : null
+}
+
 /**
  * @swagger
  * /api/design-templates/public/categories:
@@ -110,7 +122,7 @@ router.get('/public/categories', asyncHandler(async (_req: Request, res: Respons
  *     description: |
  *       Фильтрация по productId и typeId обязательна для галереи подтипа.
  *       Без typeId вернётся весь активный каталог — не использовать на экране галереи.
- *       spec — JSON-строка; для сетки достаточно preview_url, designState — в GET /public/{id}.
+ *       spec — JSON-строка; для сетки достаточно site_preview_url/preview_url, designState — в GET /public/{id}.
  *     tags: [Client Editor, Website Catalog]
  *     security: []
  *     parameters:
@@ -416,7 +428,8 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     name: String(body.name || '').trim(),
     description: body.description != null ? String(body.description) : undefined,
     ...categoryFields,
-    preview_url: body.preview_url != null ? String(body.preview_url) : undefined,
+    preview_url: parseOptionalUrlField(body, 'preview_url'),
+    site_preview_url: parseOptionalUrlField(body, 'site_preview_url'),
     spec: body.spec != null
       ? (typeof body.spec === 'string' ? JSON.parse(body.spec) : (body.spec as object))
       : undefined,
@@ -518,7 +531,10 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     res.status(400).json({ message: (err as Error).message })
     return
   }
-  if (body.preview_url != null) input.preview_url = String(body.preview_url)
+  const previewUrl = parseOptionalUrlField(body, 'preview_url')
+  const sitePreviewUrl = parseOptionalUrlField(body, 'site_preview_url')
+  if (previewUrl !== undefined) input.preview_url = previewUrl
+  if (sitePreviewUrl !== undefined) input.site_preview_url = sitePreviewUrl
   if (body.spec != null) {
     const spec = typeof body.spec === 'string' ? JSON.parse(body.spec) : (body.spec as object)
     if (hasBlobUrl(spec)) {

@@ -63,7 +63,6 @@ export interface EditorCanvasViewState {
 export interface EditorCanvasHistoryState {
   canUndo: boolean;
   canRedo: boolean;
-  zoom: number;
 }
 
 export interface EditorCanvasAssets {
@@ -78,9 +77,6 @@ export interface EditorCanvasHandlers {
   onGuidesChange: (guides: GuideLine[]) => void;
   onUndo: () => void;
   onRedo: () => void;
-  onZoomOut: () => void;
-  onZoomIn: () => void;
-  onZoomReset: () => void;
   onSelectionChange: Parameters<typeof DesignEditorCanvas>[0]['onSelectionChange'];
   onHistoryChange: Parameters<typeof DesignEditorCanvas>[0]['onHistoryChange'];
   onZoomChange: Parameters<typeof DesignEditorCanvas>[0]['onZoomChange'];
@@ -146,15 +142,11 @@ export const EditorCanvasStage: React.FC<EditorCanvasStageProps> = ({
       issueCount={fragment.issueCount ?? 0}
       canUndo={history.canUndo}
       canRedo={history.canRedo}
-      zoom={history.zoom}
       viewOptions={view.viewOptions}
       toolsSlot={toolsSlot}
       onViewOptionsChange={handlers.onViewOptionsChange}
       onUndo={handlers.onUndo}
       onRedo={handlers.onRedo}
-      onZoomOut={handlers.onZoomOut}
-      onZoomIn={handlers.onZoomIn}
-      onZoomReset={handlers.onZoomReset}
     />
     {textToolbarSlot}
     {guideSlot}

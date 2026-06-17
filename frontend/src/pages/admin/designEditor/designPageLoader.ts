@@ -158,21 +158,57 @@ export async function loadSpreadMergedScene(input: {
   apiBaseUrl: string;
 }): Promise<void> {
   const { canvas, leftPage, rightPage, leftPageIndex, rightPageIndex, pageW, pageH, template, apiBaseUrl } = input;
-  await loadDesignPageScene({ canvas, pageData: leftPage, pageIndex: leftPageIndex, template, pageW, pageH, apiBaseUrl });
-  const tempEl = document.createElement('canvas');
-  const temp = new Canvas(tempEl, {
+  const leftTempEl = document.createElement('canvas');
+  const rightTempEl = document.createElement('canvas');
+  const leftTemp = new Canvas(leftTempEl, {
     width: pageW,
     height: pageH,
     backgroundColor: 'white',
     preserveObjectStacking: true,
   });
-  await loadDesignPageScene({ canvas: temp, pageData: rightPage, pageIndex: rightPageIndex, template, pageW, pageH, apiBaseUrl });
-  for (const obj of [...temp.getObjects()]) {
-    const clone = await obj.clone();
-    clone.set({ left: (clone.left ?? 0) + pageW });
-    canvas.add(clone);
+  const rightTemp = new Canvas(rightTempEl, {
+    width: pageW,
+    height: pageH,
+    backgroundColor: 'white',
+    preserveObjectStacking: true,
+  });
+
+  try {
+    await Promise.all([
+      loadDesignPageScene({ canvas: leftTemp, pageData: leftPage, pageIndex: leftPageIndex, template, pageW, pageH, apiBaseUrl }),
+      loadDesignPageScene({ canvas: rightTemp, pageData: rightPage, pageIndex: rightPageIndex, template, pageW, pageH, apiBaseUrl }),
+    ]);
+
+    canvas.clear();
+    canvas.setDimensions({ width: pageW * 2, height: pageH });
+    (canvas as unknown as AnyObj).backgroundColor = 'white';
+
+    for (const obj of [...leftTemp.getObjects()]) {
+      try {
+        const clone = await obj.clone();
+        clone.set({ left: clone.left ?? 0 });
+        canvas.add(clone);
+      } catch (error) {
+        if (import.meta.env.DEV) console.warn('[DesignEditorCanvas] skipped left spread object clone', error);
+      }
+    }
+
+    for (const obj of [...rightTemp.getObjects()]) {
+      try {
+        const clone = await obj.clone();
+        clone.set({ left: (clone.left ?? 0) + pageW });
+        canvas.add(clone);
+      } catch (error) {
+        if (import.meta.env.DEV) console.warn('[DesignEditorCanvas] skipped right spread object clone', error);
+      }
+    }
+  } finally {
+    leftTemp.dispose();
+    rightTemp.dispose();
   }
-  temp.dispose();
+
+  ensureWhiteCanvasBackground(canvas);
+  canvas.renderAll();
   canvas.requestRenderAll();
 }
 

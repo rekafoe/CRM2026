@@ -2090,12 +2090,47 @@
 }
 
 .prepress-overlay__label {
-  fill: rgba(185, 28, 28, 0.82);
+  fill: rgba(153, 27, 27, 0.96);
   font-family: sans-serif;
-  font-size: 9px;
+  font-size: 15px;
+  font-weight: 800;
   text-anchor: middle;
   dominant-baseline: middle;
   letter-spacing: 0.01em;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-linejoin: round;
+  stroke-width: 4px;
+}
+
+.prepress-overlay__spread-seam-band {
+  fill: rgba(220, 38, 38, 0.16);
+}
+
+.prepress-overlay__spread-seam-guide {
+  stroke: rgba(220, 38, 38, 0.45);
+  stroke-width: 0.7;
+  stroke-dasharray: 4 4;
+}
+
+.prepress-overlay__spread-seam-line {
+  stroke: rgba(185, 28, 28, 0.92);
+  stroke-width: 1.2;
+  stroke-dasharray: 8 5;
+}
+
+.prepress-overlay__spread-seam-label {
+  fill: rgba(153, 27, 27, 0.98);
+  font-family: sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  letter-spacing: 0.01em;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-linejoin: round;
+  stroke-width: 4px;
 }
 
 /* ── Toolbar additions ── */
@@ -2185,29 +2220,6 @@
 .design-editor-align-group {
   display: flex;
   gap: 2px;
-}
-
-.design-editor-zoom-group {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.design-editor-zoom-label {
-  padding: 4px 8px;
-  font-size: 12px;
-  min-width: 46px;
-  text-align: center;
-  border: none;
-  background: #fff;
-  cursor: pointer;
-  color: var(--text-secondary, #6b7280);
-}
-.design-editor-zoom-label:hover {
-  background: var(--bg-hover, #f3f4f6);
 }
 
 /* ── Panel styles ── */

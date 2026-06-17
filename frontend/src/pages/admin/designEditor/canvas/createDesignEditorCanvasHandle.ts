@@ -672,10 +672,10 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
       captureThumb: () =>
         d.fabricRef.current?.toDataURL({ format: 'jpeg', multiplier: 0.14, quality: 0.7 }) ?? '',
       getZoom: () => d.fabricRef.current?.getZoom() ?? 1,
-      setZoom: (z: number) => {
+      setZoom: () => {
         const canvas = d.fabricRef.current;
         if (!canvas) return;
-        canvas.setZoom(Math.min(Math.max(z, 0.1), 10));
+        canvas.setZoom(1);
         d.onZoomChange(canvas.getZoom());
         if (d.modeRef.current === 'basic') {
           applyBasicModeConstraints(canvas, d.selectionDisplayScaleRef.current);

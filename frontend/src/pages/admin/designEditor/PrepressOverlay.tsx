@@ -45,6 +45,12 @@ export const PrepressOverlay: React.FC<PrepressOverlayProps> = ({
   const pageOffsets = isSpreadView ? [0, pageWidthPx] : [0];
   const shouldShowBleed = showBleed && bleedPx > 0;
   const shouldShowSafeZone = showSafeZone && safeZonePx > 0;
+  const shouldShowSpreadSeamWarning = isSpreadView && pageWidthPx > 0 && pageHeightPx > 0;
+  const seamWarningWidth = Math.max(18, Math.min(48, safeZonePx > 0 ? safeZonePx * 1.4 : 24));
+  const seamLabelY = Math.min(
+    Math.max(42, safeZonePx + 24),
+    Math.max(42, pageHeightPx - 24),
+  );
 
   return (
     <svg
@@ -116,14 +122,53 @@ export const PrepressOverlay: React.FC<PrepressOverlayProps> = ({
               <text
                 className="prepress-overlay__label"
                 x={pageX + pageWidthPx / 2}
-                y={Math.max(9, safeZonePx / 2)}
+                y={Math.max(16, safeZonePx / 2)}
               >
-                всё за safe zone может срезаться
+                Не размещайте важные элементы за красной линией
               </text>
             </>
           )}
         </g>
       ))}
+      {shouldShowSpreadSeamWarning && (
+        <g className="prepress-overlay__spread-seam">
+          <rect
+            className="prepress-overlay__spread-seam-band"
+            x={pageWidthPx - seamWarningWidth / 2}
+            y={0}
+            width={seamWarningWidth}
+            height={pageHeightPx}
+          />
+          <line
+            className="prepress-overlay__spread-seam-guide"
+            x1={pageWidthPx - seamWarningWidth / 2}
+            y1={0}
+            x2={pageWidthPx - seamWarningWidth / 2}
+            y2={pageHeightPx}
+          />
+          <line
+            className="prepress-overlay__spread-seam-line"
+            x1={pageWidthPx}
+            y1={0}
+            x2={pageWidthPx}
+            y2={pageHeightPx}
+          />
+          <line
+            className="prepress-overlay__spread-seam-guide"
+            x1={pageWidthPx + seamWarningWidth / 2}
+            y1={0}
+            x2={pageWidthPx + seamWarningWidth / 2}
+            y2={pageHeightPx}
+          />
+          <text
+            className="prepress-overlay__spread-seam-label"
+            x={pageWidthPx}
+            y={seamLabelY}
+          >
+            Стык страниц: не размещайте текст и фото
+          </text>
+        </g>
+      )}
     </svg>
   );
 };

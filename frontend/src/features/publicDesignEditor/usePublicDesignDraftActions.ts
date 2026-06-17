@@ -55,6 +55,7 @@ interface UsePublicDesignDraftActionsInput {
   setPrepressConfig: Dispatch<SetStateAction<DesignPrepressConfig>>;
   onDraftTokenChange?: (token: string) => void;
   onReadyForCart?: (draftToken: string) => void;
+  selectedParams?: Record<string, unknown>;
 }
 
 export function usePublicDesignDraftActions({
@@ -87,6 +88,7 @@ export function usePublicDesignDraftActions({
   setPrepressConfig,
   onDraftTokenChange,
   onReadyForCart,
+  selectedParams,
 }: UsePublicDesignDraftActionsInput) {
   const savedDirtyVersionRef = useRef(0);
   const draftVersionRef = useRef<number | null>(null);
@@ -147,8 +149,12 @@ export function usePublicDesignDraftActions({
 
   const buildCurrentDesignState = useCallback(() => {
     const updatedPages = pages;
+    const nextSelectedParams = documentMode === 'multipage'
+      ? { ...(selectedParams ?? {}), pages: pageSpec.pageCount }
+      : selectedParams;
     return {
       pages: updatedPages,
+      selectedParams: nextSelectedParams,
       designState: buildDesignState({
         templateId: String(templateId),
         pageWidth: pageSpec.pageWidth,
@@ -167,6 +173,7 @@ export function usePublicDesignDraftActions({
     pageSpec,
     pages,
     prepressConfig,
+    selectedParams,
     spreadMode,
     templateId,
   ]);
@@ -179,8 +186,9 @@ export function usePublicDesignDraftActions({
     setSaveState('saving');
     if (!silent) setStatus(null);
     const token = await ensureDraft();
-    const { pages: updatedPages, designState } = buildCurrentDesignState();
+    const { pages: updatedPages, designState, selectedParams: nextSelectedParams } = buildCurrentDesignState();
     const patch: Record<string, unknown> = { designState };
+    if (nextSelectedParams) patch.selectedParams = nextSelectedParams;
     if (!options?.skipExpectedVersion && draftVersionRef.current) {
       patch.expectedVersion = draftVersionRef.current;
     }

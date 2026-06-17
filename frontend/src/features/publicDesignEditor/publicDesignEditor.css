@@ -179,6 +179,33 @@
   font-size: 14px;
 }
 
+.public-design-editor__photo-library-upload {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 7px 12px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.public-design-editor__photo-library-upload:hover,
+.public-design-editor__photo-library-upload:focus-visible {
+  color: #ffffff;
+  background: #2563eb;
+  border-color: #2563eb;
+  outline: none;
+}
+
 .public-design-editor__photo-library-hint {
   margin: 0;
   color: var(--pc-muted);
@@ -1522,8 +1549,7 @@
 
   .public-design-editor__canvas-actions .btn-secondary,
   .public-design-editor__advanced-tab,
-  .public-design-editor__stage-hints summary,
-  .public-design-editor__zoom-value {
+  .public-design-editor__stage-hints summary {
     min-width: 42px;
     min-height: 42px;
   }

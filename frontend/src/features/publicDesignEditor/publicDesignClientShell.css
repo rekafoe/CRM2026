@@ -14,6 +14,7 @@
   --pde-page-strip-label-h: 54px;
   --pde-page-strip-item-pad: 12px;
   --pde-page-strip-safe-pad: 14px;
+  --pde-page-strip-collapsed-h: 62px;
   --pde-page-strip-h: calc(
     var(--pde-page-strip-header-h)
     + 22px
@@ -163,13 +164,29 @@
   max-width: 100%;
   min-width: 0;
   min-height: 0;
+  height: auto;
   max-height: min(var(--pde-page-strip-h), 42vh);
   margin-bottom: 2px;
   padding: 0 0 8px;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
   box-sizing: border-box;
   scrollbar-width: thin;
+}
+
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  > .public-design-editor__main-column
+  > .public-design-editor__page-chrome--collapsed {
+  flex-basis: var(--pde-page-strip-collapsed-h);
+  max-height: var(--pde-page-strip-collapsed-h);
+}
+
+.public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
+  .public-design-editor__workspace.public-design-editor__workspace--desktop
+  > .public-design-editor__main-column
+  > .public-design-editor__page-chrome--expanded {
+  flex-basis: min(var(--pde-page-strip-h), 42vh);
 }
 
 .public-design-editor.public-design-editor--client:not(.public-design-editor--mobile)
@@ -667,6 +684,8 @@
     flex-direction: column;
     height: 100%;
     height: -webkit-fill-available;
+    height: 100dvh;
+    min-height: 100dvh !important;
     max-height: 100%;
     min-height: 0 !important;
     overflow: hidden;
@@ -682,7 +701,8 @@
   }
 
   .public-design-editor--client.public-design-editor--mobile > .public-design-editor__workspace {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    height: 0;
     min-height: 0;
     overflow: hidden;
     isolation: isolate;
@@ -708,6 +728,16 @@
     min-height: 0;
     overflow: hidden;
     padding: 6px 8px 0;
+  }
+
+  .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-canvas .public-design-editor__canvas-column {
+    flex: 1 1 0;
+    min-height: min(62vh, 520px);
+  }
+
+  .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-canvas .public-design-editor__stage {
+    display: grid;
+    min-height: min(58vh, 480px);
   }
 
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__workspace--panel-canvas .public-design-editor__sidepanel {
@@ -882,7 +912,7 @@
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage > .public-design-editor__scroll {
     grid-row: 2;
     min-width: 0;
-    min-height: 0;
+    min-height: 180px;
     overflow: hidden;
   }
 
@@ -899,7 +929,7 @@
     align-items: center;
     justify-content: center;
     min-width: 0;
-    min-height: 0;
+    min-height: 180px;
     width: 100%;
     max-width: 100%;
     overflow: hidden;
@@ -1068,7 +1098,7 @@
     min-height: 20px;
     padding: 0 6px;
     color: #ffffff;
-    background: #f97316;
+    background: #2563eb;
     border-radius: 999px;
     font-size: 11px;
     font-weight: 900;
@@ -1080,10 +1110,10 @@
     min-height: 44px;
     padding: 8px 12px;
     color: #ffffff;
-    background: linear-gradient(135deg, var(--pc-orange), #fb923c);
+    background: linear-gradient(135deg, var(--pc-cyan), var(--pc-blue));
     border: 0;
     border-radius: 14px;
-    box-shadow: 0 10px 22px rgba(249, 115, 22, 0.24);
+    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.24);
     cursor: pointer;
     font: inherit;
     font-size: 12px;
@@ -1098,6 +1128,7 @@
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 }
 

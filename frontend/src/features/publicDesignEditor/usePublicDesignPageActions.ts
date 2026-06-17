@@ -16,6 +16,12 @@ export interface PublicDesignPageSpec {
   scale: number;
 }
 
+export interface PublicDesignPageCountLimits {
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
 interface UsePublicDesignPageActionsInput {
   canvasHandleRef: RefObject<DesignEditorCanvasHandle | null>;
   currentPage: number;
@@ -30,6 +36,8 @@ interface UsePublicDesignPageActionsInput {
   setPageSpec: Dispatch<SetStateAction<PublicDesignPageSpec>>;
   setThumbnails: Dispatch<SetStateAction<Record<number, string>>>;
   markDirty: () => void;
+  pageCountLimits?: PublicDesignPageCountLimits;
+  onPageCountRejected?: (message: string) => void;
 }
 
 export function usePublicDesignPageActions({
@@ -46,6 +54,8 @@ export function usePublicDesignPageActions({
   setPageSpec,
   setThumbnails,
   markDirty,
+  pageCountLimits,
+  onPageCountRejected,
 }: UsePublicDesignPageActionsInput) {
   const pageActionQueueRef = useRef(createPageActionQueue({
     getIdleSource: () => canvasHandleRef.current,
@@ -86,6 +96,33 @@ export function usePublicDesignPageActions({
     });
   }, [canvasHandleRef, enqueuePageAction, markDirty]);
 
+  const canUsePageCount = useCallback((count: number): { ok: boolean; message?: string } => {
+    const next = Math.floor(Number(count));
+    if (!Number.isFinite(next) || next < 1) {
+      return { ok: false, message: 'Некорректное количество страниц.' };
+    }
+    const min = Math.max(minimumPageCount, Math.floor(Number(pageCountLimits?.min) || 0));
+    if (next < min) {
+      return { ok: false, message: `Для этого продукта нужно не менее ${min} стр.` };
+    }
+    const maxRaw = Number(pageCountLimits?.max);
+    if (Number.isFinite(maxRaw) && maxRaw > 0 && next > Math.floor(maxRaw)) {
+      return { ok: false, message: `Для этого продукта доступно не более ${Math.floor(maxRaw)} стр.` };
+    }
+    const step = Math.floor(Number(pageCountLimits?.step) || 0);
+    if (step > 1 && next % step !== 0) {
+      return { ok: false, message: `Количество страниц должно быть кратно ${step}.` };
+    }
+    return { ok: true };
+  }, [minimumPageCount, pageCountLimits?.max, pageCountLimits?.min, pageCountLimits?.step]);
+
+  const rejectPageCount = useCallback((count: number): boolean => {
+    const check = canUsePageCount(count);
+    if (check.ok) return false;
+    onPageCountRejected?.(check.message ?? 'Недопустимое количество страниц для продукта.');
+    return true;
+  }, [canUsePageCount, onPageCountRejected]);
+
   const handleGoToPage = useCallback(async (pageIndex: number) => {
     await runNavigationTransaction(async () => {
       const currentStripItem = navigation.stripItems.find((item) => item.pages.includes(currentPage));
@@ -100,6 +137,7 @@ export function usePublicDesignPageActions({
   }, [currentPage, navigation.stripItems, runNavigationTransaction, setCurrentPage]);
 
   const handleAddClientPage = useCallback(async () => {
+    if (rejectPageCount(pageSpec.pageCount + 1)) return;
     await runNavigationTransaction(async () => {
       const nextPageIndex = pageSpec.pageCount;
       setPages((prev) => [
@@ -116,9 +154,10 @@ export function usePublicDesignPageActions({
       });
       return true;
     });
-  }, [pageSpec.pageCount, runNavigationTransaction, setCurrentPage, setPageSpec, setPages, setThumbnails]);
+  }, [pageSpec.pageCount, rejectPageCount, runNavigationTransaction, setCurrentPage, setPageSpec, setPages, setThumbnails]);
 
   const handleInsertClientPage = useCallback(async (pageIndex: number) => {
+    if (rejectPageCount(pageSpec.pageCount + 1)) return;
     await runNavigationTransaction(async () => {
       const safeIndex = Math.max(0, Math.min(pageSpec.pageCount, pageIndex));
       setPages((prev) => {
@@ -142,6 +181,7 @@ export function usePublicDesignPageActions({
     });
   }, [
     pageSpec.pageCount,
+    rejectPageCount,
     runNavigationTransaction,
     setCurrentPage,
     setPageSpec,
@@ -154,6 +194,7 @@ export function usePublicDesignPageActions({
       const { insertAt, addCount } = spreadMode && documentMode === 'multipage'
         ? buildSpreadPageInsert(pageSpec.pageCount, coverPages)
         : { insertAt: pageSpec.pageCount, addCount: 2 as const };
+      if (rejectPageCount(pageSpec.pageCount + addCount)) return false;
       setPages((prev) => {
         const normalized = Array.from(
           { length: pageSpec.pageCount },
@@ -185,6 +226,7 @@ export function usePublicDesignPageActions({
     coverPages,
     documentMode,
     pageSpec.pageCount,
+    rejectPageCount,
     runNavigationTransaction,
     setCurrentPage,
     setPageSpec,
@@ -202,6 +244,7 @@ export function usePublicDesignPageActions({
         : null;
       const removeStart = spreadRange?.start ?? pageSpec.pageCount - 1;
       const removeCount = spreadRange?.length ?? 1;
+      if (rejectPageCount(pageSpec.pageCount - removeCount)) return false;
 
       if (pageSpec.pageCount - removeCount < minimumPageCount) return false;
 
@@ -236,6 +279,7 @@ export function usePublicDesignPageActions({
     documentMode,
     minimumPageCount,
     pageSpec.pageCount,
+    rejectPageCount,
     runNavigationTransaction,
     setCurrentPage,
     setPageSpec,
@@ -246,6 +290,7 @@ export function usePublicDesignPageActions({
 
   const handleDeleteClientPage = useCallback(async (pageIndex: number) => {
     if (pageSpec.pageCount <= minimumPageCount) return;
+    if (rejectPageCount(pageSpec.pageCount - 1)) return;
     await runNavigationTransaction(async () => {
       const safeIndex = Math.max(0, Math.min(pageSpec.pageCount - 1, pageIndex));
       setPages((prev) => {
@@ -265,6 +310,7 @@ export function usePublicDesignPageActions({
   }, [
     minimumPageCount,
     pageSpec.pageCount,
+    rejectPageCount,
     runNavigationTransaction,
     setCurrentPage,
     setPageSpec,

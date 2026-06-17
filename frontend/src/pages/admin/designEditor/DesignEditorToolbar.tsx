@@ -29,11 +29,6 @@ interface DesignEditorToolbarProps {
   // Edit
   onDeleteSelected: () => void;
   onDuplicateSelected: () => void;
-  // Zoom
-  zoom: number;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onZoomReset: () => void;
   // Text formatting
   onFontChange: (fontFamily: string) => void;
   onFontSizeChange: (size: number) => void;
@@ -67,10 +62,6 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
   onRedo,
   onDeleteSelected,
   onDuplicateSelected,
-  zoom,
-  onZoomIn,
-  onZoomOut,
-  onZoomReset,
   onFontChange,
   onFontSizeChange,
   onTextColorChange,
@@ -238,36 +229,6 @@ export const DesignEditorToolbar: React.FC<DesignEditorToolbarProps> = ({
           </button>
         </div>
       )}
-
-      {/* ── Зум ── */}
-      <div className="design-editor-toolbar-group design-editor-zoom-group">
-        <button
-          type="button"
-          className="design-editor-toolbar-icon-btn"
-          onClick={onZoomOut}
-          title="Уменьшить"
-        >
-          −
-        </button>
-        <button
-          type="button"
-          className="design-editor-zoom-label"
-          onClick={onZoomReset}
-          title="Сбросить масштаб"
-        >
-          {Math.round(zoom * 100)}%
-        </button>
-        <button
-          type="button"
-          className="design-editor-toolbar-icon-btn"
-          onClick={onZoomIn}
-          title="Увеличить"
-        >
-          +
-        </button>
-      </div>
-
-      <div className="design-editor-toolbar-divider" />
 
       {/* ── Виды / экспорт ── */}
       <span title="Линия обрезки и безопасная зона">

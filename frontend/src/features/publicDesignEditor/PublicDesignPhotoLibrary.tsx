@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react';
-import { Button } from '../../components/common';
 import { AppIcon } from '../../components/ui/AppIcon';
 import { SIDEBAR_PHOTO_DRAG_MIME } from '../../pages/admin/designEditor/constants';
 import type { SidebarPhotoItem } from '../../pages/admin/designEditor/types';
@@ -63,9 +62,13 @@ export const PublicDesignPhotoLibrary: React.FC<PublicDesignPhotoLibraryProps> =
           <span>Загрузка фото</span>
           <strong>{photos.length ? `${photos.length} фото в проекте` : 'Добавьте изображения'}</strong>
         </div>
-        <Button variant="primary" size="sm" onClick={() => inputRef.current?.click()}>
+        <button
+          type="button"
+          className="public-design-editor__photo-library-upload"
+          onClick={() => inputRef.current?.click()}
+        >
           Загрузить
-        </Button>
+        </button>
       </div>
       <p className="public-design-editor__photo-library-hint">
         Перетащите файлы сюда или выберите с компьютера. Потом кликните фото или перетащите его на макет.

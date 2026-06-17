@@ -99,7 +99,7 @@ describe('editorProductionRenderService internals', () => {
       width: 100,
       height: 100,
       sampledPixels: 100,
-      nonWhiteRatio: 1,
+      nonWhiteRatio: 0.5,
       nonBlackRatio: 1,
       uniqueColorSamples: 1,
     }, 'Page 1')).toThrow(/single-color/)
@@ -146,5 +146,17 @@ describe('editorProductionRenderService internals', () => {
     expect(rendered.widthMm).toBe(34)
     expect(rendered.heightMm).toBe(24)
     expect(rendered.pixelStats.uniqueColorSamples).toBeGreaterThan(1)
+  }, 30000)
+
+  it('does not mark pages with small visible content as single-color', async () => {
+    const rendered = await __editorProductionRenderInternals.renderFabricPageToPng({
+      version: '7.4.0',
+      objects: [
+        { type: 'text', left: 12, top: 12, text: 'small', fontSize: 6, fill: '#111111' },
+      ],
+    }, new Map(), 90, 50, 0, '', 0)
+
+    expect(rendered.pixelStats.uniqueColorSamples).toBeGreaterThan(1)
+    expect(rendered.pixelStats.nonWhiteRatio).toBeGreaterThan(0)
   }, 30000)
 })

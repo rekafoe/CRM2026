@@ -224,7 +224,8 @@ const options: swaggerJsdoc.Options = {
             description: { type: 'string', nullable: true },
             category_id: { type: 'integer', nullable: true },
             category: { type: 'string', nullable: true, description: 'Имя рубрики (денормализация)' },
-            preview_url: { type: 'string', nullable: true, description: 'Превью для карточки галереи' },
+            site_preview_url: { type: 'string', nullable: true, description: 'Ручное превью для карточек сайта' },
+            preview_url: { type: 'string', nullable: true, description: 'Авто/legacy превью из импорта; fallback для сайта' },
             spec: {
               type: 'string',
               description: 'JSON-строка; внутри designState (master для редактора)',

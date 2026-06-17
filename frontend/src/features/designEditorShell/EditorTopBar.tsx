@@ -54,8 +54,10 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
     </div>
     {!compact && (
       <div className="public-design-editor__title">
-        <span className="public-design-editor__eyebrow">{documentLabel}</span>
-        <h1>{templateName}</h1>
+        <div className="public-design-editor__title-main">
+          <span className="public-design-editor__eyebrow">{documentLabel}</span>
+          <h1>{templateName}</h1>
+        </div>
       </div>
     )}
     <div className="public-design-editor__top-actions">

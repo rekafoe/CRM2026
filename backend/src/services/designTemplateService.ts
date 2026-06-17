@@ -9,6 +9,7 @@ export interface DesignTemplateRow {
   category_id: number | null
   category: string | null
   preview_url: string | null
+  site_preview_url: string | null
   spec: string | null
   is_active: number
   sort_order: number
@@ -39,7 +40,9 @@ export interface DesignTemplateInput {
   category_id?: number | null
   /** Устаревшее: имя категории (разрешается в category_id при записи) */
   category?: string
-  preview_url?: string
+  preview_url?: string | null
+  /** Управляемое превью для карточек сайта. Не перезаписывается SVG reimport. */
+  site_preview_url?: string | null
   spec?: DesignTemplateSpec
   is_active?: boolean
   sort_order?: number
@@ -51,7 +54,7 @@ export interface DesignTemplateInput {
 const PUBLIC_TEMPLATE_COLUMNS = `
   dt.id, dt.name, dt.description, dt.category_id,
   COALESCE(c.name, dt.category) AS category,
-  dt.preview_url, dt.spec,
+  dt.preview_url, dt.site_preview_url, dt.spec,
   dt.is_active, dt.sort_order, dt.created_at, dt.updated_at
 `.trim()
 
@@ -117,6 +120,7 @@ function mapListRow(row: Record<string, unknown>): DesignTemplateListRow {
     category_id: row.category_id != null ? Number(row.category_id) : null,
     category: row.category != null ? String(row.category) : null,
     preview_url: row.preview_url != null ? String(row.preview_url) : null,
+    site_preview_url: row.site_preview_url != null ? String(row.site_preview_url) : null,
     spec: row.spec != null ? String(row.spec) : null,
     is_active: Number(row.is_active) ? 1 : 0,
     sort_order: Number(row.sort_order) || 0,
@@ -293,15 +297,16 @@ export async function createDesignTemplate(input: DesignTemplateInput): Promise<
   const cat = await resolveInputCategory(input, true)
   const result = await db.run(
     `INSERT INTO design_templates (
-      name, description, category_id, category, preview_url, spec, is_active, sort_order,
+      name, description, category_id, category, preview_url, site_preview_url, spec, is_active, sort_order,
       author_user_id, usage_fee, author_percent
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.name,
       input.description ?? null,
       cat.category_id,
       cat.category,
       input.preview_url ?? null,
+      input.site_preview_url ?? null,
       spec,
       input.is_active !== false ? 1 : 0,
       input.sort_order ?? 0,
@@ -339,6 +344,9 @@ export async function updateDesignTemplate(
     category = cat.category
   }
   const preview_url = input.preview_url !== undefined ? input.preview_url : existing.preview_url
+  const site_preview_url = input.site_preview_url !== undefined
+    ? input.site_preview_url
+    : existing.site_preview_url
   let spec = input.spec !== undefined
     ? (typeof input.spec === 'string' ? input.spec : JSON.stringify(input.spec))
     : existing.spec
@@ -366,12 +374,12 @@ export async function updateDesignTemplate(
   const db = await getDb()
   await db.run(
     `UPDATE design_templates SET
-      name = ?, description = ?, category_id = ?, category = ?, preview_url = ?, spec = ?,
+      name = ?, description = ?, category_id = ?, category = ?, preview_url = ?, site_preview_url = ?, spec = ?,
       is_active = ?, sort_order = ?, author_user_id = ?, usage_fee = ?, author_percent = ?,
       updated_at = datetime('now')
      WHERE id = ?`,
     [
-      name, description, category_id, category, preview_url, spec,
+      name, description, category_id, category, preview_url, site_preview_url, spec,
       is_active, sort_order, author_user_id, usage_fee, author_percent, id,
     ],
   )

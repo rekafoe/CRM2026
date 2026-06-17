@@ -14,12 +14,23 @@ export const EditorStageWatermark: React.FC<EditorStageWatermarkProps> = ({
   if (!visible || !logoUrl) return null;
 
   return (
-    <img
-      className="public-design-editor__stage-logo"
-      src={logoUrl}
-      alt=""
-      aria-hidden="true"
-      onError={onError}
-    />
+    <div className="public-design-editor__stage-watermark" aria-hidden="true">
+      <img
+        className="public-design-editor__stage-logo public-design-editor__stage-logo--primary"
+        src={logoUrl}
+        alt=""
+        onError={onError}
+      />
+      <img
+        className="public-design-editor__stage-logo public-design-editor__stage-logo--secondary"
+        src={logoUrl}
+        alt=""
+      />
+      <img
+        className="public-design-editor__stage-logo public-design-editor__stage-logo--tertiary"
+        src={logoUrl}
+        alt=""
+      />
+    </div>
   );
 };

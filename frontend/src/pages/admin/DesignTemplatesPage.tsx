@@ -150,6 +150,7 @@ export const DesignTemplatesPage: React.FC = () => {
   const [authorFilter, setAuthorFilter] = useState<string>('all');
   const [sortKey, setSortKey] = useState<SortKey>('sort_order');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sitePreviewFileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const importSourceFileInputRef = useRef<HTMLInputElement>(null);
   const [existingSpec, setExistingSpec] = useState<Record<string, unknown> | null>(null);
@@ -159,6 +160,7 @@ export const DesignTemplatesPage: React.FC = () => {
     description: '',
     category_id: null as number | null,
     preview_url: '',
+    site_preview_url: '',
     width_mm: '',
     height_mm: '',
     page_count: '',
@@ -371,6 +373,7 @@ export const DesignTemplatesPage: React.FC = () => {
       description: '',
       category_id: defaultCategoryId,
       preview_url: '',
+      site_preview_url: '',
       width_mm: '',
       height_mm: '',
       page_count: '',
@@ -420,6 +423,7 @@ export const DesignTemplatesPage: React.FC = () => {
       description: t.description ?? '',
       category_id: t.category_id ?? null,
       preview_url: t.preview_url ?? '',
+      site_preview_url: t.site_preview_url ?? '',
       width_mm: parsed.width_mm != null ? String(parsed.width_mm) : '',
       height_mm: parsed.height_mm != null ? String(parsed.height_mm) : '',
       page_count: parsed.page_count != null ? String(parsed.page_count) : '',
@@ -456,6 +460,19 @@ export const DesignTemplatesPage: React.FC = () => {
     e.target.value = '';
   }, []);
 
+  const handleSitePreviewUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const res = await uploadDesignTemplatePreview(file);
+      const url = res.data?.url ?? `${API_BASE_URL}/uploads/${res.data?.filename}`;
+      setForm((prev) => ({ ...prev, site_preview_url: url }));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка загрузки превью для сайта');
+    }
+    e.target.value = '';
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!form.name.trim()) {
       setError('Укажите название');
@@ -487,7 +504,8 @@ export const DesignTemplatesPage: React.FC = () => {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
         category_id: form.category_id,
-        preview_url: form.preview_url || undefined,
+        preview_url: form.preview_url || null,
+        site_preview_url: form.site_preview_url || null,
         spec: Object.keys(spec).length ? spec : undefined,
         is_active: form.is_active,
         sort_order: form.sort_order,
@@ -535,6 +553,7 @@ export const DesignTemplatesPage: React.FC = () => {
         description: t.description ?? undefined,
         category_id: t.category_id ?? undefined,
         preview_url: t.preview_url ?? undefined,
+        site_preview_url: t.site_preview_url ?? undefined,
         spec,
         is_active: false,
         sort_order: (t.sort_order ?? 0) + 1,
@@ -606,7 +625,7 @@ export const DesignTemplatesPage: React.FC = () => {
     const status = getTemplateCatalogStatus(t);
     const sizeStr = formatTemplateSize(parsed);
     const binding = formatBinding(parsed);
-    const previewSrc = resolveTemplatePreviewUrl(t.preview_url, API_BASE_URL);
+    const previewSrc = resolveTemplatePreviewUrl(t.site_preview_url || t.preview_url, API_BASE_URL);
     return (
       <div key={t.id} className={`design-template-card design-template-card--${status}`}>
         <div className="design-template-preview">
@@ -947,123 +966,182 @@ export const DesignTemplatesPage: React.FC = () => {
         onClose={() => setModalOpen(false)}
         title={editingId ? 'Карточка шаблона' : 'Новый шаблон (вручную)'}
         className="product-management design-templates-modal"
+        size="xl"
       >
         <div className="design-template-form">
-          <div className="form-row">
-            <label>Название *</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              placeholder="Например: Фотокнига Свадьба"
-            />
-          </div>
-          <div className="form-row">
-            <label>Описание</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-              rows={2}
-            />
-          </div>
-          <div className="form-row">
-            <label>Категория</label>
-            <DesignTemplateCategoryField
-              categories={categoryRegistry}
-              value={form.category_id}
-              onChange={(category_id) => setForm((p) => ({ ...p, category_id }))}
-              onCreateCategory={handleCreateCategoryInline}
-            />
-          </div>
-          <div className="form-row form-row-inline">
-            <label>
-              <span><AppIcon name="user" size="xs" /> Автор</span>
-              <select
-                value={form.author_user_id}
-                onChange={(e) => setForm((p) => ({ ...p, author_user_id: e.target.value }))}
-              >
-                <option value="">—</option>
-                {users.map((u) => (
-                  <option key={u.id} value={String(u.id)}>{u.name}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Плата за макет (бел. руб./ед.)</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.usage_fee}
-                onChange={(e) => setForm((p) => ({ ...p, usage_fee: e.target.value }))}
-              />
-            </label>
-            <label>
-              <span>% автору</span>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={form.author_percent}
-                onChange={(e) => setForm((p) => ({ ...p, author_percent: e.target.value }))}
-              />
-            </label>
-          </div>
-          {royaltyPreview && (
-            <p className="royalty-preview">
-              <BynSymbol />
-              {formatBynAmount(royaltyPreview.fee)} × {royaltyPreview.pct}% → {formatBynAmount(royaltyPreview.payout)}/ед.
-              <span className="design-template-royalty-hint"> (не в цене клиента)</span>
-            </p>
-          )}
-          <div className="form-row">
-            <label>Привязка к продукту (опционально)</label>
-            <DesignTemplateProductBindField
-              value={{ productId: form.productId, typeId: form.typeId, sizeId: form.sizeId }}
-              onChange={(bind) => setForm((p) => ({ ...p, ...bind }))}
-            />
-          </div>
-          <div className="design-template-manual-hint">
-            Поля <code>photo_*</code> / <code>text_*</code> из SVG не создаются автоматически — для парсинга макета используйте <strong>Импорт SVG</strong>.
-            Здесь можно задать размеры и фон-превью, затем собрать поля в master-редакторе («Шаблон»).
-          </div>
-          <div className="form-row">
-            <label>Превью (фон в редакторе)</label>
-            <div className="preview-upload">
-              {form.preview_url ? (
-                <div className="preview-preview">
-                  <img src={resolveTemplatePreviewUrl(form.preview_url, API_BASE_URL) ?? ''} alt="" />
-                  <button type="button" onClick={() => setForm((p) => ({ ...p, preview_url: '' }))}>×</button>
+          <div className="design-template-form-grid">
+            <section className="design-template-form-section design-template-form-section--main">
+              <header className="design-template-form-section__head">
+                <span>Основное</span>
+                <strong>Название и категория</strong>
+              </header>
+              <div className="form-row">
+                <label>Название *</label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                  placeholder="Например: Фотокнига Свадьба"
+                />
+              </div>
+              <div className="form-row">
+                <label>Описание</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+              <div className="form-row">
+                <label>Категория</label>
+                <DesignTemplateCategoryField
+                  categories={categoryRegistry}
+                  value={form.category_id}
+                  onChange={(category_id) => setForm((p) => ({ ...p, category_id }))}
+                  onCreateCategory={handleCreateCategoryInline}
+                />
+              </div>
+            </section>
+
+            <section className="design-template-form-section">
+              <header className="design-template-form-section__head">
+                <span>Публикация</span>
+                <strong>Статус и порядок</strong>
+              </header>
+              <div className="design-template-compact-fields">
+                <label className="checkbox-label">
+                  <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))} />
+                  Активен
+                </label>
+                <label>
+                  <span>Порядок</span>
+                  <input type="number" value={form.sort_order} onChange={(e) => setForm((p) => ({ ...p, sort_order: parseInt(e.target.value, 10) || 0 }))} />
+                </label>
+              </div>
+            </section>
+
+            <section className="design-template-form-section design-template-form-section--preview">
+              <header className="design-template-form-section__head">
+                <span>Превью</span>
+                <strong>Картинки для редактора и сайта</strong>
+              </header>
+              <div className="design-template-preview-fields">
+                <div className="form-row">
+                  <label>Превью для сайта</label>
+                  <div className="preview-upload">
+                    {form.site_preview_url ? (
+                      <div className="preview-preview">
+                        <img src={resolveTemplatePreviewUrl(form.site_preview_url, API_BASE_URL) ?? ''} alt="" />
+                        <button type="button" onClick={() => setForm((p) => ({ ...p, site_preview_url: '' }))}>×</button>
+                      </div>
+                    ) : null}
+                    <input ref={sitePreviewFileInputRef} type="file" accept="image/*" onChange={handleSitePreviewUpload} className="visually-hidden-file-input" />
+                    <button type="button" className="lg-btn" onClick={() => sitePreviewFileInputRef.current?.click()}>Загрузить превью сайта</button>
+                    <p className="form-hint">Основная картинка на сайте. Если пусто — сайт возьмёт авто-превью импорта.</p>
+                  </div>
                 </div>
-              ) : null}
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePreviewUpload} className="visually-hidden-file-input" />
-              <button type="button" className="lg-btn" onClick={() => fileInputRef.current?.click()}>Загрузить изображение</button>
-            </div>
-          </div>
-          <div className="form-row form-row-inline">
-            <label>
-              <span>Ширина (мм)</span>
-              <input type="number" min="1" value={form.width_mm} onChange={(e) => setForm((p) => ({ ...p, width_mm: e.target.value }))} />
-            </label>
-            <label>
-              <span>Высота (мм)</span>
-              <input type="number" min="1" value={form.height_mm} onChange={(e) => setForm((p) => ({ ...p, height_mm: e.target.value }))} />
-            </label>
-            <label>
-              <span>Страниц</span>
-              <input type="number" min="1" value={form.page_count} onChange={(e) => setForm((p) => ({ ...p, page_count: e.target.value }))} />
-            </label>
-          </div>
-          <div className="form-row form-row-inline">
-            <label className="checkbox-label">
-              <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))} />
-              Активен
-            </label>
-            <label>
-              <span>Порядок</span>
-              <input type="number" value={form.sort_order} onChange={(e) => setForm((p) => ({ ...p, sort_order: parseInt(e.target.value, 10) || 0 }))} />
-            </label>
+                <div className="form-row">
+                  <label>Превью / фон в редакторе</label>
+                  <div className="preview-upload">
+                    {form.preview_url ? (
+                      <div className="preview-preview">
+                        <img src={resolveTemplatePreviewUrl(form.preview_url, API_BASE_URL) ?? ''} alt="" />
+                        <button type="button" onClick={() => setForm((p) => ({ ...p, preview_url: '' }))}>×</button>
+                      </div>
+                    ) : null}
+                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePreviewUpload} className="visually-hidden-file-input" />
+                    <button type="button" className="lg-btn" onClick={() => fileInputRef.current?.click()}>Загрузить изображение</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="design-template-form-section design-template-form-section--binding">
+              <header className="design-template-form-section__head">
+                <span>Продукт</span>
+                <strong>Привязка к каталогу</strong>
+              </header>
+              <div className="form-row">
+                <DesignTemplateProductBindField
+                  value={{ productId: form.productId, typeId: form.typeId, sizeId: form.sizeId }}
+                  onChange={(bind) => setForm((p) => ({ ...p, ...bind }))}
+                />
+              </div>
+            </section>
+
+            <section className="design-template-form-section">
+              <header className="design-template-form-section__head">
+                <span>Автор</span>
+                <strong>Внутренняя ЗП за макет</strong>
+              </header>
+              <div className="design-template-compact-fields">
+                <label className="design-template-field--wide">
+                  <span><AppIcon name="user" size="xs" /> Автор</span>
+                  <select
+                    value={form.author_user_id}
+                    onChange={(e) => setForm((p) => ({ ...p, author_user_id: e.target.value }))}
+                  >
+                    <option value="">—</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={String(u.id)}>{u.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Плата, бел. руб./ед.</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.usage_fee}
+                    onChange={(e) => setForm((p) => ({ ...p, usage_fee: e.target.value }))}
+                  />
+                </label>
+                <label>
+                  <span>% автору</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={form.author_percent}
+                    onChange={(e) => setForm((p) => ({ ...p, author_percent: e.target.value }))}
+                  />
+                </label>
+              </div>
+              {royaltyPreview && (
+                <p className="royalty-preview">
+                  <BynSymbol />
+                  {formatBynAmount(royaltyPreview.fee)} × {royaltyPreview.pct}% → {formatBynAmount(royaltyPreview.payout)}/ед.
+                  <span className="design-template-royalty-hint"> (не в цене клиента)</span>
+                </p>
+              )}
+            </section>
+
+            <section className="design-template-form-section">
+              <header className="design-template-form-section__head">
+                <span>Макет</span>
+                <strong>Размер и страницы</strong>
+              </header>
+              <div className="design-template-compact-fields design-template-compact-fields--three">
+                <label>
+                  <span>Ширина, мм</span>
+                  <input type="number" min="1" value={form.width_mm} onChange={(e) => setForm((p) => ({ ...p, width_mm: e.target.value }))} />
+                </label>
+                <label>
+                  <span>Высота, мм</span>
+                  <input type="number" min="1" value={form.height_mm} onChange={(e) => setForm((p) => ({ ...p, height_mm: e.target.value }))} />
+                </label>
+                <label>
+                  <span>Страниц</span>
+                  <input type="number" min="1" value={form.page_count} onChange={(e) => setForm((p) => ({ ...p, page_count: e.target.value }))} />
+                </label>
+              </div>
+              <div className="design-template-manual-hint">
+                Поля <code>photo_*</code> / <code>text_*</code> из SVG не создаются автоматически — для парсинга макета используйте <strong>Импорт SVG</strong>.
+                Здесь можно задать размеры и фон-превью, затем собрать поля в master-редакторе («Шаблон»).
+              </div>
+            </section>
           </div>
           <div className="form-actions">
             <button type="button" className="lg-btn" onClick={() => setModalOpen(false)}>Отмена</button>

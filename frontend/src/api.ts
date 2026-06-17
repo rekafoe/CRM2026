@@ -1061,6 +1061,8 @@ export interface DesignTemplate {
   /** Имя категории (денормализация; в public API — для отображения) */
   category?: string | null;
   preview_url?: string | null;
+  /** Управляемое превью для сайта; если пусто, сайт использует preview_url/fallback. */
+  site_preview_url?: string | null;
   spec?: string | null;
   is_active: number;
   sort_order: number;
@@ -1285,6 +1287,7 @@ export interface DesignTemplateUsageRow {
   category?: string | null;
   is_active: number;
   preview_url?: string | null;
+  site_preview_url?: string | null;
   line_count: number;
   order_count: number;
   total_quantity: number;
@@ -1425,6 +1428,7 @@ export interface SubtypeDesignLink {
   // joined from design_templates
   name: string;
   preview_url: string | null;
+  site_preview_url?: string | null;
   category: string | null;
   is_active: number;
 }

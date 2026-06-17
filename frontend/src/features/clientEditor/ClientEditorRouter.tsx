@@ -6,6 +6,7 @@ import {
   type PublicDesignEditorAdapter,
 } from '../publicDesignEditor/publicDesignEditorAdapter';
 import type { PublicDesignDocumentMode } from '../publicDesignEditor/useDesignDocumentNavigation';
+import type { PublicDesignPageCountLimits } from '../publicDesignEditor/usePublicDesignPageActions';
 import { ClientPhotoBatchEditor } from './ClientPhotoBatchEditor';
 import './clientEditor.css';
 
@@ -22,6 +23,9 @@ export interface ClientEditorRouterProps {
   adapter?: PublicDesignEditorAdapter;
   showFinalizeButton?: boolean;
   onReadyForCart?: (draftToken: string) => void;
+  selectedParams?: Record<string, unknown>;
+  pageCountLimits?: PublicDesignPageCountLimits;
+  onPageCountChange?: (pageCount: number) => void;
 }
 
 const SCENARIO_COPY: Record<ClientEditorMode, { title: string; text: string }> = {
@@ -50,6 +54,9 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
   adapter = crmPreviewPublicDesignEditorAdapter,
   showFinalizeButton = false,
   onReadyForCart,
+  selectedParams,
+  pageCountLimits,
+  onPageCountChange,
 }) => {
   const scenario = SCENARIO_COPY[mode];
   const showIntro = mode === 'photo_batch';
@@ -90,6 +97,9 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
           documentMode={mode as PublicDesignDocumentMode}
           showFinalizeButton={showFinalizeButton}
           onReadyForCart={onReadyForCart}
+          selectedParams={selectedParams}
+          pageCountLimits={pageCountLimits}
+          onPageCountChange={onPageCountChange}
         />
       ) : (
         <Alert type="error">Для редактора макета нужен templateId.</Alert>

@@ -115,6 +115,16 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
     }
     setActiveTab(tab);
   };
+
+  const handleRailTabClick = (tab: PublicDesignClientAsideTab) => {
+    if (!collapsed && activeTab === tab) {
+      onCollapsedChange?.(true);
+      return;
+    }
+    if (collapsed) onCollapsedChange?.(false);
+    selectAsideTab(tab);
+  };
+
   const missingTextCount = Math.max(0, fragmentPreflight.textTotal - fragmentPreflight.textReady);
   const checkSummary = summarizeCheck(globalPreflight);
 
@@ -216,10 +226,7 @@ export const PublicDesignClientAside: React.FC<PublicDesignClientAsideProps> = (
               type="button"
               title={tab.title}
               className={`public-design-editor__client-aside-rail-btn${activeTab === tab.id ? ' is-active' : ''}`}
-              onClick={() => {
-                if (collapsed) onCollapsedChange?.(false);
-                selectAsideTab(tab.id);
-              }}
+              onClick={() => handleRailTabClick(tab.id)}
               aria-current={activeTab === tab.id ? 'page' : undefined}
             >
               <span className="public-design-editor__client-aside-rail-icon" aria-hidden="true">

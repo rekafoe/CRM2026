@@ -114,26 +114,6 @@
   border-color: rgba(59, 130, 246, 0.5);
 }
 
-.design-editor-zoom-group {
-  border: 1px solid var(--de-lg-border);
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--de-lg-bg);
-  box-shadow: var(--de-lg-inset), var(--de-lg-shadow);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.design-editor-zoom-label {
-  background: transparent;
-  color: #1f2937;
-  font-weight: 500;
-}
-
-.design-editor-zoom-label:hover {
-  background: rgba(255, 255, 255, 0.45);
-}
-
 .design-editor-page-btn {
   border-radius: 999px;
   border: 1px solid var(--de-lg-border);
