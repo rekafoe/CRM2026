@@ -1,4 +1,4 @@
-import { useCallback, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import type { Canvas, FabricObject } from 'fabric';
 import { normalizeDesignFieldsOnCanvas } from '../designFields';
 import { fabricDeserializeReviver } from '../designPageLoader';
@@ -13,7 +13,7 @@ interface UseDesignEditorCanvasHistoryInput {
   historyRef: MutableRefObject<CanvasHistoryStack>;
   isLoadingRef: MutableRefObject<boolean>;
   pageTransitionLockRef: MutableRefObject<boolean>;
-  onCanvasDocumentCommitRef: MutableRefObject<(() => void) | undefined>;
+  onCanvasDocumentCommitRef: MutableRefObject<(() => void | Promise<void>) | undefined>;
   documentCommitTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   pageWidthRef: MutableRefObject<number>;
   pageHeightRef: MutableRefObject<number>;
@@ -39,6 +39,13 @@ export function useDesignEditorCanvasHistory({
   reportPhotoFillProgress,
   onHistoryChange,
 }: UseDesignEditorCanvasHistoryInput) {
+  const snapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runCanvasDocumentCommit = useCallback(async () => {
+    if (!onCanvasDocumentCommitRef.current) return;
+    await Promise.resolve(onCanvasDocumentCommitRef.current());
+  }, [onCanvasDocumentCommitRef]);
+
   const scheduleCanvasDocumentCommit = useCallback(() => {
     if (!onCanvasDocumentCommitRef.current) return;
     if (documentCommitTimerRef.current) clearTimeout(documentCommitTimerRef.current);
@@ -48,11 +55,17 @@ export function useDesignEditorCanvasHistory({
         scheduleCanvasDocumentCommit();
         return;
       }
-      onCanvasDocumentCommitRef.current?.();
+      void runCanvasDocumentCommit();
     }, 400);
-  }, [documentCommitTimerRef, isLoadingRef, onCanvasDocumentCommitRef, pageTransitionLockRef]);
+  }, [
+    documentCommitTimerRef,
+    isLoadingRef,
+    onCanvasDocumentCommitRef,
+    pageTransitionLockRef,
+    runCanvasDocumentCommit,
+  ]);
 
-  const saveSnapshot = useCallback(() => {
+  const saveSnapshotNow = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas || isLoadingRef.current) return;
     const json = JSON.stringify(canvasToJSON(canvas));
@@ -60,6 +73,53 @@ export function useDesignEditorCanvasHistory({
     onHistoryChange(flags.canUndo, flags.canRedo);
     scheduleCanvasDocumentCommit();
   }, [fabricRef, historyRef, isLoadingRef, onHistoryChange, scheduleCanvasDocumentCommit]);
+
+  const saveSnapshot = useCallback((options?: { debounce?: boolean }) => {
+    if (!options?.debounce) {
+      if (snapshotTimerRef.current) {
+        clearTimeout(snapshotTimerRef.current);
+        snapshotTimerRef.current = null;
+      }
+      saveSnapshotNow();
+      return;
+    }
+    if (snapshotTimerRef.current) clearTimeout(snapshotTimerRef.current);
+    snapshotTimerRef.current = setTimeout(() => {
+      snapshotTimerRef.current = null;
+      saveSnapshotNow();
+    }, 500);
+  }, [saveSnapshotNow]);
+
+  const flushCanvasDocumentCommit = useCallback(async () => {
+    if (snapshotTimerRef.current) {
+      clearTimeout(snapshotTimerRef.current);
+      snapshotTimerRef.current = null;
+      saveSnapshotNow();
+    }
+    if (documentCommitTimerRef.current) {
+      clearTimeout(documentCommitTimerRef.current);
+      documentCommitTimerRef.current = null;
+    }
+    if (isLoadingRef.current || pageTransitionLockRef.current) return;
+    await runCanvasDocumentCommit();
+  }, [
+    documentCommitTimerRef,
+    isLoadingRef,
+    pageTransitionLockRef,
+    runCanvasDocumentCommit,
+    saveSnapshotNow,
+  ]);
+
+  useEffect(() => () => {
+    if (snapshotTimerRef.current) {
+      clearTimeout(snapshotTimerRef.current);
+      snapshotTimerRef.current = null;
+    }
+    if (documentCommitTimerRef.current) {
+      clearTimeout(documentCommitTimerRef.current);
+      documentCommitTimerRef.current = null;
+    }
+  }, [documentCommitTimerRef]);
 
   const fillPhotoFieldWithSnapshot = useCallback(
     async (canvas: Canvas, field: FabricObject, file: File): Promise<void> => {
@@ -161,6 +221,7 @@ export function useDesignEditorCanvasHistory({
   return {
     scheduleCanvasDocumentCommit,
     saveSnapshot,
+    flushCanvasDocumentCommit,
     fillPhotoFieldWithSnapshot,
     undo,
     redo,

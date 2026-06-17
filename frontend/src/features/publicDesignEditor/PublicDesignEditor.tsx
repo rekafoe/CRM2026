@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ConfirmDialog } from '../../components/common';
+import { Alert, ConfirmDialog, Modal } from '../../components/common';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import type { GuideLine } from '../../pages/admin/designEditor/CanvasRulers';
 import { EMPTY_PAGE, MM_TO_PX } from '../../pages/admin/designEditor/constants';
@@ -42,7 +42,11 @@ import {
 } from './usePublicDesignBootstrap';
 import { usePublicDesignDraftActions } from './usePublicDesignDraftActions';
 import { usePublicDesignGuidedActions } from './usePublicDesignGuidedActions';
-import { usePublicDesignPageActions } from './usePublicDesignPageActions';
+import {
+  resolveAllowedPageCountIncrease,
+  usePublicDesignPageActions,
+  type PublicDesignPageCountAdjustment,
+} from './usePublicDesignPageActions';
 import { usePublicDesignPhotoLibrary } from './usePublicDesignPhotoLibrary';
 import {
   clearThumbnailCacheForPage,
@@ -93,6 +97,29 @@ function canApplyPageCount(
   return true;
 }
 
+function canIncreasePageCount(
+  currentCount: number,
+  requestedAddCount: number,
+  limits: PublicDesignPageCountLimits | undefined,
+  minimumPageCount: number,
+): boolean {
+  return resolveAllowedPageCountIncrease({
+    currentCount,
+    requestedAddCount,
+    limits,
+    minimumPageCount,
+  }).ok;
+}
+
+function formatPageCountRu(count: number): string {
+  const normalized = Math.abs(Math.floor(count));
+  const mod10 = normalized % 10;
+  const mod100 = normalized % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} страница`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} страницы`;
+  return `${count} страниц`;
+}
+
 interface PublicDesignEditorProps {
   templateId: number;
   initialDraftToken?: string | null;
@@ -127,13 +154,15 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   }
   const bootstrapDraftToken = bootstrapDraftTokenRef.current.token;
   const canvasHandleRef = useRef<DesignEditorCanvasHandle | null>(null);
-  const commitCanvasToPagesRef = useRef<() => void>(() => {});
+  const latestPagesRef = useRef<DesignPage[]>([]);
+  const commitCanvasToPagesRef = useRef<() => Promise<DesignPage[] | null>>(() => Promise.resolve(null));
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const fitScalerRef = useRef<HTMLDivElement>(null);
 
   const [draftToken, setDraftToken] = useState<string | null>(bootstrapDraftToken);
   const [pages, setPages] = useState<DesignPage[]>([{ ...EMPTY_PAGE }]);
+  latestPagesRef.current = pages;
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedObj, setSelectedObj] = useState<SelectedObjProps | null>(null);
   const [textFloatingAnchor, setTextFloatingAnchor] = useState<{ x: number; y: number } | null>(null);
@@ -158,6 +187,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   const [mobilePanel, setMobilePanel] = useState<PublicDesignMobilePanel>('canvas');
   const isMobile = useMediaQuery('(max-width: 760px)');
   const [pendingDeletePage, setPendingDeletePage] = useState<number | null>(null);
+  const [pageCountNotice, setPageCountNotice] = useState<string | null>(null);
   const [customerForm, setCustomerForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -269,12 +299,12 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     () => buildPublicDesignPageStatuses(pageSpec.pageCount, preflight),
     [pageSpec.pageCount, preflight],
   );
-  const canAddSinglePage = useMemo(() => canApplyPageCount(pageSpec.pageCount + 1, pageCountLimits, minimumPageCount), [
+  const canAddSinglePage = useMemo(() => canIncreasePageCount(pageSpec.pageCount, 1, pageCountLimits, minimumPageCount), [
     minimumPageCount,
     pageCountLimits,
     pageSpec.pageCount,
   ]);
-  const canAddSpread = useMemo(() => canApplyPageCount(pageSpec.pageCount + 2, pageCountLimits, minimumPageCount), [
+  const canAddSpread = useMemo(() => canIncreasePageCount(pageSpec.pageCount, 2, pageCountLimits, minimumPageCount), [
     minimumPageCount,
     pageCountLimits,
     pageSpec.pageCount,
@@ -532,6 +562,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     loading,
     pageSpec,
     pages,
+    getLatestPages: () => latestPagesRef.current,
     prepressConfig,
     saving,
     spreadMode,
@@ -572,6 +603,12 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setTextFillHint(message);
   }, []);
 
+  const handlePageCountAdjusted = useCallback((adjustment: PublicDesignPageCountAdjustment) => {
+    setPageCountNotice(
+      `Было добавлено ${formatPageCountRu(adjustment.addedPages)}, потому что количество страниц для данного типа переплёта должно быть кратно ${adjustment.step}.`,
+    );
+  }, []);
+
   useEffect(() => {
     if (!textFillHint) return undefined;
     const timer = window.setTimeout(() => setTextFillHint(null), 8000);
@@ -592,6 +629,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     currentPage,
     documentMode,
     navigation,
+    pages,
     pageSpec,
     spreadMode: editorSpreadMode,
     coverPages,
@@ -603,11 +641,42 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     markDirty,
     pageCountLimits,
     onPageCountRejected: setError,
+    onPageCountAdjusted: handlePageCountAdjusted,
   });
 
   commitCanvasToPagesRef.current = () => {
-    void commitCanvasToPages();
+    return commitCanvasToPages().then((committedPages) => {
+      if (committedPages) latestPagesRef.current = committedPages;
+      return committedPages;
+    });
   };
+
+  const openCheckoutPreviewAfterFlush = useCallback(() => {
+    void (async () => {
+      await canvasHandleRef.current?.flushPendingDocumentCommit?.();
+      const latestPreflight = analyzePublicDesignPages(latestPagesRef.current, saveState, {
+        pageWidthPx: sceneGeometry.pageWidthPx,
+        pageHeightPx: sceneGeometry.pageHeightPx,
+        safeZonePx: sceneGeometry.safeZonePx,
+      });
+      if (latestPreflight.hasBlockingIssues) {
+        setActiveTaskTab('check');
+        setError('Перед возвратом в корзину исправьте ошибки проверки макета.');
+        if (isMobile) setMobilePanel('check');
+        return;
+      }
+      setCheckoutPreviewOpen(true);
+    })();
+  }, [
+    canvasHandleRef,
+    isMobile,
+    saveState,
+    sceneGeometry.pageHeightPx,
+    sceneGeometry.pageWidthPx,
+    sceneGeometry.safeZonePx,
+    setActiveTaskTab,
+    setError,
+  ]);
 
   const {
     handleFieldFocus,
@@ -623,7 +692,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     setActiveTaskTab,
     setError,
     onGoToPage: handleGoToPage,
-    onReadyForCart: () => setCheckoutPreviewOpen(true),
+    onReadyForCart: openCheckoutPreviewAfterFlush,
   });
 
   const selectedLibraryPhoto = useMemo(
@@ -702,12 +771,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   }, [activeTaskTab, isMobile]);
 
   const handleRequestReadyForCart = useCallback(() => {
-    if (preflight.hasBlockingIssues) {
-      void handleReadyForCart();
-      return;
-    }
-    setCheckoutPreviewOpen(true);
-  }, [handleReadyForCart, preflight.hasBlockingIssues]);
+    openCheckoutPreviewAfterFlush();
+  }, [openCheckoutPreviewAfterFlush]);
 
   const handleConfirmReadyForCart = useCallback(() => {
     setCheckoutPreviewOpen(false);
@@ -929,11 +994,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           onPageThumbReady: handlePageThumbReady,
           onTextFloatingAnchor: isMobile ? undefined : setTextFloatingAnchor,
           onTextFillHint: handleTextFillHint,
-          onTextEditCommitted: () => {
-            void commitCanvasToPages();
-          },
           onCanvasDocumentCommit: () => {
-            commitCanvasToPagesRef.current();
+            return commitCanvasToPagesRef.current().then(() => undefined);
           },
           onPageTransitionBusyChange: setPageTransitionBusy,
           onDropRemoteImageUrl: handleImageUrlSubmit,
@@ -1011,7 +1073,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             onIssueFocus={handleIssueFocus}
             onCollapsedChange={setClientAsideCollapsed}
             onBeforeCheckTab={() => {
-              void commitCanvasToPages();
+              void canvasHandleRef.current?.flushPendingDocumentCommit?.();
             }}
           />
         )}
@@ -1126,6 +1188,25 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           void handleDeleteClientPage(pendingDeletePage);
         }}
       />
+      <Modal
+        isOpen={pageCountNotice != null}
+        onClose={() => setPageCountNotice(null)}
+        title="Страницы добавлены"
+        size="sm"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-primary">{pageCountNotice}</p>
+          <div className="flex justify-end border-t border-color pt-4">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setPageCountNotice(null)}
+            >
+              Понятно
+            </button>
+          </div>
+        </div>
+      </Modal>
       <PublicDesignDraftConflictDialog
         isOpen={draftConflictOpen}
         onClose={handleDismissDraftConflict}

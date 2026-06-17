@@ -142,6 +142,8 @@ export interface DesignEditorCanvasHandle {
   /** Дождаться завершения async-перехода страницы/разворота */
   whenPageTransitionIdle: () => Promise<void>;
   isPageTransitionBusy: () => boolean;
+  /** Сбросить отложенную синхронизацию live canvas → pages[] перед save/navigation. */
+  flushPendingDocumentCommit: () => Promise<void>;
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -192,7 +194,7 @@ interface DesignEditorCanvasProps {
   /** После завершения inline-правки текста — синхронизировать fabricJSON в pages для preflight */
   onTextEditCommitted?: () => void;
   /** Debounced: текущая страница canvas → pages[] (preflight / autosave) */
-  onCanvasDocumentCommit?: () => void;
+  onCanvasDocumentCommit?: () => void | Promise<void>;
   /** Lifecycle страницы/разворота: true на start, false на end transition. */
   onPageTransitionBusyChange?: (busy: boolean) => void;
 }
@@ -356,6 +358,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
 
     const {
       saveSnapshot,
+      flushCanvasDocumentCommit,
       fillPhotoFieldWithSnapshot,
       undo,
       redo,
@@ -499,6 +502,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       undo,
       redo,
       saveSnapshot,
+      flushCanvasDocumentCommit,
       fillPhotoFieldWithSnapshot,
       openTextEditSheetForTarget,
       captureTextEditBaseline,

@@ -80,7 +80,8 @@ export interface DesignEditorCanvasHandleDeps {
   apiBaseUrl: string;
   undo: () => void;
   redo: () => void;
-  saveSnapshot: () => void;
+  saveSnapshot: (options?: { debounce?: boolean }) => void;
+  flushCanvasDocumentCommit: () => Promise<void>;
   fillPhotoFieldWithSnapshot: (canvas: Canvas, field: FabricObject, file: File) => Promise<void>;
   openTextEditSheetForTarget: (target: FabricObject) => boolean;
   captureTextEditBaseline: (target: FabricObject) => void;
@@ -551,7 +552,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         applyFormatToTextField(active as IText & { textStyleRuns?: TextStyleRun[] }, { [key]: value });
         canvas.requestRenderAll();
         d.onSelectionChange(getObjProps(active));
-        d.saveSnapshot();
+        d.saveSnapshot({ debounce: true });
       },
       setTextStyle: (props: { fontWeight?: string; fontStyle?: string }) => {
         const canvas = d.fabricRef.current;
@@ -561,7 +562,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         applyFormatToTextField(active as IText & { textStyleRuns?: TextStyleRun[] }, props);
         canvas.requestRenderAll();
         d.onSelectionChange(getObjProps(active));
-        d.saveSnapshot();
+        d.saveSnapshot({ debounce: true });
       },
       applyTextPropsToSelection: (props: Record<string, unknown>) => {
         const canvas = d.fabricRef.current;
@@ -575,7 +576,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
         applyFormatToTextField(active as IText & { textStyleRuns?: TextStyleRun[] }, next);
         canvas.requestRenderAll();
         d.onSelectionChange(getObjProps(active));
-        d.saveSnapshot();
+        d.saveSnapshot({ debounce: true });
       },
       setObjProp: (key: string, value: unknown) => {
         const canvas = d.fabricRef.current;
@@ -713,5 +714,6 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
       },
       whenPageTransitionIdle: () => d.pageTransitionGate.waitUntilIdle(),
       isPageTransitionBusy: () => d.pageTransitionGate.isBusy(),
+      flushPendingDocumentCommit: () => d.flushCanvasDocumentCommit(),
     };
 }

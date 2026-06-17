@@ -83,7 +83,7 @@ export interface CanvasEventHandlerDeps {
   safeZonePx: number;
   pageHeightPx: number;
   onSelectionChange: (info: SelectedObjProps | null) => void;
-  saveSnapshot: () => void;
+  saveSnapshot: (options?: { debounce?: boolean }) => void;
   undo: () => Promise<void>;
   redo: () => Promise<void>;
   fillPhotoFieldWithSnapshot: (canvas: Canvas, field: FabricObject, file: File) => Promise<void>;
@@ -494,16 +494,11 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
           snapLinesRef.current?.([]);
         };
         canvas.on('mouse:up', clearSnaps);
-        let textChangedSnapshotTimer: ReturnType<typeof setTimeout> | null = null;
         canvas.on('text:changed', () => {
           const active = canvas.getActiveObject();
           if (active) onSelectionChange(getObjProps(active));
           scheduleTextAnchor();
-          if (textChangedSnapshotTimer) clearTimeout(textChangedSnapshotTimer);
-          textChangedSnapshotTimer = setTimeout(() => {
-            textChangedSnapshotTimer = null;
-            saveSnapshot();
-          }, 400);
+          saveSnapshot({ debounce: true });
         });
 
         // Ctrl+wheel: без масштаба сцены Fabric; plain scroll страницы не трогаем

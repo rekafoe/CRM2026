@@ -37,6 +37,7 @@ interface UsePublicDesignDraftActionsInput {
   loading: boolean;
   pageSpec: PublicDesignPageSpec;
   pages: DesignPage[];
+  getLatestPages?: () => DesignPage[];
   prepressConfig: DesignPrepressConfig;
   saving: boolean;
   spreadMode: boolean;
@@ -70,6 +71,7 @@ export function usePublicDesignDraftActions({
   loading,
   pageSpec,
   pages,
+  getLatestPages,
   prepressConfig,
   saving,
   spreadMode,
@@ -148,7 +150,7 @@ export function usePublicDesignDraftActions({
   }, [adapter, documentMode, draftToken, onDraftTokenChange, setDraftToken, templateId]);
 
   const buildCurrentDesignState = useCallback(() => {
-    const updatedPages = pages;
+    const updatedPages = getLatestPages?.() ?? pages;
     const nextSelectedParams = documentMode === 'multipage'
       ? { ...(selectedParams ?? {}), pages: pageSpec.pageCount }
       : selectedParams;
@@ -170,6 +172,7 @@ export function usePublicDesignDraftActions({
   }, [
     coverPages,
     documentMode,
+    getLatestPages,
     pageSpec,
     pages,
     prepressConfig,
@@ -185,6 +188,7 @@ export function usePublicDesignDraftActions({
     setSaving(true);
     setSaveState('saving');
     if (!silent) setStatus(null);
+    await canvasHandleRef.current?.flushPendingDocumentCommit?.();
     const token = await ensureDraft();
     const { pages: updatedPages, designState, selectedParams: nextSelectedParams } = buildCurrentDesignState();
     const patch: Record<string, unknown> = { designState };
@@ -201,6 +205,7 @@ export function usePublicDesignDraftActions({
   }, [
     adapter,
     buildCurrentDesignState,
+    canvasHandleRef,
     dirtyVersion,
     ensureDraft,
     setPages,
@@ -334,6 +339,7 @@ export function usePublicDesignDraftActions({
   const handleReadyForCart = useCallback(async () => {
     try {
       setError(null);
+      await canvasHandleRef.current?.flushPendingDocumentCommit?.();
       const { pages: updatedPages } = buildCurrentDesignState();
       const nextPreflight = analyzePublicDesignPages(updatedPages, 'saved');
       setPages(updatedPages);
@@ -351,6 +357,7 @@ export function usePublicDesignDraftActions({
     }
   }, [
     buildCurrentDesignState,
+    canvasHandleRef,
     ensureDraft,
     handleSaveDraft,
     onReadyForCart,

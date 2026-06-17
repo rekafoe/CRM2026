@@ -2092,7 +2092,7 @@
 .prepress-overlay__label {
   fill: rgba(153, 27, 27, 0.96);
   font-family: sans-serif;
-  font-size: 26px;
+  font-size: 44px;
   font-weight: 900;
   text-anchor: middle;
   dominant-baseline: middle;
@@ -2100,7 +2100,7 @@
   paint-order: stroke;
   stroke: rgba(255, 255, 255, 0.96);
   stroke-linejoin: round;
-  stroke-width: 7px;
+  stroke-width: 10px;
 }
 
 .prepress-overlay__label-bg {
@@ -2110,7 +2110,7 @@
 }
 
 .prepress-overlay__label--spread {
-  font-size: 28px;
+  font-size: 48px;
 }
 
 .prepress-overlay__spread-seam-band {
@@ -2132,7 +2132,7 @@
 .prepress-overlay__spread-seam-label {
   fill: rgba(153, 27, 27, 0.98);
   font-family: sans-serif;
-  font-size: 24px;
+  font-size: 36px;
   font-weight: 900;
   text-anchor: middle;
   dominant-baseline: middle;
@@ -2140,7 +2140,7 @@
   paint-order: stroke;
   stroke: rgba(255, 255, 255, 0.94);
   stroke-linejoin: round;
-  stroke-width: 7px;
+  stroke-width: 10px;
 }
 
 /* ── Toolbar additions ── */

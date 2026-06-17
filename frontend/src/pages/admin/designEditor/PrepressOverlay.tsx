@@ -47,12 +47,11 @@ export const PrepressOverlay: React.FC<PrepressOverlayProps> = ({
   const shouldShowSafeZone = showSafeZone && safeZonePx > 0;
   const shouldShowSpreadSeamWarning = isSpreadView && pageWidthPx > 0 && pageHeightPx > 0;
   const seamWarningWidth = Math.max(28, Math.min(72, safeZonePx > 0 ? safeZonePx * 2 : 36));
-  const safeLabelY = Math.max(32, Math.min(safeZonePx + 18, pageHeightPx - 32));
-  const pageSafeLabelWidth = Math.max(120, Math.min(pageWidthPx - 24, 430));
-  const spreadSafeLabelWidth = Math.max(180, Math.min(canvasWidthPx - 32, 720));
-  const safeLabelBoxHeight = 38;
+  const safeLabelY = Math.max(48, Math.min(safeZonePx + 30, pageHeightPx - 48));
+  const pageSafeLabelWidth = Math.max(150, Math.min(pageWidthPx - 18, 460));
+  const spreadSafeLabelWidth = Math.max(240, Math.min(canvasWidthPx - 24, 760));
+  const safeLabelBoxHeight = 64;
   const seamLabelY = pageHeightPx / 2;
-  const seamLabelLength = Math.max(160, Math.min(pageHeightPx - 48, 560));
 
   return (
     <svg
@@ -136,10 +135,8 @@ export const PrepressOverlay: React.FC<PrepressOverlayProps> = ({
                   className="prepress-overlay__label"
                   x={pageX + pageWidthPx / 2}
                   y={safeLabelY}
-                  textLength={pageSafeLabelWidth - 24}
-                  lengthAdjust="spacingAndGlyphs"
                 >
-                  Обрезка: важное держите внутри красной линии
+                  Важное внутри красной линии
                 </text>
               )}
             </>
@@ -160,10 +157,8 @@ export const PrepressOverlay: React.FC<PrepressOverlayProps> = ({
             className="prepress-overlay__label prepress-overlay__label--spread"
             x={canvasWidthPx / 2}
             y={safeLabelY}
-            textLength={spreadSafeLabelWidth - 32}
-            lengthAdjust="spacingAndGlyphs"
           >
-            Обрезка: важные элементы держите внутри красной линии
+            Важное внутри красной линии
           </text>
         </>
       )}
@@ -202,10 +197,8 @@ export const PrepressOverlay: React.FC<PrepressOverlayProps> = ({
             x={pageWidthPx}
             y={seamLabelY}
             transform={`rotate(-90 ${pageWidthPx} ${seamLabelY})`}
-            textLength={seamLabelLength}
-            lengthAdjust="spacingAndGlyphs"
           >
-            Стык страниц: не размещайте текст и фото
+            Не ставьте фото и текст на стык
           </text>
         </g>
       )}
