@@ -188,14 +188,7 @@ export function analyzePublicDesignPages(
     }
   });
 
-  if (saveState === 'dirty' || saveState === 'saving') {
-    issues.push({
-      id: 'save-state',
-      level: 'warning',
-      pageIndex: 0,
-      message: saveState === 'saving' ? 'Идёт сохранение draft' : 'Есть несохранённые изменения',
-    });
-  }
+  void saveState;
 
   return {
     photoFields,

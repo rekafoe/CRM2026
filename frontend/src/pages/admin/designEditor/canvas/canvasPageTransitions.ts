@@ -128,6 +128,25 @@ async function emitSpreadPageThumbs(
   }
 }
 
+function schedulePageThumbEmit(input: {
+  canvas: Canvas;
+  targetKey: string;
+  parsedNext: NonNullable<ReturnType<typeof parsePageLoadKey>>;
+  pageLoadKeyRef: { current: string };
+  pageThumbReady: ((pageIndex: number, thumbUrl: string) => void) | undefined;
+}): void {
+  const { canvas, targetKey, parsedNext, pageLoadKeyRef, pageThumbReady } = input;
+  if (!pageThumbReady) return;
+  window.setTimeout(() => {
+    if (pageLoadKeyRef.current !== targetKey) return;
+    if (parsedNext.type === 'spread') {
+      void emitSpreadPageThumbs(canvas, parsedNext.left, parsedNext.right, pageThumbReady);
+      return;
+    }
+    void emitSinglePageThumb(canvas, parsedNext.index, pageThumbReady);
+  }, 80);
+}
+
 /** Async split/save outgoing page + load incoming page/spread by pageLoadKey. */
 export async function runPageLoadKeyTransition({
   canvas,
@@ -213,12 +232,17 @@ export async function runPageLoadKeyTransition({
     const snap = JSON.stringify(canvasToJSON(canvas));
     historyRef.current.reset(snap);
 
-    if (parsedNext?.type === 'spread') {
-      await emitSpreadPageThumbs(canvas, parsedNext.left, parsedNext.right, pageThumbReadyRef.current);
-    } else if (parsedNext?.type === 'single') {
-      if (shouldEmitIncomingThumb(canvas, parsedNext.index)) {
-        await emitSinglePageThumb(canvas, parsedNext.index, pageThumbReadyRef.current);
-      }
+    if (
+      parsedNext?.type === 'spread'
+      || (parsedNext?.type === 'single' && shouldEmitIncomingThumb(canvas, parsedNext.index))
+    ) {
+      schedulePageThumbEmit({
+        canvas,
+        targetKey,
+        parsedNext,
+        pageLoadKeyRef,
+        pageThumbReady: pageThumbReadyRef.current,
+      });
     }
 
     prevPageLoadKeyRef.current = targetKey;

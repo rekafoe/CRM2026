@@ -761,9 +761,12 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   }, [handleIssueFocus, isMobile]);
 
   const handleTaskTabChange = useCallback((tab: PublicDesignTaskTab) => {
+    if (tab === 'check') {
+      void canvasHandleRef.current?.flushPendingDocumentCommit?.();
+    }
     setActiveTaskTab(tab);
     if (isMobile && tab === 'check') setMobilePanel('check');
-  }, [isMobile]);
+  }, [canvasHandleRef, isMobile]);
 
   useEffect(() => {
     if (!isMobile || activeTaskTab !== 'check') return;

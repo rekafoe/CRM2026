@@ -18,6 +18,7 @@ export interface TextFormattingHandlers {
   onUnderlineToggle: () => void;
   onTextAlignChange: (align: string) => void;
   onLineHeightChange: (lineHeight: number) => void;
+  onEditText: () => void;
   onDuplicate: () => void;
   onBringForward: () => void;
   onDelete: () => void;
@@ -48,6 +49,7 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
   onUnderlineToggle,
   onTextAlignChange,
   onLineHeightChange,
+  onEditText,
   onDuplicate,
   onBringForward,
   onDelete,
@@ -97,6 +99,15 @@ export const TextFormattingControls: React.FC<TextFormattingControlsProps> = ({
 
   const controls = (
     <>
+      <button
+        type="button"
+        className="text-floating-toolbar__edit"
+        onClick={onEditText}
+        title="Редактировать текст"
+      >
+        Текст
+      </button>
+
       <select
         className="text-floating-toolbar__select text-floating-toolbar__select--font"
         value={selectedObj.fontFamily ?? TEXT_FONTS[0].value}

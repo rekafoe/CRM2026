@@ -588,6 +588,11 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
             return true;
           }
 
+          if (isDoubleTap && isCoarsePointerEnvironment()) {
+            openTextEditSheetRef.current(target);
+            return true;
+          }
+
           if (isDoubleTap && !isCoarsePointerEnvironment()) {
             beginTextEditingOnCanvas(canvas, target, inlineTextEditSessionRef, captureTextEditBaseline);
           }
@@ -722,11 +727,15 @@ export function registerCanvasEventHandlers(deps: CanvasEventHandlerDeps): () =>
 
         canvas.on('mouse:dblclick', (opt) => {
           const raw = opt.target as FabricObject | undefined;
-          if (raw && isTextLikeObject(raw)) {
-            if (shouldPreferTextEditSheet(modeRef.current)) {
-              openTextEditSheetRef.current(raw);
+          const scene = scenePointFromInteractionEvent(canvas, opt.e);
+          const target = raw && isTextLikeObject(raw)
+            ? raw
+            : resolveInteractiveTargetAtScene(canvas, scene.x, scene.y, raw);
+          if (target && isTextLikeObject(target)) {
+            if (shouldPreferTextEditSheet(modeRef.current) || isCoarsePointerEnvironment()) {
+              openTextEditSheetRef.current(target);
             } else if (!isCoarsePointerEnvironment()) {
-              beginTextEditingOnCanvas(canvas, raw, inlineTextEditSessionRef, captureTextEditBaseline);
+              beginTextEditingOnCanvas(canvas, target, inlineTextEditSessionRef, captureTextEditBaseline);
             }
             return;
           }

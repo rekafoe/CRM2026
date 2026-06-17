@@ -45,6 +45,10 @@ export function usePublicDesignTextFormatting(
     canvasHandleRef.current?.setTextProp('lineHeight', lineHeight);
   }, [canvasHandleRef]);
 
+  const handleEditText = useCallback(() => {
+    canvasHandleRef.current?.openTextEditSheetForActive();
+  }, [canvasHandleRef]);
+
   return {
     onFontChange: handleFontChange,
     onFontSizeChange: handleFontSizeChange,
@@ -55,6 +59,7 @@ export function usePublicDesignTextFormatting(
     onUnderlineToggle: handleUnderlineToggle,
     onTextAlignChange: handleTextAlignChange,
     onLineHeightChange: handleLineHeightChange,
+    onEditText: handleEditText,
     onDuplicate: () => canvasHandleRef.current?.duplicateSelected(),
     onBringForward: () => canvasHandleRef.current?.bringForward(),
     onDelete: () => canvasHandleRef.current?.deleteSelected(),

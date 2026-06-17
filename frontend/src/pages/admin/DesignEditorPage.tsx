@@ -1203,6 +1203,7 @@ export const DesignEditorPage: React.FC = () => {
               onUnderlineToggle={handleUnderlineToggle}
               onTextAlignChange={handleTextAlignChange}
               onLineHeightChange={handleLineHeightChange}
+              onEditText={() => activeCanvas()?.openTextEditSheetForActive()}
               onDuplicate={() => activeCanvas()?.duplicateSelected()}
               onBringForward={() => activeCanvas()?.bringForward()}
               onDelete={() => activeCanvas()?.deleteSelected()}

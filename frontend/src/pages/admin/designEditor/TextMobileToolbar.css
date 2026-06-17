@@ -1,13 +1,21 @@
 .text-mobile-toolbar {
-  flex: 0 0 auto;
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 9500;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
-  padding: 8px 10px 10px;
+  max-height: min(58dvh, 430px);
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
   background: #ffffff;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: none;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -16px 34px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
 }
 
 .text-mobile-toolbar__head {
@@ -26,8 +34,8 @@
 
 .text-mobile-toolbar__edit-btn {
   flex-shrink: 0;
-  min-height: 36px;
-  padding: 0 12px;
+  min-height: 40px;
+  padding: 0 14px;
   color: #ffffff;
   background: linear-gradient(135deg, #00a6d6, #2563eb);
   border: none;
@@ -45,8 +53,8 @@
 .text-mobile-toolbar__text-field textarea {
   box-sizing: border-box;
   width: 100%;
-  min-height: 52px;
-  max-height: 96px;
+  min-height: 72px;
+  max-height: 128px;
   padding: 10px 12px;
   color: #0f172a;
   font-size: 16px;
@@ -81,18 +89,55 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: min-content;
   padding-bottom: 2px;
 }
 
 .text-mobile-toolbar .text-floating-toolbar__select--font {
-  min-width: 108px;
-  max-width: 132px;
+  min-width: 172px;
+  max-width: 220px;
 }
 
 .text-mobile-toolbar .text-floating-toolbar__select--narrow {
-  min-width: 96px;
+  min-width: 132px;
+}
+
+.text-mobile-toolbar .text-floating-toolbar__select,
+.text-mobile-toolbar .text-floating-toolbar__size,
+.text-mobile-toolbar .text-floating-toolbar__icon-btn,
+.text-mobile-toolbar .text-floating-toolbar__color,
+.text-mobile-toolbar .text-floating-toolbar__edit {
+  height: 40px;
+}
+
+.text-mobile-toolbar .text-floating-toolbar__select {
+  padding: 0 14px;
+  font-size: 15px;
+}
+
+.text-mobile-toolbar .text-floating-toolbar__size {
+  flex-shrink: 0;
+  min-width: 104px;
+}
+
+.text-mobile-toolbar .text-floating-toolbar__size-input {
+  width: 58px;
+  font-size: 16px;
+}
+
+.text-mobile-toolbar .text-floating-toolbar__step {
+  min-width: 34px;
+  font-size: 14px;
+}
+
+.text-mobile-toolbar .text-floating-toolbar__icon-btn,
+.text-mobile-toolbar .text-floating-toolbar__color {
+  width: 40px;
+}
+
+.text-mobile-toolbar .text-floating-toolbar__edit {
+  display: none;
 }
 
 .text-mobile-toolbar .text-floating-toolbar__fx,

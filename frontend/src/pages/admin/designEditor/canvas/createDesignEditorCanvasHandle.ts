@@ -707,7 +707,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
           return d.openTextEditSheetForTarget(active);
         }
         if (isCoarsePointerEnvironment()) {
-          return true;
+          return d.openTextEditSheetForTarget(active);
         }
         beginTextEditingOnCanvas(canvas, active, d.inlineTextEditSessionRef, d.captureTextEditBaseline);
         return true;
