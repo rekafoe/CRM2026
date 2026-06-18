@@ -258,6 +258,10 @@ function parseItemParams(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }
 
+function readProductionDesignState(payload: Record<string, unknown>): unknown {
+  return payload.productionDesignState ?? payload.designState
+}
+
 export async function createEditorDraftFromOrderItem(input: {
   orderId: number
   orderItemId: number
@@ -336,7 +340,8 @@ export async function finalizeEditorDraft(
 
   const draftPayload = draft.payloadParsed
   const draftMode = typeof draft.mode === 'string' ? draft.mode : 'single'
-  if (draftMode === 'multipage' && draftPayload.designState) {
+  const orderDesignState = readProductionDesignState(draftPayload)
+  if (draftMode === 'multipage' && orderDesignState) {
     const selectedParams = isRecord(draftPayload.selectedParams) ? draftPayload.selectedParams : {}
     const orderPages =
       readOrderItemPagesParam({ pages: selectedParams.pages, specifications: selectedParams }) ??
@@ -345,7 +350,7 @@ export async function finalizeEditorDraft(
       strict: true,
       editorDraftMode: 'multipage',
       orderPages,
-      designState: draftPayload.designState,
+      designState: orderDesignState,
     })
   }
 
@@ -356,7 +361,7 @@ export async function finalizeEditorDraft(
         ...(item.params ?? {}),
         editorDraftToken: token,
         designTemplateId: draft.design_template_id ?? undefined,
-        designState: draftPayload.designState,
+        designState: orderDesignState,
         photoBatch: draftPayload.photoBatch,
         selectedEditorParams: draftPayload.selectedParams,
         editorItemIndex: index,
@@ -370,7 +375,7 @@ export async function finalizeEditorDraft(
         description: 'Макет из онлайн-редактора',
         editorDraftToken: token,
         designTemplateId: draft.design_template_id ?? undefined,
-        designState: draftPayload.designState,
+        designState: orderDesignState,
         photoBatch: draftPayload.photoBatch,
         selectedEditorParams: draftPayload.selectedParams,
       },

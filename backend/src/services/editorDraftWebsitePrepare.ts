@@ -17,6 +17,10 @@ function parseDesignState(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>
 }
 
+function readProductionDesignState(payload: Record<string, unknown>): Record<string, unknown> | null {
+  return parseDesignState(payload.productionDesignState) ?? parseDesignState(payload.designState)
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   return value as Record<string, unknown>
@@ -118,12 +122,12 @@ async function loadDraftForToken(token: string, positionLabel: string): Promise<
   if (!draft) throw new Error(`Editor draft не найден для позиции ${positionLabel}`)
   if (draft.status !== 'draft') throw new Error(`Editor draft уже использован для позиции ${positionLabel}`)
   const payload = draft.payloadParsed
-  if (!payload.designState && !payload.photoBatch) {
+  if (!payload.designState && !payload.productionDesignState && !payload.photoBatch) {
     throw new Error(`Editor draft пустой для позиции ${positionLabel}`)
   }
   return {
     draft,
-    designState: parseDesignState(payload.designState),
+    designState: readProductionDesignState(payload),
   }
 }
 
@@ -216,11 +220,11 @@ export async function prepareWebsiteItemsWithEditorDrafts<
       ...params,
       editorDraftToken: token,
       designTemplateId: loaded.draft.design_template_id ?? undefined,
-      designState: payload.designState,
+      designState: readProductionDesignState(payload),
       photoBatch: payload.photoBatch,
       selectedEditorParams: payload.selectedParams,
       editorDraftMode: loaded.draft.mode,
-    }, payload.designState)
+    }, readProductionDesignState(payload))
 
     nextItems.push({ ...item, params: itemParams })
     editorDraftItems.push({ index, tokens: [token] })

@@ -19,6 +19,28 @@ import type { ResolveImageFileUrl } from './types';
 import { asAny } from './canvasUtils';
 import { prepareImageFileForCanvasSafeMode } from './photoUploadCanvasSafeMode';
 
+async function resolveCanvasAndOriginalImageUrls(
+  file: File,
+  resolveImageFileUrl?: ResolveImageFileUrl,
+  onUploadProgress?: (progress: number) => void,
+): Promise<{
+  canvasFile: File;
+  previewUrl: string | null;
+  originalUrl: string | null;
+}> {
+  const canvasFile = await prepareImageFileForCanvasSafeMode(file);
+  const shouldUploadOriginal = canvasFile !== file && !!resolveImageFileUrl;
+  const originalUrl = shouldUploadOriginal
+    ? await resolveImageFileUrl(file)
+    : null;
+  const previewUrl = await resolveImageFileUrl?.(canvasFile, onUploadProgress) ?? null;
+  return {
+    canvasFile,
+    previewUrl,
+    originalUrl: originalUrl ?? previewUrl,
+  };
+}
+
 export async function addImageFileToCanvas(
   canvas: Canvas,
   file: File,
@@ -79,8 +101,11 @@ export async function fillPhotoField(
   afterFill?: () => void,
   onUploadProgress?: (progress: number) => void,
 ): Promise<void> {
-  const canvasFile = await prepareImageFileForCanvasSafeMode(file);
-  const stableUrl = await resolveImageFileUrl?.(canvasFile, onUploadProgress);
+  const {
+    canvasFile,
+    previewUrl: stableUrl,
+    originalUrl,
+  } = await resolveCanvasAndOriginalImageUrls(file, resolveImageFileUrl, onUploadProgress);
   const url = stableUrl || URL.createObjectURL(canvasFile);
   try {
     const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
@@ -123,6 +148,12 @@ export async function fillPhotoField(
       fileSize: canvasFile.size,
       clientAdded: isClientAddedPhotoField(f),
     });
+    const groupMeta = asAny(group);
+    groupMeta.photoFieldPreviewSrc = stableUrl ?? url;
+    groupMeta.photoFieldOriginalSrc = originalUrl ?? stableUrl ?? url;
+    groupMeta.photoFieldOriginalName = file.name;
+    groupMeta.photoFieldOriginalMime = file.type;
+    groupMeta.photoFieldOriginalSize = file.size;
 
     if (parent != null && stackIndex >= 0) {
       parent.insertAt(stackIndex, group);

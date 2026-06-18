@@ -75,6 +75,11 @@ export const FABRIC_CUSTOM_PROPS = [
   'photoFieldIntrinsicW',
   'photoFieldIntrinsicH',
   'photoFieldFileSize',
+  'photoFieldPreviewSrc',
+  'photoFieldOriginalSrc',
+  'photoFieldOriginalName',
+  'photoFieldOriginalMime',
+  'photoFieldOriginalSize',
   /** Метаданные split/merge разворота для устранения дублирования cross-seam объектов. */
   'spreadMirrorId',
   'spreadMirrorSide',

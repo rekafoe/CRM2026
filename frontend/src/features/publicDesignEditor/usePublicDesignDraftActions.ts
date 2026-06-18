@@ -20,6 +20,7 @@ import {
   recordPublicEditorPerfMetric,
   startPublicEditorPerfSpan,
 } from './publicEditorPerf';
+import { buildProductionDesignState } from './productionDesignState';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -87,14 +88,18 @@ function hashPayloadRaw(raw: string): string {
 
 function buildAutosavePayloadDigest(input: {
   designState: Record<string, unknown>;
+  productionDesignState: Record<string, unknown>;
   selectedParams: Record<string, unknown> | undefined;
 }): {
   hash: string;
   bytes: number;
 } {
   const designStateRaw = JSON.stringify(input.designState);
+  const productionDesignStateRaw = JSON.stringify(input.productionDesignState);
   const selectedParamsRaw = input.selectedParams ? JSON.stringify(input.selectedParams) : '';
-  const raw = selectedParamsRaw ? `${designStateRaw}|${selectedParamsRaw}` : designStateRaw;
+  const raw = selectedParamsRaw
+    ? `${designStateRaw}|${productionDesignStateRaw}|${selectedParamsRaw}`
+    : `${designStateRaw}|${productionDesignStateRaw}`;
   return {
     hash: hashPayloadRaw(raw),
     bytes: raw.length * 2,
@@ -287,8 +292,10 @@ export function usePublicDesignDraftActions({
         await hydrateDraftVersion(token).catch(() => undefined);
       }
       const { designState, selectedParams: nextSelectedParams } = buildCurrentDesignState();
+      const productionDesignState = buildProductionDesignState(designState);
       const digest = buildAutosavePayloadDigest({
         designState: designState as unknown as Record<string, unknown>,
+        productionDesignState: productionDesignState as unknown as Record<string, unknown>,
         selectedParams: nextSelectedParams,
       });
       recordPublicEditorPerfMetric('autosave.payload.bytes', digest.bytes, {
@@ -306,7 +313,7 @@ export function usePublicDesignDraftActions({
         return;
       }
 
-      const patch: Record<string, unknown> = { designState };
+      const patch: Record<string, unknown> = { designState, productionDesignState };
       if (nextSelectedParams) patch.selectedParams = nextSelectedParams;
       if (!options?.skipExpectedVersion && draftVersionRef.current != null) {
         patch.expectedVersion = draftVersionRef.current;
