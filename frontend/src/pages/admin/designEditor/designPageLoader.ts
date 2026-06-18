@@ -11,6 +11,13 @@ type AnyObj = Record<string, unknown>;
 
 const svgDataUrlCache = new Map<string, string>();
 
+type DeferredBackground = Record<string, unknown>;
+
+type PreparedFabricJson = {
+  json: Record<string, unknown>;
+  deferredBackgrounds: DeferredBackground[];
+};
+
 export function fabricDeserializeReviver(
   serializedObj: Record<string, unknown>,
   instance: unknown,
@@ -86,10 +93,59 @@ async function inlineSvgImageSources(value: unknown): Promise<void> {
   await Promise.all(Object.values(record).map((nested) => inlineSvgImageSources(nested)));
 }
 
-async function prepareFabricJsonForLoad(fabricJson: Record<string, unknown>): Promise<Record<string, unknown>> {
+function collectDeferredSvgBackgrounds(value: unknown, deferred: DeferredBackground[]): void {
+  if (!value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    for (let index = value.length - 1; index >= 0; index -= 1) {
+      const item = value[index];
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        const record = item as Record<string, unknown>;
+        if (record.isBackground === true && typeof record.src === 'string' && isSvgImageUrl(record.src)) {
+          deferred.unshift(record);
+          value.splice(index, 1);
+          continue;
+        }
+      }
+      collectDeferredSvgBackgrounds(item, deferred);
+    }
+    return;
+  }
+  for (const nested of Object.values(value)) collectDeferredSvgBackgrounds(nested, deferred);
+}
+
+async function prepareFabricJsonForLoad(fabricJson: Record<string, unknown>): Promise<PreparedFabricJson> {
   const prepared = deepCloneFabricJson(fabricJson);
+  const deferredBackgrounds: DeferredBackground[] = [];
+  collectDeferredSvgBackgrounds(prepared.objects, deferredBackgrounds);
   await inlineSvgImageSources(prepared);
-  return prepared;
+  await inlineSvgImageSources(deferredBackgrounds);
+  return { json: prepared, deferredBackgrounds };
+}
+
+async function addDeferredBackgrounds(canvas: Canvas, backgrounds: DeferredBackground[]): Promise<void> {
+  for (const background of backgrounds) {
+    const src = typeof background.src === 'string' ? background.src : '';
+    if (!src) continue;
+    try {
+      const img = await FabricImage.fromURL(src, src.startsWith('data:') ? {} : { crossOrigin: 'anonymous' });
+      const props = { ...background };
+      delete props.src;
+      delete props.type;
+      delete props.version;
+      img.set(props);
+      for (const key of FABRIC_CUSTOM_PROPS) {
+        if (Object.prototype.hasOwnProperty.call(background, key)) {
+          asAny(img)[key] = background[key];
+        }
+      }
+      asAny(img).isBackground = true;
+      img.set({ selectable: false, evented: false });
+      canvas.add(img);
+      canvas.sendObjectToBack(img);
+    } catch {
+      // SVG backgrounds are decorative; never block the rest of the page.
+    }
+  }
 }
 
 function getFabricJsonObjects(value: Record<string, unknown> | null): Record<string, unknown>[] {
@@ -268,7 +324,9 @@ export async function loadDesignPageScene(input: {
     (canvas as unknown as AnyObj).backgroundColor = 'white';
     try {
       // Не даём Fabric мутировать snapshot страницы в React state при переходах.
-      await canvas.loadFromJSON(await prepareFabricJsonForLoad(fabricJson), fabricDeserializeReviver);
+      const prepared = await prepareFabricJsonForLoad(fabricJson);
+      await canvas.loadFromJSON(prepared.json, fabricDeserializeReviver);
+      await addDeferredBackgrounds(canvas, prepared.deferredBackgrounds);
     } catch {
       canvas.clear();
       (canvas as unknown as AnyObj).backgroundColor = 'white';
@@ -309,7 +367,9 @@ export async function loadSpreadMergedScene(input: {
     canvas.setDimensions({ width: pageW * 2, height: pageH });
     (canvas as unknown as AnyObj).backgroundColor = 'white';
     try {
-      await canvas.loadFromJSON(await prepareFabricJsonForLoad(mergedJson), fabricDeserializeReviver);
+      const prepared = await prepareFabricJsonForLoad(mergedJson);
+      await canvas.loadFromJSON(prepared.json, fabricDeserializeReviver);
+      await addDeferredBackgrounds(canvas, prepared.deferredBackgrounds);
       ensureWhiteCanvasBackground(canvas);
       await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
       canvas.renderAll();
