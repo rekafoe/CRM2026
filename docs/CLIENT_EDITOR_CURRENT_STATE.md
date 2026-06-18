@@ -28,6 +28,7 @@ Important: when changing editor code, update the CRM source first and mirror the
 
 ### Canvas Stability
 
+- Mobile Safari SVG fallback: template SVG background images are now deferred and, on iPhone Safari, parsed into Fabric vector objects instead of being painted through `drawImage(svg)`. This targets the case where objects are selectable but the page background/text appears grey or invisible.
 - Follow-up fix: page transitions now commit the outgoing live canvas into `pages[]` inside `runPageLoadKeyTransition()` before loading the incoming page/spread. This prevents page switching from depending only on external debounced flush timing.
 - Stability reset (race hardening): pending document commits are now stamped by `pageLoadKey` and invalidated on page transitions; stale delayed commits can no longer overwrite a newly loaded page state.
 - `flushPendingDocumentCommit()` now waits for page transition idle before commit instead of returning early under lock.
