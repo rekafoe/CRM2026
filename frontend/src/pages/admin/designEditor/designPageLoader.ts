@@ -9,6 +9,8 @@ import { PUBLIC_EDITOR_DEV, recordPublicEditorPerfMetric } from '../../../featur
 
 type AnyObj = Record<string, unknown>;
 
+const svgDataUrlCache = new Map<string, string>();
+
 export function fabricDeserializeReviver(
   serializedObj: Record<string, unknown>,
   instance: unknown,
@@ -40,6 +42,54 @@ function deepCloneFabricJson(value: Record<string, unknown>): Record<string, unk
   } catch {
     return { ...value, objects: Array.isArray(value.objects) ? [...value.objects] : [] };
   }
+}
+
+function isSvgImageUrl(url: string): boolean {
+  return /\.svg(?:$|[?#])/i.test(url);
+}
+
+function svgTextToDataUrl(svgText: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgText)}`;
+}
+
+async function resolveSvgImageDataUrl(src: string): Promise<string | null> {
+  if (!isSvgImageUrl(src) || src.startsWith('data:')) return null;
+  const cached = svgDataUrlCache.get(src);
+  if (cached) return cached;
+  try {
+    const response = await fetch(src, { credentials: 'same-origin' });
+    if (!response.ok) return null;
+    const svgText = await response.text();
+    if (!/<svg[\s>]/i.test(svgText)) return null;
+    const dataUrl = svgTextToDataUrl(svgText);
+    svgDataUrlCache.set(src, dataUrl);
+    return dataUrl;
+  } catch {
+    return null;
+  }
+}
+
+async function inlineSvgImageSources(value: unknown): Promise<void> {
+  if (!value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    await Promise.all(value.map((item) => inlineSvgImageSources(item)));
+    return;
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.src === 'string') {
+    const dataUrl = await resolveSvgImageDataUrl(record.src);
+    if (dataUrl) {
+      record.src = dataUrl;
+      delete record.crossOrigin;
+    }
+  }
+  await Promise.all(Object.values(record).map((nested) => inlineSvgImageSources(nested)));
+}
+
+async function prepareFabricJsonForLoad(fabricJson: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const prepared = deepCloneFabricJson(fabricJson);
+  await inlineSvgImageSources(prepared);
+  return prepared;
 }
 
 function getFabricJsonObjects(value: Record<string, unknown> | null): Record<string, unknown>[] {
@@ -218,7 +268,7 @@ export async function loadDesignPageScene(input: {
     (canvas as unknown as AnyObj).backgroundColor = 'white';
     try {
       // Не даём Fabric мутировать snapshot страницы в React state при переходах.
-      await canvas.loadFromJSON(deepCloneFabricJson(fabricJson), fabricDeserializeReviver);
+      await canvas.loadFromJSON(await prepareFabricJsonForLoad(fabricJson), fabricDeserializeReviver);
     } catch {
       canvas.clear();
       (canvas as unknown as AnyObj).backgroundColor = 'white';
@@ -259,7 +309,7 @@ export async function loadSpreadMergedScene(input: {
     canvas.setDimensions({ width: pageW * 2, height: pageH });
     (canvas as unknown as AnyObj).backgroundColor = 'white';
     try {
-      await canvas.loadFromJSON(mergedJson, fabricDeserializeReviver);
+      await canvas.loadFromJSON(await prepareFabricJsonForLoad(mergedJson), fabricDeserializeReviver);
       ensureWhiteCanvasBackground(canvas);
       await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
       canvas.renderAll();
