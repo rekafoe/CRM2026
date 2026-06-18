@@ -51,7 +51,12 @@ export const PUBLIC_EDITOR_DEV = (() => {
     // Ignore: non-Vite runtimes may not expose import.meta.env
   }
   const scope = globalThis as { process?: { env?: Record<string, string | undefined> } };
-  return scope.process?.env?.NODE_ENV !== 'production';
+  const nodeEnv = scope.process?.env?.NODE_ENV;
+  if (typeof nodeEnv === 'string' && nodeEnv.length > 0) {
+    return nodeEnv !== 'production';
+  }
+  // Safe default for runtimes without Vite env or process.env.
+  return false;
 })();
 
 function trimSamples(samples: MetricSample[]): void {

@@ -146,9 +146,6 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
                 error: transitionError,
               });
             }
-            if (requestedKeyRef.current === targetKey) {
-              prevPageLoadKeyRef.current = null;
-            }
             continue;
           }
           const invariantError = getPageTransitionInvariantError({
@@ -174,7 +171,6 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
               invariantRetryCount = 1;
             }
             if (invariantRetryCount <= 2) {
-              prevPageLoadKeyRef.current = null;
               loadedPageForInstanceRef.current = -1;
               continue;
             }

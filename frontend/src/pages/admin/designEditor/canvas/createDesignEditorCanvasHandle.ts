@@ -76,6 +76,7 @@ export interface DesignEditorCanvasHandleDeps {
   inlineTextEditSessionRef: MutableRefObject<boolean>;
   scheduleTextAnchorRef: MutableRefObject<(() => void) | null>;
   resolveImageFileUrlRef: MutableRefObject<ResolveImageFileUrl | undefined>;
+  prevPageLoadKeyRef: MutableRefObject<string | null>;
   safeZonePx: number;
   apiBaseUrl: string;
   undo: () => void;
@@ -714,6 +715,7 @@ export function createDesignEditorCanvasHandle(d: DesignEditorCanvasHandleDeps):
       },
       whenPageTransitionIdle: () => d.pageTransitionGate.waitUntilIdle(),
       isPageTransitionBusy: () => d.pageTransitionGate.isBusy(),
+      getDisplayedPageLoadKey: () => d.prevPageLoadKeyRef.current,
       flushPendingDocumentCommit: () => d.flushCanvasDocumentCommit(),
     };
 }

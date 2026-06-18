@@ -1403,6 +1403,57 @@
   border: 1px solid #fde68a;
 }
 
+.public-design-editor__page-count-notice-modal {
+  border-radius: 20px;
+}
+
+.public-design-editor__page-count-notice-body {
+  padding-top: 16px;
+}
+
+.public-design-editor__page-count-notice {
+  display: grid;
+  gap: 12px;
+}
+
+.public-design-editor__page-count-notice-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--pc-blue);
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+}
+
+.public-design-editor__page-count-notice-message {
+  margin: 0;
+  color: var(--pc-ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.public-design-editor__page-count-notice-hint {
+  margin: 0;
+  color: var(--pc-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.public-design-editor__page-count-notice-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.public-design-editor__page-count-notice-button {
+  min-width: 140px;
+}
+
 @media (max-width: 640px) {
   .public-design-editor__checkout-preview {
     padding: 10px;
@@ -1425,7 +1476,7 @@
 }
 
 @media (max-width: 1180px) {
-  .public-design-editor__topbar {
+  .public-design-editor__topbar:not(.public-design-editor__topbar--client-actions) {
     grid-template-columns: 1fr;
   }
 

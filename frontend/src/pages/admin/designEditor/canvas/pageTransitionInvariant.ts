@@ -17,7 +17,6 @@ export function getPageTransitionInvariantError(input: {
   const {
     result,
     targetKey,
-    requestedKey,
     displayedKey,
     loadedCanvasInstance,
     expectedCanvasInstance,
@@ -34,9 +33,6 @@ export function getPageTransitionInvariantError(input: {
   }
   if (result.objectCountBeforeFlush < 0 || result.objectCountAfterLoad < 0) {
     return 'Page transition has invalid object count metrics.';
-  }
-  if (requestedKey !== targetKey) {
-    return `Page transition invariant mismatch: requested=${requestedKey}, target=${targetKey}`;
   }
   return null;
 }

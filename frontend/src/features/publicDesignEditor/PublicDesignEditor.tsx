@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ConfirmDialog, Modal } from '../../components/common';
+import { Alert, Button, ConfirmDialog, Modal } from '../../components/common';
+import { AppIcon } from '../../components/ui/AppIcon';
 import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/DesignEditorCanvas';
 import type { GuideLine } from '../../pages/admin/designEditor/CanvasRulers';
 import { EMPTY_PAGE, MM_TO_PX } from '../../pages/admin/designEditor/constants';
@@ -134,6 +135,8 @@ interface PublicDesignEditorProps {
   showFinalizeButton?: boolean;
   documentMode?: PublicDesignDocumentMode;
   onReadyForCart?: (draftToken: string) => void;
+  showClientActionBar?: boolean;
+  orderButtonLabel?: string;
   selectedParams?: Record<string, unknown>;
   pageCountLimits?: PublicDesignPageCountLimits;
   onPageCountChange?: (pageCount: number) => void;
@@ -148,6 +151,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
   showFinalizeButton = false,
   documentMode = 'single',
   onReadyForCart,
+  showClientActionBar = false,
+  orderButtonLabel = 'Заказать',
   selectedParams,
   pageCountLimits,
   onPageCountChange,
@@ -1079,6 +1084,53 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     ? ({ 'data-pde-build': 'client-desktop-main-column' } as const)
     : undefined;
 
+  const handlePreviewCheckout = () => {
+    openCheckoutPreviewAfterFlush();
+  };
+
+  const clientActionBar = showClientActionBar ? (
+    <div className="public-design-editor__client-actionbar" aria-label="Действия с макетом">
+      <div className="public-design-editor__client-actionbar-secondary">
+        <button
+          type="button"
+          className="public-design-editor__client-action public-design-editor__client-action--save"
+          onClick={() => void handleSaveDraft(false)}
+          disabled={saving}
+        >
+          <AppIcon name="save" size="sm" />
+          <span className="public-design-editor__client-action-label">Дизайн/Сохранить</span>
+          <span className="public-design-editor__client-action-chevron" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="public-design-editor__client-action public-design-editor__client-action--preview"
+          onClick={handlePreviewCheckout}
+          disabled={saving}
+        >
+          <AppIcon name="image" size="sm" />
+          <span className="public-design-editor__client-action-label">Предпросмотр</span>
+        </button>
+      </div>
+      <button
+        type="button"
+        className="public-design-editor__client-action public-design-editor__client-action--order"
+        onClick={() => void handleReadyForCart()}
+        disabled={saving}
+      >
+        {saving ? (
+          'Готовим заказ...'
+        ) : (
+          <>
+            <span className="public-design-editor__client-action-order-label">{orderButtonLabel}</span>
+            <span className="public-design-editor__client-action-order-label public-design-editor__client-action-order-label--compact">
+              Заказать
+            </span>
+          </>
+        )}
+      </button>
+    </div>
+  ) : null;
+
   return (
     <div className={editorRootClassName} {...editorRootDevProps}>
       {!isMobile && (
@@ -1089,7 +1141,9 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
           saveState={saveState}
           helpOpen={helpOpen}
           onSaveRetry={() => void handleSaveDraft(false)}
-          onHelpToggle={() => setHelpOpen((open) => !open)}
+          onHelpToggle={showClientActionBar ? undefined : () => setHelpOpen((open) => !open)}
+          actionBar={clientActionBar}
+          hideIdleSaveChip={showClientActionBar}
         />
       )}
 
@@ -1246,19 +1300,27 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
       <Modal
         isOpen={pageCountNotice != null}
         onClose={() => setPageCountNotice(null)}
-        title="Страницы добавлены"
+        title="Количество страниц скорректировано"
         size="sm"
+        className="public-design-editor__page-count-notice-modal"
+        bodyClassName="public-design-editor__page-count-notice-body"
       >
-        <div className="flex flex-col gap-4">
-          <p className="text-primary">{pageCountNotice}</p>
-          <div className="flex justify-end border-t border-color pt-4">
-            <button
+        <div className="public-design-editor__page-count-notice">
+          <div className="public-design-editor__page-count-notice-icon" aria-hidden="true">
+            <AppIcon name="info" size="sm" />
+          </div>
+          <p className="public-design-editor__page-count-notice-message">{pageCountNotice}</p>
+          <p className="public-design-editor__page-count-notice-hint">
+            Новые страницы уже добавлены в макет. Можно продолжать редактирование.
+          </p>
+          <div className="public-design-editor__page-count-notice-actions">
+            <Button
               type="button"
-              className="btn btn-primary"
               onClick={() => setPageCountNotice(null)}
+              className="public-design-editor__page-count-notice-button"
             >
               Понятно
-            </button>
+            </Button>
           </div>
         </div>
       </Modal>

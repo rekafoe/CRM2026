@@ -4,6 +4,7 @@ import type { DesignEditorCanvasHandle } from '../../pages/admin/designEditor/De
 import { EMPTY_PAGE } from '../../pages/admin/designEditor/constants';
 import type { PageSaveSnapshot } from '../../pages/admin/designEditor/mergePagesSnapshot';
 import { mergeSavedEditorPages } from '../../pages/admin/designEditor/designEditorState';
+import { parsePageLoadKey } from '../../pages/admin/designEditor/canvas/canvasSerialization';
 import type { DesignPage } from '../../pages/admin/designEditor/types';
 import { buildSpreadPageInsert, getLastInnerSpreadRange } from '../../pages/admin/designEditor/spreadUtils';
 import type { DesignDocumentNavigationState, PublicDesignDocumentMode } from './useDesignDocumentNavigation';
@@ -127,13 +128,32 @@ export function usePublicDesignPageActions({
     const handle = canvasHandleRef.current;
     if (!handle) return null;
     await handle.whenPageTransitionIdle?.();
+    const displayedKey = handle.getDisplayedPageLoadKey?.() ?? null;
+    const parsedDisplayed = displayedKey ? parsePageLoadKey(displayedKey) : null;
+    const mergeContext = parsedDisplayed?.type === 'spread'
+      ? {
+          currentPage: parsedDisplayed.left,
+          leftPageIdx: parsedDisplayed.left,
+          rightPageIdx: parsedDisplayed.right,
+        }
+      : parsedDisplayed?.type === 'single'
+        ? {
+            currentPage: parsedDisplayed.index,
+            leftPageIdx: -1,
+            rightPageIdx: -1,
+          }
+        : {
+            currentPage: currentPageRef.current,
+            leftPageIdx: pageMergeIndicesRef.current.leftPageIdx,
+            rightPageIdx: pageMergeIndicesRef.current.rightPageIdx,
+          };
     const saved = await handle.saveCurrentPage();
     const nextPages = mergeSavedEditorPages(
       pagesRef.current,
       saved as PageSaveSnapshot,
-      currentPageRef.current,
-      pageMergeIndicesRef.current.leftPageIdx,
-      pageMergeIndicesRef.current.rightPageIdx,
+      mergeContext.currentPage,
+      mergeContext.leftPageIdx,
+      mergeContext.rightPageIdx,
     );
     pendingPagesWriteRef.current = nextPages;
     pagesRef.current = nextPages;

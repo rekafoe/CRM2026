@@ -23,6 +23,8 @@ export interface ClientEditorRouterProps {
   adapter?: PublicDesignEditorAdapter;
   showFinalizeButton?: boolean;
   onReadyForCart?: (draftToken: string) => void;
+  showClientActionBar?: boolean;
+  orderButtonLabel?: string;
   selectedParams?: Record<string, unknown>;
   pageCountLimits?: PublicDesignPageCountLimits;
   onPageCountChange?: (pageCount: number) => void;
@@ -54,6 +56,8 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
   adapter = crmPreviewPublicDesignEditorAdapter,
   showFinalizeButton = false,
   onReadyForCart,
+  showClientActionBar = false,
+  orderButtonLabel = 'Заказать',
   selectedParams,
   pageCountLimits,
   onPageCountChange,
@@ -88,7 +92,7 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
           typeId={typeId}
           sizeId={sizeId}
         />
-      ) : templateId ? (
+      ) : templateId != null && Number.isFinite(templateId) ? (
         <PublicDesignEditor
           templateId={templateId}
           initialDraftToken={initialDraftToken}
@@ -97,6 +101,8 @@ export const ClientEditorRouter: React.FC<ClientEditorRouterProps> = ({
           documentMode={mode as PublicDesignDocumentMode}
           showFinalizeButton={showFinalizeButton}
           onReadyForCart={onReadyForCart}
+          showClientActionBar={showClientActionBar}
+          orderButtonLabel={orderButtonLabel}
           selectedParams={selectedParams}
           pageCountLimits={pageCountLimits}
           onPageCountChange={onPageCountChange}

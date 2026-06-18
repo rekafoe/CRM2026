@@ -142,6 +142,7 @@ export interface DesignEditorCanvasHandle {
   /** Дождаться завершения async-перехода страницы/разворота */
   whenPageTransitionIdle: () => Promise<void>;
   isPageTransitionBusy: () => boolean;
+  getDisplayedPageLoadKey: () => string | null;
   /** Сбросить отложенную синхронизацию live canvas → pages[] перед save/navigation. */
   flushPendingDocumentCommit: () => Promise<void>;
 }
@@ -523,6 +524,7 @@ export const DesignEditorCanvas = forwardRef<DesignEditorCanvasHandle, DesignEdi
       inlineTextEditSessionRef,
       scheduleTextAnchorRef,
       resolveImageFileUrlRef,
+      prevPageLoadKeyRef,
       safeZonePx,
       apiBaseUrl,
       undo,
