@@ -17,14 +17,16 @@ import {
 } from './canvasPhotoFieldFrame';
 import type { ResolveImageFileUrl } from './types';
 import { asAny } from './canvasUtils';
+import { prepareImageFileForCanvasSafeMode } from './photoUploadCanvasSafeMode';
 
 export async function addImageFileToCanvas(
   canvas: Canvas,
   file: File,
   resolveImageFileUrl?: ResolveImageFileUrl,
 ): Promise<void> {
-  const stableUrl = await resolveImageFileUrl?.(file);
-  const url = stableUrl || URL.createObjectURL(file);
+  const canvasFile = await prepareImageFileForCanvasSafeMode(file);
+  const stableUrl = await resolveImageFileUrl?.(canvasFile);
+  const url = stableUrl || URL.createObjectURL(canvasFile);
   try {
     const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
     const maxW = canvas.width! * 0.6;
@@ -77,8 +79,9 @@ export async function fillPhotoField(
   afterFill?: () => void,
   onUploadProgress?: (progress: number) => void,
 ): Promise<void> {
-  const stableUrl = await resolveImageFileUrl?.(file, onUploadProgress);
-  const url = stableUrl || URL.createObjectURL(file);
+  const canvasFile = await prepareImageFileForCanvasSafeMode(file);
+  const stableUrl = await resolveImageFileUrl?.(canvasFile, onUploadProgress);
+  const url = stableUrl || URL.createObjectURL(canvasFile);
   try {
     const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
     const f = field as unknown as Record<string, unknown>;
@@ -117,7 +120,7 @@ export async function fillPhotoField(
       panY,
       zoom,
       fitMode,
-      fileSize: file.size,
+      fileSize: canvasFile.size,
       clientAdded: isClientAddedPhotoField(f),
     });
 
