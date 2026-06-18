@@ -249,8 +249,10 @@
   width: calc(var(--de-content-w) * 1px);
   height: calc(var(--de-content-h) * 1px);
   overflow: hidden;
-  transform: scale(var(--de-fit-zoom, 1));
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0) scale(var(--de-fit-zoom, 1));
   transform-origin: top left;
+  will-change: transform;
 }
 
 .design-editor-contents {

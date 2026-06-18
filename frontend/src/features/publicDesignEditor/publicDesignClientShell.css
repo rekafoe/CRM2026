@@ -1186,8 +1186,10 @@
     width: calc(var(--de-content-w, 1) * 1px);
     height: calc(var(--de-content-h, 1) * 1px);
     overflow: hidden;
-    transform: scale(var(--de-fit-zoom, 1));
+    backface-visibility: hidden;
+    transform: translate3d(0, 0, 0) scale(var(--de-fit-zoom, 1));
     transform-origin: top left;
+    will-change: transform;
   }
 
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__page-strip {
