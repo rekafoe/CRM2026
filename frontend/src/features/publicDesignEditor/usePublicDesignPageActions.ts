@@ -114,6 +114,7 @@ export function usePublicDesignPageActions({
   currentPageRef.current = currentPage;
   const pageMergeIndicesRef = useRef({ leftPageIdx: navigation.leftPageIdx, rightPageIdx: navigation.rightPageIdx });
   pageMergeIndicesRef.current = { leftPageIdx: navigation.leftPageIdx, rightPageIdx: navigation.rightPageIdx };
+  const pageNavigationInFlightRef = useRef(false);
 
   const applyPagesUpdate = useCallback((updater: (prev: DesignPage[]) => DesignPage[]) => {
     setPages((prev) => {
@@ -242,16 +243,22 @@ export function usePublicDesignPageActions({
   ]);
 
   const handleGoToPage = useCallback(async (pageIndex: number) => {
-    await runNavigationTransaction(async () => {
-      const currentStripItem = navigation.stripItems.find((item) => item.pages.includes(currentPage));
-      const targetItem = navigation.stripItems.find(
-        (item) => item.goToPage === pageIndex || item.pages.includes(pageIndex),
-      );
-      if (!targetItem) return false;
-      if (currentStripItem === targetItem) return false;
-      setCurrentPage(targetItem.goToPage);
-      return true;
-    }, { markDirtyOnChange: false, flushBefore: false });
+    if (pageNavigationInFlightRef.current) return;
+    pageNavigationInFlightRef.current = true;
+    try {
+      await runNavigationTransaction(async () => {
+        const currentStripItem = navigation.stripItems.find((item) => item.pages.includes(currentPage));
+        const targetItem = navigation.stripItems.find(
+          (item) => item.goToPage === pageIndex || item.pages.includes(pageIndex),
+        );
+        if (!targetItem) return false;
+        if (currentStripItem === targetItem) return false;
+        setCurrentPage(targetItem.goToPage);
+        return true;
+      }, { markDirtyOnChange: false, flushBefore: false });
+    } finally {
+      pageNavigationInFlightRef.current = false;
+    }
   }, [currentPage, navigation.stripItems, runNavigationTransaction, setCurrentPage]);
 
   const handleAddClientPage = useCallback(async () => {
