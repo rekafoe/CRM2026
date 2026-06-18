@@ -10,6 +10,12 @@ import {
   recordPublicEditorDebugEvent,
   recordPublicEditorPerfMetric,
 } from '../../../features/publicDesignEditor/publicEditorPerf';
+import {
+  getIosSafariCanvasOptions,
+  hardenCanvasObjectsForIosSafari,
+  hardenFabricObjectForIosSafari,
+  isIosSafariCanvasSafeMode,
+} from './canvas/iosSafariCanvasSafeMode';
 
 type AnyObj = Record<string, unknown>;
 
@@ -114,11 +120,7 @@ function decodeSvgDataUrl(src: string): string | null {
 }
 
 function shouldLoadSvgBackgroundAsVector(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent;
-  return /Safari/i.test(ua)
-    && /(iPhone|iPad|iPod)/i.test(ua)
-    && !/(CriOS|FxiOS|EdgiOS|OPiOS)/i.test(ua);
+  return isIosSafariCanvasSafeMode();
 }
 
 async function resolveSvgImageDataUrl(src: string): Promise<string | null> {
@@ -247,7 +249,10 @@ async function loadSvgBackgroundAsVector(src: string): Promise<FabricObject | nu
     objectCount: objects.length,
     options: parsed.options,
   });
-  return util.groupSVGElements(objects, parsed.options);
+  objects.forEach(hardenFabricObjectForIosSafari);
+  const group = util.groupSVGElements(objects, parsed.options);
+  hardenFabricObjectForIosSafari(group);
+  return group;
 }
 
 async function addDeferredBackgrounds(canvas: Canvas, backgrounds: DeferredBackground[]): Promise<void> {
@@ -276,6 +281,7 @@ async function addDeferredBackgrounds(canvas: Canvas, backgrounds: DeferredBackg
       }
       asAny(obj).isBackground = true;
       obj.set({ selectable: false, evented: false });
+      hardenFabricObjectForIosSafari(obj);
       canvas.add(obj);
       canvas.sendObjectToBack(obj);
       recordPublicEditorDebugEvent('background.deferred.done', {
@@ -480,6 +486,7 @@ export async function loadDesignPageScene(input: {
       const prepared = await prepareFabricJsonForLoad(fabricJson);
       await canvas.loadFromJSON(prepared.json, fabricDeserializeReviver);
       await addDeferredBackgrounds(canvas, prepared.deferredBackgrounds);
+      hardenCanvasObjectsForIosSafari(canvas);
       recordPublicEditorDebugEvent('scene.load.single.after-json', {
         pageIndex,
         objectCount: canvas.getObjects().length,
@@ -497,6 +504,7 @@ export async function loadDesignPageScene(input: {
     ensureWhiteCanvasBackground(canvas);
     await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
     normalizeBackgroundObjects(canvas, pageW, pageH);
+    hardenCanvasObjectsForIosSafari(canvas);
     if (useTemplatePreviewBackground && !hasBackgroundObject(canvas)) {
       await addTemplatePreviewBackground(canvas, template, pageW, pageH, apiBaseUrl);
     }
@@ -508,6 +516,7 @@ export async function loadDesignPageScene(input: {
     }
   }
   ensureWhiteCanvasBackground(canvas);
+  hardenCanvasObjectsForIosSafari(canvas);
   recordPublicEditorDebugEvent('scene.load.single.done', {
     pageIndex,
     backgroundColor: (canvas as unknown as AnyObj).backgroundColor,
@@ -549,6 +558,7 @@ export async function loadSpreadMergedScene(input: {
       await addDeferredBackgrounds(canvas, prepared.deferredBackgrounds);
       ensureWhiteCanvasBackground(canvas);
       await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
+      hardenCanvasObjectsForIosSafari(canvas);
       canvas.renderAll();
       canvas.requestRenderAll();
       recordPublicEditorDebugEvent('scene.load.spread.done.direct', {
@@ -577,12 +587,14 @@ export async function loadSpreadMergedScene(input: {
     height: pageH,
     backgroundColor: 'white',
     preserveObjectStacking: true,
+    ...getIosSafariCanvasOptions(),
   });
   const rightTemp = new Canvas(rightTempEl, {
     width: pageW,
     height: pageH,
     backgroundColor: 'white',
     preserveObjectStacking: true,
+    ...getIosSafariCanvasOptions(),
   });
 
   try {
@@ -599,6 +611,7 @@ export async function loadSpreadMergedScene(input: {
       try {
         const clone = await obj.clone();
         clone.set({ left: clone.left ?? 0 });
+        hardenFabricObjectForIosSafari(clone);
         canvas.add(clone);
       } catch (error) {
         if (PUBLIC_EDITOR_DEV) console.warn('[DesignEditorCanvas] skipped left spread object clone', error);
@@ -609,6 +622,7 @@ export async function loadSpreadMergedScene(input: {
       try {
         const clone = await obj.clone();
         clone.set({ left: (clone.left ?? 0) + pageW });
+        hardenFabricObjectForIosSafari(clone);
         canvas.add(clone);
       } catch (error) {
         if (PUBLIC_EDITOR_DEV) console.warn('[DesignEditorCanvas] skipped right spread object clone', error);
@@ -620,6 +634,7 @@ export async function loadSpreadMergedScene(input: {
   }
 
   ensureWhiteCanvasBackground(canvas);
+  hardenCanvasObjectsForIosSafari(canvas);
   canvas.renderAll();
   canvas.requestRenderAll();
   recordPublicEditorDebugEvent('scene.load.spread.done.fallback', {

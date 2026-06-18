@@ -5,6 +5,7 @@ import {
   type CanvasEventHandlerDeps,
 } from './registerCanvasEventHandlers';
 import { recordPublicEditorDebugEvent } from '../../../../features/publicDesignEditor/publicEditorPerf';
+import { getIosSafariCanvasOptions, isIosSafariCanvasSafeMode } from './iosSafariCanvasSafeMode';
 
 interface UseDesignEditorCanvasSetupInput extends Omit<CanvasEventHandlerDeps, 'canvas'> {
   canvasWidthPx: number;
@@ -13,14 +14,6 @@ interface UseDesignEditorCanvasSetupInput extends Omit<CanvasEventHandlerDeps, '
   prevPageLoadKeyRef: MutableRefObject<string | null>;
   loadedPageForInstanceRef: MutableRefObject<number>;
   setCanvasReady: (ready: boolean) => void;
-}
-
-function isIphoneSafari(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent;
-  return /Safari/i.test(ua)
-    && /(iPhone|iPad|iPod)/i.test(ua)
-    && !/(CriOS|FxiOS|EdgiOS|OPiOS)/i.test(ua);
 }
 
 export function useDesignEditorCanvasSetup({
@@ -35,14 +28,14 @@ export function useDesignEditorCanvasSetup({
 }: UseDesignEditorCanvasSetupInput): void {
   useEffect(() => {
     if (!canvasElRef.current) return;
-    const disableRetinaScaling = isIphoneSafari();
+    const disableRetinaScaling = isIosSafariCanvasSafeMode();
 
     const canvas = new Canvas(canvasElRef.current, {
       width: canvasWidthPx,
       height: pageHeightPx,
       backgroundColor: 'white',
       preserveObjectStacking: true,
-      enableRetinaScaling: !disableRetinaScaling,
+      ...getIosSafariCanvasOptions(),
       selectionColor: 'rgba(37, 99, 235, 0.08)',
       selectionBorderColor: '#2563eb',
     });

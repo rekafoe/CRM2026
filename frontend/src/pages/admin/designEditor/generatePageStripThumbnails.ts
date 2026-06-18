@@ -8,6 +8,7 @@ import {
 import { loadDesignPageScene } from './designPageLoader';
 import type { DesignPage } from './types';
 import { startPublicEditorPerfSpan } from '../../../features/publicDesignEditor/publicEditorPerf';
+import { getIosSafariCanvasOptions, isIosSafariCanvasSafeMode } from './canvas/iosSafariCanvasSafeMode';
 
 const THUMB_EXPORT = { format: 'jpeg' as const, multiplier: 0.14, quality: 0.7 };
 
@@ -57,6 +58,7 @@ export async function generatePageStripThumbnails(input: {
       pageIndexes,
     } = input;
     if (pages.length === 0 || pageW <= 0 || pageH <= 0) return;
+    if (isIosSafariCanvasSafeMode()) return;
 
     const indices = pageIndexes ?? pages.map((_, index) => index);
     const pending: number[] = [];
@@ -81,6 +83,7 @@ export async function generatePageStripThumbnails(input: {
       height: pageH,
       backgroundColor: 'white',
       preserveObjectStacking: true,
+      ...getIosSafariCanvasOptions(),
     });
 
     try {

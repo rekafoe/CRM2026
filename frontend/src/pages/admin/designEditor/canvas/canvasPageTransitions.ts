@@ -17,6 +17,7 @@ import {
   recordPublicEditorTransitionDrift,
   startPublicEditorPerfSpan,
 } from '../../../../features/publicDesignEditor/publicEditorPerf';
+import { isIosSafariCanvasSafeMode } from './iosSafariCanvasSafeMode';
 
 export interface PageLoadKeyTransitionRefs {
   pageLoadKeyRef: { current: string };
@@ -120,7 +121,7 @@ async function emitSinglePageThumb(
 function shouldEmitIncomingThumb(canvas: Canvas, pageIndex: number): boolean {
   void canvas;
   void pageIndex;
-  return true;
+  return !isIosSafariCanvasSafeMode();
 }
 
 function areFabricJsonEqual(a: unknown, b: unknown): boolean {
@@ -219,6 +220,7 @@ function schedulePageThumbEmit(input: {
 }): void {
   const { canvas, targetKey, parsedNext, pageLoadKeyRef, pageThumbReady } = input;
   if (!pageThumbReady) return;
+  if (isIosSafariCanvasSafeMode()) return;
   window.setTimeout(() => {
     if (pageLoadKeyRef.current !== targetKey) return;
     if (parsedNext.type === 'spread') {
