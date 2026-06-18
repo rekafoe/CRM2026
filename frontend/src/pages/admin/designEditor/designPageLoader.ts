@@ -1,4 +1,4 @@
-import { Canvas, FabricImage } from 'fabric';
+import { Canvas, FabricImage, loadSVGFromString, util, type FabricObject } from 'fabric';
 import type { DesignTemplate } from '../../../api';
 import type { DesignPage } from './types';
 import { FABRIC_CUSTOM_PROPS } from './constants';
@@ -55,8 +55,33 @@ function isSvgImageUrl(url: string): boolean {
   return /\.svg(?:$|[?#])/i.test(url);
 }
 
+function isSvgImageSource(src: string): boolean {
+  return src.startsWith('data:image/svg+xml') || isSvgImageUrl(src);
+}
+
 function svgTextToDataUrl(svgText: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgText)}`;
+}
+
+function decodeSvgDataUrl(src: string): string | null {
+  if (!src.startsWith('data:image/svg+xml')) return null;
+  const commaIndex = src.indexOf(',');
+  if (commaIndex < 0) return null;
+  const meta = src.slice(0, commaIndex).toLowerCase();
+  const payload = src.slice(commaIndex + 1);
+  try {
+    return meta.includes(';base64') ? atob(payload) : decodeURIComponent(payload);
+  } catch {
+    return null;
+  }
+}
+
+function shouldLoadSvgBackgroundAsVector(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /Safari/i.test(ua)
+    && /(iPhone|iPad|iPod)/i.test(ua)
+    && !/(CriOS|FxiOS|EdgiOS|OPiOS)/i.test(ua);
 }
 
 async function resolveSvgImageDataUrl(src: string): Promise<string | null> {
@@ -100,7 +125,7 @@ function collectDeferredSvgBackgrounds(value: unknown, deferred: DeferredBackgro
       const item = value[index];
       if (item && typeof item === 'object' && !Array.isArray(item)) {
         const record = item as Record<string, unknown>;
-        if (record.isBackground === true && typeof record.src === 'string' && isSvgImageUrl(record.src)) {
+        if (record.isBackground === true && typeof record.src === 'string' && isSvgImageSource(record.src)) {
           deferred.unshift(record);
           value.splice(index, 1);
           continue;
@@ -122,26 +147,39 @@ async function prepareFabricJsonForLoad(fabricJson: Record<string, unknown>): Pr
   return { json: prepared, deferredBackgrounds };
 }
 
+async function loadSvgBackgroundAsVector(src: string): Promise<FabricObject | null> {
+  const svgText = decodeSvgDataUrl(src);
+  if (!svgText || !/<svg[\s>]/i.test(svgText)) return null;
+  const parsed = await loadSVGFromString(svgText);
+  const objects = parsed.objects.filter((obj): obj is FabricObject => obj != null);
+  if (!objects.length) return null;
+  return util.groupSVGElements(objects, parsed.options);
+}
+
 async function addDeferredBackgrounds(canvas: Canvas, backgrounds: DeferredBackground[]): Promise<void> {
   for (const background of backgrounds) {
     const src = typeof background.src === 'string' ? background.src : '';
     if (!src) continue;
     try {
-      const img = await FabricImage.fromURL(src, src.startsWith('data:') ? {} : { crossOrigin: 'anonymous' });
       const props = { ...background };
       delete props.src;
       delete props.type;
       delete props.version;
-      img.set(props);
+      const backgroundObject = shouldLoadSvgBackgroundAsVector()
+        ? await loadSvgBackgroundAsVector(src)
+        : null;
+      const obj = backgroundObject
+        ?? await FabricImage.fromURL(src, src.startsWith('data:') ? {} : { crossOrigin: 'anonymous' });
+      obj.set(props);
       for (const key of FABRIC_CUSTOM_PROPS) {
         if (Object.prototype.hasOwnProperty.call(background, key)) {
-          asAny(img)[key] = background[key];
+          asAny(obj)[key] = background[key];
         }
       }
-      asAny(img).isBackground = true;
-      img.set({ selectable: false, evented: false });
-      canvas.add(img);
-      canvas.sendObjectToBack(img);
+      asAny(obj).isBackground = true;
+      obj.set({ selectable: false, evented: false });
+      canvas.add(obj);
+      canvas.sendObjectToBack(obj);
     } catch {
       // SVG backgrounds are decorative; never block the rest of the page.
     }
