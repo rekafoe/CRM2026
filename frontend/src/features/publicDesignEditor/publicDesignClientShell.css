@@ -1442,6 +1442,14 @@
   pointer-events: auto;
 }
 
+.public-design-editor__debug-overlay--fullscreen {
+  inset: 0;
+  width: auto;
+  max-height: none;
+  padding: 8px;
+  background: rgba(2, 6, 23, 0.82);
+}
+
 .public-design-editor__debug-toggle {
   appearance: none;
   width: 100%;
@@ -1457,6 +1465,12 @@
   cursor: pointer;
 }
 
+.public-design-editor__debug-overlay--fullscreen .public-design-editor__debug-toggle {
+  min-height: 42px;
+  border-radius: 14px 14px 0 0;
+  font-size: 13px;
+}
+
 .public-design-editor__debug-panel {
   max-height: calc(68vh - 34px);
   overflow: auto;
@@ -1465,6 +1479,32 @@
   border-top: 0;
   border-radius: 0 0 12px 12px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.35);
+}
+
+.public-design-editor__debug-overlay--fullscreen .public-design-editor__debug-panel {
+  max-height: calc(100vh - 58px);
+  border-radius: 0 0 14px 14px;
+}
+
+.public-design-editor__debug-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.public-design-editor__debug-actions button {
+  appearance: none;
+  min-height: 34px;
+  padding: 0 10px;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  background: rgba(37, 99, 235, 0.9);
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  border-radius: 999px;
+  cursor: pointer;
 }
 
 .public-design-editor__debug-hint {
@@ -1479,6 +1519,23 @@
   margin: 0;
   padding: 8px;
   list-style: none;
+}
+
+.public-design-editor__debug-report {
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  color: #f8fafc;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.public-design-editor__debug-overlay--fullscreen .public-design-editor__debug-report {
+  min-height: calc(100vh - 156px);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .public-design-editor__debug-event {
