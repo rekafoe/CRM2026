@@ -69,7 +69,14 @@ import {
 } from './PublicDesignEditorMobileDock';
 import { PublicDesignDraftConflictDialog } from './PublicDesignDraftConflictDialog';
 import { PUBLIC_EDITOR_FEATURE_FLAGS } from './publicEditorFeatureFlags';
-import { PUBLIC_EDITOR_DEV, startPublicEditorPerfSpan } from './publicEditorPerf';
+import {
+  getPublicEditorDebugEvents,
+  isPublicEditorDebugEnabled,
+  PUBLIC_EDITOR_DEV,
+  recordPublicEditorDebugEvent,
+  startPublicEditorPerfSpan,
+  type PublicEditorDebugEvent,
+} from './publicEditorPerf';
 import '../../pages/admin/DesignEditorPage.css';
 import '../../pages/admin/designEditor/designEditorGlassTheme.css';
 import '../designEditorShell/editorShell.css';
@@ -125,6 +132,62 @@ function formatPageCountRu(count: number): string {
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} страницы`;
   return `${count} страниц`;
 }
+
+const PublicDesignDebugOverlay: React.FC = () => {
+  const [enabled, setEnabled] = useState(() => isPublicEditorDebugEnabled());
+  const [events, setEvents] = useState<PublicEditorDebugEvent[]>(() => getPublicEditorDebugEvents());
+  const [expanded, setExpanded] = useState(true);
+
+  useEffect(() => {
+    const sync = () => {
+      setEnabled(isPublicEditorDebugEnabled());
+      setEvents(getPublicEditorDebugEvents());
+    };
+    sync();
+    window.addEventListener('public-editor-debug', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('public-editor-debug', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  if (!enabled) return null;
+  const lastEvents = events.slice(-24).reverse();
+  const errorCount = events.filter((event) => event.level === 'error').length;
+  const warnCount = events.filter((event) => event.level === 'warn').length;
+
+  return (
+    <aside className="public-design-editor__debug-overlay" aria-label="Public editor debug">
+      <button
+        type="button"
+        className="public-design-editor__debug-toggle"
+        onClick={() => setExpanded((value) => !value)}
+      >
+        Debug {events.length} / W{warnCount} / E{errorCount}
+      </button>
+      {expanded && (
+        <div className="public-design-editor__debug-panel">
+          <div className="public-design-editor__debug-hint">
+            Console: window.__PUBLIC_EDITOR_DEBUG__.events()
+          </div>
+          <ol className="public-design-editor__debug-list">
+            {lastEvents.map((event) => (
+              <li
+                key={event.id}
+                className={`public-design-editor__debug-event public-design-editor__debug-event--${event.level}`}
+              >
+                <strong>{event.name}</strong>
+                <span>{new Date(event.at).toLocaleTimeString()}</span>
+                {event.data ? <pre>{JSON.stringify(event.data, null, 2)}</pre> : null}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </aside>
+  );
+};
 
 interface PublicDesignEditorProps {
   templateId: number;
@@ -406,6 +469,70 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     compactPadding: isMobile,
     layoutTrigger: viewportLayoutTrigger,
   });
+
+  useEffect(() => {
+    const readRect = (node: HTMLElement | null) => {
+      if (!node) return null;
+      const rect = node.getBoundingClientRect();
+      return {
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        top: Math.round(rect.top),
+        left: Math.round(rect.left),
+        clientWidth: node.clientWidth,
+        clientHeight: node.clientHeight,
+        scrollWidth: node.scrollWidth,
+        scrollHeight: node.scrollHeight,
+      };
+    };
+    recordPublicEditorDebugEvent('editor.viewport.state', {
+      templateId,
+      documentMode,
+      currentPage,
+      pageLoadKey: navigation.pageLoadKey,
+      isMobile,
+      fitReady,
+      fitZoom,
+      layoutWidthPx,
+      layoutHeightPx,
+      pageSpec,
+      scene: {
+        pageWidthPx: sceneGeometry.pageWidthPx,
+        pageHeightPx: sceneGeometry.pageHeightPx,
+        bleedPx: sceneGeometry.bleedPx,
+        safeZonePx: sceneGeometry.safeZonePx,
+      },
+      refs: {
+        scrollArea: readRect(scrollAreaRef.current),
+        viewport: readRect(viewportRef.current),
+        fitScaler: readRect(fitScalerRef.current),
+      },
+      visualViewport: typeof window !== 'undefined' ? {
+        width: Math.round(window.visualViewport?.width ?? 0),
+        height: Math.round(window.visualViewport?.height ?? 0),
+        offsetTop: Math.round(window.visualViewport?.offsetTop ?? 0),
+        offsetLeft: Math.round(window.visualViewport?.offsetLeft ?? 0),
+        scale: window.visualViewport?.scale ?? null,
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+      } : null,
+    });
+  }, [
+    currentPage,
+    documentMode,
+    fitReady,
+    fitZoom,
+    isMobile,
+    layoutHeightPx,
+    layoutWidthPx,
+    navigation.pageLoadKey,
+    pageSpec,
+    sceneGeometry.bleedPx,
+    sceneGeometry.pageHeightPx,
+    sceneGeometry.pageWidthPx,
+    sceneGeometry.safeZonePx,
+    templateId,
+  ]);
 
   const markDirty = useCallback(() => {
     if (suppressDirtyRef.current) return;
@@ -873,7 +1000,14 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     handleNextAction();
   }, [editorNextAction, handleNextAction]);
 
-  if (loading) return <div className="public-design-editor__state">Загрузка редактора...</div>;
+  if (loading) {
+    return (
+      <>
+        <div className="public-design-editor__state">Загрузка редактора...</div>
+        <PublicDesignDebugOverlay />
+      </>
+    );
+  }
   if (!template) return <Alert type="error">{error ?? 'Шаблон не найден'}</Alert>;
 
   const editorRootClassName = [
@@ -1133,6 +1267,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
 
   return (
     <div className={editorRootClassName} {...editorRootDevProps}>
+      <PublicDesignDebugOverlay />
       {!isMobile && (
         <EditorTopBar
           templateName={template.name}

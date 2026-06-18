@@ -5,7 +5,11 @@ import { FABRIC_CUSTOM_PROPS } from './constants';
 import { normalizeDesignFieldsOnCanvas } from './designFields';
 import { prepareTextObjectsOnCanvas } from './textStyleRuns';
 import { PUBLIC_EDITOR_FEATURE_FLAGS } from '../../../features/publicDesignEditor/publicEditorFeatureFlags';
-import { PUBLIC_EDITOR_DEV, recordPublicEditorPerfMetric } from '../../../features/publicDesignEditor/publicEditorPerf';
+import {
+  PUBLIC_EDITOR_DEV,
+  recordPublicEditorDebugEvent,
+  recordPublicEditorPerfMetric,
+} from '../../../features/publicDesignEditor/publicEditorPerf';
 
 type AnyObj = Record<string, unknown>;
 
@@ -31,6 +35,39 @@ export function fabricDeserializeReviver(
 
 function asAny(value: unknown): AnyObj {
   return value as AnyObj;
+}
+
+function summarizeSource(src: string): Record<string, unknown> {
+  return {
+    kind: src.startsWith('data:') ? 'data-url' : 'url',
+    isSvg: isSvgImageSource(src),
+    length: src.length,
+    preview: src.startsWith('data:') ? src.slice(0, 72) : src,
+  };
+}
+
+function summarizeCanvasObjects(canvas: Canvas): Array<Record<string, unknown>> {
+  return canvas.getObjects().map((obj, index) => {
+    const meta = asAny(obj);
+    return {
+      index,
+      type: obj.type,
+      id: typeof meta.id === 'string' ? meta.id : null,
+      isBackground: meta.isBackground === true,
+      isPhotoField: meta.isPhotoField === true,
+      photoFieldFilled: meta.photoFieldFilled === true,
+      fill: typeof meta.fill === 'string' ? meta.fill : undefined,
+      src: typeof meta.src === 'string' ? summarizeSource(meta.src) : undefined,
+      left: Math.round(Number(obj.left ?? 0)),
+      top: Math.round(Number(obj.top ?? 0)),
+      width: Math.round(Number(obj.width ?? 0)),
+      height: Math.round(Number(obj.height ?? 0)),
+      scaleX: Number(obj.scaleX ?? 1),
+      scaleY: Number(obj.scaleY ?? 1),
+      visible: obj.visible !== false,
+      opacity: obj.opacity,
+    };
+  });
 }
 
 function normalizeFabricJsonRoot(value: unknown): Record<string, unknown> | null {
@@ -87,16 +124,41 @@ function shouldLoadSvgBackgroundAsVector(): boolean {
 async function resolveSvgImageDataUrl(src: string): Promise<string | null> {
   if (!isSvgImageUrl(src) || src.startsWith('data:')) return null;
   const cached = svgDataUrlCache.get(src);
-  if (cached) return cached;
+  if (cached) {
+    recordPublicEditorDebugEvent('svg.inline.cache-hit', summarizeSource(src));
+    return cached;
+  }
   try {
+    recordPublicEditorDebugEvent('svg.inline.fetch.start', summarizeSource(src));
     const response = await fetch(src, { credentials: 'same-origin' });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      recordPublicEditorDebugEvent('svg.inline.fetch.bad-status', {
+        ...summarizeSource(src),
+        status: response.status,
+      }, 'warn');
+      return null;
+    }
     const svgText = await response.text();
-    if (!/<svg[\s>]/i.test(svgText)) return null;
+    if (!/<svg[\s>]/i.test(svgText)) {
+      recordPublicEditorDebugEvent('svg.inline.fetch.not-svg', {
+        ...summarizeSource(src),
+        textStart: svgText.slice(0, 120),
+      }, 'warn');
+      return null;
+    }
     const dataUrl = svgTextToDataUrl(svgText);
     svgDataUrlCache.set(src, dataUrl);
+    recordPublicEditorDebugEvent('svg.inline.fetch.ok', {
+      ...summarizeSource(src),
+      svgLength: svgText.length,
+      dataUrlLength: dataUrl.length,
+    });
     return dataUrl;
-  } catch {
+  } catch (error) {
+    recordPublicEditorDebugEvent('svg.inline.fetch.error', {
+      ...summarizeSource(src),
+      error,
+    }, 'error');
     return null;
   }
 }
@@ -142,17 +204,49 @@ async function prepareFabricJsonForLoad(fabricJson: Record<string, unknown>): Pr
   const prepared = deepCloneFabricJson(fabricJson);
   const deferredBackgrounds: DeferredBackground[] = [];
   collectDeferredSvgBackgrounds(prepared.objects, deferredBackgrounds);
+  recordPublicEditorDebugEvent('fabric.prepare.start', {
+    objectCount: Array.isArray(prepared.objects) ? prepared.objects.length : null,
+    deferredBackgroundCount: deferredBackgrounds.length,
+    deferredBackgrounds: deferredBackgrounds.map((bg) => (
+      typeof bg.src === 'string' ? summarizeSource(bg.src) : { kind: 'missing-src' }
+    )),
+  });
   await inlineSvgImageSources(prepared);
   await inlineSvgImageSources(deferredBackgrounds);
+  recordPublicEditorDebugEvent('fabric.prepare.done', {
+    objectCount: Array.isArray(prepared.objects) ? prepared.objects.length : null,
+    deferredBackgroundCount: deferredBackgrounds.length,
+    deferredBackgrounds: deferredBackgrounds.map((bg) => (
+      typeof bg.src === 'string' ? summarizeSource(bg.src) : { kind: 'missing-src' }
+    )),
+  });
   return { json: prepared, deferredBackgrounds };
 }
 
 async function loadSvgBackgroundAsVector(src: string): Promise<FabricObject | null> {
   const svgText = decodeSvgDataUrl(src);
-  if (!svgText || !/<svg[\s>]/i.test(svgText)) return null;
+  if (!svgText || !/<svg[\s>]/i.test(svgText)) {
+    recordPublicEditorDebugEvent('svg.vector.skip', {
+      ...summarizeSource(src),
+      hasDecodedText: Boolean(svgText),
+    }, 'warn');
+    return null;
+  }
   const parsed = await loadSVGFromString(svgText);
   const objects = parsed.objects.filter((obj): obj is FabricObject => obj != null);
-  if (!objects.length) return null;
+  if (!objects.length) {
+    recordPublicEditorDebugEvent('svg.vector.empty', {
+      ...summarizeSource(src),
+      svgLength: svgText.length,
+    }, 'warn');
+    return null;
+  }
+  recordPublicEditorDebugEvent('svg.vector.ok', {
+    ...summarizeSource(src),
+    svgLength: svgText.length,
+    objectCount: objects.length,
+    options: parsed.options,
+  });
   return util.groupSVGElements(objects, parsed.options);
 }
 
@@ -161,6 +255,10 @@ async function addDeferredBackgrounds(canvas: Canvas, backgrounds: DeferredBackg
     const src = typeof background.src === 'string' ? background.src : '';
     if (!src) continue;
     try {
+      recordPublicEditorDebugEvent('background.deferred.start', {
+        source: summarizeSource(src),
+        safariVector: shouldLoadSvgBackgroundAsVector(),
+      });
       const props = { ...background };
       delete props.src;
       delete props.type;
@@ -180,7 +278,16 @@ async function addDeferredBackgrounds(canvas: Canvas, backgrounds: DeferredBackg
       obj.set({ selectable: false, evented: false });
       canvas.add(obj);
       canvas.sendObjectToBack(obj);
-    } catch {
+      recordPublicEditorDebugEvent('background.deferred.done', {
+        source: summarizeSource(src),
+        objectType: obj.type,
+        objectCount: canvas.getObjects().length,
+      });
+    } catch (error) {
+      recordPublicEditorDebugEvent('background.deferred.error', {
+        source: summarizeSource(src),
+        error,
+      }, 'error');
       // SVG backgrounds are decorative; never block the rest of the page.
     }
   }
@@ -357,6 +464,14 @@ export async function loadDesignPageScene(input: {
   const fabricJson = normalizeFabricJsonRoot(pageData?.fabricJSON);
   const hasJson = !!fabricJson
     && Object.keys(fabricJson).length > 0;
+  recordPublicEditorDebugEvent('scene.load.single.start', {
+    pageIndex,
+    pageW,
+    pageH,
+    hasJson,
+    objectCount: Array.isArray(fabricJson?.objects) ? fabricJson.objects.length : null,
+    canvasObjectCountBefore: canvas.getObjects().length,
+  });
   if (hasJson) {
     canvas.clear();
     (canvas as unknown as AnyObj).backgroundColor = 'white';
@@ -365,7 +480,16 @@ export async function loadDesignPageScene(input: {
       const prepared = await prepareFabricJsonForLoad(fabricJson);
       await canvas.loadFromJSON(prepared.json, fabricDeserializeReviver);
       await addDeferredBackgrounds(canvas, prepared.deferredBackgrounds);
-    } catch {
+      recordPublicEditorDebugEvent('scene.load.single.after-json', {
+        pageIndex,
+        objectCount: canvas.getObjects().length,
+        objects: summarizeCanvasObjects(canvas),
+      });
+    } catch (error) {
+      recordPublicEditorDebugEvent('scene.load.single.error', {
+        pageIndex,
+        error,
+      }, 'error');
       canvas.clear();
       (canvas as unknown as AnyObj).backgroundColor = 'white';
     }
@@ -384,6 +508,13 @@ export async function loadDesignPageScene(input: {
     }
   }
   ensureWhiteCanvasBackground(canvas);
+  recordPublicEditorDebugEvent('scene.load.single.done', {
+    pageIndex,
+    backgroundColor: (canvas as unknown as AnyObj).backgroundColor,
+    objectCount: canvas.getObjects().length,
+    hasBackgroundObject: hasBackgroundObject(canvas),
+    objects: summarizeCanvasObjects(canvas),
+  });
   canvas.requestRenderAll();
 }
 
@@ -400,6 +531,14 @@ export async function loadSpreadMergedScene(input: {
 }): Promise<void> {
   const { canvas, leftPage, rightPage, leftPageIndex, rightPageIndex, pageW, pageH, template, apiBaseUrl } = input;
   const mergedJson = buildSpreadMergedFabricJson({ leftPage, rightPage, pageW, pageH });
+  recordPublicEditorDebugEvent('scene.load.spread.start', {
+    leftPageIndex,
+    rightPageIndex,
+    pageW,
+    pageH,
+    hasMergedJson: Boolean(mergedJson),
+    mergedObjectCount: Array.isArray(mergedJson?.objects) ? mergedJson.objects.length : null,
+  });
   if (mergedJson) {
     canvas.clear();
     canvas.setDimensions({ width: pageW * 2, height: pageH });
@@ -412,8 +551,19 @@ export async function loadSpreadMergedScene(input: {
       await normalizeDesignFieldsOnCanvas(canvas, pageW, pageH);
       canvas.renderAll();
       canvas.requestRenderAll();
+      recordPublicEditorDebugEvent('scene.load.spread.done.direct', {
+        leftPageIndex,
+        rightPageIndex,
+        objectCount: canvas.getObjects().length,
+        objects: summarizeCanvasObjects(canvas),
+      });
       return;
-    } catch {
+    } catch (error) {
+      recordPublicEditorDebugEvent('scene.load.spread.direct-error', {
+        leftPageIndex,
+        rightPageIndex,
+        error,
+      }, 'error');
       canvas.clear();
       canvas.setDimensions({ width: pageW * 2, height: pageH });
       (canvas as unknown as AnyObj).backgroundColor = 'white';
@@ -472,5 +622,11 @@ export async function loadSpreadMergedScene(input: {
   ensureWhiteCanvasBackground(canvas);
   canvas.renderAll();
   canvas.requestRenderAll();
+  recordPublicEditorDebugEvent('scene.load.spread.done.fallback', {
+    leftPageIndex,
+    rightPageIndex,
+    objectCount: canvas.getObjects().length,
+    objects: summarizeCanvasObjects(canvas),
+  });
 }
 

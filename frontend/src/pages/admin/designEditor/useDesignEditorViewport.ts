@@ -1,4 +1,5 @@
 import { useLayoutEffect, useState, type RefObject } from 'react';
+import { recordPublicEditorDebugEvent } from '../../../features/publicDesignEditor/publicEditorPerf';
 
 export type DesignEditorViewportState = {
   fitZoom: number;
@@ -73,6 +74,19 @@ export function useDesignEditorViewport(input: {
       };
     };
 
+    const readVisualViewportSize = () => {
+      const vv = window.visualViewport;
+      return {
+        width: Math.round(vv?.width ?? 0),
+        height: Math.round(vv?.height ?? 0),
+        offsetTop: Math.round(vv?.offsetTop ?? 0),
+        offsetLeft: Math.round(vv?.offsetLeft ?? 0),
+        scale: vv?.scale ?? null,
+        innerWidth: Math.round(window.innerWidth || 0),
+        innerHeight: Math.round(window.innerHeight || 0),
+      };
+    };
+
     const resolveViewportCandidates = (): HTMLElement[] => {
       const candidates = [
         viewportEl,
@@ -107,7 +121,14 @@ export function useDesignEditorViewport(input: {
       rafId = requestAnimationFrame(() => {
         if (!alive) return;
         const container = resolveBestContainer();
-        if (!container) return;
+        if (!container) {
+          recordPublicEditorDebugEvent('viewport.compute.no-container', {
+            pageWidthPx: input.pageWidthPx,
+            pageHeightPx: input.pageHeightPx,
+            compact,
+          }, 'warn');
+          return;
+        }
         const containerSize = readElementSize(container);
         let aw = containerSize.width;
         let ah = containerSize.height;
@@ -115,14 +136,14 @@ export function useDesignEditorViewport(input: {
         const minHeight = input.compactPadding === true ? 140 : 220;
         const hasUsableContainerSize = aw >= minWidth && ah >= minHeight;
         if (!hasUsableContainerSize) {
-          const vv = window.visualViewport;
+          const viewportSnapshot = readVisualViewportSize();
           const viewportWidth = Math.max(
-            Math.round(vv?.width ?? 0),
-            Math.round(window.innerWidth || 0),
+            viewportSnapshot.width,
+            viewportSnapshot.innerWidth,
           );
           const viewportHeight = Math.max(
-            Math.round(vv?.height ?? 0),
-            Math.round(window.innerHeight || 0),
+            viewportSnapshot.height,
+            viewportSnapshot.innerHeight,
           );
           if (input.compactPadding === true) {
             aw = Math.max(aw, viewportWidth);
@@ -130,6 +151,16 @@ export function useDesignEditorViewport(input: {
           }
           if ((aw < minWidth || ah < minHeight) && retryCount < 100) {
             retryCount += 1;
+            recordPublicEditorDebugEvent('viewport.compute.retry', {
+              retryCount,
+              containerTag: container.tagName,
+              containerClass: container.className,
+              containerSize,
+              minWidth,
+              minHeight,
+              viewport: viewportSnapshot,
+              compact,
+            }, 'warn');
             retryTimerId = setTimeout(compute, 100);
             return;
           }
@@ -151,6 +182,21 @@ export function useDesignEditorViewport(input: {
           y: (ah - ch * z) / 2 + canvasPadY * z,
         });
         setViewportReady(true);
+        recordPublicEditorDebugEvent('viewport.compute.done', {
+          containerTag: container.tagName,
+          containerClass: container.className,
+          containerSize,
+          availableWidth: aw,
+          availableHeight: ah,
+          contentWidth: cw,
+          contentHeight: ch,
+          fitZoom: z,
+          zRaw,
+          compact,
+          isSpreadView: input.isSpreadView,
+          showBleed: input.showBleed,
+          visualViewport: readVisualViewportSize(),
+        });
       });
     };
 
