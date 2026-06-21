@@ -4,7 +4,6 @@ import {
   registerCanvasEventHandlers,
   type CanvasEventHandlerDeps,
 } from './registerCanvasEventHandlers';
-import { recordPublicEditorDebugEvent } from '../../../../features/publicDesignEditor/publicEditorPerf';
 import { getIosSafariCanvasOptions, isIosSafariCanvasSafeMode } from './iosSafariCanvasSafeMode';
 
 interface UseDesignEditorCanvasSetupInput extends Omit<CanvasEventHandlerDeps, 'canvas'> {
@@ -39,25 +38,7 @@ export function useDesignEditorCanvasSetup({
       selectionColor: 'rgba(37, 99, 235, 0.08)',
       selectionBorderColor: '#2563eb',
     });
-    recordPublicEditorDebugEvent('canvas.setup.created', {
-      canvasWidthPx,
-      pageHeightPx,
-      disableRetinaScaling,
-      devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio : null,
-      lowerCanvas: {
-        width: canvas.lowerCanvasEl?.width ?? null,
-        height: canvas.lowerCanvasEl?.height ?? null,
-        clientWidth: canvas.lowerCanvasEl?.clientWidth ?? null,
-        clientHeight: canvas.lowerCanvasEl?.clientHeight ?? null,
-      },
-      upperCanvas: {
-        width: canvas.upperCanvasEl?.width ?? null,
-        height: canvas.upperCanvasEl?.height ?? null,
-        clientWidth: canvas.upperCanvasEl?.clientWidth ?? null,
-        clientHeight: canvas.upperCanvasEl?.clientHeight ?? null,
-      },
-    });
-    handlerDeps.fabricRef.current = canvas;
+handlerDeps.fabricRef.current = canvas;
     canvasInstanceRef.current += 1;
     prevPageLoadKeyRef.current = null;
     loadedPageForInstanceRef.current = 0;

@@ -7,7 +7,6 @@ import { prepareTextObjectsOnCanvas } from './textStyleRuns';
 import { PUBLIC_EDITOR_FEATURE_FLAGS } from '../../../features/publicDesignEditor/publicEditorFeatureFlags';
 import {
   PUBLIC_EDITOR_DEV,
-  recordPublicEditorDebugEvent,
   recordPublicEditorPerfMetric,
 } from '../../../features/publicDesignEditor/publicEditorPerf';
 import {
@@ -127,41 +126,22 @@ async function resolveSvgImageDataUrl(src: string): Promise<string | null> {
   if (!isSvgImageUrl(src) || src.startsWith('data:')) return null;
   const cached = svgDataUrlCache.get(src);
   if (cached) {
-    recordPublicEditorDebugEvent('svg.inline.cache-hit', summarizeSource(src));
-    return cached;
+return cached;
   }
   try {
-    recordPublicEditorDebugEvent('svg.inline.fetch.start', summarizeSource(src));
-    const response = await fetch(src, { credentials: 'same-origin' });
+const response = await fetch(src, { credentials: 'same-origin' });
     if (!response.ok) {
-      recordPublicEditorDebugEvent('svg.inline.fetch.bad-status', {
-        ...summarizeSource(src),
-        status: response.status,
-      }, 'warn');
-      return null;
+return null;
     }
     const svgText = await response.text();
     if (!/<svg[\s>]/i.test(svgText)) {
-      recordPublicEditorDebugEvent('svg.inline.fetch.not-svg', {
-        ...summarizeSource(src),
-        textStart: svgText.slice(0, 120),
-      }, 'warn');
-      return null;
+return null;
     }
     const dataUrl = svgTextToDataUrl(svgText);
     svgDataUrlCache.set(src, dataUrl);
-    recordPublicEditorDebugEvent('svg.inline.fetch.ok', {
-      ...summarizeSource(src),
-      svgLength: svgText.length,
-      dataUrlLength: dataUrl.length,
-    });
-    return dataUrl;
+return dataUrl;
   } catch (error) {
-    recordPublicEditorDebugEvent('svg.inline.fetch.error', {
-      ...summarizeSource(src),
-      error,
-    }, 'error');
-    return null;
+return null;
   }
 }
 
@@ -206,50 +186,22 @@ async function prepareFabricJsonForLoad(fabricJson: Record<string, unknown>): Pr
   const prepared = deepCloneFabricJson(fabricJson);
   const deferredBackgrounds: DeferredBackground[] = [];
   collectDeferredSvgBackgrounds(prepared.objects, deferredBackgrounds);
-  recordPublicEditorDebugEvent('fabric.prepare.start', {
-    objectCount: Array.isArray(prepared.objects) ? prepared.objects.length : null,
-    deferredBackgroundCount: deferredBackgrounds.length,
-    deferredBackgrounds: deferredBackgrounds.map((bg) => (
-      typeof bg.src === 'string' ? summarizeSource(bg.src) : { kind: 'missing-src' }
-    )),
-  });
-  await inlineSvgImageSources(prepared);
+await inlineSvgImageSources(prepared);
   await inlineSvgImageSources(deferredBackgrounds);
-  recordPublicEditorDebugEvent('fabric.prepare.done', {
-    objectCount: Array.isArray(prepared.objects) ? prepared.objects.length : null,
-    deferredBackgroundCount: deferredBackgrounds.length,
-    deferredBackgrounds: deferredBackgrounds.map((bg) => (
-      typeof bg.src === 'string' ? summarizeSource(bg.src) : { kind: 'missing-src' }
-    )),
-  });
-  return { json: prepared, deferredBackgrounds };
+return { json: prepared, deferredBackgrounds };
 }
 
 async function loadSvgBackgroundAsVector(src: string): Promise<FabricObject | null> {
   const svgText = decodeSvgDataUrl(src);
   if (!svgText || !/<svg[\s>]/i.test(svgText)) {
-    recordPublicEditorDebugEvent('svg.vector.skip', {
-      ...summarizeSource(src),
-      hasDecodedText: Boolean(svgText),
-    }, 'warn');
-    return null;
+return null;
   }
   const parsed = await loadSVGFromString(svgText);
   const objects = parsed.objects.filter((obj): obj is FabricObject => obj != null);
   if (!objects.length) {
-    recordPublicEditorDebugEvent('svg.vector.empty', {
-      ...summarizeSource(src),
-      svgLength: svgText.length,
-    }, 'warn');
-    return null;
+return null;
   }
-  recordPublicEditorDebugEvent('svg.vector.ok', {
-    ...summarizeSource(src),
-    svgLength: svgText.length,
-    objectCount: objects.length,
-    options: parsed.options,
-  });
-  objects.forEach(hardenFabricObjectForIosSafari);
+objects.forEach(hardenFabricObjectForIosSafari);
   const group = util.groupSVGElements(objects, parsed.options);
   hardenFabricObjectForIosSafari(group);
   return group;
@@ -260,11 +212,7 @@ async function addDeferredBackgrounds(canvas: Canvas, backgrounds: DeferredBackg
     const src = typeof background.src === 'string' ? background.src : '';
     if (!src) continue;
     try {
-      recordPublicEditorDebugEvent('background.deferred.start', {
-        source: summarizeSource(src),
-        safariVector: shouldLoadSvgBackgroundAsVector(),
-      });
-      const props = { ...background };
+const props = { ...background };
       delete props.src;
       delete props.type;
       delete props.version;
@@ -284,17 +232,8 @@ async function addDeferredBackgrounds(canvas: Canvas, backgrounds: DeferredBackg
       hardenFabricObjectForIosSafari(obj);
       canvas.add(obj);
       canvas.sendObjectToBack(obj);
-      recordPublicEditorDebugEvent('background.deferred.done', {
-        source: summarizeSource(src),
-        objectType: obj.type,
-        objectCount: canvas.getObjects().length,
-      });
-    } catch (error) {
-      recordPublicEditorDebugEvent('background.deferred.error', {
-        source: summarizeSource(src),
-        error,
-      }, 'error');
-      // SVG backgrounds are decorative; never block the rest of the page.
+} catch (error) {
+// SVG backgrounds are decorative; never block the rest of the page.
     }
   }
 }
@@ -470,15 +409,7 @@ export async function loadDesignPageScene(input: {
   const fabricJson = normalizeFabricJsonRoot(pageData?.fabricJSON);
   const hasJson = !!fabricJson
     && Object.keys(fabricJson).length > 0;
-  recordPublicEditorDebugEvent('scene.load.single.start', {
-    pageIndex,
-    pageW,
-    pageH,
-    hasJson,
-    objectCount: Array.isArray(fabricJson?.objects) ? fabricJson.objects.length : null,
-    canvasObjectCountBefore: canvas.getObjects().length,
-  });
-  if (hasJson) {
+if (hasJson) {
     canvas.clear();
     (canvas as unknown as AnyObj).backgroundColor = 'white';
     try {
@@ -487,17 +418,8 @@ export async function loadDesignPageScene(input: {
       await canvas.loadFromJSON(prepared.json, fabricDeserializeReviver);
       await addDeferredBackgrounds(canvas, prepared.deferredBackgrounds);
       hardenCanvasObjectsForIosSafari(canvas);
-      recordPublicEditorDebugEvent('scene.load.single.after-json', {
-        pageIndex,
-        objectCount: canvas.getObjects().length,
-        objects: summarizeCanvasObjects(canvas),
-      });
-    } catch (error) {
-      recordPublicEditorDebugEvent('scene.load.single.error', {
-        pageIndex,
-        error,
-      }, 'error');
-      canvas.clear();
+} catch (error) {
+canvas.clear();
       (canvas as unknown as AnyObj).backgroundColor = 'white';
     }
     // Для пустых страниц без backgroundColor в JSON сохраняем непрозрачный белый фон.
@@ -517,14 +439,7 @@ export async function loadDesignPageScene(input: {
   }
   ensureWhiteCanvasBackground(canvas);
   hardenCanvasObjectsForIosSafari(canvas);
-  recordPublicEditorDebugEvent('scene.load.single.done', {
-    pageIndex,
-    backgroundColor: (canvas as unknown as AnyObj).backgroundColor,
-    objectCount: canvas.getObjects().length,
-    hasBackgroundObject: hasBackgroundObject(canvas),
-    objects: summarizeCanvasObjects(canvas),
-  });
-  canvas.requestRenderAll();
+canvas.requestRenderAll();
 }
 
 export async function loadSpreadMergedScene(input: {
@@ -540,15 +455,7 @@ export async function loadSpreadMergedScene(input: {
 }): Promise<void> {
   const { canvas, leftPage, rightPage, leftPageIndex, rightPageIndex, pageW, pageH, template, apiBaseUrl } = input;
   const mergedJson = buildSpreadMergedFabricJson({ leftPage, rightPage, pageW, pageH });
-  recordPublicEditorDebugEvent('scene.load.spread.start', {
-    leftPageIndex,
-    rightPageIndex,
-    pageW,
-    pageH,
-    hasMergedJson: Boolean(mergedJson),
-    mergedObjectCount: Array.isArray(mergedJson?.objects) ? mergedJson.objects.length : null,
-  });
-  if (mergedJson) {
+if (mergedJson) {
     canvas.clear();
     canvas.setDimensions({ width: pageW * 2, height: pageH });
     (canvas as unknown as AnyObj).backgroundColor = 'white';
@@ -561,20 +468,9 @@ export async function loadSpreadMergedScene(input: {
       hardenCanvasObjectsForIosSafari(canvas);
       canvas.renderAll();
       canvas.requestRenderAll();
-      recordPublicEditorDebugEvent('scene.load.spread.done.direct', {
-        leftPageIndex,
-        rightPageIndex,
-        objectCount: canvas.getObjects().length,
-        objects: summarizeCanvasObjects(canvas),
-      });
-      return;
+return;
     } catch (error) {
-      recordPublicEditorDebugEvent('scene.load.spread.direct-error', {
-        leftPageIndex,
-        rightPageIndex,
-        error,
-      }, 'error');
-      canvas.clear();
+canvas.clear();
       canvas.setDimensions({ width: pageW * 2, height: pageH });
       (canvas as unknown as AnyObj).backgroundColor = 'white';
     }
@@ -637,11 +533,5 @@ export async function loadSpreadMergedScene(input: {
   hardenCanvasObjectsForIosSafari(canvas);
   canvas.renderAll();
   canvas.requestRenderAll();
-  recordPublicEditorDebugEvent('scene.load.spread.done.fallback', {
-    leftPageIndex,
-    rightPageIndex,
-    objectCount: canvas.getObjects().length,
-    objects: summarizeCanvasObjects(canvas),
-  });
 }
 

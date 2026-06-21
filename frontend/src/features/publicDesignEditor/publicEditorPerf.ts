@@ -18,17 +18,6 @@ type TransitionPairStats = {
   reportedAt30: boolean;
 };
 
-export type PublicEditorDebugEventLevel = 'info' | 'warn' | 'error';
-
-export type PublicEditorDebugEvent = {
-  id: number;
-  at: number;
-  atIso: string;
-  name: string;
-  level: PublicEditorDebugEventLevel;
-  data?: Record<string, unknown>;
-};
-
 export type PublicEditorPerfSnapshot = {
   startedAtIso: string;
   buckets: Array<{
@@ -48,15 +37,12 @@ export type PublicEditorPerfSnapshot = {
 };
 
 const METRIC_SAMPLE_LIMIT = 240;
-const DEBUG_EVENT_LIMIT = 400;
 const TRANSITION_WARN_P95_MS = 260;
 const TRANSITION_DRIFT_ACCEPTANCE_SAMPLES = 30;
 
 const startedAt = Date.now();
 const metricBuckets = new Map<string, MetricBucket>();
 const transitionPairStats = new Map<string, TransitionPairStats>();
-const debugEvents: PublicEditorDebugEvent[] = [];
-let debugEventId = 0;
 export const PUBLIC_EDITOR_DEV = (() => {
   try {
     const meta = import.meta as ImportMeta & { env?: { DEV?: unknown } };
@@ -72,82 +58,6 @@ export const PUBLIC_EDITOR_DEV = (() => {
   // Safe default for runtimes without Vite env or process.env.
   return false;
 })();
-
-function readDebugFlagFromLocation(): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('editorDebug') === '1'
-      || params.get('pdeDebug') === '1'
-      || params.get('debugEditor') === '1';
-  } catch {
-    return false;
-  }
-}
-
-function readDebugFlagFromStorage(): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    return window.localStorage.getItem('publicEditorDebug') === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function isPublicEditorDebugEnabled(): boolean {
-  return PUBLIC_EDITOR_DEV || readDebugFlagFromLocation() || readDebugFlagFromStorage();
-}
-
-function sanitizeDebugData(value: unknown, depth = 0): unknown {
-  if (value == null) return value;
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
-  if (value instanceof Error) return { name: value.name, message: value.message, stack: value.stack };
-  if (typeof value === 'function') return `[function ${value.name || 'anonymous'}]`;
-  if (depth > 3) return '[max-depth]';
-  if (Array.isArray(value)) return value.slice(0, 40).map((item) => sanitizeDebugData(item, depth + 1));
-  if (typeof value === 'object') {
-    const input = value as Record<string, unknown>;
-    const output: Record<string, unknown> = {};
-    Object.keys(input).slice(0, 80).forEach((key) => {
-      output[key] = sanitizeDebugData(input[key], depth + 1);
-    });
-    return output;
-  }
-  return String(value);
-}
-
-export function recordPublicEditorDebugEvent(
-  name: string,
-  data?: Record<string, unknown>,
-  level: PublicEditorDebugEventLevel = 'info',
-): void {
-  if (!isPublicEditorDebugEnabled()) return;
-  const event: PublicEditorDebugEvent = {
-    id: ++debugEventId,
-    at: Date.now(),
-    atIso: new Date().toISOString(),
-    name,
-    level,
-    data: data ? sanitizeDebugData(data) as Record<string, unknown> : undefined,
-  };
-  debugEvents.push(event);
-  if (debugEvents.length > DEBUG_EVENT_LIMIT) {
-    debugEvents.splice(0, debugEvents.length - DEBUG_EVENT_LIMIT);
-  }
-  const consoleMethod = level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'info';
-  console[consoleMethod]('[PublicEditorDebug]', name, event.data ?? {});
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('public-editor-debug', { detail: event }));
-  }
-}
-
-export function getPublicEditorDebugEvents(): PublicEditorDebugEvent[] {
-  return [...debugEvents];
-}
-
-export function clearPublicEditorDebugEvents(): void {
-  debugEvents.length = 0;
-}
 
 function trimSamples(samples: MetricSample[]): void {
   if (samples.length <= METRIC_SAMPLE_LIMIT) return;
@@ -311,12 +221,6 @@ declare global {
       snapshot: () => PublicEditorPerfSnapshot;
       reset: () => void;
     };
-    __PUBLIC_EDITOR_DEBUG__?: {
-      enabled: () => boolean;
-      events: () => PublicEditorDebugEvent[];
-      clear: () => void;
-      log: (name: string, data?: Record<string, unknown>, level?: PublicEditorDebugEventLevel) => void;
-    };
   }
 }
 
@@ -324,11 +228,5 @@ if (typeof window !== 'undefined') {
   window.__PUBLIC_EDITOR_PERF__ = {
     snapshot: getPublicEditorPerfSnapshot,
     reset: resetPublicEditorPerfMetrics,
-  };
-  window.__PUBLIC_EDITOR_DEBUG__ = {
-    enabled: isPublicEditorDebugEnabled,
-    events: getPublicEditorDebugEvents,
-    clear: clearPublicEditorDebugEvents,
-    log: recordPublicEditorDebugEvent,
   };
 }

@@ -1,5 +1,4 @@
 import { useLayoutEffect, useState, type RefObject } from 'react';
-import { recordPublicEditorDebugEvent } from '../../../features/publicDesignEditor/publicEditorPerf';
 
 export type DesignEditorViewportState = {
   fitZoom: number;
@@ -122,12 +121,7 @@ export function useDesignEditorViewport(input: {
         if (!alive) return;
         const container = resolveBestContainer();
         if (!container) {
-          recordPublicEditorDebugEvent('viewport.compute.no-container', {
-            pageWidthPx: input.pageWidthPx,
-            pageHeightPx: input.pageHeightPx,
-            compact,
-          }, 'warn');
-          return;
+return;
         }
         const containerSize = readElementSize(container);
         let aw = containerSize.width;
@@ -151,17 +145,7 @@ export function useDesignEditorViewport(input: {
           }
           if ((aw < minWidth || ah < minHeight) && retryCount < 100) {
             retryCount += 1;
-            recordPublicEditorDebugEvent('viewport.compute.retry', {
-              retryCount,
-              containerTag: container.tagName,
-              containerClass: container.className,
-              containerSize,
-              minWidth,
-              minHeight,
-              viewport: viewportSnapshot,
-              compact,
-            }, 'warn');
-            retryTimerId = setTimeout(compute, 100);
+retryTimerId = setTimeout(compute, 100);
             return;
           }
 
@@ -182,22 +166,7 @@ export function useDesignEditorViewport(input: {
           y: (ah - ch * z) / 2 + canvasPadY * z,
         });
         setViewportReady(true);
-        recordPublicEditorDebugEvent('viewport.compute.done', {
-          containerTag: container.tagName,
-          containerClass: container.className,
-          containerSize,
-          availableWidth: aw,
-          availableHeight: ah,
-          contentWidth: cw,
-          contentHeight: ch,
-          fitZoom: z,
-          zRaw,
-          compact,
-          isSpreadView: input.isSpreadView,
-          showBleed: input.showBleed,
-          visualViewport: readVisualViewportSize(),
-        });
-      });
+});
     };
 
     const ro = new ResizeObserver(compute);

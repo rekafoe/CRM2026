@@ -70,12 +70,8 @@ import {
 import { PublicDesignDraftConflictDialog } from './PublicDesignDraftConflictDialog';
 import { PUBLIC_EDITOR_FEATURE_FLAGS } from './publicEditorFeatureFlags';
 import {
-  getPublicEditorDebugEvents,
-  isPublicEditorDebugEnabled,
   PUBLIC_EDITOR_DEV,
-  recordPublicEditorDebugEvent,
   startPublicEditorPerfSpan,
-  type PublicEditorDebugEvent,
 } from './publicEditorPerf';
 import '../../pages/admin/DesignEditorPage.css';
 import '../../pages/admin/designEditor/designEditorGlassTheme.css';
@@ -132,174 +128,6 @@ function formatPageCountRu(count: number): string {
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} страницы`;
   return `${count} страниц`;
 }
-
-function readDebugPanelMode(): 'report' | 'events' {
-  if (typeof window === 'undefined') return 'report';
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('editorDebugEvents') === '1' ? 'events' : 'report';
-  } catch {
-    return 'report';
-  }
-}
-
-function findLastDebugEvent(events: PublicEditorDebugEvent[], name: string): PublicEditorDebugEvent | undefined {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    if (events[index]?.name === name) return events[index];
-  }
-  return undefined;
-}
-
-function formatDebugValue(value: unknown): string {
-  if (value == null) return 'none';
-  if (typeof value === 'number') return Number.isFinite(value) ? String(Math.round(value * 1000) / 1000) : 'NaN';
-  if (typeof value === 'boolean') return value ? 'yes' : 'no';
-  if (typeof value === 'string') return value.length > 90 ? `${value.slice(0, 87)}...` : value;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
-function buildPhoneDebugReport(events: PublicEditorDebugEvent[]): string {
-  const lastViewport = findLastDebugEvent(events, 'viewport.compute.done')?.data;
-  const lastEditorViewport = findLastDebugEvent(events, 'editor.viewport.state')?.data;
-  const lastScene = findLastDebugEvent(events, 'scene.load.single.done')?.data
-    ?? findLastDebugEvent(events, 'scene.load.spread.done.direct')?.data
-    ?? findLastDebugEvent(events, 'scene.load.spread.done.fallback')?.data;
-  const lastPrepare = findLastDebugEvent(events, 'fabric.prepare.done')?.data;
-  const lastBackgroundDone = findLastDebugEvent(events, 'background.deferred.done')?.data;
-  const lastBackgroundError = findLastDebugEvent(events, 'background.deferred.error')?.data;
-  const lastVectorOk = findLastDebugEvent(events, 'svg.vector.ok')?.data;
-  const lastVectorSkip = findLastDebugEvent(events, 'svg.vector.skip')?.data;
-  const lastTransition = findLastDebugEvent(events, 'transition.iteration.done')?.data;
-  const errors = events.filter((event) => event.level === 'error');
-  const warnings = events.filter((event) => event.level === 'warn');
-  const recentNames = events.slice(-14).map((event) => `${event.level[0].toUpperCase()} ${event.name}`);
-  const viewport = lastEditorViewport?.visualViewport as Record<string, unknown> | undefined;
-  const sceneObjects = Array.isArray(lastScene?.objects) ? lastScene.objects : [];
-  const objectTypes = sceneObjects.reduce<Record<string, number>>((acc, item) => {
-    const record = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-    const type = typeof record.type === 'string' ? record.type : 'unknown';
-    acc[type] = (acc[type] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  return [
-    'PRINTCORE EDITOR DEBUG REPORT',
-    `time: ${new Date().toLocaleString()}`,
-    `url: ${typeof window !== 'undefined' ? window.location.href : 'n/a'}`,
-    `events: ${events.length} | warnings: ${warnings.length} | errors: ${errors.length}`,
-    '',
-    'PHONE / VIEWPORT',
-    `screen: ${typeof window !== 'undefined' ? `${window.screen.width}x${window.screen.height}` : 'n/a'}`,
-    `inner: ${typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : 'n/a'}`,
-    `visualViewport: ${viewport ? `${formatDebugValue(viewport.width)}x${formatDebugValue(viewport.height)} offset=${formatDebugValue(viewport.offsetTop)},${formatDebugValue(viewport.offsetLeft)} scale=${formatDebugValue(viewport.scale)}` : 'none'}`,
-    `fitZoom: ${formatDebugValue(lastViewport?.fitZoom)} | ready: ${formatDebugValue(lastEditorViewport?.fitReady)}`,
-    `container: ${formatDebugValue(lastViewport?.availableWidth)}x${formatDebugValue(lastViewport?.availableHeight)}`,
-    `content: ${formatDebugValue(lastViewport?.contentWidth)}x${formatDebugValue(lastViewport?.contentHeight)}`,
-    '',
-    'CANVAS / FABRIC',
-    `pageLoadKey: ${formatDebugValue(lastEditorViewport?.pageLoadKey)}`,
-    `pageSpec: ${formatDebugValue(lastEditorViewport?.pageSpec)}`,
-    `json objects after prepare: ${formatDebugValue(lastPrepare?.objectCount)}`,
-    `deferred SVG backgrounds: ${formatDebugValue(lastPrepare?.deferredBackgroundCount)}`,
-    `canvas objects: ${formatDebugValue(lastScene?.objectCount)} | hasBackground: ${formatDebugValue(lastScene?.hasBackgroundObject)}`,
-    `object types: ${formatDebugValue(objectTypes)}`,
-    `background loaded: ${lastBackgroundDone ? `yes (${formatDebugValue(lastBackgroundDone.objectType)})` : 'no'}`,
-    `background error: ${lastBackgroundError ? formatDebugValue(lastBackgroundError.error) : 'none'}`,
-    `svg vector: ${lastVectorOk ? `ok objects=${formatDebugValue(lastVectorOk.objectCount)}` : lastVectorSkip ? `skip ${formatDebugValue(lastVectorSkip)}` : 'none'}`,
-    '',
-    'TRANSITION',
-    `displayed: ${formatDebugValue(lastTransition?.displayedKey)} | requested: ${formatDebugValue(lastTransition?.requestedKey)}`,
-    `objects after load: ${formatDebugValue(lastTransition?.objectCountAfterLoad)} | canvas now: ${formatDebugValue(lastTransition?.canvasObjectCount)}`,
-    '',
-    'LATEST WARNINGS / ERRORS',
-    ...(warnings.slice(-4).map((event) => `WARN ${event.name}: ${formatDebugValue(event.data)}`)),
-    ...(errors.slice(-4).map((event) => `ERROR ${event.name}: ${formatDebugValue(event.data)}`)),
-    warnings.length === 0 && errors.length === 0 ? 'none' : '',
-    '',
-    'LAST EVENTS',
-    ...recentNames,
-  ].filter((line) => line !== null).join('\n');
-}
-
-const PublicDesignDebugOverlay: React.FC = () => {
-  const [enabled, setEnabled] = useState(() => isPublicEditorDebugEnabled());
-  const [events, setEvents] = useState<PublicEditorDebugEvent[]>(() => getPublicEditorDebugEvents());
-  const [expanded, setExpanded] = useState(true);
-  const [mode, setMode] = useState<'report' | 'events'>(() => readDebugPanelMode());
-  const [fullScreen, setFullScreen] = useState(() => readDebugPanelMode() === 'report');
-
-  useEffect(() => {
-    const sync = () => {
-      setEnabled(isPublicEditorDebugEnabled());
-      setEvents(getPublicEditorDebugEvents());
-    };
-    sync();
-    window.addEventListener('public-editor-debug', sync);
-    window.addEventListener('storage', sync);
-    return () => {
-      window.removeEventListener('public-editor-debug', sync);
-      window.removeEventListener('storage', sync);
-    };
-  }, []);
-
-  if (!enabled) return null;
-  const lastEvents = events.slice(-24).reverse();
-  const errorCount = events.filter((event) => event.level === 'error').length;
-  const warnCount = events.filter((event) => event.level === 'warn').length;
-  const report = buildPhoneDebugReport(events);
-
-  return (
-    <aside
-      className={[
-        'public-design-editor__debug-overlay',
-        fullScreen ? 'public-design-editor__debug-overlay--fullscreen' : '',
-      ].filter(Boolean).join(' ')}
-      aria-label="Public editor debug"
-    >
-      <button
-        type="button"
-        className="public-design-editor__debug-toggle"
-        onClick={() => setExpanded((value) => !value)}
-      >
-        Debug {events.length} / W{warnCount} / E{errorCount} - показать мне экран
-      </button>
-      {expanded && (
-        <div className="public-design-editor__debug-panel">
-          <div className="public-design-editor__debug-actions">
-            <button type="button" onClick={() => setMode('report')}>Отчёт для скрина</button>
-            <button type="button" onClick={() => setMode('events')}>События</button>
-            <button type="button" onClick={() => setFullScreen((value) => !value)}>
-              {fullScreen ? 'Маленькое окно' : 'На весь экран'}
-            </button>
-          </div>
-          <div className="public-design-editor__debug-hint">
-            Открой отчёт на весь экран и сделай 2-3 скриншота: верх, середина, низ.
-          </div>
-          {mode === 'report' ? (
-            <pre className="public-design-editor__debug-report">{report}</pre>
-          ) : (
-            <ol className="public-design-editor__debug-list">
-              {lastEvents.map((event) => (
-                <li
-                  key={event.id}
-                  className={`public-design-editor__debug-event public-design-editor__debug-event--${event.level}`}
-                >
-                  <strong>{event.name}</strong>
-                  <span>{new Date(event.at).toLocaleTimeString()}</span>
-                  {event.data ? <pre>{JSON.stringify(event.data, null, 2)}</pre> : null}
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      )}
-    </aside>
-  );
-};
 
 interface PublicDesignEditorProps {
   templateId: number;
@@ -581,70 +409,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     compactPadding: isMobile,
     layoutTrigger: viewportLayoutTrigger,
   });
-
-  useEffect(() => {
-    const readRect = (node: HTMLElement | null) => {
-      if (!node) return null;
-      const rect = node.getBoundingClientRect();
-      return {
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-        top: Math.round(rect.top),
-        left: Math.round(rect.left),
-        clientWidth: node.clientWidth,
-        clientHeight: node.clientHeight,
-        scrollWidth: node.scrollWidth,
-        scrollHeight: node.scrollHeight,
-      };
-    };
-    recordPublicEditorDebugEvent('editor.viewport.state', {
-      templateId,
-      documentMode,
-      currentPage,
-      pageLoadKey: navigation.pageLoadKey,
-      isMobile,
-      fitReady,
-      fitZoom,
-      layoutWidthPx,
-      layoutHeightPx,
-      pageSpec,
-      scene: {
-        pageWidthPx: sceneGeometry.pageWidthPx,
-        pageHeightPx: sceneGeometry.pageHeightPx,
-        bleedPx: sceneGeometry.bleedPx,
-        safeZonePx: sceneGeometry.safeZonePx,
-      },
-      refs: {
-        scrollArea: readRect(scrollAreaRef.current),
-        viewport: readRect(viewportRef.current),
-        fitScaler: readRect(fitScalerRef.current),
-      },
-      visualViewport: typeof window !== 'undefined' ? {
-        width: Math.round(window.visualViewport?.width ?? 0),
-        height: Math.round(window.visualViewport?.height ?? 0),
-        offsetTop: Math.round(window.visualViewport?.offsetTop ?? 0),
-        offsetLeft: Math.round(window.visualViewport?.offsetLeft ?? 0),
-        scale: window.visualViewport?.scale ?? null,
-        innerWidth: window.innerWidth,
-        innerHeight: window.innerHeight,
-      } : null,
-    });
-  }, [
-    currentPage,
-    documentMode,
-    fitReady,
-    fitZoom,
-    isMobile,
-    layoutHeightPx,
-    layoutWidthPx,
-    navigation.pageLoadKey,
-    pageSpec,
-    sceneGeometry.bleedPx,
-    sceneGeometry.pageHeightPx,
-    sceneGeometry.pageWidthPx,
-    sceneGeometry.safeZonePx,
-    templateId,
-  ]);
 
   const markDirty = useCallback(() => {
     if (suppressDirtyRef.current) return;
@@ -1114,10 +878,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
 
   if (loading) {
     return (
-      <>
-        <div className="public-design-editor__state">Загрузка редактора...</div>
-        <PublicDesignDebugOverlay />
-      </>
+      <div className="public-design-editor__state">Загрузка редактора...</div>
     );
   }
   if (!template) return <Alert type="error">{error ?? 'Шаблон не найден'}</Alert>;
@@ -1379,7 +1140,6 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
 
   return (
     <div className={editorRootClassName} {...editorRootDevProps}>
-      <PublicDesignDebugOverlay />
       {!isMobile && (
         <EditorTopBar
           templateName={template.name}

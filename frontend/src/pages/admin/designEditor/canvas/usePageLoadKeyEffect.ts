@@ -13,7 +13,6 @@ import {
 import { getPageTransitionInvariantError } from './pageTransitionInvariant';
 import {
   PUBLIC_EDITOR_DEV,
-  recordPublicEditorDebugEvent,
 } from '../../../../features/publicDesignEditor/publicEditorPerf';
 
 export interface UsePageLoadKeyEffectInput {
@@ -81,13 +80,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
     invalidatePendingDocumentCommit?.();
     drainingRef.current = true;
     pageTransitionGate.begin();
-    recordPublicEditorDebugEvent('transition.gate.begin', {
-      pageLoadKey,
-      displayedKey: prevPageLoadKeyRef.current,
-      canvasReady,
-    });
-
-    void (async () => {
+void (async () => {
       try {
         const refs: PageLoadKeyTransitionRefs = {
           pageLoadKeyRef,
@@ -128,14 +121,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
           const prevKey = prevPageLoadKeyRef.current;
           const canvasInstance = canvasInstanceRef.current;
           const canvas = fabricRef.current;
-          recordPublicEditorDebugEvent('transition.iteration.start', {
-            targetKey,
-            prevKey,
-            canvasInstance,
-            objectCount: canvas.getObjects().length,
-            drainIterations,
-          });
-          if (
+if (
             prevKey === targetKey
             && loadedPageForInstanceRef.current === canvasInstance
           ) {
@@ -154,12 +140,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
               callbacks,
             });
           } catch (transitionError) {
-            recordPublicEditorDebugEvent('transition.iteration.error', {
-              targetKey,
-              requestedKey: requestedKeyRef.current,
-              transitionError,
-            }, 'error');
-            if (PUBLIC_EDITOR_DEV) {
+if (PUBLIC_EDITOR_DEV) {
               console.warn('[DesignEditorCanvas] transition iteration failed, retrying drain', {
                 targetKey,
                 requestedKey: requestedKeyRef.current,
@@ -177,13 +158,7 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
             expectedCanvasInstance: canvasInstance,
           });
           if (invariantError) {
-            recordPublicEditorDebugEvent('transition.invariant-mismatch', {
-              targetKey,
-              requestedKey: requestedKeyRef.current,
-              invariantError,
-              invariantRetryCount,
-            }, 'warn');
-            if (PUBLIC_EDITOR_DEV) {
+if (PUBLIC_EDITOR_DEV) {
               console.warn('[DesignEditorCanvas] transition invariant mismatch, self-healing', {
                 targetKey,
                 requestedKey: requestedKeyRef.current,
@@ -212,33 +187,18 @@ export function usePageLoadKeyEffect(input: UsePageLoadKeyEffectInput): void {
             canvas.upperCanvasEl.dataset.pageObjectCount = String(canvas.getObjects().length);
             canvas.upperCanvasEl.dataset.pageObjectCountAfterLoad = String(result.objectCountAfterLoad);
           }
-          recordPublicEditorDebugEvent('transition.iteration.done', {
-            targetKey,
-            requestedKey: requestedKeyRef.current,
-            displayedKey: result.displayedKey,
-            activePageIndex: result.activePageIndex,
-            objectCountBeforeFlush: result.objectCountBeforeFlush,
-            objectCountAfterLoad: result.objectCountAfterLoad,
-            canvasObjectCount: canvas.getObjects().length,
-          });
-
-          if (requestedKeyRef.current === targetKey) break;
+if (requestedKeyRef.current === targetKey) break;
         }
       } catch (error) {
         // Ошибка загрузки страницы не должна оставлять pagestrip в busy-состоянии.
         if (PUBLIC_EDITOR_DEV) {
           console.error('[DesignEditorCanvas] page transition failed', error);
         }
-        recordPublicEditorDebugEvent('transition.drain.error', { error }, 'error');
-      } finally {
+} finally {
         drainingRef.current = false;
         pageTransitionLockRef.current = false;
         pageTransitionGate.end();
-        recordPublicEditorDebugEvent('transition.gate.end', {
-          requestedKey: requestedKeyRef.current,
-          displayedKey: prevPageLoadKeyRef.current,
-        });
-      }
+}
     })();
 
     return undefined;
