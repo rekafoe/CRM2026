@@ -25,6 +25,62 @@ function readDraftDesignState(payload: Record<string, unknown>): Record<string, 
   return parseObject(payload.productionDesignState) ?? parseObject(payload.designState)
 }
 
+function summarizeDesignStateForAgentDebug(value: unknown): Record<string, unknown> {
+  const state = parseObject(value) ?? {}
+  const pages = Array.isArray(state.pages) ? state.pages : []
+  let objects = 0
+  let images = 0
+  let photoFields = 0
+  let filledPhotoFields = 0
+  let textObjects = 0
+  const walk = (node: unknown): void => {
+    if (!node || typeof node !== 'object' || Array.isArray(node)) return
+    const obj = node as Record<string, unknown>
+    objects += 1
+    const type = String(obj.type ?? '').toLowerCase()
+    if (type === 'image' || typeof obj.src === 'string') images += 1
+    if (obj.isPhotoField === true) {
+      photoFields += 1
+      if (obj.photoFieldFilled === true) filledPhotoFields += 1
+    }
+    if (type === 'i-text' || type === 'itext' || type === 'textbox' || type === 'text') textObjects += 1
+    for (const key of ['objects', '_objects']) {
+      const children = obj[key]
+      if (Array.isArray(children)) children.forEach(walk)
+    }
+    walk(obj.clipPath)
+  }
+  for (const page of pages) {
+    const pageObj = parseObject(page) ?? {}
+    walk(pageObj.fabricJSON ?? page)
+  }
+  return {
+    pageCount: Number(state.pageCount ?? pages.length) || pages.length,
+    pages: pages.length,
+    sceneScale: state.sceneScale,
+    pageWidth: state.pageWidth,
+    pageHeight: state.pageHeight,
+    objects,
+    images,
+    photoFields,
+    filledPhotoFields,
+    textObjects,
+  }
+}
+
+function fingerprintAgentDebugToken(value: string): Record<string, unknown> {
+  let hash = 2_166_136_261
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i)
+    hash = Math.imul(hash, 1_677_761_9)
+  }
+  return {
+    present: value.length > 0,
+    length: value.length,
+    fingerprint: value ? `${value.length}:${(hash >>> 0).toString(36)}` : null,
+  }
+}
+
 function collectEditorDraftTokens(params: Record<string, unknown>): string[] {
   const tokens = new Set<string>()
   const add = (value: unknown) => {
@@ -70,7 +126,21 @@ async function resolveLatestDesignStateForProduction(
     const draftState = readDraftDesignState(draft.payloadParsed)
     if (draftState) draftStates.push(draftState)
   }
-  return mergeDraftDesignStates(draftStates) ?? parseObject(params.designState)
+  const fallbackState = parseObject(params.designState)
+  const resolvedState = mergeDraftDesignStates(draftStates) ?? fallbackState
+  // #region agent log
+  logger.info('[agent:pdf-mismatch] CRM production job resolved designState source summary', {
+    runId: 'pdf-mismatch-prod',
+    hypothesisId: 'H3',
+    draftTokenCount: draftTokens.length,
+    draftTokens: draftTokens.map(fingerprintAgentDebugToken),
+    draftStatesCount: draftStates.length,
+    hasFallbackDesignState: Boolean(fallbackState),
+    usedFallback: draftStates.length === 0 && Boolean(fallbackState),
+    resolved: summarizeDesignStateForAgentDebug(resolvedState),
+  })
+  // #endregion
+  return resolvedState
 }
 
 export async function enqueueEditorProductionJobsForOrder(orderId: number): Promise<void> {
