@@ -63,12 +63,9 @@ export function usePublicDesignBootstrap({
         const t = res.data;
         const spec = readDesignTemplateSpec(t);
         const ds = spec.designState;
-        const draftState = initialDraftToken
-          ? (adapter
-            ? (await adapter.getDraft(initialDraftToken)).payloadParsed?.designState as typeof ds | undefined
-            : undefined)
-          : undefined;
-        const sourceState = draftState ?? ds;
+        const sourceState = initialDraftToken
+          ? (adapter ? (await adapter.getDraft(initialDraftToken)).payloadParsed?.designState as typeof ds | undefined : undefined) ?? ds
+          : ds;
         const w = sourceState?.pageWidth ?? spec.width_mm ?? 90;
         const h = sourceState?.pageHeight ?? spec.height_mm ?? 55;
         const statePageCount = Number(sourceState?.pageCount ?? spec.page_count ?? 1);
