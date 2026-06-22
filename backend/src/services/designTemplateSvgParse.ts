@@ -1,5 +1,5 @@
 /**
- * Именованные слои импортного SVG → photo_* rect, text_* text,
+ * Именованные слои импортного SVG → photo_* rect, text_* text, decor_* (rect/circle/path),
  * trim/bleed/safe → prepress (грубая эстимация мм),
  * фоновый файл без этих элементов и без дубля с редактором overlay.
  */
@@ -55,10 +55,25 @@ export type SvgText = {
   scene: GeometryPoint & { fontSize: number }
 }
 
+export type SvgDecorShape = 'rect' | 'circle' | 'path'
+
+export type SvgDecor = {
+  name: string
+  shape: SvgDecorShape
+  fill?: string
+  stroke?: string
+  strokeWidth?: number
+  opacity?: number
+  pathData?: string
+  svg: GeometryRect
+  scene: GeometryRect
+}
+
 /** Интерактивный слой в порядке появления в SVG (z-order для Fabric). */
 export type SvgInteractiveLayer =
   | { kind: 'photo'; data: SvgRect }
   | { kind: 'text'; data: SvgText }
+  | { kind: 'decor'; data: SvgDecor }
 
 export type MmRect = {
   name: string
@@ -79,15 +94,17 @@ export type ParserLayerStatus = 'parsed_interactive' | 'kept_as_background' | 'i
 export type ParserReasonCode =
   | 'PHOTO_PARSED'
   | 'TEXT_PARSED'
+  | 'DECOR_PARSED'
   | 'PHOTO_NO_VALID_RECT'
   | 'TXT_NO_VALID_NODE'
+  | 'DECOR_NO_VALID_SHAPE'
   | 'GUIDE_IGNORED'
   | 'TECHNICAL_IGNORED'
   | 'LAYER_NOT_CLASSIFIED'
 
 export type ParserLayerReport = {
   name: string
-  kindExpected: 'photo' | 'text' | 'guide' | 'technical' | 'unknown'
+  kindExpected: 'photo' | 'text' | 'decor' | 'guide' | 'technical' | 'unknown'
   status: ParserLayerStatus
   reasonCode: ParserReasonCode
   bboxSvg?: GeometryRect
@@ -116,7 +133,7 @@ export interface ImportedSvgLayers {
   heightMm: number
   photoRects: SvgRect[]
   textItems: SvgText[]
-  /** photo_* и text_* в порядке документа SVG (для z-order в fabricJSON). */
+  /** photo_*, text_*, decor_* в порядке документа SVG (для z-order в fabricJSON). */
   interactiveLayers: SvgInteractiveLayer[]
   guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>>
   lockedBgDetected: boolean
@@ -125,6 +142,7 @@ export interface ImportedSvgLayers {
   summary: {
     photoFields: number
     textFields: number
+    decorFields: number
     guides: string[]
     strippedLayers: number
     interactiveLayerCount: number
@@ -166,6 +184,7 @@ function warnWithCode(warnings: string[], code: string, message: string): void {
 function inferKindExpected(name: string): ParserLayerReport['kindExpected'] {
   if (name.startsWith('photo_')) return 'photo'
   if (name.startsWith('text_')) return 'text'
+  if (name.startsWith('decor_')) return 'decor'
   if (GUIDE_NAMES.has(name as 'trim' | 'bleed' | 'safe')) return 'guide'
   if (TECH_PREFIXES.some((p) => name.startsWith(p))) return 'technical'
   return 'unknown'
@@ -281,6 +300,143 @@ function transformedRect(
   const minY = Math.min(...ys)
   const maxY = Math.max(...ys)
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+}
+
+function resolveDecorPresentation(
+  attrs: Record<string, string>,
+  inheritedStyle: Record<string, string>,
+  cssClassStyles: Record<string, Record<string, string>>,
+): Pick<SvgDecor, 'fill' | 'stroke' | 'strokeWidth' | 'opacity'> {
+  const style = {
+    ...inheritedStyle,
+    ...styleFromClassNames(attrs.class, cssClassStyles),
+    ...parseStyle(attrs.style),
+  }
+  if (attrs.fill?.trim()) style.fill = attrs.fill.trim()
+  if (attrs.stroke?.trim()) style.stroke = attrs.stroke.trim()
+  if (attrs['stroke-width']?.trim()) style['stroke-width'] = attrs['stroke-width'].trim()
+  if (attrs.opacity?.trim()) style.opacity = attrs.opacity.trim()
+  const fill = normalizeSvgPaintColor(style.fill)
+  const stroke = normalizeSvgPaintColor(style.stroke)
+  const strokeWidth = parseNumber(style['stroke-width']) ?? undefined
+  const opacity = parseNumber(style.opacity) ?? undefined
+  return {
+    ...(fill ? { fill } : {}),
+    ...(stroke ? { stroke } : {}),
+    ...(strokeWidth != null ? { strokeWidth: Math.max(0, strokeWidth) } : {}),
+    ...(opacity != null ? { opacity: Math.min(1, Math.max(0, opacity)) } : {}),
+  }
+}
+
+function parseSvgPathApproxBounds(d: string): GeometryRect | null {
+  if (!d.trim()) return null
+  const tokenRe = /([a-zA-Z])([^a-zA-Z]*)/g
+  const numberRe = /-?\d*\.?\d+(?:e[-+]?\d+)?/gi
+  let currentX = 0
+  let currentY = 0
+  let startX = 0
+  let startY = 0
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  const mark = (x: number, y: number) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    maxX = Math.max(maxX, x)
+    maxY = Math.max(maxY, y)
+  }
+  const read = (raw: string): number[] => {
+    const out: number[] = []
+    let m: RegExpExecArray | null
+    while ((m = numberRe.exec(raw)) !== null) out.push(Number(m[0]))
+    return out.filter(Number.isFinite)
+  }
+  let token: RegExpExecArray | null
+  while ((token = tokenRe.exec(d)) !== null) {
+    const cmd = token[1]
+    const nums = read(token[2] ?? '')
+    const lower = cmd.toLowerCase()
+    const rel = cmd !== lower
+      ? false
+      : true
+    const step = (x: number, y: number) => {
+      currentX = rel ? currentX + x : x
+      currentY = rel ? currentY + y : y
+      mark(currentX, currentY)
+    }
+    if (lower === 'm' || lower === 'l' || lower === 't') {
+      for (let i = 0; i + 1 < nums.length; i += 2) {
+        step(nums[i]!, nums[i + 1]!)
+        if (lower === 'm' && i === 0) {
+          startX = currentX
+          startY = currentY
+        }
+      }
+      continue
+    }
+    if (lower === 'h') {
+      for (const x of nums) step(x, 0)
+      continue
+    }
+    if (lower === 'v') {
+      for (const y of nums) step(0, y)
+      continue
+    }
+    if (lower === 'c') {
+      for (let i = 0; i + 5 < nums.length; i += 6) {
+        const x1 = rel ? currentX + nums[i]! : nums[i]!
+        const y1 = rel ? currentY + nums[i + 1]! : nums[i + 1]!
+        const x2 = rel ? currentX + nums[i + 2]! : nums[i + 2]!
+        const y2 = rel ? currentY + nums[i + 3]! : nums[i + 3]!
+        mark(x1, y1)
+        mark(x2, y2)
+        step(nums[i + 4]!, nums[i + 5]!)
+      }
+      continue
+    }
+    if (lower === 's' || lower === 'q') {
+      for (let i = 0; i + 3 < nums.length; i += 4) {
+        const x1 = rel ? currentX + nums[i]! : nums[i]!
+        const y1 = rel ? currentY + nums[i + 1]! : nums[i + 1]!
+        mark(x1, y1)
+        step(nums[i + 2]!, nums[i + 3]!)
+      }
+      continue
+    }
+    if (lower === 'a') {
+      for (let i = 0; i + 6 < nums.length; i += 7) {
+        const rx = Math.abs(nums[i]!)
+        const ry = Math.abs(nums[i + 1]!)
+        const x = rel ? currentX + nums[i + 5]! : nums[i + 5]!
+        const y = rel ? currentY + nums[i + 6]! : nums[i + 6]!
+        mark(currentX - rx, currentY - ry)
+        mark(currentX + rx, currentY + ry)
+        mark(x - rx, y - ry)
+        mark(x + rx, y + ry)
+        currentX = x
+        currentY = y
+        mark(currentX, currentY)
+      }
+      continue
+    }
+    if (lower === 'z') {
+      currentX = startX
+      currentY = startY
+      mark(currentX, currentY)
+      continue
+    }
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return null
+  }
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(0, maxX - minX),
+    height: Math.max(0, maxY - minY),
+  }
 }
 
 /** Среднее внешнее поле между outer и inner (мм). */
@@ -1252,13 +1408,13 @@ function dimsFromSvgRoot(svg: string): {
 }
 
 function warnUnhandledLayerName(kind: string, name: string, warnings: string[], seen: Set<string>) {
-  if (kind === 'группа' && (name.startsWith('photo_') || name.startsWith('text_'))) return
+  if (kind === 'группа' && (name.startsWith('photo_') || name.startsWith('text_') || name.startsWith('decor_'))) return
 
   const key = `${kind}:${name}`
   if (seen.has(key)) return
   seen.add(key)
 
-  if (name.startsWith('photo_') || name.startsWith('text_')) return
+  if (name.startsWith('photo_') || name.startsWith('text_') || name.startsWith('decor_')) return
   if (
     name === 'locked_bg' ||
     name === 'trim' ||
@@ -1271,7 +1427,7 @@ function warnUnhandledLayerName(kind: string, name: string, warnings: string[], 
     return
   }
   warnings.push(
-    `Неиспользуемое имя в ${kind} "${name}". Ожидались photo_*, text_*, trim, bleed, safe, locked_bg, hidden_*, guide_*.`,
+    `Неиспользуемое имя в ${kind} "${name}". Ожидались photo_*, text_*, decor_*, trim, bleed, safe, locked_bg, hidden_*, guide_*.`,
   )
 }
 
@@ -1348,6 +1504,7 @@ export function parseImportedSvgLayers(
   const warnings = [...dims.warnings]
   const photoRects: SvgRect[] = []
   const textItems: SvgText[] = []
+  const decorItems: SvgDecor[] = []
   const interactiveLayers: SvgInteractiveLayer[] = []
   const guideRectsMm: Partial<Record<'trim' | 'bleed' | 'safe', MmRect>> = {}
   let lockedBgDetected = false
@@ -1355,8 +1512,10 @@ export function parseImportedSvgLayers(
   const removalRanges: RemovalRange[] = []
   const seenPhotoLayerNames = new Set<string>()
   const seenTextLayerNames = new Set<string>()
+  const seenDecorLayerNames = new Set<string>()
   const parsedPhotoLayerNames = new Set<string>()
   const parsedTextLayerNames = new Set<string>()
+  const parsedDecorLayerNames = new Set<string>()
   const namedLayerReports = new Map<string, ParserLayerReport>()
   const seenLayerOrder: string[] = []
 
@@ -1381,6 +1540,28 @@ export function parseImportedSvgLayers(
       ...existing,
       ...patch,
     })
+  }
+
+  function markFallbackLayer(name: string): void {
+    const isPhoto = name.startsWith('photo_')
+    const isText = name.startsWith('text_')
+    const isDecor = name.startsWith('decor_')
+    markLayerReport(name, {
+      status: (isPhoto || isText || isDecor) ? 'kept_as_background' : 'ignored_technical',
+      reasonCode: isPhoto
+        ? 'PHOTO_NO_VALID_RECT'
+        : isText
+          ? 'TXT_NO_VALID_NODE'
+          : isDecor
+            ? 'DECOR_NO_VALID_SHAPE'
+            : (GUIDE_NAMES.has(name as 'trim' | 'bleed' | 'safe') ? 'GUIDE_IGNORED' : 'TECHNICAL_IGNORED'),
+    })
+    if (!isPhoto && !isText && !isDecor && !GUIDE_NAMES.has(name as 'trim' | 'bleed' | 'safe') && !TECH_PREFIXES.some((p) => name.startsWith(p)) && name !== 'locked_bg') {
+      markLayerReport(name, {
+        status: 'kept_as_background',
+        reasonCode: 'LAYER_NOT_CLASSIFIED',
+      })
+    }
   }
 
   const groupStack: (string | null)[] = [null]
@@ -1450,6 +1631,7 @@ export function parseImportedSvgLayers(
         const removableInteractive = !!ln && (
           (ln.startsWith('photo_') && parsedPhotoLayerNames.has(ln))
           || (ln.startsWith('text_') && parsedTextLayerNames.has(ln))
+          || (ln.startsWith('decor_') && parsedDecorLayerNames.has(ln))
         )
         if (framed.removable || removableInteractive) {
           removalRanges.push({ start: framed.openLt, end: gt + 1 })
@@ -1463,15 +1645,11 @@ export function parseImportedSvgLayers(
       const attrs = parseAttributes(attrPart)
       const ln = getLayerName(attrs)
       if (ln) {
-        markLayerReport(ln, {
-          status: ln.startsWith('photo_') || ln.startsWith('text_') ? 'kept_as_background' : 'ignored_technical',
-          reasonCode: ln.startsWith('photo_') || ln.startsWith('text_')
-            ? (ln.startsWith('photo_') ? 'PHOTO_NO_VALID_RECT' : 'TXT_NO_VALID_NODE')
-            : (GUIDE_NAMES.has(ln as 'trim' | 'bleed' | 'safe') ? 'GUIDE_IGNORED' : 'TECHNICAL_IGNORED'),
-        })
+        markFallbackLayer(ln)
       }
       if (ln?.startsWith('photo_')) seenPhotoLayerNames.add(ln)
       if (ln?.startsWith('text_')) seenTextLayerNames.add(ln)
+      if (ln?.startsWith('decor_')) seenDecorLayerNames.add(ln)
       if (ln === 'locked_bg') lockedBgDetected = true
       if (ln) warnUnhandledLayerName('группа', ln, warnings, warnedNames)
       groupStack.push(ln)
@@ -1503,15 +1681,12 @@ export function parseImportedSvgLayers(
       const explicit = getLayerName(attrs)
       const ef = explicit ?? inherited
       if (ef) {
-        markLayerReport(ef, {
-          status: ef.startsWith('photo_') || ef.startsWith('text_') ? 'kept_as_background' : 'ignored_technical',
-          reasonCode: ef.startsWith('photo_') || ef.startsWith('text_')
-            ? (ef.startsWith('photo_') ? 'PHOTO_NO_VALID_RECT' : 'TXT_NO_VALID_NODE')
-            : (GUIDE_NAMES.has(ef as 'trim' | 'bleed' | 'safe') ? 'GUIDE_IGNORED' : 'TECHNICAL_IGNORED'),
-        })
+        markFallbackLayer(ef)
       }
+      if (ef === 'locked_bg') lockedBgDetected = true
       if (ef?.startsWith('photo_')) seenPhotoLayerNames.add(ef)
       if (ef?.startsWith('text_')) seenTextLayerNames.add(ef)
+      if (ef?.startsWith('decor_')) seenDecorLayerNames.add(ef)
       const x = parseNumber(attrs.x) ?? 0
       const y = parseNumber(attrs.y) ?? 0
       const width = parseNumber(attrs.width)
@@ -1567,6 +1742,143 @@ export function parseImportedSvgLayers(
         removalRanges.push({ start: lt, end: gt + 1 })
       }
 
+      if (ef?.startsWith('decor_') && width != null && height != null && width > 0 && height > 0) {
+        const tr = transformedRect(x, y, width, height, objectTransform)
+        const mmRect = geometry.svgRectToMm(tr)
+        const sceneRect = geometry.mmRectToScene(mmRect)
+        const decorEntry: SvgDecor = {
+          name: ef,
+          shape: 'rect',
+          ...resolveDecorPresentation(
+            attrs,
+            groupStyleStack[groupStyleStack.length - 1] ?? {},
+            cssClassStyles,
+          ),
+          svg: tr,
+          scene: sceneRect,
+        }
+        decorItems.push(decorEntry)
+        interactiveLayers.push({ kind: 'decor', data: decorEntry })
+        parsedDecorLayerNames.add(ef)
+        markLayerReport(ef, {
+          status: 'parsed_interactive',
+          reasonCode: 'DECOR_PARSED',
+          bboxSvg: tr,
+          bboxScene: sceneRect,
+        })
+        removalRanges.push({ start: lt, end: gt + 1 })
+      }
+
+      i = gt + 1
+      continue
+    }
+
+    if (tagLc === 'circle') {
+      const attrs = parseAttributes(attrPart)
+      const ef = getLayerName(attrs) ?? inherited
+      if (ef) {
+        markFallbackLayer(ef)
+        if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
+      }
+      if (ef === 'locked_bg') lockedBgDetected = true
+      if (ef) warnUnhandledLayerName('circle', ef, warnings, warnedNames)
+      if (!ef?.startsWith('decor_')) {
+        i = gt + 1
+        continue
+      }
+      const cx = parseNumber(attrs.cx) ?? 0
+      const cy = parseNumber(attrs.cy) ?? 0
+      const r = parseNumber(attrs.r)
+      if (r == null || r <= 0) {
+        i = gt + 1
+        continue
+      }
+      const objectTransform = multiplyTransform(
+        inheritedTransform,
+        parseSvgTransform(attrs.transform, unsupportedFeatures),
+      )
+      const tr = transformedRect(cx - r, cy - r, r * 2, r * 2, objectTransform)
+      const mmRect = geometry.svgRectToMm(tr)
+      const sceneRect = geometry.mmRectToScene(mmRect)
+      const decorEntry: SvgDecor = {
+        name: ef,
+        shape: 'circle',
+        ...resolveDecorPresentation(
+          attrs,
+          groupStyleStack[groupStyleStack.length - 1] ?? {},
+          cssClassStyles,
+        ),
+        svg: tr,
+        scene: sceneRect,
+      }
+      decorItems.push(decorEntry)
+      interactiveLayers.push({ kind: 'decor', data: decorEntry })
+      parsedDecorLayerNames.add(ef)
+      markLayerReport(ef, {
+        status: 'parsed_interactive',
+        reasonCode: 'DECOR_PARSED',
+        bboxSvg: tr,
+        bboxScene: sceneRect,
+      })
+      removalRanges.push({ start: lt, end: gt + 1 })
+      i = gt + 1
+      continue
+    }
+
+    if (tagLc === 'path') {
+      const attrs = parseAttributes(attrPart)
+      const ef = getLayerName(attrs) ?? inherited
+      if (ef) {
+        markFallbackLayer(ef)
+        if (ef.startsWith('decor_')) seenDecorLayerNames.add(ef)
+      }
+      if (ef === 'locked_bg') lockedBgDetected = true
+      if (ef) warnUnhandledLayerName('path', ef, warnings, warnedNames)
+      if (!ef?.startsWith('decor_')) {
+        i = gt + 1
+        continue
+      }
+      const d = attrs.d?.trim()
+      const baseBounds = d ? parseSvgPathApproxBounds(d) : null
+      if (!d || !baseBounds || baseBounds.width <= 0 || baseBounds.height <= 0) {
+        i = gt + 1
+        continue
+      }
+      const objectTransform = multiplyTransform(
+        inheritedTransform,
+        parseSvgTransform(attrs.transform, unsupportedFeatures),
+      )
+      const tr = transformedRect(
+        baseBounds.x,
+        baseBounds.y,
+        baseBounds.width,
+        baseBounds.height,
+        objectTransform,
+      )
+      const mmRect = geometry.svgRectToMm(tr)
+      const sceneRect = geometry.mmRectToScene(mmRect)
+      const decorEntry: SvgDecor = {
+        name: ef,
+        shape: 'path',
+        pathData: d,
+        ...resolveDecorPresentation(
+          attrs,
+          groupStyleStack[groupStyleStack.length - 1] ?? {},
+          cssClassStyles,
+        ),
+        svg: tr,
+        scene: sceneRect,
+      }
+      decorItems.push(decorEntry)
+      interactiveLayers.push({ kind: 'decor', data: decorEntry })
+      parsedDecorLayerNames.add(ef)
+      markLayerReport(ef, {
+        status: 'parsed_interactive',
+        reasonCode: 'DECOR_PARSED',
+        bboxSvg: tr,
+        bboxScene: sceneRect,
+      })
+      removalRanges.push({ start: lt, end: gt + 1 })
       i = gt + 1
       continue
     }
@@ -1581,17 +1893,12 @@ export function parseImportedSvgLayers(
       const attrs = parseAttributes(attrPart)
       const ef = getLayerName(attrs) ?? inherited
       if (ef) {
-        markLayerReport(ef, {
-          status: ef.startsWith('text_') || ef.startsWith('photo_') ? 'kept_as_background' : 'ignored_technical',
-          reasonCode: ef.startsWith('text_')
-            ? 'TXT_NO_VALID_NODE'
-            : ef.startsWith('photo_')
-              ? 'PHOTO_NO_VALID_RECT'
-              : (GUIDE_NAMES.has(ef as 'trim' | 'bleed' | 'safe') ? 'GUIDE_IGNORED' : 'TECHNICAL_IGNORED'),
-        })
+        markFallbackLayer(ef)
       }
+      if (ef === 'locked_bg') lockedBgDetected = true
       if (ef?.startsWith('photo_')) seenPhotoLayerNames.add(ef)
       if (ef?.startsWith('text_')) seenTextLayerNames.add(ef)
+      if (ef?.startsWith('decor_')) seenDecorLayerNames.add(ef)
       const outerEnd = findOuterTextCloseEnd(svg, gt)
 
       if (outerEnd == null) {
@@ -1782,6 +2089,14 @@ export function parseImportedSvgLayers(
       `Слой ${name} оставлен в фоне: не найден валидный rect для photo-поля.`,
     )
   }
+  for (const name of seenDecorLayerNames) {
+    if (parsedDecorLayerNames.has(name)) continue
+    warnWithCode(
+      warnings,
+      'DECOR_NO_VALID_SHAPE',
+      `Слой ${name} оставлен в фоне: для decor_* поддержаны rect/circle/path с валидной геометрией.`,
+    )
+  }
   if (unsupportedFeatures.size > 0) {
     warnWithCode(
       warnings,
@@ -1808,17 +2123,17 @@ export function parseImportedSvgLayers(
     )
   }
 
-  if (photoRects.length === 0 && mergedTextItems.length === 0) {
+  if (photoRects.length === 0 && mergedTextItems.length === 0 && decorItems.length === 0) {
     warnWithCode(
       warnings,
       'INTERACTIVE_FIELDS_NOT_FOUND',
-      'Не найдено объектов photo_* или text_*; добавьте поля вручную или проверьте имена групп.',
+      'Не найдено объектов photo_*, text_* или decor_*; добавьте поля вручную или проверьте имена групп.',
     )
   }
   warnWithCode(
     warnings,
     'IMPORT_SUMMARY',
-    `Импорт SVG: найдено фото-полей ${photoRects.length}, текстовых полей ${mergedTextItems.length}, направляющих ${Object.keys(guideRectsMm).length}.`,
+    `Импорт SVG: найдено фото-полей ${photoRects.length}, текстовых полей ${mergedTextItems.length}, decor-объектов ${decorItems.length}, направляющих ${Object.keys(guideRectsMm).length}.`,
   )
 
   const assembleStart = performance.now()
@@ -1854,20 +2169,21 @@ export function parseImportedSvgLayers(
     summary: {
       photoFields: photoRects.length,
       textFields: mergedTextItems.length,
+      decorFields: decorItems.length,
       guides: Object.keys(guideRectsMm),
       strippedLayers: mergedRanges.length,
       interactiveLayerCount: interactiveLayers.length,
-      interactiveParsedPercent: (seenPhotoLayerNames.size + seenTextLayerNames.size) > 0
+      interactiveParsedPercent: (seenPhotoLayerNames.size + seenTextLayerNames.size + seenDecorLayerNames.size) > 0
         ? Math.round(
-          ((parsedPhotoLayerNames.size + parsedTextLayerNames.size)
-            / (seenPhotoLayerNames.size + seenTextLayerNames.size)) * 1000,
+          ((parsedPhotoLayerNames.size + parsedTextLayerNames.size + parsedDecorLayerNames.size)
+            / (seenPhotoLayerNames.size + seenTextLayerNames.size + seenDecorLayerNames.size)) * 1000,
         ) / 10
         : 100,
-      fallbackBackgroundPercent: (seenPhotoLayerNames.size + seenTextLayerNames.size) > 0
+      fallbackBackgroundPercent: (seenPhotoLayerNames.size + seenTextLayerNames.size + seenDecorLayerNames.size) > 0
         ? Math.round(
-          (((seenPhotoLayerNames.size + seenTextLayerNames.size)
-            - (parsedPhotoLayerNames.size + parsedTextLayerNames.size))
-            / (seenPhotoLayerNames.size + seenTextLayerNames.size)) * 1000,
+          (((seenPhotoLayerNames.size + seenTextLayerNames.size + seenDecorLayerNames.size)
+            - (parsedPhotoLayerNames.size + parsedTextLayerNames.size + parsedDecorLayerNames.size))
+            / (seenPhotoLayerNames.size + seenTextLayerNames.size + seenDecorLayerNames.size)) * 1000,
         ) / 10
         : 0,
       unsupportedFeatures: [...unsupportedFeatures],

@@ -204,6 +204,32 @@ describe('parseImportedSvgLayers', () => {
     ])
   })
 
+  it('распознаёт decor_* (rect/circle/path) как интерактивные объекты', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <rect id="decor_box" x="1" y="2" width="20" height="10" fill="#ff0000"/>
+  <circle id="decor_dot" cx="40" cy="25" r="5" fill="#00ff00"/>
+  <path id="decor_wave" d="M 60 20 L 80 20 L 80 30 Z" fill="#0000ff"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    const decor = r.interactiveLayers.filter((layer) => layer.kind === 'decor')
+    expect(decor).toHaveLength(3)
+    expect(decor.map((layer) => layer.data.name)).toEqual(['decor_box', 'decor_dot', 'decor_wave'])
+    expect(r.summary.decorFields).toBe(3)
+    expect(r.parserReport.countsByReasonCode.DECOR_PARSED).toBe(3)
+  })
+
+  it('для невалидного decor_* пишет DECOR_NO_VALID_SHAPE', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">
+  <path id="decor_bad" d="M 10 10" fill="#000"/>
+</svg>`
+    const r = parseImportedSvgLayers(svg)
+    expect(r.interactiveLayers.filter((layer) => layer.kind === 'decor')).toHaveLength(0)
+    expect(r.warnings.some((w) => w.includes('DECOR_NO_VALID_SHAPE') && w.includes('decor_bad'))).toBe(true)
+    expect(r.parserReport.countsByReasonCode.DECOR_NO_VALID_SHAPE).toBe(1)
+  })
+
   it('наследует font-family с родительской группы text_* (Corel/AI)', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">

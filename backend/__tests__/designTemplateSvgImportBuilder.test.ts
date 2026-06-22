@@ -62,4 +62,45 @@ describe('fabricTextFromSvgText', () => {
     }, 'trace', [], { trace: true })
     expect(doc.pages[0]?.parsed.trace?.timeline.length).toBeGreaterThan(0)
   })
+
+  it('добавляет locked_bg только при явном слое locked_bg', () => {
+    const withoutLockedBg = `<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm"><rect id="decor_box" x="1" y="1" width="10" height="8"/></svg>`
+    const docWithoutBg = buildImportedSvgTemplateDocument({
+      buffer: Buffer.from(withoutLockedBg, 'utf8'),
+      originalname: 'without-locked-bg.svg',
+      mimetype: 'image/svg+xml',
+    }, 'without-locked-bg', [])
+    expect(docWithoutBg.pages[0]?.parsed.lockedBgDetected).toBe(false)
+    expect(docWithoutBg.pages[0]?.designPage.fabricJSON.objects.some((obj) => obj.id === 'locked_bg')).toBe(false)
+
+    const withLockedBg = `<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm"><rect id="locked_bg" x="0" y="0" width="90" height="50"/><rect id="decor_box" x="1" y="1" width="10" height="8"/></svg>`
+    const docWithBg = buildImportedSvgTemplateDocument({
+      buffer: Buffer.from(withLockedBg, 'utf8'),
+      originalname: 'with-locked-bg.svg',
+      mimetype: 'image/svg+xml',
+    }, 'with-locked-bg', [])
+    expect(docWithBg.pages[0]?.parsed.lockedBgDetected).toBe(true)
+    expect(docWithBg.pages[0]?.designPage.fabricJSON.objects.some((obj) => obj.id === 'locked_bg')).toBe(true)
+  })
+
+  it('конвертирует decor_* в fabric-объекты и пишет warning без locked_bg', () => {
+    const warnings: string[] = []
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 90 50">
+  <rect id="decor_rect" x="5" y="5" width="20" height="10" fill="#ff0000"/>
+  <circle id="decor_circle" cx="45" cy="25" r="6" fill="#00ff00"/>
+  <path id="decor_path" d="M 60 10 L 80 10 L 80 20 Z" fill="#0000ff"/>
+  <rect x="1" y="1" width="2" height="2" fill="#111111"/>
+</svg>`
+    const doc = buildImportedSvgTemplateDocument({
+      buffer: Buffer.from(svg, 'utf8'),
+      originalname: 'decor.svg',
+      mimetype: 'image/svg+xml',
+    }, 'decor', warnings)
+    const objects = doc.pages[0]!.designPage.fabricJSON.objects
+    const decorObjects = objects.filter((obj) => String(obj.id).startsWith('decor_'))
+    expect(decorObjects).toHaveLength(3)
+    expect(decorObjects.map((obj) => obj.type).sort()).toEqual(['circle', 'path', 'rect'])
+    expect(warnings.some((w) => w.includes('без интерактивного префикса') && w.includes('decor_*'))).toBe(true)
+  })
 })

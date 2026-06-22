@@ -10,6 +10,7 @@ import type { BundledTemplateFont } from '../utils/extractDesignStateFonts'
 import {
   parseImportedSvgLayers,
   type PrepressFromSvgGuides,
+  type SvgDecor,
   type SvgRect,
   type SvgText,
 } from './designTemplateSvgParse'
@@ -179,6 +180,96 @@ function toFabricText(item: SvgText) {
   }
 }
 
+function toFabricPathCommands(pathData: string): Array<[string, ...number[]]> | null {
+  const commands: Array<[string, ...number[]]> = []
+  const tokenRe = /([a-zA-Z])([^a-zA-Z]*)/g
+  const numberRe = /-?\d*\.?\d+(?:e[-+]?\d+)?/gi
+  const arity: Record<string, number> = {
+    M: 2,
+    m: 2,
+    L: 2,
+    l: 2,
+    H: 1,
+    h: 1,
+    V: 1,
+    v: 1,
+    C: 6,
+    c: 6,
+    S: 4,
+    s: 4,
+    Q: 4,
+    q: 4,
+    T: 2,
+    t: 2,
+    A: 7,
+    a: 7,
+    Z: 0,
+    z: 0,
+  }
+  let token: RegExpExecArray | null
+  while ((token = tokenRe.exec(pathData)) !== null) {
+    const cmd = token[1]
+    const args: number[] = []
+    numberRe.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = numberRe.exec(token[2] ?? '')) !== null) {
+      args.push(Number(m[0]))
+    }
+    const step = arity[cmd]
+    if (step == null) continue
+    if (step === 0) {
+      commands.push([cmd])
+      continue
+    }
+    for (let i = 0; i + step - 1 < args.length; i += step) {
+      commands.push([cmd, ...args.slice(i, i + step)])
+    }
+  }
+  return commands.length > 0 ? commands : null
+}
+
+function toFabricDecor(item: SvgDecor): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    version: '6.0.0',
+    originX: 'left',
+    originY: 'top',
+    left: item.scene.x,
+    top: item.scene.y,
+    width: item.scene.width,
+    height: item.scene.height,
+    id: item.name,
+    fill: item.fill ?? '#111827',
+    ...(item.stroke ? { stroke: item.stroke } : {}),
+    ...(item.strokeWidth != null ? { strokeWidth: item.strokeWidth } : {}),
+    ...(item.opacity != null ? { opacity: item.opacity } : {}),
+  }
+  if (item.shape === 'circle') {
+    return {
+      ...base,
+      type: 'circle',
+      radius: Math.max(0.5, Math.min(item.scene.width, item.scene.height) / 2),
+      scaleX: item.scene.width / Math.max(1, Math.min(item.scene.width, item.scene.height)),
+      scaleY: item.scene.height / Math.max(1, Math.min(item.scene.width, item.scene.height)),
+    }
+  }
+  if (item.shape === 'path' && item.pathData) {
+    const path = toFabricPathCommands(item.pathData)
+    if (path) {
+      return {
+        ...base,
+        type: 'path',
+        path,
+      }
+    }
+  }
+  return {
+    ...base,
+    type: 'rect',
+    rx: 0,
+    ry: 0,
+  }
+}
+
 function toFabricBackground(src: string, scene: { width: number; height: number }, sceneScale: number) {
   const safeScale = Number.isFinite(sceneScale) && sceneScale > 0 ? sceneScale : 1
   return {
@@ -207,6 +298,9 @@ export function layerDebug(parsed: ParsedSvg) {
   return {
     photo: parsed.photoRects.map((r) => ({ name: r.name, svg: r.svg, mm: { x: r.x, y: r.y, width: r.width, height: r.height }, scene: r.scene })),
     text: parsed.textItems.map((t) => ({ name: t.name, text: t.text, textAnchor: t.textAnchor, svg: t.svg, mm: { x: t.x, y: t.y, fontSize: t.fontSize }, scene: t.scene })),
+    decor: parsed.interactiveLayers
+      .filter((layer): layer is { kind: 'decor'; data: SvgDecor } => layer.kind === 'decor')
+      .map((layer) => ({ name: layer.data.name, shape: layer.data.shape, svg: layer.data.svg, scene: layer.data.scene })),
     guides: parsed.guideRectsMm,
   }
 }
@@ -321,6 +415,11 @@ function readSvgEntries(file: ImportFile, ext: string, warnings: string[]): Arra
 
 function samePageSize(a: number, b: number): boolean {
   return Math.abs(a - b) <= 0.2
+}
+
+function countDrawableSvgNodes(svg: string): number {
+  const matches = svg.match(/<(rect|circle|ellipse|path|polygon|polyline|line|image|text)\b/gi)
+  return matches?.length ?? 0
 }
 
 function matchBundledFontToTextLayer(
@@ -473,6 +572,13 @@ function buildPageFromSvg(input: {
       `Страница ${input.pageIndex + 1}: интерактивные и направляющие слои вырезаны из SVG-фона.`,
     )
   }
+  const unclassifiedNamed = parsed.parserReport.countsByReasonCode.LAYER_NOT_CLASSIFIED ?? 0
+  const drawableInStripped = countDrawableSvgNodes(parsed.strippedSvg)
+  if (!parsed.lockedBgDetected && (unclassifiedNamed > 0 || drawableInStripped > 0)) {
+    input.warnings.push(
+      `Страница ${input.pageIndex + 1}: найдено ${Math.max(unclassifiedNamed, drawableInStripped)} объектов без интерактивного префикса и без locked_bg — в редактор они не попадут. Переименуйте в decor_* или добавьте явный locked_bg.`,
+    )
+  }
 
   const stored = saveBufferToUploads(
     Buffer.from(parsed.strippedSvg, 'utf8'),
@@ -499,9 +605,15 @@ function buildPageFromSvg(input: {
       fabricJSON: {
         version: '6.0.0',
         objects: [
-          toFabricBackground(previewUrl, parsed.geometry.scenePx, parsed.geometry.sceneScale),
+          ...(parsed.lockedBgDetected
+            ? [toFabricBackground(previewUrl, parsed.geometry.scenePx, parsed.geometry.sceneScale)]
+            : []),
           ...parsed.interactiveLayers.map((layer) => (
-            layer.kind === 'photo' ? toFabricRect(layer.data) : toFabricText(layer.data)
+            layer.kind === 'photo'
+              ? toFabricRect(layer.data)
+              : layer.kind === 'text'
+                ? toFabricText(layer.data)
+                : toFabricDecor(layer.data)
           )),
         ],
         background: 'white',
