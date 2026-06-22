@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { PDFDocument } from 'pdf-lib'
+import type { PDFPage } from 'pdf-lib'
 import puppeteer, { type Browser } from 'puppeteer'
 import { getDb } from '../config/database'
 import {
@@ -21,6 +22,7 @@ import { getDesignTemplate } from './designTemplateService'
 import { logger } from '../utils/logger'
 
 const MM_TO_PX = 96 / 25.4
+const MM_TO_PT = 72 / 25.4
 const EXPORT_DPI = 300
 const PX_PER_MM_AT_96 = MM_TO_PX
 const EXPORT_PX_PER_MM = EXPORT_DPI / 25.4
@@ -545,7 +547,7 @@ async function renderHtmlToPdfBuffer(html: string, widthMm: number, heightMm: nu
   const browser = await getBrowser()
   const page = await browser.newPage()
   try {
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 120000 })
+    await page.setContent(html, { waitUntil: 'load', timeout: 120000 })
     await page.evaluate(() => document.fonts.ready)
     const pdf = await page.pdf({
       width: `${widthMm}mm`,
@@ -558,6 +560,48 @@ async function renderHtmlToPdfBuffer(html: string, widthMm: number, heightMm: nu
   } finally {
     await page.close()
   }
+}
+
+type PdfRasterDocument = PDFDocument & {
+  embedPng: (input: Uint8Array | ArrayBuffer) => Promise<PdfEmbeddedImage>
+}
+
+type PdfEmbeddedImage = {
+  width: number
+  height: number
+}
+
+type PdfRasterPage = PDFPage & {
+  drawImage: (
+    image: PdfEmbeddedImage,
+    options: { x: number; y: number; width: number; height: number },
+  ) => void
+}
+
+async function addPngRasterPageToDocument(
+  doc: PDFDocument,
+  png: Buffer,
+  sheetWidthMm: number,
+  sheetHeightMm: number,
+  placement?: { leftMm: number; topMm: number; widthMm: number; heightMm: number },
+): Promise<void> {
+  const rasterDoc = doc as PdfRasterDocument
+  const image = await rasterDoc.embedPng(png)
+  const pageWidthPt = sheetWidthMm * MM_TO_PT
+  const pageHeightPt = sheetHeightMm * MM_TO_PT
+  const page = rasterDoc.addPage([pageWidthPt, pageHeightPt]) as PdfRasterPage
+
+  const leftMm = placement?.leftMm ?? 0
+  const topMm = placement?.topMm ?? 0
+  const widthMm = placement?.widthMm ?? sheetWidthMm
+  const heightMm = placement?.heightMm ?? sheetHeightMm
+
+  page.drawImage(image, {
+    x: leftMm * MM_TO_PT,
+    y: pageHeightPt - (topMm + heightMm) * MM_TO_PT,
+    width: widthMm * MM_TO_PT,
+    height: heightMm * MM_TO_PT,
+  })
 }
 
 function buildRasterPageHtml(png: Buffer, widthMm: number, heightMm: number): string {
@@ -648,14 +692,12 @@ export async function renderClientRenderedPagesProductionPdf(
     if (!filePath) throw new Error(`PNG-страница ${pageIndex} не найдена на диске`)
     const png = fs.readFileSync(filePath)
     if (png.length <= 0) throw new Error(`PNG-страница ${pageIndex} пустая`)
-    const singlePdf = await renderHtmlToPdfBuffer(
-      buildClientRenderedRasterPageHtml(png, sheetWidthMm, sheetHeightMm, pageWidthMm, pageHeightMm, bleedMm),
-      sheetWidthMm,
-      sheetHeightMm,
-    )
-    const singleDoc = await PDFDocument.load(singlePdf)
-    const copied = await doc.copyPages(singleDoc, singleDoc.getPageIndices())
-    copied.forEach((page) => doc.addPage(page))
+    await addPngRasterPageToDocument(doc, png, sheetWidthMm, sheetHeightMm, {
+      leftMm: bleedMm,
+      topMm: bleedMm,
+      widthMm: pageWidthMm,
+      heightMm: pageHeightMm,
+    })
   }
 
   const bytes = await doc.save()
@@ -1232,14 +1274,12 @@ export async function renderDesignStateProductionPdf(
       heightMm: rendered.heightMm,
       pixelStats: rendered.pixelStats,
     })
-    const singlePdf = await renderHtmlToPdfBuffer(
-      buildRasterPageHtml(rendered.png, rendered.widthMm, rendered.heightMm),
+    await addPngRasterPageToDocument(
+      merged,
+      rendered.png,
       rendered.widthMm,
       rendered.heightMm,
     )
-    const doc = await PDFDocument.load(singlePdf)
-    const copied = await merged.copyPages(doc, doc.getPageIndices())
-    copied.forEach((p) => merged.addPage(p))
   }
 
   const bytes = await merged.save()
