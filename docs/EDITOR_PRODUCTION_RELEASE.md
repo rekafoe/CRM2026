@@ -38,7 +38,8 @@
 - Генерация **только в CRM** (очередь + ручной перезапуск).
 - Триггер: заказ `source=website` или `mini_app` со статусом пула (status=1) → job `production_pdf`.
 - Формат: **один multipage PDF** на позицию (`artifactType=production_pdf`, версии не удаляются).
-- Качество: **Fabric-based raster 300 DPI**, размер страницы в **мм** (trim + bleed), рендер в headless Chromium через реальный Fabric canvas из `order_items.params.designState`, затем упаковка PNG-страниц в multipage PDF.
+- Качество: **Fabric-based raster 300 DPI**, размер страницы в **мм** (`pageSize + 2*bleed`), рендер в headless Chromium через реальный Fabric canvas из `order_items.params.designState`, затем упаковка PNG-страниц в multipage PDF.
+- Production PDF по умолчанию — только постраничный (в размер продукта), без автоматической раскладки на SRA3.
 - Защита от брака: если страница не загрузила assets/fonts или отрендерилась пустой, почти полностью белой/чёрной либо одноцветной, job должен упасть с понятной ошибкой и не сохранять плохой `production_pdf`.
 - Цвет: текущий этап — **RGB raster PDF**. Полноценный vector/CMYK PDF — отдельный следующий этап после стабилизации raster production.
 - Сайт **не** обязан прикладывать PDF при checkout.

@@ -519,6 +519,7 @@ async function renderFabricPageToPng(
   bleedMm: number,
   fontFaceCss: string,
   pageIndex: number,
+  sceneScale = 1,
 ): Promise<RenderedFabricPage> {
   if (!fs.existsSync(FABRIC_BROWSER_BUNDLE_PATH)) {
     throw new Error(`Fabric browser bundle not found: ${FABRIC_BROWSER_BUNDLE_PATH}`)
@@ -528,16 +529,17 @@ async function renderFabricPageToPng(
   const page = await browser.newPage()
   const normalizedFabricJSON = remapFabricImageSources(parseJsonObject(fabricJSON), fileNameByUrl)
   const bleed = Math.max(0, Number.isFinite(bleedMm) ? bleedMm : 0)
+  const normalizedSceneScale = Number.isFinite(sceneScale) && sceneScale > 0 ? sceneScale : 1
   const widthMm = pageWidthMm + bleed * 2
   const heightMm = pageHeightMm + bleed * 2
   const renderPayload = {
     fabricJSON: normalizedFabricJSON,
-    pageWidthPx: Math.round(pageWidthMm * PX_PER_MM_AT_96),
-    pageHeightPx: Math.round(pageHeightMm * PX_PER_MM_AT_96),
+    pageWidthPx: Math.max(1, Math.round(pageWidthMm * PX_PER_MM_AT_96 * normalizedSceneScale)),
+    pageHeightPx: Math.max(1, Math.round(pageHeightMm * PX_PER_MM_AT_96 * normalizedSceneScale)),
     bleedPx: Math.round(bleed * EXPORT_PX_PER_MM),
     sheetWidthPx: Math.max(1, Math.round(widthMm * EXPORT_PX_PER_MM)),
     sheetHeightPx: Math.max(1, Math.round(heightMm * EXPORT_PX_PER_MM)),
-    multiplier: FABRIC_EXPORT_MULTIPLIER,
+    multiplier: Math.max(0.01, FABRIC_EXPORT_MULTIPLIER / normalizedSceneScale),
     cutMarks: true,
   }
 
@@ -796,6 +798,7 @@ export async function renderDesignStateProductionPdf(
   const pageHeightMm = Number(state.pageHeight ?? 50)
   const prepress = parseJsonObject(state.prepress)
   const bleedMm = Number(prepress.bleedMm ?? 0)
+  const sceneScale = Number(state.sceneScale)
   const pages = Array.isArray(state.pages) ? state.pages : []
   if (pages.length === 0) throw new Error('В designState нет страниц')
 
@@ -830,6 +833,7 @@ export async function renderDesignStateProductionPdf(
       bleedMm,
       fontFaceCss,
       index,
+      sceneScale,
     )
     logger.info('Editor production Fabric page rendered', {
       orderId,

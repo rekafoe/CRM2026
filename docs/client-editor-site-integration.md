@@ -378,7 +378,8 @@ CRM: `prepareWebsiteItemsWithEditorDrafts` → `order_items.params.designState` 
 
 ### Production PDF
 
-**Сайт не обязан** прикладывать production PDF при checkout. PDF собирается в CRM (очередь `production_pdf`). Подробно: [EDITOR_PRODUCTION_RELEASE.md](./EDITOR_PRODUCTION_RELEASE.md).
+**Сайт не обязан** прикладывать production PDF при checkout. PDF собирается в CRM (очередь `production_pdf`).
+Базовый production-режим: postраничный PDF в размер продукта (`pageSize + 2*bleed`) без автоматической раскладки на SRA3. Подробно: [EDITOR_PRODUCTION_RELEASE.md](./EDITOR_PRODUCTION_RELEASE.md).
 
 ---
 

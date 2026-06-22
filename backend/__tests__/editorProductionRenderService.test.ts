@@ -6,6 +6,11 @@ import { orderFilesDir } from '../src/config/upload'
 describe('editorProductionRenderService internals', () => {
   const transparentPng =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='
+  const mmToPxAt300 = (mm: number) => Math.round((mm * 300) / 25.4)
+  const readPngSize = (png: Buffer) => ({
+    width: png.readUInt32BE(16),
+    height: png.readUInt32BE(20),
+  })
 
   afterAll(async () => {
     await __editorProductionRenderInternals.closeProductionRenderBrowser()
@@ -146,6 +151,22 @@ describe('editorProductionRenderService internals', () => {
     expect(rendered.widthMm).toBe(34)
     expect(rendered.heightMm).toBe(24)
     expect(rendered.pixelStats.uniqueColorSamples).toBeGreaterThan(1)
+  }, 30000)
+
+  it('keeps physical sheet pixel size with sceneScale=3', async () => {
+    const rendered = await __editorProductionRenderInternals.renderFabricPageToPng({
+      version: '7.4.0',
+      objects: [
+        { type: 'rect', left: 240, top: 140, width: 80, height: 50, fill: '#1d4ed8' },
+      ],
+    }, new Map(), 30, 20, 2, '', 0, 3)
+
+    const pngSize = readPngSize(rendered.png)
+    expect(rendered.widthMm).toBe(34)
+    expect(rendered.heightMm).toBe(24)
+    expect(pngSize.width).toBe(mmToPxAt300(34))
+    expect(pngSize.height).toBe(mmToPxAt300(24))
+    expect(rendered.pixelStats.nonWhiteRatio).toBeGreaterThan(0.001)
   }, 30000)
 
   it('does not mark pages with small visible content as single-color', async () => {

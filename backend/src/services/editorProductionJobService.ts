@@ -71,14 +71,6 @@ async function processProductionPdfJob(jobId: number, orderId: number, orderItem
 
   await renderDesignStateProductionPdf(orderId, orderItemId, params.designState)
   await markJob(jobId, 'done')
-
-  if (params.editorLayoutGroup) {
-    await db.run(
-      `INSERT INTO editor_production_jobs (order_id, order_item_id, job_type, status, updated_at)
-       VALUES (?, ?, 'imposition_sra3', 'pending', datetime('now'))`,
-      [orderId, orderItemId],
-    )
-  }
 }
 
 export async function processEditorProductionJobBatch(limit = 5): Promise<number> {
