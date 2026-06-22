@@ -16,6 +16,7 @@ import { EarningsService } from '../services/earningsService'
 import { registerExternalOrderFiles, updateExternalOrderFile } from '../services/externalOrderFilesService'
 import { buildEditorProductionManifest } from '../services/editorProductionExportService'
 import {
+  enqueueClientRenderedProductionIfReady,
   getProductionStatus,
   requestManualProductionRegeneration,
 } from '../services/editorProductionJobService'
@@ -264,19 +265,43 @@ router.post('/:id/files', (req, res, next) => {
       if (item && item.orderId === orderId) orderItemId = id
     }
   }
+  const artifactType = typeof (req.body as any)?.artifactType === 'string'
+    ? String((req.body as any).artifactType).trim()
+    : ''
+  const checksum = typeof (req.body as any)?.checksum === 'string'
+    ? String((req.body as any).checksum).trim()
+    : ''
+  const partNumberRaw = (req.body as any)?.partNumber
+  const partNumber = partNumberRaw != null && partNumberRaw !== ''
+    ? Number(partNumberRaw)
+    : null
+  const metadata = typeof (req.body as any)?.metadata === 'string'
+    ? String((req.body as any).metadata)
+    : null
   await db.run(
-    'INSERT INTO order_files (orderId, orderItemId, filename, originalName, mime, size) VALUES (?, ?, ?, ?, ?, ?)',
+    `INSERT INTO order_files (
+      orderId, orderItemId, filename, originalName, mime, size, artifactType, checksum, partNumber, metadata
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     orderId,
     orderItemId,
     saved.filename,
     saved.originalName,
     f.mimetype || null,
-    saved.size
+    saved.size,
+    artifactType || null,
+    checksum || null,
+    Number.isFinite(partNumber) ? partNumber : null,
+    metadata
   )
   const row = await db.get<any>(
-    'SELECT id, orderId, orderItemId, filename, originalName, mime, size, uploadedAt, approved, approvedAt, approvedBy FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1',
+    `SELECT id, orderId, orderItemId, filename, originalName, mime, size, uploadedAt,
+      approved, approvedAt, approvedBy, artifactType, checksum, partNumber, metadata
+     FROM order_files WHERE orderId = ? ORDER BY id DESC LIMIT 1`,
     orderId
   )
+  if (artifactType === 'client_rendered_page' && orderItemId != null) {
+    await enqueueClientRenderedProductionIfReady(orderId, orderItemId)
+  }
   res.status(201).json(row)
 }))
 

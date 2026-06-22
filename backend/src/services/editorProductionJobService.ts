@@ -1,6 +1,9 @@
 import { getDb } from '../config/database'
 import { logger } from '../utils/logger'
-import { renderDesignStateProductionPdf } from './editorProductionRenderService'
+import {
+  renderClientRenderedPagesProductionPdf,
+  renderDesignStateProductionPdf,
+} from './editorProductionRenderService'
 import { runImpositionJobForOrderItem } from './editorImpositionService'
 import { getEditorDraft } from './publicEditorDraftService'
 
@@ -113,6 +116,93 @@ function mergeDraftDesignStates(states: Array<Record<string, unknown>>): Record<
   return base
 }
 
+type ClientRenderedPagesManifest = {
+  pageCount: number
+  pageWidthMm: number
+  pageHeightMm: number
+  bleedMm: number
+  dpi: number
+}
+
+function readClientRenderedPagesManifest(params: Record<string, unknown>): ClientRenderedPagesManifest | null {
+  if (params.productionRenderSource !== 'client_png') return null
+  const manifest = parseObject(params.clientRenderedPages)
+  if (!manifest || manifest.source !== 'client_png') return null
+  const pageCount = Math.floor(Number(manifest.pageCount))
+  const pageWidthMm = Number(manifest.pageWidthMm)
+  const pageHeightMm = Number(manifest.pageHeightMm)
+  if (!Number.isFinite(pageCount) || pageCount <= 0) return null
+  if (!Number.isFinite(pageWidthMm) || pageWidthMm <= 0) return null
+  if (!Number.isFinite(pageHeightMm) || pageHeightMm <= 0) return null
+  return {
+    pageCount,
+    pageWidthMm,
+    pageHeightMm,
+    bleedMm: Math.max(0, Number(manifest.bleedMm) || 0),
+    dpi: Math.max(1, Math.floor(Number(manifest.dpi) || 300)),
+  }
+}
+
+async function countClientRenderedPages(orderId: number, orderItemId: number): Promise<number> {
+  const db = await getDb()
+  const row = await db.get<{ count: number }>(
+    `SELECT COUNT(DISTINCT COALESCE(partNumber, id)) AS count
+     FROM order_files
+     WHERE orderId = ? AND orderItemId = ? AND artifactType = 'client_rendered_page'`,
+    [orderId, orderItemId],
+  )
+  return Number(row?.count ?? 0)
+}
+
+async function hasClientRenderedPageSet(
+  orderId: number,
+  orderItemId: number,
+  manifest: ClientRenderedPagesManifest,
+): Promise<boolean> {
+  const count = await countClientRenderedPages(orderId, orderItemId)
+  return count >= manifest.pageCount
+}
+
+async function enqueueProductionPdfJobIfMissing(
+  orderId: number,
+  orderItemId: number,
+  includeDone = false,
+): Promise<number | null> {
+  const db = await getDb()
+  const statuses = includeDone
+    ? "'pending','processing','done'"
+    : "'pending','processing'"
+  const result = await db.run(
+    `INSERT INTO editor_production_jobs (order_id, order_item_id, job_type, status, updated_at)
+     SELECT ?, ?, 'production_pdf', 'pending', datetime('now')
+     WHERE NOT EXISTS (
+       SELECT 1 FROM editor_production_jobs
+       WHERE order_id = ? AND order_item_id = ? AND job_type = 'production_pdf' AND status IN (${statuses})
+     )`,
+    [orderId, orderItemId, orderId, orderItemId],
+  )
+  return result.lastID != null ? Number(result.lastID) : null
+}
+
+export async function enqueueClientRenderedProductionIfReady(
+  orderId: number,
+  orderItemId: number,
+): Promise<{ ready: boolean; jobId: number | null }> {
+  const db = await getDb()
+  const item = await db.get<{ params: string | null }>(
+    'SELECT params FROM items WHERE id = ? AND orderId = ?',
+    [orderItemId, orderId],
+  )
+  if (!item) return { ready: false, jobId: null }
+  const params = parseParams(item.params)
+  const manifest = readClientRenderedPagesManifest(params)
+  if (!manifest) return { ready: false, jobId: null }
+  const ready = await hasClientRenderedPageSet(orderId, orderItemId, manifest)
+  if (!ready) return { ready: false, jobId: null }
+  const jobId = await enqueueProductionPdfJobIfMissing(orderId, orderItemId, true)
+  return { ready: true, jobId }
+}
+
 async function resolveLatestDesignStateForProduction(
   params: Record<string, unknown>,
 ): Promise<Record<string, unknown> | null> {
@@ -160,16 +250,22 @@ export async function enqueueEditorProductionJobsForOrder(orderId: number): Prom
 
   for (const item of items ?? []) {
     const params = parseParams(item.params)
-    if (!params.designState) continue
-    await db.run(
-      `INSERT INTO editor_production_jobs (order_id, order_item_id, job_type, status, updated_at)
-       SELECT ?, ?, 'production_pdf', 'pending', datetime('now')
-       WHERE NOT EXISTS (
-         SELECT 1 FROM editor_production_jobs
-         WHERE order_id = ? AND order_item_id = ? AND job_type = 'production_pdf' AND status IN ('pending', 'processing')
-       )`,
-      [orderId, item.id, orderId, item.id],
-    )
+    const clientRenderedPages = readClientRenderedPagesManifest(params)
+    if (clientRenderedPages) {
+      const uploadedPages = await countClientRenderedPages(orderId, item.id)
+      if (uploadedPages < clientRenderedPages.pageCount) {
+        logger.info('Editor production waits for client rendered PNG pages', {
+          orderId,
+          orderItemId: item.id,
+          expectedPages: clientRenderedPages.pageCount,
+          uploadedPages,
+        })
+        continue
+      }
+    } else if (!params.designState) {
+      continue
+    }
+    await enqueueProductionPdfJobIfMissing(orderId, item.id)
   }
 }
 
@@ -195,6 +291,12 @@ async function processProductionPdfJob(jobId: number, orderId: number, orderItem
   )
   if (!item) throw new Error('Позиция не найдена')
   const params = parseParams(item.params)
+  const clientRenderedPages = readClientRenderedPagesManifest(params)
+  if (clientRenderedPages) {
+    await renderClientRenderedPagesProductionPdf(orderId, orderItemId, clientRenderedPages)
+    await markJob(jobId, 'done')
+    return
+  }
   const designState = await resolveLatestDesignStateForProduction(params)
   if (!designState) throw new Error('Нет designState')
 

@@ -569,6 +569,151 @@ function buildRasterPageHtml(png: Buffer, widthMm: number, heightMm: number): st
   </style></head><body><img src="${dataUrl}" alt=""/></body></html>`
 }
 
+type ClientRenderedPagesManifest = {
+  pageCount: number
+  pageWidthMm: number
+  pageHeightMm: number
+  bleedMm: number
+  dpi: number
+}
+
+type ClientRenderedPageRow = {
+  id: number
+  filename: string
+  originalName: string | null
+  mime: string | null
+  size: number | null
+  checksum: string | null
+  partNumber: number | null
+  metadata: string | null
+}
+
+async function loadClientRenderedPageRows(
+  orderId: number,
+  orderItemId: number,
+): Promise<ClientRenderedPageRow[]> {
+  const db = await getDb()
+  return db.all<ClientRenderedPageRow[]>(
+    `SELECT id, filename, originalName, mime, size, checksum, partNumber, metadata
+     FROM order_files
+     WHERE orderId = ? AND orderItemId = ? AND artifactType = 'client_rendered_page'
+     ORDER BY COALESCE(partNumber, id) ASC, id ASC`,
+    [orderId, orderItemId],
+  )
+}
+
+function buildClientRenderedRasterPageHtml(
+  png: Buffer,
+  sheetWidthMm: number,
+  sheetHeightMm: number,
+  pageWidthMm: number,
+  pageHeightMm: number,
+  bleedMm: number,
+): string {
+  const dataUrl = `data:image/png;base64,${png.toString('base64')}`
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:${sheetWidthMm}mm;height:${sheetHeightMm}mm;margin:0;background:#fff;overflow:hidden}
+    img{position:absolute;left:${bleedMm}mm;top:${bleedMm}mm;width:${pageWidthMm}mm;height:${pageHeightMm}mm;object-fit:fill}
+  </style></head><body><img src="${dataUrl}" alt=""/></body></html>`
+}
+
+export async function renderClientRenderedPagesProductionPdf(
+  orderId: number,
+  orderItemId: number,
+  manifest: ClientRenderedPagesManifest,
+): Promise<{ filename: string; size: number; pageCount: number }> {
+  const rows = await loadClientRenderedPageRows(orderId, orderItemId)
+  if (rows.length < manifest.pageCount) {
+    throw new Error(`Не загружены все PNG-страницы: ${rows.length}/${manifest.pageCount}`)
+  }
+
+  const pagesByPart = new Map<number, ClientRenderedPageRow>()
+  for (const row of rows) {
+    const part = Math.floor(Number(row.partNumber ?? pagesByPart.size + 1))
+    if (part > 0 && !pagesByPart.has(part)) pagesByPart.set(part, row)
+  }
+
+  const doc = await PDFDocument.create()
+  const pageWidthMm = manifest.pageWidthMm
+  const pageHeightMm = manifest.pageHeightMm
+  const bleedMm = Math.max(0, Number(manifest.bleedMm) || 0)
+  const sheetWidthMm = pageWidthMm + bleedMm * 2
+  const sheetHeightMm = pageHeightMm + bleedMm * 2
+
+  for (let pageIndex = 1; pageIndex <= manifest.pageCount; pageIndex += 1) {
+    const row = pagesByPart.get(pageIndex)
+    if (!row) throw new Error(`Нет PNG-страницы ${pageIndex}`)
+    const filePath = resolveSafeExistingPath([orderFilesDir], row.filename)
+    if (!filePath) throw new Error(`PNG-страница ${pageIndex} не найдена на диске`)
+    const png = fs.readFileSync(filePath)
+    if (png.length <= 0) throw new Error(`PNG-страница ${pageIndex} пустая`)
+    const singlePdf = await renderHtmlToPdfBuffer(
+      buildClientRenderedRasterPageHtml(png, sheetWidthMm, sheetHeightMm, pageWidthMm, pageHeightMm, bleedMm),
+      sheetWidthMm,
+      sheetHeightMm,
+    )
+    const singleDoc = await PDFDocument.load(singlePdf)
+    const copied = await doc.copyPages(singleDoc, singleDoc.getPageIndices())
+    copied.forEach((page) => doc.addPage(page))
+  }
+
+  const bytes = await doc.save()
+  const buffer = Buffer.from(bytes)
+  const saved = saveBufferToOrderFiles(buffer, `production-${orderId}-${orderItemId}.pdf`)
+  if (!saved) throw new Error('Не удалось сохранить production PDF')
+
+  const db = await getDb()
+  const versionRow = await db.get<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM order_files
+     WHERE orderId = ? AND orderItemId = ? AND artifactType = 'production_pdf'`,
+    [orderId, orderItemId],
+  )
+  const version = Number(versionRow?.n ?? 0) + 1
+  await db.run(
+    `INSERT INTO order_files (orderId, orderItemId, filename, originalName, mime, size, artifactType, metadata)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      orderId,
+      orderItemId,
+      saved.filename,
+      `production-v${version}-item-${orderItemId}.pdf`,
+      'application/pdf',
+      saved.size,
+      'production_pdf',
+      JSON.stringify({
+        version,
+        source: 'client_png',
+        dpi: manifest.dpi,
+        pageCount: manifest.pageCount,
+        pageWidthMm,
+        pageHeightMm,
+        bleedMm,
+        colorSpace: 'rgb',
+        rasterFiles: rows.slice(0, manifest.pageCount).map((row) => ({
+          id: row.id,
+          filename: row.filename,
+          partNumber: row.partNumber,
+          size: row.size,
+          checksum: row.checksum,
+        })),
+      }),
+    ],
+  )
+
+  logger.info('Editor production PDF assembled from client rendered PNG pages', {
+    orderId,
+    orderItemId,
+    pageCount: manifest.pageCount,
+    dpi: manifest.dpi,
+    bleedMm,
+    filename: saved.filename,
+    size: saved.size,
+  })
+
+  return { filename: saved.filename, size: saved.size, pageCount: manifest.pageCount }
+}
+
 async function renderFabricPageToPng(
   fabricJSON: unknown,
   fileNameByUrl: Map<string, string>,
