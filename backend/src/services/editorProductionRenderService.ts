@@ -15,6 +15,7 @@ import {
   resolveFontFilesForDesignState,
 } from './designFontService'
 import { buildMixedFontTextInnerHtml } from '../utils/textStyleRuns'
+import { extractUsedFontFamiliesFromDesignState } from '../utils/extractDesignStateFonts'
 import { getDesignTemplate } from './designTemplateService'
 import { logger } from '../utils/logger'
 
@@ -41,6 +42,10 @@ type ProductionPageDiagnostics = {
   filledPhotoFields: number
   clipPaths: number
   images: number
+  dataImages: number
+  fileImages: number
+  existingFileImages: number
+  missingFileImages: number
   unresolvedImages: string[]
 }
 
@@ -410,6 +415,10 @@ function collectProductionPageDiagnostics(
     filledPhotoFields: 0,
     clipPaths: 0,
     images: 0,
+    dataImages: 0,
+    fileImages: 0,
+    existingFileImages: 0,
+    missingFileImages: 0,
     unresolvedImages: [],
   }
   walkFabric(fabricJSON, (obj) => {
@@ -421,7 +430,17 @@ function collectProductionPageDiagnostics(
     if (type === 'image' || typeof obj.src === 'string') {
       diagnostics.images += 1
       const src = typeof obj.src === 'string' ? obj.src : ''
-      if (src && !resolveImageSrc(src, fileNameByUrl)) diagnostics.unresolvedImages.push(src)
+      const resolved = src ? resolveImageSrc(src, fileNameByUrl) : null
+      if (!resolved) {
+        if (src) diagnostics.unresolvedImages.push(src)
+      } else if (resolved.startsWith('data:')) {
+        diagnostics.dataImages += 1
+      } else if (resolved.startsWith('file://')) {
+        diagnostics.fileImages += 1
+        const filePath = decodeURIComponent(resolved.replace(/^file:\/\//, ''))
+        if (fs.existsSync(filePath)) diagnostics.existingFileImages += 1
+        else diagnostics.missingFileImages += 1
+      }
     }
   })
   return diagnostics
@@ -562,6 +581,10 @@ async function renderFabricPageToPng(
       groups: payloadDiagnostics.groups,
       clipPaths: payloadDiagnostics.clipPaths,
       images: payloadDiagnostics.images,
+      dataImages: payloadDiagnostics.dataImages,
+      fileImages: payloadDiagnostics.fileImages,
+      existingFileImages: payloadDiagnostics.existingFileImages,
+      missingFileImages: payloadDiagnostics.missingFileImages,
       filledPhotoFields: payloadDiagnostics.filledPhotoFields,
       unresolvedImageCount: payloadDiagnostics.unresolvedImages.length,
     },
@@ -923,6 +946,7 @@ export async function renderDesignStateProductionPdf(
     ? templateSpec.fonts
     : []
   const requiredFonts = await buildRequiredFontsForDesignState(designState, bundledFonts)
+  const usedFontFamilies = extractUsedFontFamiliesFromDesignState(designState)
   const missingFonts = requiredFonts
     .filter((entry) => entry.source === 'missing')
     .map((entry) => entry.family)
@@ -961,6 +985,13 @@ export async function renderDesignStateProductionPdf(
     sceneScale,
     templateId: Number.isFinite(templateId) ? templateId : null,
     fileUrlMapSize: fileNameByUrl.size,
+    usedFontFamilies,
+    requiredFonts: requiredFonts.map((font) => ({
+      family: font.family,
+      source: font.source,
+      format: font.format ?? null,
+      hasUrl: Boolean(font.url),
+    })),
     missingFonts,
     resolvedFonts: resolvedFonts.map((font) => font.family),
   })
