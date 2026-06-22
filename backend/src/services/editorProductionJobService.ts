@@ -2,6 +2,7 @@ import { getDb } from '../config/database'
 import { logger } from '../utils/logger'
 import { renderDesignStateProductionPdf } from './editorProductionRenderService'
 import { runImpositionJobForOrderItem } from './editorImpositionService'
+import { getEditorDraft } from './publicEditorDraftService'
 
 export type EditorProductionJobType = 'production_pdf' | 'imposition_sra3'
 export type EditorProductionJobStatus = 'pending' | 'processing' | 'done' | 'failed'
@@ -13,6 +14,63 @@ function parseParams(raw: string | null): Record<string, unknown> {
   } catch {
     return {}
   }
+}
+
+function parseObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function readDraftDesignState(payload: Record<string, unknown>): Record<string, unknown> | null {
+  return parseObject(payload.productionDesignState) ?? parseObject(payload.designState)
+}
+
+function collectEditorDraftTokens(params: Record<string, unknown>): string[] {
+  const tokens = new Set<string>()
+  const add = (value: unknown) => {
+    if (typeof value === 'string' && value.trim()) tokens.add(value.trim())
+  }
+  add(params.editorDraftToken)
+  if (Array.isArray(params.editorDraftTokens)) {
+    for (const token of params.editorDraftTokens) add(token)
+  }
+  const layoutGroup = parseObject(params.editorLayoutGroup)
+  const slots = Array.isArray(layoutGroup?.slots) ? layoutGroup.slots : []
+  for (const slotRaw of slots) {
+    const slot = parseObject(slotRaw)
+    add(slot?.editorDraftToken)
+  }
+  return [...tokens]
+}
+
+function mergeDraftDesignStates(states: Array<Record<string, unknown>>): Record<string, unknown> | null {
+  if (states.length === 0) return null
+  if (states.length === 1) return states[0]!
+  const base = { ...states[0] }
+  const pages: unknown[] = []
+  for (const state of states) {
+    const statePages = Array.isArray(state.pages) ? state.pages : []
+    pages.push(...statePages)
+  }
+  base.pages = pages
+  base.pageCount = pages.length
+  return base
+}
+
+async function resolveLatestDesignStateForProduction(
+  params: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
+  const draftTokens = collectEditorDraftTokens(params)
+  if (draftTokens.length === 0) return parseObject(params.designState)
+
+  const draftStates: Array<Record<string, unknown>> = []
+  for (const token of draftTokens) {
+    const draft = await getEditorDraft(token)
+    if (!draft) continue
+    const draftState = readDraftDesignState(draft.payloadParsed)
+    if (draftState) draftStates.push(draftState)
+  }
+  return mergeDraftDesignStates(draftStates) ?? parseObject(params.designState)
 }
 
 export async function enqueueEditorProductionJobsForOrder(orderId: number): Promise<void> {
@@ -67,9 +125,10 @@ async function processProductionPdfJob(jobId: number, orderId: number, orderItem
   )
   if (!item) throw new Error('Позиция не найдена')
   const params = parseParams(item.params)
-  if (!params.designState) throw new Error('Нет designState')
+  const designState = await resolveLatestDesignStateForProduction(params)
+  if (!designState) throw new Error('Нет designState')
 
-  await renderDesignStateProductionPdf(orderId, orderItemId, params.designState)
+  await renderDesignStateProductionPdf(orderId, orderItemId, designState)
   await markJob(jobId, 'done')
 }
 

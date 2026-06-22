@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getPublicDesignTemplate, getPublicEditorBranding, type DesignTemplate } from '../../api';
 import { EMPTY_PAGE, SAFE_ZONE_MM } from '../../pages/admin/designEditor/constants';
 import { readDesignTemplateSpec, resolveDesignSceneScale } from '../../pages/admin/designEditor/designEditorState';
-import type { DesignPage, DesignPrepressConfig, DesignState } from '../../pages/admin/designEditor/types';
+import type { DesignPage, DesignPrepressConfig } from '../../pages/admin/designEditor/types';
 import type { PublicDesignEditorAdapter } from './publicDesignEditorAdapter';
 import { ensureEvenInnerSpreadPages } from '../../pages/admin/designEditor/spreadUtils';
 import type { PublicDesignDocumentMode } from './useDesignDocumentNavigation';
@@ -30,42 +30,6 @@ interface UsePublicDesignBootstrapInput {
   setPrepressConfig: (value: DesignPrepressConfig) => void;
   setSaveState: (value: 'idle' | 'dirty' | 'saving' | 'saved' | 'error') => void;
   setSpreadMode: (value: boolean) => void;
-}
-
-function isSyntheticTemplatePreviewBackground(obj: Record<string, unknown>): boolean {
-  return obj.isBackground === true && obj.backgroundFit === 'page';
-}
-
-function countMeaningfulDesignObjects(state: DesignState | undefined): number {
-  if (!state || !Array.isArray(state.pages)) return 0;
-  let count = 0;
-  for (const page of state.pages) {
-    const objects = page?.fabricJSON?.objects;
-    if (!Array.isArray(objects)) continue;
-    for (const raw of objects) {
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
-      const obj = raw as Record<string, unknown>;
-      if (isSyntheticTemplatePreviewBackground(obj)) continue;
-      count += 1;
-    }
-  }
-  return count;
-}
-
-function resolveBootstrapSourceState(input: {
-  templateState: DesignState | undefined;
-  draftState: DesignState | undefined;
-}): DesignState | undefined {
-  const { templateState, draftState } = input;
-  if (!draftState) return templateState;
-  const hasDraftPages = Array.isArray(draftState.pages) && draftState.pages.length > 0;
-  if (!hasDraftPages) return templateState ?? draftState;
-  const templateObjectCount = countMeaningfulDesignObjects(templateState);
-  const draftObjectCount = countMeaningfulDesignObjects(draftState);
-  if (templateObjectCount > 0 && draftObjectCount === 0) {
-    return templateState;
-  }
-  return draftState;
 }
 
 export function usePublicDesignBootstrap({
@@ -104,10 +68,7 @@ export function usePublicDesignBootstrap({
             ? (await adapter.getDraft(initialDraftToken)).payloadParsed?.designState as typeof ds | undefined
             : undefined)
           : undefined;
-        const sourceState = resolveBootstrapSourceState({
-          templateState: ds,
-          draftState,
-        });
+        const sourceState = draftState ?? ds;
         const w = sourceState?.pageWidth ?? spec.width_mm ?? 90;
         const h = sourceState?.pageHeight ?? spec.height_mm ?? 55;
         const statePageCount = Number(sourceState?.pageCount ?? spec.page_count ?? 1);

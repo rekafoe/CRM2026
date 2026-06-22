@@ -10,7 +10,10 @@ import {
   saveBufferToOrderFiles,
   uploadsDir,
 } from '../config/upload'
-import { resolveFontFilesForDesignState } from './designFontService'
+import {
+  buildRequiredFontsForDesignState,
+  resolveFontFilesForDesignState,
+} from './designFontService'
 import { buildMixedFontTextInnerHtml } from '../utils/textStyleRuns'
 import { getDesignTemplate } from './designTemplateService'
 import { logger } from '../utils/logger'
@@ -789,8 +792,23 @@ export async function renderDesignStateProductionPdf(
 ): Promise<{ filename: string; size: number; pageCount: number }> {
   const state = parseJsonObject(designState)
   const templateSpec = await loadTemplateSpecForOrderItem(orderItemId)
+  const bundledFonts = templateSpec && Array.isArray(templateSpec.fonts)
+    ? templateSpec.fonts
+    : []
+  const requiredFonts = await buildRequiredFontsForDesignState(designState, bundledFonts)
+  const missingFonts = requiredFonts
+    .filter((entry) => entry.source === 'missing')
+    .map((entry) => entry.family)
   const resolvedFonts = await resolveFontFilesForDesignState(designState, templateSpec)
   const fontFaceCss = buildFontFaceCss(resolvedFonts)
+  if (missingFonts.length > 0) {
+    logger.warn('Editor production missing fonts fallback', {
+      orderId,
+      orderItemId,
+      missingFonts,
+      resolvedFonts: resolvedFonts.map((font) => font.family),
+    })
+  }
   const pageWidthMm = Number(state.pageWidth ?? 90)
   const pageHeightMm = Number(state.pageHeight ?? 50)
   const prepress = parseJsonObject(state.prepress)
@@ -873,7 +891,14 @@ export async function renderDesignStateProductionPdf(
       'application/pdf',
       saved.size,
       'production_pdf',
-      JSON.stringify({ version, dpi: EXPORT_DPI, pageCount: pages.length, colorSpace: 'rgb' }),
+      JSON.stringify({
+        version,
+        dpi: EXPORT_DPI,
+        pageCount: pages.length,
+        colorSpace: 'rgb',
+        resolvedFonts: resolvedFonts.map((font) => font.family),
+        missingFonts,
+      }),
     ],
   )
 

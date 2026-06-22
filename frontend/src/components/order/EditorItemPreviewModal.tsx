@@ -98,6 +98,29 @@ async function exportDesignStatePdf(designState: DesignState): Promise<void> {
   doc.save(`order-item-${designState.templateId ?? 'design'}-pages.pdf`);
 }
 
+async function waitForProductionFile(params: {
+  orderId: number;
+  orderItemId: number;
+  timeoutMs?: number;
+  intervalMs?: number;
+}): Promise<ProductionFileRow> {
+  const timeoutMs = Number.isFinite(params.timeoutMs) ? Math.max(5_000, params.timeoutMs!) : 90_000;
+  const intervalMs = Number.isFinite(params.intervalMs) ? Math.max(500, params.intervalMs!) : 1_500;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const { data } = await getOrderItemProductionStatus(params.orderId, params.orderItemId);
+    const jobs = ((data as { jobs?: ProductionJobRow[] }).jobs ?? []);
+    const files = ((data as { productionFiles?: ProductionFileRow[] }).productionFiles ?? []);
+    if (files.length > 0) return files[files.length - 1]!;
+    const lastFailed = jobs.find((job) => job.status === 'failed');
+    if (lastFailed) {
+      throw new Error(lastFailed.lastError || 'Генерация production PDF завершилась ошибкой');
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error('Таймаут ожидания production PDF. Проверьте очередь и попробуйте снова.');
+}
+
 const JOB_STATUS_LABEL: Record<string, string> = {
   pending: 'В очереди',
   processing: 'Генерация…',
@@ -181,6 +204,13 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
     try {
       setExporting(true);
       setError(null);
+      if (orderId && item?.id) {
+        await generateOrderItemProduction(orderId, item.id);
+        const file = await waitForProductionFile({ orderId, orderItemId: item.id });
+        await loadProductionStatus();
+        await downloadOrderFile(orderId, file.id, file.originalName || file.filename);
+        return;
+      }
       await exportDesignStatePdf(designState);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось экспортировать PDF');
@@ -301,7 +331,7 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
           <>
             <div className="editor-preview-modal__actions">
               <button type="button" className="editor-preview-modal__primary" onClick={handleExportPdf} disabled={exporting || loading}>
-                {exporting ? 'Экспортируем PDF...' : 'Скачать постраничный PDF'}
+                {exporting ? 'Готовим production PDF...' : 'Скачать постраничный PDF'}
               </button>
               <span>Страницы экспортируются в порядке 1-{designState.pages.length}.</span>
             </div>
