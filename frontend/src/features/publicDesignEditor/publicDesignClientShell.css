@@ -1138,11 +1138,25 @@
   .public-design-editor--client.public-design-editor--mobile .design-editor-canvas-wrap {
     padding: 4px;
     touch-action: none;
+    background: #ffffff;
   }
 
   .public-design-editor--client.public-design-editor--mobile .fabric-canvas-outer .upper-canvas,
   .public-design-editor--client.public-design-editor--mobile .fabric-canvas-outer .lower-canvas {
     touch-action: none;
+    background: #ffffff;
+  }
+
+  .public-design-editor--client.public-design-editor--mobile .design-editor-canvas-wrap canvas,
+  .public-design-editor--client.public-design-editor--mobile .fabric-canvas-outer .canvas-container {
+    margin: 0;
+    background: #ffffff;
+  }
+
+  .public-design-editor--client.public-design-editor--mobile .fabric-canvas-inner {
+    box-shadow: none;
+    overflow: hidden;
+    background: #ffffff;
   }
 
   .public-design-editor--client.public-design-editor--mobile .public-design-editor__stage > .public-design-editor__scroll {

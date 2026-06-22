@@ -707,6 +707,7 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     pageCountLimits,
     onPageCountRejected: setError,
     onPageCountAdjusted: handlePageCountAdjusted,
+    flushBeforePageNavigation: isMobile,
   });
 
   commitCanvasToPagesRef.current = () => {

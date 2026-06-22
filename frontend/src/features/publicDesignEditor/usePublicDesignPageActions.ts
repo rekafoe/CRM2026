@@ -47,6 +47,7 @@ interface UsePublicDesignPageActionsInput {
   pageCountLimits?: PublicDesignPageCountLimits;
   onPageCountRejected?: (message: string) => void;
   onPageCountAdjusted?: (adjustment: PublicDesignPageCountAdjustment) => void;
+  flushBeforePageNavigation?: boolean;
 }
 
 export function resolveAllowedPageCountIncrease(input: {
@@ -94,6 +95,7 @@ export function usePublicDesignPageActions({
   pageCountLimits,
   onPageCountRejected,
   onPageCountAdjusted,
+  flushBeforePageNavigation = false,
 }: UsePublicDesignPageActionsInput) {
   const pageActionQueueRef = useRef(createPageActionQueue({
     getIdleSource: () => canvasHandleRef.current,
@@ -255,11 +257,17 @@ export function usePublicDesignPageActions({
         if (currentStripItem === targetItem) return false;
         setCurrentPage(targetItem.goToPage);
         return true;
-      }, { markDirtyOnChange: false, flushBefore: false });
+      }, { markDirtyOnChange: false, flushBefore: flushBeforePageNavigation });
     } finally {
       pageNavigationInFlightRef.current = false;
     }
-  }, [currentPage, navigation.stripItems, runNavigationTransaction, setCurrentPage]);
+  }, [
+    currentPage,
+    flushBeforePageNavigation,
+    navigation.stripItems,
+    runNavigationTransaction,
+    setCurrentPage,
+  ]);
 
   const handleAddClientPage = useCallback(async () => {
     const addCount = resolveAddCount(1);
