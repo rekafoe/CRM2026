@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import { PDFDocument } from 'pdf-lib'
 import puppeteer, { type Browser } from 'puppeteer'
 import { getDb } from '../config/database'
@@ -244,6 +245,44 @@ function remapFabricImageSources(value: unknown, fileNameByUrl: Map<string, stri
   if (obj.clipPath) obj.clipPath = remapFabricImageSources(obj.clipPath, fileNameByUrl)
   if (obj.backgroundImage) obj.backgroundImage = remapFabricImageSources(obj.backgroundImage, fileNameByUrl)
   if (obj.overlayImage) obj.overlayImage = remapFabricImageSources(obj.overlayImage, fileNameByUrl)
+  return obj
+}
+
+function imageMimeFromFilePath(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase()
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
+  if (ext === '.png') return 'image/png'
+  if (ext === '.webp') return 'image/webp'
+  if (ext === '.gif') return 'image/gif'
+  return 'application/octet-stream'
+}
+
+function fileUrlToExistingPath(src: string): string | null {
+  if (!src.startsWith('file://')) return null
+  try {
+    const filePath = fileURLToPath(src)
+    return fs.existsSync(filePath) ? filePath : null
+  } catch {
+    return null
+  }
+}
+
+function inlineLocalFabricImageSources(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => inlineLocalFabricImageSources(item))
+  if (!value || typeof value !== 'object') return value
+  const obj: FabricObj = { ...(value as FabricObj) }
+  if (typeof obj.src === 'string') {
+    const filePath = fileUrlToExistingPath(obj.src)
+    if (filePath) {
+      const mime = imageMimeFromFilePath(filePath)
+      obj.src = `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}`
+    }
+  }
+  if (Array.isArray(obj.objects)) obj.objects = obj.objects.map((item) => inlineLocalFabricImageSources(item))
+  if (Array.isArray(obj._objects)) obj._objects = obj._objects.map((item) => inlineLocalFabricImageSources(item))
+  if (obj.clipPath) obj.clipPath = inlineLocalFabricImageSources(obj.clipPath)
+  if (obj.backgroundImage) obj.backgroundImage = inlineLocalFabricImageSources(obj.backgroundImage)
+  if (obj.overlayImage) obj.overlayImage = inlineLocalFabricImageSources(obj.overlayImage)
   return obj
 }
 
@@ -546,7 +585,8 @@ async function renderFabricPageToPng(
 
   const browser = await getBrowser()
   const page = await browser.newPage()
-  const normalizedFabricJSON = remapFabricImageSources(parseJsonObject(fabricJSON), fileNameByUrl)
+  const fileMappedFabricJSON = remapFabricImageSources(parseJsonObject(fabricJSON), fileNameByUrl)
+  const normalizedFabricJSON = inlineLocalFabricImageSources(fileMappedFabricJSON)
   const bleed = Math.max(0, Number.isFinite(bleedMm) ? bleedMm : 0)
   const normalizedSceneScale = Number.isFinite(sceneScale) && sceneScale > 0 ? sceneScale : 1
   const widthMm = pageWidthMm + bleed * 2
@@ -561,6 +601,7 @@ async function renderFabricPageToPng(
     multiplier: Math.max(0.01, FABRIC_EXPORT_MULTIPLIER / normalizedSceneScale),
     cutMarks: true,
   }
+  const fileMappedDiagnostics = collectProductionPageDiagnostics(fileMappedFabricJSON, fileNameByUrl)
   const payloadDiagnostics = collectProductionPageDiagnostics(normalizedFabricJSON, fileNameByUrl)
   // #region agent log
   logger.info('[agent:pdf-mismatch] CRM production Fabric render payload summary', {
@@ -576,6 +617,18 @@ async function renderFabricPageToPng(
     sheetWidthPx: renderPayload.sheetWidthPx,
     sheetHeightPx: renderPayload.sheetHeightPx,
     multiplier: renderPayload.multiplier,
+    fileMappedDiagnostics: {
+      objects: fileMappedDiagnostics.objects,
+      groups: fileMappedDiagnostics.groups,
+      clipPaths: fileMappedDiagnostics.clipPaths,
+      images: fileMappedDiagnostics.images,
+      dataImages: fileMappedDiagnostics.dataImages,
+      fileImages: fileMappedDiagnostics.fileImages,
+      existingFileImages: fileMappedDiagnostics.existingFileImages,
+      missingFileImages: fileMappedDiagnostics.missingFileImages,
+      filledPhotoFields: fileMappedDiagnostics.filledPhotoFields,
+      unresolvedImageCount: fileMappedDiagnostics.unresolvedImages.length,
+    },
     diagnostics: {
       objects: payloadDiagnostics.objects,
       groups: payloadDiagnostics.groups,
