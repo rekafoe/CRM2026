@@ -99,7 +99,7 @@ describe('editorProductionRenderService internals', () => {
     }
   })
 
-  it('fails loudly for single-color production renders', () => {
+  it('allows single-color production renders when they are not white/black', () => {
     expect(() => __editorProductionRenderInternals.assertHealthyPixelStats({
       width: 100,
       height: 100,
@@ -107,7 +107,7 @@ describe('editorProductionRenderService internals', () => {
       nonWhiteRatio: 0.5,
       nonBlackRatio: 1,
       uniqueColorSamples: 1,
-    }, 'Page 1')).toThrow(/single-color/)
+    }, 'Page 1')).not.toThrow()
   })
 
   it('fails loudly for almost fully white or black production renders', () => {

@@ -258,9 +258,6 @@ function assertHealthyPixelStats(stats: ProductionPixelStats, pageLabel: string)
   if (stats.nonBlackRatio < 0.0001) {
     throw new Error(`${pageLabel}: production render is almost fully black`)
   }
-  if (stats.uniqueColorSamples <= 1) {
-    throw new Error(`${pageLabel}: production render is a single-color page`)
-  }
 }
 
 function cssNumber(value: unknown, fallback = 0): number {
