@@ -606,6 +606,93 @@ async function renderFabricPageToPng(
             canvas.loadFromJSON(payload.fabricJSON, () => resolve())
           })
         }
+        const summarizeFabricObject = (obj: any, depth = 0): any[] => {
+          if (!obj || depth > 2) return []
+          const safeNumber = (value: unknown): number | null => {
+            const n = Number(value)
+            return Number.isFinite(n) ? n : null
+          }
+          const bounds = (() => {
+            try {
+              if (typeof obj.setCoords === 'function') obj.setCoords()
+              const rect = typeof obj.getBoundingRect === 'function' ? obj.getBoundingRect() : null
+              if (!rect) return null
+              return {
+                left: safeNumber(rect.left),
+                top: safeNumber(rect.top),
+                width: safeNumber(rect.width),
+                height: safeNumber(rect.height),
+                offCanvas: (
+                  Number(rect.left) + Number(rect.width) < 0 ||
+                  Number(rect.top) + Number(rect.height) < 0 ||
+                  Number(rect.left) > payload.pageWidthPx ||
+                  Number(rect.top) > payload.pageHeightPx
+                ),
+              }
+            } catch {
+              return null
+            }
+          })()
+          const element = typeof obj.getElement === 'function'
+            ? obj.getElement()
+            : obj._element ?? obj._originalElement ?? null
+          const imageInfo = (obj.type === 'image' || element)
+            ? {
+              hasElement: Boolean(element),
+              complete: typeof element?.complete === 'boolean' ? element.complete : null,
+              naturalWidth: safeNumber(element?.naturalWidth ?? element?.videoWidth),
+              naturalHeight: safeNumber(element?.naturalHeight ?? element?.videoHeight),
+              displayWidth: safeNumber(obj.getScaledWidth?.() ?? (Number(obj.width) * Number(obj.scaleX ?? 1))),
+              displayHeight: safeNumber(obj.getScaledHeight?.() ?? (Number(obj.height) * Number(obj.scaleY ?? 1))),
+            }
+            : null
+          const children = typeof obj.getObjects === 'function'
+            ? obj.getObjects()
+            : Array.isArray(obj._objects)
+              ? obj._objects
+              : Array.isArray(obj.objects)
+                ? obj.objects
+                : []
+          const current = {
+            type: obj.type ?? null,
+            depth,
+            visible: obj.visible !== false,
+            opacity: safeNumber(obj.opacity ?? 1),
+            left: safeNumber(obj.left),
+            top: safeNumber(obj.top),
+            width: safeNumber(obj.width),
+            height: safeNumber(obj.height),
+            scaleX: safeNumber(obj.scaleX ?? 1),
+            scaleY: safeNumber(obj.scaleY ?? 1),
+            angle: safeNumber(obj.angle ?? 0),
+            childCount: Array.isArray(children) ? children.length : 0,
+            isPhotoField: obj.isPhotoField === true,
+            photoFieldFilled: obj.photoFieldFilled === true,
+            hasClipPath: Boolean(obj.clipPath),
+            bounds,
+            imageInfo,
+          }
+          const nested = Array.isArray(children)
+            ? children.flatMap((child: any) => summarizeFabricObject(child, depth + 1))
+            : []
+          return [current, ...nested]
+        }
+        const objectSummaries = canvas.getObjects().flatMap((obj: any) => summarizeFabricObject(obj))
+        const loadedDiagnostics = {
+          topLevelObjects: canvas.getObjects().length,
+          flattenedObjects: objectSummaries.length,
+          images: objectSummaries.filter((obj: any) => obj.type === 'image' || obj.imageInfo).length,
+          decodedImages: objectSummaries.filter((obj: any) => {
+            const info = obj.imageInfo
+            return info && Number(info.naturalWidth) > 0 && Number(info.naturalHeight) > 0
+          }).length,
+          zeroSizeImages: objectSummaries.filter((obj: any) => {
+            const info = obj.imageInfo
+            return info && (Number(info.naturalWidth) <= 0 || Number(info.naturalHeight) <= 0)
+          }).length,
+          offCanvasObjects: objectSummaries.filter((obj: any) => obj.bounds?.offCanvas === true).length,
+          sampleObjects: objectSummaries.slice(0, 12),
+        }
         canvas.getObjects().forEach((obj: any) => {
           if (obj && typeof obj.set === 'function') {
             obj.set({ selectable: false, evented: false })
@@ -690,6 +777,7 @@ async function renderFabricPageToPng(
 
         return {
           dataUrl: sheet.toDataURL('image/png'),
+          loadedDiagnostics,
           pixelStats: {
             width: sheet.width,
             height: sheet.height,
@@ -707,6 +795,12 @@ async function renderFabricPageToPng(
 
     assertHealthyPixelStats(result.pixelStats, `Page ${pageIndex + 1}`)
     // #region agent log
+    logger.info('[agent:pdf-mismatch] CRM production Fabric loaded object summary', {
+      runId: 'pdf-mismatch-prod',
+      hypothesisId: 'H6,H7,H8',
+      page: pageIndex + 1,
+      loadedDiagnostics: result.loadedDiagnostics,
+    })
     logger.info('[agent:pdf-mismatch] CRM production Fabric render result pixel summary', {
       runId: 'pdf-mismatch-prod',
       hypothesisId: 'H4,H5',
