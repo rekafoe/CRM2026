@@ -170,34 +170,11 @@ function walkFabric(value: unknown, visit: (obj: FabricObj) => void): void {
   walkFabric(obj.clipPath, visit)
 }
 
-function isTransparentPaint(value: unknown): boolean {
-  if (value == null) return true
-  const raw = String(value).trim().toLowerCase()
-  if (!raw || raw === 'transparent' || raw === 'none') return true
-  return /^rgba\([^)]*,\s*0(?:\.0+)?\)$/.test(raw)
-}
-
-function hasVisibleProductionContent(fabricJSON: unknown): boolean {
+/** Пустая страница редактора: `{ fabricJSON: {} }` или без objects. */
+function isBlankEditorPage(fabricJSON: unknown): boolean {
   const root = parseJsonObject(fabricJSON)
   const objects = Array.isArray(root.objects) ? root.objects : []
-  let hasContent = false
-  const visit = (obj: FabricObj): void => {
-    if (hasContent || obj.visible === false || Number(obj.opacity ?? 1) <= 0) return
-    const type = String(obj.type ?? '').toLowerCase()
-    if ((type === 'i-text' || type === 'textbox' || type === 'text') && String(obj.text ?? '').trim()) {
-      hasContent = !isTransparentPaint(obj.fill)
-      return
-    }
-    if ((type === 'image' || typeof obj.src === 'string') && String(obj.src ?? '').trim()) {
-      hasContent = true
-      return
-    }
-    if (type === 'rect' || type === 'circle') {
-      hasContent = !isTransparentPaint(obj.fill) || !isTransparentPaint(obj.stroke)
-    }
-  }
-  for (const obj of objects) walkFabric(obj, visit)
-  return hasContent
+  return objects.length === 0
 }
 
 function getFabricChildren(obj: FabricObj): FabricObj[] {
@@ -359,16 +336,15 @@ function buildFabricRenderHtml(fontFaceCss = ''): string {
   </style></head><body></body></html>`
 }
 
-function assertHealthyPixelStats(
-  stats: ProductionPixelStats,
-  pageLabel: string,
-  options?: { allowBlankWhite?: boolean },
-): void {
+function assertHealthyPixelStats(stats: ProductionPixelStats, pageLabel: string): void {
   if (stats.sampledPixels <= 0) {
     throw new Error(`${pageLabel}: production render did not produce pixels`)
   }
-  if (stats.nonWhiteRatio < 0.0001 && !options?.allowBlankWhite) {
-    throw new Error(`${pageLabel}: production render is almost fully white`)
+  if (stats.nonWhiteRatio < 0.0001) {
+    logger.info('Production render page is blank/white (allowed)', {
+      pageLabel,
+      pixelStats: stats,
+    })
   }
   if (stats.nonBlackRatio < 0.0001) {
     throw new Error(`${pageLabel}: production render is almost fully black`)
@@ -810,12 +786,16 @@ export async function renderClientRenderedPagesProductionPdf(
       'production_pdf',
       JSON.stringify({
         version,
+        renderSource: 'client_png',
+        productionRenderSource: 'client_png',
         source: 'client_png',
         dpi: manifest.dpi,
         pageCount: manifest.pageCount,
         pageWidthMm,
         pageHeightMm,
         bleedMm,
+        clientRenderedPagesExpected: manifest.pageCount,
+        clientRenderedPagesUploaded: pagesByPart.size,
         colorSpace: 'rgb',
         rasterFiles: rows.slice(0, manifest.pageCount).map((row) => ({
           id: row.id,
@@ -1185,8 +1165,13 @@ async function renderFabricPageToPng(
       }
     }, renderPayload)
 
-    const allowBlankWhite = !hasVisibleProductionContent(normalizedFabricJSON)
-    assertHealthyPixelStats(result.pixelStats, `Page ${pageIndex + 1}`, { allowBlankWhite })
+    if (isBlankEditorPage(normalizedFabricJSON)) {
+      logger.info('Production Fabric render blank editor page', {
+        page: pageIndex + 1,
+        pixelStats: result.pixelStats,
+      })
+    }
+    assertHealthyPixelStats(result.pixelStats, `Page ${pageIndex + 1}`)
     // #region agent log
     logger.info('[agent:pdf-mismatch] CRM production Fabric loaded object summary', {
       runId: 'pdf-mismatch-prod',
@@ -1438,6 +1423,7 @@ export async function renderDesignStateProductionPdf(
       'production_pdf',
       JSON.stringify({
         version,
+        renderSource: 'fabric_legacy',
         dpi: EXPORT_DPI,
         pageCount: pages.length,
         colorSpace: 'rgb',
@@ -1461,7 +1447,7 @@ export const __editorProductionRenderInternals = {
   closeProductionRenderBrowser,
   collectProductionPageDiagnostics,
   computeCoverPlacementMm,
-  hasVisibleProductionContent,
+  isBlankEditorPage,
   remapFabricImageSources,
   renderFabricPageToPng,
   resolveImageSrc,

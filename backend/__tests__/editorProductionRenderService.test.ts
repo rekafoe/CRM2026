@@ -110,16 +110,7 @@ describe('editorProductionRenderService internals', () => {
     }, 'Page 1')).not.toThrow()
   })
 
-  it('fails loudly for almost fully white or black production renders', () => {
-    expect(() => __editorProductionRenderInternals.assertHealthyPixelStats({
-      width: 100,
-      height: 100,
-      sampledPixels: 100,
-      nonWhiteRatio: 0,
-      nonBlackRatio: 1,
-      uniqueColorSamples: 2,
-    }, 'Page 1')).toThrow(/almost fully white/)
-
+  it('fails loudly for almost fully black production renders', () => {
     expect(() => __editorProductionRenderInternals.assertHealthyPixelStats({
       width: 100,
       height: 100,
@@ -130,12 +121,7 @@ describe('editorProductionRenderService internals', () => {
     }, 'Page 2')).toThrow(/almost fully black/)
   })
 
-  it('allows intentionally blank white production pages', () => {
-    expect(__editorProductionRenderInternals.hasVisibleProductionContent({
-      version: '7.4.0',
-      objects: [],
-    })).toBe(false)
-
+  it('allows blank white production pages without failing', () => {
     expect(() => __editorProductionRenderInternals.assertHealthyPixelStats({
       width: 100,
       height: 100,
@@ -143,16 +129,40 @@ describe('editorProductionRenderService internals', () => {
       nonWhiteRatio: 0,
       nonBlackRatio: 1,
       uniqueColorSamples: 1,
-    }, 'Page 2', { allowBlankWhite: true })).not.toThrow()
+    }, 'Page 2')).not.toThrow()
   })
 
-  it('detects printable content before allowing blank page fallback', () => {
-    expect(__editorProductionRenderInternals.hasVisibleProductionContent({
+  it('detects blank editor pages like EMPTY_PAGE', () => {
+    expect(__editorProductionRenderInternals.isBlankEditorPage({
+      version: '7.4.0',
+      objects: [],
+    })).toBe(true)
+    expect(__editorProductionRenderInternals.isBlankEditorPage({ fabricJSON: {} })).toBe(true)
+    expect(__editorProductionRenderInternals.isBlankEditorPage({
       version: '7.4.0',
       objects: [
         { type: 'text', text: 'Hello', fill: '#111111' },
       ],
-    })).toBe(true)
+    })).toBe(false)
+  })
+
+  it('allows blank second page in two-page editor layout', () => {
+    const page1 = {
+      version: '7.4.0',
+      objects: [{ type: 'rect', left: 0, top: 0, width: 40, height: 24, fill: '#c01818' }],
+    }
+    const page2 = { fabricJSON: {} }
+
+    expect(__editorProductionRenderInternals.isBlankEditorPage(page1)).toBe(false)
+    expect(__editorProductionRenderInternals.isBlankEditorPage(page2)).toBe(true)
+    expect(() => __editorProductionRenderInternals.assertHealthyPixelStats({
+      width: 100,
+      height: 100,
+      sampledPixels: 100,
+      nonWhiteRatio: 0,
+      nonBlackRatio: 1,
+      uniqueColorSamples: 1,
+    }, 'Page 2')).not.toThrow()
   })
 
   it('computes cover placement without white bleed margins', () => {

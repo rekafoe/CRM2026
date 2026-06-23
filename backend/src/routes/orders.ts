@@ -20,6 +20,7 @@ import {
   getProductionStatus,
   requestManualProductionRegeneration,
 } from '../services/editorProductionJobService'
+import { logger } from '../utils/logger'
 
 const router = Router()
 
@@ -300,7 +301,14 @@ router.post('/:id/files', (req, res, next) => {
     orderId
   )
   if (artifactType === 'client_rendered_page' && orderItemId != null) {
-    await enqueueClientRenderedProductionIfReady(orderId, orderItemId)
+    const enqueueResult = await enqueueClientRenderedProductionIfReady(orderId, orderItemId)
+    if (!enqueueResult.ready) {
+      logger.info('Client rendered page uploaded, production PDF job still waiting for full page set', {
+        orderId,
+        orderItemId,
+        partNumber,
+      })
+    }
   }
   res.status(201).json(row)
 }))

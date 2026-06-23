@@ -198,8 +198,26 @@ export async function enqueueClientRenderedProductionIfReady(
   const manifest = readClientRenderedPagesManifest(params)
   if (!manifest) return { ready: false, jobId: null }
   const ready = await hasClientRenderedPageSet(orderId, orderItemId, manifest)
-  if (!ready) return { ready: false, jobId: null }
+  if (!ready) {
+    const uploadedPages = await countClientRenderedPages(orderId, orderItemId)
+    logger.info('Editor production waits for client rendered PNG pages', {
+      orderId,
+      orderItemId,
+      expectedPages: manifest.pageCount,
+      uploadedPages,
+      productionRenderSource: 'client_png',
+    })
+    return { ready: false, jobId: null }
+  }
   const jobId = await enqueueProductionPdfJobIfMissing(orderId, orderItemId, true)
+  logger.info('Editor production client PNG set ready, production PDF job enqueued', {
+    orderId,
+    orderItemId,
+    expectedPages: manifest.pageCount,
+    uploadedPages: manifest.pageCount,
+    jobId,
+    productionRenderSource: 'client_png',
+  })
   return { ready: true, jobId }
 }
 
@@ -283,6 +301,10 @@ async function markJob(
   )
 }
 
+function expectsClientPngProduction(params: Record<string, unknown>): boolean {
+  return params.productionRenderSource === 'client_png'
+}
+
 async function processProductionPdfJob(jobId: number, orderId: number, orderItemId: number): Promise<void> {
   const db = await getDb()
   const item = await db.get<{ params: string | null }>(
@@ -291,12 +313,38 @@ async function processProductionPdfJob(jobId: number, orderId: number, orderItem
   )
   if (!item) throw new Error('Позиция не найдена')
   const params = parseParams(item.params)
+  const expectsClientPng = expectsClientPngProduction(params)
   const clientRenderedPages = readClientRenderedPagesManifest(params)
-  if (clientRenderedPages) {
+
+  if (expectsClientPng) {
+    if (!clientRenderedPages) {
+      throw new Error(
+        'Заказ ожидает client PNG (productionRenderSource=client_png), но manifest clientRenderedPages некорректен',
+      )
+    }
+    const uploadedPages = await countClientRenderedPages(orderId, orderItemId)
+    if (uploadedPages < clientRenderedPages.pageCount) {
+      throw new Error(
+        `Не загружены client PNG для production PDF: ${uploadedPages}/${clientRenderedPages.pageCount}`,
+      )
+    }
     await renderClientRenderedPagesProductionPdf(orderId, orderItemId, clientRenderedPages)
     await markJob(jobId, 'done')
     return
   }
+
+  if (clientRenderedPages) {
+    const uploadedPages = await countClientRenderedPages(orderId, orderItemId)
+    if (uploadedPages < clientRenderedPages.pageCount) {
+      throw new Error(
+        `Не загружены client PNG для production PDF: ${uploadedPages}/${clientRenderedPages.pageCount}`,
+      )
+    }
+    await renderClientRenderedPagesProductionPdf(orderId, orderItemId, clientRenderedPages)
+    await markJob(jobId, 'done')
+    return
+  }
+
   const designState = await resolveLatestDesignStateForProduction(params)
   if (!designState) throw new Error('Нет designState')
 
