@@ -170,6 +170,36 @@ function walkFabric(value: unknown, visit: (obj: FabricObj) => void): void {
   walkFabric(obj.clipPath, visit)
 }
 
+function isTransparentPaint(value: unknown): boolean {
+  if (value == null) return true
+  const raw = String(value).trim().toLowerCase()
+  if (!raw || raw === 'transparent' || raw === 'none') return true
+  return /^rgba\([^)]*,\s*0(?:\.0+)?\)$/.test(raw)
+}
+
+function hasVisibleProductionContent(fabricJSON: unknown): boolean {
+  const root = parseJsonObject(fabricJSON)
+  const objects = Array.isArray(root.objects) ? root.objects : []
+  let hasContent = false
+  const visit = (obj: FabricObj): void => {
+    if (hasContent || obj.visible === false || Number(obj.opacity ?? 1) <= 0) return
+    const type = String(obj.type ?? '').toLowerCase()
+    if ((type === 'i-text' || type === 'textbox' || type === 'text') && String(obj.text ?? '').trim()) {
+      hasContent = !isTransparentPaint(obj.fill)
+      return
+    }
+    if ((type === 'image' || typeof obj.src === 'string') && String(obj.src ?? '').trim()) {
+      hasContent = true
+      return
+    }
+    if (type === 'rect' || type === 'circle') {
+      hasContent = !isTransparentPaint(obj.fill) || !isTransparentPaint(obj.stroke)
+    }
+  }
+  for (const obj of objects) walkFabric(obj, visit)
+  return hasContent
+}
+
 function getFabricChildren(obj: FabricObj): FabricObj[] {
   const objects = Array.isArray(obj.objects)
     ? obj.objects
@@ -329,11 +359,15 @@ function buildFabricRenderHtml(fontFaceCss = ''): string {
   </style></head><body></body></html>`
 }
 
-function assertHealthyPixelStats(stats: ProductionPixelStats, pageLabel: string): void {
+function assertHealthyPixelStats(
+  stats: ProductionPixelStats,
+  pageLabel: string,
+  options?: { allowBlankWhite?: boolean },
+): void {
   if (stats.sampledPixels <= 0) {
     throw new Error(`${pageLabel}: production render did not produce pixels`)
   }
-  if (stats.nonWhiteRatio < 0.0001) {
+  if (stats.nonWhiteRatio < 0.0001 && !options?.allowBlankWhite) {
     throw new Error(`${pageLabel}: production render is almost fully white`)
   }
   if (stats.nonBlackRatio < 0.0001) {
@@ -1151,7 +1185,8 @@ async function renderFabricPageToPng(
       }
     }, renderPayload)
 
-    assertHealthyPixelStats(result.pixelStats, `Page ${pageIndex + 1}`)
+    const allowBlankWhite = !hasVisibleProductionContent(normalizedFabricJSON)
+    assertHealthyPixelStats(result.pixelStats, `Page ${pageIndex + 1}`, { allowBlankWhite })
     // #region agent log
     logger.info('[agent:pdf-mismatch] CRM production Fabric loaded object summary', {
       runId: 'pdf-mismatch-prod',
@@ -1426,6 +1461,7 @@ export const __editorProductionRenderInternals = {
   closeProductionRenderBrowser,
   collectProductionPageDiagnostics,
   computeCoverPlacementMm,
+  hasVisibleProductionContent,
   remapFabricImageSources,
   renderFabricPageToPng,
   resolveImageSrc,

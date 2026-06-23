@@ -130,6 +130,31 @@ describe('editorProductionRenderService internals', () => {
     }, 'Page 2')).toThrow(/almost fully black/)
   })
 
+  it('allows intentionally blank white production pages', () => {
+    expect(__editorProductionRenderInternals.hasVisibleProductionContent({
+      version: '7.4.0',
+      objects: [],
+    })).toBe(false)
+
+    expect(() => __editorProductionRenderInternals.assertHealthyPixelStats({
+      width: 100,
+      height: 100,
+      sampledPixels: 100,
+      nonWhiteRatio: 0,
+      nonBlackRatio: 1,
+      uniqueColorSamples: 1,
+    }, 'Page 2', { allowBlankWhite: true })).not.toThrow()
+  })
+
+  it('detects printable content before allowing blank page fallback', () => {
+    expect(__editorProductionRenderInternals.hasVisibleProductionContent({
+      version: '7.4.0',
+      objects: [
+        { type: 'text', text: 'Hello', fill: '#111111' },
+      ],
+    })).toBe(true)
+  })
+
   it('computes cover placement without white bleed margins', () => {
     const placement = __editorProductionRenderInternals.computeCoverPlacementMm(
       900,
