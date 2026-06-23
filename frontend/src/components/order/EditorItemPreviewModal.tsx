@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from 'fabric';
 import { jsPDF } from 'jspdf';
 import type { Item } from '../../types';
@@ -6,11 +6,17 @@ import {
   downloadOrderFile,
   generateOrderItemProduction,
   getOrderItemProductionStatus,
+  listOrderFiles,
 } from '../../api';
 import { API_BASE_URL } from '../../config/constants';
 import { createDesignSceneGeometry } from '../../pages/admin/designEditor/designGeometry';
-import { loadDesignPageScene } from '../../pages/admin/designEditor/designPageLoader';
+import { loadDesignPageScene, type ResolveEditorImageSrc } from '../../pages/admin/designEditor/designPageLoader';
 import type { DesignPage, DesignState } from '../../pages/admin/designEditor/types';
+import {
+  createOrderFileImageSrcResolver,
+  loadClientRenderedPagePreviews,
+  revokeEditorPreviewObjectUrls,
+} from './editorPreviewSources';
 import { getEditorItemSummary } from './editorItemSummary';
 import './EditorItemPreviewModal.css';
 
@@ -39,10 +45,23 @@ interface EditorItemPreviewModalProps {
 type PagePreview = {
   page: number;
   url: string;
+  source?: 'client_png' | 'fabric';
 };
 
+function readDesignStatePages(designState: DesignState): DesignPage[] {
+  if (Array.isArray(designState.pages) && designState.pages.length > 0) {
+    return designState.pages;
+  }
+  const pageCount = Math.max(1, Number(designState.pageCount) || 1);
+  return Array.from({ length: pageCount }, () => ({ fabricJSON: {} }));
+}
+
 function isDesignState(value: unknown): value is DesignState {
-  return Boolean(value && typeof value === 'object' && Array.isArray((value as DesignState).pages));
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const state = value as DesignState;
+  if (Array.isArray(state.pages) && state.pages.length > 0) return true;
+  const pageCount = Number(state.pageCount);
+  return Number.isFinite(pageCount) && pageCount > 0;
 }
 
 async function renderDesignPageToDataUrl(
@@ -50,6 +69,7 @@ async function renderDesignPageToDataUrl(
   designState: DesignState,
   pageIndex: number,
   multiplier = 1,
+  resolveImageSrc?: ResolveEditorImageSrc,
 ): Promise<string> {
   const geometry = createDesignSceneGeometry({
     pageWidthMm: designState.pageWidth,
@@ -74,6 +94,7 @@ async function renderDesignPageToDataUrl(
       pageW: geometry.pageWidthPx,
       pageH: geometry.pageHeightPx,
       apiBaseUrl: API_BASE_URL,
+      resolveImageSrc,
     });
     return canvas.toDataURL({ format: 'png', multiplier });
   } finally {
@@ -81,7 +102,11 @@ async function renderDesignPageToDataUrl(
   }
 }
 
-async function exportDesignStatePdf(designState: DesignState): Promise<void> {
+async function exportDesignStatePdf(
+  designState: DesignState,
+  resolveImageSrc?: ResolveEditorImageSrc,
+): Promise<void> {
+  const pages = readDesignStatePages(designState);
   const doc = new jsPDF({
     orientation: designState.pageWidth > designState.pageHeight ? 'landscape' : 'portrait',
     unit: 'mm',
@@ -89,9 +114,9 @@ async function exportDesignStatePdf(designState: DesignState): Promise<void> {
     compress: true,
   });
 
-  for (let i = 0; i < designState.pages.length; i++) {
+  for (let i = 0; i < pages.length; i += 1) {
     if (i > 0) doc.addPage([designState.pageWidth, designState.pageHeight], designState.pageWidth > designState.pageHeight ? 'landscape' : 'portrait');
-    const dataUrl = await renderDesignPageToDataUrl(designState.pages[i], designState, i, 2);
+    const dataUrl = await renderDesignPageToDataUrl(pages[i], designState, i, 2, resolveImageSrc);
     doc.addImage(dataUrl, 'PNG', 0, 0, designState.pageWidth, designState.pageHeight);
   }
 
@@ -122,6 +147,13 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
   const [productionFiles, setProductionFiles] = useState<ProductionFileRow[]>([]);
   const [productionLoading, setProductionLoading] = useState(false);
   const [productionRegenerating, setProductionRegenerating] = useState(false);
+  const [previewSource, setPreviewSource] = useState<'client_png' | 'fabric' | null>(null);
+  const objectUrlsRef = useRef<Set<string>>(new Set());
+  const resolveImageSrcRef = useRef<ResolveEditorImageSrc | undefined>(undefined);
+  const designPages = useMemo(
+    () => (designState ? readDesignStatePages(designState) : []),
+    [designState],
+  );
 
   const loadProductionStatus = useCallback(async () => {
     if (!orderId || !item?.id || !designState) return;
@@ -147,32 +179,80 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
   }, [isOpen, loadProductionStatus]);
 
   useEffect(() => {
-    if (!isOpen || !designState) {
+    if (!isOpen) {
       setPagePreviews([]);
+      setPreviewSource(null);
+      revokeEditorPreviewObjectUrls(objectUrlsRef.current);
+      resolveImageSrcRef.current = undefined;
       return;
     }
+    if (!designState || !item?.id) {
+      setPagePreviews([]);
+      setPreviewSource(null);
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all(
-      designState.pages.map(async (page, index) => ({
-        page: index + 1,
-        url: await renderDesignPageToDataUrl(page, designState, index, 1),
-      })),
-    )
-      .then((previews) => {
-        if (!cancelled) setPagePreviews(previews);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Не удалось построить preview макета');
-      })
-      .finally(() => {
+    revokeEditorPreviewObjectUrls(objectUrlsRef.current);
+
+    void (async () => {
+      try {
+        let resolveImageSrc: ResolveEditorImageSrc | undefined;
+        if (orderId) {
+          const { data: files } = await listOrderFiles(orderId);
+          const clientPreviews = await loadClientRenderedPagePreviews(
+            orderId,
+            item.id,
+            files ?? [],
+            objectUrlsRef.current,
+          );
+          if (clientPreviews && clientPreviews.length > 0) {
+            if (!cancelled) {
+              setPagePreviews(clientPreviews.map((preview) => ({
+                ...preview,
+                source: 'client_png' as const,
+              })));
+              setPreviewSource('client_png');
+            }
+            return;
+          }
+          resolveImageSrc = createOrderFileImageSrcResolver(
+            orderId,
+            files ?? [],
+            objectUrlsRef.current,
+          );
+          resolveImageSrcRef.current = resolveImageSrc;
+        }
+
+        const previews = await Promise.all(
+          designPages.map(async (page, index) => ({
+            page: index + 1,
+            url: await renderDesignPageToDataUrl(page, designState, index, 1, resolveImageSrc),
+            source: 'fabric' as const,
+          })),
+        );
+        if (!cancelled) {
+          setPagePreviews(previews);
+          setPreviewSource('fabric');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Не удалось построить preview макета');
+          setPagePreviews([]);
+          setPreviewSource(null);
+        }
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
+
     return () => {
       cancelled = true;
+      revokeEditorPreviewObjectUrls(objectUrlsRef.current);
     };
-  }, [designState, isOpen]);
+  }, [designPages, designState, isOpen, item?.id, orderId]);
 
   if (!isOpen || !item || !summary) return null;
 
@@ -181,7 +261,7 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
     try {
       setExporting(true);
       setError(null);
-      await exportDesignStatePdf(designState);
+      await exportDesignStatePdf(designState, resolveImageSrcRef.current);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось экспортировать PDF');
     } finally {
@@ -303,19 +383,27 @@ export const EditorItemPreviewModal: React.FC<EditorItemPreviewModalProps> = ({
               <button type="button" className="editor-preview-modal__primary" onClick={handleExportPdf} disabled={exporting || loading}>
                 {exporting ? 'Экспортируем PDF...' : 'Скачать постраничный PDF'}
               </button>
-              <span>Страницы экспортируются в порядке 1-{designState.pages.length}.</span>
+              <span>
+                Страницы экспортируются в порядке 1-{designPages.length}.
+                {previewSource === 'client_png' ? ' Preview: client PNG с сайта.' : previewSource === 'fabric' ? ' Preview: рендер из designState.' : ''}
+              </span>
             </div>
             {loading ? (
               <div className="editor-preview-modal__loading">Строим preview страниц...</div>
-            ) : (
+            ) : pagePreviews.length > 0 ? (
               <div className="editor-preview-modal__pages">
                 {pagePreviews.map((preview) => (
                   <figure key={preview.page} className="editor-preview-modal__page">
                     <img src={preview.url} alt={`Страница ${preview.page}`} />
-                    <figcaption>Страница {preview.page}</figcaption>
+                    <figcaption>
+                      Страница {preview.page}
+                      {preview.source === 'client_png' ? ' · client PNG' : ''}
+                    </figcaption>
                   </figure>
                 ))}
               </div>
+            ) : (
+              <div className="editor-preview-modal__loading">Нет данных для preview страниц.</div>
             )}
           </>
         )}

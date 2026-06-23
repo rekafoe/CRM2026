@@ -162,6 +162,28 @@ async function inlineSvgImageSources(value: unknown): Promise<void> {
   await Promise.all(Object.values(record).map((nested) => inlineSvgImageSources(nested)));
 }
 
+export type ResolveEditorImageSrc = (src: string) => Promise<string | null>;
+
+async function remapFabricJsonImageSources(
+  value: unknown,
+  resolveImageSrc: ResolveEditorImageSrc,
+): Promise<void> {
+  if (!value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    await Promise.all(value.map((item) => remapFabricJsonImageSources(item, resolveImageSrc)));
+    return;
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.src === 'string' && !record.src.startsWith('data:') && !record.src.startsWith('blob:')) {
+    const resolved = await resolveImageSrc(record.src);
+    if (resolved) {
+      record.src = resolved;
+      delete record.crossOrigin;
+    }
+  }
+  await Promise.all(Object.values(record).map((nested) => remapFabricJsonImageSources(nested, resolveImageSrc)));
+}
+
 function collectDeferredSvgBackgrounds(value: unknown, deferred: DeferredBackground[]): void {
   if (!value || typeof value !== 'object') return;
   if (Array.isArray(value)) {
@@ -182,13 +204,20 @@ function collectDeferredSvgBackgrounds(value: unknown, deferred: DeferredBackgro
   for (const nested of Object.values(value)) collectDeferredSvgBackgrounds(nested, deferred);
 }
 
-async function prepareFabricJsonForLoad(fabricJson: Record<string, unknown>): Promise<PreparedFabricJson> {
+async function prepareFabricJsonForLoad(
+  fabricJson: Record<string, unknown>,
+  resolveImageSrc?: ResolveEditorImageSrc,
+): Promise<PreparedFabricJson> {
   const prepared = deepCloneFabricJson(fabricJson);
   const deferredBackgrounds: DeferredBackground[] = [];
   collectDeferredSvgBackgrounds(prepared.objects, deferredBackgrounds);
-await inlineSvgImageSources(prepared);
+  await inlineSvgImageSources(prepared);
   await inlineSvgImageSources(deferredBackgrounds);
-return { json: prepared, deferredBackgrounds };
+  if (resolveImageSrc) {
+    await remapFabricJsonImageSources(prepared, resolveImageSrc);
+    await remapFabricJsonImageSources(deferredBackgrounds, resolveImageSrc);
+  }
+  return { json: prepared, deferredBackgrounds };
 }
 
 async function loadSvgBackgroundAsVector(src: string): Promise<FabricObject | null> {
@@ -403,8 +432,9 @@ export async function loadDesignPageScene(input: {
   pageW: number;
   pageH: number;
   apiBaseUrl: string;
+  resolveImageSrc?: ResolveEditorImageSrc;
 }): Promise<void> {
-  const { canvas, pageData, pageIndex, template, pageW, pageH, apiBaseUrl } = input;
+  const { canvas, pageData, pageIndex, template, pageW, pageH, apiBaseUrl, resolveImageSrc } = input;
   const useTemplatePreviewBackground = pageIndex == null || pageIndex === 0;
   const fabricJson = normalizeFabricJsonRoot(pageData?.fabricJSON);
   const hasJson = !!fabricJson
@@ -414,7 +444,7 @@ if (hasJson) {
     (canvas as unknown as AnyObj).backgroundColor = 'white';
     try {
       // Не даём Fabric мутировать snapshot страницы в React state при переходах.
-      const prepared = await prepareFabricJsonForLoad(fabricJson);
+      const prepared = await prepareFabricJsonForLoad(fabricJson, resolveImageSrc);
       await canvas.loadFromJSON(prepared.json, fabricDeserializeReviver);
       await addDeferredBackgrounds(canvas, prepared.deferredBackgrounds);
       hardenCanvasObjectsForIosSafari(canvas);
