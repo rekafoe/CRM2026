@@ -23,6 +23,38 @@ import { logger } from '../utils/logger'
 
 const MM_TO_PX = 96 / 25.4
 const MM_TO_PT = 72 / 25.4
+
+/** Масштаб «cover»: заполнить весь лист с bleed без белых полей, сохраняя пропорции. */
+function computeCoverPlacementMm(
+  imageWidthPx: number,
+  imageHeightPx: number,
+  sheetWidthMm: number,
+  sheetHeightMm: number,
+): { leftMm: number; topMm: number; widthMm: number; heightMm: number } {
+  if (imageWidthPx <= 0 || imageHeightPx <= 0) {
+    return { leftMm: 0, topMm: 0, widthMm: sheetWidthMm, heightMm: sheetHeightMm }
+  }
+  const imageAspect = imageWidthPx / imageHeightPx
+  const sheetAspect = sheetWidthMm / sheetHeightMm
+  if (imageAspect > sheetAspect) {
+    const heightMm = sheetHeightMm
+    const widthMm = sheetHeightMm * imageAspect
+    return {
+      leftMm: (sheetWidthMm - widthMm) / 2,
+      topMm: 0,
+      widthMm,
+      heightMm,
+    }
+  }
+  const widthMm = sheetWidthMm
+  const heightMm = sheetWidthMm / imageAspect
+  return {
+    leftMm: 0,
+    topMm: (sheetHeightMm - heightMm) / 2,
+    widthMm,
+    heightMm,
+  }
+}
 const EXPORT_DPI = 300
 const PX_PER_MM_AT_96 = MM_TO_PX
 const EXPORT_PX_PER_MM = EXPORT_DPI / 25.4
@@ -496,13 +528,31 @@ function cssFontFormat(format: string): string {
   }
 }
 
+function fontMimeType(format: string): string {
+  switch (format.toLowerCase()) {
+    case 'woff2': return 'font/woff2'
+    case 'woff': return 'font/woff'
+    case 'otf': return 'font/otf'
+    default: return 'font/ttf'
+  }
+}
+
+/** Data URL вместо file:// — иначе Puppeteer не подгружает @font-face в setContent. */
 function buildFontFaceCss(
   fonts: Array<{ family: string; filePath: string; format: string }>,
 ): string {
   return fonts.map((font) => {
-    const fileUrl = `file://${font.filePath.replace(/\\/g, '/')}`
     const family = font.family.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-    return `@font-face{font-family:'${family}';src:url('${fileUrl}') format('${cssFontFormat(font.format)}');font-weight:normal;font-style:normal;}`
+    let src = ''
+    try {
+      const buffer = fs.readFileSync(font.filePath)
+      const mime = fontMimeType(font.format)
+      src = `url('data:${mime};base64,${buffer.toString('base64')}')`
+    } catch {
+      const fileUrl = `file://${font.filePath.replace(/\\/g, '/')}`
+      src = `url('${fileUrl}')`
+    }
+    return `@font-face{font-family:'${family}';src:${src} format('${cssFontFormat(font.format)}');font-weight:normal;font-style:normal;font-display:block;}`
   }).join('\n')
 }
 
@@ -584,6 +634,7 @@ async function addPngRasterPageToDocument(
   sheetWidthMm: number,
   sheetHeightMm: number,
   placement?: { leftMm: number; topMm: number; widthMm: number; heightMm: number },
+  options?: { fit?: 'cover' | 'fill' },
 ): Promise<void> {
   const rasterDoc = doc as PdfRasterDocument
   const image = await rasterDoc.embedPng(png)
@@ -591,10 +642,13 @@ async function addPngRasterPageToDocument(
   const pageHeightPt = sheetHeightMm * MM_TO_PT
   const page = rasterDoc.addPage([pageWidthPt, pageHeightPt]) as PdfRasterPage
 
-  const leftMm = placement?.leftMm ?? 0
-  const topMm = placement?.topMm ?? 0
-  const widthMm = placement?.widthMm ?? sheetWidthMm
-  const heightMm = placement?.heightMm ?? sheetHeightMm
+  const coverPlacement = options?.fit === 'cover'
+    ? computeCoverPlacementMm(image.width, image.height, sheetWidthMm, sheetHeightMm)
+    : null
+  const leftMm = coverPlacement?.leftMm ?? placement?.leftMm ?? 0
+  const topMm = coverPlacement?.topMm ?? placement?.topMm ?? 0
+  const widthMm = coverPlacement?.widthMm ?? placement?.widthMm ?? sheetWidthMm
+  const heightMm = coverPlacement?.heightMm ?? placement?.heightMm ?? sheetHeightMm
 
   page.drawImage(image, {
     x: leftMm * MM_TO_PT,
@@ -658,7 +712,7 @@ function buildClientRenderedRasterPageHtml(
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{width:${sheetWidthMm}mm;height:${sheetHeightMm}mm;margin:0;background:#fff;overflow:hidden}
-    img{position:absolute;left:${bleedMm}mm;top:${bleedMm}mm;width:${pageWidthMm}mm;height:${pageHeightMm}mm;object-fit:fill}
+    img{position:absolute;left:0;top:0;width:${sheetWidthMm}mm;height:${sheetHeightMm}mm;object-fit:cover}
   </style></head><body><img src="${dataUrl}" alt=""/></body></html>`
 }
 
@@ -692,11 +746,8 @@ export async function renderClientRenderedPagesProductionPdf(
     if (!filePath) throw new Error(`PNG-страница ${pageIndex} не найдена на диске`)
     const png = fs.readFileSync(filePath)
     if (png.length <= 0) throw new Error(`PNG-страница ${pageIndex} пустая`)
-    await addPngRasterPageToDocument(doc, png, sheetWidthMm, sheetHeightMm, {
-      leftMm: bleedMm,
-      topMm: bleedMm,
-      widthMm: pageWidthMm,
-      heightMm: pageHeightMm,
+    await addPngRasterPageToDocument(doc, png, sheetWidthMm, sheetHeightMm, undefined, {
+      fit: 'cover',
     })
   }
 
@@ -763,6 +814,7 @@ async function renderFabricPageToPng(
   pageHeightMm: number,
   bleedMm: number,
   fontFaceCss: string,
+  fontFamilies: string[],
   pageIndex: number,
   sceneScale = 1,
 ): Promise<RenderedFabricPage> {
@@ -786,7 +838,8 @@ async function renderFabricPageToPng(
     sheetWidthPx: Math.max(1, Math.round(widthMm * EXPORT_PX_PER_MM)),
     sheetHeightPx: Math.max(1, Math.round(heightMm * EXPORT_PX_PER_MM)),
     multiplier: Math.max(0.01, FABRIC_EXPORT_MULTIPLIER / normalizedSceneScale),
-    cutMarks: true,
+    cutMarks: false,
+    fontFamilies,
   }
   const fileMappedDiagnostics = collectProductionPageDiagnostics(fileMappedFabricJSON, fileNameByUrl)
   const payloadDiagnostics = collectProductionPageDiagnostics(normalizedFabricJSON, fileNameByUrl)
@@ -965,6 +1018,68 @@ async function renderFabricPageToPng(
             }
           }
         })
+
+        const primaryFontFamily = (family: unknown): string => {
+          const raw = String(family ?? '').split(',')[0]?.trim() ?? ''
+          return raw.replace(/^["']|["']$/g, '')
+        }
+        const collectCanvasFontFamilies = (): string[] => {
+          const families = new Set<string>(
+            Array.isArray(payload.fontFamilies)
+              ? payload.fontFamilies.map((family) => primaryFontFamily(family)).filter(Boolean)
+              : [],
+          )
+          const walk = (objects: any[]) => {
+            for (const obj of objects) {
+              const type = String(obj?.type ?? '').toLowerCase()
+              if (type === 'i-text' || type === 'textbox' || type === 'text') {
+                const family = primaryFontFamily(obj.fontFamily)
+                if (family) families.add(family)
+              }
+              const children = typeof obj.getObjects === 'function'
+                ? obj.getObjects()
+                : Array.isArray(obj._objects)
+                  ? obj._objects
+                  : []
+              if (Array.isArray(children) && children.length > 0) walk(children)
+            }
+          }
+          walk(canvas.getObjects())
+          return [...families]
+        }
+        const loadFontFamily = async (family: string): Promise<void> => {
+          if (!family) return
+          const escaped = family.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+          try {
+            await document.fonts.load(`16px "${escaped}"`)
+          } catch {
+            /* системный шрифт */
+          }
+        }
+        const refreshTextObjects = (objects: any[]): void => {
+          for (const obj of objects) {
+            const type = String(obj?.type ?? '').toLowerCase()
+            if (type === 'i-text' || type === 'textbox' || type === 'text') {
+              const family = obj.fontFamily
+              if (family && typeof obj.set === 'function') {
+                obj.set('fontFamily', family)
+              }
+              if (typeof obj.initDimensions === 'function') obj.initDimensions()
+              if (typeof obj.set === 'function') obj.set('dirty', true)
+            }
+            const children = typeof obj.getObjects === 'function'
+              ? obj.getObjects()
+              : Array.isArray(obj._objects)
+                ? obj._objects
+                : []
+            if (Array.isArray(children) && children.length > 0) refreshTextObjects(children)
+          }
+        }
+        for (const family of collectCanvasFontFamilies()) {
+          await loadFontFamily(family)
+        }
+        await document.fonts.ready
+        refreshTextObjects(canvas.getObjects())
         canvas.renderAll()
         await new Promise((resolve) => requestAnimationFrame(resolve))
         await document.fonts.ready
@@ -982,36 +1097,16 @@ async function renderFabricPageToPng(
         sheet.height = payload.sheetHeightPx
         const ctx = sheet.getContext('2d')
         if (!ctx) throw new Error('Unable to create production sheet canvas')
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, sheet.width, sheet.height)
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = 'high'
-        ctx.drawImage(trimImage, payload.bleedPx, payload.bleedPx)
-
-        if (payload.cutMarks && payload.bleedPx > 0) {
-          const trimW = trimImage.naturalWidth || Math.round(payload.pageWidthPx * payload.multiplier)
-          const trimH = trimImage.naturalHeight || Math.round(payload.pageHeightPx * payload.multiplier)
-          const left = payload.bleedPx
-          const top = payload.bleedPx
-          const right = left + trimW
-          const bottom = top + trimH
-          const mark = Math.max(18, Math.round(payload.bleedPx * 0.75))
-          const gap = Math.max(6, Math.round(payload.bleedPx * 0.18))
-          ctx.save()
-          ctx.strokeStyle = '#000000'
-          ctx.lineWidth = Math.max(1, Math.round(payload.multiplier))
-          ctx.beginPath()
-          ctx.moveTo(left - gap - mark, top); ctx.lineTo(left - gap, top)
-          ctx.moveTo(left, top - gap - mark); ctx.lineTo(left, top - gap)
-          ctx.moveTo(right + gap, top); ctx.lineTo(right + gap + mark, top)
-          ctx.moveTo(right, top - gap - mark); ctx.lineTo(right, top - gap)
-          ctx.moveTo(left - gap - mark, bottom); ctx.lineTo(left - gap, bottom)
-          ctx.moveTo(left, bottom + gap); ctx.lineTo(left, bottom + gap + mark)
-          ctx.moveTo(right + gap, bottom); ctx.lineTo(right + gap + mark, bottom)
-          ctx.moveTo(right, bottom + gap); ctx.lineTo(right, bottom + gap + mark)
-          ctx.stroke()
-          ctx.restore()
-        }
+        const trimW = trimImage.naturalWidth || Math.round(payload.pageWidthPx * payload.multiplier)
+        const trimH = trimImage.naturalHeight || Math.round(payload.pageHeightPx * payload.multiplier)
+        const coverScale = Math.max(sheet.width / trimW, sheet.height / trimH)
+        const drawW = trimW * coverScale
+        const drawH = trimH * coverScale
+        const drawX = (sheet.width - drawW) / 2
+        const drawY = (sheet.height - drawH) / 2
+        ctx.drawImage(trimImage, drawX, drawY, drawW, drawH)
 
         const sampleCanvas = document.createElement('canvas')
         sampleCanvas.width = Math.min(180, sheet.width)
@@ -1263,6 +1358,7 @@ export async function renderDesignStateProductionPdf(
       pageHeightMm,
       bleedMm,
       fontFaceCss,
+      resolvedFonts.map((font) => font.family),
       index,
       sceneScale,
     )
@@ -1325,9 +1421,11 @@ export const __editorProductionRenderInternals = {
   assertHealthyPixelStats,
   buildPageHtml,
   buildRasterPageHtml,
+  buildFontFaceCss,
   buildImageSrcLookupKeys,
   closeProductionRenderBrowser,
   collectProductionPageDiagnostics,
+  computeCoverPlacementMm,
   remapFabricImageSources,
   renderFabricPageToPng,
   resolveImageSrc,

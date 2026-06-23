@@ -130,6 +130,34 @@ describe('editorProductionRenderService internals', () => {
     }, 'Page 2')).toThrow(/almost fully black/)
   })
 
+  it('computes cover placement without white bleed margins', () => {
+    const placement = __editorProductionRenderInternals.computeCoverPlacementMm(
+      900,
+      600,
+      94,
+      64,
+    )
+    expect(placement.heightMm).toBeCloseTo(64)
+    expect(placement.widthMm).toBeCloseTo(96)
+    expect(placement.leftMm).toBeCloseTo(-1)
+    expect(placement.topMm).toBe(0)
+  })
+
+  it('embeds fonts as data URLs for Puppeteer production render', () => {
+    const filePath = path.join(orderFilesDir, `font-face-test-${Date.now()}.woff2`)
+    fs.writeFileSync(filePath, Buffer.from('fake-font-bytes'))
+    try {
+      const css = __editorProductionRenderInternals.buildFontFaceCss([
+        { family: 'TestFont', filePath, format: 'woff2' },
+      ])
+      expect(css).toContain("font-family:'TestFont'")
+      expect(css).toContain('data:font/woff2;base64,')
+      expect(css).not.toContain('file://')
+    } finally {
+      fs.rmSync(filePath, { force: true })
+    }
+  })
+
   it('builds a full-page raster wrapper for PNG production pages', () => {
     const html = __editorProductionRenderInternals.buildRasterPageHtml(Buffer.from('abc'), 92, 54)
 
@@ -145,7 +173,7 @@ describe('editorProductionRenderService internals', () => {
         { type: 'rect', left: 6, top: 6, width: 40, height: 24, fill: '#c01818' },
         { type: 'text', left: 8, top: 34, text: 'PDF', fontSize: 14, fill: '#111111' },
       ],
-    }, new Map(), 30, 20, 2, '', 0)
+    }, new Map(), 30, 20, 2, '', [], 0)
 
     expect(rendered.png.length).toBeGreaterThan(100)
     expect(rendered.widthMm).toBe(34)
@@ -159,7 +187,7 @@ describe('editorProductionRenderService internals', () => {
       objects: [
         { type: 'rect', left: 240, top: 140, width: 80, height: 50, fill: '#1d4ed8' },
       ],
-    }, new Map(), 30, 20, 2, '', 0, 3)
+    }, new Map(), 30, 20, 2, '', [], 0, 3)
 
     const pngSize = readPngSize(rendered.png)
     expect(rendered.widthMm).toBe(34)
@@ -175,7 +203,7 @@ describe('editorProductionRenderService internals', () => {
       objects: [
         { type: 'text', left: 12, top: 12, text: 'small', fontSize: 6, fill: '#111111' },
       ],
-    }, new Map(), 90, 50, 0, '', 0)
+    }, new Map(), 90, 50, 0, '', [], 0)
 
     expect(rendered.pixelStats.uniqueColorSamples).toBeGreaterThan(1)
     expect(rendered.pixelStats.nonWhiteRatio).toBeGreaterThan(0)
