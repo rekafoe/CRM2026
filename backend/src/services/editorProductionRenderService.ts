@@ -17,6 +17,7 @@ import {
   resolveFontFilesForDesignState,
 } from './designFontService'
 import { buildMixedFontTextInnerHtml } from '../utils/textStyleRuns'
+import { prepareFabricJsonTextForProduction } from '../utils/fabricTextProductionPrepare'
 import { extractUsedFontFamiliesFromDesignState } from '../utils/extractDesignStateFonts'
 import { getDesignTemplate } from './designTemplateService'
 import { logger } from '../utils/logger'
@@ -486,7 +487,7 @@ function buildObjectHtml(
     const fontFamily = String(obj.fontFamily ?? 'Arial, sans-serif')
     const fontWeight = String(obj.fontWeight ?? 'normal')
     const inner = buildMixedFontTextInnerHtml(String(obj.text ?? ''), obj, Math.min(scaleX, scaleY))
-    return `<div style="${style};color:${escapeHtml(fill)};font-size:${fontSize}px;font-family:${escapeHtml(fontFamily)};font-weight:${escapeHtml(fontWeight)};white-space:pre-wrap;overflow:hidden;line-height:1.2">${inner}</div>`
+    return `<div style="${style};color:${escapeHtml(fill)};font-size:${fontSize}px;font-family:${escapeHtml(fontFamily)};font-weight:${escapeHtml(fontWeight)};white-space:pre-wrap;overflow:visible;line-height:1.2">${inner}</div>`
   }
 
   if (type === 'rect' || type === 'circle') {
@@ -850,7 +851,9 @@ async function renderFabricPageToPng(
   const browser = await getBrowser()
   const page = await browser.newPage()
   const fileMappedFabricJSON = remapFabricImageSources(parseJsonObject(fabricJSON), fileNameByUrl)
-  const normalizedFabricJSON = inlineLocalFabricImageSources(fileMappedFabricJSON)
+  const normalizedFabricJSON = prepareFabricJsonTextForProduction(
+    inlineLocalFabricImageSources(fileMappedFabricJSON),
+  )
   const bleed = Math.max(0, Number.isFinite(bleedMm) ? bleedMm : 0)
   const normalizedSceneScale = Number.isFinite(sceneScale) && sceneScale > 0 ? sceneScale : 1
   const widthMm = pageWidthMm + bleed * 2
@@ -1088,6 +1091,22 @@ async function renderFabricPageToPng(
               const family = obj.fontFamily
               if (family && typeof obj.set === 'function') {
                 obj.set('fontFamily', family)
+              }
+              const text = String(obj.text ?? '')
+              if (!text.includes('\n') && typeof obj.calcTextWidth === 'function') {
+                try {
+                  const fontSize = Math.max(6, Number(obj.fontSize) || 16)
+                  const measured = Number(obj.calcTextWidth())
+                  const currentWidth = Number(obj.width)
+                  if (Number.isFinite(measured) && measured > 0) {
+                    const target = measured + fontSize * 0.3
+                    if (!Number.isFinite(currentWidth) || currentWidth + 1 < target) {
+                      obj.set({ width: target })
+                    }
+                  }
+                } catch {
+                  /* ignore measurement errors */
+                }
               }
               if (typeof obj.initDimensions === 'function') obj.initDimensions()
               if (typeof obj.set === 'function') obj.set('dirty', true)

@@ -66,6 +66,42 @@ export function resolveTextStyleRuns(obj: Record<string, unknown>): TextStyleRun
   return []
 }
 
+export function buildFabricStylesFromRuns(
+  text: string,
+  runs: TextStyleRun[],
+  baseFontSizePx: number,
+): FabricStyles | undefined {
+  const lines = text.split('\n')
+  const lineStartOffsets: number[] = []
+  let offset = 0
+  for (const line of lines) {
+    lineStartOffsets.push(offset)
+    offset += line.length + 1
+  }
+  const out: FabricStyles = {}
+  for (const seg of runs) {
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+      const lineStart = lineStartOffsets[lineIndex] ?? 0
+      const lineText = lines[lineIndex] ?? ''
+      const lineEnd = lineStart + lineText.length
+      if (seg.end <= lineStart || seg.start >= lineEnd) continue
+      const charIndex = Math.max(0, seg.start - lineStart)
+      const patch: Record<string, unknown> = {}
+      if (seg.fontFamily) patch.fontFamily = seg.fontFamily
+      if (seg.fontWeight) patch.fontWeight = seg.fontWeight
+      if (seg.fontStyle) patch.fontStyle = seg.fontStyle
+      if (seg.fill) patch.fill = seg.fill
+      if (seg.fontSize != null && seg.fontSize > baseFontSizePx + 0.5) {
+        patch.fontSize = Math.max(6, seg.fontSize)
+      }
+      if (Object.keys(patch).length === 0) continue
+      out[lineIndex] ??= {}
+      out[lineIndex]![charIndex] = patch
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 export function collectFontFamiliesFromTextField(obj: Record<string, unknown>, families: Set<string>): void {
   const ff = normalizeFontFamilyName(String(obj.fontFamily ?? ''))
   if (ff) families.add(ff)
