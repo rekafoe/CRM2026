@@ -336,8 +336,19 @@ function buildFabricRenderHtml(fontFaceCss = ''): string {
   </style></head><body></body></html>`
 }
 
-function assertHealthyPixelStats(stats: ProductionPixelStats, pageLabel: string): void {
+function assertHealthyPixelStats(
+  stats: ProductionPixelStats,
+  pageLabel: string,
+  options?: { allowEmptySample?: boolean },
+): void {
   if (stats.sampledPixels <= 0) {
+    if (options?.allowEmptySample) {
+      logger.info('Production render page has no opaque sample pixels (allowed blank page)', {
+        pageLabel,
+        pixelStats: stats,
+      })
+      return
+    }
     throw new Error(`${pageLabel}: production render did not produce pixels`)
   }
   if (stats.nonWhiteRatio < 0.0001) {
@@ -1113,6 +1124,8 @@ async function renderFabricPageToPng(
         if (!ctx) throw new Error('Unable to create production sheet canvas')
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = 'high'
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, sheet.width, sheet.height)
         const trimW = trimImage.naturalWidth || Math.round(payload.pageWidthPx * payload.multiplier)
         const trimH = trimImage.naturalHeight || Math.round(payload.pageHeightPx * payload.multiplier)
         const coverScale = Math.max(sheet.width / trimW, sheet.height / trimH)
@@ -1165,13 +1178,16 @@ async function renderFabricPageToPng(
       }
     }, renderPayload)
 
-    if (isBlankEditorPage(normalizedFabricJSON)) {
+    const blankEditorPage = isBlankEditorPage(normalizedFabricJSON)
+    if (blankEditorPage) {
       logger.info('Production Fabric render blank editor page', {
         page: pageIndex + 1,
         pixelStats: result.pixelStats,
       })
     }
-    assertHealthyPixelStats(result.pixelStats, `Page ${pageIndex + 1}`)
+    assertHealthyPixelStats(result.pixelStats, `Page ${pageIndex + 1}`, {
+      allowEmptySample: blankEditorPage,
+    })
     // #region agent log
     logger.info('[agent:pdf-mismatch] CRM production Fabric loaded object summary', {
       runId: 'pdf-mismatch-prod',

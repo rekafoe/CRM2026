@@ -132,6 +132,28 @@ describe('editorProductionRenderService internals', () => {
     }, 'Page 2')).not.toThrow()
   })
 
+  it('allows blank pages with zero sampled pixels when explicitly marked blank', () => {
+    expect(() => __editorProductionRenderInternals.assertHealthyPixelStats({
+      width: 100,
+      height: 100,
+      sampledPixels: 0,
+      nonWhiteRatio: 0,
+      nonBlackRatio: 0,
+      uniqueColorSamples: 0,
+    }, 'Page 10', { allowEmptySample: true })).not.toThrow()
+  })
+
+  it('fails when production render produces zero sampled pixels for non-blank pages', () => {
+    expect(() => __editorProductionRenderInternals.assertHealthyPixelStats({
+      width: 100,
+      height: 100,
+      sampledPixels: 0,
+      nonWhiteRatio: 0,
+      nonBlackRatio: 0,
+      uniqueColorSamples: 0,
+    }, 'Page 10')).toThrow(/did not produce pixels/)
+  })
+
   it('detects blank editor pages like EMPTY_PAGE', () => {
     expect(__editorProductionRenderInternals.isBlankEditorPage({
       version: '7.4.0',
