@@ -1,8 +1,16 @@
+jest.mock('../modules/pricing/services/unifiedPricingService', () => ({
+  UnifiedPricingService: {
+    calculatePrice: jest.fn(),
+  },
+}));
+
 import {
   buildGroupKey,
   buildPricingGroups,
   configurationFromItemParams,
+  quoteLines,
 } from '../modules/pricing/services/pricingGroupService';
+import { UnifiedPricingService } from '../modules/pricing/services/unifiedPricingService';
 
 describe('pricingGroupService', () => {
   describe('buildGroupKey', () => {
@@ -117,6 +125,51 @@ describe('pricingGroupService', () => {
       expect(sheetsNeeded).toBe(25);
       expect(configuration.material_id).toBe(12);
       expect(configuration.priceType).toBe('online');
+    });
+  });
+
+  describe('quoteLines', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('передаёт в grouped tier тираж изделий для листовых продуктов, а не физические листы', async () => {
+      const calculatePrice = UnifiedPricingService.calculatePrice as jest.Mock;
+      calculatePrice
+        .mockResolvedValueOnce({
+          finalPrice: 100,
+          pricePerUnit: 1,
+          sheetsNeeded: 5,
+          tierVolumeForGrouping: 100,
+        })
+        .mockResolvedValueOnce({
+          finalPrice: 100,
+          pricePerUnit: 1,
+          sheetsNeeded: 5,
+        });
+
+      await quoteLines([
+        {
+          lineId: 'cards',
+          productId: 58,
+          quantity: 100,
+          configuration: {
+            material_id: 12,
+            print_technology: 'digital_toner',
+            print_color_mode: 'color',
+            print_sides_mode: 'single',
+          },
+        },
+      ]);
+
+      expect(calculatePrice).toHaveBeenNthCalledWith(
+        2,
+        58,
+        expect.objectContaining({
+          orderPricingContext: { tierSheetsOverride: 100 },
+        }),
+        100
+      );
     });
   });
 });

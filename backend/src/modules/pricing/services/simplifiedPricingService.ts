@@ -120,8 +120,8 @@ export interface SimplifiedPricingResult {
   pricePerUnit: number;
 
   /**
-   * Объём для tier при группировке позиций заказа/корзины.
-   * Многостраничные — print units (блок+обложка); листовые — физические листы.
+   * Объём для выбора print tier при группировке позиций заказа/корзины.
+   * Должен быть в той же оси, что и обычный calculate для выбранного типа продукта.
    */
   tierVolumeForGrouping?: number;
   
@@ -2207,7 +2207,7 @@ export class SimplifiedPricingService {
         ? multipageTierPrintUnits
         : isRollMeterage
           ? Math.max(1, Math.floor(metersNeeded))
-          : sheetsNeeded,
+          : quantity,
     };
   }
   

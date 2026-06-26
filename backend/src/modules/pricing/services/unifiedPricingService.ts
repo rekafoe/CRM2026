@@ -19,7 +19,7 @@ export interface UnifiedPricingResult {
   productSize: ProductSize;
   layout: any;
   sheetsNeeded?: number; // 📄 Количество листов для печати
-  /** Объём для tier при группировке (print units / листы) */
+  /** Объём для tier при группировке в той же оси, что и обычный calculate */
   tierVolumeForGrouping?: number;
   metersNeeded?: number; // 📏 Погонные метры для рулонной печати
   itemsPerSheet?: number; // 📐 Укладка: сколько изделий на лист
