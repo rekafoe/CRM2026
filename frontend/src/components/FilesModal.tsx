@@ -70,6 +70,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const [files, setFiles] = useState<OrderFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   /** К какой позиции привязать следующий загружаемый файл (null = общие) */
   const [selectedOrderItemId, setSelectedOrderItemId] = useState<number | null>(null);
   /** Префлайт */
@@ -182,12 +183,24 @@ export const FilesModal: React.FC<FilesModalProps> = ({
     }
   };
 
-  const handleDownloadAll = () => {
-    files.forEach((f, i) => {
-      setTimeout(() => {
-        void handleDownloadFile(f);
-      }, i * 200);
-    });
+  const handleDownloadAll = async () => {
+    if (isDownloadingAll) return;
+
+    setIsDownloadingAll(true);
+    try {
+      await Promise.all(
+        files.map(
+          (file, index) =>
+            new Promise<void>((resolve) => {
+              window.setTimeout(() => {
+                void handleDownloadFile(file).finally(resolve);
+              }, index * 200);
+            })
+        )
+      );
+    } finally {
+      setIsDownloadingAll(false);
+    }
   };
 
   const handleDownloadFile = async (file: OrderFile) => {
@@ -196,13 +209,13 @@ export const FilesModal: React.FC<FilesModalProps> = ({
         alert(`Файл ещё не готов: ${getExternalStatusLabel(file.externalStatus)}`);
         return;
       }
-      downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch((error) => {
+      await downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch((error) => {
         const msg = error instanceof Error ? error.message : 'Не удалось скачать внешний файл';
         alert(msg);
       });
       return;
     }
-    downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch(() => alert('Не удалось скачать файл'));
+    await downloadOrderFile(orderId, file.id, file.originalName || file.filename).catch(() => alert('Не удалось скачать файл'));
   };
 
   const handleApproveFile = async (fileId: number) => {
@@ -429,8 +442,23 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             </select>
           )}
           {files.length > 0 && (
-          <button className="btn-download-all" onClick={handleDownloadAll}>
-            <AppIcon name="download" size="xs" /> Скачать все файлы
+          <button
+            className={`btn-download-all ${isDownloadingAll ? 'is-downloading' : ''}`}
+            onClick={() => void handleDownloadAll()}
+            disabled={isDownloadingAll}
+            aria-busy={isDownloadingAll}
+          >
+            {isDownloadingAll ? (
+              <>
+                <span className="fm-download-all-spinner" aria-hidden="true" />
+                Скачиваются...
+              </>
+            ) : (
+              <>
+                <AppIcon name="download" size="xs" />
+                Скачать все файлы
+              </>
+            )}
           </button>
           )}
           <label className={`btn-upload ${isUploading ? 'is-uploading' : ''}`}>
