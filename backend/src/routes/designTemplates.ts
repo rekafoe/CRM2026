@@ -32,6 +32,7 @@ import {
   updateDesignTemplateCategory,
 } from '../services/designTemplateCategoryService'
 import { getDesignTemplateUsageAnalytics } from '../services/designTemplateUsageService'
+import { logger } from '../utils/logger'
 
 const router = Router()
 
@@ -349,7 +350,10 @@ router.post('/:id/reimport', uploadOrderFilesMemory.fields([
     res.json(result)
   } catch (err: unknown) {
     const details = err as Error & { importErrors?: string[]; importWarnings?: string[] }
-    console.warn('[design-templates/reimport] failed:', details.message, details.importErrors ?? [])
+    logger.warn('design-templates/reimport failed', {
+      message: details.message,
+      errors: details.importErrors ?? [],
+    })
     res.status(400).json({
       message: details.message || 'Ошибка повторного импорта',
       errors: details.importErrors ?? [details.message || 'Ошибка повторного импорта'],
@@ -505,7 +509,10 @@ router.post('/import', uploadOrderFilesMemory.fields([
     res.status(201).json(result)
   } catch (err: unknown) {
     const details = err as Error & { importErrors?: string[]; importWarnings?: string[] }
-    console.warn('[design-templates/import] failed:', details.message, details.importErrors ?? [])
+    logger.warn('design-templates/import failed', {
+      message: details.message,
+      errors: details.importErrors ?? [],
+    })
     res.status(400).json({
       message: details.message || 'Ошибка импорта шаблона',
       errors: details.importErrors ?? [details.message || 'Ошибка импорта шаблона'],

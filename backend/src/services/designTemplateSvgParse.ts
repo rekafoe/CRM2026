@@ -1059,9 +1059,27 @@ function pruneRedundantTextChunks<T extends { text: string }>(chunks: T[]): T[] 
 }
 
 function pruneRedundantInlineChunks(items: SvgText[]): SvgText[] {
-  if (items.length <= 1) return items
-  const sorted = [...items].sort((a, b) => a.scene.x - b.scene.x || a.scene.y - b.scene.y)
+  const valid = items.filter(hasTextScene)
+  if (valid.length <= 1) return valid
+  const sorted = [...valid].sort((a, b) => a.scene.x - b.scene.x || a.scene.y - b.scene.y)
   return pruneRedundantTextChunks(sorted)
+}
+
+function hasTextScene(item: SvgText | undefined): item is SvgText {
+  return Boolean(
+    item?.scene
+    && Number.isFinite(item.scene.x)
+    && Number.isFinite(item.scene.y)
+    && Number.isFinite(item.scene.fontSize),
+  )
+}
+
+function requireTextItemsWithScene(items: SvgText[], context: string): SvgText[] {
+  const valid = items.filter(hasTextScene)
+  if (valid.length === 0) {
+    throw new Error(`[TXT_MERGE_EMPTY] ${context}`)
+  }
+  return valid
 }
 
 function normalizeSegmentFontSize(
@@ -1116,8 +1134,8 @@ function mergeSplitWordAlternateFontTspans(
 }
 
 function mergeSplitWordAlternateFontTextItems(items: SvgText[]): SvgText[] {
-  const valid = items.filter((item): item is SvgText => Boolean(item?.scene))
-  if (valid.length <= 1) return valid.length > 0 ? valid : items
+  const valid = items.filter(hasTextScene)
+  if (valid.length <= 1) return valid
   const base = valid[0]!
   const baseKey = segmentPresentationKey({
     fontFamily: base.fontFamily,
@@ -1236,11 +1254,10 @@ function pickAnchorMmX(items: SvgText[], anchor: SvgText['textAnchor']): number 
 }
 
 function mergeInlineTextItems(items: SvgText[]): SvgText {
-  const valid = items.filter((item): item is SvgText => Boolean(item?.scene))
-  const source = valid.length > 0 ? valid : items
-  if (source.length === 0) {
-    throw new Error('[TXT_MERGE_EMPTY] Не удалось объединить текстовые фрагменты text_* (нет валидной геометрии).')
-  }
+  const source = requireTextItemsWithScene(
+    items,
+    'Не удалось объединить текстовые фрагменты text_* (нет валидной геометрии).',
+  )
   if (source.length === 1) return source[0]!
   const pruned = pruneRedundantInlineChunks(source)
   const inlineItems = pruned.length > 0 ? pruned : source
@@ -1312,11 +1329,10 @@ function mergeInlineTextItems(items: SvgText[]): SvgText {
 }
 
 function mergeStackedTextItems(items: SvgText[]): SvgText {
-  const valid = items.filter((item): item is SvgText => Boolean(item?.scene))
-  const source = valid.length > 0 ? valid : items
-  if (source.length === 0) {
-    throw new Error('[TXT_MERGE_EMPTY] Не удалось объединить многострочный text_* (нет валидной геометрии).')
-  }
+  const source = requireTextItemsWithScene(
+    items,
+    'Не удалось объединить многострочный text_* (нет валидной геометрии).',
+  )
   if (source.length === 1) return source[0]!
   const sorted = [...source].sort((a, b) => a.y - b.y || a.x - b.x)
   const text = sorted.map((item) => item.text).join('\n')
@@ -1354,10 +1370,10 @@ function mergeTextItemsByName(items: SvgText[]): SvgText[] {
     groups.set(item.name, group)
   }
   return order.map((name) => {
-    const group = (groups.get(name) ?? []).filter((item): item is SvgText => Boolean(item?.scene))
-    if (group.length === 0) {
-      throw new Error(`[TXT_MERGE_EMPTY] Текстовый слой «${name}» не содержит валидных фрагментов.`)
-    }
+    const group = requireTextItemsWithScene(
+      groups.get(name) ?? [],
+      `Текстовый слой «${name}» не содержит валидных фрагментов.`,
+    )
     if (group.length === 1) return group[0]!
     const sorted = [...group].sort((a, b) => a.y - b.y || a.x - b.x)
     const yTol = Math.max(sorted[0]!.scene.fontSize * 0.5, sorted[0]!.fontSize * 0.5)
