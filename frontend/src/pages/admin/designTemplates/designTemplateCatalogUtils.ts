@@ -35,6 +35,36 @@ export type ParsedTemplateCatalogSpec = {
   fontsResolved: boolean;
 };
 
+export type DesignTemplateImportApiError = {
+  message: string;
+  errors: string[];
+  warnings: string[];
+};
+
+/** Разбор ошибки импорта (axios interceptor сохраняет responseData на thrown Error). */
+export function parseDesignTemplateImportError(err: unknown, fallback = 'Ошибка импорта шаблона'): DesignTemplateImportApiError {
+  const withData = err as Error & {
+    responseData?: { message?: string; error?: string; errors?: string[]; warnings?: string[] };
+    response?: { data?: { message?: string; error?: string; errors?: string[]; warnings?: string[] } };
+  };
+  const data = withData.responseData ?? withData.response?.data;
+  if (data) {
+    const errors = Array.isArray(data.errors)
+      ? data.errors.filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
+      : [];
+    const warnings = Array.isArray(data.warnings)
+      ? data.warnings.filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
+      : [];
+    const message = String(data.message || data.error || errors[0] || fallback).trim() || fallback;
+    return { message, errors: errors.length > 0 ? errors : [message], warnings };
+  }
+  if (err instanceof Error) {
+    const message = err.message.replace(/^\d{3}:\s*/, '').trim() || fallback;
+    return { message, errors: [message], warnings: [] };
+  }
+  return { message: fallback, errors: [fallback], warnings: [] };
+}
+
 export function parseTemplateSpec(template: DesignTemplate): ParsedTemplateCatalogSpec {
   const empty: ParsedTemplateCatalogSpec = {
     hasDesignState: false,

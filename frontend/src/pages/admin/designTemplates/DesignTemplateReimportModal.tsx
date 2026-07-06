@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Modal } from '../../../components/common';
 import { AppIcon } from '../../../components/ui/AppIcon';
 import { reimportDesignTemplateFile, type DesignTemplate } from '../../../api';
+import { parseDesignTemplateImportError } from './designTemplateCatalogUtils';
 import '../../../components/admin/ProductManagement.css';
 
 type Props = {
@@ -18,12 +19,14 @@ export const DesignTemplateReimportModal: React.FC<Props> = ({ template, isOpen,
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
 
   const reset = () => {
     setSvgFile(null);
     setSourceFile(null);
     setError(null);
+    setImportErrors([]);
     setWarnings([]);
     if (svgInputRef.current) svgInputRef.current.value = '';
     if (sourceInputRef.current) sourceInputRef.current.value = '';
@@ -42,6 +45,7 @@ export const DesignTemplateReimportModal: React.FC<Props> = ({ template, isOpen,
     }
     setImporting(true);
     setError(null);
+    setImportErrors([]);
     setWarnings([]);
     try {
       const res = await reimportDesignTemplateFile(template.id, { file: svgFile, sourceFile });
@@ -54,9 +58,10 @@ export const DesignTemplateReimportModal: React.FC<Props> = ({ template, isOpen,
         onDone();
       }
     } catch (err: unknown) {
-      const response = (err as { response?: { data?: { message?: string; warnings?: string[] } } }).response;
-      setWarnings(response?.data?.warnings ?? []);
-      setError(response?.data?.message ?? (err instanceof Error ? err.message : 'Ошибка импорта'));
+      const parsed = parseDesignTemplateImportError(err, 'Ошибка импорта');
+      setWarnings(parsed.warnings);
+      setImportErrors(parsed.errors);
+      setError(parsed.message);
     } finally {
       setImporting(false);
     }
@@ -115,6 +120,12 @@ export const DesignTemplateReimportModal: React.FC<Props> = ({ template, isOpen,
         </div>
 
         {error && <p className="design-categories-modal-error">{error}</p>}
+        {importErrors.length > 0 && (
+          <div className="design-template-import-errors">
+            <strong>Ошибка импорта:</strong>
+            <ul>{importErrors.map((entry) => <li key={entry}>{entry}</li>)}</ul>
+          </div>
+        )}
         {warnings.length > 0 && (
           <div className="design-template-import-warnings">
             <strong>Предупреждения:</strong>

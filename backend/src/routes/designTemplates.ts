@@ -349,6 +349,7 @@ router.post('/:id/reimport', uploadOrderFilesMemory.fields([
     res.json(result)
   } catch (err: unknown) {
     const details = err as Error & { importErrors?: string[]; importWarnings?: string[] }
+    console.warn('[design-templates/reimport] failed:', details.message, details.importErrors ?? [])
     res.status(400).json({
       message: details.message || 'Ошибка повторного импорта',
       errors: details.importErrors ?? [details.message || 'Ошибка повторного импорта'],
@@ -504,6 +505,7 @@ router.post('/import', uploadOrderFilesMemory.fields([
     res.status(201).json(result)
   } catch (err: unknown) {
     const details = err as Error & { importErrors?: string[]; importWarnings?: string[] }
+    console.warn('[design-templates/import] failed:', details.message, details.importErrors ?? [])
     res.status(400).json({
       message: details.message || 'Ошибка импорта шаблона',
       errors: details.importErrors ?? [details.message || 'Ошибка импорта шаблона'],

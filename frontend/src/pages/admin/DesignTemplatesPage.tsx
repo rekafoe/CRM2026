@@ -27,6 +27,7 @@ import {
   formatBynAmount,
   formatTemplateSize,
   getTemplateCatalogStatus,
+  parseDesignTemplateImportError,
   parseTemplateSpec,
   resolveTemplatePreviewUrl,
   type TemplateCatalogStatus,
@@ -188,6 +189,7 @@ export const DesignTemplatesPage: React.FC = () => {
     file: null as File | null,
   });
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
 
   const loadCategories = useCallback(async () => {
@@ -580,6 +582,7 @@ export const DesignTemplatesPage: React.FC = () => {
       setImporting(true);
       setError(null);
       setImportWarnings([]);
+      setImportErrors([]);
       const res = await importDesignTemplateFile({
         file: importForm.file,
         sourceFile: importForm.sourceFile,
@@ -600,9 +603,10 @@ export const DesignTemplatesPage: React.FC = () => {
       await loadTemplates();
       if ((res.data.warnings ?? []).length === 0) setImportModalOpen(false);
     } catch (err: unknown) {
-      const response = (err as { response?: { data?: { message?: string; warnings?: string[] } } }).response;
-      setImportWarnings(response?.data?.warnings ?? []);
-      setError(response?.data?.message ?? (err instanceof Error ? err.message : 'Ошибка импорта шаблона'));
+      const parsed = parseDesignTemplateImportError(err);
+      setImportWarnings(parsed.warnings);
+      setImportErrors(parsed.errors);
+      setError(parsed.message);
     } finally {
       setImporting(false);
     }
@@ -1240,6 +1244,12 @@ export const DesignTemplatesPage: React.FC = () => {
               requiredSize
             />
           </div>
+          {importErrors.length > 0 && (
+            <div className="design-template-import-errors">
+              <strong>Ошибка импорта:</strong>
+              <ul>{importErrors.map((entry) => <li key={entry}>{entry}</li>)}</ul>
+            </div>
+          )}
           {importWarnings.length > 0 && (
             <div className="design-template-import-warnings">
               <strong>Предупреждения:</strong>

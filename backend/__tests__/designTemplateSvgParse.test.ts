@@ -466,6 +466,19 @@ describe('parseImportedSvgLayers', () => {
     expect(text?.textStyles?.some((s) => s.fontFamily === 'Ceremonious One')).toBe(true)
   })
 
+  it('не падает при двух одинаковых inline-фрагментах Corel в группе text_*', () => {
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="50mm" viewBox="0 0 900 500">
+  <g id="text_title">
+    <text x="100" y="120" font-size="24"><tspan>Заголовок</tspan></text>
+    <text x="100" y="120" font-size="24"><tspan>Заголовок</tspan></text>
+  </g>
+</svg>`
+    const text = parseImportedSvgLayers(svg).textItems[0]
+    expect(text?.text).toBe('Заголовок')
+    expect(text?.scene.x).toBeGreaterThan(0)
+  })
+
   it('сохраняет z-order когда text идёт раньше photo в SVG', () => {
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 100 50">

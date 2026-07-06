@@ -43,7 +43,13 @@ api.interceptors.response.use(
     if (error.response) {
       // Server responded with error status
       const message = error.response.data?.message || error.response.data?.error || error.response.statusText || 'Ошибка сервера';
-      throw new Error(`${error.response.status}: ${message}`);
+      const wrapped = new Error(`${error.response.status}: ${message}`) as Error & {
+        status?: number;
+        responseData?: unknown;
+      };
+      wrapped.status = error.response.status;
+      wrapped.responseData = error.response.data;
+      throw wrapped;
     } else if (error.request) {
       // Request was made but no response received
       throw new Error('Нет ответа от сервера');
