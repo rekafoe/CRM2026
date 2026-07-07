@@ -568,6 +568,24 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     return () => cancelAnimationFrame(id);
   }, [fitReady, fitZoom, loading, templateId]);
 
+  // On mobile: when the user (or flow) returns to the 'canvas' panel, nudge the
+  // canvas to re-sync offsets and selection scale. Other panels may have hidden
+  // the stage via CSS (display:none for photos/check, or compact for text).
+  // This is a no-op guard to reduce chance of blank/stale view after panel switch.
+  // It only calls existing safe handle methods and does not alter layout or data.
+  useEffect(() => {
+    if (!isMobile || mobilePanel !== 'canvas') return;
+    const id = requestAnimationFrame(() => {
+      try {
+        canvasHandleRef.current?.syncCanvasOffset?.();
+        canvasHandleRef.current?.setSelectionDisplayScale?.(fitZoom);
+      } catch {
+        /* defensive: never break UI on sync after panel change */
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [mobilePanel, isMobile, fitZoom]);
+
   useEffect(() => {
     if (!fontsLoadedTick) return;
     requestAnimationFrame(() => {
@@ -875,6 +893,13 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
     }
     handleNextAction();
   }, [editorNextAction, handleNextAction]);
+
+  // Stable wrapper for dock tab changes. Currently delegates to setMobilePanel
+  // (exact previous behaviour). Central place to add idle-await or busy guards
+  // later without touching every call site. Does not change any functionality.
+  const handleMobilePanelChange = useCallback((panel: PublicDesignMobilePanel) => {
+    setMobilePanel(panel);
+  }, []);
 
   if (loading) {
     return (
@@ -1260,7 +1285,8 @@ export const PublicDesignEditor: React.FC<PublicDesignEditorProps> = ({
             missingTextCount={missingTextCount}
             checkIssueCount={checkIssueCount}
             nextAction={editorNextAction}
-            onPanelChange={setMobilePanel}
+            disabled={pageTransitionBusy}
+            onPanelChange={handleMobilePanelChange}
             onNextAction={handleMobileNextAction}
           />
         </footer>

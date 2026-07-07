@@ -63,6 +63,7 @@ describe('fabricTextProductionPrepare', () => {
     const title = prepared.objects[0] as Record<string, unknown>
 
     expect(Number(title.width)).toBeGreaterThan(80)
-    expect(Number(title.left)).toBeLessThan(200)
+    // center origin: left (center x) must remain unchanged
+    expect(Number(title.left)).toBe(200)
   })
 })

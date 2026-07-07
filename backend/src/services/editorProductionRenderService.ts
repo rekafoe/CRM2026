@@ -1059,16 +1059,15 @@ async function renderFabricPageToPng(
                   if (Number.isFinite(measured) && measured > 0) {
                     const target = measured + fontSize * 0.3
                     if (!Number.isFinite(currentWidth) || currentWidth + 1 < target) {
-                      const delta = target - (Number.isFinite(currentWidth) ? currentWidth : 0)
-                      const originX = String(obj.originX ?? 'left')
-                      const patch: Record<string, number> = { width: target }
-                      if (delta > 0) {
-                        let nextLeft = Number(obj.left ?? 0)
-                        if (originX === 'center') nextLeft -= delta / 2
-                        else if (originX === 'right' || originX === 'end') nextLeft -= delta
-                        patch.left = nextLeft
-                      }
-                      obj.set(patch)
+                      // Preserve the original placement for template text_* exactly.
+                      // Widen the box for correct wrapping/measurement in the PDF render,
+                      // but restore left/top so the text does not move relative to the page
+                      // compared to what the user saw while flipping pages in the editor.
+                      const preservedLeft = obj.left
+                      const preservedTop = obj.top
+                      obj.set({ width: target })
+                      if (preservedLeft != null) obj.set({ left: preservedLeft })
+                      if (preservedTop != null) obj.set({ top: preservedTop })
                     }
                   }
                 } catch {

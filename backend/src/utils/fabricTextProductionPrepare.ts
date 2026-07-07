@@ -48,18 +48,14 @@ function expandSingleLineTextboxWidthInJson(obj: FabricObj): void {
 }
 
 function adjustTextboxWidthPreservingOriginInJson(obj: FabricObj, nextWidth: number): void {
-  const currentWidth = Number(obj.width ?? 0)
-  if (!Number.isFinite(currentWidth) || currentWidth <= 0 || nextWidth <= currentWidth) {
-    obj.width = nextWidth
-    return
-  }
-  const delta = nextWidth - currentWidth
-  const originX = String(obj.originX ?? 'left')
-  let nextLeft = Number(obj.left ?? 0)
-  if (originX === 'center') nextLeft -= delta / 2
-  else if (originX === 'right' || originX === 'end') nextLeft -= delta
+  // For template text fields the original left/top (from Corel SVG import) is sacred.
+  // On production render we may widen the measured box, but we must never mutate
+  // the placement so that the rendered result matches what the user saw in the editor.
+  const preservedLeft = obj.left
+  const preservedTop = obj.top
   obj.width = nextWidth
-  obj.left = nextLeft
+  if (preservedLeft != null) obj.left = preservedLeft
+  if (preservedTop != null) obj.top = preservedTop
 }
 
 /** Подготовка Fabric JSON для production render: mixed-font styles + ширина однострочных textbox. */

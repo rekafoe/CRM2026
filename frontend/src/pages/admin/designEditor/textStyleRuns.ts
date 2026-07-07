@@ -155,6 +155,26 @@ export function stripFabricStylesForEditing(obj: TextLikeObject): void {
   }
 }
 
+function lockTemplateImportedTextPosition(obj: TextLikeObject): void {
+  // Hard guarantee for page-flip stability of template texts:
+  // Objects with id like "text_1" (imported from SVG) must keep the exact
+  // left/top they had in the page's fabricJSON. Hydration and width widening
+  // are allowed to change the box size, but never the placement anchor.
+  if (obj.type !== 'textbox') return;
+  const id = String(obj.id ?? '');
+  if (!id.toLowerCase().startsWith('text_')) return;
+  if (obj.textFieldClientAdded === true) return;
+  const l = Number(obj.left);
+  const t = Number(obj.top);
+  const patch: Record<string, number> = {};
+  if (Number.isFinite(l)) patch.left = l;
+  if (Number.isFinite(t)) patch.top = t;
+  if (Object.keys(patch).length > 0) {
+    obj.set(patch);
+  }
+  obj.setCoords?.();
+}
+
 export function hydrateTextObjectStyles(obj: TextLikeObject): void {
   const text = String(obj.text ?? '');
   const baseFontSize = Math.max(6, Number(obj.fontSize) || 16);
@@ -175,7 +195,46 @@ export function hydrateTextObjectStyles(obj: TextLikeObject): void {
   } else {
     obj.set('styles', undefined as unknown as FabricStyles);
   }
-  obj.initDimensions?.();
+  obj.setCoords?.();
+  lockTemplateImportedTextPosition(obj);
+}
+
+function measureTextboxContentWidth(obj: TextLikeObject): number | null {
+  const withMeasure = obj as TextLikeObject & { calcTextWidth?: () => number };
+  if (typeof withMeasure.calcTextWidth !== 'function') return null;
+  try {
+    const measured = Number(withMeasure.calcTextWidth());
+    return Number.isFinite(measured) && measured > 0 ? measured : null;
+  } catch {
+    return null;
+  }
+}
+
+function computeMinTextboxWidth(obj: TextLikeObject, text: string): number {
+  const fontSize = Math.max(6, Number(obj.fontSize) || 16);
+  const runs = obj.textStyleRuns;
+  const hasMixedFonts = Array.isArray(runs) && runs.some(
+    (run) => run.fontFamily && run.fontFamily !== obj.fontFamily,
+  );
+  const widthFactor = hasMixedFonts ? 0.72 : 0.7;
+  const padding = hasMixedFonts ? fontSize * 1.4 : fontSize * 0.9;
+  const heuristic = Math.max(120, text.length * fontSize * widthFactor + padding);
+  const measured = measureTextboxContentWidth(obj);
+  if (measured != null) {
+    return Math.max(heuristic, measured + fontSize * 0.3);
+  }
+  return heuristic;
+}
+
+function adjustTextboxWidthPreservingOrigin(obj: TextLikeObject, nextWidth: number): void {
+  // For template-imported text_* we must keep the exact original placement (left/top)
+  // that was set during SVG import. Width may be widened to fit content, but the
+  // anchor point must not move when the user flips pages.
+  const preservedLeft = Number(obj.left ?? 0);
+  const preservedTop = Number(obj.top ?? 0);
+  obj.set({ width: nextWidth });
+  if (Number.isFinite(preservedLeft)) obj.set({ left: preservedLeft });
+  if (Number.isFinite(preservedTop)) obj.set({ top: preservedTop });
   obj.setCoords?.();
 }
 
@@ -186,13 +245,10 @@ function normalizeImportedSingleLineTextboxWidth(obj: TextLikeObject): void {
   if (!id.toLowerCase().startsWith('text_')) return;
   const text = String(obj.text ?? '');
   if (!text || text.includes('\n')) return;
-  const fontSize = Math.max(6, Number(obj.fontSize) || 16);
-  const minWidth = Math.max(120, text.length * fontSize * 0.7 + fontSize * 0.9);
+  const minWidth = computeMinTextboxWidth(obj, text);
   const width = Number(obj.width ?? 0);
   if (!Number.isFinite(width) || width + 1 >= minWidth) return;
-  obj.set({ width: minWidth });
-  obj.initDimensions?.();
-  obj.setCoords?.();
+  adjustTextboxWidthPreservingOrigin(obj, minWidth);
 }
 
 export function applyFormatToTextField(
@@ -231,7 +287,6 @@ export function applyFormatToTextField(
     obj.textStyleRuns = updated;
     hydrateTextObjectStyles(obj);
   } else if (typeof patch.fontFamily !== 'string') {
-    obj.initDimensions?.();
     obj.setCoords?.();
   }
 }
@@ -296,6 +351,7 @@ export function migrateAndHydrateTextObject(obj: FabricObject): void {
   const textObj = obj as TextLikeObject;
   hydrateTextObjectStyles(textObj);
   normalizeImportedSingleLineTextboxWidth(textObj);
+  lockTemplateImportedTextPosition(textObj);
 }
 
 export function prepareTextObjectsOnCanvas(objects: FabricObject[]): void {

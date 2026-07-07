@@ -22,6 +22,9 @@ interface PublicDesignEditorMobileDockProps {
   nextAction: PublicEditorNextAction;
   onPanelChange: (panel: PublicDesignMobilePanel) => void;
   onNextAction: () => void;
+  /** When true (e.g. during page transition), tab buttons are disabled to prevent
+   *  interacting with canvas while it is mid-load/clear or visually hidden. */
+  disabled?: boolean;
 }
 
 export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDockProps> = ({
@@ -34,6 +37,7 @@ export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDock
   nextAction,
   onPanelChange,
   onNextAction,
+  disabled = false,
 }) => (
   <nav className="public-design-editor__mobile-dock" aria-label="Переключение макета, фото и текста">
     <div className="public-design-editor__mobile-dock-tabs" role="tablist">
@@ -42,6 +46,7 @@ export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDock
         role="tab"
         className={`public-design-editor__mobile-dock-tab${activePanel === 'canvas' ? ' is-active' : ''}`}
         aria-selected={activePanel === 'canvas'}
+        disabled={disabled}
         onClick={() => onPanelChange('canvas')}
       >
         <span>Макет</span>
@@ -51,6 +56,7 @@ export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDock
         role="tab"
         className={`public-design-editor__mobile-dock-tab${activePanel === 'photos' ? ' is-active' : ''}`}
         aria-selected={activePanel === 'photos'}
+        disabled={disabled}
         onClick={() => onPanelChange('photos')}
       >
         <span>Фото</span>
@@ -63,6 +69,7 @@ export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDock
           role="tab"
           className={`public-design-editor__mobile-dock-tab${activePanel === 'text' ? ' is-active' : ''}`}
           aria-selected={activePanel === 'text'}
+          disabled={disabled}
           onClick={() => onPanelChange('text')}
         >
           <span>Текст</span>
@@ -74,6 +81,7 @@ export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDock
         role="tab"
         className={`public-design-editor__mobile-dock-tab${activePanel === 'check' ? ' is-active' : ''}`}
         aria-selected={activePanel === 'check'}
+        disabled={disabled}
         onClick={() => onPanelChange('check')}
       >
         <span>Проверка</span>
@@ -84,6 +92,7 @@ export const PublicDesignEditorMobileDock: React.FC<PublicDesignEditorMobileDock
       <button
         type="button"
         className="public-design-editor__mobile-dock-next"
+        disabled={disabled}
         onClick={onNextAction}
       >
         {mobileDockActionLabel(nextAction)}
