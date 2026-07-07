@@ -43,8 +43,23 @@ function expandSingleLineTextboxWidthInJson(obj: FabricObj): void {
   const minWidth = Math.max(120, text.length * fontSize * widthFactor + padding)
   const width = Number(obj.width ?? 0)
   if (!Number.isFinite(width) || width + 2 < minWidth) {
-    obj.width = minWidth
+    adjustTextboxWidthPreservingOriginInJson(obj, minWidth)
   }
+}
+
+function adjustTextboxWidthPreservingOriginInJson(obj: FabricObj, nextWidth: number): void {
+  const currentWidth = Number(obj.width ?? 0)
+  if (!Number.isFinite(currentWidth) || currentWidth <= 0 || nextWidth <= currentWidth) {
+    obj.width = nextWidth
+    return
+  }
+  const delta = nextWidth - currentWidth
+  const originX = String(obj.originX ?? 'left')
+  let nextLeft = Number(obj.left ?? 0)
+  if (originX === 'center') nextLeft -= delta / 2
+  else if (originX === 'right' || originX === 'end') nextLeft -= delta
+  obj.width = nextWidth
+  obj.left = nextLeft
 }
 
 /** Подготовка Fabric JSON для production render: mixed-font styles + ширина однострочных textbox. */

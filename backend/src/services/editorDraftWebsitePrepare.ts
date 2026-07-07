@@ -5,7 +5,6 @@ import {
 } from './editorDesignPreflight'
 import { getEditorDraft, type EditorDraftRow } from './publicEditorDraftService'
 import { readEditorDraftMode, readOrderItemPagesParam } from '../utils/multipagePagesConsistency'
-import { logger } from '../utils/logger'
 
 type FabricPage = { fabricJSON?: unknown }
 
@@ -39,55 +38,6 @@ function walkFabricLikeTree(value: unknown, visit: (obj: Record<string, unknown>
       continue
     }
     walkFabricLikeTree(child, visit)
-  }
-}
-
-function summarizeDesignStateForAgentDebug(value: unknown): Record<string, unknown> {
-  const state = parseDesignState(value) ?? {}
-  const pages = Array.isArray(state.pages) ? state.pages : []
-  let objects = 0
-  let images = 0
-  let photoFields = 0
-  let filledPhotoFields = 0
-  let textObjects = 0
-  for (const page of pages) {
-    const pageRec = asRecord(page)
-    const fabricRoot = pageRec?.fabricJSON ?? page
-    walkFabricLikeTree(fabricRoot, (obj) => {
-      objects += 1
-      const type = String(obj.type ?? '').toLowerCase()
-      if (type === 'image' || typeof obj.src === 'string') images += 1
-      if (obj.isPhotoField === true) {
-        photoFields += 1
-        if (obj.photoFieldFilled === true) filledPhotoFields += 1
-      }
-      if (type === 'i-text' || type === 'itext' || type === 'textbox' || type === 'text') textObjects += 1
-    })
-  }
-  return {
-    pageCount: Number(state.pageCount ?? pages.length) || pages.length,
-    pages: pages.length,
-    sceneScale: state.sceneScale,
-    pageWidth: state.pageWidth,
-    pageHeight: state.pageHeight,
-    objects,
-    images,
-    photoFields,
-    filledPhotoFields,
-    textObjects,
-  }
-}
-
-function fingerprintAgentDebugToken(value: string): Record<string, unknown> {
-  let hash = 2_166_136_261
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i)
-    hash = Math.imul(hash, 1_677_761_9)
-  }
-  return {
-    present: value.length > 0,
-    length: value.length,
-    fingerprint: value ? `${value.length}:${(hash >>> 0).toString(36)}` : null,
   }
 }
 
@@ -176,21 +126,6 @@ async function loadDraftForToken(token: string, positionLabel: string): Promise<
     throw new Error(`Editor draft пустой для позиции ${positionLabel}`)
   }
   const productionState = readProductionDesignState(payload)
-  // #region agent log
-  logger.info('[agent:pdf-mismatch] CRM loaded editor draft for website order summary', {
-    runId: 'pdf-mismatch-prod',
-    hypothesisId: 'H1,H2,H3',
-    positionLabel,
-    token: fingerprintAgentDebugToken(token),
-    mode: draft.mode,
-    status: draft.status,
-    hasDesignState: Boolean(payload.designState),
-    hasProductionDesignState: Boolean(payload.productionDesignState),
-    design: summarizeDesignStateForAgentDebug(payload.designState),
-    production: summarizeDesignStateForAgentDebug(payload.productionDesignState),
-    chosen: summarizeDesignStateForAgentDebug(productionState),
-  })
-  // #endregion
   return {
     draft,
     designState: productionState,

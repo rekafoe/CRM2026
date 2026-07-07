@@ -40,4 +40,29 @@ describe('fabricTextProductionPrepare', () => {
     expect(Number(title.width)).toBeGreaterThan(120)
     expect(Number(item.width)).toBeGreaterThan(90)
   })
+
+  it('preserves center origin when widening narrow textbox', () => {
+    const input = {
+      version: '6.0.0',
+      objects: [
+        {
+          type: 'textbox',
+          id: 'text_title',
+          left: 200,
+          top: 20,
+          originX: 'center',
+          width: 80,
+          fontSize: 36,
+          fontFamily: 'Times New Roman',
+          text: 'Очень длинный заголовок для проверки',
+        },
+      ],
+    }
+
+    const prepared = prepareFabricJsonTextForProduction(input) as typeof input
+    const title = prepared.objects[0] as Record<string, unknown>
+
+    expect(Number(title.width)).toBeGreaterThan(80)
+    expect(Number(title.left)).toBeLessThan(200)
+  })
 })

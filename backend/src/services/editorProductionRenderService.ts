@@ -869,48 +869,6 @@ async function renderFabricPageToPng(
     cutMarks: false,
     fontFamilies,
   }
-  const fileMappedDiagnostics = collectProductionPageDiagnostics(fileMappedFabricJSON, fileNameByUrl)
-  const payloadDiagnostics = collectProductionPageDiagnostics(normalizedFabricJSON, fileNameByUrl)
-  // #region agent log
-  logger.info('[agent:pdf-mismatch] CRM production Fabric render payload summary', {
-    runId: 'pdf-mismatch-prod',
-    hypothesisId: 'H4,H5',
-    page: pageIndex + 1,
-    pageWidthMm,
-    pageHeightMm,
-    bleedMm,
-    sceneScale: normalizedSceneScale,
-    pageWidthPx: renderPayload.pageWidthPx,
-    pageHeightPx: renderPayload.pageHeightPx,
-    sheetWidthPx: renderPayload.sheetWidthPx,
-    sheetHeightPx: renderPayload.sheetHeightPx,
-    multiplier: renderPayload.multiplier,
-    fileMappedDiagnostics: {
-      objects: fileMappedDiagnostics.objects,
-      groups: fileMappedDiagnostics.groups,
-      clipPaths: fileMappedDiagnostics.clipPaths,
-      images: fileMappedDiagnostics.images,
-      dataImages: fileMappedDiagnostics.dataImages,
-      fileImages: fileMappedDiagnostics.fileImages,
-      existingFileImages: fileMappedDiagnostics.existingFileImages,
-      missingFileImages: fileMappedDiagnostics.missingFileImages,
-      filledPhotoFields: fileMappedDiagnostics.filledPhotoFields,
-      unresolvedImageCount: fileMappedDiagnostics.unresolvedImages.length,
-    },
-    diagnostics: {
-      objects: payloadDiagnostics.objects,
-      groups: payloadDiagnostics.groups,
-      clipPaths: payloadDiagnostics.clipPaths,
-      images: payloadDiagnostics.images,
-      dataImages: payloadDiagnostics.dataImages,
-      fileImages: payloadDiagnostics.fileImages,
-      existingFileImages: payloadDiagnostics.existingFileImages,
-      missingFileImages: payloadDiagnostics.missingFileImages,
-      filledPhotoFields: payloadDiagnostics.filledPhotoFields,
-      unresolvedImageCount: payloadDiagnostics.unresolvedImages.length,
-    },
-  })
-  // #endregion
 
   try {
     await page.setViewport({
@@ -1101,14 +1059,22 @@ async function renderFabricPageToPng(
                   if (Number.isFinite(measured) && measured > 0) {
                     const target = measured + fontSize * 0.3
                     if (!Number.isFinite(currentWidth) || currentWidth + 1 < target) {
-                      obj.set({ width: target })
+                      const delta = target - (Number.isFinite(currentWidth) ? currentWidth : 0)
+                      const originX = String(obj.originX ?? 'left')
+                      const patch: Record<string, number> = { width: target }
+                      if (delta > 0) {
+                        let nextLeft = Number(obj.left ?? 0)
+                        if (originX === 'center') nextLeft -= delta / 2
+                        else if (originX === 'right' || originX === 'end') nextLeft -= delta
+                        patch.left = nextLeft
+                      }
+                      obj.set(patch)
                     }
                   }
                 } catch {
                   /* ignore measurement errors */
                 }
               }
-              if (typeof obj.initDimensions === 'function') obj.initDimensions()
               if (typeof obj.set === 'function') obj.set('dirty', true)
             }
             const children = typeof obj.getObjects === 'function'
@@ -1207,20 +1173,6 @@ async function renderFabricPageToPng(
     assertHealthyPixelStats(result.pixelStats, `Page ${pageIndex + 1}`, {
       allowEmptySample: blankEditorPage,
     })
-    // #region agent log
-    logger.info('[agent:pdf-mismatch] CRM production Fabric loaded object summary', {
-      runId: 'pdf-mismatch-prod',
-      hypothesisId: 'H6,H7,H8',
-      page: pageIndex + 1,
-      loadedDiagnostics: result.loadedDiagnostics,
-    })
-    logger.info('[agent:pdf-mismatch] CRM production Fabric render result pixel summary', {
-      runId: 'pdf-mismatch-prod',
-      hypothesisId: 'H4,H5',
-      page: pageIndex + 1,
-      pixelStats: result.pixelStats,
-    })
-    // #endregion
     const base64 = result.dataUrl.replace(/^data:image\/png;base64,/, '')
     return {
       png: Buffer.from(base64, 'base64'),
@@ -1361,31 +1313,6 @@ export async function renderDesignStateProductionPdf(
   const templateId = Number(state.templateId)
   const fileNameByUrl = await loadOrderFileUrlMap(orderId, orderItemId)
   await addTemplateAssetUrlMap(fileNameByUrl, Number.isFinite(templateId) && templateId > 0 ? templateId : null)
-  // #region agent log
-  logger.info('[agent:pdf-mismatch] CRM production PDF render document summary', {
-    runId: 'pdf-mismatch-prod',
-    hypothesisId: 'H4,H5',
-    orderId,
-    orderItemId,
-    pageCount: pages.length,
-    statePageCount: state.pageCount,
-    pageWidthMm,
-    pageHeightMm,
-    bleedMm,
-    sceneScale,
-    templateId: Number.isFinite(templateId) ? templateId : null,
-    fileUrlMapSize: fileNameByUrl.size,
-    usedFontFamilies,
-    requiredFonts: requiredFonts.map((font) => ({
-      family: font.family,
-      source: font.source,
-      format: font.format ?? null,
-      hasUrl: Boolean(font.url),
-    })),
-    missingFonts,
-    resolvedFonts: resolvedFonts.map((font) => font.family),
-  })
-  // #endregion
   const merged = await PDFDocument.create()
 
   for (let index = 0; index < pages.length; index += 1) {
