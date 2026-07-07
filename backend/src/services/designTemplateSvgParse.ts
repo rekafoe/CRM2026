@@ -161,7 +161,7 @@ export interface ImportedSvgLayers {
   }
 }
 
-const TECH_PREFIXES = ['hidden_', 'guide_']
+const TECH_PREFIXES = ['hidden_', 'guide_', '___FAKE_']
 
 const GUIDE_NAMES = new Set(['trim', 'bleed', 'safe'])
 const MAX_SVG_GROUP_DEPTH = 128

@@ -17,7 +17,16 @@ import {
 
 const IMPORTED_TEMPLATE_SCENE_SCALE = 3
 const MAX_IMPORTED_SVG_PAGES = 99
-const MAX_IMPORTED_SVG_BYTES = 8 * 1024 * 1024
+const DEFAULT_MAX_IMPORTED_SVG_BYTES = 32 * 1024 * 1024
+const ABSOLUTE_MAX_IMPORTED_SVG_BYTES = 64 * 1024 * 1024
+
+function resolveMaxImportedSvgBytes(): number {
+  const raw = Number(process.env.IMPORT_MAX_SVG_PAGE_BYTES)
+  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_MAX_IMPORTED_SVG_BYTES
+  return Math.min(Math.floor(raw), ABSOLUTE_MAX_IMPORTED_SVG_BYTES)
+}
+
+const MAX_IMPORTED_SVG_BYTES = resolveMaxImportedSvgBytes()
 const MAX_IMPORTED_SVG_TAGS = 120000
 const MAX_IMPORTED_SVG_GROUP_DEPTH = 128
 const MAX_SVG_NODE_LIMITS: Record<'text' | 'tspan' | 'rect' | 'path', number> = {
@@ -320,6 +329,10 @@ function buildImportedPrepress(
   }
 }
 
+function formatSvgSizeMb(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')
+}
+
 function importError(message: string, warnings: string[], code = 'IMPORT_ERROR'): never {
   const coded = `[${code}] ${message}`
   throw Object.assign(new Error(coded), {
@@ -511,7 +524,8 @@ function buildPageFromSvg(input: {
   const svgBytes = Buffer.byteLength(input.svg, 'utf8')
   if (svgBytes > MAX_IMPORTED_SVG_BYTES) {
     importError(
-      `SVG страницы ${input.pageIndex + 1} слишком большой (${svgBytes} bytes), лимит ${MAX_IMPORTED_SVG_BYTES}.`,
+      `SVG страницы ${input.pageIndex + 1} слишком большой (${formatSvgSizeMb(svgBytes)} МБ, лимит ${formatSvgSizeMb(MAX_IMPORTED_SVG_BYTES)} МБ). `
+      + 'Часто это встроенные растровые изображения из Corel — упростите фон страницы или задайте IMPORT_MAX_SVG_PAGE_BYTES (до 64 МБ).',
       input.warnings,
       'SVG_SIZE_LIMIT_EXCEEDED',
     )
