@@ -19,21 +19,28 @@ ENV NODE_ENV=production
 ENV PUPPETEER_CACHE_DIR=/usr/src/app/.cache/puppeteer
 ENV npm_config_fetch_timeout=300000
 
-# deps for puppeteer/chromium runtime + sqlite3 native install (npm ci --omit=dev)
+# Chromium runtime + session dbus + sqlite3 native install (npm ci --omit=dev)
 RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates \
   python3 make g++ \
+  dbus \
+  dbus-x11 \
   chromium \
   fonts-liberation \
+  fonts-dejavu-core \
   libasound2 \
   libatk1.0-0 \
   libatk-bridge2.0-0 \
   libcairo2 \
   libcups2 \
+  libdbus-1-3 \
   libdrm2 \
+  libexpat1 \
+  libfontconfig1 \
   libgbm1 \
   libglib2.0-0 \
   libgtk-3-0 \
+  libnspr4 \
   libnss3 \
   libpango-1.0-0 \
   libpangocairo-1.0-0 \
@@ -41,9 +48,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libx11-xcb1 \
   libxcb1 \
   libxcomposite1 \
+  libxcursor1 \
   libxdamage1 \
   libxext6 \
   libxfixes3 \
+  libxi6 \
+  libxkbcommon0 \
   libxrandr2 \
   libxrender1 \
   libxss1 \
@@ -51,7 +61,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev \
+  && npx puppeteer browsers install chrome
 COPY --from=builder /usr/src/app/dist ./dist
 COPY public ./public
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["sh", "-c", "if [ \"${RUN_MIGRATIONS_ON_START:-1}\" = \"1\" ]; then npm run migrate; fi; npm run start"]
