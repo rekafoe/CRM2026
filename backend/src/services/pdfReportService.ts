@@ -6,7 +6,8 @@ import { buildOrderNumberFromSourceAndId } from '../utils/orderNumberGenerator';
 import { computeItemLineTotal } from '../utils/orderAmounts';
 import * as fs from 'fs';
 import * as path from 'path';
-import puppeteer, { Browser } from 'puppeteer';
+import { launchPuppeteerBrowser } from '../utils/puppeteerLaunch';
+import type { Browser } from 'puppeteer';
 
 /** Переиспользуемый экземпляр браузера — избегаем ~800ms на каждый запрос */
 let _browser: Browser | null = null;
@@ -15,19 +16,7 @@ let _browserPromise: Promise<Browser> | null = null;
 async function getBrowser(): Promise<Browser> {
   if (_browser?.connected) return _browser;
   if (_browserPromise) return _browserPromise;
-  _browserPromise = puppeteer.launch({
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_BIN,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu'
-    ]
-  });
+  _browserPromise = launchPuppeteerBrowser();
   _browser = await _browserPromise;
   _browser.on('disconnected', () => {
     _browser = null;

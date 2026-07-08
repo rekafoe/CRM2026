@@ -3,7 +3,8 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { PDFDocument } from 'pdf-lib'
 import type { PDFPage } from 'pdf-lib'
-import puppeteer, { type Browser } from 'puppeteer'
+import type { Browser } from 'puppeteer'
+import { launchPuppeteerBrowser } from '../utils/puppeteerLaunch'
 import { getDb } from '../config/database'
 import {
   designTemplateAssetsDir,
@@ -108,16 +109,7 @@ async function getBrowser(): Promise<Browser> {
     const b = await browserPromise
     if (b.connected) return b
   }
-  browserPromise = puppeteer.launch({
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_BIN,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--allow-file-access-from-files',
-    ],
-  })
+  browserPromise = launchPuppeteerBrowser(['--allow-file-access-from-files'])
   const browser = await browserPromise
   browser.on('disconnected', () => {
     browserPromise = null

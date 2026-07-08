@@ -2,7 +2,7 @@ import { MaterialService } from '../../warehouse/services/materialService';
 import { getDb } from '../../../db';
 import * as fs from 'fs';
 import * as path from 'path';
-import puppeteer from 'puppeteer';
+import { launchPuppeteerBrowser } from '../../../utils/puppeteerLaunch';
 import { logger } from '../../../utils/logger';
 
 export interface StockReportData {
@@ -276,19 +276,7 @@ export class PDFReportService {
       logger.debug('Starting PDF generation...');
       
       // Запускаем браузер
-      browser = await puppeteer.launch({
-        headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_BIN,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ]
-      });
+      browser = await launchPuppeteerBrowser();
 
       const page = await browser.newPage();
       

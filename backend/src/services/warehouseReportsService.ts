@@ -1316,22 +1316,10 @@ export class WarehouseReportsService {
     try {
       console.log('🔄 Starting PDF generation...');
       
-      // Динамический импорт puppeteer
-      const puppeteer = await import('puppeteer');
+      const { launchPuppeteerBrowser } = await import('../utils/puppeteerLaunch');
       
       // Запускаем браузер
-      browser = await puppeteer.default.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ]
-      });
+      browser = await launchPuppeteerBrowser();
 
       const page = await browser.newPage();
       
