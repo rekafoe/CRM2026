@@ -73,6 +73,7 @@ const PUBLIC_ROUTE_RULES: PublicRouteRule[] = [
   { method: 'GET', path: /^\/api\/orders\/[0-9]+\/prepay$/ },
   // Public design editor: templates are anonymous; draft mutations are checked by WEBSITE_ORDER_API_KEY in route.
   { method: 'GET', path: /^\/api\/design-templates\/public(?:\/.*)?$/ },
+  { method: 'GET', path: /^\/api\/design-fonts\/public\/?$/ },
   { method: 'GET', path: /^\/api\/design-fonts\/public\/list\/?$/ },
   { method: 'GET', path: /^\/api\/design-fonts\/public\/[0-9]+\/content\/?$/ },
   { method: 'GET', path: /^\/api\/public-editor\/drafts\/[^/]+\/files\/[0-9]+\/content\/?$/ },

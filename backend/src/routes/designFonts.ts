@@ -162,10 +162,14 @@ router.delete('/:id', authenticate, asyncHandler(async (req: Request, res: Respo
   res.status(204).send()
 }))
 
-router.get('/public/list', asyncHandler(async (_req: Request, res: Response) => {
+const servePublicFontList = asyncHandler(async (_req: Request, res: Response) => {
   const fonts = await listDesignFonts(true)
   res.json(fonts)
-}))
+})
+
+/** Алиас для BFF сайта и старых клиентов (канонический путь — /public/list). */
+router.get('/public', servePublicFontList)
+router.get('/public/list', servePublicFontList)
 
 router.get('/public/:id/content', asyncHandler(async (req: Request, res: Response) => {
   const id = Number(req.params.id)
