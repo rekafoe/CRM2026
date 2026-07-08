@@ -1,6 +1,9 @@
 import fs from 'fs'
 import puppeteer, { type Browser, type LaunchOptions } from 'puppeteer'
 
+const CHROME_PATH_FILE = process.env.PUPPETEER_EXECUTABLE_PATH_FILE?.trim()
+  || '/usr/src/app/.chrome-path'
+
 const CONTAINER_CHROME_ARGS = [
   '--no-sandbox',
   '--disable-setuid-sandbox',
@@ -19,6 +22,7 @@ const CONTAINER_CHROME_ARGS = [
   '--font-render-hinting=none',
   '--disable-breakpad',
   '--disable-crash-reporter',
+  '--disable-features=DBusSessionBus,TranslateUI',
 ] as const
 
 const SYSTEM_CHROMIUM_CANDIDATES = [
@@ -38,7 +42,16 @@ function isValidDbusAddress(value: string): boolean {
   return /^(unix:|tcp:|autolaunch:)/.test(value)
 }
 
+function readChromePathFromBuildFile(): string | undefined {
+  if (!isExistingFile(CHROME_PATH_FILE)) return undefined
+  const fromFile = fs.readFileSync(CHROME_PATH_FILE, 'utf8').trim()
+  return isExistingFile(fromFile) ? fromFile : undefined
+}
+
 function resolveBundledChromiumPath(): string | undefined {
+  const fromBuildFile = readChromePathFromBuildFile()
+  if (fromBuildFile) return fromBuildFile
+
   try {
     const bundled = puppeteer.executablePath()
     return isExistingFile(bundled) ? bundled : undefined
@@ -52,12 +65,12 @@ export function resolveChromiumExecutablePath(): string | undefined {
     || process.env.CHROME_BIN?.trim()
   if (isExistingFile(fromEnv)) return fromEnv
 
+  const bundled = resolveBundledChromiumPath()
+  if (bundled) return bundled
+
   for (const candidate of SYSTEM_CHROMIUM_CANDIDATES) {
     if (fs.existsSync(candidate)) return candidate
   }
-
-  const bundled = resolveBundledChromiumPath()
-  if (bundled) return bundled
 
   return fromEnv || undefined
 }
@@ -77,7 +90,7 @@ export function buildPuppeteerLaunchOptions(extraArgs: string[] = []): LaunchOpt
   const executablePath = resolveChromiumExecutablePath()
   if (!executablePath) {
     throw new Error(
-      'Chromium не найден. В Docker: apt install chromium или npx puppeteer browsers install chrome.',
+      'Chromium не найден. В Docker: npx puppeteer browsers install chrome.',
     )
   }
   return {
@@ -89,25 +102,24 @@ export function buildPuppeteerLaunchOptions(extraArgs: string[] = []): LaunchOpt
 }
 
 export async function launchPuppeteerBrowser(extraArgs: string[] = []): Promise<Browser> {
-  const options = buildPuppeteerLaunchOptions(extraArgs)
-  try {
-    return await puppeteer.launch(options)
-  } catch (error) {
-    const executablePath = options.executablePath
-    const bundled = resolveBundledChromiumPath()
-    const canRetryWithBundled = Boolean(
-      bundled
-      && executablePath
-      && bundled !== executablePath,
-    )
-    if (!canRetryWithBundled) throw error
+  const primary = buildPuppeteerLaunchOptions(extraArgs)
+  const candidates = [primary.executablePath, resolveBundledChromiumPath()].filter(
+    (value, index, list): value is string => Boolean(value && list.indexOf(value) === index),
+  )
 
-    console.warn(
-      `[puppeteer] launch failed with ${executablePath}, retrying bundled Chrome at ${bundled}`,
-    )
-    return puppeteer.launch({
-      ...options,
-      executablePath: bundled,
-    })
+  let lastError: unknown
+  for (const executablePath of candidates) {
+    try {
+      console.info(`[puppeteer] launching Chrome at ${executablePath}`)
+      return await puppeteer.launch({
+        ...primary,
+        executablePath,
+      })
+    } catch (error) {
+      lastError = error
+      console.warn(`[puppeteer] launch failed for ${executablePath}`, error)
+    }
   }
+
+  throw lastError
 }

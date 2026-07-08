@@ -7,22 +7,34 @@ import { computeItemLineTotal } from '../utils/orderAmounts';
 import * as fs from 'fs';
 import * as path from 'path';
 import { launchPuppeteerBrowser } from '../utils/puppeteerLaunch';
+import { convertHtmlToPdfWithWkhtmltopdf, isWkhtmltopdfAvailable } from '../utils/htmlToPdf';
 import type { Browser } from 'puppeteer';
 
 /** Переиспользуемый экземпляр браузера — избегаем ~800ms на каждый запрос */
 let _browser: Browser | null = null;
 let _browserPromise: Promise<Browser> | null = null;
 
+function resetBrowserState(): void {
+  _browser = null;
+  _browserPromise = null;
+}
+
 async function getBrowser(): Promise<Browser> {
   if (_browser?.connected) return _browser;
   if (_browserPromise) return _browserPromise;
-  _browserPromise = launchPuppeteerBrowser();
-  _browser = await _browserPromise;
-  _browser.on('disconnected', () => {
-    _browser = null;
-    _browserPromise = null;
-  });
-  return _browser;
+  _browserPromise = launchPuppeteerBrowser()
+    .then((browser) => {
+      _browser = browser;
+      browser.on('disconnected', () => {
+        resetBrowserState();
+      });
+      return browser;
+    })
+    .catch((error) => {
+      resetBrowserState();
+      throw error;
+    });
+  return _browserPromise;
 }
 
 export interface StockReportData {
@@ -294,49 +306,65 @@ export class PDFReportService {
     html: string,
     options?: { headerTemplate?: string; footerTemplate?: string }
   ): Promise<Buffer> {
-    const browser = await getBrowser();
-    const page = await browser.newPage();
-    try {
-      // load — ждём DOM + ресурсы; networkidle0 добавляет лишние ~500ms
-      await page.setContent(html, {
-        waitUntil: 'load'
-      });
+    const hasCustomHeaderFooter = !!(options?.headerTemplate || options?.footerTemplate);
+    const margin = {
+      top: '20mm',
+      right: '15mm',
+      bottom: hasCustomHeaderFooter ? '30mm' : '20mm',
+      left: '15mm',
+    };
 
-      // Определяем header и footer
-      const hasCustomHeaderFooter = !!(options?.headerTemplate || options?.footerTemplate);
-      const defaultHeaderTemplate = `
+    try {
+      const browser = await getBrowser();
+      const page = await browser.newPage();
+      try {
+        await page.setContent(html, {
+          waitUntil: 'load',
+        });
+
+        const defaultHeaderTemplate = `
         <div style="font-size: 10px; text-align: center; width: 100%; color: #666;">
           Отчет об остатках материалов - ${new Date().toLocaleDateString('ru-RU')}
         </div>
       `;
-      const defaultFooterTemplate = `
+        const defaultFooterTemplate = `
         <div style="font-size: 10px; text-align: center; width: 100%; color: #666;">
           Страница <span class="pageNumber"></span> из <span class="totalPages"></span>
         </div>
       `;
 
-      // Генерируем PDF
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: {
-          top: '20mm',
-          right: '15mm',
-          bottom: hasCustomHeaderFooter ? '30mm' : '20mm',
-          left: '15mm'
-        },
-        displayHeaderFooter: hasCustomHeaderFooter || true,
-        headerTemplate: options?.headerTemplate ?? defaultHeaderTemplate,
-        footerTemplate: options?.footerTemplate ?? defaultFooterTemplate
-      });
+        const pdfBuffer = await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin,
+          displayHeaderFooter: hasCustomHeaderFooter || true,
+          headerTemplate: options?.headerTemplate ?? defaultHeaderTemplate,
+          footerTemplate: options?.footerTemplate ?? defaultFooterTemplate,
+        });
 
-      console.log('✅ PDF generated successfully');
-      return Buffer.from(pdfBuffer);
+        console.log('✅ PDF generated successfully via puppeteer');
+        return Buffer.from(pdfBuffer);
+      } finally {
+        await page.close();
+      }
     } catch (error) {
-      console.error('❌ Error converting HTML to PDF:', error);
-      throw error;
-    } finally {
-      await page.close();
+      resetBrowserState();
+      if (!isWkhtmltopdfAvailable()) {
+        console.error('❌ Error converting HTML to PDF:', error);
+        throw error;
+      }
+
+      console.warn('⚠️ Puppeteer unavailable, falling back to wkhtmltopdf', error);
+      const pdfBuffer = await convertHtmlToPdfWithWkhtmltopdf(html, {
+        top: margin.top,
+        right: margin.right,
+        bottom: margin.bottom,
+        left: margin.left,
+        headerTemplate: options?.headerTemplate,
+        footerTemplate: options?.footerTemplate,
+      });
+      console.log('✅ PDF generated successfully via wkhtmltopdf');
+      return pdfBuffer;
     }
   }
 

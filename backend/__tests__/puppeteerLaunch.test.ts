@@ -3,6 +3,7 @@ import {
   buildPuppeteerLaunchEnvironment,
   resolveChromiumExecutablePath,
 } from '../src/utils/puppeteerLaunch'
+import { isWkhtmltopdfAvailable } from '../src/utils/htmlToPdf'
 
 describe('puppeteerLaunch', () => {
   it('drops invalid dbus addresses from launch env', () => {
@@ -33,5 +34,11 @@ describe('puppeteerLaunch', () => {
     if (prev === undefined) delete process.env.PUPPETEER_EXECUTABLE_PATH
     else process.env.PUPPETEER_EXECUTABLE_PATH = prev
     expect(resolved === undefined || typeof resolved === 'string').toBe(true)
+  })
+})
+
+describe('htmlToPdf', () => {
+  it('detects wkhtmltopdf availability without throwing', () => {
+    expect(typeof isWkhtmltopdfAvailable()).toBe('boolean')
   })
 })

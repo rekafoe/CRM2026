@@ -17,15 +17,16 @@ FROM node:20-bookworm-slim AS runner
 WORKDIR /usr/src/app
 ENV NODE_ENV=production
 ENV PUPPETEER_CACHE_DIR=/usr/src/app/.cache/puppeteer
+ENV PUPPETEER_EXECUTABLE_PATH_FILE=/usr/src/app/.chrome-path
 ENV npm_config_fetch_timeout=300000
 
-# Chromium runtime + session dbus + sqlite3 native install (npm ci --omit=dev)
+# Puppeteer Chrome + wkhtmltopdf fallback + sqlite3 native install
 RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates \
   python3 make g++ \
   dbus \
   dbus-x11 \
-  chromium \
+  wkhtmltopdf \
   fonts-liberation \
   fonts-dejavu-core \
   libasound2 \
@@ -62,7 +63,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY package*.json ./
 RUN npm ci --omit=dev \
-  && npx puppeteer browsers install chrome
+  && npx puppeteer browsers install chrome \
+  && node -e "const fs=require('fs'); const p=require('puppeteer').executablePath(); if(!fs.existsSync(p)) { throw new Error('Chrome not found at '+p) }; fs.writeFileSync('.chrome-path', p); console.log('Chrome:', p);"
 COPY --from=builder /usr/src/app/dist ./dist
 COPY public ./public
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
