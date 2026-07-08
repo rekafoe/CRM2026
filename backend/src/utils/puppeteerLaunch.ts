@@ -18,30 +18,58 @@ const CONTAINER_CHROME_ARGS = [
   '--hide-scrollbars',
   '--mute-audio',
   '--font-render-hinting=none',
+  '--disable-breakpad',
+  '--disable-crash-reporter',
 ] as const
+
+const SYSTEM_CHROMIUM_CANDIDATES = [
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/google-chrome',
+] as const
+
+function isExistingFile(path: string | undefined): path is string {
+  return Boolean(path && fs.existsSync(path))
+}
+
+function resolveBundledChromiumPath(): string | undefined {
+  try {
+    const bundled = puppeteer.executablePath()
+    return isExistingFile(bundled) ? bundled : undefined
+  } catch {
+    return undefined
+  }
+}
 
 function resolveChromiumExecutablePath(): string | undefined {
   const fromEnv = process.env.PUPPETEER_EXECUTABLE_PATH?.trim()
     || process.env.CHROME_BIN?.trim()
-  if (fromEnv && fs.existsSync(fromEnv)) return fromEnv
+  if (isExistingFile(fromEnv)) return fromEnv
 
-  const candidates = [
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/google-chrome',
-  ]
-  for (const candidate of candidates) {
+  const bundled = resolveBundledChromiumPath()
+  if (bundled) return bundled
+
+  for (const candidate of SYSTEM_CHROMIUM_CANDIDATES) {
     if (fs.existsSync(candidate)) return candidate
   }
+
   return fromEnv || undefined
+}
+
+function sanitizeDbusEnvironment(): void {
+  const dbusAddress = process.env.DBUS_SESSION_BUS_ADDRESS?.trim()
+  // Невалидный адрес (/dev/null) ломает Chromium: "Address does not contain a colon".
+  if (!dbusAddress || dbusAddress === '/dev/null') {
+    delete process.env.DBUS_SESSION_BUS_ADDRESS
+  }
 }
 
 export function buildPuppeteerLaunchOptions(extraArgs: string[] = []): LaunchOptions {
   const executablePath = resolveChromiumExecutablePath()
   if (!executablePath) {
     throw new Error(
-      'Chromium не найден. Установите chromium в образе Docker или задайте PUPPETEER_EXECUTABLE_PATH (/usr/bin/chromium).',
+      'Chromium не найден. В Docker выполните npm ci без PUPPETEER_SKIP_DOWNLOAD или задайте PUPPETEER_EXECUTABLE_PATH.',
     )
   }
   return {
@@ -52,9 +80,6 @@ export function buildPuppeteerLaunchOptions(extraArgs: string[] = []): LaunchOpt
 }
 
 export async function launchPuppeteerBrowser(extraArgs: string[] = []): Promise<Browser> {
-  // В Docker/Railway нет system dbus — иначе Chrome часто падает при старте.
-  if (!process.env.DBUS_SESSION_BUS_ADDRESS) {
-    process.env.DBUS_SESSION_BUS_ADDRESS = '/dev/null'
-  }
+  sanitizeDbusEnvironment()
   return puppeteer.launch(buildPuppeteerLaunchOptions(extraArgs))
 }

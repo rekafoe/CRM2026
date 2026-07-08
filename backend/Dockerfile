@@ -16,9 +16,7 @@ RUN npm run build
 FROM node:20-bookworm-slim AS runner
 WORKDIR /usr/src/app
 ENV NODE_ENV=production
-ENV PUPPETEER_SKIP_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-ENV DBUS_SESSION_BUS_ADDRESS=/dev/null
+ENV PUPPETEER_CACHE_DIR=/usr/src/app/.cache/puppeteer
 ENV npm_config_fetch_timeout=300000
 
 # deps for puppeteer/chromium runtime + sqlite3 native install (npm ci --omit=dev)
