@@ -26,7 +26,7 @@ describe('applyLibraryFontFallbacksToDesignState', () => {
     expect(obj.fontFamily).toBe('Voguella')
   })
 
-  it('не трогает слой с явным font-family из SVG', () => {
+  it('заменяет неизвестный шрифт из SVG на библиотечный по id слоя text_voguella', () => {
     const designState = {
       pages: [{
         fabricJSON: {
@@ -43,7 +43,29 @@ describe('applyLibraryFontFallbacksToDesignState', () => {
       family_name: 'Voguella',
     }]) as typeof designState
     const obj = (next.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
-    expect(obj.fontFamily).toBe('Aubrey Pro')
+    expect(obj.fontFamily).toBe('Voguella')
+  })
+
+  it('не трогает слой, если font-family уже есть в библиотеке CRM', () => {
+    const designState = {
+      pages: [{
+        fabricJSON: {
+          objects: [{
+            type: 'textbox',
+            id: 'text_voguella',
+            fontFamily: 'Ceremonious One',
+            text: 'Имя',
+          }],
+        },
+      }],
+    }
+    const next = applyLibraryFontFallbacksToDesignState(designState, [{
+      family_name: 'Voguella',
+    }, {
+      family_name: 'Ceremonious One',
+    }]) as typeof designState
+    const obj = (next.pages[0].fabricJSON as { objects: Array<{ fontFamily: string }> }).objects[0]
+    expect(obj.fontFamily).toBe('Ceremonious One')
   })
 })
 

@@ -331,52 +331,98 @@ export async function ensureDesignFontLoaded(
 export async function loadDesignFontsFromPages(
   pages: Array<{ fabricJSON: Record<string, unknown> }>,
   libraryFonts: CrmLibraryFont[],
-): Promise<void> {
+): Promise<string[]> {
   const { extractUsedFontFamiliesFromPages } = await import(
     '../pages/admin/designEditor/patchFabricTextObjects'
   );
   const families = extractUsedFontFamiliesFromPages(pages);
+  const loaded: string[] = [];
   for (const family of families) {
-    await ensureDesignFontLoaded(family, libraryFonts);
+    const ok = await ensureDesignFontLoaded(family, libraryFonts);
+    if (ok) loaded.push(family);
   }
-  if (families.length > 0) notifyDesignFontsReady();
+  if (loaded.length > 0) notifyDesignFontsReady();
+  return loaded;
+}
+
+let editorLibraryFontsCache: CrmLibraryFont[] | null = null;
+
+/** Список шрифтов CRM для редактора (admin или public API). */
+export async function fetchCrmLibraryFontsForEditor(): Promise<CrmLibraryFont[]> {
+  if (editorLibraryFontsCache) return editorLibraryFontsCache;
+  try {
+    const { getDesignFonts, getPublicDesignFonts } = await import('../api');
+    try {
+      const res = await getDesignFonts();
+      editorLibraryFontsCache = (Array.isArray(res.data) ? res.data : [])
+        .filter((font) => font.is_active)
+        .map((font) => ({
+          id: font.id,
+          family_name: font.family_name,
+          name_aliases: font.name_aliases,
+          url: font.url,
+          format: font.format,
+        }));
+    } catch {
+      const res = await getPublicDesignFonts();
+      editorLibraryFontsCache = (Array.isArray(res.data) ? res.data : []).map((font) => ({
+        id: font.id,
+        family_name: font.family_name,
+        name_aliases: font.name_aliases,
+        url: font.url,
+        format: font.format,
+      }));
+    }
+  } catch {
+    editorLibraryFontsCache = [];
+  }
+  return editorLibraryFontsCache;
+}
+
+export function invalidateEditorLibraryFontsCache(): void {
+  editorLibraryFontsCache = null;
 }
 
 /** Загружает шрифты из spec.requiredFonts в document.fonts (перед отрисовкой Fabric). */
 export async function loadDesignFontsFromSpec(
   spec: Record<string, unknown> | null | undefined,
+  libraryFonts?: CrmLibraryFont[],
 ): Promise<{ loaded: string[]; missing: string[] }> {
   const entries = Array.isArray(spec?.requiredFonts)
     ? spec!.requiredFonts as RequiredFontSpecEntry[]
     : [];
   const loaded: string[] = [];
   const missing: string[] = [];
+  let libs = libraryFonts;
 
   for (const entry of entries) {
     const family = entry?.family?.trim();
     if (!family) continue;
-    if (entry.source === 'missing' || !entry.url) {
-      missing.push(family);
-      continue;
-    }
     if (isFontRegisteredAndReady(family)) {
       loaded.push(family);
       continue;
     }
 
     let ok = false;
-    if (entry.source === 'global' && entry.fontId) {
-      ok = await loadDesignFontFromLibrary({
-        id: entry.fontId,
-        family_name: family,
-        name_aliases: entry.name_aliases,
-        url: entry.url,
-        format: entry.format,
-      });
+    if (entry.source !== 'missing' && entry.url) {
+      if (entry.source === 'global' && entry.fontId) {
+        ok = await loadDesignFontFromLibrary({
+          id: entry.fontId,
+          family_name: family,
+          name_aliases: entry.name_aliases,
+          url: entry.url,
+          format: entry.format,
+        });
+      }
+      if (!ok && entry.url) {
+        const src = resolveFontAssetUrl(entry.url);
+        ok = await loadFontFaceFromSource(family, src, entry.format, entry.fontId);
+      }
     }
-    if (!ok && entry.url) {
-      const src = resolveFontAssetUrl(entry.url);
-      ok = await loadFontFaceFromSource(family, src, entry.format, entry.fontId);
+
+    if (!ok) {
+      if (!libs) libs = await fetchCrmLibraryFontsForEditor();
+      ok = await ensureDesignFontLoaded(family, libs);
     }
 
     if (ok) loaded.push(family);
@@ -385,4 +431,36 @@ export async function loadDesignFontsFromSpec(
 
   if (loaded.length > 0) notifyDesignFontsReady();
   return { loaded, missing };
+}
+
+/**
+ * Полная загрузка шрифтов редактора: requiredFonts из spec + семейства из fabricJSON
+ * через библиотеку CRM (актуально после ручного добавления шрифтов в админке).
+ */
+export async function loadDesignFontsForEditor(input: {
+  spec?: Record<string, unknown> | null;
+  pages?: Array<{ fabricJSON: Record<string, unknown> }>;
+  libraryFonts?: CrmLibraryFont[];
+}): Promise<{ loaded: string[]; missing: string[] }> {
+  const libraryFonts = input.libraryFonts ?? await fetchCrmLibraryFontsForEditor();
+  const specResult = await loadDesignFontsFromSpec(input.spec, libraryFonts);
+  const pages = input.pages ?? [];
+  if (pages.length > 0 && libraryFonts.length > 0) {
+    const fromPages = await loadDesignFontsFromPages(pages, libraryFonts);
+    for (const family of fromPages) {
+      if (!specResult.loaded.includes(family)) specResult.loaded.push(family);
+    }
+  }
+
+  const stillMissing: string[] = [];
+  for (const family of specResult.missing) {
+    const ok = await ensureDesignFontLoaded(family, libraryFonts);
+    if (ok) {
+      if (!specResult.loaded.includes(family)) specResult.loaded.push(family);
+    } else {
+      stillMissing.push(family);
+    }
+  }
+
+  return { loaded: specResult.loaded, missing: stillMissing };
 }

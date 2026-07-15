@@ -60,6 +60,13 @@ const PUBLIC_TEMPLATE_COLUMNS = `
 
 const PUBLIC_TEMPLATE_JOIN = 'design_templates dt LEFT JOIN design_template_categories c ON c.id = dt.category_id'
 
+/** product_subtype_designs + шаблон + категория (нельзя JOIN PUBLIC_TEMPLATE_JOIN — там уже есть LEFT JOIN). */
+const PUBLIC_TEMPLATE_FROM_SUBTYPE_LINK = `
+  product_subtype_designs psd
+  INNER JOIN design_templates dt ON dt.id = psd.design_template_id
+  LEFT JOIN design_template_categories c ON c.id = dt.category_id
+`.trim()
+
 function normalizeUsageFee(value: unknown): number {
   const n = Number(value)
   return Number.isFinite(n) && n >= 0 ? n : 0
@@ -229,16 +236,14 @@ export async function getPublicDesignTemplates(params: {
     if (sizeId) {
       rows = await db.all(
         `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
-         FROM product_subtype_designs psd
-         JOIN ${PUBLIC_TEMPLATE_JOIN} ON dt.id = psd.design_template_id
+         FROM ${PUBLIC_TEMPLATE_FROM_SUBTYPE_LINK}
          WHERE psd.product_id = ? AND psd.type_id = ? AND psd.size_id = ? AND dt.is_active = 1
          ORDER BY psd.sort_order ASC, dt.sort_order ASC, dt.name ASC`,
         [params.productId, params.typeId, sizeId],
       ) as DesignTemplateRow[]
       const legacy = await db.all(
         `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
-         FROM product_subtype_designs psd
-         JOIN ${PUBLIC_TEMPLATE_JOIN} ON dt.id = psd.design_template_id
+         FROM ${PUBLIC_TEMPLATE_FROM_SUBTYPE_LINK}
          WHERE psd.product_id = ? AND psd.type_id = ? AND (psd.size_id IS NULL OR psd.size_id = '') AND dt.is_active = 1`,
         [params.productId, params.typeId],
       ) as DesignTemplateRow[]
@@ -257,8 +262,7 @@ export async function getPublicDesignTemplates(params: {
     } else {
       rows = await db.all(
         `SELECT ${PUBLIC_TEMPLATE_COLUMNS}
-         FROM product_subtype_designs psd
-         JOIN ${PUBLIC_TEMPLATE_JOIN} ON dt.id = psd.design_template_id
+         FROM ${PUBLIC_TEMPLATE_FROM_SUBTYPE_LINK}
          WHERE psd.product_id = ? AND psd.type_id = ? AND dt.is_active = 1
          ORDER BY psd.size_id ASC, psd.sort_order ASC, dt.sort_order ASC, dt.name ASC`,
         [params.productId, params.typeId],

@@ -123,6 +123,20 @@ export function hasMissingRequiredFonts(entries: RequiredFontEntry[]): boolean {
 
 type LibraryFontRef = { family_name: string; name_aliases?: string[] }
 
+function isFontKnownInLibrary(family: string, libraryFonts: LibraryFontRef[]): boolean {
+  const current = normalizeFontFamilyName(family)
+  if (!current || isGenericFontFamily(current)) return false
+  const currentKey = fontFamilyCompactKey(current)
+  if (!currentKey) return false
+  for (const font of libraryFonts) {
+    const names = [font.family_name, ...(font.name_aliases ?? [])]
+    for (const name of names) {
+      if (fontFamilyCompactKey(name) === currentKey) return true
+    }
+  }
+  return false
+}
+
 function matchLibraryFontToTextLayer(
   textId: string,
   libraryFonts: LibraryFontRef[],
@@ -163,16 +177,27 @@ export function applyLibraryFontFallbacksToDesignState(
       if (!id.toLowerCase().startsWith('text_')) return
       const matched = matchLibraryFontToTextLayer(id, libraryFonts)
       if (!matched) return
-      if (isGenericFontFamily(String(obj.fontFamily ?? ''))) {
-        obj.fontFamily = matched
-      }
+      const currentFamily = String(obj.fontFamily ?? '')
+      const shouldReplace =
+        isGenericFontFamily(currentFamily)
+        || !isFontKnownInLibrary(currentFamily, libraryFonts)
+      if (!shouldReplace) return
+      obj.fontFamily = matched
       walkFabricTextStyles(obj, (style) => {
-        if (isGenericFontFamily(String(style.fontFamily ?? ''))) {
+        const segFamily = String(style.fontFamily ?? '')
+        if (
+          isGenericFontFamily(segFamily)
+          || !isFontKnownInLibrary(segFamily, libraryFonts)
+        ) {
           style.fontFamily = matched
         }
       })
       walkFabricTextStyleRuns(obj, (run) => {
-        if (isGenericFontFamily(String(run.fontFamily ?? ''))) {
+        const segFamily = String(run.fontFamily ?? '')
+        if (
+          isGenericFontFamily(segFamily)
+          || !isFontKnownInLibrary(segFamily, libraryFonts)
+        ) {
           run.fontFamily = matched
         }
       })

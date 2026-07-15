@@ -55,6 +55,9 @@ const UserManagement = lazy(() =>
 const PreflightPage = lazy(() =>
   import('./admin/PreflightPage').then((m) => ({ default: m.PreflightPage }))
 );
+const InboxFunnelPlanPage = lazy(() =>
+  import('./admin/InboxFunnelPlanPage').then((m) => ({ default: m.InboxFunnelPlanPage }))
+);
 const ServicesManagementPage = lazy(() =>
   import('./admin/ServicesManagementPage').then((m) => ({ default: m.ServicesManagementPage }))
 );
@@ -208,6 +211,9 @@ const AdminPanelHome: React.FC = () => {
           <button onClick={() => navigate('/adminpanel/preflight')} className="nav-btn">
             <AppIcon name="layers" size="xs" /> Префлайт
           </button>
+          <button onClick={() => navigate('/adminpanel/inbox-plan')} className="nav-btn">
+            <AppIcon name="bell" size="xs" /> Воронка чатов
+          </button>
           <button onClick={() => navigate('/adminpanel/design-templates')} className="nav-btn">
             <AppIcon name="image" size="xs" /> Шаблоны дизайна
           </button>
@@ -330,6 +336,15 @@ const AdminPanelHome: React.FC = () => {
               <span className="link-title">Префлайт</span>
               <span className="link-desc">Проверка макетов: вылеты, цвет, шрифты, разрешение</span>
             </button>
+            <button
+              type="button"
+              className="admin-link-card"
+              onClick={() => navigate('/adminpanel/inbox-plan')}
+            >
+              <span className="link-icon"><AppIcon name="bell" size="md" circle /></span>
+              <span className="link-title">Воронка чатов</span>
+              <span className="link-desc">План единого inbox + security hotfix (TG / Viber / Instagram / сайт)</span>
+            </button>
             <button 
               className="admin-link-card"
               onClick={() => navigate('/adminpanel/design-templates')}
@@ -390,6 +405,7 @@ export const AdminPanelPage: React.FC = () => {
           <Route path="/print-prices/:id" element={<PrintPriceEditPage />} />
           <Route path="/counters" element={<CountersServicePage />} />
           <Route path="/preflight" element={<PreflightPage />} />
+          <Route path="/inbox-plan" element={<InboxFunnelPlanPage />} />
           <Route path="/design-templates" element={<DesignTemplatesPage />} />
           <Route path="/design-fonts" element={<DesignFontsPage />} />
           <Route path="/design-editor/:templateId" element={<DesignEditorPage />} />

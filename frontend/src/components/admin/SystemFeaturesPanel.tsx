@@ -69,12 +69,20 @@ const SystemFeaturesPanel: React.FC = () => {
       plan: 'Система сценариев для автоматических уведомлений. Шаблоны писем. Гибкие триггеры для отправки.'
     },
     {
+      id: 'inbox-funnel',
+      title: 'Единый inbox (воронка чатов)',
+      description: 'TG Bot + Viber PA + Instagram Business + формы сайта в одном inbox CRM. Детали: /adminpanel/inbox-plan',
+      category: 'communication',
+      status: 'planned',
+      plan: 'Сначала security hotfix (bcrypt, IDOR, API-ключи, webhook secrets). Затем схема conversations/messages/attachments/events, Telegram ingest, UI «Чаты», формы сайта. Далее Viber PA и Instagram adapter. Блокер: личные аккаунты — нужен Путь A (бизнес-каналы) или B (omnichannel-SaaS). Полный план: docs/inbox-funnel-and-security-plan.md и страница /adminpanel/inbox-plan. MVP ~6–8 нед (TG+формы+UI).'
+    },
+    {
       id: 'chat',
       title: 'Чат для сотрудников и клиентов',
       description: 'Клиенты отправляют сообщения из личного кабинета. Сотрудники отвечают и переписываются между собой',
       category: 'communication',
       status: 'planned',
-      plan: 'Встроенный чат в личном кабинете. Чат между сотрудниками. Система уведомлений. История переписки.'
+      plan: 'Часть воронки чатов (см. inbox-funnel). Встроенный чат в ЛК + внутренний чат сотрудников поверх единого inbox.'
     },
     {
       id: 'online-chat',
@@ -82,15 +90,15 @@ const SystemFeaturesPanel: React.FC = () => {
       description: 'Посетитель сайта получает поддержку. Свободный менеджер обрабатывает сообщения не покидая CRM',
       category: 'communication',
       status: 'planned',
-      plan: 'Виджет для сайта. API для интеграции. Система распределения сообщений между менеджерами. Форма обратной связи.'
+      plan: 'MVP: формы сайта → POST /api/inbox/website-inquiry. Live-chat виджет + WebSocket — отдельная фаза после inbox. См. /adminpanel/inbox-plan.'
     },
     {
       id: 'telegram-bot',
       title: 'Телеграм-бот',
       description: 'Автоответчик о стадии заказа, помощь с расчетом и оплатой, утверждение макета, формирование акта-сверки',
       category: 'communication',
-      status: 'planned',
-      plan: 'Интеграция с Telegram API. Голосовые и текстовые команды. Автоматические ответы. Интеграция с заказами.'
+      status: 'in-development',
+      plan: 'База webhook уже есть. Следующий шаг воронки: ingest сообщений/файлов в inbox вместо hint на Mini App; TELEGRAM_WEBHOOK_SECRET обязателен в prod. См. /adminpanel/inbox-plan.'
     },
     {
       id: 'sms-bot',

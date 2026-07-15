@@ -48,6 +48,7 @@ npm run dev  # Запуск на порту 5173
 - [👥 Users](./users.md) - Пользователи и роли
 - [🎨 Галерея дизайнов на сайте](./site-design-gallery-integration.md) - 4 экрана, `productId`/`typeId`/`sizeId`, public API
 - [📐 Каталог шаблонов CRM](./design-templates-catalog.md) - автор, плата в бел. руб., привязки к размерам, `design_author` в ЗП
+- [💬 Воронка чатов + безопасность](./inbox-funnel-and-security-plan.md) - единый inbox (TG/Viber/Inst/сайт), стратегия каналов, security hotfix; в админке `/adminpanel/inbox-plan`
 
 ## 🛠️ Технологии
 

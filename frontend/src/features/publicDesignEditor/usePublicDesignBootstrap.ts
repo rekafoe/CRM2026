@@ -7,7 +7,7 @@ import type { PublicDesignEditorAdapter } from './publicDesignEditorAdapter';
 import { ensureEvenInnerSpreadPages } from '../../pages/admin/designEditor/spreadUtils';
 import type { PublicDesignDocumentMode } from './useDesignDocumentNavigation';
 import type { PublicDesignPageSpec } from './usePublicDesignPageActions';
-import { loadDesignFontsFromSpec } from '../../utils/loadDesignFonts';
+import { loadDesignFontsForEditor } from '../../utils/loadDesignFonts';
 
 export const DEFAULT_PUBLIC_DESIGN_PREPRESS_CONFIG: DesignPrepressConfig = {
   bleedMm: 2,
@@ -100,7 +100,10 @@ export function usePublicDesignBootstrap({
         setCoverPages(nextCoverPages);
         setPrepressConfig(normalizePrepressConfig(sourceState?.prepress ?? spec.prepress));
         setPages(spreadLayout.pages);
-        void loadDesignFontsFromSpec(spec).then((fontResult) => {
+        void loadDesignFontsForEditor({
+          spec,
+          pages: spreadLayout.pages,
+        }).then((fontResult) => {
           if (fontResult.loaded.length > 0) {
             setFontsLoadedTick((tick) => tick + 1);
           }
