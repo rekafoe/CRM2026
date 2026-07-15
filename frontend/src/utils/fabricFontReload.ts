@@ -1,6 +1,7 @@
 import type { Canvas, FabricObject } from 'fabric';
 import {
   collectFontFamiliesFromTextField,
+  hydrateTextObjectStyles,
   remeasureTextObjectsAfterFontLoad,
 } from '../pages/admin/designEditor/textStyleRuns';
 
@@ -15,21 +16,26 @@ type TextLikeObject = FabricObject & {
   setCoords?: () => void;
 };
 
-function collectTextObjectFontFamilies(obj: FabricObject, out: Set<string>): void {
-  if (!isTextObject(obj)) return;
-  collectFontFamiliesFromTextField(obj as unknown as Record<string, unknown>, out);
-}
-
 function collectTextObjectFontLoads(obj: FabricObject, out: Set<string>): void {
   if (!isTextObject(obj)) return;
   const textObj = obj as TextLikeObject;
-  const family = String((textObj as unknown as { fontFamily?: string }).fontFamily ?? '').trim();
-  if (!family) return;
+  const families = new Set<string>();
+  collectFontFamiliesFromTextField(textObj as unknown as Record<string, unknown>, families);
   const fontSize = Math.max(6, Number(textObj.fontSize) || 16);
-  const escaped = family.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  out.add(`${fontSize}px "${escaped}"`);
+  for (const family of families) {
+    const escaped = family.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    out.add(`${fontSize}px "${escaped}"`);
+    out.add(`16px "${escaped}"`);
+  }
 }
 
+function refreshTextObjectFont(obj: FabricObject): void {
+  if (!isTextObject(obj)) return;
+  const textObj = obj as TextLikeObject;
+  hydrateTextObjectStyles(textObj as Parameters<typeof hydrateTextObjectStyles>[0]);
+  textObj.initDimensions?.();
+  textObj.setCoords?.();
+}
 
 function walkObjects(objects: FabricObject[], visit: (obj: FabricObject) => void): void {
   for (const obj of objects) {
@@ -44,7 +50,8 @@ function walkObjects(objects: FabricObject[], visit: (obj: FabricObject) => void
 export function collectCanvasFontFamilies(canvas: Canvas): string[] {
   const families = new Set<string>();
   walkObjects(canvas.getObjects(), (obj) => {
-    collectTextObjectFontFamilies(obj, families);
+    if (!isTextObject(obj)) return;
+    collectFontFamiliesFromTextField(obj as unknown as Record<string, unknown>, families);
   });
   return [...families];
 }
@@ -65,6 +72,7 @@ export async function reloadFabricCanvasFonts(canvas: Canvas): Promise<void> {
     }),
   );
   await document.fonts.ready;
+  walkObjects(canvas.getObjects(), refreshTextObjectFont);
   remeasureTextObjectsAfterFontLoad(canvas.getObjects());
   canvas.requestRenderAll();
 }

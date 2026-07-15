@@ -186,7 +186,11 @@ export function hydrateTextObjectStyles(obj: TextLikeObject): void {
     }
   }
   if (!runs?.length) {
-    if (obj.styles) obj.set('styles', undefined as unknown as FabricStyles);
+    const baseFont = String(obj.fontFamily ?? '').trim();
+    // Стили из SVG могут содержать fontFamily по символам — не затираем при отсутствии runs.
+    if (obj.styles && baseFont) {
+      obj.set('styles', undefined as unknown as FabricStyles);
+    }
     return;
   }
   const styles = buildFabricStylesFromRuns(text, runs, baseFontSize);
@@ -227,9 +231,6 @@ function computeMinTextboxWidth(obj: TextLikeObject, text: string): number {
 }
 
 function adjustTextboxWidthPreservingOrigin(obj: TextLikeObject, nextWidth: number): void {
-  // For template-imported text_* we must keep the exact original placement (left/top)
-  // that was set during SVG import. Width may be widened to fit content, but the
-  // anchor point must not move when the user flips pages.
   const preservedLeft = Number(obj.left ?? 0);
   const preservedTop = Number(obj.top ?? 0);
   obj.set({ width: nextWidth });
@@ -369,7 +370,6 @@ export function remeasureTextObjectsAfterFontLoad(objects: FabricObject[]): void
   for (const obj of objects) {
     if (isFabricTextObjectType(obj.type)) {
       const textObj = obj as TextLikeObject;
-      hydrateTextObjectStyles(textObj);
       textObj.initDimensions?.();
       normalizeImportedSingleLineTextboxWidth(textObj);
       lockTemplateImportedTextPosition(textObj);
